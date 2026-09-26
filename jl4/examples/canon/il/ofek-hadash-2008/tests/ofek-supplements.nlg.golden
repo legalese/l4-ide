@@ -1,12 +1,12 @@
-the section 39 rate for `homeroom teacher of a class other than the first grade` with `a primary school` and 0 is equal to 10 % 
-the section 39 rate for `homeroom teacher of a first-grade class` with `a primary school` and 0 is equal to 11.5 % 
-the section 39 rate for `subject coordinator` with `a primary school` and 0 is equal to 6 % 
-the section 39 rate for `subject coordinator` with `a junior high school` and 0 is equal to 8 % 
-the section 39 rate for `social-education coordinator` with `a junior high school` and 0 is equal to 10 % 
-the section 39 rate for `laboratory coordinator` with `a primary school` and 0 is equal to 3 % 
-the section 39 rate for `grade-level coordinator` with `a primary school` and 4 is equal to 7 % 
-the section 39 rate for `grade-level coordinator` with `a primary school` and 5 is equal to 6 % 
-`the post carries the role supplements` with 50 % 
+the section 39 rate for `homeroom teacher of a class other than the first grade` with `a primary school` and 0 is equal to 10%
+the section 39 rate for `homeroom teacher of a first-grade class` with `a primary school` and 0 is equal to 11.5%
+the section 39 rate for `subject coordinator` with `a primary school` and 0 is equal to 6%
+the section 39 rate for `subject coordinator` with `a junior high school` and 0 is equal to 8%
+the section 39 rate for `social-education coordinator` with `a junior high school` and 0 is equal to 10%
+the section 39 rate for `laboratory coordinator` with `a primary school` and 0 is equal to 3%
+the section 39 rate for `grade-level coordinator` with `a primary school` and 4 is equal to 7%
+the section 39 rate for `grade-level coordinator` with `a primary school` and 5 is equal to 6%
+`the post carries the role supplements` with 50%
 not `the post carries the role supplements` with 0.3
 `the number of role supplements is allowed` with 2 and `FALSE`
 not `the number of role supplements is allowed` with 3 and `FALSE`
@@ -20,11 +20,11 @@ Tosefet Ofek 2022 payable at rank 1 with `the BA table — rating code 101`, 1 a
 Tosefet Ofek 2022 payable at rank 9 with `the BA table — rating code 101`, 1 and `the first day of the 2024 school year` is equal to 0
 Tosefet Ofek 2022 payable at rank 1 with `the MA table — rating code 102`, 1 and `the first day of the 2024 school year` is equal to 1664.87
 Tosefet Ofek 2022 payable at rank 1 with `the BA table — rating code 101`, 1 and `a day in the 2022 school year` is equal to 792.77
-Tosefet Ofek 2022 payable at rank 1 with `the BA table — rating code 101`, 1 and `YMD` with 2022, 1 and 1 is equal to 0
-Tosefet Ofek 2022 payable at rank 1 with `the BA table — rating code 101`, 50 %  and `the first day of the 2024 school year` is equal to 792.77
+Tosefet Ofek 2022 payable at rank 1 with `the BA table — rating code 101`, 1 and 1 January 2022 is equal to 0
+Tosefet Ofek 2022 payable at rank 1 with `the BA table — rating code 101`, 50% and `the first day of the 2024 school year` is equal to 792.77
 the supplement payable for `homeroom teacher of a class other than the first grade` with `a junior high school`, 0, 12000 and `the first day of the 2024 school year` is equal to 1200
-Tosefet Ofek 2022 payable at rank 4 with `the BA table — rating code 101`, 50 %  and `the first day of the 2024 school year` is equal to 417.77
-the school-role supplement for 3 units with 1 and `YMD` with 2025, 10 and 1 is equal to 0
+Tosefet Ofek 2022 payable at rank 4 with `the BA table — rating code 101`, 50% and `the first day of the 2024 school year` is equal to 417.77
+the school-role supplement for 3 units with 1 and 1 October 2025 is equal to 0
 the school-role supplement for 3 units with 1 and `a day in the 2026 school year` is equal to 600
 the school-role supplement for 5 units with 1 and `a day in the 2026 school year` is equal to 1000
 not `the units are within the section 22 range` with 1

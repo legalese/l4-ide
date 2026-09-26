@@ -172,6 +172,7 @@ library
     L4.Mixfix
     L4.Names
     L4.Nlg
+    L4.Nlg.Phrasebook
     L4.OpenFisca.IR
     L4.OpenFisca.Lower
     L4.OpenFisca.Emit

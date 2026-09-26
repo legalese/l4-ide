@@ -1,27 +1,27 @@
-not `falls strictly after` with `JUST` with `YMD` with 1992, 6 and 26 and `YMD` with 1992, 6 and 26
-`falls strictly after` with `JUST` with `YMD` with 1992, 6 and 27 and `YMD` with 1992, 6 and 26
-not `falls strictly after` with `JUST` with `YMD` with 1992, 6 and 25 and `YMD` with 1992, 6 and 26
-not `falls strictly after` with `NOTHING` and `YMD` with 1992, 6 and 26
-not `falls on or after` with `JUST` with `YMD` with 1938, 8 and 28 and `YMD` with 1938, 8 and 29
-`falls on or after` with `JUST` with `YMD` with 1938, 8 and 29 and `YMD` with 1938, 8 and 29
-not `falls on or after` with `NOTHING` and `YMD` with 1938, 8 and 29
-not `was living on` with `the WA Ismail` and `YMD` with 2018, 2 and 20
-`was living on` with `the WA Ismail` and `YMD` with 2018, 2 and 19
-`was living on` with `the WA Jaya` and `YMD` with 2020, 1 and 5
-not `was living on` with `the WA Nirmala` and `YMD` with 2020, 1 and 5
-`is proved to fall strictly before` with `JUST` with `YMD` with 2015, 3 and 1 and `JUST` with `YMD` with 2018, 6 and 6
-not `is proved to fall strictly before` with `JUST` with `YMD` with 2018, 6 and 6 and `JUST` with `YMD` with 2015, 3 and 1
-not `is proved to fall strictly before` with `JUST` with `YMD` with 2015, 3 and 1 and `JUST` with `YMD` with 2015, 3 and 1
-not `is proved to fall strictly before` with `NOTHING` and `JUST` with `YMD` with 2018, 6 and 6
-not `is proved to fall strictly before` with `JUST` with `YMD` with 2015, 3 and 1 and `NOTHING`
-`the twenty-first anniversary of` with `YMD` with 2000, 6 and 1 is equal to `YMD` with 2021, 6 and 1
-`the twenty-first anniversary of` with `YMD` with 2000, 2 and 29 is equal to `YMD` with 2021, 3 and 1
-`six months after` with `YMD` with 2020, 3 and 1 is equal to `YMD` with 2020, 9 and 1
-`six months after` with `YMD` with 2020, 8 and 31 is equal to `YMD` with 2021, 2 and 28
-`six months after` with `YMD` with 2023, 8 and 31 is equal to `YMD` with 2024, 2 and 29
-`six months after` with `YMD` with 2020, 9 and 1 is equal to `YMD` with 2021, 3 and 1
-`the earliest of` with list of `YMD` with 2020, 3 and 1 and `YMD` with 2020, 2 and 1 is equal to `JUST` with `YMD` with 2020, 2 and 1
-`the earliest of` with list of `YMD` with 2020, 2 and 1 is equal to `JUST` with `YMD` with 2020, 2 and 1
+not `falls strictly after` with `JUST` with 26 June 1992 and 26 June 1992
+`falls strictly after` with `JUST` with 27 June 1992 and 26 June 1992
+not `falls strictly after` with `JUST` with 25 June 1992 and 26 June 1992
+not `falls strictly after` with `NOTHING` and 26 June 1992
+not `falls on or after` with `JUST` with 28 August 1938 and 29 August 1938
+`falls on or after` with `JUST` with 29 August 1938 and 29 August 1938
+not `falls on or after` with `NOTHING` and 29 August 1938
+not `was living on` with `the WA Ismail` and 20 February 2018
+`was living on` with `the WA Ismail` and 19 February 2018
+`was living on` with `the WA Jaya` and 5 January 2020
+not `was living on` with `the WA Nirmala` and 5 January 2020
+`is proved to fall strictly before` with `JUST` with 1 March 2015 and `JUST` with 6 June 2018
+not `is proved to fall strictly before` with `JUST` with 6 June 2018 and `JUST` with 1 March 2015
+not `is proved to fall strictly before` with `JUST` with 1 March 2015 and `JUST` with 1 March 2015
+not `is proved to fall strictly before` with `NOTHING` and `JUST` with 6 June 2018
+not `is proved to fall strictly before` with `JUST` with 1 March 2015 and `NOTHING`
+`the twenty-first anniversary of` with 1 June 2000 is equal to 1 June 2021
+`the twenty-first anniversary of` with 29 February 2000 is equal to 1 March 2021
+`six months after` with 1 March 2020 is equal to 1 September 2020
+`six months after` with 31 August 2020 is equal to 28 February 2021
+`six months after` with 31 August 2023 is equal to 29 February 2024
+`six months after` with 1 September 2020 is equal to 1 March 2021
+`the earliest of` with list of 1 March 2020 and 1 February 2020 is equal to `JUST` with 1 February 2020
+`the earliest of` with list of 1 February 2020 is equal to `JUST` with 1 February 2020
 `the earliest of` with `EMPTY` is equal to `NOTHING`
 `the age of the testator when the will was made` with `the will of Amrita` is equal to `21 years of age or over`
 `the age of the testator when the will was made` with `the will of Eugene, made at 19` is equal to `under 21 years of age`
@@ -191,9 +191,9 @@ not `s 10(1) — the disposition is utterly null and void` with `the case of a l
 not `s 13 — the will has been revoked by marriage` with `the plain case of Amrita`
 `s 13 — the will has been revoked by marriage` with `the case of Amrita marrying Gita in 2018, after the will`
 not `s 13 — the will has been revoked by marriage` with `the case of Amrita marrying Gita in 2010, before the will`
-`the marriage was solemnised after the will was made` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2018, 6 and 6 and `TRUE`
-not `the marriage was solemnised after the will was made` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2010, 1 and 1 and `TRUE`
-`s 13(1) — the will is revoked by the marriage` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2010, 1 and 1 and `TRUE`
+`the marriage was solemnised after the will was made` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with 6 June 2018 and `TRUE`
+not `the marriage was solemnised after the will was made` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with 1 January 2010 and `TRUE`
+`s 13(1) — the will is revoked by the marriage` with `the will of Amrita` and `a marriage` with `the WA Gita`, `JUST` with 1 January 2010 and `TRUE`
 `s 13(1) — the exception for a will made in exercise of a power of appointment` with `the will of Amrita, made in exercise of a power of appointment`
 not `s 13(1) — the exception for a will made in exercise of a power of appointment` with `the will of Amrita`
 not `s 13 — the will has been revoked by marriage` with `the case of an appointing will, Amrita marrying Gita in 2018`
@@ -201,8 +201,8 @@ not `s 13(1) — the exception for a will made in exercise of a power of appoint
 `s 13 — the will has been revoked by marriage` with `the case of a will made under a power whose appointed estate passes in default, Amrita marrying Gita`
 not `s 13 — the will has been revoked by marriage` with `the case of a will in contemplation of the marriage to Gita, Amrita marrying Gita`
 `s 13 — the will has been revoked by marriage` with `the case of a will in contemplation of the marriage to Gita, Amrita marrying Harun`
-`s 13(2) — the will is expressed to be made in contemplation of this marriage` with `the will of Amrita, in contemplation of her marriage to Gita` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2018, 6 and 6 and `TRUE`
-not `s 13(2) — the will is expressed to be made in contemplation of this marriage` with `the will of Amrita, naming Gita but not expressed to be made in contemplation of the marriage` and `a marriage` with `the WA Gita`, `JUST` with `YMD` with 2018, 6 and 6 and `TRUE`
+`s 13(2) — the will is expressed to be made in contemplation of this marriage` with `the will of Amrita, in contemplation of her marriage to Gita` and `a marriage` with `the WA Gita`, `JUST` with 6 June 2018 and `TRUE`
+not `s 13(2) — the will is expressed to be made in contemplation of this marriage` with `the will of Amrita, naming Gita but not expressed to be made in contemplation of the marriage` and `a marriage` with `the WA Gita`, `JUST` with 6 June 2018 and `TRUE`
 `s 13 — the will has been revoked by marriage` with `the case of a will naming Gita but not expressed to be made in contemplation, Amrita marrying Gita`
 not `s 13 — the will has been revoked by marriage` with `the case of the will of Rahim, made on 29 August 1938`
 `s 13 — the will has been revoked by marriage` with `the case of the will of Rahim, made on 28 August 1938`
@@ -300,11 +300,11 @@ not `s 28(4) — the grant is to be disregarded` with `no application to rectify
 `s 28(4) — the grant is to be disregarded` with `an application to rectify, only a grant limited to part of the estate having been made` and `the grant limited to a part of the estate made on 1 February 2020`
 not `s 28(4) — the grant is to be disregarded` with `an application to rectify, a grant of the remainder having also been made` and `the grant limited to a part of the estate made on 1 February 2020`
 `the date on which the grant is made` with `the probate resealed on 1 September 2020, granted on 1 March 2020`
-`the date on which the grant is made` with `the probate resealed on 1 September 2020, granted on 1 March 2020` is equal to `JUST` with `YMD` with 2020, 9 and 1
-`the date on which the grant is made` with `the grant of probate made on 1 March 2020` is equal to `JUST` with `YMD` with 2020, 3 and 1
-`the date on which the grant is made` with `the letters of administration sealed on 1 September 2020, granted on 1 March 2020` is equal to `JUST` with `YMD` with 2020, 3 and 1
+`the date on which the grant is made` with `the probate resealed on 1 September 2020, granted on 1 March 2020` is equal to `JUST` with 1 September 2020
+`the date on which the grant is made` with `the grant of probate made on 1 March 2020` is equal to `JUST` with 1 March 2020
+`the date on which the grant is made` with `the letters of administration sealed on 1 September 2020, granted on 1 March 2020` is equal to `JUST` with 1 March 2020
 `s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify made 5 months after the grant`
-`s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify made 5 months after the grant` is equal to `JUST` with `YMD` with 2020, 3 and 1
+`s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify made 5 months after the grant` is equal to `JUST` with 1 March 2020
 `s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify, only a grant limited to settled land having been made`
 `s 28(2) — the date on which a grant authorising the administration of the testator’s estate is first made` with `an application to rectify, only a grant limited to settled land having been made` is equal to `NOTHING`
 `s 28(2) — whether the application for rectification is in time` with `no application to rectify has been made` is equal to `no application for an order under subsection (1) has been made`

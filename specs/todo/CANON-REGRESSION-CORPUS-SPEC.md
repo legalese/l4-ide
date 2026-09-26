@@ -8,7 +8,7 @@ now false: §3B added a CI job, a golden glob and 85 files under `jl4/examples/c
 carried the mirror to 90; and §4 deleted 45 files from `jl4/examples/legal/`. The measurements are
 from `unstable` `388f8605` and canon `mengwong/drafts` `299dd490`, taken the evening of 2026-09-15.
 **§4.2 (LODGER) BUILT 2026-09-23:** the remaining canon-bound subjects moved, the mirror carries
-`registers/*.json`, and the pin is canon drafts `9ef88a7a` with twelve blessed rows.
+`registers/*.json`, with twelve blessed rows. **The pin is on canon `main`** as of 2026-09-26 (`6b6476d6`); see M7.
 
 ## 1. The ruling, verbatim
 
@@ -162,13 +162,7 @@ what was implemented, with the two departures named under _What review changed_.
   sg-succession's deposits, `app/` and `cleanroom-2026-08/`. `legal/chubb` now contains no `.l4`
   at all, so the `legal/**` glob yields nothing from it.
 - **The merge-queue requirement.** `Canon Mirror` is not a required check in the ruleset.
-- **The pin is on a canon BRANCH, not on `main`**, which §3A.4/§3B.6 require. It is
-  `gm/rebless-2026-09-15`, cut from `mengwong/drafts`, created because the first run needed a
-  re-blessed golden. It stays valid when that branch merges — a merge does not change the
-  commit. None of the five blessed dirs is on `main` yet, so the requirement cannot be met
-  today. None of the five
-  blessed dirs is on `main` yet, so the requirement cannot be met today; the pin's header says the
-  target is `main` and `--pull` fails loudly if the shelf SHA is rebased away.
+- **The pin is on canon `main`**, as §3A.4 and §3B.6 require. It has been there since 2026-09-26 (`6b6476d6`, `"ref": "main"` in `etc/canon-pin.json`). Canon#2 moved the drafts shelf onto `main` that day, and `--check` confirmed every blessed `from` directory was byte-identical at both SHAs.
 
 **What review changed** (two read-only adversarial refuters, plus GM's own reading):
 
@@ -345,7 +339,7 @@ SUITCASE, also 2026-09-23, fired it with rulings on the plan's open points:
 - **M4: the explainer's README citations stay on the l4-ide copy.** This follows from M3.
 - **M5: deposit Jersey's `SOURCE-EXTRACT.md`.** Meng: "you can find the jersey charities act online, it's public law."
 - **M6: SUITCASE is the HG2 go** to publish these subjects in public canon.
-- **M7: the pin stays on a `mengwong/drafts` SHA.**
+- **M7: the pin stays on a `mengwong/drafts` SHA.** SUPERSEDED 2026-09-26. That day Meng ruled that canon deposits go to `main` (legalese/l4-ide#497), and canon#2 moved the shelf onto `main`. The pin was re-referenced to `main` `6b6476d6` in the SPACEBAR/ALMANAC re-bless.
 
 **What was done — canon** (drafts `7a87b244` → `9ef88a7a`, merge of `claude/lodger-deposit`):
 
