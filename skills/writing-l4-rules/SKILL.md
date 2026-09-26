@@ -15,7 +15,7 @@ This file is a compact operational guide. For anything syntactic you do not reme
 
 - [references/regulative.md](references/regulative.md) — deep dive on obligations, `#TRACE`, and the `MUST`/`MAY`/`SHANT`/`DO` `HENCE` `LEST` `BREACH` machinery
 - [references/builtins.md](references/builtins.md) — coercions, HTTP (Hypertext Transfer Protocol) / JSON (JavaScript Object Notation), temporal globals, and the library index
-- [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM (large language model) will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix)
+- [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM (large language model) will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix, and four errors whose message points away from the fix)
 - [references/state-ledger.md](references/state-ledger.md) — the append-only state ledger: `RECORD`/`COMMIT`/`ATTEST`, `RECALL` (last-write-wins) vs `RECALL ALL` (collect-all), recipient-qualified `RECORD … 's` (NOTIFY)
 - [references/sets.md](references/sets.md) — `SET OF a`: `UNION`/`INTERSECT`/`` `LESS` ``/`WITHOUT`, the set-aware `AND`/`OR`/`PLUS`/`MINUS` overloads, `set equals` (bare `EQUALS` on sets is a deliberate error), and the one-level-quotient caveat
 - [references/drafting-patterns.md](references/drafting-patterns.md) — hard-won idioms for formalizing statute (proviso/negative/gate limbs, enumerated cases, statutory tables, leap-safe dates, mandatory vs discretionary outcomes)
