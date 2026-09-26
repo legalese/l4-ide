@@ -1,17 +1,8 @@
 # Depositing an encoding in canon
 
 [`legalese/canon`](https://github.com/legalese/canon) is the corpus repository: it holds law, and `legalese/l4-ide` holds tools.
-Its layout is ruled in `docs/directory-conventions.md` (rulings Q1–Q6, 2026-08-05).
-**Until [legalese/canon#3](https://github.com/legalese/canon/pull/3) merges, that document is on canon's `docs/directory-conventions` branch rather than `main`**, so read it with:
-
-```bash
-git -C <canon> fetch origin
-git -C <canon> show origin/docs/directory-conventions:docs/directory-conventions.md
-```
-
-**Heads-up: until legalese/canon#3 merges, canon's `main` also has a second spelling.**
-Subjects from the bulk ingestion sit under full jurisdiction names (`subjects/israel/…`, `subjects/western-australia/…`), some with the `.l4` directly in the subject directory. #3 moves them all to the ISO layout below (ruled 2026-09-26: the shorter spelling).
-Use the ISO layout for new work, and before creating a subject, check whether the law already has one under either spelling.
+Its layout is ruled in `docs/directory-conventions.md` (rulings Q1–Q6, 2026-08-05; the ISO spelling ruled again 2026-09-26), on canon's `main`.
+Read it before creating a subject, and check whether the law already has one: a second encoding of a law is a new row beside the others, not a new subject.
 
 ## Where
 
@@ -46,11 +37,7 @@ subjects/<jurisdiction>/<slug>/
 **`encoding.json`** — `id`, `encoder`, `display_name`, `status` (`draft` until a domain expert has reviewed it), `version` (semver, starting `0.1.0`), `license`, `maintainer`, `modules` (the list, in reading order), `scope` (the provisions encoded, and those not), and a `not_reviewed` note saying who has and has not read it against the source.
 If some tests are meant to fail, say which file and how many under `expected_red`.
 
-The fullest worked example is `subjects/il/hvac-work-licensing-2025/encodings/legalese/`, on the `mengwong/drafts` branch until [legalese/canon#2](https://github.com/legalese/canon/pull/2) moves it to `main`; read its `encoding.json` and `NOTES.md` before writing your own:
-
-```bash
-git -C <canon> show origin/mengwong/drafts:subjects/il/hvac-work-licensing-2025/encodings/legalese/encoding.json
-```
+The fullest worked example is `subjects/il/hvac-work-licensing-2025/encodings/legalese/`; read its `encoding.json` and `NOTES.md` before writing your own.
 
 ## Licence terms
 

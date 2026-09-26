@@ -3,7 +3,7 @@
 Read this before running. Nothing in the skill repeats what is here, and `subject.json`'s
 `_comment` carries the measurements; this file carries the judgement calls.
 
-The encoding's own write-up is in canon, on `mengwong/drafts`, and is far longer than this:
+The encoding's own write-up is in canon, on `main`, and is far longer than this:
 
     subjects/il/ofek-hadash-2008/encodings/legalese/NOTES.md
 

@@ -91,8 +91,8 @@ are **refusals**, which is where s 123(5) becomes visible:
 - The header of the charge is normalised to one form; the reported charges vary in
   punctuation ("at or about", "Chapter 224"), and the bench asserts the body, not the header.
 - The evidence graph is kept by the app, not by the L4. Nothing in the corpus models proof.
-- The encodings have not been reviewed by a lawyer. They are a draft on the canon repository's
-  drafts shelf, and the row's `NOTES.md` records every interpretation call the encoders made.
+- The encodings have not been reviewed by a lawyer. They are a draft row in the canon repository,
+  and the row's `NOTES.md` records every interpretation call the encoders made.
 
 ## Running it
 

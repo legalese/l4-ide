@@ -245,7 +245,7 @@ neither is committed here.
 The T&C PDFs are the issuers' published documents, mirrored for versioning.
 The L4 is Meng's. **Deposited in `legalese/canon` on 2026-09-21**, at
 `subjects/contracts/payments/sg-miles-card/encodings/legalese/`, commit `0bec622` on
-branch `mengwong/drafts` — NOT `subjects/sg/miles-card/` as this paragraph used to say.
+branch `mengwong/drafts`, on `main` since legalese/canon#2 — NOT `subjects/sg/miles-card/` as this paragraph used to say.
 `sg/` is for enacted law (docs/directory-conventions.md §2); eight private issuers' T&C
 are not that. `contracts/` is the genre tree, and none of its four seed genres held a
 card's rewards programme, so `payments/` was added alongside this deposit. The bundling

@@ -12,9 +12,10 @@
 # It does, however, COMPUTE AND PRINT THE DESTINATION it would write to. A
 # refusal that names the exact repository, branch and directory is one the
 # reader can check; a refusal that only says "somewhere in canon" is one they
-# have to take on trust. It also means the fence — never the default branch,
-# always somebody's drafts shelf — is built and exercised before the feature
-# that would need it, which is how the MCP leg's loopback guard was done too.
+# have to take on trust. It also means the destination — canon `main` unless
+# the depositor names another branch (ruled 2026-09-26) — is computed and shown
+# before the feature that writes to it exists, which is how the MCP leg's
+# loopback guard was done too.
 
 if [[ "${1:-}" == "--inputs" ]]; then
   printf '%s\n' "${BASH_SOURCE[0]}"

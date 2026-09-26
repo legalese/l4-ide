@@ -841,11 +841,11 @@ const values = {
     : `**DOES NOT VERIFY** — ${chain.problems.join("; ")}`,
   "run.verdict": end?.verdict ?? mv.verdict,
   // The destination is a PATH, and the branch is deliberately absent from it:
-  // which drafts shelf an encoding lands on is a fact about who deposits it,
-  // resolved at deposit time by lib/canon-destination.mjs. Saying "a drafts
-  // branch" rather than naming one is the accurate claim, not a hedge.
+  // lib/canon-destination.mjs resolves it at deposit time — `main`, unless
+  // L4_GO_CANON_BRANCH or --branch names another (ruled 2026-09-26: members
+  // commit to main, outsiders push to a fork).
   "run.canon_destination": begin?.canon_destination
-    ? `\`${esc(begin.canon_destination)}/\` in **legalese/canon**, on the depositor's own drafts branch (named at deposit time; never the default branch)`
+    ? `\`${esc(begin.canon_destination)}/\` in **legalese/canon**, on \`main\` unless the depositor names another branch at deposit time`
     : "_no `canon` block in this subject's sidecar, so no destination is declared. A guessed path on a public repository is worse than an absent one._",
   "run.verdict_gloss":
     VERDICT_GLOSS[end?.verdict ?? mv.verdict] ?? "(no gloss recorded)",
