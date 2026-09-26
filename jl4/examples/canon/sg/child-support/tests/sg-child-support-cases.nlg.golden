@@ -31,14 +31,14 @@ the difference between `lifetime Gift-line cash for` with `Devi` and `lifetime G
 `co-matching cap under the outgoing scheme for` with `Aisha` is equal to 4000
 `co-matching cap under the outgoing scheme for` with `Bala` is equal to 9000
 `co-matching cap under the outgoing scheme for` with `Gopal` is equal to 15000
-`EVAL UNDER RULES EFFECTIVE AT` with `YMD` with 2027, 9 and 30 and `the co-matching cap for` with `Gopal` is equal to 15000
-`EVAL UNDER RULES EFFECTIVE AT` with `YMD` with 2027, 10 and 1 and `the co-matching cap for` with `Gopal` is equal to 5000
+`EVAL UNDER RULES EFFECTIVE AT` with 30 September 2027 and `the co-matching cap for` with `Gopal` is equal to 15000
+`EVAL UNDER RULES EFFECTIVE AT` with 1 October 2027 and `the co-matching cap for` with `Gopal` is equal to 5000
 `settled cap change for` with `Gopal` is equal to -10000
 `settled cap change for` with `Aisha` is equal to 1000
 `settled cap for` with `Elias` is equal to 0
 `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is a lifetime total` and `the settled Package` is equal to 0
 `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is fresh headroom` and `the settled Package` is equal to 5000
-`co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is a lifetime total` and `YMD` with 2027, 9 and 30 is equal to `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is fresh headroom` and `YMD` with 2027, 9 and 30
+`co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is a lifetime total` and 30 September 2027 is equal to `co-matching left for _ given _ under _ on _` with `Gopal`, 12000, `reading — the cap is fresh headroom` and 30 September 2027
 `children twelve and below` with `the parent of three` and `the reference day` is equal to 2
 `children below seven` with `the parent of three` and `the reference day` is equal to 2
 `children from seven to twelve` with `the parent of three` and `the reference day` is equal to 0

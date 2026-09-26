@@ -200,6 +200,11 @@ in any of its formats. Both take `--lang`.
 In both, a call to a rule that carries a herald reads as that herald with the call's arguments in its `%slots%`: `#EVAL `is large` 150` linearizes as `the amount 150 is large`.
 An argument the herald does not mention is not dropped; it follows the sentence as `with …`, so a herald written without slots still shows every value the call supplied.
 
+`l4 nlg` writes a date given as literals as a date: `YMD 2025 7 16` and `Date 16 7 2025` both read `16 July 2025`.
+That covers only daydate's own `YMD` and `Date`, only when all three arguments are whole numbers, and only when they name a real day.
+Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
+A percentage reads `50%`.
+
 In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
 `lang` is the `--lang` you asked for, or the module's `@lang` if you asked for nothing, or `en`.
 `dir="rtl"` is added for a right-to-left language — decided from the script subtag when the tag carries one, so `he-Latn` is left-to-right and `az-Arab` is not — and omitted for every other, left-to-right being HTML's own default.

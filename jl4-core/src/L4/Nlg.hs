@@ -31,6 +31,9 @@ import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 import L4.Desugar
 import Optics
+import Data.Ratio (denominator, numerator)
+import Data.Time (fromGregorianValid)
+import qualified Data.Time.Format as TimeFormat
 
 -- | Convert a deontic modal to its text representation for NLG
 deonticModalText :: DeonticModal -> Text
@@ -496,6 +499,8 @@ instance Linearize (Expr Resolved) where
       , text "then"
       , lin e
       ]
+    App _ n es
+      | Just d <- daydateLiteral n es -> text d
     App _ n es -> hcat $
       [ linearize n
       ]
@@ -581,7 +586,9 @@ instance Linearize (Expr Resolved) where
       , enumerate (punctuate ".") (punctuate ".") (fmap lin br)
       ]
     Lit _ l -> lin l
-    Percent _ l -> hcat [lin l, punctuate "%"]
+    -- Glued, not punctuated: 'punctuate' carries a trailing space and 'hcat'
+    -- adds another, which printed @50 %  and …@.
+    Percent _ l -> lin l <> text "%"
     List _ es -> hcat
       [ text "list"
       , text "of"
@@ -638,6 +645,44 @@ instance Linearize (NamedExpr Resolved) where
       , text "is"
       , lin e
       ]
+
+-- | daydate's date constructors, applied to three whole-number literals, read
+-- as the date they name: @YMD 2025 7 16@ and @Date 16 7 2025@ both become
+-- @16 July 2025@ rather than @`YMD` with 2025, 7 and 16@.
+--
+-- Deliberately narrow, and every miss falls through to the ordinary call:
+--
+--   * the name must be daydate's own, in either spelling (@`YMD` AKA `Year
+--     month day`@, @`Date` AKA `Days to date`@ — the defining name at a call
+--     site is the alias), and its definition must come from @daydate.l4@, so a
+--     user's own @YMD@ is not touched;
+--   * all three arguments must be whole-number literals, since a variable has
+--     no date to print;
+--   * the date must be VALID. @Date@ rolls an out-of-range component forward
+--     and @YMD@ refuses it; printing either as a calendar date would state
+--     something the rule does not, so neither is rendered.
+--
+-- English month names only. Other languages wait on the frame-word lexicon.
+daydateLiteral :: Resolved -> [Expr Resolved] -> Maybe Text
+daydateLiteral r args@[_, _, _] = do
+  guard (fromDaydate r)
+  order <- lookup (unqualifiedRawNameToText (rawName (getActual r))) orders
+  [a, b, c] <- traverse wholeLit args
+  let (y, m, d) = order (a, b, c)
+  day <- fromGregorianValid y (fromInteger m) (fromInteger d)
+  pure (Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale "%-d %B %Y" day))
+ where
+  ymd (y, m, d) = (y, m, d)
+  dmy (d, m, y) = (y, m, d)
+  orders =
+    [ ("YMD", ymd), ("Year month day", ymd)
+    , ("Date", dmy), ("Days to date", dmy) ]
+  wholeLit = \ case
+    Lit _ (NumericLit _ q) | denominator q == 1 -> Just (numerator q)
+    _ -> Nothing
+  fromDaydate x =
+    "daydate.l4" `Text.isSuffixOf` (fromNormalizedUri (getUnique x).moduleUri).getUri
+daydateLiteral _ _ = Nothing
 
 instance Linearize (LocalDecl Resolved) where
   linearize = \ case
