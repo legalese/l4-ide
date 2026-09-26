@@ -1,0 +1,8 @@
+head-input-rule: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` |  | --- |  | ``` | row five saw `amount` | ``` | 
+head-input-input: ``` | NUMBER | ``` | 
+head-input-given: ``` | NUMBER | ``` | 
+head-input-body-ref: ``` | NUMBER | ``` | 
+given-gloss-input: ``` | NUMBER | ``` |  | --- |  | ``` | the sum of money | ``` | 
+given-gloss-rule: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
+given-gloss-body-ref: ``` | NUMBER | ``` | 
+head-input-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 

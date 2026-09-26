@@ -1089,6 +1089,22 @@ All 35 `%slot%` markers in the mirror are in that state, and 8 of the 39 in the 
 `l4 render` has always printed those raw markers (`the salary table%the teacher% is placed in`); making the sentence reach `l4 nlg` is what makes it a second witness.
 So the canon-side follow-up is a re-bless AND a backticking sweep, in that order of discovery and the reverse order of fixing.
 
+**LSP hover: ANSWERED 2026-09-26 (Meng, MIRROR): hover shows output meaning** (smucclaw/l4-ide#979).
+Hover read the type checker's `nlgMap`, which records a herald at the node it is attached to, so it showed a head-input herald as the input's gloss while `l4 nlg` and `l4 render` printed it as the rule's sentence.
+The alternative was to keep showing attachment with a note, and it was declined: the editor should say what the tools print.
+`LSP.L4.Rules.outputNlgMap` runs `promoteHeadInputNlg` over the checked module and restamps the map at every defining name whose herald the promotion changed, so hover follows the same decision rather than a copy of it.
+A herald in the `GIVEN` is untouched, because the promotion leaves it alone.
+Measured on `jl4/examples/lsp/hover/nlg-site-hover.l4`, with the issue's own example, before and after:
+
+| hovered                        | before                                             | after                                 |
+| ------------------------------ | -------------------------------------------------- | ------------------------------------- |
+| the rule name `row five`       | type only                                          | type, then ``row five saw `amount` `` |
+| the input `amount` in the head | type, then ``row five saw row five saw `amount` `` | type only                             |
+| `total`, heralded in `GIVEN`   | type, then `the sum of money`                      | unchanged                             |
+
+The doubled "row five saw" in the old input hover was the herald's `%amount%` slot linearizing through `amount`'s own annotation, which carried the same herald (`L4.Nlg`'s `Linearize Resolved` instance reads the binding's herald at an unannotated reference); it goes once the input no longer holds it.
+Hover changes only at the definition, because only defining names are restamped: a call site of `row five` shows its type alone (pinned in the same golden).
+
 **Still owed: the cross-module case.**
 `promoteHeadInputNlg` folds over the module it is given, so a call to a heralded rule defined in an IMPORTED module still prints the bare name — the prelude's 67 among them.
 `l4 render` handles that, and it needs a different key to do it: `L4.Export.Document.nlgFnInfo` is keyed by `(name, arity)` rather than by `Unique` precisely because each module is resolved independently and a call site does not share a `Unique` with its definition.

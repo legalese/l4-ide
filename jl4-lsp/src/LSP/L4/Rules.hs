@@ -12,6 +12,8 @@ import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
+import L4.Nlg (promoteHeadInputNlg)
+import Optics (gplate, toListOf, (%), (^.))
 import qualified L4.Lexer as Lexer
 import qualified L4.SmartPunctuation as SP
 import qualified L4.Parser as Parser
@@ -929,7 +931,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         , infos
         , errors  -- Include actual errors (OutOfScopeError etc.) for implicit ASSUME extraction
         , infoMap = result.infoMap
-        , nlgMap = result.nlgMap
+        , nlgMap = outputNlgMap result.program result.nlgMap
         , scopeMap = result.scopeMap
         , descMap = result.descMap
         , dependencies = dependencies <> foldMap (.dependencies) dependencies
@@ -1311,6 +1313,40 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange $ Just fx.range
   Resolve.FixityAnnotationNoLocation _ ->
     srcSpanToLspRange Nothing
+
+-- ----------------------------------------------------------------------------
+-- The nlg map hover reads
+-- ----------------------------------------------------------------------------
+
+-- | The type checker's 'TypeCheck.NlgMap', restamped to where the projections
+-- read each herald, so hover shows what @l4 nlg@ and @l4 render@ print.
+--
+-- The type checker records a herald at the node it is attached to. For a herald
+-- written after a rule head's INPUT that is the input, but the projections read
+-- it as the RULE's sentence ('promoteHeadInputNlg', smucclaw\/l4-ide#972). Ruled
+-- 2026-09-26 on smucclaw\/l4-ide#979: hover shows the output meaning, so
+-- hovering the rule shows the sentence and hovering the input shows no gloss.
+--
+-- The decision is not re-made here. 'promoteHeadInputNlg' runs over the module,
+-- and every defining name whose herald it changed is restamped at that name's
+-- range. A herald in the @GIVEN@ is left where it is because the promotion
+-- leaves it alone (smucclaw\/l4-ide#977). The zip is aligned because the
+-- promotion only rewrites the annotations of 'Resolved' nodes and never the
+-- tree's shape.
+outputNlgMap :: Module Resolved -> TypeCheck.NlgMap -> TypeCheck.NlgMap
+outputNlgMap m nlgs = foldl' restamp nlgs moved
+ where
+  resolveds = toListOf (gplate @Resolved)
+  moved =
+    [ (range, after)
+    | (Def _ n, Def _ n') <- zip (resolveds m) (resolveds (promoteHeadInputNlg m))
+    , let after = n' ^. annoOf % annNlg
+    , n ^. annoOf % annNlg /= after
+    , Just range <- [rangeOf n]
+    ]
+  restamp acc (range, mnlg) =
+    let iv = IV.srcRangeToInterval range
+    in  maybe id (IV.insert iv) mnlg (IV.deleteInterval iv acc)
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting

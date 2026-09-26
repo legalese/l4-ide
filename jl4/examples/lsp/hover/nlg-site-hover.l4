@@ -1,0 +1,18 @@
+-- Where an @nlg herald shows on hover (smucclaw/l4-ide#979, ruled 2026-09-26).
+-- Hover shows what `l4 nlg` and `l4 render` print, not where the herald sits.
+
+-- Test 1: a herald written after the head's INPUT is the RULE's sentence.
+-- Hovering the rule name shows it; hovering the input in the head does not.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row five` amount @nlg row five saw %amount%
+  MEANS amount GREATER THAN 100
+
+-- Test 2: a herald written in the GIVEN is the input's gloss (smucclaw#977).
+-- Hovering the input still shows it; the rule has no sentence of its own.
+GIVEN total IS A NUMBER @nlg the sum of money
+DECIDE `p seven` IF total GREATER THAN 200
+
+-- Test 3: a call site of the rule from Test 1. The map is restamped only at
+-- the definition, so hover here is unchanged by #979.
+DECIDE `row five check` IS `row five` 200

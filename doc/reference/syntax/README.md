@@ -315,6 +315,10 @@ GIVETH A BOOLEAN
 
 Both render as ``the claim of `amount` is large``, at every call site and in every projection.
 
+The editor shows the same reading.
+Hover over the rule's name in its head and you see the sentence, even when it was written after an input.
+Hover over that input and you see only its type, with no gloss.
+
 **Until 2026-09-21, only one projection agreed with that.**
 `l4 render` read such an annotation as the rule's sentence; `l4 nlg` read it as the input's gloss, so a positional call printed the rule's bare name and a `WITH` call printed the sentence in the `where` clause instead of as the heading.
 Measured over the nine modules of the Ofek Hadash encoding in the regression corpus: 65 annotations written in that shape, 65 read by `l4 render`, none by `l4 nlg`.
