@@ -34,7 +34,7 @@ Most of the quality comes from the brief.
   Note that `install-l4.sh` links `~/.local/bin/l4`, replacing whatever was there.
 - **Leave `JL4_LIBRARY_PATH` unset.** The standard library is compiled into the binary and always matches it; pointing the variable at a newer library produces a cascade of `could not find a definition` errors.
 - **Use the strongest model available, at high effort.** The comparison above ran every arm on Opus at high effort.
-- **Clone `legalese/canon`** and check out your drafts branch (step 10).
+- **Clone `legalese/canon`**, or fork it if you are not in the Legalese GitHub organisation (step 10).
 
 ### 1. Gather the sources, with provenance
 
@@ -130,7 +130,7 @@ A reviewer reads this first. It carries:
 ### 10. Deposit it in canon
 
 [`references/canon-deposit.md`](references/canon-deposit.md) has the layout, the two descriptor files, and the commands.
-In short: your own `<github-username>/drafts` branch, never `main`; `subjects/<jurisdiction>/<slug>/` for the law and `encodings/<row>/` for your encoding of it.
+In short: members of the Legalese GitHub organisation commit to `main`; anyone else is welcome through a fork and a pull request. `subjects/<jurisdiction>/<slug>/` for the law, and `encodings/<row>/` for your encoding of it.
 
 ### 11. Hand it over
 

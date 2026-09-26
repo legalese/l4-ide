@@ -15,8 +15,8 @@ Follow the ruled layout for new work, and if the law you are encoding already ha
 
 ## Where
 
-- **Branch: your own drafts shelf, `<github-username>/drafts`**, created from `main` if you do not have one yet. Never `main`.
-  An encoding stays on a drafts shelf until the question of the source text's licence terms is settled for it.
+- **Branch.** Members of the `legalese` GitHub organisation commit straight to `main` (ruled 2026-09-26).
+  **Contributions from outside Legalese are welcome**, by the standard GitHub route: fork `legalese/canon`, commit to a branch of your fork, and open a pull request against `main`.
 - **The law**: `subjects/<jurisdiction>/<slug>/`
   - `<jurisdiction>` is the ISO 3166-1 alpha-2 code of the enacting authority, lowercase: `sg`, `il`, `us`, `uk`, and `eu` for the European Union.
     A subdivision nests as its own path component using its ISO 3166-2 suffix: `us/ca`, `uk/sct`.
@@ -46,7 +46,7 @@ subjects/<jurisdiction>/<slug>/
 **`encoding.json`** — `id`, `encoder`, `display_name`, `status` (`draft` until a domain expert has reviewed it), `version` (semver, starting `0.1.0`), `license`, `maintainer`, `modules` (the list, in reading order), `scope` (the provisions encoded, and those not), and a `not_reviewed` note saying who has and has not read it against the source.
 If some tests are meant to fail, say which file and how many under `expected_red`.
 
-The fullest worked example is `subjects/il/hvac-work-licensing-2025/encodings/legalese/` on the `mengwong/drafts` branch; read its `encoding.json` and `NOTES.md` before writing your own:
+The fullest worked example is `subjects/il/hvac-work-licensing-2025/encodings/legalese/`, on the `mengwong/drafts` branch until [legalese/canon#2](https://github.com/legalese/canon/pull/2) moves it to `main`; read its `encoding.json` and `NOTES.md` before writing your own:
 
 ```bash
 git -C <canon> show origin/mengwong/drafts:subjects/il/hvac-work-licensing-2025/encodings/legalese/encoding.json
@@ -68,10 +68,14 @@ They drift silently if you leave them for later.
 ## Committing
 
 ```bash
-git -C <canon> switch <github-username>/drafts   # or: switch -c <github-username>/drafts origin/main
+# members of the legalese organisation
+git -C <canon> switch main && git -C <canon> pull --ff-only
 git -C <canon> add subjects/<jurisdiction>/<slug> subjects/README.md NOTICE
 git -C <canon> commit -m "<jurisdiction>/<slug>: <what this encodes, in a line>"
-git -C <canon> push -u origin <github-username>/drafts
+git -C <canon> push origin main
+
+# everyone else: the same commit on a branch of your fork, then
+gh pr create --repo legalese/canon --base main
 ```
 
 Canon has no CI of its own.
