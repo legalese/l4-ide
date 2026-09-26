@@ -1391,8 +1391,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       xml `shouldSatisfy` Text.isInfixOf "<text>annual_income</text>"
 
     it "gives a single-output table's <output> no @name and no @typeRef" $ do
-      -- READING, DMN 8.2.11: an output clause is named only so a MULTI-output
-      -- result can be keyed. MEASUREMENT: KIE fires ILLEGAL_USE_OF_NAME and
+      -- SPEC, DMN 1.3 §8.3.2 Table 34: a single-output table's OutputClause
+      -- SHALL NOT specify a name or a typeRef; only multi-output clauses are
+      -- named, so the result can be keyed. MEASUREMENT: KIE fires ILLEGAL_USE_OF_NAME and
       -- ILLEGAL_USE_OF_TYPEREF otherwise -- six warnings on the Reg CF exhibit
       -- alone -- and dropping both leaves Camunda 8's answers unchanged.
       let xml = emitDrg (drgOf spacedNames)
