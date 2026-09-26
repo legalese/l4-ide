@@ -103,11 +103,9 @@
 #     L4_GO_REQUIRED       1 ⇒ any SKIPPED stage is fatal (exit 5), as CI
 #                          wants; `run` refuses at the door when the doctor
 #                          forecasts one, rather than minutes in
-#     L4_GO_CANON_BRANCH   the drafts shelf p10 would deposit to. Derived from
-#                          the GitHub login of whoever is running when unset
-#                          (gh -> git config github.user -> $USER), so a
-#                          contributor lands on THEIR <username>/drafts and not
-#                          on somebody else's. `main` is refused outright.
+#     L4_GO_CANON_BRANCH   the canon branch p10 would deposit to. Unset, it is
+#                          `main` (ruled 2026-09-26); a contributor outside
+#                          Legalese names a branch of their fork instead.
 #     L4_GO_FIXED_NOW      pin the clock (default 2025-01-31T00:00:00Z)
 
 set -euo pipefail
@@ -1446,11 +1444,9 @@ EOF
     # WHERE THIS ENCODING IS DESTINED, recorded at run_begin so the report stays
     # a function of the journal and nothing else.
     #
-    # The BRANCH is deliberately not part of it. Which drafts shelf an encoding
-    # lands on is a fact about WHO deposits it, resolved at deposit time by
-    # lib/canon-destination.mjs from the person actually running — so freezing
-    # one person's shelf onto a run record would be recording the wrong kind of
-    # fact, and would also put a `gh` call on the critical path of every run.
+    # The BRANCH is deliberately not part of it: it is a fact about the deposit,
+    # resolved at deposit time by lib/canon-destination.mjs (canon's `main`
+    # unless L4_GO_CANON_BRANCH says otherwise), not a fact about the run.
     # `primary` is the driver's SELECTOR, never a row name — canon rules that no
     # row is primary, so the committed encoding files under the name the sidecar
     # gives it. With none declared there is no destination, and the report says

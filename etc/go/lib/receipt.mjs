@@ -150,8 +150,8 @@ switch (kind) {
       l4_binary: args.l4_binary ?? null,
       declared_stages: (args.declared ?? "").split(",").filter(Boolean),
       // The canon directory this encoding is destined for, or "" when the
-      // subject declares none. Path only — the drafts shelf it lands on belongs
-      // to whoever deposits it and is resolved then, not now.
+      // subject declares none. Path only — the branch is resolved at deposit
+      // time, not now.
       canon_destination: args.canon_destination || null,
       // Which stages each gate gates, recorded at run_begin so a later
       // `verify --gates` can check the ORDERING — that a granted gate was

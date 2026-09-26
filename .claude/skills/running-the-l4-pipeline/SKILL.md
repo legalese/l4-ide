@@ -270,17 +270,15 @@ node etc/go/lib/estimate-cost.mjs project --sources <some other statute>/
 Every run's report now carries a **destined for** row, and `p10-publish` prints the same destination in its refusal. Nothing publishes — P10 still exits 3 — but the destination is computed rather than described, so it is something you can check:
 
 ```
-legalese/canon @ mengwong/drafts : subjects/sg/succession/encodings/cleanroom-2026-08/ (branch via gh)
+legalese/canon @ main : subjects/sg/succession/encodings/cleanroom-2026-08/ (branch via default)
 ```
 
 **Key idioms:**
 
-- **The branch is yours, not Meng's.** It resolves to `<your-username>/drafts` — from `gh api user` first, then `git config github.user`, then `$USER`. Running this out of `legalese/l4-plugin` lands your encoding on your own shelf. Override with `L4_GO_CANON_BRANCH`.
-- **Check the branch when it came from `$USER`.** The destination line says which source answered. An OS account name need not be a GitHub login, and when it is not, the branch names a shelf belonging to nobody on a public repo.
-- **`main` is refused, and so is any non-drafts branch.** An encoding stays on a drafts shelf until its source-terms question is settled.
+- **The branch is canon's `main`** (ruled 2026-09-26): members of the `legalese` GitHub organisation commit there. A contributor outside Legalese sets `L4_GO_CANON_BRANCH` (or passes `--branch`) to a branch of their fork and opens a pull request. The destination line says which source named the branch.
 - **A subject with no `canon` block has no destination**, and P10 says so instead of guessing. Declare one with `"canon": { "subject_path": "sg/succession" }` — the grammar is canon's `docs/directory-conventions.md`.
-- **The row id is the encoding id.** No mapping to remember: canon's drafts branch already files `cleanroom-2026-08` under that name.
-- **`primary` is refused as a row name.** It is the driver's selector, not a directory — canon rules that no row is primary. The committed encoding takes the name its sidecar gives it in `canon.primary_row`, naming the occasion the way canon's other rows do (`legalese-2026-09`). Neither committed sidecar declares one yet, so `--encoding primary` currently reports no destination, which is the honest answer rather than a made-up path.
+- **The row id is the encoding id.** No mapping to remember: canon already files `cleanroom-2026-08` under that name.
+- **`primary` is refused as a row name.** It is the driver's selector, not a directory — canon rules that no row is primary. The committed encoding takes the name its sidecar gives it in `canon.primary_row`, naming the occasion the way canon's other rows do (`legalese-2026-09`). A sidecar that declares none gets no destination for `--encoding primary`, which is the honest answer rather than a made-up path; `regcf`, `sg-succession`, `sg-miles-card` and `ofek` declare `legalese`.
 
 ### 7a. The store: what outlives the run
 
