@@ -34,10 +34,9 @@ WHAT IT WOULD DO
 MSG
 
 # The destination, derived rather than described. GO_S_CANON_PATH comes from the
-# subject's sidecar; the row id is the encoding this run is about, which canon's
-# own drafts branch already agrees with; the branch is resolved from whoever is
-# running (see lib/canon-destination.mjs) so a contributor's encoding lands on
-# THEIR shelf and not on the shelf of whoever wrote the default.
+# subject's sidecar; the row id is the encoding this run is about, which canon
+# already agrees with; the branch is canon's main, ruled 2026-09-26 (see
+# lib/canon-destination.mjs), unless L4_GO_CANON_BRANCH names a fork's branch.
 echo "" >&2
 echo "WHERE IT WOULD GO" >&2
 if [[ -z "${GO_S_CANON_PATH:-}" ]]; then
@@ -63,10 +62,10 @@ else
   }
   cat >&2 <<'MSG'
 
-  The branch is a DRAFTS SHELF and never the default branch. An encoding lands
-  on the depositor's own shelf and stays there until its source-terms question
-  is settled; a deposit straight onto `main` is a larger outward act than the
-  one HG2 was asked about. Override the shelf with L4_GO_CANON_BRANCH.
+  The branch is canon's `main` (ruled 2026-09-26): members of the legalese
+  GitHub organisation commit there. A contributor outside Legalese sets
+  L4_GO_CANON_BRANCH to a branch of their fork and opens a pull request.
+  Either way the deposit is HG2's to open.
 MSG
 fi
 

@@ -9127,125 +9127,47 @@ process.stdout.write("\n-- store verbs --\n");
 // ===== the canon destination, and its fence =================================
 //
 // p10 refuses and will keep refusing, so none of this is exercised by a real
-// deposit. That is exactly why it is pinned: the fence has to be correct on the
-// day the stage stops refusing, and by then nobody will remember it was never
-// run. The property that matters is not "the path is right" — it is that the
-// pipeline CANNOT name the default branch and cannot silently name one person's
-// shelf for everybody.
+// deposit. That is exactly why it is pinned: the destination has to be correct
+// on the day the stage stops refusing, and by then nobody will remember it was
+// never run. Since 2026-09-26 the branch is canon's `main` (Legalese members
+// commit there; anyone else names their fork's branch and opens a PR).
 {
   process.stdout.write("\n-- the canon destination --\n");
   const D = await import("./lib/canon-destination.mjs");
-  const noTools = () => {
-    throw new Error("not installed");
-  };
   const ok = { subjectPath: "sg/succession", row: "cleanroom-2026-08" };
 
   check(
     "the repository is not a parameter — it is R1's ruling",
     D.CANON_REPO === "legalese/canon",
   );
-
-  for (const bad of ["main", "master"]) {
-    let threw = null;
-    try {
-      D.resolveDestination({ ...ok, branch: bad, env: {}, exec: noTools });
-    } catch (e) {
-      threw = e.message;
-    }
-    check(
-      `'${bad}' is REFUSED as a deposit target`,
-      threw !== null && /REFUSED/.test(threw),
-    );
-  }
   {
-    let threw = null;
-    try {
-      D.resolveDestination({
-        ...ok,
-        branch: "feature/nice-idea",
-        env: {},
-        exec: noTools,
-      });
-    } catch (e) {
-      threw = e.message;
-    }
+    const d = D.resolveDestination({ ...ok, env: {} });
     check(
-      "a branch that is not a drafts shelf is refused, naming the shape expected",
-      threw !== null && /drafts/.test(threw),
+      "with no branch named, the destination is canon main (ruled 2026-09-26)",
+      d.branch === "main" && d.branch_source === "default",
+    );
+    check(
+      "and describe() prints it with its source",
+      D.describe(d) ===
+        "legalese/canon @ main : subjects/sg/succession/encodings/cleanroom-2026-08/ (branch via default)",
     );
   }
-
-  // THE DERIVATION ORDER, and the reason it is an order: `gh` answers the
-  // question actually being asked (a GitHub login for a GitHub branch), while
-  // $USER answers a different one that is usually but not always the same.
-  const ghSays = (who) => (cmd) => {
-    if (cmd === "gh") return who;
-    throw new Error("no");
-  };
   check(
-    "the owner comes from `gh` when it can answer",
+    "L4_GO_CANON_BRANCH names another branch — a fork's, for a contributor outside Legalese",
     D.resolveDestination({
       ...ok,
-      env: { USER: "someone-else" },
-      exec: ghSays("realname"),
-    }).branch === "realname/drafts",
+      env: { L4_GO_CANON_BRANCH: "someone/fork-branch" },
+    }).branch === "someone/fork-branch",
   );
   check(
-    "…falling back to git config github.user",
+    "and an explicit --branch beats it",
     D.resolveDestination({
       ...ok,
-      env: { USER: "someone-else" },
-      exec: (cmd, args) => {
-        if (cmd === "git" && args.includes("github.user")) return "configured";
-        throw new Error("no");
-      },
-    }).branch === "configured/drafts",
-  );
-  {
-    const d = D.resolveDestination({
-      ...ok,
-      env: { USER: "osname" },
-      exec: noTools,
-    });
-    check("…and finally to $USER", d.branch === "osname/drafts");
-    check(
-      "but a $USER-derived branch WARNS, because an OS account is not a GitHub login",
-      d.branch_source === "os-user" &&
-        d.warnings.some((w) => /need not be a GitHub login/.test(w)),
-    );
-  }
-  {
-    const d = D.resolveDestination({ ...ok, env: {}, exec: noTools });
-    check(
-      "with nothing able to name an owner the branch is null, not a default person",
-      d.branch === null && d.branch_source === null,
-    );
-    check(
-      "and describe() says so rather than printing a plausible wrong branch",
-      /<USERNAME>\/drafts/.test(D.describe(d)),
-    );
-  }
-  check(
-    "an explicit --branch beats every derivation",
-    D.resolveDestination({
-      ...ok,
-      branch: "aswathy/drafts",
-      env: { L4_GO_CANON_BRANCH: "mengwong/drafts", USER: "x" },
-      exec: ghSays("y"),
-    }).branch === "aswathy/drafts",
-  );
-  check(
-    "and L4_GO_CANON_BRANCH beats the derivation but not an explicit flag",
-    D.resolveDestination({
-      ...ok,
-      env: { L4_GO_CANON_BRANCH: "aswathy/drafts", USER: "x" },
-      exec: ghSays("y"),
-    }).branch === "aswathy/drafts",
+      branch: "explicit-branch",
+      env: { L4_GO_CANON_BRANCH: "someone/fork-branch" },
+    }).branch === "explicit-branch",
   );
 
-  // The layout is canon's Q3 shape: the encoding row sits one level BELOW the
-  // subject, and the row id is the sidecar's own encoding id — which canon's
-  // drafts branch already agrees with.
   // `primary` is the driver's SELECTOR and not a row name. Filing the committed
   // encoding at `encodings/primary/` would re-create, in the law repository, the
   // privilege SPEC.md §8.0 and canon's own Q3 both remove — and the law
@@ -9256,9 +9178,7 @@ process.stdout.write("\n-- store verbs --\n");
       D.resolveDestination({
         subjectPath: "us/regcf",
         row: "primary",
-        branch: "a/drafts",
         env: {},
-        exec: noTools,
       });
     } catch (e) {
       threw = e.message;
@@ -9275,37 +9195,28 @@ process.stdout.write("\n-- store verbs --\n");
 
   check(
     "the encoding row sits under subjects/<path>/encodings/<row>",
-    D.resolveDestination({ ...ok, branch: "a/drafts", env: {}, exec: noTools })
-      .encoding_dir === "subjects/sg/succession/encodings/cleanroom-2026-08",
+    D.resolveDestination({ ...ok, env: {} }).encoding_dir ===
+      "subjects/sg/succession/encodings/cleanroom-2026-08",
   );
 
-  // ADVISORY, not fatal: canon's directory-conventions.md is PROPOSED and its
-  // own main branch holds `western-australia/`. A validator that refused would
-  // reject paths that are correct for the tree as it stands.
+  // ADVISORY, not fatal: canon holds a `doctrine/` tree that the conventions
+  // (ruled onto main 2026-09-26) do not cover, so a refusal would outrun them.
   {
     const d = D.resolveDestination({
       subjectPath: "western-australia/residential-tenancies-act",
       row: "legalese-2026-09",
-      branch: "a/drafts",
       env: {},
-      exec: noTools,
     });
     check(
       "a non-conforming jurisdiction component WARNS and does not fail",
       d.encoding_dir.startsWith("subjects/western-australia/") &&
-        d.warnings.some((w) => /PROPOSED/.test(w)),
+        d.warnings.some((w) => /ISO 3166-1 alpha-2/.test(w)),
     );
   }
   for (const bad of ["", "regcf", "/us/regcf", "us/Reg CF"]) {
     let threw = null;
     try {
-      D.resolveDestination({
-        subjectPath: bad,
-        row: "r",
-        branch: "a/drafts",
-        env: {},
-        exec: noTools,
-      });
+      D.resolveDestination({ subjectPath: bad, row: "r", env: {} });
     } catch (e) {
       threw = e.message;
     }

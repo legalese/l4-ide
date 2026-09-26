@@ -224,9 +224,9 @@ export function loadSubject(id, selectedEncoding = "primary") {
   // repo is worse than an absent one.
   //
   // Only the SUBJECT PATH lives here, because only it is a fact about the law.
-  // The branch is a fact about WHO is depositing (`<username>/drafts`) and is
-  // resolved per-run in lib/canon-destination.mjs; the encoding row id is the
-  // encoding's own id, which canon's drafts branch already agrees with —
+  // The branch is a fact about the deposit (canon's `main` unless overridden)
+  // and is resolved in lib/canon-destination.mjs; the encoding row id is the
+  // encoding's own id, which canon already agrees with —
   // subjects/sg/succession/encodings/cleanroom-2026-08/ is filed under exactly
   // the id this sidecar calls that encoding.
   if (desc.canon !== undefined) {
