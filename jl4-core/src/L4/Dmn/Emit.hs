@@ -387,18 +387,20 @@ inputXml c =
 
 -- | The single output clause.
 --
--- __No @\@name@ and no @\@typeRef@.__ /Read from/ DMN 8.2.11: an output clause
--- is named so that a multi-output table's result can be keyed, and with one
--- output the result /is/ the value. /Measured/, which is the part that decides
--- it: KIE says so out loud — @ILLEGAL_USE_OF_NAME@ and @ILLEGAL_USE_OF_TYPEREF@,
+-- __No @\@name@ and no @\@typeRef@.__ /Required by/ DMN 1.3 §8.3.2, Table 34:
+-- \"The OutputClause of a single output decision table SHALL NOT specify a
+-- typeRef\", and it SHALL NOT specify a name either; only a multi-output
+-- table's clauses are named, so that its result can be keyed, and with one
+-- output the result /is/ the value. /Measured/ as well: KIE says so out loud — @ILLEGAL_USE_OF_NAME@ and @ILLEGAL_USE_OF_TYPEREF@,
 -- six warnings on the Reg CF exhibit alone — and dropping both takes KIE to 0
 -- errors and 0 warnings and leaves Camunda 8's answers unchanged. Camunda 7
 -- loses only the result-map /key/ (@{investor limit=80000}@ becomes
 -- @{null=80000}@), and is not a target anyway. Nothing a reader needs is lost:
 -- the decision's own @\<variable typeRef\>@ carries the type and
 -- @decisionTable\/\@outputLabel@ carries the name. (§13.2. The DMN-clause
--- sentence is a reading of the specification; only the engine sentences are
--- measurements.)
+-- sentence quotes the specification. Until 2026-09-26 it cited DMN 8.2.11,
+-- which is /Default output values/, and called the rule a reading; it is a
+-- normative SHALL NOT. The engine sentences are measurements.)
 --
 -- 'OutputColumn' keeps both fields regardless, because "L4.Dmn.Markdown" needs
 -- them — a dmnmd header is @name (out) : Type@ — and because a multi-output
