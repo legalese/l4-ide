@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "skills/writing-l4-rules/**"
+      - "skills/**"
       - ".claude-plugin/**"
       - "plugin.json"
       - "PLUGIN.md"
@@ -29,7 +29,7 @@ jobs:
           # Build number from the Actions run → 0.2.{build}
           BUILD="${{ github.run_number }}"
           # Get short hash of latest commit touching plugin directories
-          SHORT_SHA=$(git log -1 --format=%h -- skills/writing-l4-rules/ .claude-plugin/ plugin.json skill/ l4/)
+          SHORT_SHA=$(git log -1 --format=%h -- skills/ .claude-plugin/ plugin.json skill/ l4/)
           # Create version string
           VERSION="v0.2.${BUILD}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -59,7 +59,7 @@ jobs:
       - name: Create plugin packages
         run: |
           # Remove existing packages if present
-          rm -f writing-l4-rules.skill l4-plugin.zip
+          rm -f writing-l4-rules.skill encoding-a-subject.skill l4-plugin.zip
 
           # Create skill-only package (for users who just want the SKILL.md + references)
           (
@@ -73,13 +73,21 @@ jobs:
               -x "*/__pycache__/*" \
               -x "*/node_modules/.cache/*"
           )
+          (
+            cd skills/encoding-a-subject
+            zip -r "$GITHUB_WORKSPACE/encoding-a-subject.skill" \
+              assets/ \
+              references/ \
+              SKILL.md \
+              -x "*.DS_Store"
+          )
 
           # Create full plugin package: both manifests (Claude Code's
           # .claude-plugin/ and the portable root plugin.json) + skill + docs.
           zip -r l4-plugin.zip \
             .claude-plugin/ \
             plugin.json \
-            skills/writing-l4-rules/ \
+            skills/ \
             PLUGIN.md \
             -x "*.DS_Store" \
             -x "*/__pycache__/*" \
@@ -87,7 +95,7 @@ jobs:
 
           # Verify packages
           echo "=== Skill Package ==="
-          ls -lh writing-l4-rules.skill
+          ls -lh writing-l4-rules.skill encoding-a-subject.skill
           echo ""
           echo "=== Plugin Package ==="
           ls -lh l4-plugin.zip
@@ -133,12 +141,13 @@ jobs:
             3. Restart Claude Code
 
             **Skill-Only Installation:**
-            1. Download `writing-l4-rules.skill`
-            2. Extract into `~/.claude/skills/writing-l4-rules/` or `<project>/.claude/skills/writing-l4-rules/`
+            1. Download `writing-l4-rules.skill`, and `encoding-a-subject.skill` if you will encode whole Acts
+            2. Extract each into `~/.claude/skills/<skill-name>/` or `<project>/.claude/skills/<skill-name>/`
 
             ### What's Included
 
             - **L4 authoring skill**: Expert guidance for formalising legal text as typed decision functions and regulative rules
+            - **Encoding workflow skill**: Encoding a whole Act, regulation or contract from its sources, with a brief, a coverage table, source-derived tests, and the legalese/canon layout
             - **Reference documentation**: Deep dives on regulative rules, builtin libraries, and common gotchas
             - **Deploy to Legalese Cloud**: Annotate with `@export` / `@desc` and ship rules as REST, MCP, WebMCP, and OpenAPI endpoints
 
@@ -160,6 +169,7 @@ jobs:
             **Generated:** ${{ github.event.head_commit.timestamp }}
           files: |
             writing-l4-rules.skill
+            encoding-a-subject.skill
             l4-plugin.zip
           draft: false
           prerelease: false
@@ -170,7 +180,7 @@ jobs:
         if: steps.check_release.outputs.exists == 'true'
         run: |
           echo "Updating existing release ${{ steps.version.outputs.tag }}"
-          gh release upload ${{ steps.version.outputs.tag }} writing-l4-rules.skill l4-plugin.zip --clobber
+          gh release upload ${{ steps.version.outputs.tag }} writing-l4-rules.skill encoding-a-subject.skill l4-plugin.zip --clobber
         env:
           GH_TOKEN: ${{ github.token }}
 

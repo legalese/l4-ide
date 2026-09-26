@@ -1,6 +1,13 @@
 #!/usr/bin/env node
-// Build the distributable L4 plugin bundle: the writing-l4-rules skill plus
-// every file the skill cites, and nothing else.
+// Build the distributable L4 plugin bundle: every skill under `skills/` plus
+// every file those skills cite, and nothing else.
+//
+// WHICH SKILLS. Every directory under `skills/`, read from disk. The pipeline
+// skill, `.claude/skills/running-the-l4-pipeline/`, is a plain directory there
+// and has no entry under `skills/`, so it is never bundled: it drives
+// `etc/go/`, which a plugin does not carry, and Meng ruled on 2026-09-26 that it
+// stays repo-local (specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md on
+// ci/skills-layout). A skill meant to travel goes under `skills/`.
 //
 // WHY THIS IS COMPUTED RATHER THAN A LIST. The skill teaches by example: it
 // names ~46 files it does not carry (`jl4/examples/canon/us/regcf/regcf.l4` alone
@@ -24,19 +31,28 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// Where Claude Code looks for a project skill. In this repo that path is a git
-// symlink (mode 120000) to the tracked location `skills/writing-l4-rules`, and
-// the two sit at DIFFERENT DEPTHS from the repo root -- five segments versus
-// four. The link-rewrite pass below does `../` arithmetic against this path, so
-// reading it as the symlink makes every skill-relative link off by one. That is
-// exactly the arithmetic its own comment warns a human gets wrong, applied to
-// itself: measured on `unstable` 2026-09-11, four correct `../../../../doc/...`
-// links were rewritten to `../../../../.claude/doc/...`, which resolves nowhere.
-// Resolve to the real location so the arithmetic is done where the files are,
-// and so this works unchanged whether or not the symlink survives.
-const SKILL_CONFIGURED = ".claude/skills/writing-l4-rules";
-const SKILL = fs.realpathSync(path.join(REPO, SKILL_CONFIGURED));
-const SKILL_REL = path.relative(REPO, SKILL);
+// Read from `skills/`, the TRACKED location, and resolve each entry to its real
+// path. Where Claude Code looks for a project skill, `.claude/skills/<name>`,
+// is a git symlink (mode 120000) to `skills/<name>` at a DIFFERENT DEPTH from
+// the repo root -- five segments versus four. The link-rewrite pass below does
+// `../` arithmetic against the skill's path, so reading it as the symlink makes
+// every skill-relative link off by one. That is exactly the arithmetic its own
+// comment warns a human gets wrong, applied to itself: measured on `unstable`
+// 2026-09-11, four correct `../../../../doc/...` links were rewritten to
+// `../../../../.claude/doc/...`, which resolves nowhere. Resolving to the real
+// location does the arithmetic where the files are, whatever links point there.
+const SKILLS = fs
+  .readdirSync(path.join(REPO, "skills"), { withFileTypes: true })
+  .filter((e) => e.isDirectory() || e.isSymbolicLink())
+  .map((e) => {
+    const dir = fs.realpathSync(path.join(REPO, "skills", e.name));
+    return { name: e.name, dir, rel: path.relative(REPO, dir) };
+  })
+  .sort((a, b) => a.name.localeCompare(b.name));
+// A path inside ANY bundled skill is internal to the bundle: the skills are
+// copied whole, to the same relative place, so links between them already work.
+const inSomeSkill = (rel) =>
+  SKILLS.some((s) => rel === s.rel || rel.startsWith(s.rel + "/"));
 
 const outArg = process.argv[2];
 const quiet = process.argv.includes("--quiet");
@@ -46,8 +62,10 @@ if (!outArg) {
 }
 const OUT = path.resolve(outArg);
 
-if (!fs.existsSync(SKILL)) {
-  throw new Error(`skill not found at ${SKILL} -- did it move again?`);
+if (!SKILLS.some((s) => s.name === "writing-l4-rules")) {
+  throw new Error(
+    `writing-l4-rules not found under ${path.join(REPO, "skills")} -- did it move again?`,
+  );
 }
 
 // The prefixes a citation can start with are the repo's own top-level entries,
@@ -78,16 +96,16 @@ function walk(dir) {
 }
 
 // --- gather citations -------------------------------------------------------
-const skillFiles = walk(SKILL);
+const skillFiles = SKILLS.flatMap((s) => walk(s.dir));
 const cited = new Map(); // relpath -> Set of skill files citing it
 for (const f of skillFiles) {
   if (!/\.(md|l4|sh)$/.test(f)) continue;
   const text = fs.readFileSync(f, "utf8");
   for (const m of text.matchAll(CITATION)) {
     const rel = m[1];
-    if (rel.startsWith(SKILL_REL)) continue; // self-reference
+    if (inSomeSkill(rel)) continue; // self-reference
     if (!cited.has(rel)) cited.set(rel, new Set());
-    cited.get(rel).add(path.relative(SKILL, f));
+    cited.get(rel).add(path.relative(REPO, f));
   }
   // Markdown links that climb out of the skill with `../` are citations too,
   // and the bare-prefix regex above cannot see them -- the character before
@@ -96,9 +114,9 @@ for (const f of skillFiles) {
   for (const m of text.matchAll(/\]\((\.\.\/[^)\s]+)\)/g)) {
     const abs = path.resolve(path.dirname(f), m[1]);
     const rel = path.relative(REPO, abs);
-    if (rel.startsWith("..") || rel.startsWith(SKILL_REL)) continue;
+    if (rel.startsWith("..") || inSomeSkill(rel)) continue;
     if (!cited.has(rel)) cited.set(rel, new Set());
-    cited.get(rel).add(path.relative(SKILL, f));
+    cited.get(rel).add(path.relative(REPO, f));
   }
 }
 
@@ -135,35 +153,36 @@ function copyInto(relSrc, relDest) {
 // The skill itself goes to the Agent Plugins 1.0 fixed location, `skills/`,
 // which is where a plugin client looks -- NOT to `.claude/skills/`, which is
 // this repo's project-skill location and means nothing to an installed plugin.
-copyInto(SKILL_REL, "skills/writing-l4-rules");
+for (const s of SKILLS) copyInto(s.rel, `skills/${s.name}`);
 
 // The skill sits at a different depth in the bundle than in the repo
 // (`skills/x` vs `.claude/skills/x`), so a `../`-relative link that is correct
 // in one is off-by-one in the other. Recompute each from the actual depths
 // rather than assuming either layout -- this is precisely the arithmetic a
 // human gets wrong, and it fails silently because nothing link-checks a skill.
-const BUNDLED_SKILL = path.join(OUT, "skills/writing-l4-rules");
-for (const f of walk(BUNDLED_SKILL)) {
-  if (!f.endsWith(".md")) continue;
-  const origin = path.join(SKILL, path.relative(BUNDLED_SKILL, f));
-  const before = fs.readFileSync(f, "utf8");
-  const after = before.replace(/\]\((\.\.\/[^)\s]+)\)/g, (whole, link) => {
-    const target = path.relative(
-      REPO,
-      path.resolve(path.dirname(origin), link),
-    );
-    if (target.startsWith("..")) return whole; // points outside the repo; leave it
-    // A link that stays inside the skill needs no rewriting: the skill's own
-    // tree is copied verbatim, so its internal relative links are already
-    // correct. Rewriting them pointed them at `.claude/skills/...` inside the
-    // bundle, where nothing lives -- 100 broken links, all self-inflicted.
-    if (target.startsWith(SKILL_REL)) return whole;
-    let out = path.relative(path.dirname(f), path.join(OUT, target));
-    if (!out.startsWith(".")) out = "./" + out;
-    return `](${out})`;
-  });
-  if (after !== before) fs.writeFileSync(f, after);
-}
+const bundled = (s) => path.join(OUT, "skills", s.name);
+for (const s of SKILLS)
+  for (const f of walk(bundled(s))) {
+    if (!f.endsWith(".md")) continue;
+    const origin = path.join(s.dir, path.relative(bundled(s), f));
+    const before = fs.readFileSync(f, "utf8");
+    const after = before.replace(/\]\((\.\.\/[^)\s]+)\)/g, (whole, link) => {
+      const target = path.relative(
+        REPO,
+        path.resolve(path.dirname(origin), link),
+      );
+      if (target.startsWith("..")) return whole; // points outside the repo; leave it
+      // A link that stays inside the skill needs no rewriting: the skill's own
+      // tree is copied verbatim, so its internal relative links are already
+      // correct. Rewriting them pointed them at `.claude/skills/...` inside the
+      // bundle, where nothing lives -- 100 broken links, all self-inflicted.
+      if (inSomeSkill(target)) return whole;
+      let out = path.relative(path.dirname(f), path.join(OUT, target));
+      if (!out.startsWith(".")) out = "./" + out;
+      return `](${out})`;
+    });
+    if (after !== before) fs.writeFileSync(f, after);
+  }
 
 // The standard library is compiled INTO the `l4` binary, wholesale: the
 // Template Haskell splice in jl4-core/src/L4/API/EmbeddedLibraries.hs embeds
@@ -390,7 +409,7 @@ if (relSpec) {
 // published -- which is the only way to find out whether the skill still works
 // when its examples travel with it.
 if (process.argv.includes("--project-layout")) {
-  copyInto(SKILL_REL, ".claude/skills/writing-l4-rules");
+  for (const s of SKILLS) copyInto(s.rel, `.claude/skills/${s.name}`);
   if (!quiet)
     console.log(
       "project     : also written to .claude/skills/ (--project-layout)",
@@ -399,7 +418,7 @@ if (process.argv.includes("--project-layout")) {
 
 // --- totals (needed by both the bundle README and the report) ---------------
 const bytes = carried.reduce((a, [, n]) => a + n, 0);
-const skillBytes = walk(SKILL).reduce((a, f) => a + fs.statSync(f).size, 0);
+const skillBytes = skillFiles.reduce((a, f) => a + fs.statSync(f).size, 0);
 const mb = (n) => (n / 1024 / 1024).toFixed(2);
 
 // --- manifests --------------------------------------------------------------
@@ -428,10 +447,10 @@ const pluginMd = path.join(OUT, "PLUGIN.md");
 if (fs.existsSync(pluginMd)) {
   fs.writeFileSync(
     pluginMd,
-    fs
-      .readFileSync(pluginMd, "utf8")
-      .split(SKILL_REL)
-      .join("skills/writing-l4-rules"),
+    SKILLS.reduce(
+      (text, s) => text.split(s.rel).join(`skills/${s.name}`),
+      fs.readFileSync(pluginMd, "utf8"),
+    ),
   );
 }
 
@@ -481,20 +500,23 @@ fs.writeFileSync(
 **This directory is generated. Do not edit it by hand.** Every file here was
 copied out of [legalese/l4-ide](https://github.com/legalese/l4-ide) by
 \`etc/build-plugin-bundle.mjs\`; edits made here are lost on the next build.
-Change the skill in l4-ide at \`.claude/skills/writing-l4-rules/\` and rebuild.
+Change a skill in l4-ide under \`skills/\` and rebuild.
 
 Generated from l4-ide \`${headSha.slice(0, 12)}\`.
 
 ## What is here, and why
 
-\`skills/writing-l4-rules/\` is the skill. Everything else is the material the
-skill **cites**: it teaches by worked example, naming files like
-\`jl4/examples/canon/us/regcf/regcf.l4\` in its prose rather than restating them.
+${SKILLS.map((s) => `\`skills/${s.name}/\``).join(" and ")} ${SKILLS.length === 1 ? "is the skill" : "are the skills"}:
+\`writing-l4-rules\` teaches the language, and \`encoding-a-subject\`, where present, is
+the workflow for encoding a whole body of law and filing it in legalese/canon.
+Everything else is the material the skills **cite**: they teach by worked example,
+naming files like \`jl4/examples/canon/us/regcf/regcf.l4\` in prose rather than
+restating them.
 Those citations are carried at their original repo-relative paths, so each one
 resolves against this bundle root exactly as it resolves against the l4-ide
 root. Nothing in the skill text was rewritten.
 
-The set is computed from the skill's own text, not from a maintained list, so
+The set is computed from the skills' own text, not from a maintained list, so
 citing a new example carries that example on the next build.
 
 One class is deliberately **not** carried: \`jl4-core/libraries/*.l4\`, the
@@ -507,7 +529,7 @@ than itself does not report a version mismatch; it fails as cascading
 
 | | |
 |---|---|
-| skill | ${skillFiles.length} files |
+| skills | ${SKILLS.length} (${skillFiles.length} files) |
 | cited material | ${carried.length} files |
 | cited but NOT carried | ${fromRuntime.length} standard-library files |
 | bundle | ${mb(skillBytes + bytes)} MB |
@@ -550,7 +572,7 @@ if (!quiet) {
 // check and still shipped one dangling link, because the generator only ever
 // checked its own bookkeeping. This checks the artifact instead.
 const dangling = [];
-for (const f of walk(BUNDLED_SKILL)) {
+for (const f of SKILLS.flatMap((s) => walk(bundled(s)))) {
   if (!/\.(md|l4|sh)$/.test(f)) continue;
   const text = fs.readFileSync(f, "utf8");
   const who = path.relative(OUT, f);
