@@ -7,6 +7,9 @@ The June demonstrator `L4.TNR` is retired and no longer in the tree; its last
 commit is `0f90dab7` on this branch, for retrieval. What it demonstrated is
 now the house-style worklist (§2.3). §3.6 is proposed, not built, and nothing
 in it has been measured.
+**RULED 2026-09-26 (Meng, bench "Tables, Trees, Prose", cards T1–T3):** how §3.6 applies to a decision table (§3.6, "Decision tables: two named checks"), and how a table is rendered through a tree (§3.7).
+Those are rulings on design, and none of them is implemented.
+Cards T4–T6 of the same bench are recorded in `INLINE-DMNMD-SPEC.md` §4.1 and §5.
 **Branch:** `nlg-roundtrip` (this file is the branch's whole diff against `unstable`)
 **Related:** `specs/done/DESC-ANNOTATION-SPEC.md`, `specs/todo/REF-ANNOTATION-SPEC.md`, `jl4-core/src/L4/Nlg.hs`
 
@@ -622,7 +625,9 @@ l4  ≡_B  reencode (get l4)
 where `≡_B` is agreement over a shared fact battery, measured pairwise on
 declared decision pairs. That is exactly what the §8 diff oracle
 (`etc/go/lib/denovo-diff.mjs`) measures between the committed corpus and a de
-novo encoding, and it is reused here unchanged: the left side is the corpus
+novo encoding, and it is reused here ~~unchanged~~ as it stands, **except for
+decision tables (AMENDED 2026-09-26, T1; see "Decision tables: two named checks"
+below)**: the left side is the corpus
 module, the right side is the re-encoding, the surface map declares which
 decision on the left pairs with which on the right, and `run` reports an
 agreement count plus a minimised witness for every divergence. The oracle never
@@ -640,6 +645,43 @@ Echo leakage does not inflate this number. A re-encoder that reads an `@nlg`
 phrase back off the page is reading exactly what a human reader of the printed
 instrument would read; if that phrase is enough to recover the decision, the
 prose carried the meaning, which is the claim.
+
+#### Decision tables: two named checks — RULED 2026-09-26 (T1)
+
+**Ruled by Meng on 2026-09-26, bench "Tables, Trees, Prose", card T1, marked accept: option B of four.**
+Ruled, not implemented: neither check below exists, and neither has been run.
+It amends "reused here unchanged" in the property above, which is struck.
+
+For a decision table, `l4` in the property is the table's **L4 image**: the first-match `BRANCH` the table denotes, whether written inline (`INLINE-DMNMD-SPEC.md`) or emitted by a transpiler such as `dmnmd --to=l4`.
+The lossless gate for tables is two named checks, and neither stands in for the other.
+
+**`≡_R`, region-exact comparison.**
+When both sides have constant endpoints and constant outputs, each column's values split into finitely many **blocks** on which every cell's test is constant, and a **region** is one block per column.
+Every guard is constant on a region, so evaluating one input per region of the two sides' common refinement **decides** equivalence instead of sampling it.
+`INLINE-DMNMD-SPEC.md` §3's Reg CF sketch has 8 regions, 4 blocks on `aggregate` times 2 on `previously sold`.
+That count was made by hand on the card, and reproduced on 2026-09-26 by a throwaway counter built on dmnmd's own readers ("step 0", committed nowhere).
+
+1. **The prose gate** compares the table's L4 image with the re-encoded L4′, region-exact over outputs.
+   `NOTHING` counts as an output once the no-match ruling (T6, `INLINE-DMNMD-SPEC.md` §5) lands.
+   For any column whose guard is not a constant endpoint, it falls back to the sampled battery `≡_B` above.
+   That fallback is triggered mechanically by l4-ide's `FidelityNote` (`jl4-core/src/L4/Interchange/Fidelity.hs:36`), never by judgement.
+   The report says which relation each decision pair used.
+2. **The transpiler check** compares the table with its own L4 image, region-exact over outputs **plus** "no rule matched" and "rules conflict".
+   It tests the code that turns a table into L4: dmnmd's per-region `#ASSERT` generation, and the table→tree compiler of §3.7, whose output is also an L4 image of the table.
+   It is not the prose gate.
+
+**What review changed.**
+The first draft put "no rule matched" and "rules conflict" into the prose gate.
+An independent skeptic pointed out that a table's L4 image is already a first-match `BRANCH` with a sentinel, so those non-answers are gone before any prose exists.
+Scoring them against the prose would blame a transpiler loss on the prose, which is the "no localisation" failure this section rejects above.
+That was taken: option B became two named checks, and the non-answers moved to the transpiler check and to T6.
+What the card adds to §3.6 is region-exactness.
+
+**Not taken.**
+Option A, this section's `≡_B` as written, catches a moved threshold only if some perturbation happens to cross it.
+Option C, B plus provenance as a gate, cannot be computed on this pair: the re-encoding is made from prose rendered with block ids off, so it has no source-row identity.
+Provenance is reported instead as a metric on the table→tree leg (§3.7, T3).
+Option D, identical rows, would forbid the tree rendering outright.
 
 #### The bar
 
@@ -694,7 +736,89 @@ already exist and need only their right side re-pointed.
 
 Exit: **one measured run on one subject**, with the agreement rate, the witness
 list and a disposition for every witness written into §9 of this spec. Until
-that entry exists, every sentence in this section is a proposal.
+that entry exists, every sentence in this section is a proposal, except the T1
+ruling above, which fixes which relation gates a decision table and measures
+nothing.
+
+### 3.7 Decision tables through a tree: split order and merging — RULED 2026-09-26 (T2, T3)
+
+**Ruled by Meng on 2026-09-26, bench "Tables, Trees, Prose", cards T2 and T3, both marked accept.**
+Ruled, not implemented: no table→tree compiler exists in either repo.
+`INLINE-DMNMD-SPEC.md` §4.1 (T4) places the one these rulings govern in l4-ide.
+
+**Why the rulings are recorded here.**
+No spec in this repo designs table→tree compilation, so there was no owning section to amend.
+The nearest is the pattern-compilation sketch in `specs/done/PATTERN-MATCHING-SPEC.md` (:417, "Pattern Compilation to Decision Trees"), deferred as "Phase 3: Decision Tree Compilation" (:567), which lists column-selection heuristics as future work and chooses none.
+Both rulings answer to this spec: T2 to lens law 3 (§3.1), and T3 to what §3.6's prose round trip can and cannot see.
+
+**What the tree is (proposed, not ruled).**
+The compiler reads a table's columns, rules, hit policy and default, and emits a tree whose internal nodes each test one column and whose leaves carry the table's value on that part of the input space.
+In L4 it is a nested `BRANCH`; in prose, each node becomes a lead-in and each edge a paragraph, which is the "deterministic aggregation first" that §2.6 asks for.
+
+#### Split order — T2, option A of four, with the mode stored
+
+- **Authored column order.**
+  The compiler splits on the leftmost column that still discriminates among the live rules, in the order the author wrote the columns.
+- **Tree or rows is chosen once, and stored.**
+  The size budget below chooses tree or rows once, and the choice is stored as an annotation on the table.
+  §3.1 already lets rendering depend on "the AST and annotations".
+  Rows means one arm per rule, today's first-match rendering.
+- **A change of mode or root is reported, never silent.**
+  An edit that would cross the budget, or would remove a column's last discriminating test, raises a diagnostic that names the mode or root change, instead of silently re-rendering.
+- **The stability property test is reworded.**
+  The compiler's property test (proposed, not built) was "a one-cell edit changes only the affected subtree".
+  It becomes "changes only the affected subtree, or reports a mode or root change", seeded with the two cases in the objection below.
+- **The budget.**
+  A table renders as a tree when its rule leaves, not counting no-match leaves, number at most 2 × its authored rows, a trailing catch-all counting as a row.
+
+Step 0 (the throwaway counter of §3.6's T1 block) measured 145 tables: 140 read from dmnmd's 183 markdown fixtures at dmnmd trunk `18481de`, and 5 from this repo's 49 checked-in `.dmn` files, 27 of which dmnmd refused outright.
+On that corpus the budget sends exactly one table to rows: `Categorize` in dmnmd's `languages/haskell/test/golden/miles-card-dmn.md`, with 19 rows, 362 leaves in authored order and 182 in its best column order.
+Counting no-match leaves as well would send 14 more tables to rows.
+**Corrected from the card**, which called those 14 "one- and two-row tables": 13 are, and the fourteenth, `NearMiss` in dmnmd's `policy/hp-unique-near-duplicate-rows-accepted`, has five rows (recomputed from step 0's per-table results).
+The corpus is thin evidence for any budget: 119 of the 145 tables have two rows or fewer, and 3 have ten or more.
+
+**What review changed.**
+An independent skeptic showed that without a stored mode, option A's fallback is a cliff.
+With columns `x1 y1 x2 y2`, rows `(T,T,-,-)` and `(-,-,-,T)` → yes compile to a 5-leaf tree.
+Change row 2's `x2` to `T` and it needs 7 leaves, over 2 × rows, so every sentence becomes an "otherwise, if" ladder.
+Deleting a column's only test re-roots the tree too.
+So lens law 3 failed under A as first drafted, and only D passed it.
+The objection was taken: the mode is now stored, and a change of mode or root is reported.
+That example crosses 2 × rows only if its default counts as a row (3 rows, and 5 ≤ 6 < 7), which is why the budget names its denominator.
+The budget was added after step 0 and had no fresh skeptic.
+
+**Not taken.**
+Options B (greedy information gain, or Montalbano balance) and C (minimum-size search): one threshold edit can re-root the tree and rewrite all the prose.
+B also duplicates the wizard, to which `QUESTION-ORDERING-SPEC.md` §9.0 assigns interrogation order while calling textual order "the isomorphism anchor" (:195).
+Option D (never split, rows only) passes lens law 3 but gives no aggregation.
+
+#### What may merge — T3, option A of three, with one key
+
+- **One key, for stopping and for merging.**
+  A node becomes a leaf, and neighbouring blocks merge, only where the same rule resolves every point; for hit policies A and P, the same rule set.
+  That means only where the subtrees, labelled with their source rules, are identical.
+  Unordered columns (Boolean, enum) merge as sets, not as neighbours.
+- **Provenance-equivalence is a metric on the table→tree leg only.**
+  It is reported there, and not on the prose round trip, where the prose carries no row ids (§3.6, "The property").
+  It is not a gate: T1's option C was not taken.
+
+The point of the key is that each branch still says which provision fired.
+In `INLINE-DMNMD-SPEC.md` §3's Reg CF sketch, rows 2 and 3 both answer "reviewed" but are different provisions: the tier-2 ceiling and the first-time-issuer carve-out.
+Option B, merging any blocks with equal outputs, is the standard DMN simplification (Calvanese et al. 2018, `specs/research/DMN-STEELMAN.md:881-884`).
+This ruling departs from it, and provenance is the reason.
+
+Step 0 found 8 tables whose trees differ under A and B, all with two or three rows.
+No larger table supplies the deciding example, so the choice rests on provenance, not on a measured case.
+
+**What review changed.**
+As first specified, A did not deliver "which provision fired".
+Stopping at a leaf once the resolved value is constant merged same-output provisions under U, A and P before any merge rule ran, while under F a key on the live-rule set over-split.
+Reg CF cannot decide the question either, because every option gives the same tree in authored order.
+The objection was taken: A is now one key for both stopping and merging, and the deciding example was left to measurement, which found none.
+
+**Not taken.**
+Option B gives the smallest tree, but a leaf may be attributed to the wrong rule once citations go per-arm.
+Option C, the full grid, re-splits on thresholds of rules that no longer apply.
 
 ## 4. Pilot Corpus
 
@@ -863,6 +987,10 @@ record of what the demonstrator showed, retrievable at `0f90dab7`.
   §3.6 re-pointed at `l4 render --format text`. §2.7 added: the
   complaint-to-rule loop the demonstrator ran on, with its three landing
   levels and the golden diff as acceptance evidence.
+- **2026-09-26** — six rulings on decision tables recorded from Meng's "Tables, Trees, Prose" bench, all marked accept.
+  T1 (two named checks) amends §3.6; T2 (split order) and T3 (merging) are §3.7.
+  T4–T6 are in `INLINE-DMNMD-SPEC.md`: where the code lives (§4.1), the cell language (§5 item 3), and conflicts and no-match (§5).
+  Ruled, not implemented; §3.6 is still **not run**.
 
 ## 10. The second renderer — RULED 2026-09-02
 
