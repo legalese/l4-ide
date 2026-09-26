@@ -173,8 +173,10 @@ step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
 # worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
-# not a formatting defect. Check the files this branch actually changed.
-CHANGED=$(git -C "$WT" diff --name-only "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
+# not a formatting defect. Check the files this branch actually changed, and
+# only those that still exist: `--diff-filter=d` leaves out deletions, which
+# prettier would otherwise report as "No files matching the pattern".
+CHANGED=$(git -C "$WT" diff --name-only --diff-filter=d "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
 if [ -n "$CHANGED" ]; then
   # shellcheck disable=SC2086
   step "prettier 3.4.2 (changed files)" bash -c "cd '$WT' && npx -y prettier@3.4.2 --check $(echo $CHANGED | tr '\n' ' ')"
