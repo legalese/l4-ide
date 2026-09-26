@@ -29,14 +29,18 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
   mean. **The consequence that catches people: the shelf ships off `unstable`, so anything merged
   there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
 
-### 1.0 The authoring skill lives in TWO repos — correct here, port in the same session
+### 1.0 The skills live in TWO repos — correct here, port in the same session
 
-`skills/writing-l4-rules/` is duplicated verbatim in **`legalese/l4-plugin`**, at the same path,
-described there as "the L4 authoring skill packaged for use outside the l4-ide monorepo". This repo
-is upstream: `.github/workflows/release-l4-skill.yml` packages the skill into `l4-plugin.zip`, and
-the marketplace entry is `/plugin marketplace add legalese/l4-ide`.
+Every skill under `skills/` is duplicated in **`legalese/l4-plugin`**, at the same path: today
+`writing-l4-rules` (the language) and `encoding-a-subject` (encoding a whole body of law and filing
+it in canon). `.claude/skills/<name>` are symlinks to them. `.claude/skills/running-the-l4-pipeline/`
+is a real directory and is **not** shipped: Meng ruled on 2026-09-26 that it stays repo-local,
+recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout` branch.
+This repo is upstream: `.github/workflows/release-l4-skill.yml` packages `skills/` into
+`l4-plugin.zip`. There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and
+`/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
 
-**So a correction to the skill lands here first**, per the user-level `CLAUDE.md` rule "when you
+**So a correction to a skill lands here first**, per the user-level `CLAUDE.md` rule "when you
 correct a document, find its other copies first". The bundle names this repo as its source, so the
 pointer home exists, and the path back down is the generator below.
 
@@ -52,29 +56,26 @@ So a skill fix is ported by regenerating the bundle, never by hand-copying files
 
 What the script does, sorted by how its failures show up:
 
-- It empties the output directory, keeping only `.git`, then copies the skill and every repo file the skill's text cites, each at its original path (except `jl4-core/libraries/`, which the `l4` binary carries), and writes the bundle's README and manifests.
-- **Loud:** it then checks the bundle from the outside. Every citation and markdown link in the bundled skill must resolve, or it lists them and exits 1. That is a defect in the skill, not in the script.
+- It empties the output directory, keeping only `.git`, then copies the skills and every repo file their text cites, each at its original path (except `jl4-core/libraries/`, which the `l4` binary carries), and writes the bundle's README and manifests.
+- **Loud:** it then checks the bundle from the outside. Every citation and markdown link in the bundled skills must resolve, or it lists them and exits 1. That is a defect in the skill, not in the script.
 - **Loud, not fatal:** with `--l4-release`, it pins `scripts/install-l4.sh` to a release on `legalese/prereleases`; if the shelf cannot be reached, it prints `NO INSTALLER EMITTED` and builds the rest.
 - **Silent:** without `--l4-release`, no installer is written, and because the directory was emptied first, the bundle's existing `scripts/install-l4.sh` is deleted with no message. Pass the flag every time.
 
-**This paragraph used to claim a second thing — that the copies are byte-identical — and that is
-false.** Measured 2026-09-19 with `cmp`, on `origin/unstable` @ `ae74ae717`: `SKILL.md` is 799
-lines here and 796 there, differing on 21 lines, and `references/source-patterns/11-when-the-
-encoding-cannot-answer.md` and `specs/todo/IMPLICIT-PROPS-DESIGN.md` differ too. The bundle is
-BEHIND rather than divergent — its two most recent commits are `docs(skill): re-sync — ditto's
-positive case` and `docs(skill): re-sync — cite canon NOTES.md §9.2`, i.e. the hand-port stopgap
-this section warns about, actually happening, one file at a time.
+**The copies are identical only just after a regeneration.** Measured 2026-09-27:
+`diff -rq skills <l4-plugin>/skills` is empty (28 files each), with `l4-plugin` at `cc907b5`
+(generated from `a3ebc0e76`) and `unstable` at `98a975c72`. Every skill change that lands here
+afterwards leaves the bundle BEHIND until the next regeneration.
 
 So `diff` is still the right instrument, but read it as **"how far behind is the bundle"** and not
 as "this should be empty".
 Against today's tree a non-empty diff is normal between regenerations; to ask whether anyone edited the bundle by hand, diff it against the l4-ide commit its README names.
-What IS worth checking is whether a specific claim you are porting matches: the ofek
-citations, for instance, are identical in both trees even though the files around them are not
+What IS worth checking is whether a specific claim you are porting matches: the citations into
+canon, for instance
 (`etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` checks exactly that,
-and both trees resolve 7 of 7). One thing does not port: prose asserting something is "verifiable in situ" is false
+and both trees resolved 7 of 7 on 2026-09-27). One thing does not port: prose asserting something is "verifiable in situ" is false
 in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it. Say which tree a
-check needs. Note also that the README points at `.claude/skills/writing-l4-rules/`, which is the
-symlink; the tracked path is `skills/writing-l4-rules/` (see the skill-path symlink hazard).
+check needs. Edit the tracked path, `skills/<name>/`, not the `.claude/skills/<name>` symlink (see
+the skill-path symlink hazard).
 
 > **Why.** PR #382 corrected two claims in the skill — `#EVAL`'s `OF` form, and a provenance note
 > asserting the DMN exporter was not on `unstable`. Both were equally wrong in `l4-plugin`, and
