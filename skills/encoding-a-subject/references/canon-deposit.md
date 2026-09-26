@@ -2,16 +2,16 @@
 
 [`legalese/canon`](https://github.com/legalese/canon) is the corpus repository: it holds law, and `legalese/l4-ide` holds tools.
 Its layout is ruled in `docs/directory-conventions.md` (rulings Q1–Q6, 2026-08-05).
-**That document is on canon's `docs/directory-conventions` branch and not yet on `main`**, so read it with:
+**Until [legalese/canon#3](https://github.com/legalese/canon/pull/3) merges, that document is on canon's `docs/directory-conventions` branch rather than `main`**, so read it with:
 
 ```bash
 git -C <canon> fetch origin
 git -C <canon> show origin/docs/directory-conventions:docs/directory-conventions.md
 ```
 
-**Heads-up: canon's `main` does not yet follow those rulings everywhere.**
-Some subjects on `main` sit under full jurisdiction names (`subjects/israel/…`, `subjects/western-australia/…`) with the `.l4` directly in the subject directory, while the ruled layout below uses ISO codes and `encodings/<row>/`.
-Follow the ruled layout for new work, and if the law you are encoding already has a directory under the other spelling, ask before creating a second one.
+**Heads-up: until legalese/canon#3 merges, canon's `main` also has a second spelling.**
+Subjects from the bulk ingestion sit under full jurisdiction names (`subjects/israel/…`, `subjects/western-australia/…`), some with the `.l4` directly in the subject directory. #3 moves them all to the ISO layout below (ruled 2026-09-26: the shorter spelling).
+Use the ISO layout for new work, and before creating a subject, check whether the law already has one under either spelling.
 
 ## Where
 
