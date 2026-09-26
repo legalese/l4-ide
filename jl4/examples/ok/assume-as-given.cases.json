@@ -1,0 +1,16 @@
+{
+  "is-warm": [
+    { "temperature": 30 },
+    { "temperature": 10 },
+    { "temperature": 25 }
+  ],
+  "is-comfortable": [
+    { "temperature": 22, "humidity": 50 },
+    { "temperature": 30, "humidity": 50 },
+    { "temperature": 22, "humidity": 80 }
+  ],
+  "exceeds-threshold": [
+    { "temperature": 30, "threshold": 20 },
+    { "temperature": 10, "threshold": 20 }
+  ]
+}

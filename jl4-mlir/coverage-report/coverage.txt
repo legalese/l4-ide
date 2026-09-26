@@ -1,11 +1,11 @@
 L4 -> MLIR/WASM compile-coverage sweep (M2)
 
-Total files: 438
+Total files: 432
 
 Outcomes:
-  clean              35
+  clean              36
   has-unsupported    2
-  no-exports         349
+  no-exports         342
   typecheck-fail     51
   lower-fail         1
 
@@ -16,4 +16,6 @@ Typecheck failure classes:
   ambiguous          2
 
 Unsupported-construct reasons (function count):
-     2  REGULATIVE (deontic) construct not supported by the WASM backend
+     1  ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend
+     1  CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend
+     1  CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend

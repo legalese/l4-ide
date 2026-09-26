@@ -27,8 +27,8 @@ lazytrace2.l4:25:1-32:
   │└ MkPair OF 1, 2
   │┌ addPair
   │└ <function>
-  ├ CONSIDER p WHEN MkPair p1
-  │                         p2 THEN p1 PLUS p2
+  ├ CONSIDER p
+  │   WHEN MkPair p1 p2 THEN p1 PLUS p2
   ├ p1 PLUS p2
   └ 3
 lazytrace2.l4:26:1-13:
@@ -53,26 +53,30 @@ lazytrace2.l4:27:1-32:
   │└ LIST 1, 2, 3
   │┌ sumList
   │└ <function>
-  ├ CONSIDER list WHEN EMPTY THEN 0,
-  │                 WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN 0
+  │   WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
   ├ z PLUS (sumList OF zs)
   │┌ sumList OF zs
   ││┌ sumList
   ││└ <function>
-  │├ CONSIDER list WHEN EMPTY THEN 0,
-  ││                 WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
+  │├ CONSIDER list
+  ││   WHEN EMPTY THEN 0
+  ││   WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
   │├ z PLUS (sumList OF zs)
   ││┌ sumList OF zs
   │││┌ sumList
   │││└ <function>
-  ││├ CONSIDER list WHEN EMPTY THEN 0,
-  │││                 WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
+  ││├ CONSIDER list
+  │││   WHEN EMPTY THEN 0
+  │││   WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
   ││├ z PLUS (sumList OF zs)
   │││┌ sumList OF zs
   ││││┌ sumList
   ││││└ <function>
-  │││├ CONSIDER list WHEN EMPTY THEN 0,
-  ││││                 WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
+  │││├ CONSIDER list
+  ││││   WHEN EMPTY THEN 0
+  ││││   WHEN z FOLLOWED BY zs THEN z PLUS (sumList OF zs)
   │││├ 0
   │││└ 0
   ││└ 3

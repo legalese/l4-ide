@@ -41,7 +41,7 @@
 <title>0&#45;&gt;2</title>
 <path fill="none" stroke="#dc3545" stroke-dasharray="5,2" d="M122.39,-124.12C131.18,-118.09 141.05,-110.03 147.72,-100.69 152.07,-94.6 155.62,-87.58 158.5,-80.46"/>
 <polygon fill="#dc3545" stroke="#dc3545" points="161.77,-81.72 161.85,-71.13 155.18,-79.35 161.77,-81.72"/>
-<text xml:space="preserve" text-anchor="middle" x="170.45" y="-91.19" font-family="Helvetica,sans-Serif" font-size="10.00">timeout</text>
+<text xml:space="preserve" text-anchor="middle" x="172.32" y="-91.19" font-family="Helvetica,sans-Serif" font-size="10.00">violation</text>
 </g>
 </g>
 </svg>

@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+pattern-nested-maybe-partial.l4:13:3-14:25:
+  I found a problem while checking the definition of `f`:
+    The following branches still need to be considered:
+    
+      WHEN V NOTHING THEN
+    

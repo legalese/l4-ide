@@ -1,0 +1,67 @@
+IMPORT prelude
+
+§ `Set operators — Phase 1: SET OF a and the canonical vocabulary`
+
+-- The §11.5 trichotomy of SET-OPERATORS-SPEC.md, executable. The legal
+-- discriminator between readings of and/or is the extensional relationship
+-- between the operand sets; each row of the trichotomy is just data.
+
+§§ `Strings: the trichotomy`
+
+-- Royal Trust [1986] UKPC 34: education ⊆ welfare, so the intersective
+-- reading of "education and welfare" collapses to education and makes
+-- "welfare" otiose.
+`education purposes` MEANS setFromList (LIST "schools", "universities", "scholarships")
+`welfare purposes`   MEANS setFromList (LIST "schools", "universities", "scholarships",
+                                             "housing", "recreation")
+
+#EVAL `education purposes` `is subset of` `welfare purposes`
+#EVAL setSize (`education purposes` INTERSECT `welfare purposes`)
+
+-- NY/NJ: disjoint operands, empty intersection — the union reading is forced
+-- (the otiosity canon: Nam Hong [2016] SGCA 42 ¶26).
+`new yorkers`   MEANS setFromList (LIST "alice", "bob")
+`new jerseyans` MEANS setFromList (LIST "carol")
+
+#EVAL setSize (`new yorkers` UNION `new jerseyans`)
+#EVAL setSize (`new yorkers` INTERSECT `new jerseyans`)
+
+-- Koh Lau Keow [2013] SGHC 155: co-extensive operands — the exegetical "or".
+`home uses`      MEANS setFromList (LIST "refuge", "residence")
+`sanctuary uses` MEANS setFromList (LIST "residence", "refuge")
+
+#EVAL (`home uses` `is subset of` `sanctuary uses`) AND (`sanctuary uses` `is subset of` `home uses`)
+
+-- Re Best [1904] 2 Ch 354: proper overlap — both terms do work, read literally.
+`charitable objects` MEANS setFromList (LIST "almshouse", "school")
+`benevolent objects` MEANS setFromList (LIST "school", "social club")
+
+#EVAL setSize (`charitable objects` INTERSECT `benevolent objects`)
+
+§§ `Difference: LESS and WITHOUT`
+
+`all employees`  MEANS setFromList (LIST "dilbert", "alice", "wally", "asok")
+`on probation`   MEANS setFromList (LIST "asok")
+
+-- "all employees LESS those on probation" — backticked: bare LESS is a keyword
+#EVAL setSize (`all employees` `LESS` `on probation`)
+-- WITHOUT is the bare-spelling alias
+#EVAL setSize (`all employees` WITHOUT `on probation`)
+
+§§ `Enums: a finite element universe`
+
+DECLARE State IS ONE OF NY, NJ, CT
+
+`the tri-state universe` MEANS setFromList (LIST NY, NJ, CT)
+`eligible states`        MEANS setFromList (LIST NY, NJ)
+
+#EVAL NY `is in` `eligible states`
+#EVAL CT `is in` `eligible states`
+-- absolute complement, computable because the enum universe is finite
+#EVAL setToList (`the tri-state universe` WITHOUT `eligible states`)
+
+§§ `Construction and conversion`
+
+#EVAL setSize (`new yorkers` INTERSECT emptySet)
+#EVAL setSize (setFromList (LIST 1, 1, 2, 3, 3, 3))
+#EVAL setToList (SET OF LIST 5, 5, 6)

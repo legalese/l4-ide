@@ -6,7 +6,9 @@ import Test.Hspec
 
 import BundleStore
 import qualified Data.Map.Strict as Map
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
+import qualified Data.Text as Text
+import System.Directory (removeDirectoryRecursive, doesDirectoryExist, createDirectoryIfMissing)
+import System.FilePath ((</>))
 
 spec :: Spec
 spec = describe "BundleStore" do
@@ -66,6 +68,37 @@ spec = describe "BundleStore" do
         (loadedSources, loadedMeta) <- loadBundle store "deploy-overwrite"
         loadedSources `shouldBe` sources2
         loadedMeta.smVersion `shouldBe` "v2"
+
+      -- Regression for smucclaw/l4-ide#850. The tmp staging dir name is
+      -- deterministic (@<id>.tmp@), so an interrupted deploy can leave a stale
+      -- staging dir behind — the nginx `requires` restart cascade during
+      -- `nixos-rebuild switch` is exactly such an interruption. If the next
+      -- deploy does not clean that dir first, it writes the NEW sources on top
+      -- of the stale ones and the atomic swap installs the MERGED result; a
+      -- recompile then picks up the stale src/l4 copy and fails import
+      -- resolution while still reporting the deployment as "ready".
+      it "cleans a leftover tmp staging dir so a redeploy replaces, not merges (smucclaw/l4-ide#850)" \store -> do
+        let deployId = "ifema-cross-defaults"
+            staleTmpSources =
+              store.storePath </> (Text.unpack deployId <> ".tmp") </> "sources"
+            newSources = Map.fromList
+              [ ("ifema/find-cross-defaults.l4", "IMPORT ifema-definitions\nDECIDE f IS TRUE")
+              , ("ifema/ifema-definitions.l4", "DECIDE g IS FALSE")
+              ]
+            meta = StoredMetadata "v1" "2025-01-01T00:00:00Z" Nothing Nothing Nothing
+        -- Simulate the leftover from an interrupted previous deploy: an old
+        -- src/l4 file staged in the reused tmp dir that was never swapped in.
+        createDirectoryIfMissing True (staleTmpSources </> "src" </> "l4")
+        writeFile (staleTmpSources </> "src" </> "l4" </> "find-cross-defaults.l4")
+          "IMPORT ifema-definitions\nDECIDE f IS TRUE"
+        saveBundle store deployId newSources meta
+        (loadedSources, _) <- loadBundle store deployId
+        -- Only the new sources survive; the stale src/l4 copy must be gone.
+        loadedSources `shouldBe` newSources
+        Map.keys loadedSources `shouldNotContain` ["src/l4/find-cross-defaults.l4"]
+        -- listSourceFiles agrees: no stale path lingering on disk.
+        files <- listSourceFiles store deployId
+        files `shouldNotContain` ["src/l4/find-cross-defaults.l4"]
 
     describe "listDeployments" do
       it "lists saved deployments" \store -> do

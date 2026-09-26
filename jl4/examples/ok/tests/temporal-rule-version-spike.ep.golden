@@ -1,0 +1,54 @@
+-- SPIKE: the rule-version axis (tcRuleValidTime) is LOAD-BEARING.
+--
+-- `RULES EFFECTIVE DATE` is a nullary DATE builtin that reads the
+-- rule-valid-time axis stamped by `EVAL UNDER RULES EFFECTIVE AT` (and by
+-- the per-day interval iterators such as VALUE AT). When the axis is unset,
+-- it falls back to the localized current day (same computation as TODAY).
+--
+-- Rule versioning thereby becomes expressible as ordinary L4: the same
+-- predicate, evaluated under two different rule-versions, yields two
+-- different results.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z, so the ambient
+-- (unset-axis) fallback day is 2025-01-31, which is on the NEW side of the
+-- 2024-01-01 changeover.
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+-- GST rose from 7% to 9% for rules effective on/after 2024-01-01.
+`GST rate` MEANS
+  IF (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL (Date 1 1 2024))
+  THEN 9
+  ELSE 7
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`GST payable on` amount MEANS amount TIMES `GST rate` DIVIDED BY 100
+
+-- expected: 7 — same predicate, OLD rule-version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
+
+-- expected: 9 — same predicate, NEW rule-version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) `GST rate`
+
+-- expected: 7 — flips BACK under the old version (WHNFWhen cache
+-- revalidation across context switches, not staleness)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
+
+-- expected: 9 — ambient: axis unset, fallback = localized today 2025-01-31
+#EVAL `GST rate`
+
+-- expected: 70 — composes through a dependent rule (old version)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`GST payable on` 1000)
+
+-- expected: 90 — dependent rule under the new version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) (`GST payable on` 1000)
+
+-- expected: 7 — VALUE AT's per-day UnderRulesEffectiveAt stamp is load-bearing
+#EVAL `VALUE AT` (Date 1 6 2023) (GIVEN d YIELD `GST rate`)
+
+-- expected: 9
+#EVAL `VALUE AT` (Date 1 7 2024) (GIVEN d YIELD `GST rate`)

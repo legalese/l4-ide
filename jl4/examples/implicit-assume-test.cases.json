@@ -1,0 +1,13 @@
+{
+  "is-comfortable": [
+    { "temperature": 30, "threshold": 20, "humidity": 50 },
+    { "temperature": 10, "threshold": 20, "humidity": 50 },
+    { "temperature": 30, "threshold": 20, "humidity": 80 }
+  ],
+  "is-warm-and-approved": [
+    { "temperature": 25, "approved": true },
+    { "temperature": 25, "approved": false },
+    { "temperature": 35, "approved": true },
+    { "temperature": 15, "approved": true }
+  ]
+}

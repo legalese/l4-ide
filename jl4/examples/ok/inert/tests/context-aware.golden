@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+context-aware.l4:60:1-25:
+  FALSE
+context-aware.l4:61:1-24:
+  FALSE
+context-aware.l4:62:1-19:
+  FALSE
+context-aware.l4:63:1-21:
+  TRUE
+context-aware.l4:64:1-16:
+  FALSE
+context-aware.l4:65:1-33:
+  TRUE
+context-aware.l4:66:1-26:
+  FALSE

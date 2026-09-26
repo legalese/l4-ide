@@ -1,0 +1,27 @@
+-- =============================================================================
+-- Clause-matrix exhaustiveness, suggestion-cap overflow (§14.7, R5): a 9×9
+-- enum grid with only the B1 column's nine cells covered leaves 72 missing
+-- clauses — more than maxMissingSuggestions (64) — so the warning is
+-- SUPPRESSED entirely rather than printing pages of clauses. This fail-open
+-- suppression is DELIBERATE, the same capped-to-suppress convention as the
+-- single-CONSIDER analysis: no warning is better than a wrong one or a hang.
+-- The golden pins the silence. (A group this shape below the cap does warn:
+-- covering only A1 B1 and A2 B1 yields 23 suggestions and a full listing.)
+DECLARE Alpha IS ONE OF A1, A2, A3, A4, A5, A6, A7, A8, A9
+DECLARE Beta  IS ONE OF B1, B2, B3, B4, B5, B6, B7, B8, B9
+
+GIVEN a IS AN Alpha
+      b IS A Beta
+GIVETH A NUMBER
+DECIDE g A1 B1 IS 1
+DECIDE g A2 B1 IS 2
+DECIDE g A3 B1 IS 3
+DECIDE g A4 B1 IS 4
+DECIDE g A5 B1 IS 5
+DECIDE g A6 B1 IS 6
+DECIDE g A7 B1 IS 7
+DECIDE g A8 B1 IS 8
+DECIDE g A9 B1 IS 9
+
+#EVAL g A1 B1   -- 1
+#EVAL g A9 B1   -- 9

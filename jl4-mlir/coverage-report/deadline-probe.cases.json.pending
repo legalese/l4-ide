@@ -1,0 +1,7 @@
+{
+  "repayment": [
+    { "arguments": {}, "startTime": 0, "events": [ { "party": "the borrower", "action": "repay loan", "at": 20 } ] },
+    { "arguments": {}, "startTime": 0, "events": [ { "party": "the borrower", "action": "repay loan", "at": 5 } ] },
+    { "arguments": {}, "startTime": 0, "events": [] }
+  ]
+}

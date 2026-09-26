@@ -1,0 +1,15 @@
+IMPORT prelude
+
+DECLARE Rev IS ONE OF
+  FOO HAS fv IS A NUMBER
+  BAR HAS bv IS A NUMBER
+
+@export mk revmaybe
+GIVEN n IS A NUMBER
+GIVETH A MAYBE Rev
+`mk revmaybe` MEANS JUST (FOO n)
+
+@export mk revlist
+GIVEN n IS A NUMBER
+GIVETH A LIST OF Rev
+`mk revlist` MEANS LIST (FOO n), (BAR n)

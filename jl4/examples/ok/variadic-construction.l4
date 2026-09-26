@@ -1,0 +1,61 @@
+§ `Route-α variadic construction (SET-OPERATORS-SPEC §D7.1)`
+
+-- A record constructor with exactly one LIST-typed field, applied to two
+-- or more arguments, collects the arguments into a List literal:
+--   C OF e1, ..., en  ==>  C OF (LIST e1, ..., en)
+-- The rewrite fires only where direct application would be an arity error,
+-- so it is a strict conservative extension.
+
+DECLARE Bag OF a
+  HAS items IS A LIST OF a
+
+GIVEN a IS A TYPE
+      b IS A Bag OF a
+GIVETH A NUMBER
+bagSize b MEANS
+  CONSIDER b's items
+  WHEN EMPTY THEN 0
+  WHEN x FOLLOWED BY xs THEN 1 PLUS bagSize (Bag OF xs)
+
+-- exact fit: one argument that IS a list wraps it (no rewrite)
+wrapped MEANS Bag OF LIST 10, 20, 30
+#EVAL bagSize wrapped
+
+-- the variadic forms: two or more arguments collect into a list
+collected MEANS Bag OF 1, 2, 3
+#EVAL bagSize collected
+
+pair MEANS Bag OF "a", "b"
+#EVAL bagSize pair
+
+-- juxtaposition application collects identically
+juxta MEANS Bag 4 5 6
+#EVAL bagSize juxta
+
+-- collected arguments may themselves be compound expressions
+computed MEANS Bag OF (1 PLUS 1), (2 TIMES 3), 7
+#EVAL bagSize computed
+
+-- the sets-of-lists corner (§D7.1): a single list argument takes the
+-- exact-fit wrap reading, NOT the singleton reading. A bag containing
+-- one list requires explicit nesting:
+`bag of one list` MEANS Bag OF LIST (LIST 1, 2)
+#EVAL bagSize `bag of one list`
+
+-- enum elements work like any other type
+DECLARE Colour IS ONE OF red, green, blue
+palette MEANS Bag OF red, green, blue
+#EVAL bagSize palette
+
+-- the rescue is a biased FALLBACK: a same-named binding that makes the
+-- call site typecheck directly wins, and the rescue never participates
+-- (adversarial-review regression lock, 2026-07-18)
+DECLARE Wrap OF a
+  HAS items IS A LIST OF a
+
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+Wrap p q MEANS 42
+
+#EVAL Wrap 1 2

@@ -1,0 +1,19 @@
+-- Unification termination regression (SHOULD SUCCEED).
+-- Feeding the same unknown-typed value to parameters typed `Pair OF a, b`
+-- and `Pair OF b, a` is well-typed (with a = b). The unifier used to build
+-- the cyclic substitution a := b, b := a here and hang forever while
+-- applying the substitution.
+DECLARE Pair OF a, b
+  HAS fst IS AN a
+      snd IS A  b
+
+GIVEN a IS A TYPE
+      b IS A TYPE
+      p IS A Pair OF a, b
+      q IS A Pair OF b, a
+GIVETH A Pair OF a, b
+swappy p q MEANS p
+
+ASSUME mystery
+
+oops MEANS swappy mystery mystery

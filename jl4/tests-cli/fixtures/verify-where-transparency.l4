@@ -1,0 +1,48 @@
+-- Referential transparency: the same rule, spelled four ways.
+--
+-- `x WHERE x MEANS e` must be analysed as `e`. Before
+-- specs/todo/WHERE-INLINING-SPEC.md only `flat` was found unsatisfiable; the
+-- other three hid a limb behind a local name and the contradiction vanished,
+-- although every one of them is a top-level decision that IS analysed.
+--
+-- `parameterised` is the control. A binding that takes arguments stays opaque —
+-- substituting under arguments is beta reduction, which this pass does not do —
+-- so it must produce NO finding, and it must not lose its arguments on the way.
+
+GIVEN m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `flat` IF
+        m
+    AND NOT m
+
+GIVEN m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `behind a where` IF
+        m
+    AND NOT e
+    WHERE
+        e MEANS m
+
+GIVEN m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `behind a let` IF
+    LET e MEANS m
+    IN  m AND NOT e
+
+GIVEN m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `behind two hops` IF
+        p
+    AND NOT q
+    WHERE
+        p MEANS q
+        q MEANS m
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `parameterised` IF
+        `both of` a b
+    AND NOT `both of` b a
+    WHERE
+        GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+        `both of` x y MEANS x AND y

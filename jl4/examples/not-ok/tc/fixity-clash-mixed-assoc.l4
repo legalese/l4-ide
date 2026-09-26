@@ -1,0 +1,16 @@
+-- Equal-priority operators with different associativity directions cannot be
+-- chained without parentheses: the grouping would be ambiguous.
+
+@infixr 5
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p CONSR q MEANS p + 10 * q
+
+@infixl 5
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p SNOCL q MEANS p * 10 + q
+
+#EVAL 1 CONSR 2 SNOCL 3

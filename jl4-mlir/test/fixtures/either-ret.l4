@@ -1,0 +1,18 @@
+-- Return a USER enum-with-data across the ABI. Construction lowers RIGHT n /
+-- LEFT n to a BARE tag (payload discarded), so the WASM return would carry
+-- only the tag while jl4-service returns {"RIGHT":{"rv":n}} — a silent wrong
+-- at supported:true. FIXED (fail-closed): an @export whose GIVETH type is an
+-- enum-with-data now REFUSES (supported:false → routes to the reference
+-- evaluator), so this fixture is now `refused-unsupported`, NOT `differs`.
+-- Kept OUT of the gated corpus (it refuses entirely, like either-shadow).
+IMPORT prelude
+
+DECLARE Rev IS ONE OF
+  RIGHT HAS rv IS A NUMBER
+  LEFT  HAS lv IS A NUMBER
+
+@export return a user enum-with-data
+GIVEN n IS A NUMBER
+GIVETH A Rev
+`mk rev` MEANS
+  IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n

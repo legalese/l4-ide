@@ -1,0 +1,73 @@
+-- Test: section-qualified references work in EVERY namespace, not just for values.
+--
+-- `cross-section-ref.l4` covers the value case (`Section A`.sharedValue).
+-- This file is its sibling for the other three: a DECLARE'd TYPE, a data
+-- CONSTRUCTOR, and a record SELECTOR, each named across a § boundary.
+--
+-- Before this was fixed (issue #921), only the value case resolved: the
+-- qualified aliases for a DECLARE'd type were generated during the declare
+-- phase but never published beyond it, and constructors/selectors were never
+-- qualified at all. So an ambiguous type or constructor name had no escape
+-- hatch.
+
+§ `Section A` AKA secA
+DECLARE Verdict IS ONE OF yes, no
+DECLARE Wrapper HAS w IS A Verdict
+sharedValue MEANS 42
+
+§§ `Subsection A1`
+DECLARE Colour IS ONE OF red, green
+
+§ `Section B`
+
+-- value: the case cross-section-ref.l4 already covered
+qValue MEANS `Section A`.sharedValue
+
+-- type: qualified in GIVETH ...
+GIVETH A `Section A`.Verdict
+qType MEANS `Section A`.yes
+
+-- ... and in GIVEN
+GIVEN v IS A `Section A`.Verdict
+GIVETH A BOOLEAN
+qTypeParam MEANS v EQUALS `Section A`.no
+
+-- constructor: qualified in expression position ...
+qCon MEANS qTypeParam OF `Section A`.no
+
+-- ... and in pattern position
+GIVEN v IS A `Section A`.Verdict
+GIVETH A NUMBER
+qPattern MEANS CONSIDER v
+               WHEN `Section A`.yes THEN 1
+               WHEN `Section A`.no  THEN 0
+
+-- record construction, then selector projection, both qualified
+qRecord MEANS `Section A`.Wrapper WITH w IS `Section A`.yes
+qSelector MEANS qRecord's `Section A`.w
+
+-- a section AKA works as a qualifier for types and constructors too
+GIVETH A secA.Verdict
+qAka MEANS secA.no
+
+-- nested sections qualify with the full path
+GIVETH A `Section A`.`Subsection A1`.Colour
+qNested MEANS `Section A`.`Subsection A1`.green
+
+-- unqualified access is unchanged
+qUnqualified MEANS sharedValue PLUS 1
+
+#CHECK qType
+#CHECK qCon
+#CHECK qSelector
+
+#EVAL qValue
+#EVAL qType
+#EVAL qCon
+#EVAL qPattern OF `Section A`.yes
+#EVAL qPattern OF `Section A`.no
+#EVAL qRecord
+#EVAL qSelector
+#EVAL qAka
+#EVAL qNested
+#EVAL qUnqualified

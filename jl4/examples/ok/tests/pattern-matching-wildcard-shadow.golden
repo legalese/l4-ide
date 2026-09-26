@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-wildcard-shadow.l4:25:1-18:
+  2
+pattern-matching-wildcard-shadow.l4:26:1-15:
+  2
+pattern-matching-wildcard-shadow.l4:27:1-17:
+  1

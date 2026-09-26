@@ -88,10 +88,6 @@ nlgExpr = \ case
       e1' <- nlgExpr e1
       e2' <- nlgExpr e2
       pure $ Modulo ann e1' e2'
-    Exponent ann e1 e2 -> do
-      e1' <- nlgExpr e1
-      e2' <- nlgExpr e2
-      pure $ Exponent ann e1' e2'
     Cons ann e1 e2 -> do
       e1' <- nlgExpr e1
       e2' <- nlgExpr e2
@@ -189,6 +185,16 @@ nlgExpr = \ case
       e2' <- nlgExpr e2
       e3' <- nlgExpr e3
       pure $ Post ann e1' e2' e3'
+    Record ann mParty cell val isOfficial mHence -> do
+      mParty' <- traverse nlgExpr mParty
+      cell' <- nlgExpr cell
+      val' <- nlgExpr val
+      mHence' <- traverse nlgExpr mHence
+      pure $ Record ann mParty' cell' val' isOfficial mHence'
+    ReadCell ann mParty isOfficial mode cell -> do
+      mParty' <- traverse nlgExpr mParty
+      cell' <- nlgExpr cell
+      pure $ ReadCell ann mParty' isOfficial mode cell'
     Concat ann es -> do
       es' <- traverse nlgExpr es
       pure $ Concat ann es'
@@ -226,11 +232,12 @@ nlgLocalDecl = \ case
 
 nlgAssume :: Assume Resolved -> Check (Assume Resolved)
 nlgAssume = \ case
-  MkAssume ann tySig appForm mTy ->
+  MkAssume ann tySig appForm mTy mTypically ->
     MkAssume ann
       <$> nlgTypeSig tySig
       <*> nlgAppForm appForm
       <*> traverse nlgType mTy
+      <*> traverse nlgExpr mTypically
 
 nlgNamedExpr :: NamedExpr Resolved -> Check (NamedExpr Resolved)
 nlgNamedExpr = \ case
@@ -286,10 +293,11 @@ nlgGivenSig (MkGivenSig ann ns) =
     <$> traverse nlgOptionallyTypedName ns
 
 nlgOptionallyTypedName :: OptionallyTypedName Resolved -> Check (OptionallyTypedName Resolved)
-nlgOptionallyTypedName (MkOptionallyTypedName ann n mty) =
+nlgOptionallyTypedName (MkOptionallyTypedName ann n mty mTypically) =
   MkOptionallyTypedName ann
     <$> resolveNlgAnnotationInResolved n
     <*> traverse nlgType mty
+    <*> traverse nlgExpr mTypically
 
 nlgDeclare :: Declare Resolved -> Check (Declare Resolved)
 nlgDeclare (MkDeclare ann tysig appForm tydecl) =
@@ -318,8 +326,9 @@ nlgConDecl (MkConDecl ann n typedName) =
     <*> traverse nlgTypedName typedName
 
 nlgTypedName :: TypedName Resolved -> Check (TypedName Resolved)
-nlgTypedName (MkTypedName ann n ty mExpr) =
+nlgTypedName (MkTypedName ann n ty mTypically mExpr) =
   MkTypedName ann
     <$> resolveNlgAnnotationInResolved n
     <*> nlgType ty
+    <*> traverse nlgExpr mTypically
     <*> pure mExpr

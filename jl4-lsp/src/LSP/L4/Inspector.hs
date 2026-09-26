@@ -138,16 +138,18 @@ evalDirectiveToResult
   -> SrcRange
   -> EL.EvalDirectiveResult
   -> DirectiveResult
-evalDirectiveToResult fields dirType rng (EL.MkEvalDirectiveResult _range res mtrace) =
+evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led) =
   DirectiveResult
     { directiveType = dirType
-    , prettyText = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult _range res mtrace)
+    , prettyText = EL.prettyEvalDirectiveResultWithFields fields evalRes
     , success = case res of
-        EL.Assertion b        -> Just b
+        EL.Assertion (Right b) -> Just b
+        EL.Assertion (Left _)  -> Just False
         EL.Reduction (Right _) -> Just True
         EL.Reduction (Left _)  -> Just False
     , structuredValue = case res of
-        EL.Assertion b -> Just (Aeson.toJSON b)
+        EL.Assertion (Right b) -> Just (Aeson.toJSON b)
+        EL.Assertion (Left _)  -> Nothing
         EL.Reduction (Left _) -> Nothing
         EL.Reduction (Right nf) -> Just (nfToJson nf)
     , range = rng
@@ -270,12 +272,13 @@ evalDirectiveToUpdateItem
   -> (Int -> Int -> Text)   -- ^ slice raw source lines, inclusive 1-indexed [startLine, endLine]
   -> EL.EvalDirectiveResult
   -> Maybe DirectiveUpdateItem
-evalDirectiveToUpdateItem fields getLines (EL.MkEvalDirectiveResult (Just rng@(MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res mtrace) =
+evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led) =
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
-    , prettyText  = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult (Just rng) res mtrace)
+    , prettyText  = EL.prettyEvalDirectiveResultWithFields fields evalRes
     , success     = case res of
-        EL.Assertion b         -> Just b
+        EL.Assertion (Right b) -> Just b
+        EL.Assertion (Left _)  -> Just False
         EL.Reduction (Right _) -> Just True
         EL.Reduction (Left _)  -> Just False
     , body        = getLines startLine endLine
@@ -380,6 +383,7 @@ exportedFunctionToSummary declares ef =
               , parameterItems = Nothing
               , parameterRequired = Nothing
               , parameterL4Type = Nothing
+              , parameterDefault = Nothing
               }
             Just ty -> FSchema.typeToParameter declares Set.empty ty
           desc = case ep.paramDescription of

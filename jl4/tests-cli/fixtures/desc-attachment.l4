@@ -1,0 +1,51 @@
+-- Oracle for the two @desc-attachment rules `L4.Parser.ResolveAnnotation`
+-- implements. Both were, at different times, silently wrong: `instance HasDesc
+-- (Expr n)` was `pure`, so the desc pass never descended into an expression at
+-- all, and its first repair descended only into a `WHERE`/`LET` sitting at the
+-- top of a body. In every failing case `l4 check` reported success and the
+-- annotation simply vanished, which is why this file exists.
+--
+--   1. A @desc written above a WHERE binding is claimed by THAT BINDING, and
+--      not left pending for a later top-level declaration to claim
+--      (`descPrecedesNode` admits any preceding desc within 8 columns of
+--      slack, so "a later declaration claims it" is the real alternative, not
+--      a hypothetical one). Read off the `auto terms:` glossary, which keys
+--      every entry by the name of the definition that owns the gloss.
+--
+--   2. A @desc written above a LET binding NESTED INSIDE another expression is
+--      claimed by that binding too. Read off `l4 ast`: the glossary cannot see
+--      this one, because `collectGlossary` walks only a WHERE/LET at the top
+--      of a decide body.
+
+@desc A parcel of land
+DECLARE Parcel
+    HAS
+      @desc whether the parcel is registered
+      `registered` IS A BOOLEAN
+
+@ref Land Titles Act s 4
+@export Whether the parcel may be transferred
+GIVEN p IS A Parcel @desc The parcel under assessment
+GIVETH A BOOLEAN
+DECIDE `transfer permitted` p IF `title is clean`
+ WHERE
+    @desc BINDINGGLOSS the title is free of encumbrance
+    `title is clean` MEANS p's `registered`
+
+-- Deliberately carries NO @desc of its own: if the binding gloss above were
+-- still pending when the desc pass reached here, THIS is what would claim it,
+-- and the glossary would key that text under `claim window in days`.
+GIVETH A NUMBER
+DECIDE `claim window in days` IS
+    IF TRUE
+    THEN LET
+           @desc NESTEDGLOSS a LET binding inside an IF arm
+           `grace period` BE 14
+         IN `grace period`
+    ELSE 0
+
+#EVAL `transfer permitted` OF Parcel WITH `registered` IS TRUE
+-- TRUE
+
+#EVAL `claim window in days`
+-- 14

@@ -35,8 +35,19 @@ embedOneLibrary :: FilePath -> FilePath -> Q Exp
 embedOneLibrary libDir fileName = do
   let name = takeBaseName fileName
       path = libDir </> fileName
-  
-  -- Register dependency so rebuilds happen when files change
+
+  -- Register dependency so rebuilds happen when files change.
+  --
+  -- STALENESS GOTCHA: @path@ is whatever directory the splice in
+  -- 'L4.API.EmbeddedLibraries' resolved at /build/ time — typically the Cabal
+  -- install datadir (e.g. @~/.cabal/share/.../jl4-core-*/libraries@), NOT your
+  -- checkout. So editing a worktree's @jl4-core/libraries/*.l4@ does not
+  -- invalidate this splice, and a plain @cabal build@ keeps the old embedded
+  -- stdlib. To pick up stdlib edits either force a re-embed (touch
+  -- EmbeddedLibraries.hs / clean-rebuild jl4-core) or — the reliable way while
+  -- developing — set @JL4_LIBRARY_PATH@ to your worktree's
+  -- @jl4-core/libraries@, which outranks the embed in import resolution.
+  -- See jl4-core/libraries/README.md and LIBRARY-RESOLUTION-SHADOW-SPEC §3.4.
   addDependentFile path
   
   -- Read file contents at compile time

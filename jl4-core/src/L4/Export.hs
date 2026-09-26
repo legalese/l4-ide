@@ -9,14 +9,21 @@ module L4.Export (
   getExportedFunctions,
   getDefaultFunction,
   enrichReturnTypes,
+  enrichParamTypes,
   buildTypeDescMap,
   assumesFromModule,
+  assumesReadBy,
+  transitiveReferencedUniques,
+  AssumeRewrite (..),
+  rewriteModuleAssumes,
   extractAssumeParamTypes,
+  extractAssumeParamsWithDefaults,
   extractAssumeParamResolveds,
   extractImplicitAssumeParams,
   hasTypeInferenceVars,
   validateExportInputs,
   isExportedDecide,
+  isNonexhaustiveDecide,
 ) where
 
 import Base
@@ -56,6 +63,7 @@ data ExportedParam = ExportedParam
   , paramType :: !(Maybe (Type' Resolved))
   , paramDescription :: !(Maybe Text)
   , paramRequired :: !Bool
+  , paramDefault :: !(Maybe (Expr Resolved)) -- ^ TYPICALLY default value, if declared
   }
   deriving stock (Eq, Show, Generic)
 #if defined(SERIALISE_ENABLED)
@@ -65,6 +73,11 @@ data ExportedParam = ExportedParam
 data DescFlags = DescFlags
   { isDefault :: !Bool
   , isExport :: !Bool
+  , isNonexhaustive :: !Bool
+  -- ^ @\@nonexhaustive@: the author declares this definition deliberately partial
+  -- (not defined for all inputs; evaluation fails outside its domain), which
+  -- silences the non-exhaustive-CONSIDER warning for its body. Redundancy
+  -- warnings stay active.
   }
   deriving stock (Eq, Show)
 
@@ -89,6 +102,7 @@ parseDescText txt =
     DescFlags
       { isDefault = False
       , isExport = False
+      , isNonexhaustive = False
       }
 
   consumeKeywords t flagsAcc =
@@ -108,6 +122,8 @@ parseDescText txt =
                 }
           "export" ->
             consumeKeywords restStripped flagsAcc{isExport = True}
+          "nonexhaustive" ->
+            consumeKeywords restStripped flagsAcc{isNonexhaustive = True}
           _ -> (flagsAcc, current)
 
 getExportedFunctions :: Module Resolved -> [ExportedFunction]
@@ -129,7 +145,7 @@ getExportedFunctions mod'@(MkModule _ _ section) =
     decls >>= collectDecl tdm assumes'
 
   collectDecl tdm assumes' = \ case
-    Decide _ dec -> maybeToList (buildExportedFunction tdm assumes' dec)
+    Decide _ dec -> maybeToList (buildExportedFunction mod' tdm assumes' dec)
     Section _ sub -> collectSection tdm assumes' sub
     _ -> []
 
@@ -161,17 +177,65 @@ enrichReturnTypes entInfo = map enrich
           other       -> other
       _ -> Nothing
 
+-- | Fill in missing parameter types using type-checker entity info — the
+-- parameter-side sibling of 'enrichReturnTypes'. A bare-head DECIDE
+-- (@DECIDE factorial x IS …@ with no GIVEN) carries no annotated type for
+-- its params, but the typechecker still infers one; we look up the
+-- function's inferred 'Fun' type and pair its argument types with the
+-- params positionally. Only the leading GIVEN\/head params are paired —
+-- ASSUME-derived params (appended after them by 'buildExportedFunction')
+-- carry their own type signature and the argument list has run out by the
+-- time the zip reaches them. Params that already have a type are never
+-- overwritten.
+enrichParamTypes :: EntityInfo -> [ExportedFunction] -> [ExportedFunction]
+enrichParamTypes entInfo = map enrich
+ where
+  enrich ef
+    | all (isJust . (.paramType)) ef.exportParams = ef
+    | otherwise =
+        let MkDecide _ _ (MkAppForm _ name _ _) _ = ef.exportDecide
+        in ef { exportParams = zipFill ef.exportParams (inferArgTypes name) }
+
+  inferArgTypes :: Resolved -> [Type' Resolved]
+  inferArgTypes name =
+    case Map.lookup (getUnique name) entInfo of
+      Just (_, KnownTerm (Fun _ args _) _) ->
+        [ty | MkOptionallyNamedType _ _ ty <- args]
+      _ -> []
+
+  zipFill ps tys = zipWith fill ps (map Just tys ++ repeat Nothing)
+
+  fill p mty
+    | isJust p.paramType = p
+    -- An inference variable means the typechecker never pinned the type
+    -- down; @{"type":"object"}@ is wrong for a scalar, but an InfVar-derived
+    -- schema entry would be a differently-shaped lie. Leave it untyped.
+    | Just ty <- mty, not (hasInfVar ty) =
+        p { paramType = Just ty
+          , paramRequired = not (isMaybeType (Just ty))
+          }
+    | otherwise = p
+
+  hasInfVar :: Type' Resolved -> Bool
+  hasInfVar = \ case
+    InfVar {} -> True
+    TyApp _ _ tys -> any hasInfVar tys
+    Fun _ args ret -> any hasInfVar [ty | MkOptionallyNamedType _ _ ty <- args] || hasInfVar ret
+    Forall _ _ ty -> hasInfVar ty
+    Type {} -> False
+
 buildExportedFunction
-  :: TypeDescMap
+  :: Module Resolved
+  -> TypeDescMap
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> Maybe ExportedFunction
-buildExportedFunction typeDescMap assumes decide@(MkDecide _ tySig appForm _) = do
+buildExportedFunction mod' typeDescMap assumes decide@(MkDecide _ tySig appForm _) = do
   desc <- getAnno decide ^. annDesc
   let parsed = parseDescText (getDesc desc)
   guard (parsed.flags.isExport)
   let givenParams = extractParams typeDescMap tySig
-      assumedParams = extractAssumedDependencies typeDescMap assumes decide
+      assumedParams = extractAssumedDependencies mod' typeDescMap assumes decide
   pure
     ExportedFunction
       { exportName = resolvedToText (extractAppFormName appForm)
@@ -189,7 +253,7 @@ extractParams :: TypeDescMap -> TypeSig Resolved -> [ExportedParam]
 extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
   fmap toParam names
  where
-  toParam (MkOptionallyTypedName ann resolved mType) =
+  toParam (MkOptionallyTypedName ann resolved mType mTypically) =
     let paramDesc = fmap getDesc (ann ^. annDesc)
         fallbackDesc = mType >>= getTypeDesc typeDescMap
     in ExportedParam
@@ -197,6 +261,7 @@ extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
       , paramType = mType
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
+      , paramDefault = mTypically
       }
 
 extractReturnType :: TypeSig Resolved -> Maybe (Type' Resolved)
@@ -240,7 +305,7 @@ assumesFromModule mod'@(MkModule _ _ section) =
     decls >>= collectDecl
 
   collectDecl = \case
-    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) mType) ->
+    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) mType _mTypically) ->
       case mType of
         Just ty | isFunctionTypeExpanded synonyms ty -> []  -- Skip function-typed ASSUMEs
         _ -> [(getUnique name, assume)]
@@ -282,42 +347,124 @@ isFunctionTypeExpanded synonyms = go Set.empty
       in expansion || any (go visited) args
     _ -> False
 
--- | Collect the 'Unique' of every identifier the expression references —
--- whether it appears as a plain variable (@App _ ref []@) or as a function
--- applied to arguments (@App _ ref [arg, ...]@). This is the single canonical
--- dependency collector for an expression body.
+-- | Collect the 'Unique' of every identifier the expression references
+-- /directly/ — as a plain variable (@App _ ref []@), a function applied to
+-- positional arguments (@App _ ref [arg, ...]@) or to named arguments
+-- ('AppNamed'), or the field head of a projection (a computed @MEANS@
+-- record field desugars to a top-level selector DECIDE, which must be
+-- walked like any other callee). WHERE-locals and lambdas are part of the
+-- body expression, so their references are collected too.
 --
--- Upstream callers (e.g. 'extractAssumedDependencies') intersect this set
--- with a pre-filtered map (e.g. 'assumesFromModule' drops function-typed
--- ASSUMEs), so semantic specialization happens at the filter step rather
--- than in the collector itself.
+-- This is one body deep: it does not follow references into the bodies of
+-- the definitions they name. For the read-set of an export — what an
+-- evaluation of it will actually demand — use 'transitiveReferencedUniques'.
+--
+-- Upstream callers intersect this set with a pre-filtered map (e.g.
+-- 'assumesFromModule' drops function-typed ASSUMEs), so semantic
+-- specialization happens at the filter step rather than in the collector.
 collectReferencedUniques :: Expr Resolved -> Set.Set Unique
 collectReferencedUniques =
   foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
-    App _ (Ref _ uniq _) _ -> Set.singleton uniq
+    App _ r _        -> Set.singleton (getUnique r)
+    AppNamed _ r _ _ -> Set.singleton (getUnique r)
+    Proj _ _ f       -> Set.singleton (getUnique f)
     _ -> Set.empty
 
--- | Extract ASSUME declarations that are referenced by a DECIDE body.
+-- | The body of every module-level DECIDE (in any section), keyed by the
+-- 'Unique' of the name it defines. This is the call graph's edge table:
+-- 'transitiveReferencedUniques' follows a reference into its body.
+decideBodiesFromModule :: Module Resolved -> Map.Map Unique (Expr Resolved)
+decideBodiesFromModule (MkModule _ _ section) =
+  Map.fromList (goSection section)
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) -> [(getUnique name, body)]
+    Section _ sub -> goSection sub
+    _ -> []
+
+-- | The transitive read-set of an expression: every 'Unique' it references
+-- directly ('collectReferencedUniques'), plus everything referenced by the
+-- body of any module-level definition reachable from it through the call
+-- graph — so an @\@export@ whose helper reads an ASSUME is charged with
+-- that ASSUME. Cycle-safe: recursive and mutually recursive definitions
+-- are visited once.
+--
+-- Callers that want the ASSUMEs an export depends on should go through
+-- 'assumesReadBy'; this is the one place that closure is computed, so the
+-- schema, the direct evaluator, the batch wrapper and the WASM ABI all
+-- agree on what a request must supply.
+transitiveReferencedUniques :: Module Resolved -> Expr Resolved -> Set.Set Unique
+transitiveReferencedUniques mod' = go Set.empty . Set.toList . collectReferencedUniques
+ where
+  defs = decideBodiesFromModule mod'
+  go seen [] = seen
+  go seen (u : us)
+    | Set.member u seen = go seen us
+    | otherwise =
+        let next = maybe [] (Set.toList . collectReferencedUniques) (Map.lookup u defs)
+        in go (Set.insert u seen) (next <> us)
+
+-- | The ASSUMEs (drawn from a pre-filtered map such as 'assumesFromModule')
+-- that a DECIDE reads — directly, or through any definition it reaches.
+-- Returned in the map's key order (declaration order of the 'Unique's),
+-- which is the order every consumer presents them in.
+assumesReadBy
+  :: Module Resolved
+  -> Map.Map Unique (Assume Resolved)
+  -> Decide Resolved
+  -> [Assume Resolved]
+assumesReadBy mod' assumes (MkDecide _ _ _ body) =
+  let referencedUniques = transitiveReferencedUniques mod' body
+  in [ assume
+     | (uniq, assume) <- Map.toList assumes
+     , Set.member uniq referencedUniques
+     ]
+
+-- | What 'rewriteModuleAssumes' should do with one module-level ASSUME.
+data AssumeRewrite
+  = KeepAssume
+  | DropAssume
+  | ReplaceAssume (TopDecl Resolved)
+
+-- | Rewrite every module-level ASSUME (in any section). Used to bind
+-- supplied values for ASSUMEs at evaluation time: the evaluator keeps an
+-- ASSUME as 'ValAssumed' at its own address in the module environment,
+-- which every closure in the module captures, so a @LET@ around a call
+-- cannot reach a helper that reads it — but a definition installed at the
+-- ASSUME's own address (same 'Resolved', hence same 'Unique') can.
+rewriteModuleAssumes
+  :: (Assume Resolved -> AssumeRewrite)
+  -> Module Resolved
+  -> Module Resolved
+rewriteModuleAssumes rewrite (MkModule ann uri section) =
+  MkModule ann uri (goSection section)
+ where
+  goSection (MkSection sann name aka decls) =
+    MkSection sann name aka (mapMaybe goDecl decls)
+  goDecl = \case
+    decl@(Assume _ assume) -> case rewrite assume of
+      KeepAssume          -> Just decl
+      DropAssume          -> Nothing
+      ReplaceAssume decl' -> Just decl'
+    Section sann sub -> Just (Section sann (goSection sub))
+    other -> Just other
+
+-- | Extract ASSUME declarations that are referenced by a DECIDE body, or by
+-- anything it reaches ('assumesReadBy').
 -- Returns ExportedParams for each ASSUME that the function depends on.
 extractAssumedDependencies
-  :: TypeDescMap
+  :: Module Resolved
+  -> TypeDescMap
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [ExportedParam]
-extractAssumedDependencies typeDescMap assumes (MkDecide _ _ _ body) =
-  let
-    referencedUniques = collectReferencedUniques body
-    matchingAssumes =
-      [ assume
-      | (uniq, assume) <- Map.toList assumes
-      , Set.member uniq referencedUniques
-      ]
-  in
-    map (assumeToParam typeDescMap) matchingAssumes
+extractAssumedDependencies mod' typeDescMap assumes decide =
+  map (assumeToParam typeDescMap) (assumesReadBy mod' assumes decide)
 
 -- | Convert an ASSUME declaration to an ExportedParam
 assumeToParam :: TypeDescMap -> Assume Resolved -> ExportedParam
-assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType) =
+assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
   let
     paramDesc = fmap getDesc (ann ^. annDesc)
     fallbackDesc = mType >>= getTypeDesc typeDescMap
@@ -327,6 +474,7 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType) =
       , paramType = mType
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
+      , paramDefault = mTypically
       }
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
@@ -343,6 +491,22 @@ extractAssumeParamTypes
 extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
+-- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
+-- value (if any) declared on each ASSUME, and the ASSUME's own @\@desc@
+-- text (if any). Used by the function schema to expose defaults and
+-- descriptions to API consumers.
+extractAssumeParamsWithDefaults
+  :: Module Resolved
+  -> Decide Resolved
+  -> [(Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)]
+extractAssumeParamsWithDefaults mod' decide =
+  mapMaybe assumeInfo (assumesReadBy mod' (assumesFromModule mod') decide)
+ where
+  assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)
+  assumeInfo (MkAssume ann _ (MkAppForm _ name _ _) (Just ty) mTypically) =
+    Just (resolvedToText name, ty, mTypically, getDesc <$> ann ^. annDesc)
+  assumeInfo _ = Nothing
+
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of
 -- its textual form. Consumers that need to bind the ASSUME in a local scope
 -- (e.g. MLIR lowering) need the Resolved so subsequent in-scope references
@@ -351,20 +515,11 @@ extractAssumeParamResolveds
   :: Module Resolved
   -> Decide Resolved
   -> [(Resolved, Type' Resolved)]
-extractAssumeParamResolveds mod' (MkDecide _ _ _ body) =
-  let
-    assumes = assumesFromModule mod'
-    referencedUniques = collectReferencedUniques body
-    matchingAssumes =
-      [ assume
-      | (uniq, assume) <- Map.toList assumes
-      , Set.member uniq referencedUniques
-      ]
-  in
-    mapMaybe assumeToResolvedInfo matchingAssumes
+extractAssumeParamResolveds mod' decide =
+  mapMaybe assumeToResolvedInfo (assumesReadBy mod' (assumesFromModule mod') decide)
  where
   assumeToResolvedInfo :: Assume Resolved -> Maybe (Resolved, Type' Resolved)
-  assumeToResolvedInfo (MkAssume _ _ (MkAppForm _ name _ _) (Just ty)) =
+  assumeToResolvedInfo (MkAssume _ _ (MkAppForm _ name _ _) (Just ty) _mTypically) =
     Just (name, ty)
   assumeToResolvedInfo _ = Nothing
 
@@ -422,7 +577,7 @@ validateExportInputs :: Module Resolved -> [CheckErrorWithContext]
 validateExportInputs mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
-  in concatMap (checkOneExport synonyms assumes) (collectExportedDecides mod')
+  in concatMap (checkOneExport mod' synonyms assumes) (collectExportedDecides mod')
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
@@ -440,6 +595,15 @@ isExportedDecide decide =
     Just desc -> (parseDescText (getDesc desc)).flags.isExport
     Nothing   -> False
 
+-- | Was this definition marked @\@nonexhaustive@ by its author? See 'DescFlags'.
+-- Polymorphic in the pass so the type checker can consult it before
+-- resolution.
+isNonexhaustiveDecide :: Decide n -> Bool
+isNonexhaustiveDecide decide =
+  case getAnno decide ^. annDesc of
+    Just desc -> (parseDescText (getDesc desc)).flags.isNonexhaustive
+    Nothing   -> False
+
 -- | Like 'assumesFromModule' but WITHOUT the function-type filter —
 -- so the validator sees every ASSUME and can flag function-typed ones.
 allAssumesFromModule :: Module Resolved -> Map.Map Unique (Assume Resolved)
@@ -448,19 +612,23 @@ allAssumesFromModule (MkModule _ _ section) =
  where
   collectSection (MkSection _ _ _ decls) = decls >>= collectDecl
   collectDecl = \case
-    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) _) ->
+    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) _ _) ->
       [(getUnique name, assume)]
     Section _ sub -> collectSection sub
     _ -> []
 
 checkOneExport
-  :: Map.Map Unique (Type' Resolved)
+  :: Module Resolved
+  -> Map.Map Unique (Type' Resolved)
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [CheckErrorWithContext]
-checkOneExport synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
+checkOneExport mod' synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
   checkGivenFunctionInputs synonyms fnName tySig
-  ++ checkAssumeFunctionInputs synonyms assumes fnName decide
+  ++ checkAssumeFunctionInputs synonyms readAssumes fnName
+  ++ checkAssumeNameClash readAssumes fnName tySig
+ where
+  readAssumes = assumesReadBy mod' assumes decide
 
 checkGivenFunctionInputs
   :: Map.Map Unique (Type' Resolved)
@@ -469,23 +637,42 @@ checkGivenFunctionInputs
   -> [CheckErrorWithContext]
 checkGivenFunctionInputs synonyms fnName (MkTypeSig _ (MkGivenSig _ names) _) =
   [ mkExportFunErr fnName paramName
-  | MkOptionallyTypedName _ paramName (Just ty) <- names
+  | MkOptionallyTypedName _ paramName (Just ty) _ <- names
   , isFunctionTypeExpanded synonyms ty
   ]
 
 checkAssumeFunctionInputs
   :: Map.Map Unique (Type' Resolved)
-  -> Map.Map Unique (Assume Resolved)
+  -> [Assume Resolved]
   -> Resolved
-  -> Decide Resolved
   -> [CheckErrorWithContext]
-checkAssumeFunctionInputs synonyms assumes fnName (MkDecide _ _ _ body) =
-  let referencedUniques = collectReferencedUniques body
-  in [ mkExportFunErr fnName paramName
-     | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
-     , Set.member uniq referencedUniques
-     , isFunctionTypeExpanded synonyms ty
-     ]
+checkAssumeFunctionInputs synonyms readAssumes fnName =
+  [ mkExportFunErr fnName paramName
+  | MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty) _mTypically <- readAssumes
+  , isFunctionTypeExpanded synonyms ty
+  ]
+
+-- | A GIVEN parameter and a read ASSUME that share a name would collapse
+-- into one input field of the export's schema (the GIVEN shadows the
+-- ASSUME inside the export's own body, but a helper it reaches still reads
+-- the module-level ASSUME), so a request could never supply both. Report
+-- it rather than let the schema silently merge them.
+checkAssumeNameClash
+  :: [Assume Resolved]
+  -> Resolved
+  -> TypeSig Resolved
+  -> [CheckErrorWithContext]
+checkAssumeNameClash readAssumes fnName (MkTypeSig _ (MkGivenSig _ names) _) =
+  [ MkCheckErrorWithContext
+      { kind    = ExportAssumeNameClash fnName paramName
+      , context = WhileCheckingDecide (getActual fnName) None
+      }
+  | MkOptionallyTypedName _ paramName _ _ <- names
+  , resolvedToText paramName `Set.member` assumeNames
+  ]
+ where
+  assumeNames = Set.fromList
+    [ resolvedToText name | MkAssume _ _ (MkAppForm _ name _ _) _ _ <- readAssumes ]
 
 mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
 mkExportFunErr fnName paramName =

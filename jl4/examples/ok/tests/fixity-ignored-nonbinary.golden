@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+fixity-ignored-nonbinary.l4:4:1-10:
+  I found a problem while checking the definition of `notbinary`:
+    The fixity annotation on `notbinary` is ignored.
+    
+    Fixity (@infixl, @infixr, @infix) can only be declared for a plain
+    binary infix operator, i.e. a definition of the shape
+    
+      a OP b MEANS ...
+    
+    where a and b are the GIVEN parameters.
+fixity-ignored-nonbinary.l4:9:1-19:
+  42

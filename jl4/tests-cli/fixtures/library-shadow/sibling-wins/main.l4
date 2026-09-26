@@ -1,0 +1,9 @@
+-- Companion to ../embedded-wins/main.l4 (LIBRARY-RESOLUTION-SHADOW-SPEC).
+--
+-- Here a project-local prelude.l4 sits beside the importing file. The B′
+-- ordering must still let it win over the embedded stdlib: this file uses
+-- `shadow marker`, which only the local override defines, so the check
+-- succeeds iff the project-scoped copy was chosen.
+IMPORT prelude
+
+check MEANS `shadow marker`

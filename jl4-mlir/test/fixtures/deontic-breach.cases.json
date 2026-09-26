@@ -9,6 +9,14 @@
       "arguments": {},
       "startTime": 0,
       "events": [{ "party": "the borrower", "action": "repay loan", "at": 5 }]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [
+        { "party": "the borrower", "action": "repay loan", "at": 100 },
+        { "party": "the borrower", "action": "repay loan", "at": 10 }
+      ]
     }
   ]
 }

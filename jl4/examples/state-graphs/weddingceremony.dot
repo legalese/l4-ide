@@ -18,11 +18,11 @@ digraph {
       ,style=filled
       ,shape=ellipse
       ,fillcolor="#ffffff"];
-    2 [label=next
+    2 [label=Fulfilled
       ,fillcolor=white
       ,style=filled
-      ,shape=ellipse
-      ,fillcolor="#ffffff"];
+      ,shape=doublecircle
+      ,fillcolor="#d4edda"];
     3 [label=Breach
       ,fillcolor=white
       ,style=filled
@@ -41,4 +41,3 @@ digraph {
            ,color="#dc3545"
            ,style=dashed];
 }
-

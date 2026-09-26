@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: resolution-cascade.l4
+  Hidden: no
+  Range: 29:8-29:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      Verdict
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      Verdict (defined at resolution-cascade.l4:26:9-16) of arity 0
+      Verdict (defined at resolution-cascade.l4:24:9-16) of arity 0

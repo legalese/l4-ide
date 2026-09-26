@@ -2,13 +2,13 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
         "category": {
-            "$ref": "#/$defs/STRING"
+            "type": "string"
         },
         "country": {
-            "$ref": "#/$defs/STRING"
+            "type": "string"
         },
         "itemPrice": {
-            "$ref": "#/$defs/NUMBER"
+            "type": "number"
         }
     },
     "required": [
