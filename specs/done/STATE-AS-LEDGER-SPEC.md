@@ -1,6 +1,7 @@
 # Specification: State as an Event-Sourced Ledger
 
 > Status: DONE (core M0–M5) — RECORD/COMMIT/ATTEST/RECALL, per-party + official ledgers, and deontic sequencing shipped via PR #31 (merged 2026-07-07). Deferred refinements: R2 typed EnvironmentState schema (flat-ledger soundness gap, documented, not a crash risk); M4.5(b) local-write quarantine (blocked on the Reader-local mechanism in IMPLICIT-PROPS-DESIGN.md); typed party keys.
+> **Successor proposal (2026-09-23, not landed):** `specs/todo/NORM-LOG-SPEC.md` proposes a second kind of ledger entry that the machine writes itself — a norm's fate (performed, failed, repaired, breached) — so that a later norm can read an earlier one's history without its author having written a `RECORD`. It uses the space `LedgerEvent` was left open for, and does not change D1 for drafter-written cells.
 > **Audience:** A Claude Code agent (or human contributor) who will turn this into a frozen spec and an implementation plan.
 > **Companion docs:**
 
