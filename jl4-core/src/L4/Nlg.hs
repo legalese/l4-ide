@@ -1,6 +1,8 @@
 module L4.Nlg (
   simpleLinearizer,
+  simpleLinearizerIn,
   linearizeDirectives,
+  linearizeDirectivesIn,
   selectLanguage,
   NlgSite (..),
   decideNlg,
@@ -14,8 +16,11 @@ module L4.Nlg (
   NlgFnInfo,
   nlgFnInfo,
   substituteNlgCalls,
+  substituteNlgCallsIn,
   substituteNlgDirective,
+  substituteNlgDirectiveIn,
   renderNlgWith,
+  renderNlgWithIn,
   normalizeWs,
   oxford,
 ) where
@@ -30,10 +35,12 @@ import L4.Lexer (LangTag, PosToken, isNlgEscapable)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 import L4.Desugar
+import L4.Nlg.Phrasebook (Phrasebook, phrasebookFor, maqaf)
 import Optics
 import Data.Ratio (denominator, numerator)
 import Data.Time (fromGregorianValid)
 import qualified Data.Time.Format as TimeFormat
+import Data.Char (isLetter)
 
 -- | Convert a deontic modal to its text representation for NLG
 deonticModalText :: DeonticModal -> Text
@@ -55,6 +62,10 @@ data LinToken = MkLinToken
 
 data LinType
   = LinText
+  | LinFrame
+    -- ^ A word the LINEARIZER supplies rather than the author: "is equal to",
+    -- "with", "not". Only these are looked up in a phrasebook ('localize');
+    -- an author's text, a literal and a name never are.
   | LinVar
   | LinUser
   | LinPossessive
@@ -68,15 +79,24 @@ newtype LinTree = MkLinTree
   deriving newtype (Semigroup, Monoid)
 
 instance IsString LinTree where
-  fromString = text . Text.pack
+  fromString = frame . Text.pack
 
 -- | Linearize an expression into plain text.
 -- This linearizer does not attempt to do any smart operations, such as capitalization.
 simpleLinearizer :: Linearize a => a -> Text
-simpleLinearizer a =
-  let
-    tree = linearize a
+simpleLinearizer = renderLinTree . linearize
 
+-- | 'simpleLinearizer' with the frame words in a language, plus the English
+-- frame words that language's phrasebook had no entry for.
+--
+-- With 'Nothing', or a language that has no phrasebook, the text is exactly
+-- 'simpleLinearizer''s and the set is empty.
+simpleLinearizerIn :: Linearize a => Maybe LangTag -> a -> (Text, Set.Set Text)
+simpleLinearizerIn mlang a = first renderLinTree (localizeIn mlang (linearize a))
+
+renderLinTree :: LinTree -> Text
+renderLinTree tree =
+  let
     sp :: Text
     sp = " "
 
@@ -87,10 +107,67 @@ simpleLinearizer a =
       LinUser -> t.payload
       LinVar -> "`" <> t.payload <> "`"
       LinText -> t.payload
+      LinFrame -> t.payload
   in
     case tree.tokens of
       [] -> ""
       (x:xs) -> Text.stripStart (prettyLinTok x) <> mconcat (fmap prettyLinTok xs)
+
+localizeIn :: Maybe LangTag -> LinTree -> (LinTree, Set.Set Text)
+localizeIn mlang tree = case phrasebookFor =<< mlang of
+  Nothing -> (tree, Set.empty)
+  Just pb -> localize pb tree
+
+-- | Replace a linearization's frame phrases with a phrasebook's renderings,
+-- and report the English words it has no entry for.
+--
+-- A RUN is a maximal stretch of frame tokens separated only by the spaces
+-- 'hcat' puts between them. So "is", "equal" and "to" arrive as one run and
+-- can match the single phrase "is equal to". Within a run the longest phrase
+-- wins. A word with no entry stays English and is reported; a token with no
+-- letter in it ("%", a space) is neither translated nor reported.
+--
+-- A rendering that ends in a maqaf is a prefix, and it swallows the space
+-- after it, so "שווה ל־" meets its value as "שווה ל־200".
+localize :: Phrasebook -> LinTree -> (LinTree, Set.Set Text)
+localize pb (MkLinTree toks0) = first MkLinTree (go toks0)
+ where
+  go [] = ([], Set.empty)
+  go ts@(t : rest0)
+    | isFrameWord t =
+        let (run, rest)     = spanRun ts
+            (out, misses)   = translate (concatMap (Text.words . (.payload)) (filter isFrameWord run))
+            glue            = case reverse out of
+                                (w : _) -> Text.takeEnd 1 w == Text.singleton maqaf
+                                []      -> False
+            rest'           = if glue then dropSpace rest else rest
+            (more, misses') = go rest'
+        in (intersperse spaceTok (map frameTok out) <> more, misses <> misses')
+    | otherwise = first (t :) (go rest0)
+
+  -- A run keeps the spaces BETWEEN its words but not a trailing one. That
+  -- space separates the run from whatever follows, so it is emitted after it.
+  spanRun ts =
+    let (run, rest) = span (\ t -> isFrameWord t || isSpaceTok t) ts
+        trailing    = reverse (takeWhile isSpaceTok (reverse run))
+    in (take (length run - length trailing) run, trailing <> rest)
+
+  dropSpace (t : ts) | isSpaceTok t = ts
+  dropSpace ts = ts
+
+  translate [] = ([], Set.empty)
+  translate ws@(w : ws') =
+    case [ (n, r) | n <- [length ws, length ws - 1 .. 1]
+                  , Just r <- [Map.lookup (take n ws) pb] ] of
+      (n, r) : _ -> first (r :) (translate (drop n ws))
+      []         -> bimap (w :) (if Text.any isLetter w then Set.insert w else id)
+                          (translate ws')
+
+  isFrameWord t = t.type' == LinFrame && Text.any isLetter t.payload
+  isSpaceTok t  = t.type' `elem` [LinText, LinFrame] && not (Text.null t.payload)
+                  && Text.all (== ' ') t.payload
+  frameTok w    = MkLinToken { payload = w, type' = LinFrame }
+  spaceTok      = MkLinToken { payload = " ", type' = LinText }
 
 -- | Render in a particular language, by promoting each node's rendering for
 -- that language into the slot every reader already looks at.
@@ -335,13 +412,27 @@ unslot = \ case
 -- over the dependencies too — prepared the same way, since a rule a directive
 -- calls can live in an imported module and its sentence is read from there.
 linearizeDirectives :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> [Text]
-linearizeDirectives mlang mod'' deps'' =
-  fmap (simpleLinearizer . substituteNlgDirective heralds)
-       (toListOf (gplate @(Directive Resolved)) mod')
+linearizeDirectives mlang mod'' deps'' = fst (linearizeDirectivesIn mlang mod'' deps'')
+
+-- | 'linearizeDirectives', plus the English frame words the language's
+-- phrasebook had no entry for ('localize'). The set is empty for 'Nothing',
+-- for @en@, and for a language with no phrasebook at all.
+--
+-- The misses are counted on the directive BEFORE the splice. A spliced call
+-- is 'Inert' text by the time the line is rendered, so its arguments' frame
+-- words cannot be seen there. The unspliced directive has the same frame
+-- words, plus the "with", "and" and "where" of the calls themselves, and those
+-- are all in every phrasebook, so the two sets of misses are equal.
+linearizeDirectivesIn :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> ([Text], Set.Set Text)
+linearizeDirectivesIn mlang mod'' deps'' =
+  ( fmap (fst . simpleLinearizerIn mlang . substituteNlgDirectiveIn mlang heralds) directives
+  , foldMap (snd . simpleLinearizerIn mlang) directives
+  )
  where
-  prepare = selectLanguage mlang . promoteHeadInputNlg
-  mod'    = prepare mod''
-  heralds = nlgFnInfo (mod' : map prepare deps'')
+  prepare    = selectLanguage mlang . promoteHeadInputNlg
+  mod'       = prepare mod''
+  heralds    = nlgFnInfo (mod' : map prepare deps'')
+  directives = toListOf (gplate @(Directive Resolved)) mod'
 
 -- | Does any rendering in this module name this language?
 --
@@ -379,113 +470,113 @@ instance Linearize (Expr Resolved) where
   linearize expr = case carameliseNode expr of
     And _ e1 e2 -> hcat
       [ lin e1
-      , text "and"
+      , frame "and"
       , lin e2
       ]
     Or _ e1 e2 -> hcat
       [ lin e1
-      , text "or"
+      , frame "or"
       , lin e2
       ]
     RAnd _ e1 e2 -> hcat
       [ lin e1
-      , text "and"
+      , frame "and"
       , lin e2
       ]
     ROr _ e1 e2 -> hcat
       [ lin e1
-      , text "or"
+      , frame "or"
       , lin e2
       ]
     Implies _ e1 e2 -> hcat
       [ lin e1
-      , text "implies"
+      , frame "implies"
       , lin e2
       ]
     Equals _ e1 e2 -> hcat
       [ lin e1
-      , text "is"
-      , text "equal"
-      , text "to"
+      , frame "is"
+      , frame "equal"
+      , frame "to"
       , lin e2
       ]
     Not _ e -> hcat
-      [ text "not"
+      [ frame "not"
       , lin e
       ]
     Plus _ e1 e2 -> hcat
-      [ text "the"
-      , text "sum"
-      , text "of"
+      [ frame "the"
+      , frame "sum"
+      , frame "of"
       , lin e1
-      , text "and"
+      , frame "and"
       , lin e2
       ]
     Minus _ e1 e2 -> hcat
-      [ text "the"
-      , text "difference"
-      , text "between"
+      [ frame "the"
+      , frame "difference"
+      , frame "between"
       , lin e2
-      , text "and"
+      , frame "and"
       , lin e1
       ]
     Times _ e1 e2 -> hcat
-      [ text "the"
-      , text "product"
-      , text "of"
+      [ frame "the"
+      , frame "product"
+      , frame "of"
       , lin e1
-      , text "and"
+      , frame "and"
       , lin e2
       ]
     DividedBy _ e1 e2 -> hcat
-      [ text "the"
-      , text "result"
-      , text "of"
-      , text "dividing"
+      [ frame "the"
+      , frame "result"
+      , frame "of"
+      , frame "dividing"
       , lin e1
-      , text "by"
+      , frame "by"
       , lin e2
       ]
     Modulo _ e1 e2 -> hcat
-      [ text "the"
-      , text "result"
-      , text "of"
+      [ frame "the"
+      , frame "result"
+      , frame "of"
       , lin e1
-      , text "modulo"
+      , frame "modulo"
       , lin e2
       ]
     Cons _ e1 e2 -> hcat
       [ lin e1
-      , text "followed"
-      , text "by"
+      , frame "followed"
+      , frame "by"
       , lin e2
       ]
     Leq _ e1 e2 -> hcat
       [ lin e1
-      , text "is"
-      , text "at"
-      , text "most"
+      , frame "is"
+      , frame "at"
+      , frame "most"
       , lin e2
       ]
     Geq _ e1 e2 -> hcat
       [ lin e1
-      , text "is"
-      , text "at"
-      , text "least"
+      , frame "is"
+      , frame "at"
+      , frame "least"
       , lin e2
       ]
     Lt _ e1 e2 -> hcat
       [ lin e1
-      , text "is"
-      , text "less"
-      , text "than"
+      , frame "is"
+      , frame "less"
+      , frame "than"
       , lin e2
       ]
     Gt _ e1 e2 -> hcat
       [ lin e1
-      , text "is"
-      , text "greater"
-      , text "than"
+      , frame "is"
+      , frame "greater"
+      , frame "than"
       , lin e2
       ]
     Proj _ e1 e2 -> hcat
@@ -496,29 +587,29 @@ instance Linearize (Expr Resolved) where
     Var _ v -> linearize v
     Lam _ sig e -> hcat
       [ lin sig
-      , text "then"
+      , frame "then"
       , lin e
       ]
     App _ n es
-      | Just d <- daydateLiteral n es -> text d
+      | Just (d, m, y) <- daydateLiteral n es -> hcat [ text d, frame m, text y ]
     App _ n es -> hcat $
       [ linearize n
       ]
       <> ifNonEmpty es
-            [ text "with"
-            , enumerate (punctuate ",") (spaced $ text "and") (fmap lin es)
+            [ frame "with"
+            , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin es)
             ]
     AppNamed _ n es _order -> hcat
       [ linearize n
-      , text "where"
-      , enumerate (punctuate ",") (spaced $ text "and") (fmap lin es)
+      , frame "where"
+      , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin es)
       ]
     IfThenElse _ cond then' else' -> hcat
-      [ text "if"
+      [ frame "if"
       , lin cond
-      , text "then"
+      , frame "then"
       , lin then'
-      , text "else"
+      , frame "else"
       , lin else'
       ]
     MultiWayIf _ conds o -> hcat $
@@ -526,23 +617,23 @@ instance Linearize (Expr Resolved) where
       <> ["otherwise", lin o ]
     Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mopens mdeadline mjoin mfollowup mlest) -> hcat $
       linSubject subj
-      <> [ text (deonticModalText modal)
+      <> [ frame (deonticModalText modal)
          , lin rule
          ]
-      <> maybe [] (\ provided -> [ text "provided that", lin provided ]) mprovided
+      <> maybe [] (\ provided -> [ frame "provided that", lin provided ]) mprovided
       <> maybe [] linOpening mopens
       <> maybe [] (linClosing (isJust mopens)) mdeadline
       <> maybe [] linJoin mjoin
-      <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
-      <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
+      <> maybe [] (\ followup -> [ frame "hence",  lin followup ]) mfollowup
+      <> maybe [] (\ lest -> [ frame "lest",  lin lest ]) mlest
       where
         linJoin j = case j of
           -- follows 'L4.Print' (uponEachWords); R-Q1 RULED 2026-09-07
           JoinOnce _ th mdue ->
-            [ text "once" ]
-            <> (case th of AllHave _ -> [ text "all", text "have" ])
+            [ frame "once" ]
+            <> (case th of AllHave _ -> [ frame "all", frame "have" ])
             <> linJoinDue mdue
-          JoinUpon _ _ mdue -> [ text "upon", text "each" ] <> linJoinDue mdue
+          JoinUpon _ _ mdue -> [ frame "upon", frame "each" ] <> linJoinDue mdue
         linJoinDue = maybe [] linDeadline
         -- @within d@, then the anchor: the lifecycle words as prose, or the
         -- expression (R-Q7, §5.1.1); @before date@ for the absolute edge
@@ -553,34 +644,34 @@ instance Linearize (Expr Resolved) where
         -- and the English says so: "after 3 days, within 30 days of that".
         linClosing afterOpening = \ case
           MkDeadline _ d ma ->
-            [ text "within", lin d ]
-            <> maybe (if afterOpening then [ text "of", text "that" ] else [])
-                     (\ a -> [ text "of" ] <> linAnchor a) ma
-          MkBefore _ e -> [ text "before", lin e ]
+            [ frame "within", lin d ]
+            <> maybe (if afterOpening then [ frame "of", frame "that" ] else [])
+                     (\ a -> [ frame "of" ] <> linAnchor a) ma
+          MkBefore _ e -> [ frame "before", lin e ]
         -- @after d [of anchor]@ — the window's opening edge
         linOpening (MkOpening _ d ma) =
-          [ text "after", lin d ]
-          <> maybe [] (\ a -> [ text "of" ] <> linAnchor a) ma
+          [ frame "after", lin d ]
+          <> maybe [] (\ a -> [ frame "of" ] <> linAnchor a) ma
         linAnchor = \ case
-          AnchorJoin _     -> [ text "the", text "join" ]
-          AnchorDeadline _ -> [ text "the", text "deadline" ]
-          AnchorArming _   -> [ text "the", text "arming" ]
+          AnchorJoin _     -> [ frame "the", frame "join" ]
+          AnchorDeadline _ -> [ frame "the", frame "deadline" ]
+          AnchorArming _   -> [ frame "the", frame "arming" ]
           AnchorAt _ e     -> [ lin e ]
         linSubject = \ case
-          Party _ party -> [ text "party", lin party ]
+          Party _ party -> [ frame "party", lin party ]
           Every _ mCast v mRoll mFilter ->
-            [ text "every" ]
+            [ frame "every" ]
             -- Resolved can't use 'lin', as it doesn't have an 'Anno'
             <> maybe [] (\ c -> [ linearize c ]) mCast
             <> [ linearize v ]
-            <> maybe [] (\ r -> [ text "in", lin r ]) mRoll
-            <> maybe [] (\ f -> [ text "who", lin f ]) mFilter
+            <> maybe [] (\ r -> [ frame "in", lin r ]) mRoll
+            <> maybe [] (\ f -> [ frame "who", lin f ]) mFilter
     Consider _ e br -> hcat
-      [ text "consider"
-      , text "the"
-      , text "case"
-      , text "distinctions"
-      , text "of"
+      [ frame "consider"
+      , frame "the"
+      , frame "case"
+      , frame "distinctions"
+      , frame "of"
       , lin e
       , punctuate ":"
       , enumerate (punctuate ".") (punctuate ".") (fmap lin br)
@@ -588,35 +679,35 @@ instance Linearize (Expr Resolved) where
     Lit _ l -> lin l
     -- Glued, not punctuated: 'punctuate' carries a trailing space and 'hcat'
     -- adds another, which printed @50 %  and …@.
-    Percent _ l -> lin l <> text "%"
+    Percent _ l -> lin l <> frame "%"
     List _ es -> hcat
-      [ text "list"
-      , text "of"
-      , enumerate (punctuate ",") (spaced $ text "and") (fmap lin es)
+      [ frame "list"
+      , frame "of"
+      , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin es)
       ]
     Where _ e lcl -> hcat
       [ lin e
-      , text "where"
-      , enumerate (punctuate ",") (spaced $ text "and") (fmap lin lcl)
+      , frame "where"
+      , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin lcl)
       ]
     LetIn _ lcl e -> hcat
-      [ text "let"
-      , enumerate (punctuate ",") (spaced $ text "and") (fmap lin lcl)
-      , text "in"
+      [ frame "let"
+      , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin lcl)
+      , frame "in"
       , lin e
       ]
     Event _ ev -> lin ev
-    Fetch _ e -> hcat [ text "fetch", lin e ]
-    Env _ e -> hcat [ text "environment variable", lin e ]
-    Post _ e1 e2 e3 -> hcat [ text "post", lin e1, lin e2, lin e3 ]
-    Record _ mParty cell val isOfficial mHence -> hcat ([ text (if isOfficial then "commit" else "record") ] <> maybe [] (\p -> [ lin p, text "'s" ]) mParty <> [ lin cell, text "is", lin val ] <> maybe [] (\k -> [ text "hence", lin k ]) mHence)
-    ReadCell _ mParty isOfficial mode cell -> hcat ([ text "recall" ] <> (case mode of RecallAll -> [ text "all" ]; RecallLast -> []) <> (if isOfficial then [ text "official's" ] else []) <> maybe [] (\p -> [ lin p, text "'s" ]) mParty <> [ lin cell ])
-    Concat _ exprs -> hcat [ text "concatenate", enumerate (punctuate ",") (spaced $ text "and") (fmap lin exprs) ]
-    AsString _ e -> hcat [ lin e, text "as", text "string" ]
+    Fetch _ e -> hcat [ frame "fetch", lin e ]
+    Env _ e -> hcat [ frame "environment variable", lin e ]
+    Post _ e1 e2 e3 -> hcat [ frame "post", lin e1, lin e2, lin e3 ]
+    Record _ mParty cell val isOfficial mHence -> hcat ([ frame (if isOfficial then "commit" else "record") ] <> maybe [] (\p -> [ lin p, frame "'s" ]) mParty <> [ lin cell, frame "is", lin val ] <> maybe [] (\k -> [ frame "hence", lin k ]) mHence)
+    ReadCell _ mParty isOfficial mode cell -> hcat ([ frame "recall" ] <> (case mode of RecallAll -> [ frame "all" ]; RecallLast -> []) <> (if isOfficial then [ frame "official's" ] else []) <> maybe [] (\p -> [ lin p, frame "'s" ]) mParty <> [ lin cell ])
+    Concat _ exprs -> hcat [ frame "concatenate", enumerate (punctuate ",") (spaced $ frame "and") (fmap lin exprs) ]
+    AsString _ e -> hcat [ lin e, frame "as", frame "string" ]
     Breach _ mParty mReason -> hcat $
-      [ text "breach" ]
-      <> maybe [] (\p -> [ text "by", lin p ]) mParty
-      <> maybe [] (\r -> [ text "because", lin r ]) mReason
+      [ frame "breach" ]
+      <> maybe [] (\p -> [ frame "by", lin p ]) mParty
+      <> maybe [] (\r -> [ frame "because", lin r ]) mReason
     -- A refusal reads as what it is: the model declining to answer, with the
     -- author's reason.
     Refuse _ msg -> hcat [ "the model refuses to answer:", lin msg ]
@@ -642,7 +733,7 @@ instance Linearize (NamedExpr Resolved) where
   linearize = \ case
     MkNamedExpr _ n e -> hcat
       [ linearize n
-      , text "is"
+      , frame "is"
       , lin e
       ]
 
@@ -662,15 +753,18 @@ instance Linearize (NamedExpr Resolved) where
 --     and @YMD@ refuses it; printing either as a calendar date would state
 --     something the rule does not, so neither is rendered.
 --
--- English month names only. Other languages wait on the frame-word lexicon.
-daydateLiteral :: Resolved -> [Expr Resolved] -> Maybe Text
+-- The month name is a frame word ('LinFrame'), so a phrasebook translates it.
+daydateLiteral :: Resolved -> [Expr Resolved] -> Maybe (Text, Text, Text)
 daydateLiteral r args@[_, _, _] = do
   guard (fromDaydate r)
   order <- lookup (unqualifiedRawNameToText (rawName (getActual r))) orders
   [a, b, c] <- traverse wholeLit args
   let (y, m, d) = order (a, b, c)
   day <- fromGregorianValid y (fromInteger m) (fromInteger d)
-  pure (Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale "%-d %B %Y" day))
+  -- The month is a frame word, so a phrasebook can name it; the day and
+  -- the year are figures in every language we render.
+  let fmt f = Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale f day)
+  pure (fmt "%-d", fmt "%B", fmt "%Y")
  where
   ymd (y, m, d) = (y, m, d)
   dmy (d, m, y) = (y, m, d)
@@ -697,16 +791,16 @@ instance Linearize Lit where
 instance Linearize (Branch Resolved) where
   linearize = \ case
     MkBranch _ (When _ pat) e -> hcat
-      [ text "when"
+      [ frame "when"
       , lin pat
-      , text "then"
+      , frame "then"
       , lin e
       ]
     MkBranch _ (Otherwise _) e -> hcat
-      [ text "in"
-      , text "any"
-      , text "other"
-      , text "case"
+      [ frame "in"
+      , frame "any"
+      , frame "other"
+      , frame "case"
       , lin e
       ]
 
@@ -718,14 +812,14 @@ instance Linearize (Pattern Resolved) where
     PatApp _ constructor pats -> hcat
       [ -- Resolved can't use 'lin', as it doesn't have an 'Anno'
         linearize constructor
-      , text "has"
-      , enumerate (punctuate ",") (spaced $ text "and") (fmap lin pats)
+      , frame "has"
+      , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin pats)
       ]
     PatCons _ start rest -> hcat
       [ lin start
-      , text "is"
-      , text "followed"
-      , text "by"
+      , frame "is"
+      , frame "followed"
+      , frame "by"
       , lin rest
       ]
     PatExpr _ expr -> hcat [ "is", "exactly", lin expr ]
@@ -734,8 +828,8 @@ instance Linearize (Pattern Resolved) where
 instance Linearize (GivenSig Resolved) where
   linearize = \ case
     MkGivenSig _ args -> hcat
-      [ text "given"
-      , enumerate (punctuate ",") (spaced $ text "and") (fmap lin args)
+      [ frame "given"
+      , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin args)
       ]
 
 instance Linearize (OptionallyTypedName Resolved) where
@@ -765,7 +859,7 @@ instance Linearize Resolved where
 
 instance Linearize Nlg where
   linearize = \ case
-    MkInvalidNlg _ -> text "(internal error)"
+    MkInvalidNlg _ -> frame "(internal error)"
     MkParsedNlg _ _ frags -> foldMap linParsedFragment frags
     MkResolvedNlg _ _ frags -> foldMap linResolvedFragment frags
    where
@@ -860,6 +954,17 @@ text t = MkLinTree
     }
   ]
 
+-- | A frame word: one the linearizer supplies, as opposed to the author's
+-- text. A string literal in an instance body is one of these too, through
+-- 'IsString'. See 'LinFrame'.
+frame :: Text -> LinTree
+frame t = MkLinTree
+  [ MkLinToken
+    { type' = LinFrame
+    , payload = t
+    }
+  ]
+
 var :: Text -> LinTree
 var t = MkLinTree
   [ MkLinToken
@@ -940,21 +1045,33 @@ nlgFnInfo mods = Map.fromList
 -- its parameters reads as prose and one that covers none degrades to exactly
 -- what it read as before.
 substituteNlgCalls :: NlgFnInfo -> Expr Resolved -> Expr Resolved
-substituteNlgCalls info = transformOf (gplate @(Expr Resolved)) $ \case
+substituteNlgCalls = substituteNlgCallsIn Nothing
+
+-- | 'substituteNlgCalls' with the arguments, and the "with" and "and" of any
+-- appended ones, rendered with a language's frame words. The herald's own
+-- text is the author's and is never touched.
+substituteNlgCallsIn :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
   App ann n args
     | Just (nlg, params) <- Map.lookup (resolvedText n, length args) info
     , length params == length args ->
         let bound    = zip params args
             leftover = [ a | (p, a) <- bound, p `notElem` nlgRefs nlg ]
-            sentence = renderNlgWith (Map.fromList bound) nlg
+            sentence = renderNlgWithIn mlang (Map.fromList bound) nlg
             -- Joined as the bare linearizer joins arguments ("a, b and c",
             -- no serial comma), so one line does not carry both styles.
-            rest     = case map simpleLinearizer leftover of
+            rest     = case map (fst . simpleLinearizerIn mlang) leftover of
               []  -> ""
-              [x] -> " with " <> x
-              xs  -> " with " <> Text.intercalate ", " (init xs) <> " and " <> last xs
+              [x] -> " " <> word "with" <> " " <> x
+              xs  -> " " <> word "with" <> " " <> Text.intercalate ", " (init xs)
+                       <> " " <> prefix (word "and") <> last xs
         in Inert ann (sentence <> rest) InertCtxNone
   e -> e
+ where
+  word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)
+  -- A maqaf-final rendering is written against the next word.
+  prefix w | Text.takeEnd 1 w == Text.singleton maqaf = w
+           | otherwise                                = w <> " "
 
 -- | The same splice, applied to every expression a directive carries — the
 -- subject of an @#EVAL@ or @#ASSERT@, and the contract, time and events of a
@@ -962,7 +1079,10 @@ substituteNlgCalls info = transformOf (gplate @(Expr Resolved)) $ \case
 -- heralded call as its sentence rather than as the bare name followed by
 -- @with@ and the arguments.
 substituteNlgDirective :: NlgFnInfo -> Directive Resolved -> Directive Resolved
-substituteNlgDirective info = over (gplate @(Expr Resolved)) (substituteNlgCalls info)
+substituteNlgDirective = substituteNlgDirectiveIn Nothing
+
+substituteNlgDirectiveIn :: Maybe LangTag -> NlgFnInfo -> Directive Resolved -> Directive Resolved
+substituteNlgDirectiveIn mlang info = over (gplate @(Expr Resolved)) (substituteNlgCallsIn mlang info)
 
 -- | The parameters a herald actually refers to.
 nlgRefs :: Nlg -> [Unique]
@@ -973,7 +1093,10 @@ nlgRefs = \case
 -- | Render an @\@nlg@ annotation, substituting each parameter reference with the
 -- corresponding call argument.
 renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
-renderNlgWith argMap = \case
+renderNlgWith = renderNlgWithIn Nothing
+
+renderNlgWithIn :: Maybe LangTag -> Map.Map Unique (Expr Resolved) -> Nlg -> Text
+renderNlgWithIn mlang argMap = \case
   MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
   other                 -> simpleLinearizer other
  where
@@ -987,7 +1110,7 @@ renderNlgWith argMap = \case
   -- which would re-expand that parameter's own @\@nlg@ and recurse when the
   -- annotation is attached to a parameter it also references.
   frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
-    Just a  -> simpleLinearizer a
+    Just a  -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
 
 resolvedText :: Resolved -> Text

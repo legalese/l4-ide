@@ -205,6 +205,13 @@ That covers only daydate's own `YMD` and `Date`, only when all three arguments a
 Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
 A percentage reads `50%`.
 
+The words L4 itself puts around your sentences — "is equal to", "not", "with", a month's name — follow `--lang` in `l4 nlg`.
+For ``#EVAL `is large` 150 EQUALS TRUE`` over the rule above, `l4 nlg --lang he` prints ``150 עולה על הסף שווה ל־`TRUE` `` where `l4 nlg` prints ``the amount 150 is large is equal to `TRUE` ``.
+They come from a table of phrases, not a grammar, so the English word order stays: a Hebrew line is Hebrew words in the order English would put them.
+A word the table has no entry for stays English, and `l4 nlg` names it on stderr, so you can see what was not translated.
+The Hebrew table has not yet been reviewed by a Hebrew-speaking lawyer, and `l4 render` does not use it yet.
+Without `--lang`, nothing changes.
+
 In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
 `lang` is the `--lang` you asked for, or the module's `@lang` if you asked for nothing, or `en`.
 `dir="rtl"` is added for a right-to-left language — decided from the script subtag when the tag carries one, so `he-Latn` is left-to-right and `az-Arab` is not — and omitted for every other, left-to-right being HTML's own default.

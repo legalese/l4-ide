@@ -456,6 +456,24 @@ tag itself**, and it should not gate the tag.
 3. **Locale selection and fidelity.** `LinTree` as Reader-and-Writer; extend the fidelity channel
    to the `@nlg` consumers that have none.
 
+   **First cut BUILT 2026-09-26 (PHRASEBOOK), for `l4 nlg` only. It is not the design above.**
+   Selection was already a rewrite (`selectLanguage`), so the only missing piece was the frame
+   words, and those did not need a Reader. What was built instead:
+   - frame words became their own token type, `LinFrame`;
+   - a per-language table of English phrases, `L4.Nlg.Phrasebook`, is applied as one pass over
+     the finished `LinTree` (`L4.Nlg.localize`), longest phrase first.
+
+   With no `--lang`, the pass does not run, so every golden is untouched by construction. A frame
+   word with no entry stays English, and `l4 nlg` names it on stderr. That is the "recorded,
+   never silently substituted" requirement, met on stderr rather than in the fidelity channel.
+
+   Three things are **not** done:
+   - `l4 render` still prints English frame words, because `L4.Export.Document` builds its own
+     prose.
+   - Hebrew word order is not handled. A lexicon cannot move a possessive, so `'s` is left
+     English on purpose and reported.
+   - The Hebrew entries have had no Hebrew-speaking review.
+
 ## 4. Annotation escapes — `\%` and `\]` in `@nlg`, `\>` in `@ref` — IMPLEMENTED, not merged
 
 Independent of the language work and being landed first, because both are live defects today
