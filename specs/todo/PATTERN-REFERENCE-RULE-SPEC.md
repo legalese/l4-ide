@@ -488,9 +488,8 @@ pages outside `specs/` mention the keyword.
    entry updated. `doc/test-docs.sh` must pass with **this branch's** `l4` first on `PATH`
    (CLAUDE.md §3.1, the stale `~/.local/bin/l4` trap).
 4. **The skill.** `skills/writing-l4-rules/` (`SKILL.md`, `references/regulative.md`,
-   `source-patterns/05-…`, `06-…`) corrected here. The `legalese/l4-plugin` copy is generated and
-   its generator is not on `unstable` (CLAUDE.md §1.0); the PR says the port is owed and the GM
-   hand-ports after merge.
+   `source-patterns/05-…`, `06-…`) corrected here. The `legalese/l4-plugin` copy is generated:
+   after merge, port it by re-running `etc/build-plugin-bundle.mjs` (CLAUDE.md §1.0).
 5. **Checker comments.** `TypeCheck.hs:1966-1975` and `:2186-2212` describe the old world; rewrite
    them to describe R1.
 6. **Goldens.** After the sweep, one blessing pass: run `cabal test jl4-test`, read every changed

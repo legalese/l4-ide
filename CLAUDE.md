@@ -38,22 +38,24 @@ the marketplace entry is `/plugin marketplace add legalese/l4-ide`.
 
 **So a correction to the skill lands here first**, per the user-level `CLAUDE.md` rule "when you
 correct a document, find its other copies first". The bundle names this repo as its source, so the
-pointer home exists — what is missing is a working path back down.
+pointer home exists, and the path back down is the generator below.
 
-**The bundle is generated, not hand-maintained, and its generator is not in this repo.**
+**The bundle is generated, and its generator is in this repo: `etc/build-plugin-bundle.mjs`.**
 `l4-plugin`'s README says in terms: _"This directory is generated. Do not edit it by hand … Every
 file here was copied out of legalese/l4-ide by `etc/build-plugin-bundle.mjs`; edits made here are
-lost on the next build."_ That script is **not on `unstable`**. It lives on the local-only branch
-`ci/skills-layout` (6 commits ahead, never pushed), so as of 2026-09-11 it exists on one machine.
+lost on the next build."_
+So a skill fix is ported by regenerating the bundle, never by hand-copying files into it:
 
-The consequence, which anyone porting a skill fix needs to know: **there is no sanctioned mechanism
-available.** A hand-port to `l4-plugin` is a stopgap that the next regeneration silently reverts,
-and regeneration itself is unavailable to anyone without that branch. **Landing
-`etc/build-plugin-bundle.mjs` is the fix**; until then, say in the porting PR that it was
-hand-copied and will be superseded.
+1. Land the fix here first.
+2. From an l4-ide checkout at the commit to publish (normally `unstable`), with a clone of `legalese/l4-plugin` beside it, run `node etc/build-plugin-bundle.mjs <l4-plugin clone> --l4-release latest`.
+3. Review the diff in the clone and open a PR on `l4-plugin`. The bundle's README records the l4-ide commit it was generated from.
 
-One thing makes a hand-port survivable meanwhile: the relative links inside `references/` resolve
-in both, because the layout matches.
+What the script does, sorted by how its failures show up:
+
+- It empties the output directory, keeping only `.git`, then copies the skill and every repo file the skill's text cites, each at its original path (except `jl4-core/libraries/`, which the `l4` binary carries), and writes the bundle's README and manifests.
+- **Loud:** it then checks the bundle from the outside. Every citation and markdown link in the bundled skill must resolve, or it lists them and exits 1. That is a defect in the skill, not in the script.
+- **Loud, not fatal:** with `--l4-release`, it pins `scripts/install-l4.sh` to a release on `legalese/prereleases`; if the shelf cannot be reached, it prints `NO INSTALLER EMITTED` and builds the rest.
+- **Silent:** without `--l4-release`, no installer is written, and because the directory was emptied first, the bundle's existing `scripts/install-l4.sh` is deleted with no message. Pass the flag every time.
 
 **This paragraph used to claim a second thing — that the copies are byte-identical — and that is
 false.** Measured 2026-09-19 with `cmp`, on `origin/unstable` @ `ae74ae717`: `SKILL.md` is 799
@@ -64,9 +66,9 @@ positive case` and `docs(skill): re-sync — cite canon NOTES.md §9.2`, i.e. th
 this section warns about, actually happening, one file at a time.
 
 So `diff` is still the right instrument, but read it as **"how far behind is the bundle"** and not
-as "this should be empty". A non-empty diff is the NORMAL state until `etc/build-plugin-bundle.mjs`
-lands, and a reader who expects emptiness will conclude someone edited the bundle by hand when
-nobody has. What IS worth checking is whether a specific claim you are porting matches: the ofek
+as "this should be empty".
+Against today's tree a non-empty diff is normal between regenerations; to ask whether anyone edited the bundle by hand, diff it against the l4-ide commit its README names.
+What IS worth checking is whether a specific claim you are porting matches: the ofek
 citations, for instance, are identical in both trees even though the files around them are not
 (`etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` checks exactly that,
 and both trees resolve 7 of 7). One thing does not port: prose asserting something is "verifiable in situ" is false
@@ -80,6 +82,13 @@ symlink; the tracked path is `skills/writing-l4-rules/` (see the skill-path syml
 > the repo name. I then hand-edited the bundle, which its own README forbids on the first screen —
 > because I ported before reading it. The generator's absence from `unstable` was found only after
 > that, which is the more useful half of the finding.
+>
+> The generator landed on 2026-09-11 (`3c92bbc4e`), and this section went on saying it had not.
+> On 2026-09-25 legalese/l4-plugin#2 believed it and hand-copied the bundle, and the copy lost
+> `scripts/validate.sh`'s executable bit (`100755` here, `100644` there), so the command
+> `scripts/README.md` tells users to run failed with "Permission denied". legalese/l4-plugin#3
+> regenerated the bundle the next day and the bit came back. A hand-copy fails silently; the
+> generator does not.
 
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 
