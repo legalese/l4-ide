@@ -1,6 +1,7 @@
 # Plugin distribution: split the plugin out of the monorepo
 
-> **Status — PROPOSED, NOT LANDED (2026-09-09).** Nothing here has been agreed.
+> **Status — PROPOSED, NOT LANDED (2026-09-09).** Nothing here has been agreed,
+> except the one ruling recorded in §1 (2026-09-26: the pipeline skill is not shipped).
 > The branch that carries this document also moves the skill directory, which
 > reverses a deliberate decision in `4c4c5ed4` (Thomas Gorissen, 2026-08-07);
 > **that reversal needs Thomas's approval before this goes near `unstable`.**
@@ -42,6 +43,13 @@ Two further facts about the present state, both verified on `fca84449`:
   should not be: it dispatches `etc/go/go.sh` and reads
   `etc/go/subjects/<subject>/NOTES.md`, so outside this repo it is inert.
   That — not accident — is why the two skills sat in different directories.
+
+  **RULED 2026-09-26 (Meng): `running-the-l4-pipeline` stays repo-local and is not shipped in `legalese/l4-plugin`.**
+  This settles the sentence above, which until now was this document's argument rather than anyone's decision.
+  It is independent of Q1–Q4: wherever the plugin ends up living, this skill is not in it.
+  Measured the same day: `legalese/l4-plugin` `main` @ `effac0e` ships `skills/writing-l4-rules` and nothing else, and `etc/build-plugin-bundle.mjs` on `unstable` never names the pipeline skill, so the ruling describes the tree as it already is.
+  The pipeline's P1–P5 stages validate an encoding and produce none, so guidance on producing an encoding, which does have to reach people outside this repo, belongs in a skill the plugin ships, not in this one.
+
 - **Lightweight packages already exist and nothing points at them.**
   `release-l4-skill.yml` builds `writing-l4-rules.skill` and `l4-plugin.zip`
   on every release. Both are listed _below_ the marketplace instructions, as
