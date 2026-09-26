@@ -463,7 +463,7 @@ noticing canon, we can revisit this to be more scalable to external contribution
 
 This replaces the 2026-09-15 rule, which put each encoding on its depositor's own
 `<username>/drafts` shelf, derived the owner from `gh`, `git config` and `$USER`, and refused
-`main`. `legalese/canon#2` moves the `mengwong/drafts` shelf onto `main`. **Depositing is still
+`main`. `legalese/canon#2` moved the `mengwong/drafts` shelf onto `main` the same day. **Depositing is still
 HG2's**: the ruling changes where a deposit lands, not who may open one.
 
 **`primary` is refused as a row name.** It is the driver's selector for the committed encoding
@@ -482,8 +482,8 @@ pipeline's sidecar calls that encoding. The two vocabularies already agreed; the
 them agreeing.
 
 **The path grammar is advisory, with a reason.** canon's `docs/directory-conventions.md` was
-ruled onto `main` on 2026-09-26 with the shorter, ISO 3166 spelling (`legalese/canon#3` merges the
-document and moves every full-name directory). A non-conforming first component still **warns and
+ruled onto `main` on 2026-09-26 with the shorter, ISO 3166 spelling (`legalese/canon#3`, merged the
+same day, brought the document and moved every full-name directory). A non-conforming first component still **warns and
 does not fail**, because canon also holds a `doctrine/` tree that the conventions do not mention;
 making it a refusal wants a ruling on that tree first.
 
