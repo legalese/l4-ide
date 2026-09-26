@@ -8,8 +8,8 @@ not `section 5(b) — domiciled outside Singapore and possessed beneficially of 
 not `section 8 — the intestate leaves surviving him more than one wife` with `case 1 — a surviving spouse and issue`
 `the distribution, read out` with `case 1 — a surviving spouse and issue` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
 `the total of the shares distributed` with `case 1 — a surviving spouse and issue` is equal to 1
-not `rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `Kumar` and `JUST` with `YMD` with 2024, 1 and 1
-`rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `Gopal` and `JUST` with `YMD` with 2024, 1 and 1
+not `rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `Kumar` and `JUST` with 1 January 2024
+`rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `Gopal` and `JUST` with 1 January 2024
 `the distribution, read out` with `case 2 — per stirpes to the remotest degree` is equal to list of Fatimah takes 0.5, Hana takes 0.25 and Jia takes 0.25
 `the total of the shares distributed` with `case 2 — per stirpes to the remotest degree` is equal to 1
 `rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 3 — a surviving spouse, no issue and no parent`
@@ -42,7 +42,7 @@ the number of items in `the parents of the intestate who survive him` with `case
 `the total of the shares distributed` with `case 5 — no spouse, no descendants, one surviving parent` is equal to 1
 `rule 6 — there are no surviving spouse, descendants or parents` with `case 6 — brothers and sisters and the children of a deceased sister`
 the number of items in `Tan`'s `children` is equal to 3
-the number of items in `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Tan` and `JUST` with `YMD` with 2024, 5 and 5 is equal to 2
+the number of items in `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Tan` and `JUST` with 5 May 2024 is equal to 2
 not `section 3 — a “child” within the meaning of this Act` with `a child neither legitimate nor adopted` with `Wira`
 not `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 6 — brothers and sisters and the children of a deceased sister`
 not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 6 — brothers and sisters and the children of a deceased sister`
@@ -156,51 +156,51 @@ not `a universal or residuary beneficial gift` with `a beneficial gift` with `Be
 not `a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `an appointment by will under a power` and 1000000
 not `a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `a charge or direction for the payment of a debt` and 1000000
 `section 6(a) — there shall be no distinction between those related through his father and those related through his mother`
-`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Esther` and `JUST` with `YMD` with 2024, 3 and 1
-not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `the ISA Farid` and `JUST` with `YMD` with 2024, 3 and 1
-`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `the ISA Gita` and `JUST` with `YMD` with 2024, 3 and 1
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Esther` and `JUST` with 1 March 2024
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `the ISA Farid` and `JUST` with 1 March 2024
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `the ISA Gita` and `JUST` with 1 March 2024
 `the distribution, read out` with `case 17 — a child conceived in the womb and a child conceived after the death` is equal to list of Gita takes 0.5 and Esther takes 0.5
 `the total of the shares distributed` with `case 17 — a child conceived in the womb and a child conceived after the death` is equal to 1
-not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Jamal, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-`the person survives the intestate` with `Jamal, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-not `the person survives the intestate and is within the classes section 6(a) names` with `Jamal, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Jamal, born after Rahim died` and `JUST` with 5 May 2024
+`the person survives the intestate` with `Jamal, born after Rahim died` and `JUST` with 5 May 2024
+not `the person survives the intestate and is within the classes section 6(a) names` with `Jamal, born after Rahim died` and `JUST` with 5 May 2024
 `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 17a — a brother conceived after the intestate's death` is empty
 `rule 9 — in default of distribution under rules 1 to 8` with `case 17a — a brother conceived after the intestate's death`
 `the distribution, read out` with `case 17a — a brother conceived after the intestate's death` is equal to list of the Government takes 1
 `the total of the shares distributed` with `case 17a — a brother conceived after the intestate's death` is equal to 1
-`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Jamal, conceived before Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Jamal, conceived before Rahim died` and `JUST` with 5 May 2024
 `the distribution, read out` with `case 17b — a brother conceived in the womb at the intestate's death` is equal to list of Jamal takes 1
 `the total of the shares distributed` with `case 17b — a brother conceived in the womb at the intestate's death` is equal to 1
-`actually born in the lifetime of the intestate` with `born on the day Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
-not `actually born in the lifetime of the intestate` with `born the day after Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
-not `the person survives the intestate` with `died on the day Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
-`the person survives the intestate` with `died the day after Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
-not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Kadir, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-`the person survives the intestate` with `Kadir, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-not `the person survives the intestate and is within the classes section 6(a) names` with `Kadir, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`actually born in the lifetime of the intestate` with `born on the day Hakim died` and `JUST` with 1 March 2024
+not `actually born in the lifetime of the intestate` with `born the day after Hakim died` and `JUST` with 1 March 2024
+not `the person survives the intestate` with `died on the day Hakim died` and `JUST` with 1 March 2024
+`the person survives the intestate` with `died the day after Hakim died` and `JUST` with 1 March 2024
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Kadir, born after Rahim died` and `JUST` with 5 May 2024
+`the person survives the intestate` with `Kadir, born after Rahim died` and `JUST` with 5 May 2024
+not `the person survives the intestate and is within the classes section 6(a) names` with `Kadir, born after Rahim died` and `JUST` with 5 May 2024
 `the uncles and aunts of the intestate who survive him` with `case 17d — an uncle conceived after the intestate's death` is empty
 not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 17d — an uncle conceived after the intestate's death`
 `rule 9 — in default of distribution under rules 1 to 8` with `case 17d — an uncle conceived after the intestate's death`
 `the distribution, read out` with `case 17d — an uncle conceived after the intestate's death` is equal to list of the Government takes 1
 `the total of the shares distributed` with `case 17d — an uncle conceived after the intestate's death` is equal to 1
-not `the person survives the intestate and is within the classes section 6(a) names` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-`the person survives the intestate` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `the person survives the intestate and is within the classes section 6(a) names` with `Nabil, born after Rahim died` and `JUST` with 5 May 2024
+`the person survives the intestate` with `Nabil, born after Rahim died` and `JUST` with 5 May 2024
 `section 3 — a “child” within the meaning of this Act` with `an ISA legitimate child` with `Zara`
-not `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5 is empty
-not `rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Nabil, born after Rahim died` and `JUST` with 5 May 2024 is empty
+not `rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Nabil, born after Rahim died` and `JUST` with 5 May 2024
 `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 17e — a brother conceived after the death, leaving a surviving child` is empty
 `rule 9 — in default of distribution under rules 1 to 8` with `case 17e — a brother conceived after the death, leaving a surviving child`
 `the distribution, read out` with `case 17e — a brother conceived after the death, leaving a surviving child` is equal to list of the Government takes 1
 `the total of the shares distributed` with `case 17e — a brother conceived after the death, leaving a surviving child` is equal to 1
-not `the person survives the intestate` with `Nabil, who predeceased Rahim` and `JUST` with `YMD` with 2024, 5 and 5
-`rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Nabil, who predeceased Rahim` and `JUST` with `YMD` with 2024, 5 and 5
+not `the person survives the intestate` with `Nabil, who predeceased Rahim` and `JUST` with 5 May 2024
+`rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Nabil, who predeceased Rahim` and `JUST` with 5 May 2024
 `the distribution, read out` with `case 17g — a brother who predeceased, leaving the same surviving child` is equal to list of Zara takes 1
 `the total of the shares distributed` with `case 17g — a brother who predeceased, leaving the same surviving child` is equal to 1
-`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Nia, in the womb when Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Osman, conceived after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
-`the person survives the intestate` with `Osman, conceived after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Nia, in the womb when Rahim died` and `JUST` with 5 May 2024
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Osman, conceived after Rahim died` and `JUST` with 5 May 2024
+`the person survives the intestate` with `Osman, conceived after Rahim died` and `JUST` with 5 May 2024
 `section 3 — a “child” within the meaning of this Act` with `an ISA legitimate child` with `Osman, conceived after Rahim died`
-the number of items in `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Bakri, who died a month before Rahim` and `JUST` with `YMD` with 2024, 5 and 5 is equal to 1
+the number of items in `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Bakri, who died a month before Rahim` and `JUST` with 5 May 2024 is equal to 1
 `the distribution, read out` with `case 17f — a niece in the womb at the death, and a nephew conceived after it` is equal to list of Nia takes 1
 `the total of the shares distributed` with `case 17f — a niece in the womb at the death, and a nephew conceived after it` is equal to 1
 `section 3 — a “child” within the meaning of this Act` with `an ISA legitimate child` with `Ivan`
@@ -274,14 +274,14 @@ not `section 5(b) — domiciled outside Singapore and possessed beneficially of 
 not `section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from`
 `section 5 — that property` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from` is equal to 0
 not `this Act has effect in respect of the estate` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from`
-`rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Tan, whose only child predeceased her` and `JUST` with `YMD` with 2024, 5 and 5 is empty
-not `rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Tan, whose only child predeceased her` and `JUST` with `YMD` with 2024, 5 and 5
+`rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Tan, whose only child predeceased her` and `JUST` with 5 May 2024 is empty
+not `rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Tan, whose only child predeceased her` and `JUST` with 5 May 2024
 `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 25 — only a grand-niece survives, and a grandparent` is empty
 `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 25 — only a grand-niece survives, and a grandparent`
 `the distribution, read out` with `case 25 — only a grand-niece survives, and a grandparent` is equal to list of Xin takes 1
 `the total of the shares distributed` with `case 25 — only a grand-niece survives, and a grandparent` is equal to 1
-not `rule 3 — the ancestor leaves a child who takes, or who is himself represented` with `the ISA Chandra` and `JUST` with `YMD` with 2024, 7 and 7
-not `rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `the ISA Chandra` and `JUST` with `YMD` with 2024, 7 and 7
+not `rule 3 — the ancestor leaves a child who takes, or who is himself represented` with `the ISA Chandra` and `JUST` with 7 July 2024
+not `rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `the ISA Chandra` and `JUST` with 7 July 2024
 not `the intestate leaves issue` with `case 26 — the only grandchild is neither legitimate nor adopted`
 `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 26 — the only grandchild is neither legitimate nor adopted`
 `the distribution, read out` with `case 26 — the only grandchild is neither legitimate nor adopted` is equal to list of Xin takes 1

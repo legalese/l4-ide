@@ -38,19 +38,19 @@ not `security for the due administration of the estate is required in` with `the
 `the amount of the bond in` with `the Bernard intestacy with a mortgaged flat` is equal to 250000
 not `security for the due administration of the estate is required in` with `the Family Court administration`
 `the number of sureties required in` with `the Family Court administration` is equal to 0
-`the date 6 months after the death in` with `the Bernard intestacy` is equal to `YMD` with 2026, 7 and 15
+`the date 6 months after the death in` with `the Bernard intestacy` is equal to 15 July 2026
 not `section 55(1)(a) is engaged in` with `the neglected estate as at 30 June 2026`
 `section 55(1)(a) is engaged in` with `the neglected estate as at 16 July 2026`
 `letters of administration may be granted to the Public Trustee under section 55 in` with `the neglected estate as at 16 July 2026`
 `the Public Trustee may apply before the 6 months expire in` with `the neglected estate as at 30 June 2026`
-`the date one month after the grant in` with `the Alice probate` is equal to `JUST` with `YMD` with 2026, 4 and 10
+`the date one month after the grant in` with `the Alice probate` is equal to `JUST` with 10 April 2026
 not `section 55(1)(c) is engaged in` with `the Alice probate`
-`the date 6 months after the death of the last surviving executor or administrator in` with `the stranded estate` is equal to `JUST` with `YMD` with 2026, 8 and 28
+`the date 6 months after the death of the last surviving executor or administrator in` with `the stranded estate` is equal to `JUST` with 28 August 2026
 `section 55(1)(f) is engaged in` with `the stranded estate`
 `the stranded estate` 's `an application has been made for probate or letters of administration`
 not `section 55(1)(f) is engaged in` with `the estate whose administrator died and whose family applied again`
 not `letters of administration may be granted to the Public Trustee under section 55 in` with `the estate whose administrator died and whose family applied again`
-`the last date for an application to rectify the will in` with `the Alice probate` is equal to `JUST` with `YMD` with 2026, 9 and 10
+`the last date for an application to rectify the will in` with `the Alice probate` is equal to `JUST` with 10 September 2026
 `the last date for an application to rectify the will in` with `the Bernard intestacy` is equal to `NOTHING`
 `the deceased died intestate in` with `the Family Court administration`
 `the last date for an application to rectify the will in` with `the Family Court administration` is equal to `NOTHING`

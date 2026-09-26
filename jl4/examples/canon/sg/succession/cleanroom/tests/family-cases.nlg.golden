@@ -46,8 +46,8 @@ not `the father is guardian of the infant under section 6(2)` with `Divya as an 
 `the mother holds the guardianship section 6(1) gives her` with `Divya as an infant concerned in the estate`
 `the persons who are guardians of the infant` with `Divya as an infant concerned in the estate` is equal to list of meera
 `who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and `the day letters of administration are applied for` is equal to `the person is an infant on that date, and the guardians of the infant are` with list of meera
-`who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and `YMD` with 2033, 11 and 2 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
-`who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and `YMD` with 2033, 11 and 1 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of meera
+`who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and 2 November 2033 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and 1 November 2033 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of meera
 `every guardian recorded for this infant is recorded against this infant` with `Divya as an infant concerned in the estate`
 meera is one of `the persons who are guardians of the infant` with `Divya as an infant concerned in the estate`
 `whether section 21(2) and the Guardianship of Infants Act agree about this grant` with `the Sivakumar intestacy`, `the grant to the widow and the son` and `the day letters of administration are applied for` is equal to `both Acts are satisfied: the Probate Act opens section 21(2) and the Guardianship of Infants Act counts the grantee as a guardian of the infant`
@@ -150,7 +150,7 @@ not `the will is properly executed` with `the Iskandar will, put to the Wills Ac
 `the standing of the guardian under this Act` with `Zarina, appointed guardian of Adam by his father’s will` and `Adam, his mother surviving` is equal to `he acts jointly with the mother or father, as the case may be`
 `the mother is guardian of the infant under section 6(1)` with `Adam, his mother surviving`
 `the persons who are guardians of the infant` with `Adam, his mother surviving` is equal to list of aisyah and zarina
-`who are the guardians of the infant, if this Act has an infant to govern` with `Adam, his mother surviving` and `YMD` with 2026, 1 and 15 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of aisyah and zarina
+`who are the guardians of the infant, if this Act has an infant to govern` with `Adam, his mother surviving` and 15 January 2026 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of aisyah and zarina
 not `guardians are appointed by both parents` with `Adam, his mother surviving`
 not `section 7(5) is engaged` with `Adam, his mother surviving`
 `the guardians who act jointly under section 7(5)` with `Adam, his mother surviving` is equal to `EMPTY`
@@ -208,8 +208,8 @@ not `rule 9 — in default of distribution under rules 1 to 8` with `the Faizal 
 not `s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` with `the Faizal estate, the deceased not being a Muslim`
 `s 18(1) — the person has died intestate` with `the Faizal estate`
 `the persons entitled under section 18(4)(a)` with `the Faizal estate` is equal to list of `Rohani Sulaiman`, `Hafiz Faizal` and `Sofea Faizal`
-`s 6(2) — there is a minority` with `the Faizal estate` and `YMD` with 2026, 1 and 15
-`s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Sofea Faizal` and `YMD` with 2026, 1 and 15
+`s 6(2) — there is a minority` with `the Faizal estate` and 15 January 2026
+`s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Sofea Faizal` and 15 January 2026
 `the mother is guardian of the infant under section 6(1)` with `Sofea, an infant concerned in the estate`
 `the persons who are guardians of the infant` with `Sofea, an infant concerned in the estate` is equal to list of rohani
 `the formal validity of the will` with `the Faizal will, put to the Wills Act` is equal to `valid`
@@ -246,24 +246,24 @@ not `this Act has effect in respect of the estate` with `the Tan Boon Hock estat
 not `s 4 — will of infant invalid` with `the will under consideration` with `the Menon will, put to the Wills Act`
 not `s 4 — the testator is proved to have been 21 years of age or over` with `the will under consideration` with `the Menon will, put to the Wills Act`
 `the formal validity of the will` with `the Menon will, put to the Wills Act` is equal to `the age of the testator when the will was made not being in evidence, section 4 cannot be applied`
-not `_ is an infant on _` with `Gerald Menon, whose age is nowhere in evidence` and `YMD` with 2026, 1 and 15
-not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Gerald Menon, whose age is nowhere in evidence` and `YMD` with 2026, 1 and 15
-not `s 6(2) — there is a minority` with `the Menon estate` and `YMD` with 2026, 1 and 15
-`the person is an infant on the date in question` with `Gerald Menon, whose age is nowhere in evidence` and `YMD` with 2026, 1 and 15 is equal to `NOTHING`
-`who are the guardians of the infant, if this Act has an infant to govern` with `Gerald Menon, put forward as an infant` and `YMD` with 2026, 1 and 15 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
-`_ is an infant on _` with `Divya Sivakumar` and `YMD` with 2033, 11 and 1
-not `_ is an infant on _` with `Divya Sivakumar` and `YMD` with 2033, 11 and 2
-`the person is an infant on the date in question` with `Divya Sivakumar` and `YMD` with 2033, 11 and 1 is equal to `JUST` with `TRUE`
-`the person is an infant on the date in question` with `Divya Sivakumar` and `YMD` with 2033, 11 and 2 is equal to `JUST` with `FALSE`
-`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and `YMD` with 2033, 11 and 1
-`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and `YMD` with 2033, 11 and 2
-`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and `YMD` with 2026, 1 and 15
-`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and `YMD` with 2099, 12 and 31
-`the two Acts agree whether this person is an infant on this date` with `Meera Sivakumar` and `YMD` with 2026, 1 and 15
-`the two Acts agree whether this person is an infant on this date` with `Ethan Sim` and `YMD` with 2029, 9 and 8
-`the two Acts agree whether this person is an infant on this date` with `Ethan Sim` and `YMD` with 2029, 9 and 9
-not `the two Acts agree whether this person is an infant on this date` with `Gerald Menon, whose age is nowhere in evidence` and `YMD` with 2026, 1 and 15
-not `the two Acts agree whether this person is an infant on this date` with `Gerald Menon, whose age is nowhere in evidence` and `YMD` with 1900, 1 and 1
+not `_ is an infant on _` with `Gerald Menon, whose age is nowhere in evidence` and 15 January 2026
+not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Gerald Menon, whose age is nowhere in evidence` and 15 January 2026
+not `s 6(2) — there is a minority` with `the Menon estate` and 15 January 2026
+`the person is an infant on the date in question` with `Gerald Menon, whose age is nowhere in evidence` and 15 January 2026 is equal to `NOTHING`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Gerald Menon, put forward as an infant` and 15 January 2026 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
+`_ is an infant on _` with `Divya Sivakumar` and 1 November 2033
+not `_ is an infant on _` with `Divya Sivakumar` and 2 November 2033
+`the person is an infant on the date in question` with `Divya Sivakumar` and 1 November 2033 is equal to `JUST` with `TRUE`
+`the person is an infant on the date in question` with `Divya Sivakumar` and 2 November 2033 is equal to `JUST` with `FALSE`
+`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and 1 November 2033
+`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and 2 November 2033
+`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and 15 January 2026
+`the two Acts agree whether this person is an infant on this date` with `Divya Sivakumar` and 31 December 2099
+`the two Acts agree whether this person is an infant on this date` with `Meera Sivakumar` and 15 January 2026
+`the two Acts agree whether this person is an infant on this date` with `Ethan Sim` and 8 September 2029
+`the two Acts agree whether this person is an infant on this date` with `Ethan Sim` and 9 September 2029
+not `the two Acts agree whether this person is an infant on this date` with `Gerald Menon, whose age is nowhere in evidence` and 15 January 2026
+not `the two Acts agree whether this person is an infant on this date` with `Gerald Menon, whose age is nowhere in evidence` and 1 January 1900
 not `rule 5 — there are no descendants, and there are a parent or parents of the intestate` with `the Sivakumar intestacy, his parents surviving`
 `the distribution, read out` with `the Sivakumar intestacy, his parents surviving` is equal to list of Meera Sivakumar takes 0.5, Arjun Sivakumar takes 0.25 and Divya Sivakumar takes 0.25
 `the sum taken under the Intestate Succession Act by the person whose reference is` with `the Sivakumar intestacy, his parents surviving` and ramanathan is equal to 0
@@ -287,8 +287,8 @@ not `one person takes the whole of the property distributable under this Act` wi
 not `one person takes the whole of the property distributable under this Act` with `the Sivakumar intestacy`
 `s 29 — the security ordinarily required of this grantee` with `the Sivakumar intestacy`, `the grant to the widow and the son`, `the widow as grantee`, `the further facts, the section 29(5) antecedent taken from the Intestate Succession Act` with `the Sivakumar intestacy` and `the day letters of administration are applied for` is equal to `security by bond in the prescribed form by the grantee and 2 sureties` with 1200000
 `one person takes the whole of the property distributable under this Act` with `the Devan intestacy`
-`s 29 — the security ordinarily required of this grantee` with `the Devan intestacy`, `the grant of letters of administration to Kiran`, `Kiran as grantee`, `the further facts, the section 29(5) antecedent taken from the Intestate Succession Act` with `the Devan intestacy` and `YMD` with 2026, 3 and 1 is equal to `security by bond in the prescribed form by the grantee, sureties being dispensed with` with 400000
-`s 29 — the security ordinarily required of this grantee` with `the Devan intestacy`, `the grant of letters of administration to Kiran`, `Kiran as grantee`, `the further facts, nothing being made out` and `YMD` with 2026, 3 and 1 is equal to `security by bond in the prescribed form by the grantee and 2 sureties` with 400000
+`s 29 — the security ordinarily required of this grantee` with `the Devan intestacy`, `the grant of letters of administration to Kiran`, `Kiran as grantee`, `the further facts, the section 29(5) antecedent taken from the Intestate Succession Act` with `the Devan intestacy` and 1 March 2026 is equal to `security by bond in the prescribed form by the grantee, sureties being dispensed with` with 400000
+`s 29 — the security ordinarily required of this grantee` with `the Devan intestacy`, `the grant of letters of administration to Kiran`, `Kiran as grantee`, `the further facts, nothing being made out` and 1 March 2026 is equal to `security by bond in the prescribed form by the grantee and 2 sureties` with 400000
 `section 3 — a “child” within the meaning of this Act` with `a legitimate child in the case file` with `Kiran Devan`
 not `section 3 — a “child” within the meaning of this Act` with `a child in the case file neither legitimate nor adopted` with `Nithya Devan`
 `a “child” within the meaning of section 3 of the Intestate Succession Act 1967` with `a legitimate child in the case file` with `Kiran Devan`
@@ -347,6 +347,6 @@ not `section 17 denies the guardian power to give a good discharge` with `Grace,
 `whether some guardian of this infant could give a good discharge for the infant’s share` with `Ethan, the court having authorised the discharge of his legacy` is equal to `a guardian whom the Guardianship of Infants Act counts could give a good discharge for the infant’s share`
 not `this Act has effect in respect of the estate` with `the Sim testacy`
 `the capital moneys of this infant that no guardian may give a good discharge for` with `the Sim testacy` and `Ethan as an infant concerned in the estate` is equal to 0
-`who are the guardians of the infant, if this Act has an infant to govern` with `Ethan as an infant concerned in the estate` and `YMD` with 2029, 9 and 8 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of grace
-`who are the guardians of the infant, if this Act has an infant to govern` with `Ethan as an infant concerned in the estate` and `YMD` with 2029, 9 and 9 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
-not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Ethan Sim` and `YMD` with 2029, 9 and 9
+`who are the guardians of the infant, if this Act has an infant to govern` with `Ethan as an infant concerned in the estate` and 8 September 2029 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of grace
+`who are the guardians of the infant, if this Act has an infant to govern` with `Ethan as an infant concerned in the estate` and 9 September 2029 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
+not `s 21(1) — no probate or letters of administration shall be granted to a person while he is an infant` with `Ethan Sim` and 9 September 2029

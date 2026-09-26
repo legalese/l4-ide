@@ -1,10 +1,10 @@
-`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2026, 8 and 26 is equal to `JUST` with `TRUE`
-`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2035, 1 and 1 is equal to `JUST` with `FALSE`
-`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2033, 7 and 18 is equal to `JUST` with `TRUE`
-`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2033, 7 and 19 is equal to `JUST` with `FALSE`
-`the person is an infant on the date in question` with `Wei Ming, majority date not in evidence` and `YMD` with 2026, 8 and 26 is equal to `NOTHING`
-`the date on which the person attains the age of majority, computed from the date of birth` with `Wei Ming, the infant` and 21 is equal to `JUST` with `YMD` with 2033, 7 and 19
-`the date on which the person attains the age of majority, computed from the date of birth` with `Wei Ming, the infant` and 18 is equal to `JUST` with `YMD` with 2030, 7 and 19
+`the person is an infant on the date in question` with `Wei Ming, the infant` and 26 August 2026 is equal to `JUST` with `TRUE`
+`the person is an infant on the date in question` with `Wei Ming, the infant` and 1 January 2035 is equal to `JUST` with `FALSE`
+`the person is an infant on the date in question` with `Wei Ming, the infant` and 18 July 2033 is equal to `JUST` with `TRUE`
+`the person is an infant on the date in question` with `Wei Ming, the infant` and 19 July 2033 is equal to `JUST` with `FALSE`
+`the person is an infant on the date in question` with `Wei Ming, majority date not in evidence` and 26 August 2026 is equal to `NOTHING`
+`the date on which the person attains the age of majority, computed from the date of birth` with `Wei Ming, the infant` and 21 is equal to `JUST` with 19 July 2033
+`the date on which the person attains the age of majority, computed from the date of birth` with `Wei Ming, the infant` and 18 is equal to `JUST` with 19 July 2030
 `the date on which the person attains the age of majority, computed from the date of birth` with `Lai Peng, the mother` and 21 is equal to `NOTHING`
 `the short title of this Act` is equal to Guardianship of Infants Act 1934
 `the forum is a court within the meaning of section 2` with `the General Division of the High Court or a Family Court` with `a Family Court`
@@ -390,13 +390,13 @@ not `a Family Court has power to take the step` with `variation of the order`
 `whether this Act applies to the money` with `money in a District Court ordered to be transferred to the credit of an infant` and `TRUE` is equal to `this Act applies to the money`
 `whether this Act applies to the money` with `money of neither kind described in section 21` and `FALSE` is equal to `this Act applies to the money`
 `whether this Act applies to the money` with `money of neither kind described in section 21` and `TRUE` is equal to `this Act applies to the money`
-`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2026, 8 and 26 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of mother and lim
-`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2033, 7 and 18 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of mother and lim
-`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2033, 7 and 19 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and 26 August 2026 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of mother and lim
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and 18 July 2033 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of mother and lim
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and 19 July 2033 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
 `the persons who are guardians of the infant` with `Wei Ming, the father having died leaving a testamentary guardian` is equal to list of mother and lim
-`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2035, 1 and 1 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
-`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian` and `YMD` with 2026, 8 and 26 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
-`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian` and `YMD` with 2035, 1 and 1 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and 1 January 2035 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian` and 26 August 2026 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian` and 1 January 2035 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
 `every guardian recorded for this infant is recorded against this infant` with `Wei Ming, the father having died leaving a testamentary guardian`
 `every guardian recorded for this infant is recorded against this infant` with `Wei Ming, guardians appointed by both parents, both parents dead`
 `every guardian recorded for this infant is recorded against this infant` with `Wei Ming, the father having appointed no guardian`
