@@ -30,7 +30,7 @@ This is the "I have a statute and I want it in L4" path. **The encoding is writt
 | #   | prerequisite                                                                 | why                                                                                                                                      |
 | --- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | An `l4` binary                                                               | Every claim you make about the encoding is `l4 check` and `l4 run` telling you so. Without one you are writing text nobody has verified. |
-| 2   | [Claude Code](https://claude.com/claude-code) and a clone of this repository | The two authoring skills live in `.claude/skills/` and load automatically when Claude Code starts in the clone. Nothing to install.      |
+| 2   | [Claude Code](https://claude.com/claude-code) and a clone of this repository | The authoring skills live in `.claude/skills/` and load automatically when Claude Code starts in the clone. Nothing to install.          |
 | 3   | The source text                                                              | The statute, regulation or contract, fetched from its authoritative source. Encode from the fetched text, never from memory.             |
 
 Items 4 and 5 — Node.js ≥ 20 and GraphViz (`dot`) — are for the **pipeline**, and you do not need them on day one. They matter once the encoding exists and you want the projections and diagrams. **Claude Code can install any of these for you**; ask it to, rather than working through a toolchain by hand.
@@ -72,7 +72,7 @@ claude
 > with test assertions for each of the worked examples in the schedule.
 ```
 
-The `writing-l4-rules` skill loads on any request of that shape. It carries the house style, the builtin libraries, eleven reference notes on recurring source patterns — definitions and scope, conditions, quantities, dates, duties and powers, presumptions, discretion, text that is not a rule — and the traps a general-purpose model gets wrong unaided.
+Two skills load on a request of that shape. **`encoding-a-subject`** is the workflow around the L4: a brief that pins scope and deliverables, a coverage table listing every provision before any is encoded, the shared nouns before the rules, tests taken from the source rather than from the code, a self-check that reads diagnostics rather than exit codes (`l4 run` exits 0 on a failed `#ASSERT`), an independent test pass, and filing the result in [legalese/canon](https://github.com/legalese/canon). **`writing-l4-rules`** carries the language: the house style, the builtin libraries, eleven reference notes on recurring source patterns — definitions and scope, conditions, quantities, dates, duties and powers, presumptions, discretion, text that is not a rule — and the traps a general-purpose model gets wrong unaided.
 
 From there it is the ordinary loop: draft a provision, `l4 check` it, add `#EVAL` assertions for the examples the source itself gives you, run them, and move on. Encode the source's own worked examples first — they are the only tests whose expected answers you did not invent.
 

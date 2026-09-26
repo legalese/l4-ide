@@ -28,6 +28,7 @@ Things that will trip up a general-purpose large language model because they are
 - [A library's own example definitions are visible to importers](#a-librarys-own-example-definitions-are-visible-to-importers)
 - [NLG and reference annotations](#nlg-and-reference-annotations)
 - [`EVERY … WHO elem` is deprecated and nothing tells you](#every--who-elem-is-deprecated-and-nothing-tells-you)
+- [Four errors that do not point at the fix](#four-errors-that-do-not-point-at-the-fix)
 
 ---
 
@@ -564,6 +565,41 @@ condition and is fine. Only an `elem` standing in for a missing roll is the depr
 
 See [regulative.md](regulative.md#do-not-write-the-deprecated-who-elem-roll) for why it was
 deprecated and what else `EVERY` needs.
+
+---
+
+## Four errors that do not point at the fix
+
+Each of these fails loudly, but the message names a symptom somewhere other than the fix, so the usual response is to edit the wrong thing.
+Measured 2026-09-26 on a 23 September 2026 build of `unstable`; the 7 September 2026 prerelease gives the same messages.
+
+**A `LIST OF` parameter in a comma-separated `GIVEN`.**
+`GIVEN xs IS A LIST OF NUMBER, n IS A NUMBER` fails with `unexpected IS`, pointing at the parameter _after_ the list: the comma is read as continuing the list type.
+Put each parameter on its own line under one `GIVEN`, with no commas — that layout is always safe:
+
+```l4
+GIVEN xs IS A LIST OF NUMBER
+      n  IS A NUMBER
+```
+
+**There is no `++`.**
+`LIST 1 ++ LIST 2` fails with `expecting operator char`.
+Join two lists with `append xs ys`, which comes from `IMPORT prelude` — without the import the message is `I could not find a definition for the identifier append`.
+To put one element in front of a list, `x FOLLOWED BY xs`.
+
+**`WHEN JUST _` does not parse.**
+It fails with `unexpected '_'`: there is no wildcard after `JUST`.
+Name the value even if you do not use it — `WHEN JUST x THEN TRUE` checks cleanly.
+
+**No partial application.**
+``map (`add` 1) xs``, where `` `add` `` takes two inputs, fails with a message about `map`'s first input having the wrong type (a `NUMBER` where a `FUNCTION` was expected), or, outside `map`, that `` `add` `` "expects 2 inputs, but here it is given 1 input".
+Write the function out:
+
+```l4
+map (GIVEN x YIELD `add` 1 x) xs
+```
+
+Two older traps from the same family now explain themselves, so they are not listed above: a `GIVEN` whose names are in a different order from the definition's parameters, and `NOT` swallowing the rest of a line (`NOT FALSE AND FALSE`) — both now fail with a message that explains the problem.
 
 ---
 
