@@ -16,3 +16,27 @@ DECIDE `p seven` IF total GREATER THAN 200
 -- Test 3: a call site of the rule from Test 1. The map is restamped only at
 -- the definition, so hover here is unchanged by #979.
 DECIDE `row five check` IS `row five` 200
+
+-- Test 4 (control): a herald on its own line above the head is the rule's
+-- sentence, and it was always stamped on the declaration, not moved by #979.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large
+DECIDE `is large` IF amount GREATER THAN 100
+
+-- Test 5 (control): a herald trailing the rule's name in its head.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is small` @nlg the claim of %amount% is small
+  IF amount LESS THAN 10
+
+-- Test 6 (control): a herald on a GIVEN type variable is that variable's gloss.
+GIVEN a IS A TYPE @nlg the kind of thing
+      x IS AN a
+GIVETH AN a
+`same thing` MEANS x
+
+-- Test 7 (control for Test 3): call sites of Tests 4 and 5. A reference never
+-- shows a herald on hover, wherever the herald was written.
+DECIDE `large check` IS `is large` 200
+DECIDE `small check` IS `is small` 2

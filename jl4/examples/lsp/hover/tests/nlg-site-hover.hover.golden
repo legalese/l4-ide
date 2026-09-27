@@ -6,3 +6,14 @@ given-gloss-input: ``` | NUMBER | ``` |  | --- |  | ``` | the sum of money | ```
 given-gloss-rule: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
 given-gloss-body-ref: ``` | NUMBER | ``` | 
 head-input-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
+declaration-rule: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` |  | --- |  | ``` | the claim of `amount` is large | ``` | 
+declaration-given: ``` | NUMBER | ``` | 
+declaration-body-ref: ``` | NUMBER | ``` | 
+head-name-rule: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` |  | --- |  | ``` | the claim of `amount` is small | ``` | 
+head-name-given: ``` | NUMBER | ``` | 
+head-name-body-ref: ``` | NUMBER | ``` | 
+given-name-tyvar: TYPE VAR
+given-name-input: ``` | a | ``` | 
+given-name-rule: ``` | FOR ALL a [the kind of thing] FUNCTION FROM a TO a | ``` | 
+declaration-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
+head-name-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 

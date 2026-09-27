@@ -80,6 +80,18 @@ hoverGolden evalConfig dir inputFile = do
       , (Position 13 9, "given-gloss-rule")
       , (Position 13 22, "given-gloss-body-ref")
       , (Position 17 30, "head-input-call-site")
+        -- Controls: the sites #979 did not move must hover as before.
+      , (Position 24 9, "declaration-rule")
+      , (Position 21 7, "declaration-given")
+      , (Position 24 23, "declaration-body-ref")
+      , (Position 29 9, "head-name-rule")
+      , (Position 27 7, "head-name-given")
+      , (Position 30 6, "head-name-body-ref")
+      , (Position 33 6, "given-name-tyvar")
+      , (Position 34 6, "given-name-input")
+      , (Position 36 3, "given-name-rule")
+      , (Position 40 27, "declaration-call-site")
+      , (Position 41 27, "head-name-call-site")
       ]
     other -> error ("Hover.positionsFor: no positions pinned for " <> other)
 

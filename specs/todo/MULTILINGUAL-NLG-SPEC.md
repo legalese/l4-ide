@@ -1103,7 +1103,9 @@ Measured on `jl4/examples/lsp/hover/nlg-site-hover.l4`, with the issue's own exa
 | `total`, heralded in `GIVEN`   | type, then `the sum of money`                      | unchanged                             |
 
 The doubled "row five saw" in the old input hover was the herald's `%amount%` slot linearizing through `amount`'s own annotation, which carried the same herald (`L4.Nlg`'s `Linearize Resolved` instance reads the binding's herald at an unannotated reference); it goes once the input no longer holds it.
-Hover changes only at the definition, because only defining names are restamped: a call site of `row five` shows its type alone (pinned in the same golden).
+Hover changes only at the definition, and that matches every other placement: the type checker stamps the map only where a herald is written (`setAnnNlg`), never at a reference, so a call site shows its type alone whether the herald was written above the head, after the head name or after an input.
+The same golden pins all three, with the head-name and declaration placements as controls that #979 does not move.
+One residue it also pins, not a #979 defect: hovering a `GIVEN` type variable prints `TYPE VAR` and drops its herald, because `LSP.L4.Actions.infoToHover` reads the nlg only in its `TypeInfo` branch; the gloss appears instead inside the rule's type, as `FOR ALL a [the kind of thing]`.
 
 **Still owed: the cross-module case.**
 `promoteHeadInputNlg` folds over the module it is given, so a call to a heralded rule defined in an IMPORTED module still prints the bare name — the prelude's 67 among them.

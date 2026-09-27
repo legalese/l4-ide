@@ -318,6 +318,7 @@ Both render as ``the claim of `amount` is large``, at every call site and in eve
 The editor shows the same reading.
 Hover over the rule's name in its head and you see the sentence, even when it was written after an input.
 Hover over that input and you see only its type, with no gloss.
+Hover over a call to the rule and you see its type alone, as you do for a rule annotated in any other place: the editor shows an annotation where it is defined, not where it is used.
 
 **Until 2026-09-21, only one projection agreed with that.**
 `l4 render` read such an annotation as the rule's sentence; `l4 nlg` read it as the input's gloss, so a positional call printed the rule's bare name and a `WITH` call printed the sentence in the `where` clause instead of as the heading.
