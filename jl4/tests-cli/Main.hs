@@ -49,6 +49,9 @@ import qualified CliTest.Yscript as Yscript
 bilingualFixture :: FilePath
 bilingualFixture = fixtureDir </> "bilingual.l4"
 
+bilingualFramesFixture :: FilePath
+bilingualFramesFixture = fixtureDir </> "bilingual-frames.l4"
+
 -- | Eight shapes whose @l4 state-graph@ caption said something false in
 -- September 2026, each cut down to the four or five lines that draw it.
 --
@@ -553,6 +556,29 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("exceeds the threshold" `isInfixOf`)
       sout `shouldNotSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    -- The frame words: the ones the linearizer supplies, not the author.
+    -- `--lang he` renders them from the Hebrew phrasebook, a phrase at a time;
+    -- the maqaf-final "ל־" meets its value with no space; a month is a frame
+    -- word too; and a word with no entry stays English and is NAMED on stderr,
+    -- so the gap is visible. With no flag nothing changes.
+    it "l4 nlg --lang he renders the frame words from the phrasebook" $ do
+      Output code sout serr <- runL4 bin ["nlg", "--lang", "he", bilingualFramesFixture]
+      code `shouldBe` ExitSuccess
+      lines sout `shouldBe`
+        [ "150 עולה על הסף שווה ל־`TRUE`"
+        , "לא 5 עולה על הסף"
+        , "16 ביולי 2025"
+        , "150 as string"
+        ]
+      serr `shouldSatisfy` ("have no he rendering and stay English: as, string" `isInfixOf`)
+
+    it "l4 nlg with no --lang keeps English frame words and reports nothing" $ do
+      Output code sout serr <- runL4 bin ["nlg", bilingualFramesFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("exceeds the threshold is equal to `TRUE`" `isInfixOf`)
+      sout `shouldSatisfy` ("16 July 2025" `isInfixOf`)
+      serr `shouldNotSatisfy` ("stay English" `isInfixOf`)
 
     it "l4 render reaches the same annotations, through the exporter" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
