@@ -330,15 +330,14 @@ Each row is one rule; the two `l4 nlg` columns are a positional call and a `WITH
 | 7   | name and input, then `MEANS`   | own line under input   | sentence            | sentence        | sentence    |
 | 8   | `DECIDE` name and input        | trailing the head      | sentence            | sentence        | sentence    |
 | 9   | name, then input, then `MEANS` | own line BEFORE input  | sentence            | sentence        | sentence    |
-| 10  | name and input with `AKA`      | own line after the AKA | sentence            | sentence        | **bare**    |
-| 11  | name and input with `AKA`      | own line above         | **bare name**       | **bare name**   | sentence    |
+| 10  | name and input with `AKA`      | own line after the AKA | sentence            | sentence        | sentence    |
+| 11  | name and input with `AKA`      | own line above         | sentence            | sentence        | sentence    |
 
-Rows 5, 7 and 8 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
+Rows 5, 7, 8, 10 and 11 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
 The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](../../../jl4/examples/ok/nlg-head-placement.l4), whose committed golden pins both `l4 nlg` columns, and a CLI test pins the `l4 render` one — so a change to any cell is a test failure rather than stale prose here.
 
-**A head carrying an `AKA` is the one shape where the two projections still disagree**, rows 10 and 11.
-The annotation lands on the `AKA`'s name rather than on an input, which is a different question from this one, and no placement on such a head satisfies both projections.
-Write the sentence above the head if the document matters more, under the `AKA` if `l4 nlg` does.
+**A head carrying an `AKA` reads the same way**, rows 10 and 11.
+Under the `AKA` the annotation lands on the alias name, and an alias is another name for the rule, so the annotation is the rule's sentence; a call through the alias reads it too.
 
 **Where the sentence goes when you write it in the `GIVEN` instead.**
 That is an input gloss and stays one — it labels the input in a `WITH` call's `where` clause, and it is not the rule's sentence.

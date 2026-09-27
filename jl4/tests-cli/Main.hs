@@ -1654,18 +1654,26 @@ spec bin = do
       sout `shouldSatisfy` ("row thirteen the rule saw 200\n" `isInfixOf`)
       sout `shouldSatisfy` ("row thirteen the input" `isInfixOf`)
 
-    it "does not touch an AKA head, where the disagreement is a different one" $ do
+    it "reads a herald on an AKA head as the rule's sentence at both call shapes (#978)" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
-      -- Row 10: the AKA's name claims the herald, so `l4 nlg` prints it — as
-      -- the bare linearizer does, slot unfilled and the argument appended,
-      -- because the herald is on no position `decideNlg` searches — and
-      -- `l4 render` prints its own paraphrase. Row 11: the herald above the
-      -- head IS found by `decideNlg`, so the splice reads it and the two
-      -- projections now agree on this row; the AKA residue is row 10 alone.
-      nlgOut `shouldSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      -- Row 10: the herald lands on the AKA's NAME. `L4.Nlg.decideNlg` now
+      -- searches that position, so `l4 render` finds it and `l4 nlg` fills its
+      -- slot; before, render lost it and nlg printed "row ten saw `amount`
+      -- with 200". A call through the alias reads the same.
+      nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("row ten saw 200\nrow ten saw `amount` where `amount` is 200\nrow ten saw 200\n" `isInfixOf`)
+      renOut `shouldSatisfy` ("row ten saw amount" `isInfixOf`)
+      -- Row 11: the herald above the head lands on the declaration. A `WITH`
+      -- call used to print the bare name, "`row eleven` where ...".
       nlgOut `shouldSatisfy` ("row eleven saw 200\n" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("row eleven saw `amount` where `amount` is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("`row eleven` where" `isInfixOf`)
       renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
+
+    it "heads a WITH call with the herald without re-expanding an input's gloss (row 13)" $ do
+      Output _ nlgOut _ <- nlgOf
+      nlgOut `shouldSatisfy` ("row thirteen the rule saw `amount` where row thirteen the input is 200" `isInfixOf`)
 
     it "reads a GIVEN gloss as the input's label, never as the rule's sentence (row 14)" $ do
       Output _ nlgOut _ <- nlgOf
