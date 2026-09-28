@@ -39,7 +39,14 @@ Plugins (`RunnerPlugin` in `runner.ts`):
   abandoned session, the next start commits that ("Clear tmp of abandoned
   session"). git runs with hooks and fsmonitor
   disabled, `core.createObject=rename` and `gc.auto=0` (`git.ts`).
-- The user's MCP servers arrive with `cloud-agent-mcp`.
+- `mcp-servers.ts` (§6.4): an ephemeral X25519 key pair at start, whose public
+  key rides on every running/busy/waiting `session-state` event;
+  `mcp-credentials` is opened with `mcpCredentialsContext(sid)`, validated,
+  and merged by server name (re-sent credentials replace the old ones). The
+  HTTP servers from `session.json` connect once their credentials arrive
+  (streamable HTTP, JSON or SSE responses) and appear as `vsmcp__<server>_<tool>`
+  tools. A 401/403 or an expired token emits `auth-required { reason: "mcp",
+server }` once per credential. stdio servers never reach a cloud session.
 
 ## Environment (cloud)
 

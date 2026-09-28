@@ -8,6 +8,12 @@ import type { CloudEvent } from '@repo/legalese-agent/protocol'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
 import { NodeWorkspace } from '../src/node-workspace.js'
 import { GitSync } from '../src/git-sync.js'
+import { McpServers } from '../src/mcp-servers.js'
+import {
+  encodeSealed,
+  mcpCredentialsContext,
+  seal,
+} from '@repo/legalese-agent/protocol'
 import {
   ReplyCollector,
   Runner,
@@ -680,6 +686,95 @@ describe('Runner', () => {
     assert.match(ask, /final reply:\nCreated\.\n/)
     assert.ok(!ask.includes('Let me create it'))
     assert.match(ask, /^A data\/rule\.l4$/m)
+  })
+
+  test('publishes the sealing key and uses MCP servers once credentials arrive', async () => {
+    const file = path.join(sessionDir, 'session.json')
+    const sessionJson = JSON.parse(await readFile(file, 'utf8'))
+    sessionJson.mcpServers = [
+      { name: 'docs', url: 'https://docs.example.test/mcp' },
+    ]
+    await writeFile(file, JSON.stringify(sessionJson))
+    const mcpFetch = (async (
+      _url: string | URL | Request,
+      init?: RequestInit
+    ) => {
+      const body = JSON.parse(String(init?.body)) as {
+        id?: number
+        method: string
+      }
+      const result =
+        body.method === 'tools/list'
+          ? {
+              tools: [
+                {
+                  name: 'lookup',
+                  inputSchema: { type: 'object', properties: {} },
+                },
+              ],
+            }
+          : body.method === 'tools/call'
+            ? { content: [{ type: 'text', text: 'looked up' }] }
+            : {}
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', id: body.id, result }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }) as typeof fetch
+    proxy.scripts.push(
+      [
+        metadata('conv7'),
+        toolCall('m1', 'vsmcp__docs_lookup', {}),
+        chunk({}, 'tool_calls'),
+      ],
+      [chunk({ content: 'ok' }), chunk({}, 'stop')]
+    )
+    const runner = build({ plugins: [new McpServers({ fetch: mcpFetch })] })
+    const done = runner.run()
+    await waitUntil(async () => (await readEvents(stateDir)).length > 0)
+    const running = (await readEvents(stateDir))[0] as CloudEvent & {
+      publicKey?: string
+    }
+    assert.equal(running.type, 'session-state')
+    assert.match(running.publicKey ?? '', /^[A-Za-z0-9_-]{43}$/)
+    await sendCommand(root, SID, {
+      type: 'mcp-credentials',
+      sealed: encodeSealed(
+        seal(
+          running.publicKey!,
+          JSON.stringify({
+            servers: [{ name: 'docs', headers: { Authorization: 'Bearer t' } }],
+          }),
+          mcpCredentialsContext(SID)
+        )
+      ),
+    })
+    await sendCommand(root, SID, {
+      type: 'message',
+      turnId: 't1',
+      text: 'look it up',
+    })
+    await waitUntil(async () =>
+      (await readEvents(stateDir)).some((e) => e.type === 'done')
+    )
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    const tools = proxy.chatRequests()[0]!.body.tools as Array<{
+      function: { name: string }
+    }>
+    assert.ok(tools.some((t) => t.function.name === 'vsmcp__docs_lookup'))
+    const toolMsg = proxy.chatRequests()[1]!.body.messages as Array<{
+      content: string
+    }>
+    assert.equal(toolMsg[0]!.content, 'looked up')
+    // Busy/running states carry the key too.
+    const states = (await readEvents(stateDir)).filter(
+      (e) =>
+        e.type === 'session-state' && (e as { state: string }).state === 'busy'
+    ) as Array<{ publicKey?: string }>
+    assert.equal(states[0]?.publicKey, running.publicKey)
   })
 })
 
