@@ -1,4 +1,4 @@
-import type { AiProxyTool } from './ai-proxy-client.js'
+import type { AiProxyTool } from './ports.js'
 
 /**
  * OpenAI function-tool declarations for the built-in client-side
