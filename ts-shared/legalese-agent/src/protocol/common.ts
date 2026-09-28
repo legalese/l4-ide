@@ -8,8 +8,9 @@ import {
   type Check,
 } from './validate.js'
 
-/** Session ids are ULIDs: 26 characters of Crockford base32 (§15.5). */
-export const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/
+/** Session ids are ULIDs: 26 characters of Crockford base32 (§15.5);
+ *  the first is 0–7 (48-bit timestamp). */
+export const ULID_RE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/
 
 export function isSessionId(value: unknown): value is string {
   return typeof value === 'string' && ULID_RE.test(value)
@@ -61,7 +62,8 @@ export interface McpServerConfig {
   /** Unique within the session; tools appear as `vsmcp__<name>__<tool>`. */
   name: string
   url: string
-  transport: 'http' | 'sse'
+  /** Default `http` (streamable HTTP). */
+  transport?: 'http' | 'sse'
   /** Tools the user enabled; absent = all. */
   enabledTools?: string[]
 }
@@ -71,7 +73,7 @@ export const MCP_SERVER_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/
 export const mcpServerConfig: Check<McpServerConfig> = obj({
   name: str({ pattern: MCP_SERVER_NAME_RE }),
   url: str({ max: 2048, pattern: /^https:\/\/[^\s]+$/ }),
-  transport: literal('http', 'sse'),
+  transport: optional(literal('http', 'sse')),
   enabledTools: optional(arr(str({ min: 1, max: 256 }), { max: 1000 })),
 })
 

@@ -6,6 +6,8 @@ import {
   agentKeyName,
   chatEventToPayload,
   clientCommand,
+  decodeSealed,
+  encodeSealed,
   cloudEventToChatEvent,
   createSessionRequest,
   eventsResponse,
@@ -40,17 +42,23 @@ const SID = '01J9Z8X7W6V5T4S3R2Q1P0N9M8'
 
 describe('session files', () => {
   const session: SessionFile = {
-    version: 1,
     sessionId: SID,
     ownerUserId: 'user_01ABC',
     title: 'Tax rules',
     created: 1_790_000_000_000,
     lastActivity: 1_790_000_060_000,
-    status: 'active',
+    status: 'running',
     mcpServers: [
       { name: 'docs', url: 'https://mcp.example.com/mcp', transport: 'http' },
     ],
   }
+
+  test('session.json reads the Sessions API form (nulls as absent)', () => {
+    const parsed = parseSessionFile(
+      JSON.stringify({ ...session, conversationId: null, orgId: null })
+    )
+    assert.deepEqual(parsed, session)
+  })
 
   test('session.json round-trips and drops unknown fields', () => {
     const parsed = parseSessionFile(
@@ -103,7 +111,7 @@ describe('session files', () => {
       segment: 2,
       length: 10,
     })
-    assert.throws(() => parseHeadFile('{"segment":-1,"length":0}'))
+    assert.throws(() => parseHeadFile('{"segment":0,"length":0}'))
     assert.equal(parseCommandSeq(formatCommandSeq(42)), 42)
     assert.equal(parseCommandSeq('4 2'), null)
   })
@@ -127,6 +135,7 @@ describe('session files', () => {
     assert.deepEqual(parseCursor('3:1024'), { segment: 3, offset: 1024 })
     assert.equal(parseCursor('3:-1'), null)
     assert.equal(formatCursor({ segment: 1, offset: 2 }), '1:2')
+    assert.equal(formatCursor({ segment: 0, offset: 0 }), '0')
   })
 })
 
@@ -260,15 +269,14 @@ describe('Sessions API and agent keys', () => {
   test('create-session request', () => {
     const r = tryParse(createSessionRequest, {
       title: 'x',
-      seed: { size: 1024 },
+      seedSize: 1024,
       attachments: [
         { name: 'a.pdf', contentType: 'application/pdf', size: 10 },
       ],
     })
     assert.equal(r.ok, true)
     const tooBig = tryParse(createSessionRequest, {
-      seed: { size: 60 * 1024 * 1024 },
-      attachments: [],
+      seedSize: 60 * 1024 * 1024,
     })
     assert.equal(tooBig.ok, false)
   })
@@ -332,10 +340,16 @@ describe('sealed secrets', () => {
     assert.ok(isSealingPublicKey(harness.publicKey))
     const ctx = mcpCredentialsContext(SID)
     const envelope = seal(harness.publicKey, credentials, ctx)
-    // The command carrying it validates…
-    clientCommand({ type: 'mcp-credentials', sealed: envelope }, '')
+    // The command carrying it (compact string form) validates…
+    const sealed = encodeSealed(envelope)
+    const command = clientCommand({ type: 'mcp-credentials', sealed }, '')
+    assert.deepEqual(decodeSealed(sealed), envelope)
     // …and only the harness can open it.
-    const plain = openSealed(harness, envelope, ctx).toString('utf8')
+    const plain = openSealed(
+      harness,
+      (command as { sealed: string }).sealed,
+      ctx
+    ).toString('utf8')
     assert.deepEqual(
       mcpCredentials(JSON.parse(plain), ''),
       JSON.parse(credentials)

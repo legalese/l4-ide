@@ -10,7 +10,7 @@ import {
   opaqueId,
 } from './common.js'
 import { isIncomingBundleName } from './files.js'
-import { sealedEnvelope, type SealedEnvelope } from './sealed.js'
+import { sealedString } from './sealed.js'
 import {
   ProtocolError,
   arr,
@@ -34,8 +34,9 @@ export type CommandPayload =
       attachments?: string[]
     }
   /** A message typed while turn `turnId` is running (see ChatService
-   *  inject). */
-  | { type: 'inject'; turnId: string; injectionId: string; text: string }
+   *  inject). `injectionId` is echoed in `queue-consumed`; the harness
+   *  mints one when absent. */
+  | { type: 'inject'; turnId: string; injectionId?: string; text: string }
   | { type: 'abort'; turnId: string }
   /** Answer to an `approval-request` event. */
   | { type: 'approve'; callId: string; decision: 'allow' | 'deny' }
@@ -43,9 +44,10 @@ export type CommandPayload =
   | { type: 'answer'; callId: string; answer: string }
   /** Restore the files to before turn `turnId` (§9.4). */
   | { type: 'rollback'; turnId: string }
-  /** MCP credentials sealed to the running harness's key (§6.4); the
-   *  plaintext is {@link McpCredentials} as JSON. */
-  | { type: 'mcp-credentials'; sealed: SealedEnvelope }
+  /** MCP credentials sealed to the running harness's key (§6.4), as
+   *  `encodeSealed(seal(publicKey, JSON.stringify(creds),
+   *  mcpCredentialsContext(sid)))`; the plaintext is {@link McpCredentials}. */
+  | { type: 'mcp-credentials'; sealed: string }
   | { type: 'stop' }
   /** Merge `state/git/incoming/<file>` (§9.1). Issued by the Sessions
    *  API after an accepted push, never by clients. */
@@ -91,7 +93,7 @@ const payloads: { [T in CommandType]: Check<Payload<T>> } = {
   inject: obj({
     type: literal('inject'),
     turnId: opaqueId,
-    injectionId: opaqueId,
+    injectionId: optional(opaqueId),
     text: str({ max: PROMPT_MAX }),
   }),
   abort: obj({ type: literal('abort'), turnId: opaqueId }),
@@ -108,7 +110,7 @@ const payloads: { [T in CommandType]: Check<Payload<T>> } = {
   rollback: obj({ type: literal('rollback'), turnId: opaqueId }),
   'mcp-credentials': obj({
     type: literal('mcp-credentials'),
-    sealed: sealedEnvelope,
+    sealed: sealedString,
   }),
   stop: obj({ type: literal('stop') }),
   'apply-bundle': obj({

@@ -28,6 +28,7 @@ import {
 import {
   ProtocolError,
   arr,
+  bool,
   int,
   literal,
   obj,
@@ -39,7 +40,7 @@ import {
 
 // ── Errors ────────────────────────────────────────────────────────────
 
-/** Sessions API error codes; the body is `{ error: code }` (§15.5). */
+/** The §15.5 Sessions API error codes; the body is `{ error: code }`. */
 export type SessionsApiErrorCode =
   | 'bad_request'
   | 'unauthenticated'
@@ -57,6 +58,19 @@ export const SESSIONS_API_ERROR_STATUS: Record<SessionsApiErrorCode, number> = {
   too_large: 413,
 }
 
+/** More specific codes the Sessions API also returns (jl4-auth-proxy
+ *  `cloud-sessions-api`). Clients branch on the HTTP status and treat
+ *  these as detail. */
+export type SessionsApiDetailCode =
+  | 'not_initialized'
+  | 'already_initialized'
+  | 'too_many_sessions'
+  | 'invalid_seed'
+  | 'stopping'
+  | 'start_failed'
+  | 'unavailable'
+  | 'internal'
+
 export interface ApiError {
   error: string
 }
@@ -65,36 +79,42 @@ export const apiError: Check<ApiError> = obj({ error: str({ max: 128 }) })
 
 // ── Sessions API ──────────────────────────────────────────────────────
 
+const gitUrl: Check<string> = str({
+  max: 2048,
+  pattern: /^https?:\/\/[^\s]+\.git$/,
+})
+
 /** A pre-signed, size-bound upload into `inbox/<sid>/`. */
 export interface PresignedUpload {
   url: string
   method: 'PUT'
   /** Headers the PUT must carry (content type / length conditions). */
   headers: Record<string, string>
-  maxBytes: number
+  maxBytes?: number
 }
 
 const presignedUpload: Check<PresignedUpload> = obj({
   url: str({ max: 8192, pattern: /^https:\/\// }),
   method: literal('PUT'),
   headers: stringMap(),
-  maxBytes: int({ min: 0 }),
+  maxBytes: optional(int({ min: 0 })),
 })
 
 /** `POST /sessions`. */
 export interface CreateSessionRequest {
   title?: string
   mcpServers?: McpServerConfig[]
-  /** The seed tarball (`seed.tar.gz`) the client will upload. */
-  seed: { size: number }
-  attachments: AttachmentRef[]
+  /** Bytes of the seed tarball (`seed.tar.gz`), so its upload URL can
+   *  be size-bound. */
+  seedSize?: number
+  attachments?: AttachmentRef[]
 }
 
 export const createSessionRequest: Check<CreateSessionRequest> = obj({
   title: optional(str({ max: SESSION_TITLE_MAX })),
   mcpServers: optional(arr(mcpServerConfig, { max: 32 })),
-  seed: obj({ size: int({ min: 0, max: MAX_SEED_BYTES }) }),
-  attachments: arr(attachmentRef, { max: 50 }),
+  seedSize: optional(int({ min: 0, max: MAX_SEED_BYTES })),
+  attachments: optional(arr(attachmentRef, { max: 50 })),
 })
 
 export interface CreateSessionResponse {
@@ -109,7 +129,7 @@ export interface CreateSessionResponse {
 
 export const createSessionResponse: Check<CreateSessionResponse> = obj({
   sessionId,
-  gitUrl: str({ max: 2048, pattern: /^https?:\/\/[^\s]+\.git$/ }),
+  gitUrl,
   uploads: obj({
     seed: presignedUpload,
     attachments: arr(
@@ -122,7 +142,8 @@ export const createSessionResponse: Check<CreateSessionResponse> = obj({
   }),
 })
 
-/** `POST /sessions/:sid/init`, `/start`, `/stop`: the session's state. */
+/** `POST /sessions/:sid/init`, `/start` (202), `/stop`: the session's
+ *  state. `DELETE /sessions/:sid` answers 204. */
 export interface SessionStateResponse {
   state: SessionState
 }
@@ -158,13 +179,17 @@ export const listSessionsResponse: Check<ListSessionsResponse> = obj({
 
 /** `GET /sessions/:sid`. */
 export interface GetSessionResponse {
+  sessionId: string
   session: SessionFile
   state: SessionState
+  gitUrl: string
 }
 
 export const getSessionResponse: Check<GetSessionResponse> = obj({
+  sessionId,
   session: sessionFile,
   state: sessionState,
+  gitUrl,
 })
 
 /** `POST /sessions/:sid/start`. Responds `202 { state }`. */
@@ -235,28 +260,82 @@ export interface EventStreamResponse {
   /** Cursor to send next time (`<segment>:<offset>`). */
   cursor: string
   state: SessionState
+  /** More events are ready: poll again without waiting. */
+  more?: boolean
+}
+
+/** A session the caller asked for that couldn't be read (e.g.
+ *  `not_found`). */
+export interface EventStreamError {
+  sessionId: string
+  error: string
 }
 
 export interface EventsResponse {
-  sessions: EventStreamResponse[]
+  sessions: Array<EventStreamResponse | EventStreamError>
 }
 
+const cursorString: Check<string> = (v, path) => {
+  if (typeof v !== 'string' || !parseCursor(v)) {
+    throw new ProtocolError('invalid cursor', path)
+  }
+  return v
+}
+
+const eventStreamResponse: Check<EventStreamResponse> = obj({
+  sessionId,
+  events: arr(cloudEvent, { max: 100_000 }),
+  cursor: cursorString,
+  state: sessionState,
+  more: optional(bool()),
+})
+
+const eventStreamError: Check<EventStreamError> = obj({
+  sessionId,
+  error: str({ max: 128 }),
+})
+
+function isErrorEntry(v: unknown): boolean {
+  return typeof v === 'object' && v !== null && 'error' in v
+}
+
+/** Strict: any invalid event fails the whole response. */
 export const eventsResponse: Check<EventsResponse> = obj({
   sessions: arr(
-    obj({
-      sessionId,
-      events: arr(cloudEvent, { max: 100_000 }),
-      cursor: (v, path) => {
-        if (typeof v !== 'string' || !parseCursor(v)) {
-          throw new ProtocolError('invalid cursor', path)
-        }
-        return v
-      },
-      state: sessionState,
-    }),
+    (v, path): EventStreamResponse | EventStreamError =>
+      isErrorEntry(v)
+        ? eventStreamError(v, path)
+        : eventStreamResponse(v, path),
     { max: MAX_EVENT_STREAMS }
   ),
 })
+
+/**
+ * Lenient: validate one session's entry, dropping (and counting)
+ * invalid events instead of failing — the harness writes them, and one
+ * bad line shouldn't stall a client.
+ */
+export function parseEventStream(value: unknown): {
+  stream: EventStreamResponse | EventStreamError
+  dropped: number
+} {
+  if (isErrorEntry(value)) {
+    return { stream: eventStreamError(value, 'stream'), dropped: 0 }
+  }
+  const raw = (value ?? {}) as { events?: unknown }
+  const events: CloudEvent[] = []
+  let dropped = 0
+  for (const e of Array.isArray(raw.events) ? raw.events : []) {
+    try {
+      events.push(cloudEvent(e, 'event'))
+    } catch (err) {
+      if (!(err instanceof ProtocolError)) throw err
+      dropped++
+    }
+  }
+  const stream = eventStreamResponse({ ...raw, events: [] }, 'stream')
+  return { stream: { ...stream, events }, dropped }
+}
 
 // ── jl4-auth-proxy: access token and agent keys (§6.1, §6.2) ─────────
 
@@ -265,11 +344,15 @@ export interface AccessTokenResponse {
   /** WorkOS access token (JWT, ~5 minutes). */
   accessToken: string
   expiresAt: number
+  /** A rotated sealed session, when jl4-auth-proxy refreshed it; store
+   *  it in place of the old one. */
+  token?: string
 }
 
 export const accessTokenResponse: Check<AccessTokenResponse> = obj({
   accessToken: str({ min: 1, max: 16_384 }),
   expiresAt: epochMs,
+  token: optional(str({ min: 1, max: 16_384 })),
 })
 
 export const AGENT_KEY_PURPOSE = 'cloud-session'
@@ -328,7 +411,12 @@ export const renewAgentKeyResponse: Check<RenewAgentKeyResponse> = obj({
   expiresAt: epochMs,
 })
 
-/** Renew / end errors and their statuses (§15.5). `end` answers 204. */
+/**
+ * Renew / end errors and their statuses (§15.5); `end` answers 204.
+ * jl4-auth-proxy also answers `502 { error: "upstream_unavailable" }`
+ * when WorkOS fails (the chain may be gone: park), and
+ * `400 invalid_session_id` / `unknown_purpose` on a bad mint.
+ */
 export const AGENT_KEY_ERROR_STATUS: Record<AgentKeyFailure, number> = {
   invalid_key: 401,
   chain_expired: 403,
@@ -365,7 +453,9 @@ export function agentKeyName(
 export function parseAgentKeyName(
   name: string
 ): { sessionId: string; chainStartEpochSeconds: number } | null {
-  const m = /^cloud-session:([0-9A-HJKMNP-TV-Z]{26}):(\d{1,12})$/.exec(name)
+  const m = /^cloud-session:([0-7][0-9A-HJKMNP-TV-Z]{25}):(\d{1,12})$/.exec(
+    name
+  )
   if (!m) return null
   return { sessionId: m[1]!, chainStartEpochSeconds: Number(m[2]) }
 }

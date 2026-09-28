@@ -12,6 +12,8 @@
  *     state/commands/<n>.json       CloudCommand         (Sessions API; exclusive create)
  *     state/git/main.bundle         bundle of main       (harness)
  *     state/git/incoming/<ulid>.bundle                   (Sessions API; exclusive create)
+ *     state/init.json, state/stop-requested.json, state/git/local.json
+ *                                   Sessions API bookkeeping; the harness ignores them
  *
  * Readers only open known names built from validated parts; they never
  * list directories (§7.2, §8).
@@ -42,18 +44,12 @@ import {
  * What `session.json` says about the session's lifecycle. The state the
  * user sees is derived (§7.3); only `parked` here changes it.
  *
- * - `created`  — `POST /sessions` made the folder; no seed yet
- * - `ready`    — `POST /sessions/:sid/init` extracted the seed
- * - `active`   — a harness took the lease and is running
+ * - `new`      — written by `POST /sessions`; no harness has run yet
+ * - `running`  — a harness took the lease (written by the harness)
  * - `sleeping` — the harness exited after the idle timeout or a stop
  * - `parked`   — the key chain couldn't be renewed; needs a new chain
  */
-export type SessionFileStatus =
-  | 'created'
-  | 'ready'
-  | 'active'
-  | 'sleeping'
-  | 'parked'
+export type SessionFileStatus = 'new' | 'running' | 'sleeping' | 'parked'
 
 /** Why a session is parked or needs auth (renew errors, §15.5). */
 export type AgentKeyFailure =
@@ -70,19 +66,20 @@ export const AGENT_KEY_FAILURES: readonly AgentKeyFailure[] = [
 ]
 
 export interface SessionFile {
-  version: 1
   sessionId: string
   /** WorkOS user id of the owner; lets break-glass recovery attribute
    *  a folder (§4.3). */
   ownerUserId: string
-  /** WorkOS organisation of the owner at creation, when known. */
+  /** WorkOS organisation of the owner at creation, when known
+   *  (`null` in the file reads as absent). */
   orgId?: string
   title: string
   /** Epoch ms. */
   created: number
   /** Epoch ms of the last command or turn activity. */
   lastActivity: number
-  /** ai-proxy conversation id, set once the first turn gets one. */
+  /** ai-proxy conversation id, set once the first turn gets one. The
+   *  Sessions API writes `null` until then, which reads as absent. */
   conversationId?: string
   status: SessionFileStatus
   /** Set with `status: 'parked'`. */
@@ -94,7 +91,6 @@ export interface SessionFile {
 export const SESSION_TITLE_MAX = 200
 
 export const sessionFile: Check<SessionFile> = obj({
-  version: literal(1),
   sessionId,
   ownerUserId: str({ min: 1, max: 128 }),
   orgId: optional(str({ min: 1, max: 128 })),
@@ -102,7 +98,7 @@ export const sessionFile: Check<SessionFile> = obj({
   created: epochMs,
   lastActivity: epochMs,
   conversationId: optional(opaqueId),
-  status: literal('created', 'ready', 'active', 'sleeping', 'parked'),
+  status: literal('new', 'running', 'sleeping', 'parked'),
   parkedReason: optional(
     literal('invalid_key', 'chain_expired', 'inactive', 'chain_forked')
   ),
@@ -154,20 +150,24 @@ export function isLeaseLive(lease: LeaseFile, now = Date.now()): boolean {
 /** The harness starts a new event segment past this size (§8). */
 export const EVENT_SEGMENT_MAX_BYTES = 1024 * 1024
 
-/** Where the event log ends: segment `n` has `length` bytes. */
+/** Event segments are `state/events/<n>.jsonl`, numbered from 1. */
+export const FIRST_EVENT_SEGMENT = 1
+
+/** Where the event log ends: segment `n` has `length` bytes. Absent
+ *  until the harness writes its first event. */
 export interface HeadFile {
   segment: number
   length: number
 }
 
 export const headFile: Check<HeadFile> = obj({
-  segment: int({ min: 0, max: 1_000_000 }),
+  segment: int({ min: FIRST_EVENT_SEGMENT, max: 1_000_000 }),
   length: int({ min: 0, max: 64 * 1024 * 1024 }),
 })
 
 /**
- * An event cursor, `<segment>:<byteOffset>` (§8). `0:0` (or just `0`,
- * as `GET /events?s=<sid>:0` sends it) reads from the start.
+ * An event cursor, `<segment>:<byteOffset>` (§8). `0` (segment 0,
+ * before the first segment) reads from the start: `GET /events?s=<sid>:0`.
  */
 export interface EventCursor {
   segment: number
@@ -177,7 +177,7 @@ export interface EventCursor {
 export const CURSOR_START: EventCursor = { segment: 0, offset: 0 }
 
 export function formatCursor(c: EventCursor): string {
-  return `${c.segment}:${c.offset}`
+  return c.segment === 0 && c.offset === 0 ? '0' : `${c.segment}:${c.offset}`
 }
 
 /** Parse a cursor; `null` when malformed. */
@@ -236,6 +236,10 @@ export function sessionPaths(sid: string): {
   commandSeq: string
   command: (n: number) => string
   mainBundle: string
+  /** Sessions API-owned bookkeeping; the harness ignores these. */
+  initMarker: string
+  stopRequested: string
+  gitLocal: string
   incomingBundle: (name: string) => string
 } {
   if (!ULID_RE.test(sid)) throw new Error('invalid session id')
@@ -259,6 +263,9 @@ export function sessionPaths(sid: string): {
     commandSeq: `${state}/commands.seq`,
     command: (n) => `${state}/commands/${nonNegInt(n, 'command number')}.json`,
     mainBundle: `${state}/git/main.bundle`,
+    initMarker: `${state}/init.json`,
+    stopRequested: `${state}/stop-requested.json`,
+    gitLocal: `${state}/git/local.json`,
     incomingBundle: (name) => {
       if (!isIncomingBundleName(name)) throw new Error('invalid bundle name')
       return `${state}/git/incoming/${name}`

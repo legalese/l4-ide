@@ -34,14 +34,16 @@ import {
   randomBytes,
   type KeyObject,
 } from 'node:crypto'
-import { literal, obj, str, type Check } from './validate.js'
+import { ProtocolError, literal, obj, str, type Check } from './validate.js'
 
 export const SEALED_ALG = 'X25519-HKDF-SHA256-A256GCM'
 
 /** base64url without padding. */
 const B64URL_RE = /^[A-Za-z0-9_-]+$/
 
-/** What travels in an `mcp-credentials` command. All fields base64url. */
+/** A sealed message. All binary fields base64url. On the wire (the
+ *  `mcp-credentials` command) it travels as the compact string from
+ *  {@link encodeSealed}. */
 export interface SealedEnvelope {
   v: 1
   alg: typeof SEALED_ALG
@@ -63,6 +65,48 @@ export const sealedEnvelope: Check<SealedEnvelope> = obj({
   ct: str({ max: 1_000_000, pattern: /^[A-Za-z0-9_-]*$/ }),
   tag: str({ min: 22, max: 22, pattern: B64URL_RE }),
 })
+
+/** Compact form: `v1.<epk>.<iv>.<ct>.<tag>`. */
+export const SEALED_STRING_RE =
+  /^v1\.[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{22}$/
+
+/** Longest accepted compact string (≈ 750 kB of plaintext). */
+export const SEALED_STRING_MAX = 1_000_100
+
+export function encodeSealed(env: SealedEnvelope): string {
+  const e = sealedEnvelope(env, 'sealed')
+  return `v1.${e.epk}.${e.iv}.${e.ct}.${e.tag}`
+}
+
+export function decodeSealed(text: string): SealedEnvelope {
+  if (
+    typeof text !== 'string' ||
+    text.length > SEALED_STRING_MAX ||
+    !SEALED_STRING_RE.test(text)
+  ) {
+    throw new ProtocolError('not a sealed string', 'sealed')
+  }
+  const [, epk, iv, ct, tag] = text.split('.') as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ]
+  return { v: 1, alg: SEALED_ALG, epk, iv, ct, tag }
+}
+
+/** Validates the compact string form. */
+export const sealedString: Check<string> = (v, path) => {
+  if (
+    typeof v !== 'string' ||
+    v.length > SEALED_STRING_MAX ||
+    !SEALED_STRING_RE.test(v)
+  ) {
+    throw new ProtocolError('expected a sealed string', path)
+  }
+  return v
+}
 
 /** The harness's key pair. `publicKey` is what goes in the
  *  `session-state` event; `privateKey` never leaves the process. */
@@ -156,10 +200,13 @@ export function seal(
  */
 export function openSealed(
   keyPair: SealingKeyPair,
-  envelope: SealedEnvelope,
+  envelope: SealedEnvelope | string,
   context: string
 ): Buffer {
-  const env = sealedEnvelope(envelope, 'sealed')
+  const env =
+    typeof envelope === 'string'
+      ? decodeSealed(envelope)
+      : sealedEnvelope(envelope, 'sealed')
   const shared = diffieHellman({
     privateKey: keyPair.privateKey,
     publicKey: importPublicKey(env.epk),
