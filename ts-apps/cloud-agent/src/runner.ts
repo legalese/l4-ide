@@ -157,6 +157,7 @@ export class Runner {
   readonly providers: ToolProvider[]
   private readonly chat: ChatService
   private readonly plugins: RunnerPlugin[]
+  private readonly started = new Set<RunnerPlugin>()
   private readonly ctx: RunnerContext
   private readonly now: () => number
   private readonly idleExitMs: number
@@ -273,6 +274,7 @@ export class Runner {
       })
       for (const p of this.plugins) {
         if (p.start) await p.start(this.ctx)
+        this.started.add(p)
       }
       this.announceState()
       await this.events.flush()
@@ -627,8 +629,9 @@ export class Runner {
       await waitFor(working, Math.max(0, deadline - this.now() - 10_000))
     }
     this.interaction.pending.cancelAll()
+    // Only plugins that started (the chain can end before they do).
     for (const p of this.plugins) {
-      if (!p.beforeExit) continue
+      if (!p.beforeExit || !this.started.has(p)) continue
       try {
         await waitFor(
           p.beforeExit(reason, this.ctx),
