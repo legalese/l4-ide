@@ -62,6 +62,7 @@ import { VsCodeL4Language } from './ai/vscode-l4-language.js'
 import { VsCodeEditorContext } from './ai/editor-context.js'
 import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
 import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
+import { createCloudSessions } from './cloud/vscode-cloud.js'
 
 /***********************************************
      decode for RenderAsLadderInfo
@@ -688,6 +689,19 @@ export async function activate(context: ExtensionContext) {
       vscode.workspace.getConfiguration().get<string>('legaleseAi.methodology'),
     extensionVersion,
   })
+
+  // Cloud sessions (specs/todo/CLOUD-SESSIONS-SPEC.md): inert until
+  // `legaleseAi.cloudSessions.enabled` is on and an API URL is set —
+  // nothing polls or calls out before a session is started or opened.
+  // Their chat events take the same path as the local chat service's.
+  const cloudSessions = createCloudSessions({
+    auth,
+    client,
+    mcp: vsMcpTools,
+    emitChat: (event) => aiInteraction.emit(event),
+    logger: aiLogger,
+  })
+  context.subscriptions.push(cloudSessions)
 
   // Instantiate the sidebar provider BEFORE wiring AI chat handlers
   // so the handlers can subscribe to its visibility event and buffer
