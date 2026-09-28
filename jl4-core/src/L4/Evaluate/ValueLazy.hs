@@ -135,6 +135,12 @@ data Blame a = Blame
   { before :: [Failure a]
   , anchor :: Failure a
   , after  :: [Failure a]
+  , effective :: Maybe Rational
+    -- ^ SEESAW slice (exp/seesaw-redesign): when the breach took effect —
+    -- max(deadline, the failed layer's arming) for a missed deadline, the
+    -- act's stamp for a violated SHANT, the continuation clock for a declared
+    -- breach (filled at App1). A compound's is combined along the operand
+    -- tree: RAND min, ROR max, a barrier as RAND.
   }
   deriving stock (Generic, Show, Functor, Foldable, Traversable)
   deriving anyclass NFData
@@ -166,7 +172,7 @@ breachBlame = \ case
 
 -- | A single failure, its own anchor.
 singleBlame :: Failure a -> Blame a
-singleBlame f = Blame [] f []
+singleBlame f = Blame [] f [] Nothing
 
 -- | Every failure, in order: @before ++ [anchor] ++ after@.
 blameList :: Blame a -> NonEmpty (Failure a)

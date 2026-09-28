@@ -1589,7 +1589,13 @@ backward val = withPoppedFrame $ \ case
         pushFrame (TernaryBuiltin1 fn arg2 z)
         continueRef arg1
       ValFulfilled -> continueBackward ValFulfilled
-      ValBreached r -> continueBackward (ValBreached r)
+      ValBreached r -> do
+        -- SEESAW slice: a breach meets its [time, events] here; a declared
+        -- breach has no time of its own, so it takes this clock, if absent.
+        r' <- case (rs, (breachBlame r).effective) of
+          ([t, _], Nothing) -> peekClock t >>= \ mt -> pure (setEffective mt r)
+          _                 -> pure r
+        continueBackward (ValBreached r')
       ValAssumed r ->
         stuckOnAssumed r -- TODO: we can do better here
       res -> internalException (RuntimeTypeError $ "expected a function but found: " <> prettyLayout res)
@@ -2241,7 +2247,9 @@ backwardContractFrame val = \ case
                 whenDeonticLog \ _ -> do
                   mBearer <- peekWHNF partyR
                   expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
-                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline))))
+                armedT <- peekClock armed
+                let eff = max deadline (fromMaybe deadline armedT)
+                continueBackward (ValBreached (setEffective (Just eff) (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline)))))
               Just lestFollowup -> reofferResolve False lestFollowup ToLest
       else do
         -- NOTE: we have observed the event and do not branch, either, the
@@ -2365,7 +2373,7 @@ backwardContractFrame val = \ case
               -- matrix only mandates SHANT+action => LEST/breach and does not
               -- prescribe the breach record's deadline field, so this does
               -- not contradict the spec.
-              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp))))
+              continueBackward (ValBreached (setEffective (Just stamp) (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp)))))
           -- MUST, MAY, DO: action done = success
           _ -> do
             matchedStep ToHence
@@ -2560,7 +2568,7 @@ backwardContractFrame val = \ case
       ValNil -> case reverse acc of
         []       -> userException (UserError (emptyBreachByRefusal clause))
         (p : ps) -> declareBreach $ ExplicitBreach
-          Blame { before = [], anchor = declared p, after = map declared ps }
+          Blame { before = [], anchor = declared p, after = map declared ps, effective = Nothing }
       _ | null acc -> declareBreach (ExplicitBreach (singleBlame (declared partyRef)))
         | otherwise -> internalException $ RuntimeTypeError $
             "expected a LIST of parties after BREACH BY but found: " <> prettyLayout val
@@ -2673,18 +2681,32 @@ backwardContractFrame val = \ case
       -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
       -- both missed names alice twice, once per way. A breach with no BY is
       -- one entry naming nobody.
-      let leftAnchored = case (breachTime r1, breachTime r2, op) of
-            (Just vt, Just vt', ValRAnd) -> vt <= vt'
-            (Just vt, Just vt', ValROr)  -> vt > vt'
-            (_, _, ValRAnd)              -> True
-            (_, _, ValROr)               -> False
-          -- P2b: simultaneous, or one side untimestamped, is CSL's tie-break
-          tieBreak = case (breachTime r1, breachTime r2) of
-            (Just vt, Just vt') -> vt == vt'
-            _                   -> True
-          (anchor, blame)
+      -- SEESAW slice: order by EFFECTIVE time (RAND earliest, ROR latest);
+      -- on a tie both sides are decisive, and the headline goes to a missed
+      -- deadline over a declared breach (explicit iff every decisive entry is
+      -- declared), then to the earlier revealing stamp; only a tie on all of
+      -- those is still positional (the slice has no decisive SET).
+      let e1 = (breachBlame r1).effective
+          e2 = (breachBlame r2).effective
+          isRAnd = case op of ValRAnd -> True; _ -> False
+          tieBreak = case (e1, e2) of
+            (Just a, Just b) -> a == b
+            _                -> True
+          leftAnchored
+            | Just a <- e1, Just b <- e2, a /= b = if isRAnd then a < b else a > b
+            | otherwise = case (r1, r2) of
+                (DeadlineMissed {}, ExplicitBreach {}) -> True
+                (ExplicitBreach {}, DeadlineMissed {}) -> False
+                _ -> case (breachTime r1, breachTime r2) of
+                  (Just a, Just b) | a /= b -> a < b
+                  _                         -> isRAnd
+          effC = case (e1, e2) of
+            (Just a, Just b) -> Just (if isRAnd then min a b else max a b)
+            _                -> if leftAnchored then e1 else e2
+          (anchor, blame0)
             | leftAnchored = (r1, anchorLeft  (breachBlame r1) (breachBlame r2))
             | otherwise    = (r2, anchorRight (breachBlame r1) (breachBlame r2))
+          blame = blame0 {effective = effC}
           chosen = rebase blame anchor
       -- P2b: which side's breach anchors the compound's, and whether the
       -- tie-break chose it. The summary names every failure of both sides.
@@ -3454,6 +3476,7 @@ earliestFailure (f :| fs) = foldl' pick (0, f) (zip [1 ..] fs)
       BarrierBreached {}        -> Nothing
     failureTime = \ case
       BarrierFailedAt {failAt} -> Just failAt
+      BarrierBreached {failReason} | Just e <- (breachBlame failReason).effective -> Just e
       BarrierBreached {failReason} -> case failReason of
         DeadlineMissed _ _ _ b -> case b.anchor of
           MissedDeadline _ _ deadline -> Just deadline
@@ -3591,7 +3614,7 @@ barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
-    continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason)))))
+    continueBackward (ValBreached (setEffective (Just deadline) (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason))))))
 
 -- | The state-layer LEST, applied to the trimmed stream ('BarrierTrim'):
 -- @cellRef@ is the first cell of the barrier's stream whose event is
@@ -3778,6 +3801,10 @@ partyKeyWHNF = \ case
 -- | The same breach — same kind, same revealing event if any — carrying this
 -- blame instead (R-T3, spec §6.1). The anchor of the blame must be of the
 -- breach's own kind; every caller builds it so.
+-- | SEESAW slice: set a breach's effective time.
+setEffective :: Maybe Rational -> ReasonForBreach a -> ReasonForBreach a
+setEffective e r = rebase ((breachBlame r) {effective = e}) r
+
 rebase :: Blame a -> ReasonForBreach a -> ReasonForBreach a
 rebase blame = \ case
   DeadlineMissed ev'p ev'a stamp _ -> DeadlineMissed ev'p ev'a stamp blame
