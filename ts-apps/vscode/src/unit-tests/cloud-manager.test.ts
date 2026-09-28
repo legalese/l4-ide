@@ -157,7 +157,7 @@ function ev<T extends Omit<CloudEvent, 'seq' | 'ts'>>(e: T): CloudEvent {
 
 describe('CloudSessionManager.runInCloud', () => {
   test('seeds, queues the prompt, then mints a key and starts (§10)', async () => {
-    const { api, manager, progress } = setup()
+    const { api, clock, manager, progress } = setup()
     const res = await manager.runInCloud({
       turnId: 'turn-1',
       text: 'Check clause 4\nplease',
@@ -196,6 +196,9 @@ describe('CloudSessionManager.runInCloud', () => {
     assert.deepEqual(progress, ['uploading', 'uploading', 'starting'])
     assert.equal(manager.sessionForTurn('turn-1'), SID)
     assert.ok(manager.isWatching(SID))
+    api.state = 'busy'
+    await clock.advance(0)
+    assert.deepEqual(progress, ['uploading', 'uploading', 'starting', 'ready'])
   })
 
   test('declines oversized attachments before creating anything', async () => {

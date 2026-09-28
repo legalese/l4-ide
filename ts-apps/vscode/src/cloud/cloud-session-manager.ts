@@ -119,6 +119,8 @@ interface Tracked {
   mcpAuthHandled: number
   /** MCP server names in `session.json`. */
   mcpNames?: string[]
+  /** Turn started with `runInCloud`, until the session is live. */
+  startingTurn?: string
 }
 
 function titleFrom(text: string): string {
@@ -193,6 +195,14 @@ export class CloudSessionManager {
     if (t.state === state) return
     t.state = state
     this.deps.listener.state?.(sid, state)
+    if (t.startingTurn && LIVE_STATES.has(state)) {
+      this.deps.listener.progress?.({
+        turnId: t.startingTurn,
+        sessionId: sid,
+        phase: 'ready',
+      })
+      t.startingTurn = undefined
+    }
   }
 
   // ── Starting ────────────────────────────────────────────────────────
@@ -278,6 +288,7 @@ export class CloudSessionManager {
         sessionId: sid,
         phase: 'starting',
       })
+      t.startingTurn = turnId
       await this.resume(sid)
     } catch (err) {
       this.byTurn.delete(turnId)
