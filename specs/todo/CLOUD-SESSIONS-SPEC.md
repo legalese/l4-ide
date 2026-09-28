@@ -914,70 +914,70 @@ Tracking rules:
   the tick:
   `- [x] [post-mortem](cloud-sessions/<item>.md) · <item> ([PR #n](url)) — …`
 - Post-mortems live in `specs/todo/cloud-sessions/`, one per item, using the
-  template in §15.5.
+  template in §15.6.
 
 ### 15.1 l4-ide
 
-- [ ] `cloud-sessions-spec` (base `main`) — this spec and the post-mortem
+- [x] [post-mortem](cloud-sessions/cloud-sessions-spec.md) · `cloud-sessions-spec` (base `main`) ([PR #506](https://github.com/legalese/l4-ide/pull/506)) — this spec and the post-mortem
       folder, so the plan is reviewable. Updated as items complete.
-- [ ] `vscode-min-1-106` (base `main`) — raise `engines.vscode` and
+- [x] [post-mortem](cloud-sessions/vscode-min-1-106.md) · `vscode-min-1-106` (base `main`) ([PR #507](https://github.com/legalese/l4-ide/pull/507)) — raise `engines.vscode` and
       `@types/vscode` in `ts-apps/vscode/package.json` from `^1.95.0` to
       `^1.106.0`. Run `npm install` to update the lockfile, then type-check and
       build the extension against the newer types. From then on the
       Marketplace stops offering updates to users on VS Code older than 1.106
       (§9.3, R13).
-- [ ] `legalese-agent-core` (base `vscode-min-1-106`) — extract
+- [x] [post-mortem](cloud-sessions/legalese-agent-core.md) · `legalese-agent-core` (base `vscode-min-1-106`) ([PR #508](https://github.com/legalese/l4-ide/pull/508)) — extract
       `ts-shared/legalese-agent` with the ports in §11 and VS Code adapters,
       with no change in behaviour. Includes the two extension fixes in §11:
       approvals scoped to one conversation, and per-session instances instead
       of module-level singletons.
-- [ ] `cloud-session-protocol` (base `legalese-agent-core`) — shared types and
+- [x] [post-mortem](cloud-sessions/cloud-session-protocol.md) · `cloud-session-protocol` (base `legalese-agent-core`) ([PR #509](https://github.com/legalese/l4-ide/pull/509)) — shared types and
       validators for events, commands, `session.json` and the Sessions API
       requests and responses (§7, §8).
-- [ ] `cloud-agent-runner` (base `cloud-session-protocol`) — `ts-apps/cloud-agent`:
+- [x] [post-mortem](cloud-sessions/cloud-agent-runner.md) · `cloud-agent-runner` (base `cloud-session-protocol`) ([PR #513](https://github.com/legalese/l4-ide/pull/513)) — `ts-apps/cloud-agent`:
       Node adapters, `jl4-lsp` over stdio, the file relay, lease, idle exit,
       the key-chain credential provider with parking, and a `--dev` mode
       (§5.4, §6.2, §8, §11).
-- [ ] `cloud-agent-git` (base `cloud-agent-runner`) — per-turn commits with
+- [x] [post-mortem](cloud-sessions/cloud-agent-git.md) · `cloud-agent-git` (base `cloud-agent-runner`) ([PR #514](https://github.com/legalese/l4-ide/pull/514)) — per-turn commits with
       `Turn-Id` trailers, bundles, incoming bundles and local merges, and
       rollback (§9.1, §9.4).
-- [ ] `cloud-agent-mcp` (base `cloud-agent-git`) — sealed secrets and the
+- [x] [post-mortem](cloud-sessions/cloud-agent-mcp.md) · `cloud-agent-mcp` (base `cloud-agent-git`) ([PR #515](https://github.com/legalese/l4-ide/pull/515)) — sealed secrets and the
       user's HTTP MCP servers (§6.4).
-- [ ] `cloud-agent-image` (base `cloud-agent-mcp`) — Dockerfile, entry point
+- [x] [post-mortem](cloud-sessions/cloud-agent-image.md) · `cloud-agent-image` (base `cloud-agent-mcp`) ([PR #516](https://github.com/legalese/l4-ide/pull/516)) — Dockerfile, entry point
       with the environment allow-list, and the `cloud-agent-image.yml`
       workflow (§5.1, §5.3, §14).
-- [ ] `cloud-sessions-client` (base `cloud-session-protocol`) — extension side:
+- [x] [post-mortem](cloud-sessions/cloud-sessions-client.md) · `cloud-sessions-client` (base `cloud-session-protocol`) ([PR #510](https://github.com/legalese/l4-ide/pull/510)) — extension side:
       Sessions API client, access token, polling, commands, key-chain minting,
       seeding (path fix, size limits), MCP transfer and sealing. Takes over
       the useful parts of the `thomasgorissen/ai-cloud-agent` prototype
       (§6, §10, §12).
-- [ ] `cloud-sessions-git-sync` (base `cloud-sessions-client`) — clone and sync
+- [x] [post-mortem](cloud-sessions/cloud-sessions-git-sync.md) · `cloud-sessions-git-sync` (base `cloud-sessions-client`) ([PR #511](https://github.com/legalese/l4-ide/pull/511)) — clone and sync
       through VS Code's Git extension (§9.3).
-- [ ] `cloud-sessions-ui` (base `cloud-sessions-git-sync`) — webview: history
+- [x] [post-mortem](cloud-sessions/cloud-sessions-ui.md) · `cloud-sessions-ui` (base `cloud-sessions-git-sync`) ([PR #512](https://github.com/legalese/l4-ide/pull/512)) — webview: history
       with cloud entries, cloud session view, `user-message` handling, Run in
       cloud, Resume, rollback and Sync buttons (§12).
 
 ### 15.2 ai-proxy
 
-- [ ] `ai-user-scoped-agent-keys` (base `main`) — accept WorkOS user-scoped
+- [x] [post-mortem](cloud-sessions/ai-user-scoped-agent-keys.md) · `ai-user-scoped-agent-keys` (base `main`) ([PR #3](https://github.com/legalese/ai-proxy/pull/3)) — accept WorkOS user-scoped
       keys (take over the `thomasgorissen/ai-cloud-agent` branch: organisation
       from `owner.organization_id`, no caching), and set `userId = owner.id` so
       conversations stay under the user across key rotations
       (`src/chat.ts:461-462`).
-- [ ] `ai-turn-reattach-ownership` (base `main`) — turn reattach checks that
+- [x] [post-mortem](cloud-sessions/ai-turn-reattach-ownership.md) · `ai-turn-reattach-ownership` (base `main`) ([PR #4](https://github.com/legalese/ai-proxy/pull/4)) — turn reattach checks that
       the turn belongs to the caller (`src/index.ts:534`).
-- [ ] `ai-cloud-session-activity` (base `ai-user-scoped-agent-keys`) — session
+- [x] [post-mortem](cloud-sessions/ai-cloud-session-activity.md) · `ai-cloud-session-activity` (base `ai-user-scoped-agent-keys`) ([PR #5](https://github.com/legalese/ai-proxy/pull/5)) — session
       id in billing records; the `/efs/agent-activity/<sid>` stamp for
       `cloud-session:` keys (§6.3 fallback); an optional validation cache of
       at most 60 s, off by default.
 
 ### 15.3 jl4-auth-proxy
 
-- [ ] `auth-agent-token-revoke-ownership` (base `main`) — `revoke` checks that
+- [x] [post-mortem](cloud-sessions/auth-agent-token-revoke-ownership.md) · `auth-agent-token-revoke-ownership` (base `main`) ([PR #4](https://github.com/legalese/jl4-auth-proxy/pull/4)) — `revoke` checks that
       the key belongs to the caller (`src/auth/routes.ts:863-881`).
-- [ ] `auth-access-token` (base `auth-agent-token-revoke-ownership`) —
+- [x] [post-mortem](cloud-sessions/auth-access-token.md) · `auth-access-token` (base `auth-agent-token-revoke-ownership`) ([PR #5](https://github.com/legalese/jl4-auth-proxy/pull/5)) —
       `GET /auth/access-token` (§6.1).
-- [ ] `auth-agent-key-chains` (base `auth-access-token`) — `purpose:
+- [x] [post-mortem](cloud-sessions/auth-agent-key-chains.md) · `auth-agent-key-chains` (base `auth-access-token`) ([PR #7](https://github.com/legalese/jl4-auth-proxy/pull/7)) — `purpose:
 "cloud-session"`, `renew` and `end`, with the activity check and its EFS
       fallback (§6.2, §6.3).
 
@@ -986,14 +986,14 @@ Tracking rules:
 A second Terraform root plus the Sessions API, following the ai-proxy pattern
 of looking up shared resources by tag.
 
-- [ ] `cloud-sessions-terraform` (base `main`) — §4, §5.1, §5.2 and §13 as
+- [x] [post-mortem](cloud-sessions/cloud-sessions-terraform.md) · `cloud-sessions-terraform` (base `main`) ([PR #6](https://github.com/legalese/jl4-auth-proxy/pull/6)) — §4, §5.1, §5.2 and §13 as
       Terraform: bucket and lifecycle rules, S3 Files file system, mount
       targets, service role, policies, ECS cluster, shared task and execution
       roles, log group, ECR repositories, SSM parameters, the Lambda with its
       function URL and scheduler, alarms, break-glass and log-reader roles,
       and an S3 gateway endpoint if missing. `terraform fmt` and `validate`
       only; nothing is applied.
-- [ ] `cloud-sessions-api` (base `cloud-sessions-terraform`) — the Sessions API
+- [x] [post-mortem](cloud-sessions/cloud-sessions-api.md) · `cloud-sessions-api` (base `cloud-sessions-terraform`) ([PR #8](https://github.com/legalese/jl4-auth-proxy/pull/8)) — the Sessions API
       Lambda (§7–§10): routes, JWT verification, folder derivation,
       provisioning, file relay, seed init, git served from bundles, sweep, and
       its container image. Unit tests run against a temporary directory as the
@@ -1002,7 +1002,48 @@ of looking up shared resources by tag.
 Deploy-time steps, not pull requests: Fargate vCPU quota increase; the
 one-time file-system root ownership (§4.1); `FOLDER_KEY` value.
 
-### 15.5 Post-mortem template
+### 15.5 Cross-repo contracts
+
+Pull requests in different repos are built in parallel, so these details are
+fixed here. The TypeScript definitions in `cloud-session-protocol` are the
+reference for §8 shapes; the Sessions API mirrors them.
+
+**jl4-auth-proxy (`https://legalese.cloud`)**
+
+| Route                                                              | Auth                   | Success                                     | Errors                                                                                                                         |
+| ------------------------------------------------------------------ | ---------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /auth/access-token`                                           | sealed session         | `200 { accessToken, expiresAt }` (epoch ms) | `401 { error: "unauthenticated" }`                                                                                             |
+| `POST /auth/agent-token` `{ purpose: "cloud-session", sessionId }` | sealed session         | `200 { token, id, expiresAt, permissions }` | as today                                                                                                                       |
+| `POST /auth/agent-token/renew`                                     | `Bearer <current key>` | `200 { token, id, expiresAt }`              | `401 { error: "invalid_key" }`, `403 { error: "chain_expired" }`, `403 { error: "inactive" }`, `409 { error: "chain_forked" }` |
+| `POST /auth/agent-token/end`                                       | `Bearer <current key>` | `204`                                       | `401 { error: "invalid_key" }`                                                                                                 |
+
+- Key name: `cloud-session:<sid>:<chainStartEpochSeconds>`; lifetime 900 s;
+  permissions `{ai:chat, l4:rules, l4:evaluate, l4:read}` ∩ the user's.
+- `expiresAt` is epoch milliseconds everywhere.
+
+**ai-proxy**
+
+- The harness sends `X-Legalese-Session: <sid>` on every request; ai-proxy adds
+  `sessionId` to its billing records.
+- Activity stamp (§6.3 fallback): after each successful model call made with a
+  `cloud-session:` key, ai-proxy writes `agent-activity/<sid>.json` at the root
+  of the EFS file system it shares with jl4-auth-proxy, containing
+  `{ "sessionId": "<sid>", "lastActiveAt": <epoch ms> }`. It writes at most
+  once a minute per session, through a temporary file and a rename, with mode
+  `0644`. jl4-auth-proxy reads it in `renew`.
+
+**Sessions API**
+
+- Base URL comes from the extension setting
+  `legaleseAi.cloudSessions.apiUrl`. The feature is off while it is empty.
+- Routes, request and response bodies: §7.1. Errors are
+  `{ error: "<code>" }` with 400, 401, 404, 409 or 413.
+- Git URL: `<apiUrl>/git/<sid>.git`.
+- `RunTask` overrides carry only `SESSION_ID` and `AGENT_KEY`. The task
+  definition carries `AI_PROXY_URL`, `MCP_URL`, `AUTH_URL` and `LOG_LEVEL`.
+- Session ids are ULIDs (26 characters, Crockford base32).
+
+### 15.6 Post-mortem template
 
 ```markdown
 # <item> — post-mortem
