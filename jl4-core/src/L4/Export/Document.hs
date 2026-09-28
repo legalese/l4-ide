@@ -1106,7 +1106,9 @@ subjectProse = \case
       <> maybe "" (\c -> nameToText (getActual c) <> " ") mCast
       <> nameToText (getActual v)
       <> maybe "" (\r -> " in " <> inlineProse r) mRoll
-      <> maybe "" (\f -> " who " <> inlineProse f) mFilter
+      <> maybe "" (\f -> case f of
+                     Who _ e   -> " who " <> inlineProse e
+                     Whose _ e -> " whose " <> inlineProse e) mFilter
 
 modalWord :: DeonticModal -> Text
 modalWord = \case

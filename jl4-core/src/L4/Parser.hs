@@ -2740,7 +2740,26 @@ subject current =
             <*> indented' (annoHole name) current
             <*> optionalWithHole (indented' (annoHole name) current)
             <*> optionalWithHole (annoLexeme (spacedKeyword_ TKIn) *> annoHole (indentedExpr current))
-            <*> optionalWithHole (annoLexeme (spacedKeyword_ TKWho) *> annoHole (indentedExpr current))
+            <*> optionalWithHole (annoHole (quantifierFilter current))
+        )
+
+-- | The quantifier's filter clause: @WHO e@ or @WHOSE e@ ('L4.Syntax.Filter').
+--
+-- Both take one bracketed expression, for the reason 'L4.Print' gives: an
+-- open-tailed expression would otherwise swallow the modal that follows it.
+-- The keyword is a token of the 'Filter' node's own 'Anno', which is what lets
+-- the printer re-emit the word the drafter wrote.
+quantifierFilter :: Pos -> Parser (Filter Name)
+quantifierFilter current =
+      attachAnno
+        ( Who emptyAnno
+            <$  annoLexeme (spacedKeyword_ TKWho)
+            <*> annoHole (indentedExpr current)
+        )
+  <|> attachAnno
+        ( Whose emptyAnno
+            <$  annoLexeme (spacedKeyword_ TKWhose)
+            <*> annoHole (indentedExpr current)
         )
 
 -- | The join line of a quantified obligation (EVERY-EACH-QUANTIFIER-SPEC

@@ -72,6 +72,7 @@ import L4.Annotation (HasSrcRange (..))
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
   ( Expr(..)
+  , Filter(..)
   , Resolved
   , Module(..)
   , Section(..)
@@ -1043,7 +1044,9 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
           Just MkQuantifier
             { quantVar    = prettyLayout v
             , quantCast   = prettyLayout <$> mCast
-            , quantFilter = prettyLayout <$> mFilter
+            , quantFilter = (\ f -> case f of
+                                Who _ e   -> prettyLayout e
+                                Whose _ e -> prettyLayout e) <$> mFilter
             , quantRoll   = prettyLayout <$> mRoll
             , quantJoin   = joinLabel <$> mJoin
             }
@@ -1419,7 +1422,9 @@ subjectText = \case
     <> maybe [] (\c -> [prettyLayout c]) mCast
     <> [ prettyLayout v ]
     <> maybe [] (\r -> [ "IN", prettyLayout r ]) mRoll
-    <> maybe [] (\f -> [ "WHO", prettyLayout f ]) mFilter
+    <> maybe [] (\f -> case f of
+                   Who _ e   -> [ "WHO", prettyLayout e ]
+                   Whose _ e -> [ "WHOSE", prettyLayout e ]) mFilter
 
 -- | Pretty-print an act pattern to text, in L4's own spelling.
 --

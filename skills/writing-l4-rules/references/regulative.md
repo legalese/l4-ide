@@ -19,6 +19,7 @@ Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, 
   - [The group must be given as a list, after `IN`](#1-the-group-must-be-given-as-a-list-after-in)
   - [The join line is mandatory whenever there is a `HENCE` or a `LEST`](#2-the-join-line-is-mandatory-whenever-there-is-a-hence-or-a-lest)
   - [`t` already refers to the member — no `EXACTLY` needed](#3-t-already-refers-to-the-member--no-exactly-needed)
+  - [`WHOSE`: the same, with the member filled in](#whose-the-same-with-the-member-filled-in)
   - [Do not write the deprecated `WHO elem` roll](#do-not-write-the-deprecated-who-elem-roll)
 - [Recursive obligations](#recursive-obligations)
 - [#TRACE — simulating contract execution](#trace--simulating-contract-execution)
@@ -389,6 +390,19 @@ EVERY Tenant t IN tenants
 ```
 
 `WHO` takes any Boolean expression in which the member is free — a field comparison, a prelude call, a named helper applied to it.
+
+### `WHOSE`: the same, with the member filled in
+
+When the condition is about the member's own fields, `WHOSE` saves writing the member on every line (built 2026-09-21):
+
+```l4
+EVERY Tenant t IN tenants
+    WHOSE arrears AT LEAST 1000
+          ...
+          standing EQUALS "current"
+```
+
+is `WHO t's arrears AT LEAST 1000 AND t's standing EQUALS "current"`. The rule is **positional**: the FIRST word of each operand of the top-level `AND`/`OR` chain (so each `...`/`..` line) is read as a field of the cast — here `Tenant`, whose fields come from its constructor, so the value-actor style (`Tenant` an arm of `Actor`) works. No other name in the condition changes meaning. Three things are refused, each pointing at `WHO`: a first word that is not a field of the cast (the message lists the fields), `WHOSE` with no cast (`EVERY t IN …`), and an operand that does not begin with a word (`NOT …`, a call, a bracket). **Prefer `WHO` for anything but plain field comparisons.** Opened fields elsewhere in the condition are a backlogged design, not built.
 
 ### Do not write the deprecated `WHO elem` roll
 

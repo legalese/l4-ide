@@ -3053,10 +3053,14 @@ startRollCall env deonton time events =
   case deonton.subject of
     Party{} -> internalException $ RuntimeTypeError
       "a PARTY obligation reached the quantifier's roll call"
-    Every _ cast var roll filt -> do
+    Every _ cast var roll mFilt -> do
       -- P2b: arming is the join's own entry into its site.
       norm <- armJoinKey deonton
-      let ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events, norm}
+      -- WHO and WHOSE are one filter to the machine: the checker has already
+      -- rewritten a WHOSE operand's first word into @v's field@ (§13.6), so
+      -- what runs here is a Boolean expression either way.
+      let filt = filterExpr <$> mFilt
+          ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events, norm}
       case maybe (filt >>= quantifierRoll var) Just roll of
         Nothing -> userException (UserError rollCallRefusal)
         -- The roll is read BEFORE any member exists, so it cannot depend on

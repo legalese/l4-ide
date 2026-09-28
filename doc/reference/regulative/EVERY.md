@@ -93,7 +93,59 @@ The condition names the variable itself — `t` is in scope inside `WHO`, which 
 
 `IN tenants`, on the first line, is doing something different: it says where the group comes from in the first place, and `WHO` then narrows what it produced. The next section but one is about that.
 
-`WHO` is the only filter word. `WHERE` after a rule keeps its usual meaning, a block of local definitions, so this still works and means what it always meant:
+## WHOSE: the same filter, without spelling out the member
+
+**Example file:** [whose-example.l4](whose-example.l4) — the rules in this section, each with a group and a trace. Its cast is a `Tenant` with an `arrears`, a `standing` and an `on notice` flag, rather than the bare `Tenant` the rest of this page uses.
+
+Most conditions say one thing about one field of the member, and under `WHO` that means writing the member's name on every line. `WHOSE` writes it for you:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`those in arrears pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+```
+
+is exactly the rule you would write as `WHO t's arrears AT LEAST 1000`, and it runs identically.
+
+**The rule is: the first word of each line is a field.** `WHOSE` reads the first word of each condition as a field of the cast — `Tenant`, here — and nothing else in the condition changes meaning. That is worth stating plainly, because it is what keeps `WHOSE` predictable: a name anywhere but the front of a condition means what it always means.
+
+More than one condition, one per line, joined by the asyndetic operators — `...` for "and", `..` for "or", each on its own line or leading the line it joins:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`those in arrears and still current pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  arrears AT LEAST 1000
+               ...
+               standing EQUALS "current"
+        MUST   Pay t
+        WITHIN 7
+```
+
+The first word of each of those lines is a field, and the rest of the line is an ordinary expression. `AND` and `OR` written out work the same way.
+
+A `BOOLEAN` field stands on its own:
+
+```l4
+        WHOSE `on notice`
+```
+
+**What `WHOSE` refuses, and what to write instead.** Three things, each with the same answer — write it with `WHO`, where the member is named:
+
+| you wrote                                                               | what you get                                                             |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| a word that is not a field of the cast                                  | the cast's fields, listed                                                |
+| `WHOSE` with no cast (`EVERY t IN …`)                                   | there is no constructor to take fields from: name the cast, or use `WHO` |
+| a line that does not start with a field — a negation, a call, a bracket | `WHO` is the general form                                                |
+
+So `WHOSE NOT (standing EQUALS "current")` is refused; write `WHO NOT (t's standing EQUALS "current")`.
+
+One more thing you will meet: where the tooling re-prints a rule from its checked form rather than from your file — `l4 batch` and the REPL do — a `WHOSE` line can come back with the projection spelled out, `WHOSE t's arrears AT LEAST 1000`. That is legal, means the same thing, and reads back unchanged: a line that already names the member is left alone. `l4 format`, which prints your file back token for token, does not change it at all.
+
+`WHO` and `WHOSE` are the only filter words. `WHERE` after a rule keeps its usual meaning, a block of local definitions, so this still works and means what it always meant:
 
 ```l4
 GIVETH A DEONTIC Actor Action
@@ -346,7 +398,20 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH
 ```
 
-**Inside the continuation**, `THE DEADLINE` and the others name the `EVERY`'s own lifecycle, and which deadline that is depends on the join:
+**Inside the continuation**, `THE DEADLINE` and the others name the `EVERY`'s own lifecycle, and which deadline that is depends on the join.
+
+At a glance, for a **barrier** — the case with a choice to make, because a group has many deadlines and the continuation needs one:
+
+| where the anchor is written                   | `THE DEADLINE` is                                                                                     |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| under `HENCE`, the `ONCE` line has a `WITHIN` | that `WITHIN` — the deadline on the group as a whole                                                  |
+| under `HENCE`, no `WITHIN` on the `ONCE` line | the **latest** of the members' own deadlines                                                          |
+| under `LEST`                                  | the deadline actually missed: the **earliest** member to fail, or the `ONCE` line's if all acted late |
+| over an empty group                           | the `ONCE` line's `WITHIN` if one is written; with none, there is no deadline, and the run refuses    |
+
+The second row is the one that surprises people, and it is deliberate (ruled 21 September 2026). "Cure within five days of the deadline" means five days from when **all** performance had fallen due. Taking the deadline of whoever happened to act last, or of the first member on the list, would make the landlord's cure period move when the tenants sign in a different order, or when the list is written in a different order — and neither of those changes what the lease says. The latest of the members' deadlines does not move for either.
+
+The precise rules, including ties:
 
 - under a **barrier**, `THE JOIN` is the last completion and `THE ARMING` is the `EVERY`'s. `THE DEADLINE` depends on the slot. Under `HENCE` it is the `ONCE` line's `WITHIN` when one is written (the deadline on the whole), and otherwise the _latest_ of the members' act deadlines — the instant by which all performance had fallen due, which does not depend on who acted last or on the order the roll names them. Under `LEST` it is the deadline that was actually missed: when members expired, the act deadline of the member whose failure the `LEST` is anchored at — the **earliest** failure, wherever that member stands on the roll; when two failures land at the same stamp, the one the stream reached first (two `SHANT` violations at one stamp are two events, and the `LEST` sees what followed the first of them); and when two misses come to light at the same event, the one with the earlier deadline — or the `ONCE` line's when everyone acted but the last act landed after it. A barrier over an empty group is joined at its arming and then goes through the `ONCE` line's `WITHIN` like any other join: its `HENCE` fires, and `THE DEADLINE` there is the `ONCE` line's `WITHIN` when written — unless that `WITHIN` is anchored to an instant so early that the deadline lies before the arming, in which case the `LEST` fires and `THE DEADLINE` there is that missed state deadline. With only an act `WITHIN` there is no deadline at all — nobody had one — so the run refuses and says so;
 - under a **fork**, each member's continuation is its own, so all three name that member's: its completion, its deadline, the `EVERY`'s arming.

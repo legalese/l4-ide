@@ -217,6 +217,10 @@ instance ToSemTokens Context PosToken (Threshold Name) where
 -- keyword it acts as.
 instance ToSemTokens Context PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
+-- WHO and WHOSE are keyword tokens of the filter node's own Anno, so the
+-- derived instance places them without help (§13.6, 2026-09-21).
+instance ToSemTokens Context PosToken (Filter Name)
+
 instance ToSemTokens Context PosToken (Deadline Name) where
 -- AFTER is a keyword token of the node's own Anno, so the derived instance
 -- places it like WITHIN's (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, 2026-09-16).
@@ -352,6 +356,8 @@ instance ToSemTokens () PosToken (Threshold Resolved) where
 instance ToSemTokens () PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
 instance ToSemTokens () PosToken (Deadline Resolved) where
+instance ToSemTokens () PosToken (Filter Resolved)
+
 instance ToSemTokens () PosToken (Opening Resolved) where
 -- See the Name-phase instance above.
 instance ToSemTokens () PosToken (Anchor Resolved) where

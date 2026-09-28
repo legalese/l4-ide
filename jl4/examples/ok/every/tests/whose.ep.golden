@@ -1,0 +1,177 @@
+-- WHOSE — the possessive filter (EVERY-EACH-QUANTIFIER-SPEC §13.6, RULED
+-- 2026-09-21).
+--
+-- WHO takes a Boolean expression in which the member is named:
+--
+--     EVERY Tenant t IN everyone WHO t's arrears AT LEAST 1000
+--
+-- WHOSE takes the same expression with one thing filled in: the FIRST word of
+-- each operand is a field of the cast, and the checker reads it as `t's`
+-- that field. The rule is positional — only the first word of an operand is
+-- touched — so no other name in the filter changes meaning, and nothing turns
+-- on what else the module has in scope.
+
+IMPORT prelude
+
+-- == 1. The value-actor style: the cast is an ARM of the party type ==
+
+DECLARE Actor IS ONE OF
+    Landlord HAS lname IS A STRING
+    Tenant   HAS tname IS A STRING
+                 arrears IS A NUMBER
+                 standing IS A STRING
+                 `on notice` IS A BOOLEAN
+
+DECLARE Action IS ONE OF
+    Pay HAS payer IS AN Actor
+
+alice MEANS Tenant WITH tname IS "Alice", arrears IS 1200, standing IS "current", `on notice` IS TRUE
+bob   MEANS Tenant WITH tname IS "Bob",   arrears IS 0,    standing IS "current", `on notice` IS FALSE
+carol MEANS Tenant WITH tname IS "Carol", arrears IS 900,  standing IS "lapsed",  `on notice` IS TRUE
+ng    MEANS Landlord "Ms Ng"
+
+everyone MEANS LIST alice, bob, carol, ng
+
+GIVETH A DEONTIC Actor Action
+`those in arrears` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+-- The same rule with the member named. WHOSE is this, with the first word
+-- filled in: Alice is bound in both, Bob and Carol in neither.
+GIVETH A DEONTIC Actor Action
+`those in arrears, spelled out` MEANS
+    EVERY Tenant t IN everyone
+        WHO    t's arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `those in arrears` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+
+#TRACE `those in arrears, spelled out` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+
+-- Alice never pays: one breach, naming her.
+#TRACE `those in arrears` AT 0 WITH
+  `WAIT UNTIL` 9
+
+#TRACE `those in arrears, spelled out` AT 0 WITH
+  `WAIT UNTIL` 9
+
+-- == 2. More than one constraint: the asyndetic operators ==
+
+-- `...` is implicit AND, so each line is one constraint and the first word of
+-- each is a field. Carol is in arrears but not current; nobody is bound.
+GIVETH A DEONTIC Actor Action
+`current and in arrears` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  arrears AT LEAST 1000
+               ...
+               standing EQUALS "current"
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `current and in arrears` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+
+-- `..` is implicit OR, and either layout reads: the operator on its own line,
+-- as above, or leading the line it joins. Alice (arrears) and Carol (lapsed)
+-- are both bound.
+GIVETH A DEONTIC Actor Action
+`in arrears or lapsed` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  arrears AT LEAST 1000
+          ..   standing EQUALS "lapsed"
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `in arrears or lapsed` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+  PARTY carol DOES Pay carol AT 4
+
+-- AND written out works the same way: the first word of each operand.
+GIVETH A DEONTIC Actor Action
+`current and in arrears, with AND` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  arrears AT LEAST 1000 AND standing EQUALS "current"
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `current and in arrears, with AND` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+
+-- == 3. A BOOLEAN field on its own ==
+
+GIVETH A DEONTIC Actor Action
+`those on notice` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  `on notice`
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `those on notice` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+  PARTY carol DOES Pay carol AT 4
+
+-- == 4. A plain record as the cast ==
+
+DECLARE Renter HAS
+    rname   IS A STRING
+    overdue IS A NUMBER
+DECLARE Collection IS ONE OF
+    Chase HAS whom IS A Renter
+
+rita MEANS Renter WITH rname IS "Rita", overdue IS 400
+sam  MEANS Renter WITH rname IS "Sam",  overdue IS 0
+renters MEANS LIST rita, sam
+
+GIVETH A DEONTIC Renter Collection
+`chase the overdue` MEANS
+    EVERY Renter r IN renters
+        WHOSE  overdue AT LEAST 100
+        MUST   Chase r
+        WITHIN 5
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `chase the overdue` AT 0 WITH
+  PARTY rita DOES Chase rita AT 2
+
+-- == 5. Already explicit: a projection is left alone ==
+--
+-- This is what `l4 batch` re-prints a WHOSE rule as, so it has to mean the
+-- same thing when it is read back.
+GIVETH A DEONTIC Actor Action
+`explicit under WHOSE` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  t's arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `explicit under WHOSE` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
