@@ -36,6 +36,7 @@ import {
   DELETED_DIR,
   NodeWorkspace,
   TMP_DIR,
+  uriForPath,
 } from './node-workspace.js'
 import { SessionJson } from './session-file.js'
 
@@ -79,6 +80,9 @@ export interface RunnerContext {
   announceState(): void
   /** Tool sources the dispatcher advertises; plugins may add to it. */
   readonly providers: ToolProvider[]
+  /** Files changed behind the language server's back (a merge or a
+   *  rollback): absolute paths. */
+  filesChanged(fsPaths: string[]): Promise<void>
 }
 
 export interface TurnInfo {
@@ -141,7 +145,11 @@ export interface RunnerOptions {
   auth: AuthProvider
   chain?: ChainControl
   workspace: Workspace
-  l4: L4Language & { dispose?(): Promise<void> }
+  l4: L4Language & {
+    dispose?(): Promise<void>
+    /** Forget open documents and re-read the given files (URIs). */
+    resync?(uris: string[]): Promise<void>
+  }
   aiEndpoint: AiEndpoint
   /** Built-in extra tool sources (the l4-rules MCP server). */
   providers?: ToolProvider[]
@@ -248,6 +256,9 @@ export class Runner {
       emit: (p) => this.events.emit(p),
       announceState: () => this.announceState(),
       providers: this.providers,
+      filesChanged: async (fsPaths) => {
+        await opts.l4.resync?.(fsPaths.map((p) => uriForPath(p)))
+      },
     }
     this.stopped = new Promise((r) => (this.resolveStopped = r))
   }
