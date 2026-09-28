@@ -183,6 +183,57 @@
     store.abort()
   }
 
+  /** "Run in cloud" (§12.2): the same input, sent as the first prompt
+   *  of a new cloud session instead of a local turn. */
+  function submitCloud(): void {
+    const trimmed = text.trim()
+    if (!trimmed || disabled || store.pendingQuestion) return
+    void store.sendCloud(trimmed, stagedMentions)
+    stagedMentions = []
+    text = ''
+    store.setDraft('')
+    mentionState = null
+    void tick().then(() => autoresize())
+  }
+
+  const cloudConv = $derived(
+    store.current?.cloud?.sessionId ? store.current.cloud : null
+  )
+  const git = $derived(store.cloudGitStatus)
+  let gitBusy = $state(false)
+  const gitLabel = $derived.by(() => {
+    if (gitBusy) return git?.kind === 'cloned' ? 'Syncing…' : 'Cloning…'
+    if (!git || git.kind !== 'cloned') return 'Clone'
+    const counts = [
+      git.ahead > 0 ? `↑${git.ahead}` : '',
+      git.behind > 0 ? `↓${git.behind}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+    return counts ? `Sync ${counts}` : 'Sync'
+  })
+  const gitTitle = $derived.by(() => {
+    if (!git) return "Clone this cloud session's files with git"
+    if (git.kind === 'unavailable') return git.message
+    if (git.kind === 'not-cloned') {
+      return "Clone this cloud session's files with git"
+    }
+    if (git.pending && cloudConv?.state === 'sleeping') {
+      return `Pushed changes are pending until the session runs. Clone: ${git.folder}`
+    }
+    return `Pull, then push your commits. Clone: ${git.folder}`
+  })
+
+  async function gitAction(): Promise<void> {
+    if (gitBusy) return
+    gitBusy = true
+    try {
+      await store.cloudGitAction()
+    } finally {
+      gitBusy = false
+    }
+  }
+
   // Attachment picker state. `attachBusy` guards against double-clicks
   // while the native dialog is open; `attachNote` surfaces soft warnings
   // ("this PDF might eat a lot of context") and rejection reasons from
@@ -381,6 +432,50 @@
           <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       </button>
+      {#if cloudConv}
+        <!-- Clone / Sync the cloud session's files (§9.3). -->
+        <button
+          type="button"
+          class="git-btn"
+          onclick={gitAction}
+          disabled={gitBusy || git?.kind === 'unavailable'}
+          title={gitTitle}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none">
+            <circle
+              cx="4.5"
+              cy="4"
+              r="1.6"
+              stroke="currentColor"
+              stroke-width="1.3"
+            />
+            <circle
+              cx="4.5"
+              cy="12"
+              r="1.6"
+              stroke="currentColor"
+              stroke-width="1.3"
+            />
+            <circle
+              cx="11.5"
+              cy="6"
+              r="1.6"
+              stroke="currentColor"
+              stroke-width="1.3"
+            />
+            <path
+              d="M4.5 5.6v4.8M11.5 7.6c0 2.2-2.5 2.4-7 2.8"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span>{gitLabel}</span>
+          {#if git?.kind === 'cloned' && git.pending && cloudConv.state === 'sleeping'}
+            <span class="git-pending">pending</span>
+          {/if}
+        </button>
+      {/if}
     </div>
     <div class="right-actions">
       <!-- No active-file context chip in a deployment-bound chat:
@@ -477,6 +572,36 @@
           </svg>
         </button>
       {:else}
+        {#if store.canRunInCloud && !store.pendingQuestion}
+          <!-- Run in cloud (§12.2): same prompt, new cloud session.
+               Outlined, beside the solid Send. -->
+          <button
+            class="submit-btn cloud"
+            onclick={submitCloud}
+            disabled={disabled || !text.trim()}
+            title="Run in cloud: start a cloud session with this prompt and the active file"
+            aria-label="Run in cloud"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M4.6 12.2a2.4 2.4 0 0 1-.3-4.8 3.1 3.1 0 0 1 6-1 2.5 2.5 0 0 1 .5 5"
+                stroke="currentColor"
+                stroke-width="1.3"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8 14.5V7M5.8 9.2L8 7l2.2 2.2"
+                stroke="currentColor"
+                stroke-width="1.6"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        {/if}
         <button
           class="submit-btn"
           onclick={submit}
@@ -728,6 +853,45 @@
   }
   /* Streaming state: darker tint of the same crimson so it reads as
      "same affordance, different mode" rather than a new color. */
+  .submit-btn.cloud {
+    background: transparent;
+    color: #c8376a;
+    border: 1px solid #c8376a;
+    margin-right: 6px;
+  }
+  .submit-btn.cloud:hover:not(:disabled) {
+    background: #c8376a;
+    color: #fff;
+  }
+  .git-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+    border-radius: 4px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    padding: 1px 6px;
+    margin-left: 4px;
+    cursor: pointer;
+  }
+  .git-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+  .git-btn:hover:not(:disabled) {
+    color: var(--vscode-foreground);
+    border-color: var(--vscode-foreground);
+  }
+  .git-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .git-pending {
+    font-size: 9px;
+    color: var(--vscode-editorWarning-foreground, #cca700);
+  }
   .submit-btn.stop {
     background: #6e1636;
     /* Dim the rectangle so it doesn't hot-spot against the dark bg. */

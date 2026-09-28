@@ -8,7 +8,10 @@
  * non-empty `legaleseAi.cloudSessions.apiUrl` (§15.5).
  */
 import * as vscode from 'vscode'
-import { GetExportedFunctionsRequestType } from 'jl4-client-rpc'
+import {
+  GetExportedFunctionsRequestType,
+  cloudConversationId,
+} from 'jl4-client-rpc'
 import type { AiChatStartParams } from 'jl4-client-rpc'
 import type { ChatServiceEvent, Logger } from '@repo/legalese-agent'
 import { LEGALESE_CLOUD_DOMAIN, type AuthManager } from '../auth.js'
@@ -362,7 +365,10 @@ export function createCloudSessions(deps: {
     pickLocalFolder: (_sid, name) => pickLocalFolder(name),
     logger: deps.logger,
     listener: {
-      chat: deps.emitChat,
+      // The webview keys a cloud conversation by its session
+      // (`cloud:<sid>`), not by the ai-proxy conversation id.
+      chat: (event, sid) =>
+        deps.emitChat({ ...event, conversationId: cloudConversationId(sid) }),
       cloudEvent: (e) => {
         // Clone / Sync open up once the first turn is committed (§9.3);
         // replayed events count, so reopening a session works.

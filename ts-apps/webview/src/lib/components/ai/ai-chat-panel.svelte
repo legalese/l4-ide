@@ -17,6 +17,11 @@
     AiChatToolCall,
     AiChatTurnSpawn,
     AiUsageUpdate,
+    AiCloudConfig,
+    AiCloudEvent,
+    AiCloudProgress,
+    AiCloudReveal,
+    AiCloudState,
     RequestOpenUrl,
     RequestSidebarLogin,
     type AiChatAttachment,
@@ -29,6 +34,7 @@
   import ConversationHistory from './conversation-history.svelte'
   import SettingsPanel from './settings-panel.svelte'
   import DeploymentBanner from './deployment-banner.svelte'
+  import CloudBanner from './cloud-banner.svelte'
   import CloudUpsell from '../cloud-upsell.svelte'
 
   let {
@@ -131,6 +137,16 @@
     m.onNotification(AiActiveFile, (p) => store.onActiveFile(p))
     m.onNotification(AiChatAskUser, (p) => store.onAskUser(p))
     m.onNotification(AiChatSeedDraft, (p) => store.seedDraft(p.text))
+    // Cloud sessions (§12): config flag, cloud-only events, state,
+    // "Run in cloud" progress, and "Open" from a notification.
+    m.onNotification(AiCloudConfig, (p) => store.onCloudConfig(p))
+    m.onNotification(AiCloudEvent, (p) => store.onCloudEvent(p))
+    m.onNotification(AiCloudState, (p) => store.onCloudState(p))
+    m.onNotification(AiCloudProgress, (p) => store.onCloudProgress(p))
+    m.onNotification(AiCloudReveal, (p) => {
+      historyOpen = false
+      store.onCloudReveal(p)
+    })
   }
 
   // Attach handlers as soon as the messenger prop is non-null. An
@@ -162,8 +178,20 @@
 
   function openHistory(): void {
     void store.refreshHistory()
+    void store.refreshCloudHistory(true)
     historyOpen = true
   }
+
+  // The cloud part of the history is refetched every 30 s while the
+  // history is open (§12.1).
+  $effect(() => {
+    if (!historyOpen || !visible || !store.cloudEnabled) return
+    const timer = setInterval(
+      () => void store.refreshCloudHistory(true),
+      30_000
+    )
+    return () => clearInterval(timer)
+  })
 
   async function onSeedSelect(seed: { prompt: string }): Promise<void> {
     // Every seed is document-driven: pre-fill the prompt, then
@@ -232,6 +260,13 @@
          shared Legalese Cloud promo so the two tabs read the same. -->
     <CloudUpsell context="ai" onSignIn={signIn} />
   {:else}
+    {#if showChat && store.current?.cloud}
+      <CloudBanner
+        cloud={store.current.cloud}
+        onResume={() => void store.resumeCloud()}
+        onStop={() => void store.stopCloud()}
+      />
+    {/if}
     {#if showEmptyState}
       <EmptyState
         onSeed={onSeedSelect}
@@ -256,12 +291,17 @@
         onAnswerQuestion={(answer) => store.answerQuestion(answer)}
         onOpenFile={(callId) => store.openFile(callId)}
         onOpenFileDiff={(callId) => store.openFileDiff(callId)}
+        cloud={!!store.current.cloud}
+        rollbackOfferAt={store.current.cloud
+          ? (i) => store.rollbackOfferAt(i)
+          : undefined}
+        onRollback={(offer) => void store.rollbackCloudTurn(offer)}
       />
     {/if}
 
     {#if historyOpen}
       <ConversationHistory
-        items={store.history}
+        items={store.historyEntries}
         currentId={store.currentId}
         streamingIds={store.streamingConversationIds}
         onLoad={onLoadConversation}
