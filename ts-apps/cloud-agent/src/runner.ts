@@ -11,6 +11,7 @@ import {
   type L4Language,
   type Logger,
   type PermissionCategory,
+  type PermissionPolicy,
   type PermissionValue,
   type ToolProvider,
   type Workspace,
@@ -126,6 +127,9 @@ export interface RunnerOptions {
   workspace: Workspace
   l4: L4Language & { dispose?(): Promise<void> }
   aiEndpoint: AiEndpoint
+  /** Tool permissions; defaults to the cloud policy
+   *  ({@link CLOUD_PERMISSIONS}). */
+  permissions?: PermissionPolicy
   /** Built-in extra tool sources (the l4-rules MCP server). */
   providers?: ToolProvider[]
   plugins?: RunnerPlugin[]
@@ -196,7 +200,7 @@ export class Runner {
     const dispatcher = new ToolDispatcher({
       logger: opts.logger,
       tools: new BuiltinTools(opts.workspace, opts.l4),
-      permissions: fixedPermissionPolicy(CLOUD_PERMISSIONS),
+      permissions: opts.permissions ?? fixedPermissionPolicy(CLOUD_PERMISSIONS),
       interaction: this.interaction,
       providers: this.providers,
     })

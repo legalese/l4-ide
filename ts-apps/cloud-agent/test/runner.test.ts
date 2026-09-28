@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
-import type { AuthProvider } from '@repo/legalese-agent'
+import {
+  fixedPermissionPolicy,
+  type AuthProvider,
+  type PermissionPolicy,
+} from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
 import { NodeWorkspace } from '../src/node-workspace.js'
@@ -75,7 +79,11 @@ describe('Runner', () => {
   })
 
   function build(
-    opts: { idleExitMs?: number; plugins?: RunnerPlugin[] } = {}
+    opts: {
+      idleExitMs?: number
+      plugins?: RunnerPlugin[]
+      permissions?: PermissionPolicy
+    } = {}
   ): Runner {
     return new Runner({
       sessionId: SID,
@@ -88,6 +96,7 @@ describe('Runner', () => {
       l4,
       aiEndpoint: { url: proxyUrl, local: false },
       plugins: opts.plugins,
+      permissions: opts.permissions,
       extensionVersion: 'test',
       idleExitMs: opts.idleExitMs ?? 60_000,
       pollMs: 20,
@@ -417,5 +426,57 @@ describe('Runner', () => {
       users.map((e) => (e as { turnId: string }).turnId),
       ['t1']
     )
+  })
+
+  test('an approval waits for an approve command, then the tool row updates', async () => {
+    proxy.scripts.push(
+      [
+        metadata('conv6'),
+        toolCall('c1', 'fs__create_file', { path: 'x.l4' }),
+        chunk({}, 'tool_calls'),
+      ],
+      [chunk({ content: 'ok' }), chunk({}, 'stop')]
+    )
+    const runner = build({
+      permissions: fixedPermissionPolicy({ 'fs.create': 'ask' }),
+    })
+    const done = runner.run()
+    await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'go' })
+    await waitUntil(
+      async () =>
+        (await readEvents(stateDir)).some((e) => e.type === 'approval-request'),
+      5_000,
+      'approval-request'
+    )
+    assert.equal((await lease()).state, 'waiting')
+    const req = (await readEvents(stateDir)).find(
+      (e) => e.type === 'approval-request'
+    ) as CloudEvent & { callId: string; name: string; turnId: string }
+    assert.deepEqual(
+      [req.callId, req.name, req.turnId],
+      ['c1', 'fs__create_file', 't1']
+    )
+    await sendCommand(root, SID, {
+      type: 'approve',
+      callId: 'c1',
+      decision: 'allow',
+    })
+    await waitUntil(async () =>
+      (await readEvents(stateDir)).some((e) => e.type === 'done')
+    )
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    const events = await readEvents(stateDir)
+    const after = events.filter((e) => e.seq > req.seq)
+    const statuses = after
+      .filter((e) => e.type === 'tool-call')
+      .map((e) => (e as { status: string }).status)
+    // Every client clears its buttons from the status update after the
+    // decision.
+    assert.deepEqual(statuses, ['running', 'done'])
+    const started = events.find((e) => e.type === 'started') as {
+      turnId: string
+    }
+    assert.equal(started.turnId, 't1')
   })
 })
