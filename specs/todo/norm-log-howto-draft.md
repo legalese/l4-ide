@@ -71,7 +71,7 @@ If your description matches more than one place in the contract, L4 warns you; a
 | how many failures in the last year?                            | `THE NUMBER OF FAILURES OF (…) WITHIN 365 BEFORE THE INSTANT` |
 | when did it fail?                                              | `THE INSTANT OF THE LAST FAILURE OF (…)`                      |
 
-"Failed" means the deadline passed without performance; "cured by reparation" means everything its `LEST` required was then done by the same party (ruling N8, still open — see the box).
+"Failed" means the deadline passed without performance; "cured by reparation" means everything its `LEST` required was then done by the same party (ruling N8).
 
 `THE INSTANT` is the **contract clock**: the moment in the trace at which your rule is being checked.
 It is **not** `NOW`, which is the computer's wall clock, and using `NOW` in a `PROVIDED` gets a warning (ruling N4).
@@ -124,9 +124,6 @@ These are the limits a drafter meets; they are stated here because each would ot
 > If `loan` and `borrowing` are two sides of one `RAND`, the side written first cannot today see the second side's history, because L4 runs the first side through the whole trace before starting the second — so the answer depends on which you write first (measured: `NORM-LOG-SPEC.md` §7 N10).
 > The recommendation on the bench is that such a read is refused with an error until L4 evaluates both sides step by step together.
 > Until N10 is ruled, this page cannot promise the library example works as one compound.
-
-> **Open — N8: "cured".**
-> The meaning of "cured by reparation" above is the bench's recommendation, not yet ruled.
 
 > **Pending elsewhere — SEESAW.**
 > When a compound breaches, the instant it reports is being ruled in another session; the "when did it fail" row follows that ruling.
