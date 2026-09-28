@@ -212,7 +212,7 @@ data NlgSite
     -- ^ The enclosing 'TopDecl'\'s annotation, the @DECIDE@\'s own, the app
     -- form's, or the body's. All four mean "the rule", so they are one case.
   | NlgOnHeadName
-    -- ^ The rule's name in its head.
+    -- ^ The rule's name in its head, or one of its @AKA@ names.
   | NlgOnHeadInput Resolved
     -- ^ An appform argument THE AUTHOR WROTE IN THE HEAD, which is that input's
     -- BINDING occurrence. This is the case the two projections used to disagree
@@ -250,7 +250,7 @@ data NlgSite
 -- Measured on @jl4\/examples\/relational\/tiers.l4@: a @\@ref@ written on the
 -- line above @GIVEN@ is found /only/ there.
 decideNlgSite :: Maybe Anno -> Decide Resolved -> Maybe (NlgSite, Nlg)
-decideNlgSite mouter (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName appArgs _) body) =
+decideNlgSite mouter (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName appArgs maka) body) =
   -- 'asum' rather than @foldr (<|>) Nothing@: same first-Just semantics, and
   -- '<|>' is not in scope in this module.
   asum $
@@ -260,6 +260,11 @@ decideNlgSite mouter (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkA
        , (NlgOnDeclaration,) <$> body ^. annoOf % annNlg
        , (NlgOnHeadName,)    <$> getOriginal headName ^. annoOf % annNlg
        ]
+    -- An @AKA@ name is another spelling of the head name, so a herald it claims
+    -- is the rule's. A herald on its own line under @\`r\` p AKA \`a\`@ lands
+    -- here, after the input; without this position @l4 render@ lost it and
+    -- @l4 nlg@ could not fill its slots (smucclaw\/l4-ide#978).
+    <> [ (NlgOnHeadName,)    <$> getOriginal a ^. annoOf % annNlg | MkAka _ as <- toList maka, a <- as ]
     <> [ (siteOfAppArg a,)   <$> getOriginal a ^. annoOf % annNlg | a <- appArgs ]
     <> [ (NlgOnGivenName r,) <$> getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ _ <- names ]
  where
@@ -1023,14 +1028,16 @@ type NlgFnInfo = Map.Map (Text, Int) (Nlg, [Unique])
 
 nlgFnInfo :: [Module Resolved] -> NlgFnInfo
 nlgFnInfo mods = Map.fromList
-  [ ((resolvedText headName, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
+  [ ((resolvedText name, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
     -- Value parameters are the appform arguments, not the GIVEN names: a
     -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
     -- GIVEN but never in the appform, so keying arity off GIVEN would not match
     -- the call's positional argument count.
   | m <- mods
-  , d@(MkDecide _ _ (MkAppForm _ headName appArgs _) _) <- foldTopLevelDecides (: []) m
+  , d@(MkDecide _ _ appForm@(MkAppForm _ _ appArgs _) _) <- foldTopLevelDecides (: []) m
   , Just nlg <- [ decideNlg Nothing d ]
+    -- Every spelling of the head: a call through an @AKA@ name is the same rule.
+  , name <- appFormHeads appForm
   ]
 
 -- | Replace a call to an @\@nlg@-annotated function with its authored sentence,
@@ -1066,12 +1073,27 @@ substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
               xs  -> " " <> word "with" <> " " <> Text.intercalate ", " (init xs)
                        <> " " <> prefix (word "and") <> last xs
         in Inert ann (sentence <> rest) InertCtxNone
+  -- A named-argument call keeps its @where@ clause, which already labels every
+  -- argument; only its heading becomes the herald, slots left as the inputs'
+  -- names. The head name did not always carry the herald itself — one written
+  -- above an @AKA@ head sits on the declaration — so without this the call
+  -- printed the bare name (smucclaw\/l4-ide#978). The table holds only what
+  -- 'decideNlg' accepts, so a @GIVEN@ gloss is never made the heading (#977).
+  -- A head name that already carries a herald is left alone, and the slots are
+  -- 'unslot'ted, because the @where@ clause is where an input's own gloss goes:
+  -- expanded in the heading too it printed twice (row 13 of
+  -- @jl4\/examples\/ok\/nlg-head-placement.l4@).
+  AppNamed ann n es order
+    | Just (nlg, _) <- Map.lookup (resolvedText n, length es) info
+    , not (carriesNlg (getActual n) || carriesNlg (getOriginal n)) ->
+        AppNamed ann (overBothNames (annoOf % annNlg .~ Just (unslot nlg)) n) es order
   e -> e
  where
   word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)
   -- A maqaf-final rendering is written against the next word.
   prefix w | Text.takeEnd 1 w == Text.singleton maqaf = w
            | otherwise                                = w <> " "
+  carriesNlg name = isJust (name ^. annoOf % annNlg)
 
 -- | The same splice, applied to every expression a directive carries — the
 -- subject of an @#EVAL@ or @#ASSERT@, and the contract, time and events of a

@@ -278,7 +278,16 @@ nlgAppForm (MkAppForm ann n ns maka) =
   MkAppForm ann
     <$> resolveNlgAnnotationInResolved n
     <*> traverse resolveNlgAnnotationInResolved ns
-    <*> traverse resolveNlgAnnotation maka
+    <*> traverse nlgAka maka
+
+-- | The @AKA@'s own annotation, and each alias name's. A herald on its own line
+-- under @\`r\` p AKA \`a\`@ lands on the alias name, and left parsed its
+-- @%slots%@ had no 'Unique' to splice a call's arguments into
+-- (smucclaw\/l4-ide#978).
+nlgAka :: Aka Resolved -> Check (Aka Resolved)
+nlgAka aka = do
+  MkAka ann ns <- resolveNlgAnnotation aka
+  MkAka ann <$> traverse resolveNlgAnnotationInResolved ns
 
 nlgTypeSig :: TypeSig Resolved -> Check (TypeSig Resolved)
 nlgTypeSig (MkTypeSig ann givenSig mGivethSig) =
