@@ -1,0 +1,95 @@
+import {
+  arr,
+  int,
+  literal,
+  obj,
+  optional,
+  str,
+  type Check,
+} from './validate.js'
+
+/** Session ids are ULIDs: 26 characters of Crockford base32 (§15.5). */
+export const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/
+
+export function isSessionId(value: unknown): value is string {
+  return typeof value === 'string' && ULID_RE.test(value)
+}
+
+/** WorkOS user-scoped API keys as handed to a task in `AGENT_KEY`. */
+export const AGENT_KEY_RE = /^sk_[A-Za-z0-9_-]{8,512}$/
+
+/** Conversation / turn / call ids minted by clients, the proxy or the
+ *  model: opaque, but bounded and path-safe. */
+export const OPAQUE_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/
+
+/** Plain file names (attachments): no separators, no leading dot. */
+export const FILE_NAME_RE = /^(?!\.)[^/\\\0\r\n]{1,255}$/
+
+export const sessionId: Check<string> = str({ pattern: ULID_RE })
+export const opaqueId: Check<string> = str({ pattern: OPAQUE_ID_RE })
+export const fileName: Check<string> = str({ pattern: FILE_NAME_RE })
+/** Epoch milliseconds — every timestamp in the protocol (§15.5). */
+export const epochMs: Check<number> = int({ min: 0 })
+
+/**
+ * Session states as the Sessions API derives them (§7.3). `running`,
+ * `busy` and `waiting` need a live lease; `parked` comes from
+ * `session.json`.
+ */
+export type SessionState =
+  | 'sleeping'
+  | 'starting'
+  | 'running'
+  | 'busy'
+  | 'waiting'
+  | 'parked'
+
+export const SESSION_STATES: readonly SessionState[] = [
+  'sleeping',
+  'starting',
+  'running',
+  'busy',
+  'waiting',
+  'parked',
+]
+
+export const sessionState: Check<SessionState> = literal(...SESSION_STATES)
+
+/** A user's HTTP / SSE MCP server as passed to a cloud session (§6.4).
+ *  Names, URLs and enabled tools only — never secrets. */
+export interface McpServerConfig {
+  /** Unique within the session; tools appear as `vsmcp__<name>__<tool>`. */
+  name: string
+  url: string
+  transport: 'http' | 'sse'
+  /** Tools the user enabled; absent = all. */
+  enabledTools?: string[]
+}
+
+export const MCP_SERVER_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/
+
+export const mcpServerConfig: Check<McpServerConfig> = obj({
+  name: str({ pattern: MCP_SERVER_NAME_RE }),
+  url: str({ max: 2048, pattern: /^https:\/\/[^\s]+$/ }),
+  transport: literal('http', 'sse'),
+  enabledTools: optional(arr(str({ min: 1, max: 256 }), { max: 1000 })),
+})
+
+/** A prompt attachment, stored in the session's `attachments/` folder
+ *  (outside the git repo). */
+export interface AttachmentRef {
+  name: string
+  contentType: string
+  /** Bytes. */
+  size: number
+}
+
+/** Attachments are capped at 10 MB, the seed at 50 MB (§10). */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+export const MAX_SEED_BYTES = 50 * 1024 * 1024
+
+export const attachmentRef: Check<AttachmentRef> = obj({
+  name: str({ pattern: FILE_NAME_RE }),
+  contentType: str({ min: 1, max: 255, pattern: /^[\w.+-]+\/[\w.+-]+$/ }),
+  size: int({ min: 0, max: MAX_ATTACHMENT_BYTES }),
+})
