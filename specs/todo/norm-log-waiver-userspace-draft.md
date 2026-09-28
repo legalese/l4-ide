@@ -1,7 +1,8 @@
 # How to write a waiver with the L4 you already have — DRAFT
 
 > **Status (2026-09-28): a tutorial draft and a measurement, not a ruling.**
-> Asked for in Meng's note on ruling N9 of `NORM-LOG-SPEC.md`, left on the rulings bench on 2026-09-28 without a mark: _"let's try a "userspace-only" alternative to this new primitive; try writing a tutorial for how a user could synthesize the waiver using existing syntax and semantics; if that's easy enough to teach, we can be conservative and not create a WAIVE primitive. Perhaps that "primitive" becomes a lib function in prelude or elsewhere."_ > **Unlike the norm-log how-to, every line of L4 on this page runs today.**
+> Asked for in Meng's note on ruling N9 of `NORM-LOG-SPEC.md`, left on the rulings bench on 2026-09-28 without a mark: "let's try a "userspace-only" alternative to this new primitive; try writing a tutorial for how a user could synthesize the waiver using existing syntax and semantics; if that's easy enough to teach, we can be conservative and not create a WAIVE primitive. Perhaps that "primitive" becomes a lib function in prelude or elsewhere."
+> **Unlike the norm-log how-to, every line of L4 on this page runs today.**
 > The two contracts are `jl4/experiments/norm-log-waiver/waiver-userspace.l4` and `waiver-untimed.l4`; both were run on 2026-09-28 with the installed `l4` (built 2026-09-28 07:49) and, for the timed file, also on the norm-log probe's snapshot binary, with identical results.
 > The verdict is in the last section.
 
