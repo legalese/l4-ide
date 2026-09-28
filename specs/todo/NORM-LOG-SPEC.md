@@ -291,7 +291,7 @@ Conditions: (1) to (3) are proved on the probe branch before anything lands, and
 _Not part of the ruling — implementation notes from session `every-each`, 2026-09-28, code read on `unstable`:_
 every contract value, a `BREACH` included, meets its `[time, events]` at `App1`, where a breach is passed through with the time discarded (`Machine.hs:1592`), and `breachTime (ExplicitBreach _) = Nothing` (`:2843`).
 Stamping there from `clockAt` (`:2194`) — fill-if-absent, so an outer application does not re-stamp — is the natural site for (1), because a shared `b MEANS BREACH` is cached once but applied once per reach.
-The time must live on each failure entry, not on the compound's constructor, or it is lost when a compound concatenates blame.
+The time must live on each failure entry, not on the compound's constructor, or it is lost when a compound concatenates blame; today neither has one (`DeclaredBreach (Maybe a) (Maybe a)` at `jl4-core/src/L4/Evaluate/ValueLazy.hs:122`, `ExplicitBreach (Blame a)` at `:156`).
 **Open gap in (2):** a `BREACH` in the `HENCE` of a kept `SHANT` gets the revealing event's stamp — an observed time with no effective counterpart; the code calls moving it "a separate decision, not taken here" (`:2104`).
 
 ---
