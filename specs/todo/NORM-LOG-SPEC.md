@@ -257,6 +257,8 @@ Without N8 this collapses into mandatory labels for a same-action cure (`repeat-
 Windows use `effective`; as-of reads use `observed`.
 `txTime` is kept for audit only, and no read may window on `txTime` or `vtFrom`.
 Conditions: a `RAND`/`ROR` compound breach takes its instant from SEESAW; `effective` is a `Maybe` until N7's rule supplies an explicit `BREACH`'s instant (it now does: the deadline of the failure that reached it).
+_Not part of the ruling — SEESAW's direction, reported by session `every-each` on 2026-09-28, pending there:_ every failure would carry an effective and an observed time, and a compound would combine them along its operand tree (`RAND` the minimum of each, `ROR` the maximum, a barrier as `RAND`).
+That is this ruling applied to compounds, so "a compound breach takes its instant from SEESAW" should be read as "its two instants"; nothing is built against the singular.
 
 **N4 — ANSWERED 2026-09-27: implicit write, explicit read, for legibility.**
 A reader can see which provisions depend on history; windows are written in the read, not built in.
@@ -286,6 +288,11 @@ R5's row in `LTS-VISUALISER.md` carries a note to this effect.
 (3) A party that was not forced is stored unevaluated and forced only when a read filters by bearer.
 (4) "Nobody named" is distinguished from "not yet known"; only the second, when a read cannot resolve it, is an evaluation error naming the site.
 Conditions: (1) to (3) are proved on the probe branch before anything lands, and a compound breach's clock waits on SEESAW.
+_Not part of the ruling — implementation notes from session `every-each`, 2026-09-28, code read on `unstable`:_
+every contract value, a `BREACH` included, meets its `[time, events]` at `App1`, where a breach is passed through with the time discarded (`Machine.hs:1592`), and `breachTime (ExplicitBreach _) = Nothing` (`:2843`).
+Stamping there from `clockAt` (`:2194`) — fill-if-absent, so an outer application does not re-stamp — is the natural site for (1), because a shared `b MEANS BREACH` is cached once but applied once per reach.
+The time must live on each failure entry, not on the compound's constructor, or it is lost when a compound concatenates blame.
+**Open gap in (2):** a `BREACH` in the `HENCE` of a kept `SHANT` gets the revealing event's stamp — an observed time with no effective counterpart; the code calls moving it "a separate decision, not taken here" (`:2104`).
 
 ---
 
