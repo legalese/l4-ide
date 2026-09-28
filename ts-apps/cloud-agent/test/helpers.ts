@@ -16,6 +16,10 @@ import { DirectiveResultsCache } from '@repo/legalese-agent'
 
 export const SID = '01J9Z3K4M5N6P7Q8R9S0T1V2W3'
 
+const hostEnv: NodeJS.ProcessEnv = process.env
+/** The host's PATH, for tests that run git. */
+export const HOST_PATH = hostEnv['PATH'] ?? ''
+
 export async function tempDir(prefix = 'cloud-agent-test-'): Promise<{
   dir: string
   cleanup: () => Promise<void>

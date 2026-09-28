@@ -15,6 +15,7 @@ import {
 } from '../src/runner.js'
 import {
   FakeAiProxy,
+  HOST_PATH,
   MemoryLogger,
   SID,
   StubL4,
@@ -611,7 +612,7 @@ describe('Runner', () => {
     ])
     proxy.scripts.push([chunk({ content: 'Created.' }), chunk({}, 'stop')])
     const runner = build({
-      plugins: [new GitSync({ PATH: process.env['PATH'] })],
+      plugins: [new GitSync({ PATH: HOST_PATH })],
     })
     const done = runner.run()
     await sendCommand(root, SID, {
