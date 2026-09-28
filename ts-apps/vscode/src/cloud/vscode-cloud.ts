@@ -26,6 +26,7 @@ import {
   type SessionFilesRecord,
   type SessionFilesStore,
 } from './cloud-session-manager.js'
+import { CloudGitSync, type GitApi, type GitApiResult } from './git-sync.js'
 import type { McpServerSource } from './mcp-transfer.js'
 import { layoutSeed, type SeedSource, type WorkspaceFolderRef } from './seed.js'
 import { SessionsApiClient } from './sessions-api.js'
@@ -282,6 +283,30 @@ export function mementoFilesStore(memento: vscode.Memento): SessionFilesStore {
   }
 }
 
+// ── Git (§9.3) ────────────────────────────────────────────────────────
+
+/** The subset of `vscode.git`'s exports this extension uses. */
+interface GitExtensionExports {
+  readonly enabled: boolean
+  getAPI(version: 1): GitApi<vscode.Uri>
+}
+
+const GIT_UNAVAILABLE =
+  "VS Code's Git support isn't available. Install git and make sure the built-in Git extension is enabled (setting `git.enabled`), then try again."
+
+/** VS Code's built-in Git extension API, activating it if needed. */
+export async function vscodeGitApi(): Promise<GitApiResult<vscode.Uri>> {
+  const ext = vscode.extensions.getExtension<GitExtensionExports>('vscode.git')
+  if (!ext) return { unavailable: GIT_UNAVAILABLE }
+  try {
+    const exports = ext.isActive ? ext.exports : await ext.activate()
+    if (!exports?.enabled) return { unavailable: GIT_UNAVAILABLE }
+    return { api: exports.getAPI(1) }
+  } catch {
+    return { unavailable: GIT_UNAVAILABLE }
+  }
+}
+
 // ── Wiring ────────────────────────────────────────────────────────────
 
 export interface CloudSessions {
@@ -299,6 +324,8 @@ export interface CloudSessions {
   /** Listeners for cloud-only events, state and progress (the webview
    *  UI plugs in here). */
   listener: Omit<CloudSessionListener, 'chat'>
+  /** Clone and sync through VS Code's Git extension (§9.3). */
+  git: CloudGitSync<vscode.Uri>
 }
 
 /**
@@ -312,7 +339,8 @@ export function createCloudSessions(deps: {
   mcp?: McpServerSource
   emitChat: (event: ChatServiceEvent) => void
   logger: Logger
-  /** Extension global state (per-session file hashes). */
+  /** Extension global state: per-session file hashes and the
+   *  session → clone folder map. */
   storage: vscode.Memento
 }): CloudSessions & vscode.Disposable {
   const authDeps: AuthProxyDeps = {
@@ -343,17 +371,52 @@ export function createCloudSessions(deps: {
   })
   // A sign-out or account switch must not keep using the old token.
   const authSub = deps.auth.onDidChange(() => tokens.invalidate())
+
+  const git = new CloudGitSync<vscode.Uri>({
+    getGitApi: vscodeGitApi,
+    apiUrl: () => (isCloudSessionsEnabled() ? cloudSessionsApiUrl() : ''),
+    listSessions: async () => (await manager.list()).sessions,
+    getAccessToken: () => tokens.get(),
+    storage: deps.storage,
+    parseUri: (url) => vscode.Uri.parse(url),
+    fileUri: (fsPath) => vscode.Uri.file(fsPath),
+    logger: deps.logger,
+  })
+  // The credentials and "Git: Clone" providers exist only while the
+  // feature is on; they're (re)registered when the settings change.
+  const syncGitRegistration = (): void => {
+    if (!isCloudSessionsEnabled()) {
+      git.unregister()
+      return
+    }
+    void git.register().then((unavailable) => {
+      if (unavailable) deps.logger.info(`cloud-sessions: ${unavailable}`)
+    })
+  }
+  syncGitRegistration()
+  const configSub = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (
+      e.affectsConfiguration(CLOUD_SESSIONS_ENABLED_SETTING) ||
+      e.affectsConfiguration(CLOUD_SESSIONS_API_URL_SETTING)
+    ) {
+      syncGitRegistration()
+    }
+  })
+
   return {
     manager,
     api,
     tokens,
     listener,
+    git,
     isEnabled: isCloudSessionsEnabled,
     gatherSeed: (params) => gatherCloudSeed(params, deps.client, deps.logger),
     gatherPromptFiles: (params) =>
       gatherPromptFiles(params, deps.client, deps.logger),
     dispose: () => {
       authSub.dispose()
+      configSub.dispose()
+      git.unregister()
       manager.dispose()
     },
   }
