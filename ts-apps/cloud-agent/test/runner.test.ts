@@ -348,13 +348,28 @@ describe('Runner', () => {
 
   test('parks at start when the first renewal fails', async () => {
     chain.ok = false
-    const runner = build()
+    const calls: string[] = []
+    const runner = build({
+      plugins: [
+        {
+          name: 'probe',
+          start: async () => {
+            calls.push('start')
+          },
+          beforeExit: async () => {
+            calls.push('beforeExit')
+          },
+        },
+      ],
+    })
     const done = runner.run()
     // KeyChainAuth calls onEnded from inside start(); the fake doesn't.
     await waitUntil(() => chain.started === 1)
     runner.onChainEnded('invalid_key')
     assert.equal(await done, 'parked')
     assert.equal((await session()).status, 'parked')
+    // Plugins that never started aren't asked to clean up.
+    assert.deepEqual(calls, [])
   })
 
   test('hands commands it does not own to plugins, and skips unknown ones', async () => {
