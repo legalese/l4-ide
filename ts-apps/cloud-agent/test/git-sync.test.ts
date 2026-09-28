@@ -6,7 +6,7 @@ import * as path from 'node:path'
 import type { CloudEventPayload } from '@repo/legalese-agent/protocol'
 import { GitSync, commitSubject } from '../src/git-sync.js'
 import type { RunnerContext } from '../src/runner.js'
-import { MemoryLogger, SID, StubL4, tempDir } from './helpers.js'
+import { HOST_PATH, MemoryLogger, SID, StubL4, tempDir } from './helpers.js'
 
 const BUNDLE = '01J9Z3K4M5N6P7Q8R9S0T1V2W4.bundle'
 
@@ -15,7 +15,7 @@ function sh(cwd: string, ...args: string[]): string {
     cwd,
     encoding: 'utf8',
     env: {
-      PATH: process.env['PATH'],
+      PATH: HOST_PATH,
       HOME: cwd,
       GIT_CONFIG_NOSYSTEM: '1',
       GIT_AUTHOR_NAME: 'User',
@@ -63,7 +63,7 @@ describe('GitSync', () => {
   })
   afterEach(() => cleanup())
 
-  const git = (): GitSync => new GitSync({ PATH: process.env['PATH'] })
+  const git = (): GitSync => new GitSync({ PATH: HOST_PATH })
   const write = (rel: string, text: string): Promise<void> =>
     mkdir(path.dirname(path.join(repo, rel)), { recursive: true }).then(() =>
       writeFile(path.join(repo, rel), text)
