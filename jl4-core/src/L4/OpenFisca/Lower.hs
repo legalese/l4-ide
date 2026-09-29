@@ -30,6 +30,7 @@ import qualified Data.Map.Strict as Map
 import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Data.Graph (SCC (..), stronglyConnComp)
 
 import Optics ((^.))
 
@@ -173,7 +174,7 @@ lowerModule entInfo mod'@(MkModule _ selfUri _) =
                      , pkgScalars    = map snd (Map.elems scalars)
                      , pkgEnums      = map (.eiDef) (Map.elems enums)
                      }
-               in case validateIdents pkg <> validatePackage (concatMap fst ok) pkg of
+               in case validateIdents pkg <> validatePackage (concatMap fst ok) pkg <> recursionErrors pkg of
                     []    -> Right pkg
                     vErrs -> Left vErrs
 
@@ -203,6 +204,20 @@ lowerOne ctx ef = mapLeft (LowerError fnName) $ do
         , envScalars    = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- sig.sigOthers ]
         }
   (undatedF, datedF) <- lowerBody env body
+
+  -- An input and a stored field of the same name would both become the one
+  -- OpenFisca input variable of that name, so two values L4 keeps apart
+  -- would be read from one. (A LIST OF field is a role, which
+  -- 'validatePackage' checks against the variables.)
+  forM_ sig.sigOthers \g ->
+    case [ (ri, fi) | ri <- Map.elems ctx.ctxRecords, fi <- ri.riFields
+                    , fi.fiStored, isNothing fi.fiListElem  -- the fields that become input variables
+                    , fi.fiName == pyIdent (givenText g) ] of
+      ((ri, fi) : _) ->
+        Left ("the input `" <> givenText g <> "` and the field `" <> fi.fiL4 <> "` of `" <> ri.riName
+              <> "` both become the OpenFisca input variable `" <> fi.fiName
+              <> "`, so a situation could not give them different values, and L4 can. Rename the input.")
+      [] -> Right ()
 
   -- Stored scalar (non-list) fields of an entity-record become input variables.
   let inputsFor e ri = sequence
@@ -417,6 +432,8 @@ lowerExpr env = go
         Left "the member cannot be used as a value; read one of its fields, or pass it unchanged to an @export decision"
     | Just name <- Map.lookup u env.envScalars, null args =
         if inMember then Left (groupValueInMember ("the input `" <> nm <> "`")) else Right (OFVarRef name)
+    | isBuiltinRef ref =
+        Left ("`" <> nm <> "` is an L4 builtin that the OpenFisca export does not compile. It compiles arithmetic, comparisons, AND / OR / NOT / IMPLIES, IF, BRANCH and CONSIDER over an enum, and the prelude's sum, count, any, all, max and min; write the value without `" <> nm <> "`, or compute it outside OpenFisca.")
     | not (null args) = Left (helperCallMsg nm)
     | otherwise = Left ("unbound reference `" <> nm <> "` (recursion, prelude values, and local bindings are not supported)")
    where
@@ -999,11 +1016,17 @@ validatePath kind = \case
                       && not (s `Set.member` openFiscaReservedKeys)
     Nothing -> False
 
--- | Keys OpenFisca's parameter loader treats specially: metadata keys, which
--- it skips as children, and the two keys that turn a node into a leaf.
+-- | Keys OpenFisca's parameter loader treats specially (metadata keys, which
+-- it skips as children, and the two keys that turn a node into a leaf), and
+-- the public attributes of its parameter objects, which a child of the same
+-- name would overwrite or be hidden by. Measured against openfisca-core
+-- 45.0.4: `children` and `get_at_instant` break the parameter tree, and the
+-- rest are refused because they were not shown safe in every position.
 openFiscaReservedKeys :: Set Text
 openFiscaReservedKeys = Set.fromList
-  ["brackets", "description", "documentation", "metadata", "reference", "unit", "values"]
+  [ "brackets", "description", "documentation", "metadata", "reference", "unit", "values"
+  , "add_child", "children", "clone", "file_path", "get_at_instant", "get_descendants"
+  , "merge", "name", "update", "validate", "values_history", "values_list" ]
 
 -- | Two parameters at one path, or one parameter at a path inside another's,
 -- would overwrite each other in the emitted parameter tree.
@@ -1279,6 +1302,9 @@ validatePackage allEnts pkg =
   <> personCount
   <> concatMap roleChecks pkg.pkgEntities
   <> topLevelClashes
+  <> entityKeyClashes
+  <> formulaLocalClashes
+  <> concatMap enumMemberChecks pkg.pkgEnums
  where
   mkErr = LowerError ""
 
@@ -1309,7 +1335,64 @@ validatePackage allEnts pkg =
     | n <- dups (map (.entPy) pkg.pkgEntities <> map (.enName) pkg.pkgEnums <> map (.varName) pkg.pkgVariables)
     ]
 
+  -- Two records whose names differ only in case (`household`, `Household`)
+  -- get one entity key, and so one plural: a situation's `households` could
+  -- not say which it means. (The plural is the key plus `s`, so distinct keys
+  -- give distinct plurals.)
+  entityKeyClashes =
+    [ mkErr ("two entities would both have the OpenFisca key `" <> k <> "` (and the situation key `" <> k <> "s`); rename one of the records")
+    | k <- dups (map (.entKey) pkg.pkgEntities) ]
+
+  -- Inside a formula the entity's key, `period` and `parameters` are the
+  -- formula's own arguments, so a module-level name spelled the same is
+  -- hidden there: an enum class (read as `Class.member`) or a group entity
+  -- (read for its role constants, `Entity.ROLE`).
+  entKeys = map (.entKey) pkg.pkgEntities
+  formulaLocals = entKeys <> ["period", "parameters"]
+  formulaLocalClashes =
+    [ mkErr ("the enum `" <> en.enName <> "` has the same Python name as " <> localName en.enName
+             <> ", which a formula binds as its own argument, so the formula could not read the enum. Rename the enum (for instance, capitalise it).")
+    | en <- pkg.pkgEnums, en.enName `elem` formulaLocals ]
+    <> [ mkErr ("the group record `" <> e.entPy <> "` has the same Python name as " <> localName e.entPy
+                <> ", which a formula binds as its own argument, so a formula could not read its roles. Rename the record (for instance, capitalise it).")
+       | e <- pkg.pkgEntities, not e.entIsPerson, e.entPy `elem` formulaLocals ]
+  localName n
+    | n `elem` entKeys = "the key of an entity (`" <> n <> "`)"
+    | otherwise     = "`" <> n <> "`"
+
+  -- OpenFisca's Enum (a Python Enum) cannot hold two members of one name,
+  -- rejects `mro`, lets a member hide its own `encode` classmethod, and sets
+  -- `names`, `indices` and `enums` on the class after the members exist.
+  -- A leading underscore reaches Python's own enum machinery.
+  enumMemberChecks en =
+    [ mkErr ("the constructors " <> Text.intercalate " and " (map backtick same)
+             <> " of the enum `" <> en.enName <> "` " <> (if length same == 2 then "both" else "all")
+             <> " become the Python name `" <> m <> "`; rename one")
+    | m <- dups (map fst en.enMembers)
+    , let same = [ l4 | (m', l4) <- en.enMembers, m' == m ] ]
+    <> [ mkErr ("the constructor `" <> l4 <> "` of the enum `" <> en.enName <> "` becomes the Python name `" <> m
+                <> "`, which OpenFisca's Enum reserves (" <> Text.intercalate ", " enumReserved
+                <> ", or a leading underscore); rename it")
+       | (m, l4) <- en.enMembers, m `elem` enumReserved || "_" `Text.isPrefixOf` m ]
+  enumReserved = ["encode", "mro", "names", "indices", "enums"]
+
   dups xs = nubOrd [ x | (x, i) <- zip xs [0 :: Int ..], (y, j) <- zip xs [0 ..], x == y, i < j ]
+
+-- | A formula that reads its own variable, directly or through other
+-- decisions, is recursion. OpenFisca evaluates both branches of an IF, so such
+-- a formula always fails with CycleError, even where L4 stops at a base case.
+recursionErrors :: OFPackage -> [LowerError]
+recursionErrors pkg =
+  [ LowerError (varL4Of c) ("recursion: " <> Text.intercalate " -> " (map backtick (c : cs <> [c]))
+      <> ". OpenFisca evaluates both branches of every IF, so a formula that reaches itself always fails with CycleError, even where L4 stops at a base case. The export does not compile recursion; write the decision without it.")
+  | CyclicSCC (c : cs) <- stronglyConnComp graph ]
+ where
+  computed = [ v | v <- pkg.pkgVariables, isJust v.varFormula ]
+  names    = Set.fromList (map (.varName) computed)
+  graph    =
+    [ (v.varName, v.varName, nubOrd [ r | r <- concatMap variableRefs (maybeToList v.varFormula <> map snd v.varDated), r `Set.member` names ])
+    | v <- computed ]
+  varL4Of n = maybe n (.varL4) (find (\v -> v.varName == n) computed)
 
 -- ---------------------------------------------------------------------------
 -- GIVEN parameter helpers
@@ -1468,8 +1551,9 @@ pyIdent raw =
 
 -- | Lowercase names a variable must not take, which get a @_@ suffix: the
 -- Python keywords (lowercased, since 'pyIdent' lowercases), the formula-local
--- names @period@ / @parameters@ / @entity@ / @formula@, and the lowercase
--- module-level names the emitted file binds (@np@, @build_entity@).
+-- names @period@ / @parameters@ / @entity@ / @formula@, the lowercase
+-- module-level names the emitted file binds (@np@, @build_entity@), and the
+-- builtins it uses (@float@ etc. as value types, @super@ in the system class).
 pyReserved :: Set Text
 pyReserved = Set.fromList
   [ "and","as","assert","async","await","break","class","continue","def","del"
@@ -1477,7 +1561,8 @@ pyReserved = Set.fromList
   , "in","is","lambda","nonlocal","none","not","or","pass","raise","return","true"
   , "try","while","with","yield","match","case"
   , "period","parameters","entity","formula"
-  , "np","build_entity" ]
+  , "np","build_entity"
+  , "float","bool","str","int","super" ]
 
 -- | The Python keywords, case-sensitively.
 pythonKeywords :: Set Text
@@ -1502,7 +1587,13 @@ pyTypeReserved :: Set Text
 pyTypeReserved = pythonKeywords <> Set.fromList
   [ "TaxBenefitSystem", "build_entity", "Variable", "MONTH", "YEAR", "ETERNITY"
   , "Enum", "ParameterNode", "np", "L4TaxBenefitSystem", "CountryTaxBenefitSystem"
-  , "_PARAMETERS" ]
+  , "_PARAMETERS"
+  -- builtins the emitted module uses
+  , "float", "bool", "str", "int", "super"
+  -- a formula's own arguments
+  , "period", "parameters"
+  -- names a Variable class body binds before it reads an entity or an enum
+  , "value_type", "possible_values", "default_value", "entity", "definition_period", "label" ]
 
 -- | Every name the emitted module uses must be a valid ASCII Python
 -- identifier. 'pyIdent' and 'pyType' keep non-ASCII letters and digits (a

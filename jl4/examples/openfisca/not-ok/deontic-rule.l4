@@ -1,0 +1,20 @@
+-- A deontic rule (PARTY … MUST). An obligation is not a value an OpenFisca
+-- variable can hold. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Actor IS ONE OF Landlord, Tenant
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+DECLARE Person HAS rent IS A NUMBER
+
+@export The tenant must pay the rent
+GIVEN p IS A Person
+GIVETH A DEONTIC Actor Action
+`pay rent` p MEANS
+    PARTY Tenant MUST pay (p's rent) WITHIN 10 HENCE FULFILLED LEST BREACH
+
+@export The rent, as a number
+GIVEN p IS A Person
+GIVETH A NUMBER
+`the rent` p MEANS p's rent
+
+#ASSERT (`the rent` OF (Person WITH rent IS 100)) EQUALS 100

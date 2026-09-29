@@ -1,0 +1,14 @@
+-- A WHERE binding. The export does not compile local bindings, and must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export W
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`w` p period MEANS x TIMES 2
+  WHERE x MEANS p's salary PLUS 1
+
+#ASSERT (`w` OF (Person WITH salary IS 4), "2026-01") EQUALS 10

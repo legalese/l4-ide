@@ -12,7 +12,8 @@ Usage (inside a venv with openfisca-core and numpy):
 where <case> is an example under jl4/examples/openfisca/ (flat-tax, benefit,
 household, roles, housing, agecheck, incometax, basic-income, dated, scale) or
 a fixture under jl4/tests-cli/fixtures/openfisca/ (gt-guard, scalar-formula,
-role-status, carriage-return, python-keywords, not-scalar, scalar-arithmetic).
+role-status, carriage-return, python-keywords, not-scalar, scalar-arithmetic,
+python-builtins, eternity-parameter).
 """
 import importlib.util
 import sys
@@ -170,6 +171,16 @@ def main():
         check(tbs, "persons", {"p": {"salary": {"2026-01": 7}}}, "notional_tax", "2026-01", 1000.0)
         check(tbs, "persons", {"p": {"salary": {"2026-01": 7}}}, "guarded_share", "2026-01", 7.0)
         check(tbs, "persons", {"p": {"salary": {"2031-01": 7}}}, "guarded_share", "2031-01", 200.0)
+    elif which == "python-builtins":
+        sit = {"s": {"band": {"ETERNITY": "low"}, "slot": {"ETERNITY": "offpeak"},
+                     "float_": {"ETERNITY": True}, "salary": {"ETERNITY": 5}}}
+        check(tbs, "super_s", sit, "tax", "2026-01", 5.0)
+        check(tbs, "super_s", sit, "fare", "2026-01", 2.0)
+    elif which == "eternity-parameter":
+        # an ETERNITY variable, calculated at a month (openfisca-core cannot
+        # pick a formula for the period ETERNITY itself).
+        for inc, exp in [(10, 600.0), (2000, 0.0)]:
+            check(tbs, "persons", {"p": {"income": {"ETERNITY": inc}}}, "grant", "2026-01", exp)
     else:
         raise SystemExit(f"unknown case: {which}")
     print("ROUND-TRIP OK")

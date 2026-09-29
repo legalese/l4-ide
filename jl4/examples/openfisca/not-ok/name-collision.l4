@@ -7,3 +7,5 @@ GIVEN p      IS A Person
       period IS A STRING
 GIVETH A NUMBER
 `sum two` p period MEANS (p's `foo bar`) PLUS (p's foo_bar)
+
+#ASSERT (`sum two` OF (Person WITH `foo bar` IS 1, foo_bar IS 2), "2026-01") EQUALS 3

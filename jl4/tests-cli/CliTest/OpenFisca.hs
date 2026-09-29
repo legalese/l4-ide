@@ -49,6 +49,8 @@ positiveFixtures =
   , ("python-keywords", "makes a record `class` and an enum `None` keyword-safe")
   , ("not-scalar",      "compiles NOT and IMPLIES over a year, a parameter or a literal with np.logical_not, not `~`")
   , ("scalar-arithmetic", "gives `scale tax` a constant income as an array, and survives a zero divisor in a branch the guard excludes")
+  , ("python-builtins", "renames a record `super`, an enum `bool`, a field `float` and an enum `period`")
+  , ("eternity-parameter", "lets a decision with no period read a parameter, computed at a month")
   ]
 
 -- | Every refusal fixture, with a fragment of the message it must print.
@@ -107,6 +109,24 @@ refusals =
   , ("period-mismatch",            "is needed with two definition periods: MONTH and ETERNITY")
   , ("name-collision",             "both compile to the OpenFisca variable `foo_bar`")
   , ("branch-misordered",          "dated-formula BRANCH arms must be in strictly-descending date order")
+  -- adversarial review of the fixes for #473: more silent miscompiles and crashes
+  , ("input-field-clash",          "the input `salary` and the field `salary` of `Person` both become the OpenFisca input variable `salary`")
+  , ("recursion",                  "recursion: `f` -> `f`")
+  , ("mutual-recursion",           "recursion: `ping` -> `pong` -> `ping`")
+  , ("enum-member-duplicate",      "the constructors `self employed` and `self_employed` of the enum `Status` both become the Python name `self_employed`")
+  , ("enum-member-reserved",       "the constructor `encode` of the enum `Colour` becomes the Python name `encode`, which OpenFisca's Enum reserves")
+  , ("enum-entity-key",            "the enum `citizen` has the same Python name as the key of an entity (`citizen`)")
+  , ("entity-key-clash",           "two entities would both have the OpenFisca key `household`")
+  , ("group-lowercase",            "the group record `household` has the same Python name as the key of an entity (`household`)")
+  , ("desc-children",              "the @desc parameter path `taxes.children` is not a valid OpenFisca parameter path: the segment `children`")
+  , ("builtin-round",              "`ROUND` is an L4 builtin that the OpenFisca export does not compile")
+  -- constructs that were refused already, and had no fixture saying so
+  , ("local-where",                "WHERE binding (local bindings are not supported)")
+  , ("local-let",                  "LET binding (local bindings are not supported)")
+  , ("list-literal",               "`sum` is supported only as `sum (map (GIVEN m YIELD …) (<members>))`")
+  , ("deontic-rule",               "its result has type DEONTIC OF Actor, Action")
+  , ("event",                      "`EVENT` is an L4 builtin that the OpenFisca export does not compile")
+  , ("lambda-outside-aggregation", "expected a member list: `<the group>'s <members field>` or `members of OF <the group>`")
   ]
 
 exampleFile, notOkFile, fxFile :: String -> FilePath

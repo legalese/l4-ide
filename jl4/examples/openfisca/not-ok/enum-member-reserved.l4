@@ -1,0 +1,20 @@
+-- A constructor named `encode` hides OpenFisca's Enum.encode, and every
+-- calculation then fails. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Colour IS ONE OF
+    encode
+    red
+
+DECLARE Person HAS colour IS A Colour
+
+@export Price by colour
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`price` p period MEANS
+    CONSIDER p's colour
+    WHEN encode THEN 10
+    OTHERWISE 20
+
+#ASSERT (`price` OF (Person WITH colour IS red), "2026-01") EQUALS 20

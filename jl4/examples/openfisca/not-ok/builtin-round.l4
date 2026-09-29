@@ -1,0 +1,13 @@
+-- ROUND is an L4 builtin the export does not compile. The refusal must say
+-- that, rather than advise marking a builtin @export.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Rounded salary
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`rounded` p period MEANS ROUND (p's salary)
+
+#ASSERT (`rounded` OF (Person WITH salary IS 2.4), "2026-01") EQUALS 2
