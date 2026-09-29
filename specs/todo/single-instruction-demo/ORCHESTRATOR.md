@@ -514,12 +514,14 @@ they are facts about the checker, not about any body of law.
 
 **What the `PASS` is worth, on the record.** The receipt carries this as a note, not just this
 document: the analysis is propositional — every leaf (a projection, a comparison, an arithmetic
-test, a call to another `DECIDE`) is an opaque atom, so no numeric, interval, date or string
-contradiction is in range. Each `DECIDE` is read on its own without inlining callees, and in a
-corpus written as many small named limbs that is most of the corpus: regcf's `issuer is eligible`
-has exactly **one** atom, the call to `issuer is excluded by Rule 100(b)`. Measured 2026-08-02 over the
-then-42 analysed decisions in `regcf.l4` (43 as of 2026-08-09), **25 have a single atom** and the widest has 6 — so most of the
-corpus has no room for a propositional contradiction to appear in. A third category exists
+test) is an opaque atom, so no numeric, interval, date or string contradiction is in range.
+Until 2026-09-29 a call to another `DECIDE` was an opaque atom too, and in a corpus written as
+many small named limbs that was most of the corpus: regcf's `issuer is eligible` has exactly
+**one** atom, the call to `issuer is excluded by Rule 100(b)`. Such a call is now read through to
+what the called rule means (`WHERE-INLINING-SPEC.md` §9), so that one atom carries its meaning
+into every check. Measured 2026-09-29 over the 43 analysed decisions in `regcf.l4`: **25 have a
+single atom**, for 11 of them that atom is a call now read through, the widest has 6, and 36 calls
+are read through in all, none left opaque. A third category exists
 besides analysed and skipped: **7 decisions across the two modules are defined inside a `WHERE`
 clause and are never visited at all**, because the ladder's own entry point
 (`foldTopLevelDecides`) does not descend into one and a verifier that disagreed with the ladder

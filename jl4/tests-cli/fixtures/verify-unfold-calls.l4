@@ -1,0 +1,48 @@
+-- Reading through calls to other rules (specs/todo/WHERE-INLINING-SPEC.md §9).
+--
+-- An exception, and an offence the exception defeats. A textbook draws this as
+-- "[conditions] -> not an offence": the exception is SUFFICIENT for the offence
+-- not to be made out. `the arrow is broken` asks for both at once, so if the
+-- offence really is defeated by the exception it can never be true.
+--
+-- Before calls were read through, each call was one opaque leaf, and `the arrow
+-- is broken` was two unrelated atoms: satisfiable, no finding, on this encoding
+-- AND on the broken one below. The tool could not tell them apart.
+--
+-- `the arrow is broken in the bad encoding` is the control. Its offence forgets
+-- the exception, so both can hold at once and there must be NO finding. If it
+-- ever reports unsat, the unfolding is inventing contradictions.
+
+DECLARE Facts HAS
+    `the act was accidental` IS A BOOLEAN
+    `the act was lawful`     IS A BOOLEAN
+    `harm was caused`        IS A BOOLEAN
+
+GIVEN f IS A Facts
+GIVETH A BOOLEAN
+DECIDE `the exception applies` f IF
+        f's `the act was accidental`
+    AND f's `the act was lawful`
+
+GIVEN f IS A Facts
+GIVETH A BOOLEAN
+DECIDE `the offence is made out` f IF
+        f's `harm was caused`
+    AND NOT `the exception applies` f
+
+GIVEN f IS A Facts
+GIVETH A BOOLEAN
+DECIDE `the arrow is broken` f IF
+        `the exception applies` f
+    AND `the offence is made out` f
+
+GIVEN f IS A Facts
+GIVETH A BOOLEAN
+DECIDE `the offence, forgetting the exception` f IF
+        f's `harm was caused`
+
+GIVEN f IS A Facts
+GIVETH A BOOLEAN
+DECIDE `the arrow is broken in the bad encoding` f IF
+        `the exception applies` f
+    AND `the offence, forgetting the exception` f

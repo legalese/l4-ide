@@ -62,8 +62,8 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 -- Referential transparency for the static analyses
 -- ---------------------------------------------------------------------------
 
--- | Substitute zero-arity local @WHERE@ / @LET … IN@ bindings into the expression
--- that uses them, to a fixed point.
+-- | Substitute local @WHERE@ / @LET … IN@ bindings into the expression that uses
+-- them, to a fixed point.
 --
 -- L4 /evaluates/ referentially transparently: @x WHERE x MEANS e@ and @e@ give the
 -- same answer. The static analyses did not agree, because the ladder IR turns a
@@ -78,11 +78,17 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 -- after which the existing atom coalescing collapses the two occurrences and the
 -- existing analysis finds the contradiction. No analysis logic changes.
 --
--- See @specs/todo/WHERE-INLINING-SPEC.md@. Four things are deliberately left opaque —
--- bindings that take parameters (substituting under arguments is beta reduction, which
--- wants a capture-avoidance story), bindings that are recursive or mutually recursive
--- (substitution would not terminate), @ASSUME@ (there is no definiens), and anything
--- referenced with a non-empty argument list.
+-- A binding that takes parameters is substituted too, by beta reduction: a call
+-- whose argument count equals the binding's parameter count is replaced by the
+-- binding's body with the arguments put in place of the parameters (see
+-- 'unfoldOnce'). A reference at any other arity — the helper passed as a value, or
+-- partially applied — is left alone, and so is the binding it needs.
+--
+-- See @specs/todo/WHERE-INLINING-SPEC.md@ (§5, and §9 for parameters). Three things
+-- are deliberately left opaque — bindings that are recursive or mutually recursive
+-- (substitution would not terminate), @ASSUME@ (there is no definiens), and a
+-- binding that applies one of its own parameters as a function (see
+-- 'unfoldableDecide').
 inlineLocalBindings :: Expr Resolved -> Expr Resolved
 inlineLocalBindings = transformOf (gplate @(Expr Resolved)) step
   where
@@ -99,65 +105,155 @@ inlineLocalBindings = transformOf (gplate @(Expr Resolved)) step
       -> Expr Resolved -> [LocalDecl Resolved] -> Expr Resolved
     rebuild mk body ds
       | Map.null usable = mk body ds
-      | null survivors  = substRefs usable body
-      | otherwise       = mk (substRefs usable body) survivors
+      | null survivors  = body'
+      | otherwise       = mk body' survivors
       where
-        cands     = Map.fromList [ p | Just p <- map candidate ds ]
-        usable    = expandAll (Map.withoutKeys cands (selfReaching cands))
+        cands  = Map.fromList [ p | LocalDecide _ d <- ds, Just p <- [unfoldableDecide d] ]
+        usable = closeUnder (pruneRecursive cands)
+        body'  = unfoldOnce usable body
+        -- A usable binding is dropped only once nothing refers to it any more. For
+        -- a zero-arity binding that is always, because every reference has arity
+        -- zero; a parameterised one can still be referenced at another arity.
         survivors =
           [ d
           | d <- ds
-          , maybe True (\ (u, _) -> not (Map.member u usable)) (candidate d)
+          , case d of
+              LocalDecide _ dec
+                | Just (u, _) <- unfoldableDecide dec
+                , Map.member u usable -> u `Set.member` stillReferenced
+              _ -> True
           ]
+        stillReferenced = grow (callees body' <> foldMap callees kept)
+          where
+            kept = [ e | LocalDecide _ dec <- ds
+                       , Just (u, MkUnfoldable _ e) <- [unfoldableDecide dec]
+                       , not (Map.member u usable) ]
+                   ++ [ e | LocalDecide _ dec <- ds, Nothing <- [unfoldableDecide dec]
+                          , MkDecide _ _ _ e <- [dec] ]
+            grow seen =
+              let more = foldMap (\ (MkUnfoldable _ e) -> callees e)
+                                 (Map.restrictKeys usable seen)
+                  seen' = seen <> more
+               in if seen' == seen then seen else grow seen'
 
-    -- A local declaration that may be substituted: a DECIDE / MEANS taking no
-    -- parameters. The empty parameter list is the arity guard, and it is
-    -- load-bearing — the interactive `inlineExpr` in LSP.L4.Viz.Ladder documents
-    -- itself as inlining "App of no args" but does not actually check, so it would
-    -- replace `f x y` with f's bare definiens and drop the arguments.
-    candidate :: LocalDecl Resolved -> Maybe (Unique, Expr Resolved)
-    candidate = \ case
-      LocalDecide _ (MkDecide _ _ (MkAppForm _ n [] _) rhs) -> Just (getUnique n, rhs)
-      _                                                     -> Nothing
+-- | A definition that a call can be unfolded into: its parameters, in order, and
+-- its body.
+data Unfoldable = MkUnfoldable [Unique] (Expr Resolved)
+  deriving stock (Eq, Show)
 
-    -- Which candidates can reach themselves through the others: self-recursive and
-    -- mutually recursive bindings, whose substitution would not terminate. Removing
-    -- them leaves an acyclic reference graph, which is what lets `expandAll` stop.
-    selfReaching :: Map.Map Unique (Expr Resolved) -> Set.Set Unique
-    selfReaching m = Set.fromList [ u | u <- Map.keys m, u `Set.member` reachable u ]
+-- | The unfoldable view of a @DECIDE@ / @MEANS@, keyed by the unique a call refers
+-- to it by.
+--
+-- Refused when the body /applies/ one of its own parameters (a higher-order
+-- helper, @GIVEN f IS A FUNCTION …@ called as @f x@): substituting an argument for
+-- a parameter is then no longer plain replacement of a value, and this pass does
+-- not attempt it.
+unfoldableDecide :: Decide Resolved -> Maybe (Unique, Unfoldable)
+unfoldableDecide (MkDecide _ _ (MkAppForm _ n args _) rhs)
+  | anyOf (cosmosOf (gplate @(Expr Resolved))) appliesParam rhs = Nothing
+  | otherwise = Just (getUnique n, MkUnfoldable (map getUnique args) rhs)
+  where
+    params = Set.fromList (map getUnique args)
+    appliesParam = \ case
+      App _ r (_ : _) -> getUnique r `Set.member` params
+      _               -> False
+
+-- | The uniques an expression refers to as the head of an application, at any
+-- arity. A bare variable is an application of arity zero, so it is included.
+callees :: Expr Resolved -> Set.Set Unique
+callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
+  App _ r _ -> Set.singleton (getUnique r)
+  _         -> Set.empty
+
+-- | Remove the definitions that can reach themselves through the others:
+-- self-recursive and mutually recursive ones, whose unfolding would not
+-- terminate. What is left has an acyclic reference graph, which is what lets
+-- 'closeUnder' and 'unfoldCalls' stop.
+pruneRecursive :: Map.Map Unique Unfoldable -> Map.Map Unique Unfoldable
+pruneRecursive m = Map.withoutKeys m (Set.fromList [ u | u <- Map.keys m, u `Set.member` reachable u ])
+  where
+    edges u = maybe Set.empty (\ (MkUnfoldable _ e) -> Set.intersection (Map.keysSet m) (callees e)) (Map.lookup u m)
+    reachable = go Set.empty . Set.toList . edges
+    go seen []       = seen
+    go seen (u : us)
+      | u `Set.member` seen = go seen us
+      | otherwise           = go (Set.insert u seen) (Set.toList (edges u) ++ us)
+
+-- | Unfold the definitions into each other until none calls another. The graph is
+-- acyclic ('pruneRecursive'), so each round strictly reduces the number of
+-- remaining calls and the iteration count is bounded.
+closeUnder :: Map.Map Unique Unfoldable -> Map.Map Unique Unfoldable
+closeUnder m0 = go (Map.size m0) m0
+  where
+    go n m
+      | n <= (0 :: Int) = m
+      | m' == m         = m
+      | otherwise       = go (n - 1) m'
+      where m' = Map.map (\ (MkUnfoldable ps e) -> MkUnfoldable ps (unfoldOnce m e)) m
+
+-- | One round of beta reduction. Every call @App _ r args@ whose callee is in the
+-- map /and whose argument count equals the callee's parameter count/ is replaced
+-- by the callee's body with each argument put in place of its parameter.
+--
+-- The arity check is the guard, and it is load-bearing: a reference at another
+-- arity (a helper passed as a value) is not a call and is left alone.
+--
+-- Capture cannot happen. Names are resolved to 'Unique's before this runs, and a
+-- parameter's unique belongs to its own definition, so an argument — built in the
+-- caller's scope — cannot contain a parameter of the callee, and a binder inside
+-- the callee's body cannot bind anything the argument refers to.
+--
+-- 'transformOf' is bottom-up and does not revisit what it returns, so a body
+-- substituted here keeps its own calls for the next round.
+unfoldOnce :: Map.Map Unique Unfoldable -> Expr Resolved -> Expr Resolved
+unfoldOnce m
+  | Map.null m = id
+  | otherwise  = transformOf (gplate @(Expr Resolved)) $ \ e -> case e of
+      App _ r args
+        | Just (MkUnfoldable ps body) <- Map.lookup (getUnique r) m
+        , length args == length ps
+        -> substParams (zip ps args) body
+      _ -> e
+
+-- | How many call sites 'unfoldOnce' would replace in this expression.
+unfoldableCallSites :: Map.Map Unique Unfoldable -> Expr Resolved -> Int
+unfoldableCallSites m = lengthOf (cosmosOf (gplate @(Expr Resolved)) % filtered isSite)
+  where
+    isSite = \ case
+      App _ r args
+        | Just (MkUnfoldable ps _) <- Map.lookup (getUnique r) m -> length args == length ps
+      _ -> False
+
+-- | Put each argument in place of its parameter.
+substParams :: [(Unique, Expr Resolved)] -> Expr Resolved -> Expr Resolved
+substParams [] = id
+substParams ps = transformOf (gplate @(Expr Resolved)) $ \ e -> case e of
+  App _ r [] | Just a <- lookup (getUnique r) ps -> a
+  _                                              -> e
+
+-- | Unfold calls to named definitions into an expression, round by round, until
+-- none is left — the whole-program counterpart of 'inlineLocalBindings', for a
+-- consumer that holds the definitions of a module and its imports.
+--
+-- The map must already be 'pruneRecursive'd; the fuel below is a second guard,
+-- not the first. @Left n@ means the expression grew past @budget@ nodes (it had
+-- reached @n@) and the caller should analyse the rule without unfolding rather
+-- than not at all. @Right (e, k)@ is the unfolded expression and the number of
+-- call sites replaced, counted across rounds.
+unfoldCalls :: Int -> Map.Map Unique Unfoldable -> Expr Resolved -> Either Int (Expr Resolved, Int)
+unfoldCalls budget m = go (Map.size m + 1) 0
+  where
+    go :: Int -> Int -> Expr Resolved -> Either Int (Expr Resolved, Int)
+    go fuel n e
+      | k == 0 || fuel <= 0 = Right (e, n)
+      | size > budget       = Left size
+      | otherwise           = go (fuel - 1) (n + k) e'
       where
-        edges u = maybe Set.empty (Set.intersection (Map.keysSet m) . refsIn) (Map.lookup u m)
-        reachable = go Set.empty . Set.toList . edges
-        go seen []       = seen
-        go seen (u : us)
-          | u `Set.member` seen = go seen us
-          | otherwise           = go (Set.insert u seen) (Set.toList (edges u) ++ us)
-
-    -- The uniques this expression refers to with an empty argument list.
-    refsIn :: Expr Resolved -> Set.Set Unique
-    refsIn = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
-      App _ r [] -> Set.singleton (getUnique r)
-      _          -> Set.empty
-
-    -- Substitute candidates into each other until none refers to another. The graph
-    -- is acyclic by construction, so each round strictly reduces the number of
-    -- remaining candidate references and the iteration count is bounded.
-    expandAll :: Map.Map Unique (Expr Resolved) -> Map.Map Unique (Expr Resolved)
-    expandAll m0 = go (Map.size m0) m0
-      where
-        go n m
-          | n <= (0 :: Int) = m
-          | m' == m         = m
-          | otherwise       = go (n - 1) m'
-          where m' = Map.map (substRefs m) m
-
-    -- Replace `App _ r []` by the definiens bound to r's unique.
-    substRefs :: Map.Map Unique (Expr Resolved) -> Expr Resolved -> Expr Resolved
-    substRefs m
-      | Map.null m = id
-      | otherwise  = transformOf (gplate @(Expr Resolved)) $ \ e -> case e of
-          App _ r [] -> Map.findWithDefault e (getUnique r) m
-          _          -> e
+        k    = unfoldableCallSites m e
+        e'   = unfoldOnce m e
+        -- Counted lazily and cut off just past the budget, so an expression that
+        -- has blown up costs O(budget) to refuse rather than O(size) to measure.
+        size = length (take (budget + 1) (toListOf (cosmosOf (gplate @(Expr Resolved))) e'))
 
 -- | 'inlineLocalBindings' over a decision's body, for consumers holding a 'Decide'.
 inlineLocalBindingsInDecide :: Decide Resolved -> Decide Resolved
