@@ -244,6 +244,9 @@ Plus an explicit `BREACH`, and the join outcomes of a compound.
 An `EVERY` member's fate is its own performance or failure, not its report to the barrier.
 Looks — `PartyMismatch`, `ActionMismatch`, `GuardFailed`, `EarlyAct`, `Waiting` — are never logged.
 Condition: the clock and blame a join outcome carries follow SEESAW (pending in session `every-each`) once it is ruled.
+_Not part of the ruling — SEESAW concurrency review, 2026-09-29:_ most join outcomes are `FULFILLED`, which carries no time (`ValFulfilled` is nullary).
+The proposed time for a fulfilment is the act's stamp for `MUST`/`DO` and the window's end for a kept `SHANT` or lapsed `MAY`; a `RAND` is fulfilled at the latest of its operands, an `ROR` at the earliest, a barrier at its last member.
+That would be ruled inside SEESAW.
 
 **N2 — ANSWERED 2026-09-27: bearer, action pattern, modal and branch of origin, conditional on N8.**
 A read names the bearer, an action pattern (the constructor, optionally with argument patterns), the modal, and whether the norm is primary or reached through a `LEST`.
@@ -259,6 +262,8 @@ Windows use `effective`; as-of reads use `observed`.
 Conditions: a `RAND`/`ROR` compound breach takes its instant from SEESAW; `effective` is a `Maybe` until N7's rule supplies an explicit `BREACH`'s instant (it now does: the deadline of the failure that reached it).
 _Not part of the ruling — SEESAW's direction, reported by session `every-each` on 2026-09-28, pending there:_ every failure would carry an effective and an observed time, and a compound would combine them along its operand tree (`RAND` the minimum of each, `ROR` the maximum, a barrier as `RAND`).
 That is this ruling applied to compounds, so "a compound breach takes its instant from SEESAW" should be read as "its two instants"; nothing is built against the singular.
+The review adds an invariant, effective ≤ observed, and one caution for as-of reads: under `RAND` a compound's blame can list entries whose effective instant is later than the compound's own, so an as-of read filters each entry by its **own** observed instant, not the compound's.
+SEESAW also floors a failure's effective instant at the arming of the layer that failed, max(deadline, arming), which differs from this ruling for a norm armed after its own deadline.
 
 **N4 — ANSWERED 2026-09-27: implicit write, explicit read, for legibility.**
 A reader can see which provisions depend on history; windows are written in the read, not built in.
@@ -293,6 +298,9 @@ every contract value, a `BREACH` included, meets its `[time, events]` at `App1`,
 Stamping there from `clockAt` (`:2194`) — fill-if-absent, so an outer application does not re-stamp — is the natural site for (1), because a shared `b MEANS BREACH` is cached once but applied once per reach.
 The time must live on each failure entry, not on the compound's constructor, or it is lost when a compound concatenates blame; today neither has one (`DeclaredBreach (Maybe a) (Maybe a)` at `jl4-core/src/L4/Evaluate/ValueLazy.hs:122`, `ExplicitBreach (Blame a)` at `:156`).
 **Open gap in (2):** a `BREACH` in the `HENCE` of a kept `SHANT` gets the revealing event's stamp — an observed time with no effective counterpart; the code calls moving it "a separate decision, not taken here" (`:2104`).
+Measured by SEESAW's concurrency review and re-run here on 2026-09-29: with `P SHANT x WITHIN 5 HENCE (R MUST z WITHIN 1)`, a trace of `WAIT UNTIL 10` leaves R's obligation pending, and `WAIT UNTIL 6` then `WAIT UNTIL 10` breaches it — an idle tick flips the verdict.
+Rule (2)'s "the deadline of the failure that reached it" has no answer there, because no failure reached it; the review proposes the window's end (as the `EVERY` bench's ruling A3 already does, not yet built), and the same for a lapsed `MAY` routed to its `HENCE`.
+It also measured that a bare `P MAY x WITHIN 5 LEST BREACH` names nobody today, so the bearer half of (2) is unbuilt, and that per-reach stamping (1) works only if the clock is forced and filled on a fresh value.
 
 **N8 — ANSWERED 2026-09-28: branch of origin, a parent link, and what "cured" means.**
 Every entry records the branch that armed it — root, `HENCE`, `LEST`, or `ToBreach` (`DeonticStep.hs:352`) — and a link to its parent norm.
@@ -332,6 +340,9 @@ T4 has one event: the patron borrows at 20, with the book (due 14) never returne
 Same contract, same trace, opposite answers, exit code 0 both times.
 The same holds with two distinct events: return at 20, borrow at 21 — `borrowing RAND loan` fulfils the borrow and `loan RAND borrowing` leaves it pending (re-run 2026-09-26 on the snapshot binary).
 The cause is that a compound runs its left operand over the whole trace before the right one starts (`Machine.hs:1549-1559`), so a shared instant is not what matters; which operand is on the left is.
+Black ink is affected too, and in both orders (SEESAW's concurrency review, probe P3b, re-run here 2026-09-29): with `a` = `P MUST x WITHIN 5 HENCE RECORD waived` and `b` = `IF RECALL P's waived THEN FULFILLED ELSE Q MUST y WITHIN 3`, P acting at 4, `a RAND b` is `FULFILLED` — `b` decides at 0 on a record written at 4 — and `b RAND a` is `BREACHED`, which is right.
+The writer-first order here reads the future, because `RECORD` carries the wall-clock transaction time, not the contract clock, so no as-of read can exclude it.
+The same review measured that extending such a trace can turn `BREACHED` into `FULFILLED`: the verdict is not monotone in the trace.
 
 **N3 — the window has to be on the contract clock, and the ledger's own clock cannot do it.**
 Repeat default — "three or more late interest payments within 365 days" — gives the expected answer on all three traces: three late payments, termination allowed; two, refused; three but more than a year earlier, refused.
