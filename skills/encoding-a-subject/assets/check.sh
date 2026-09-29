@@ -2,9 +2,10 @@
 # Run every .l4 module in an encoding and print, per module, the three numbers
 # that matter: error diagnostics, assertions satisfied, assertions failed.
 #
-# Why not trust the exit code: `l4 run` exits 0 when an #ASSERT fails. The
-# failure is a DiagnosticSeverity_Error line whose message is "assertion failed".
-# An encoding that "ran green" by exit code can be carrying failed assertions.
+# Why not trust the exit code alone: a binary built before 2026-09-29 exits 0
+# when an #ASSERT fails, and no binary's exit code says which assertion failed
+# or how many ran. The failure is a DiagnosticSeverity_Error line whose message
+# is "assertion failed".
 #
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
 # Env:    L4   the l4 binary      (default: `l4` on PATH)

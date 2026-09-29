@@ -672,11 +672,9 @@ job. SPEC.md §6's G2 acceptance is the §8 diff oracle, which `p8-diff` runs wh
 deposited — read its receipt, not the verdict, for whether a comparison happened. The driver
 prints that sentence after every g2 verdict, and `L4_GO_REQUIRED=1` turns each skip into exit 5.
 
-### 5.3 The `l4 run` workaround, and its expiry
+### 5.3 The `l4 run` workaround: why `p6-tests` reads `results[]`
 
-`l4 run` exits **0** on a failed `#ASSERT`, on a runtime exception, and on a `Stuck` evaluation.
-Only a typecheck error produces exit 1, and `--json`'s `ok` field tracks typechecking too.
-Measured 2026-08-02:
+A binary measured on 2026-08-02 exited **0** on a failed `#ASSERT`, with `ok:true`:
 
 ```
 $ l4 run /tmp/failing.l4 --json     # contains  #ASSERT `double` 21 EQUALS 43
@@ -686,14 +684,16 @@ $ echo $?
 0
 ```
 
-So `etc/go/lib/assert-report.mjs` parses `results[]`, and ships with a selftest that mutates a
-real captured envelope ten ways to prove it can be red. `p0-preflight` runs a deliberately failing
-fixture and asserts it **still** exits 0 — when that tripwire goes red, `l4 run --fail-on-assert`
-or its equivalent has shipped and the workaround must be deleted. The tripwire's error message
-says so, with the three steps.
+So `etc/go/lib/assert-report.mjs` parses `results[]`, and ships with a selftest that mutates a real captured envelope ten ways to prove it can be red.
 
-Patching `l4` itself is the right fix and `CORPUS-TRACK.md` already proposes it. It needs
-`cabal build`, and this orchestrator does not build. Recorded as the top upstream ask.
+**Answered 2026-09-29 (Meng):** `l4 run` exits 1, with `ok:false`, on a failed `#ASSERT`.
+It is the default, not the `--fail-on-assert` flag `CORPUS-TRACK.md` proposed.
+A crashing directive already exited 1 (ruled 2026-08-01).
+The upgrade tripwire in `p0-preflight`, which asserted the old exit 0, told its reader to delete `assert-report.mjs`, read the exit code in `p6-tests`, and delete the tripwire.
+Only the last part was taken, and it was taken by inverting the tripwire rather than deleting it.
+The measured reason: the exit code cannot say which directive failed or how many assertions ran, and `p6-tests`' floor (`min_assertions`) and vacuous-pass guard need both.
+So `assert-report.mjs` stays, `p6-tests` routes every non-zero exit that carries results to it, and the `p0-preflight` tripwire now checks the contract `assert-report.mjs` depends on: a deliberately failing fixture comes back as one assertion with value `false`, whatever the exit code.
+That keeps the stage correct on a binary built before 2026-09-29 as well.
 
 ### 5.4 The DMN leg: `NOT-EXECUTABLE` until 2026-08-02, `PASS`/`execution` 2026-08-02..09, golden-stale `DEGRADED` since
 
@@ -884,7 +884,7 @@ drifts on its first execution.
 | P8 verification                                                                    | **R5** ruled 2026-08-02 (the ROBDD-first ladder). Rung 1 left this row on 2026-08-09: `l4 verify` is the CLI footing this row said was unbuilt, and `p8-verify` is declared at both milestones with a structural oracle, HG1-gated (§5.1a) — an earlier version said it "still gates nothing in G0–G4" and that a leg "would be pure `UNVERIFIED`"; both were true when written. Still not built: rungs 2 and 3 (the R4 fork-space sweep, which needs the fork register's readings as queries; the external model checker, which waits on the LTS semantics)                                                                                                                                                                                                                                   |
 | the corpus-of-law repo and the lexipedia probe                                     | both since ruled (R1: `legalese/canon` in full; R2: probe DONE as PR #199); the repo's creation and any lexipedia contact remain HG2 acts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | a `regcf-corpus.cases.json`                                                        | **discharged 2026-08-02** — PR #194 landed the file (16 dated cases, expected values L4-evaluated), meeting the condition §5.4 named. "Not built _here_" stays true: the orchestrator consumes the committed file and still never writes one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| patching `l4` for `--fail-on-assert`                                               | the right fix; needs `cabal build`, which this orchestrator never runs. Top upstream ask, shipped as a workaround with an expiry tripwire                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| patching `l4` for `--fail-on-assert`                                               | shipped 2026-09-29 as the default exit code rather than a flag; `p6-tests` still reads `results[]` (§5.3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ~~machine-readable fork and external-modification registers~~ **built 2026-08-02** | all three de novo deposit contracts are defined under `specs/todo/single-instruction-demo/schemas/` — source bundle (P1), external modifications (P2, including the `searches[]` record so a negative is a checked claim), fork register (P4, enforcing R4's 1:1 `Interpretation` map) — with one validator (`etc/go/lib/register-validate.mjs`), fixtures transcribed from the BNA smoke, and selftest coverage. P5's "every entry disposed" is now an exit code. **Still not built here:** anything that _writes_ one, because P1/P2 need the network and P4 needs an encoding                                                                                                                                                                                                               |
 | commits or pushes by the orchestrator                                              | matches `build-dmnmd-to-l4.workflow.js`'s `policy: { commit: false, push: false }`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 

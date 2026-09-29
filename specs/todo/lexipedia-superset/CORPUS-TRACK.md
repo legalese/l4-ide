@@ -1074,6 +1074,9 @@ regression detector, not a verdict. C3 needs one of:
 - **(b) An out-of-band runner over `l4 run --json`** — `Run.hs:86-94` already emits
   `{file, ok, diagnostics, results}` with per-directive results.
 
+**Answered 2026-09-29 (Meng):** (a), as the default rather than behind a flag. `l4 run` exits 1
+when an `#ASSERT` evaluates to false (`evalDirectiveFailsRun` in `jl4/app/L4/Cli/Run.hs`).
+
 **Not (c):** neither `l4 batch` (`jl4/app/L4/Cli/Batch.hs`) nor `POST …/evaluation/batch`
 (`jl4-service/src/Types.hs:376-430`) has any notion of an _expected_ output — both are bulk
 evaluators, not test runners — and `l4 batch` is currently broken for spaced backtick entry

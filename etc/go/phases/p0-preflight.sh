@@ -89,10 +89,13 @@ if [[ -n "$MISSING" ]]; then
   go_broken "checkers named in $GO_S_PINS are missing from the tree:$MISSING"
 fi
 
-# --- 5. the upgrade tripwire for the `l4 run` workaround --------------------
-# etc/go/lib/assert-report.mjs exists ONLY because `l4 run` exits 0 on a failed
-# #ASSERT. The day that changes, the workaround is wrong and must be deleted.
-# So: a fixture with a deliberately failing assertion must KEEP exiting 0.
+# --- 5. the tripwire for p6-tests' oracle ----------------------------------
+# p6-tests reads `l4 run --json` results[], not the exit code (why both are kept
+# is at the top of etc/go/lib/assert-report.mjs). So a fixture with a
+# deliberately failing assertion must come back as exactly one result: an
+# assertion whose value is false. The exit code is not asserted: it is 1 on a
+# binary from 2026-09-29 on and 0 on one built before, and p6-tests handles
+# both.
 TRIPWIRE="$GO_OUT/tripwire-failing-assert.l4"
 cat >"$TRIPWIRE" <<'L4EOF'
 GIVEN x IS A NUMBER
@@ -105,16 +108,12 @@ set +e
 "$L4" run "$TRIPWIRE" --json >"$GO_OUT/tripwire.json" 2>/dev/null
 TRIP_EXIT=$?
 set -e
-if [[ $TRIP_EXIT -ne 0 ]]; then
-  cat >&2 <<EOF
-::error::UPGRADE TRIPWIRE FIRED — 'l4 run' now exits $TRIP_EXIT on a failed #ASSERT.
-  It exited 0 when etc/go/lib/assert-report.mjs was written, which is the entire
-  reason that module exists. If '--fail-on-assert' or equivalent has shipped:
-    1. delete etc/go/lib/assert-report.mjs and its selftest,
-    2. make etc/go/phases/p6-tests.sh use the exit code directly,
-    3. delete this tripwire block from p0-preflight.sh.
-EOF
-  go_broken "l4 run now exits $TRIP_EXIT on a failed #ASSERT; the assert-report workaround is stale (see the ::error:: above)"
+if ! node -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const a = Array.isArray(r.results) ? r.results : [];
+  process.exit(a.length === 1 && a[0].kind === "assertion" && a[0].value === false ? 0 : 1);
+' "$GO_OUT/tripwire.json" 2>/dev/null; then
+  go_broken "l4 run (exit $TRIP_EXIT) did not report a deliberately failing #ASSERT as one assertion with value false in results[]; p6-tests' oracle (etc/go/lib/assert-report.mjs) reads exactly that, so it cannot be trusted on this binary"
 fi
 
 # --- 6. record ---------------------------------------------------------------
@@ -158,10 +157,10 @@ fi
 
 go_receipt \
   --status PASS \
-  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_ENCODING") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire still exits 0" \
+  --oracle-cmd "node etc/go/lib/discover.mjs check $(basename "$GO_S_ENCODING") $GO_S_PINS && every checker in the pin file exists && the failing-#ASSERT tripwire comes back in results[] as value false" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "the four CLI enumerations and the module's regulative rule names are recovered by discovery calls and compared as SETS against the subject's pins.json, so a rename fails loudly naming the exact strings; the tripwire independently confirms the l4-run workaround is still needed" \
+  --oracle-because "the four CLI enumerations and the module's regulative rule names are recovered by discovery calls and compared as SETS against the subject's pins.json, so a rename fails loudly naming the exact strings; the tripwire independently confirms that l4 run still reports a failed #ASSERT in results[], which is what p6-tests reads" \
   --artifact "$PROBES" \
   --artifact "$PINLOG" \
   --artifact "$GO_OUT/tripwire.json" \
