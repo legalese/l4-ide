@@ -1,0 +1,14 @@
+-- An aggregation inside the per-member expression of another. OpenFisca has
+-- no per-member view of a group aggregate. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS members IS A LIST OF Person
+
+@export Salary times household size, summed
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`weighted` h period MEANS sum (map (GIVEN m YIELD m's salary TIMES count (h's members)) (h's members))
+
+#ASSERT (`weighted` OF (Household WITH members IS (LIST (Person WITH salary IS 1), (Person WITH salary IS 2))), "2026-01") EQUALS 6

@@ -1,0 +1,17 @@
+-- A role named like a variable of its own entity: the LIST OF field
+-- `members` and the household input `members`. An OpenFisca situation names
+-- both by the same key and could not tell them apart. The export must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS people IS A LIST OF Person
+
+@export Household size plus an extra count
+GIVEN h       IS A Household
+      period  IS A STRING
+      people  IS A NUMBER
+GIVETH A NUMBER
+`size` h period people MEANS count (h's people) PLUS people
+
+#ASSERT (`size` OF (Household WITH people IS (LIST (Person WITH salary IS 1))), "2026-01", 2) EQUALS 3

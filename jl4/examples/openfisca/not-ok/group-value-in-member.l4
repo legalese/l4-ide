@@ -1,0 +1,17 @@
+-- Inside an aggregation over members, a read of a household-level value.
+-- OpenFisca would need to project it onto the members, which the export does
+-- not compile. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS
+    members IS A LIST OF Person
+    bonus   IS A NUMBER
+
+@export Total pay including a household bonus for each member
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`total pay` h period MEANS sum (map (GIVEN m YIELD m's salary PLUS h's bonus) (h's members))
+
+#ASSERT (`total pay` OF (Household WITH members IS (LIST (Person WITH salary IS 100)), bonus IS 5), "2026-01") EQUALS 105

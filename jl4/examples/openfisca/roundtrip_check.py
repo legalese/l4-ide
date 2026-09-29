@@ -1,8 +1,18 @@
 """Defensibility round-trip: load a module emitted by `l4 export openfisca`, run it in
-a real OpenFisca simulation, and assert the results match the L4 #EVAL values.
+a real OpenFisca simulation, and assert the results match what L4 computes.
 
-Usage (inside the openfisca venv):
-    python roundtrip_check.py <generated_module.py> <flat-tax|benefit>
+The expected numbers below are copied by hand from the #ASSERTs of each L4
+source; they are not read from L4. `l4-cli-test` checks those #ASSERTs
+separately (they must all be satisfied), and runs this script over every case
+when L4_OPENFISCA_CHECK=1.
+
+Usage (inside a venv with openfisca-core and numpy):
+    python roundtrip_check.py <generated_module.py> <case>
+
+where <case> is an example under jl4/examples/openfisca/ (flat-tax, benefit,
+household, roles, housing, agecheck, incometax, basic-income, dated, scale) or
+a fixture under jl4/tests-cli/fixtures/openfisca/ (gt-guard, scalar-formula,
+role-status, carriage-return, python-keywords).
 """
 import importlib.util
 import sys
@@ -121,8 +131,35 @@ def main():
                               ("2017-01", 2000, 40.0), ("2017-01", 15000, 816.0)]:
             check(tbs, "persons", {"p": {"salary": {per: sal}}},
                   "social_security_contribution", per, exp)
+    elif which == "gt-guard":
+        # `y GREATER THAN 2015` is dated 2016, not 2015.
+        for per, exp in [("2015-06", 100.0), ("2016-06", 200.0)]:
+            check(tbs, "persons", {"p": {"salary": {per: 0}}}, "tax", per, exp)
+    elif which == "scalar-formula":
+        # a formula that reads no variable must give one value per person.
+        sim = SimulationBuilder().build_from_entities(tbs, {"persons": {
+            "a": {"salary": {"2015-01": 0}}, "b": {"salary": {"2015-01": 0}}}})
+        got = [float(x) for x in sim.calculate("tax", "2015-01")]
+        ok = got == [200.0, 200.0]
+        print(f"  tax(2015-01), two persons = {got}  (L4 expected 200.0 each)  "
+              f"{'OK' if ok else '*** MISMATCH ***'}")
+        assert ok, got
+    elif which == "role-status":
+        sim = SimulationBuilder().build_from_entities(tbs, {
+            "persons": {"a": {"salary": {"2026-01": 1000}}, "k": {"salary": {"2026-01": 5}}},
+            "households": {"h": {"status": ["a"], "children": ["k"]}}})
+        got = float(sim.calculate("status_income", "2026-01")[0])
+        ok = abs(got - 1000.0) < 1e-6
+        print(f"  status_income = {got}  (L4 expected 1000.0)  {'OK' if ok else '*** MISMATCH ***'}")
+        assert ok, got
+    elif which == "carriage-return":
+        check(tbs, "persons", {"p": {"job": {"2026-01": "paid\rworker"}}}, "paid", "2026-01", 1)
+        check(tbs, "persons", {"p": {"job": {"2026-01": "paid worker"}}}, "paid", "2026-01", 0)
+    elif which == "python-keywords":
+        check(tbs, "class_s", {"c": {"size": {"2026-01": 3}, "who": {"2026-01": "somebody"}}},
+              "fee", "2026-01", 30.0)
     else:
-        raise SystemExit(f"unknown example: {which}")
+        raise SystemExit(f"unknown case: {which}")
     print("ROUND-TRIP OK")
 
 

@@ -1,0 +1,19 @@
+-- Two decisions read the same field, one with a period (MONTH) and one
+-- without (ETERNITY). The export must REFUSE it, naming both periods.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Monthly tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`monthly tax` p period MEANS p's salary TIMES 0.1
+
+@export Timeless tax
+GIVEN p IS A Person
+GIVETH A NUMBER
+`timeless tax` p MEANS p's salary TIMES 0.2
+
+#ASSERT (`monthly tax` OF (Person WITH salary IS 10), "2026-01") EQUALS 1
+#ASSERT (`timeless tax` OF (Person WITH salary IS 10)) EQUALS 2

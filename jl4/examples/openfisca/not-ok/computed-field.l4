@@ -1,0 +1,16 @@
+-- A read of a computed (MEANS) field. The export does not inline it, and
+-- used to emit a read of a variable that does not exist. The export must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS
+    age    IS A NUMBER
+    senior IS A BOOLEAN MEANS age AT LEAST 65
+
+@export Ticket price
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`ticket price` p period MEANS IF p's senior THEN 8 ELSE 15
+
+#ASSERT (`ticket price` OF (Person WITH age IS 70), "2026-01") EQUALS 8
