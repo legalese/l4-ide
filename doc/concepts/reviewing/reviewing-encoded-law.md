@@ -64,7 +64,9 @@ Five things to notice, because they organise everything else:
 
 ## 3 · The “⟨law⟩: go” pipeline
 
-One instruction — _“SEC Regulation Crowdfunding: go”_, _“British Nationality Act: go”_ — names a body of law, and the pipeline takes it from source text to every artifact we can honestly produce:
+One instruction — _“SEC Regulation Crowdfunding: go”_, _“British Nationality Act: go”_ — names a body of law, and the pipeline takes it from source text to every artifact we can honestly produce.
+The pipeline is Legalese's own tooling and lives in a private repository, `legalese/l4-pipeline`; the language, the exporters and the corpus it runs over are all in this public one.
+Its stages:
 
 ```mermaid
 flowchart LR
@@ -286,6 +288,9 @@ There are two ways to get the third, and **only one of them involves Haskell**. 
 git clone https://github.com/legalese/l4-ide.git
 cd l4-ide
 git checkout unstable
+
+# the pipeline itself: a private Legalese repository, which runs from here
+git clone git@github.com:legalese/l4-pipeline.git etc/go
 ```
 
 **Route one — download it.** Pick your platform from the prerelease shelf, [legalese/prereleases](https://github.com/legalese/prereleases/releases). The archives are named `l4-unstable-<date>-<commit>-<platform>.tar.gz`, one each for `darwin-arm64`, `linux-x64` and `win32-x64`:
@@ -325,7 +330,7 @@ claude
 > SEC Regulation Crowdfunding: go
 ```
 
-That phrasing is the trigger, not decoration. A skill in the repository (`.claude/skills/running-the-l4-pipeline`) matches on it and dispatches `etc/go/go.sh`, then supplies the judgements the script cannot make for itself. Any subject named the same way counts — the pipeline is subject-generic, and what is specific to one body of law lives in a sidecar under `etc/go/subjects/<subject>/`.
+That phrasing is the trigger, not decoration. A skill that ships with the pipeline, `running-the-l4-pipeline`, matches on it and dispatches `etc/go/go.sh`, then supplies the judgements the script cannot make for itself. Any subject named the same way counts — the pipeline is subject-generic, and what is specific to one body of law lives in a sidecar under `etc/go/subjects/<subject>/`.
 
 If you would rather see the machinery than talk to it, the driver is usable directly, and `plan` is the honest first command — it prints which stages will run and which are scaffolded entry points that refuse:
 

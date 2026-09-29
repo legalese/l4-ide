@@ -33,9 +33,13 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
 
 Every skill under `skills/` is duplicated in **`legalese/l4-plugin`**, at the same path: today
 `writing-l4-rules` (the language) and `encoding-a-subject` (encoding a whole body of law and filing
-it in canon). `.claude/skills/<name>` are symlinks to them. `.claude/skills/running-the-l4-pipeline/`
-is a real directory and is **not** shipped: Meng ruled on 2026-09-26 that it stays repo-local,
-recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout` branch.
+it in canon). `.claude/skills/<name>` are symlinks to them. The pipeline skill,
+`running-the-l4-pipeline`, is in neither: Meng ruled on 2026-09-26 that it does not ship with the
+public plugin (recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout`
+branch), and on 2026-09-29 it left this repo with the `go` pipeline for the private
+`legalese/l4-pipeline`. That repo is cloned into `etc/go/`, which `.gitignore` excludes here, and
+ships the skill as its own plugin. **Nothing in this repo's CI runs the pipeline any more**; its
+own CI runs against `unstable` daily.
 This repo is upstream: `.github/workflows/release-l4-skill.yml` packages `skills/` into
 `l4-plugin.zip`. There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and
 `/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.

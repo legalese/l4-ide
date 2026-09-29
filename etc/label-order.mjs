@@ -240,8 +240,11 @@ export const scanFiles = (paths, readFile) => {
   return all;
 };
 
-// CLI: `node label-order.mjs FILE…` prints `labels gaps warnings` on the first
-// line and one warning per line after it. p3-check.sh reads exactly that.
+// CLI: `node etc/label-order.mjs FILE…` prints `labels gaps warnings` on the
+// first line and one warning per line after it, and always exits 0. The go
+// pipeline's p3-check.sh (legalese/l4-pipeline) reads exactly that, so change
+// the format there in the same breath. Its tests are that repository's
+// selftest.mjs, "label-order checks".
 if (
   process.argv[1] &&
   import.meta.url.endsWith(process.argv[1].split("/").pop())
