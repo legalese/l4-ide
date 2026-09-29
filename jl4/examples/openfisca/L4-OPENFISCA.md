@@ -38,8 +38,9 @@ L4 is designed to be that readable layer. The L4 source mirrors the **structure
 of the legislation** (its conditions, thresholds, definitions, and cross-
 references) using real Booleans, `IF/THEN/ELSE`, typed records, and named
 helpers. The OpenFisca Python is then a *compilation artifact* — generated, not
-hand-maintained — so the human-validated source and the executed model can never
-drift.
+hand-maintained.
+Generation keeps the two in step only as far as the compiler is faithful.
+The export refuses whatever it cannot compile faithfully rather than guessing, and §5 lists what checks the two against each other; outside the shapes those checks cover, agreement is a property of the compiler, not something a test has observed.
 
 **Why the policy owner cares:** they review the L4, not the Python. The L4 says
 `IF (p's age >= 18) AND (p's salary EQUALS 0) THEN 600 ELSE 0`; the OpenFisca
@@ -66,12 +67,13 @@ programmer.
 | **group entity** `build_entity(..., roles=[...])` | a record with `LIST OF Person` fields | each list field → a role |
 | `household.members('x', period)` | `m's x` inside `map (GIVEN m YIELD …)` | member-array read |
 | `household.sum(household.members('salary', period))` | `sum (map (GIVEN m YIELD m's salary) (h's members))` | aggregate over members |
+| `household.nb_persons()`, `household.any(…)`, `household.all(…)` | `count (h's members)`, `any (GIVEN m YIELD …) …`, `all (GIVEN m YIELD …) …` | `role=` when the group has several roles |
+| `class X(Enum)` and `np.where(v == X.a, …)` | `DECLARE X IS ONE OF a, b` and `CONSIDER … WHEN a THEN …` | constructors without fields; `OTHERWISE` last |
+| `parameters(period).taxes.rate` | a value annotated `@desc parameter taxes.rate` | a number, or year-guarded numbers newest first |
+| `parameters(period).taxes.scale.calc(income)` | `scale tax OF income, brackets`, `brackets` annotated `@desc scale taxes.scale` | marginal-rate brackets, by year |
+| `formula_2016_12` and friends | a decision body `BRANCH IF period reaches OF period, 2016, 12 THEN …` | every arm guarded that way, newest first |
 
-Constructs the bridge does **not** yet compile (each is a clearly-scoped next
-step, and all are already expressible in L4): legislation **parameter stores**
-(`parameters(period).taxes.rate` + dated `formula_YYYY_MM`), **marginal-rate
-scales** (recursion / fold), **enums** (`CONSIDER`), and the `count` / `any` /
-`all` member aggregations beyond `sum`.
+What the bridge refuses, and why, is listed in [`doc/exports/openfisca.md`](../../../doc/exports/openfisca.md), with one file per refusal in `not-ok/`.
 
 ---
 
@@ -120,7 +122,7 @@ the human-facing, type-checked, statute-aligned source that feeds it.
 
 Each example is a real `.l4` file in this directory. `l4 export openfisca FILE` emits
 the OpenFisca module; the numbers below are produced by **running that emitted
-module in OpenFisca** and confirming they match the L4 `#EVAL` values.
+module in OpenFisca** and confirming they match the L4 `#ASSERT` values.
 
 ### 4.1 `flat-tax.l4` — the OpenFisca textbook example
 
@@ -133,7 +135,7 @@ GIVETH A NUMBER
 emits a `flat_tax_on_salary(Variable)` whose formula is
 `person('salary', period) * 0.25`.
 
-Round-trip: `salary = 2000 → flat_tax_on_salary = 500.0` ✓ (L4 `#EVAL`: 500).
+Round-trip: `salary = 2000 → flat_tax_on_salary = 500.0` ✓ (L4 `#ASSERT`: 500).
 
 ### 4.2 `benefit.l4` — conditionals, Booleans, cross-decision calls
 
@@ -151,7 +153,7 @@ precedence is correct), `IF/THEN/ELSE` → `np.where`, and one decision reads
 another via `household('eligible_for_benefit', period)`.
 
 Round-trip: `eligible → True`, `monthly_benefit → 700.0` (income 1500, 2
-dependents) and `0.0` (income 3000) ✓ — matching the L4 `#EVAL`s.
+dependents) and `0.0` (income 3000) ✓ — matching the L4 `#ASSERT`s.
 
 ### 4.3 `household.l4` — group entity + `LIST OF` aggregation
 
@@ -166,7 +168,7 @@ role); the `sum (map …)` becomes
 `household.sum(household.members('salary', period))`.
 
 Round-trip: members earning 1000 and 1500 → `household_income = 2500.0` ✓
-(L4 `#EVAL`: 2500).
+(L4 `#ASSERT`: 2500).
 
 ---
 
@@ -176,13 +178,14 @@ Round-trip: members earning 1000 and 1500 → `household_income = 2500.0` ✓
 # emit
 cabal run l4 -- export openfisca jl4/examples/openfisca/household.l4 -o /tmp/household.py
 
-# run it in real OpenFisca and check the numbers match the L4 #EVALs
-uv venv --python 3.12 /tmp/of && uv pip install --python /tmp/of/bin/python openfisca-core "numpy==2.1.3"
+# run it in real OpenFisca and check the numbers match the L4 #ASSERTs
+uv venv --python 3.12 /tmp/of && uv pip install --python /tmp/of/bin/python openfisca-core==45.0.4 numpy==2.1.3
 /tmp/of/bin/python jl4/examples/openfisca/roundtrip_check.py /tmp/household.py household
 ```
 
 The golden output of every example is pinned in `expected/` and checked by the
-`l4 export openfisca` cases in `jl4/tests-cli/Main.hs`.
+`l4 export openfisca` cases in `jl4/tests-cli/CliTest/OpenFisca.hs`.
+The same module checks every refusal in `not-ok/`, runs every `#ASSERT`, and, with `L4_OPENFISCA_CHECK=1`, runs the round-trip below over every example.
 
 ---
 
@@ -198,16 +201,15 @@ round-off beyond the round-trip's `1e-6 tolerance` (`10000.001 → 10000.0009765
 For money in cents, large aggregates, or high-precision rates, treat the
 OpenFisca output as float32-approximate, not exact.
 
-### Defaults and conventions (must hold, not checked)
-- **Enum `default_value` is the first declared member.** When an enum input is
-  omitted from a situation, OpenFisca answers with that member. Order your
-  `DECLARE … IS ONE OF` so the first listed value is the safe/natural default.
-- **`members of` is recognised by name**, and is assumed to concatenate the
-  subject's role lists (= all members). If you define it to mean something else,
-  aggregations over it will silently disagree with L4.
-- **Dated/scale/parameter BRANCH arms must be written newest-first** (strictly
-  descending date). The compiler now *rejects* other orders rather than
-  mis-compiling them, but it cannot guess your intent.
+### Defaults and conventions
+- **Enum `default_value` is the first declared member** (must hold, not checked).
+  When an enum input is omitted from a situation, OpenFisca answers with that member.
+  Order your `DECLARE … IS ONE OF` so the first listed value is the safe/natural default.
+- **Some names are recognised** (checked).
+  `members of` must return every `LIST OF` field of the group; `period reaches` and `scale tax` must match their canonical definitions; `sum`, `map`, `count`, `any`, `all`, `max` and `min` must be the prelude's.
+  A definition that differs is refused, naming the difference, rather than silently replaced by OpenFisca's meaning.
+- **Dated-formula, scale and parameter BRANCH arms must be written newest-first** (checked).
+  Each of the three is refused otherwise, with a message saying so; a caller of a refused parameter is refused with a message pointing at it.
 
 ### What "round-trip passes" means
 The verification has two tiers, and a green check means different things:
@@ -215,17 +217,11 @@ The verification has two tiers, and a green check means different things:
 - **Golden tests** (`tests-cli`, run in CI) are **regression-only** — they pin
   that `l4 export openfisca` keeps emitting the same `.py`. They prove nothing about
   semantics.
-- **Round-trips** (`roundtrip_check.py`) genuinely execute the emitted module in
-  real OpenFisca, but the expected numbers come from L4's own `#EVAL`/`#ASSERT`.
-  So a pass proves **L4 and OpenFisca agree** (the bridge faithfully transcribes
-  L4) — *not* that either matches the real-world law.
-- **Law-validated** are only the variables checked against the upstream OpenFisca
-  `country-template` via the independent oracles in `jl4/experiments/openfisca/`
-  (`social_security_contribution`, `basic_income`, the `income_tax` rate). For
-  those, `of == policyengine == upstream golden`. The other worked examples here
-  (flat-tax, benefit, household, roles, housing, the custom income-tax rates) are
-  **consistency demos**: their numbers are L4-asserted, not drawn from any statute.
+- **Refusals** (`tests-cli`, run in CI) pin that each construct in `not-ok/` is refused with a message naming the problem.
+- **Assertions** (`tests-cli`, run in CI) run every `#ASSERT` in the examples and in `not-ok/`, so the L4 side of each comparison is itself checked.
+- **Round-trips** (`roundtrip_check.py`; in `tests-cli` only with `L4_OPENFISCA_CHECK=1`, so not in CI) genuinely execute the emitted module in real OpenFisca.
+  The expected numbers are copied by hand from the examples' `#ASSERT`s, not read from L4.
+  So a pass shows **L4 and OpenFisca agree on those scenarios** — *not* that either matches the real-world law.
 
-In short: the bridge is well-proven to *faithfully compile L4 to runnable
-OpenFisca*; whether a given encoding matches the law is a separate question that
-only the upstream-oracle-backed variables currently answer.
+In short: on the shapes in these examples, the emitted OpenFisca computes what the L4 computes, and the shapes the export cannot compile faithfully are refused.
+No test in this tree checks these numbers against a statute or against an independent OpenFisca model; `basic-income` is modelled on the OpenFisca `country-template` variable of that name, but nothing here compares the two.
