@@ -10,7 +10,9 @@ module L4.OpenFisca.Emit
 
 import Base
 import qualified Data.Map.Strict as Map
+import Data.Char (isControl, ord)
 import Data.Ratio (denominator, numerator)
+import Numeric (showHex)
 import qualified Data.Text as Text
 
 import L4.OpenFisca.IR
@@ -106,30 +108,52 @@ formulaLines v =
     let args = if usesParams body
                  then v.varEntKey <> ", period, parameters"
                  else v.varEntKey <> ", period"
+        rendered = emitExpr v.varEntKey v.varEntity body
+        -- An expression that reads no variable is a scalar. A bare Python
+        -- number broadcasts, but numpy's where/maximum/minimum over scalars
+        -- return a 0-d array, which OpenFisca rejects as soon as the entity
+        -- has two or more members ("its length is 1 while there are 2
+        -- persons"). Fill an array of the entity's size with it instead.
+        ret | needsBroadcast body = v.varEntKey <> ".filled_array(" <> rendered <> ")"
+            | otherwise           = rendered
     in [ ind 1 <> "def " <> name <> "(" <> args <> "):"
-       , ind 2 <> "return " <> emitExpr v.varEntKey v.varEntity body
+       , ind 2 <> "return " <> ret
        ]
   -- "YYYY-MM-DD" → "YYYY_MM" (OpenFisca dated-formula method suffix).
   dateSuffix d = case Text.splitOn "-" d of
     (y : m : _) -> y <> "_" <> m
     _           -> Text.replace "-" "_" d
 
-usesParams :: OFExpr -> Bool
-usesParams = \case
-  OFScaleCalc _ _ -> True
-  OFParamRef _    -> True
-  OFBin _ a b     -> usesParams a || usesParams b
-  OFCmp _ a b     -> usesParams a || usesParams b
-  OFAnd a b       -> usesParams a || usesParams b
-  OFOr a b        -> usesParams a || usesParams b
-  OFNot a         -> usesParams a
-  OFNeg a         -> usesParams a
-  OFSum _ a       -> usesParams a
-  OFAny _ a       -> usesParams a
-  OFAll _ a       -> usesParams a
-  OFNpCall _ as   -> any usesParams as
-  OFCond a b c    -> usesParams a || usesParams b || usesParams c
-  _               -> False
+-- | Does a formula body produce a numpy scalar instead of an array of the
+-- entity's size? True when it reads no variable of any entity yet goes through
+-- a numpy call ('OFCond' is @np.where@, 'OFNot' is @np.logical_not@, 'OFNpCall'
+-- is @np.maximum@ etc., and see 'scalarDivision' and 'OFScaleCalc').
+needsBroadcast :: OFExpr -> Bool
+needsBroadcast e = not (readsVariables e) && usesNumpy e
+ where
+  usesNumpy = \case
+    OFCond _ _ _    -> True
+    OFNpCall _ _    -> True
+    OFNot _         -> True
+    OFScaleCalc _ _ -> True
+    x | scalarDivision x -> True
+      | otherwise        -> any usesNumpy (subExprs x)
+
+-- | A division or MODULO whose operands both read no variable, by a divisor
+-- that is not a non-zero literal. Python raises ZeroDivisionError for such a
+-- division by zero, and @np.where@ evaluates both branches, so a guarded
+-- @IF d > 0 THEN n / d ELSE …@ would crash where L4 takes the other branch.
+-- It is emitted as @np.divide@ / @np.mod@, which, like the array case, warn
+-- and give inf or nan instead.
+scalarDivision :: OFExpr -> Bool
+scalarDivision = \case
+  OFBin op a b | op `elem` [OFDiv, OFMod] ->
+    not (readsVariables a) && not (readsVariables b) && not (nonZeroLiteral b)
+  _ -> False
+ where
+  nonZeroLiteral = \case
+    OFNum r -> r /= 0
+    _       -> False
 
 systemLines :: OFPackage -> [Text]
 systemLines pkg =
@@ -203,6 +227,7 @@ datedMap kvs =
 -- Compound nodes are fully parenthesised. This matters for numpy: the bitwise
 -- operators @& | ~@ (used for boolean and/or/not on arrays) bind /tighter/ than
 -- comparison operators in Python, so @a > b & c@ would misparse without parens.
+-- NOT is @np.logical_not@ rather than @~@, for the reason at its case.
 emitExpr :: Text -> Text -> OFExpr -> Text
 emitExpr ent entPy = go
  where
@@ -217,14 +242,21 @@ emitExpr ent entPy = go
     OFAny r e    -> ent <> ".any(" <> go e <> roleArg r <> ")"
     OFAll r e    -> ent <> ".all(" <> go e <> roleArg r <> ")"
     OFNbPersons r -> ent <> ".nb_persons(" <> maybe "" roleConst r <> ")"
-    OFBin op a b -> paren (go a <> " " <> binOp op <> " " <> go b)
+    x@(OFBin op a b)
+      | scalarDivision x -> "np." <> (if op == OFDiv then "divide" else "mod") <> "(" <> go a <> ", " <> go b <> ", dtype=float)"
+      | otherwise        -> paren (go a <> " " <> binOp op <> " " <> go b)
     OFCmp op a b -> paren (go a <> " " <> cmpOp op <> " " <> go b)
     OFAnd a b    -> paren (go a <> " & " <> go b)
     OFOr  a b    -> paren (go a <> " | " <> go b)
-    OFNot a      -> paren ("~" <> go a)
+    -- Not @~@: on a Python bool (a comparison that reads no variable, a
+    -- parameter, a literal) @~True@ is -2 and @~False@ is -1, both truthy.
+    OFNot a      -> "np.logical_not(" <> go a <> ")"
     OFNeg a      -> paren ("-" <> go a)
     OFCond c t e -> "np.where(" <> go c <> ", " <> go t <> ", " <> go e <> ")"
-    OFScaleCalc path income -> "parameters(period)." <> path <> ".calc(" <> go income <> ")"
+    -- @.calc@ needs an array; a scalar income is given as a one-element one.
+    OFScaleCalc path income
+      | readsVariables income -> "parameters(period)." <> path <> ".calc(" <> go income <> ")"
+      | otherwise             -> "parameters(period)." <> path <> ".calc(np.atleast_1d(" <> go income <> "))"
     OFEnumLit cls mem -> cls <> "." <> mem
     OFNpCall fn as -> "np." <> fn <> "(" <> Text.intercalate ", " (map go as) <> ")"
     OFPeriodField f -> "period.start." <> f
@@ -254,14 +286,21 @@ pyPeriod :: OFPeriod -> Text
 pyPeriod = \case
   OFMonth -> "MONTH"; OFYear -> "YEAR"; OFEternity -> "ETERNITY"
 
--- | A Python single-quoted string literal with minimal escaping.
+-- | A Python single-quoted string literal. Backslash, the quote and every
+-- control character are escaped: an unescaped carriage return (or any line
+-- break) ends the literal and the module will not load, and a NUL is refused
+-- by the Python tokenizer outright.
 pyStr :: Text -> Text
 pyStr t = "'" <> Text.concatMap esc t <> "'"
  where
   esc '\\' = "\\\\"
   esc '\'' = "\\'"
   esc '\n' = "\\n"
-  esc c    = Text.singleton c
+  esc '\r' = "\\r"
+  esc '\t' = "\\t"
+  esc c
+    | isControl c = "\\x" <> Text.justifyRight 2 '0' (Text.pack (showHex (ord c) ""))
+    | otherwise   = Text.singleton c
 
 -- | Render a rational as a clean Python numeric literal. Integers print bare;
 -- fractions that terminate in base 10 print as decimals; anything else prints

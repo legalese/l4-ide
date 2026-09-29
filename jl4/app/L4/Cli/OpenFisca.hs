@@ -59,7 +59,7 @@ openFiscaCmd opts = do
       -- Surface non-fatal diagnostics, but proceed: a clean type-check is the
       -- precondition that matters for lowering.
       putDiagnostics errs
-      case lowerModule tc.module' of
+      case lowerModule tc.entityInfo tc.module' of
         Left lerrs -> do
           putDiagnostics
             ( "l4 export openfisca: cannot compile these decisions to OpenFisca:"

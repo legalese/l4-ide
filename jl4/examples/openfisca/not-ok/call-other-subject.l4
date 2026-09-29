@@ -1,0 +1,20 @@
+-- A call to another @export decision on a different value of the subject's
+-- type. L4 computes `base` for the literal person; OpenFisca computes it for
+-- the same entity the formula is on. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Base
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`base` p period MEANS p's salary
+
+@export Base of a fixed person
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`fixed` p period MEANS `base` OF (Person WITH salary IS 7), period
+
+#ASSERT (`fixed` OF (Person WITH salary IS 1000), "2026-01") EQUALS 7

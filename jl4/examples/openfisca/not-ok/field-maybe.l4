@@ -1,0 +1,16 @@
+-- An input field of type MAYBE NUMBER. OpenFisca has no value type for it,
+-- and it used to be emitted as a float without a warning. The export must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS
+    salary IS A NUMBER
+    bonus  IS A MAYBE NUMBER
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS p's salary TIMES 0.1
+
+#ASSERT (`tax` OF (Person WITH salary IS 1000, bonus IS NOTHING), "2026-01") EQUALS 100

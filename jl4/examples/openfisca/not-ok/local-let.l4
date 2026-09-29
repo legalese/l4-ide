@@ -1,0 +1,13 @@
+-- A LET binding. The export does not compile local bindings, and must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export L
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`l` p period MEANS LET x BE p's salary PLUS 1 IN x TIMES 2
+
+#ASSERT (`l` OF (Person WITH salary IS 4), "2026-01") EQUALS 10

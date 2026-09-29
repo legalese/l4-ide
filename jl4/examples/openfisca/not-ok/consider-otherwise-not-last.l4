@@ -1,0 +1,20 @@
+-- A CONSIDER whose OTHERWISE is not the last arm. L4 is first-match, so the
+-- arm after OTHERWISE never applies; the export used to compile it anyway.
+-- The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Person HAS colour IS A Colour
+
+@export Pick
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`pick` p period MEANS
+    CONSIDER p's colour
+    WHEN Red THEN 1
+    OTHERWISE 0
+    WHEN Green THEN 2
+
+#ASSERT (`pick` OF (Person WITH colour IS Green), "2026-01") EQUALS 0

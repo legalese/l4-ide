@@ -1,0 +1,25 @@
+-- `members of` is recognised by name and compiled to ALL of the group's
+-- members. This definition returns only the adults, so L4 answers FALSE for
+-- a household whose only high earner is a child; OpenFisca would answer
+-- TRUE. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+DECLARE Household HAS
+    adults   IS A LIST OF Person
+    children IS A LIST OF Person
+
+GIVEN h IS A Household
+GIVETH A LIST OF Person
+`members of` MEANS h's adults
+
+@export Whether anyone in the household earns over 1000
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A BOOLEAN
+`any high earner` h period MEANS any (GIVEN m YIELD m's salary > 1000) (`members of` OF h)
+
+`hh` MEANS Household WITH adults IS (LIST (Person WITH salary IS 10)), children IS (LIST (Person WITH salary IS 5000))
+
+#ASSERT (`any high earner` OF `hh`, "2026-01") EQUALS FALSE

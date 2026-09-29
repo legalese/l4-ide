@@ -1,0 +1,22 @@
+-- A record `Person` that is a group (it has a LIST OF field), beside a
+-- decision with no record subject, which lives on the default person entity
+-- `Person`. One name cannot be both the person entity and a group. The
+-- export must REFUSE it.
+IMPORT prelude
+
+DECLARE Member HAS salary IS A NUMBER
+DECLARE Person HAS dependants IS A LIST OF Member
+
+@export Number of dependants
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`number of dependants` p period MEANS count (p's dependants)
+
+@export A constant
+GIVEN period IS A STRING
+GIVETH A NUMBER
+`answer` period MEANS 42
+
+#ASSERT (`answer` OF "2026-01") EQUALS 42
+#ASSERT (`number of dependants` OF (Person WITH dependants IS (LIST (Member WITH salary IS 1))), "2026-01") EQUALS 1

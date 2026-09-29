@@ -1,0 +1,24 @@
+-- A year-guarded @desc parameter whose arms are OLDEST first. L4's BRANCH
+-- takes the first arm that holds (so 2020 gives 100); OpenFisca takes the
+-- latest date that has started (200). The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.rate
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`rate` MEANS
+    BRANCH
+        IF y AT LEAST 2010 THEN 100
+        IF y AT LEAST 2015 THEN 200
+        OTHERWISE 50
+
+@export Tax for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS `rate` OF period's year
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2020, month IS 6)) EQUALS 100

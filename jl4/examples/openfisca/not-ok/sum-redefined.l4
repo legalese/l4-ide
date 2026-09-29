@@ -1,0 +1,26 @@
+-- A module that defines its own `sum` (and does not import the prelude's).
+-- The export recognises `sum` only as the prelude's, which it compiles to
+-- OpenFisca's aggregation, so a call to this one must be REFUSED rather than
+-- silently compiled as the prelude's (which would give 1, not 42).
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS members IS A LIST OF Person
+
+GIVEN f IS A FUNCTION FROM Person TO NUMBER, xs IS A LIST OF Person
+GIVETH A LIST OF NUMBER
+`map` f xs MEANS
+    CONSIDER xs
+    WHEN EMPTY THEN EMPTY
+    WHEN x FOLLOWED BY rest THEN f x FOLLOWED BY `map` f rest
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`sum` xs MEANS 42
+
+@export Household income
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`household income` h period MEANS `sum` (`map` (GIVEN m YIELD m's salary) (h's members))
+
+#ASSERT (`household income` OF (Household WITH members IS (LIST (Person WITH salary IS 1))), "2026-01") EQUALS 42

@@ -1,0 +1,14 @@
+-- A field name with a character Python does not accept in an identifier
+-- (U+00B2, superscript two). The export used to emit `area_m²` and the
+-- module would not load. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Flat HAS `area m²` IS A NUMBER
+
+@export Tax
+GIVEN f      IS A Flat
+      period IS A STRING
+GIVETH A NUMBER
+`tax` f period MEANS f's `area m²` TIMES 2
+
+#ASSERT (`tax` OF (Flat WITH `area m²` IS 25), "2026-01") EQUALS 50

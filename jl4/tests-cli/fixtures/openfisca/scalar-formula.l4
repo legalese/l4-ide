@@ -1,0 +1,15 @@
+-- A formula that reads no variable: np.where over scalars returns a 0-d
+-- array, which OpenFisca rejects once there are two persons. The emitted
+-- formula must fill an array of the entity's size.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS IF period's year AT LEAST 2015 THEN 200 ELSE 100
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2015, month IS 1)) EQUALS 200

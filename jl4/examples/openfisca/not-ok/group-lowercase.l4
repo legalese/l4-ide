@@ -1,0 +1,18 @@
+-- A group record named in lower case, `household`: its Python name is its
+-- entity key, which a formula binds as its own argument, so the formula
+-- could not read the role constant `household.ADULT`. The export must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE household HAS
+    adults   IS A LIST OF Person
+    children IS A LIST OF Person
+
+@export Adult income
+GIVEN h      IS A household
+      period IS A STRING
+GIVETH A NUMBER
+`adult income` h period MEANS sum (map (GIVEN m YIELD m's salary) (h's adults))
+
+#ASSERT (`adult income` OF (household WITH adults IS (LIST (Person WITH salary IS 5)), children IS (LIST (Person WITH salary IS 7))), "2026-01") EQUALS 5

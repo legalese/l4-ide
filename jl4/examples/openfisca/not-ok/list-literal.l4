@@ -1,0 +1,13 @@
+-- A list literal. OpenFisca variables hold one value per entity, and the
+-- only lists the export compiles are a group's members. It must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export L
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`l` p period MEANS sum (LIST (p's salary), 3)
+
+#ASSERT (`l` OF (Person WITH salary IS 4), "2026-01") EQUALS 7

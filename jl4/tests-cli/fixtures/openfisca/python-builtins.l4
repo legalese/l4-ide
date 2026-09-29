@@ -1,0 +1,34 @@
+-- Names the emitted module itself relies on: a record `super` (the system
+-- class calls super()), an enum `bool` and a field `float` (a variable's
+-- value_type), and an enum `period` (a formula's own argument). Each must
+-- be renamed with a trailing `_` so the module loads and computes.
+IMPORT prelude
+
+DECLARE bool IS ONE OF low, high
+DECLARE period IS ONE OF peak, offpeak
+DECLARE super HAS
+    band   IS A bool
+    slot   IS A period
+    `float` IS A BOOLEAN
+    salary IS A NUMBER
+
+@export Tax
+GIVEN s IS A super
+GIVETH A NUMBER
+`tax` s MEANS
+    CONSIDER s's band
+    WHEN low THEN (IF s's `float` THEN s's salary ELSE 0)
+    OTHERWISE 20
+
+@export Fare
+GIVEN s IS A super
+GIVETH A NUMBER
+`fare` s MEANS
+    CONSIDER s's slot
+    WHEN peak THEN 3
+    OTHERWISE 2
+
+`floater` MEANS super WITH band IS low, slot IS offpeak, `float` IS TRUE, salary IS 5
+
+#ASSERT (`tax` OF `floater`) EQUALS 5
+#ASSERT (`fare` OF `floater`) EQUALS 2
