@@ -15,7 +15,7 @@ module L4.OpenFisca.Lower
 
 import Base
 import Control.Applicative ((<|>))
-import Data.Char (isAlphaNum, isDigit, toLower)
+import Data.Char (isAlphaNum, isAsciiLower, isAsciiUpper, isDigit, toLower)
 import Data.Either (partitionEithers)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -75,19 +75,23 @@ lowerModule mod' =
             ]
           results    = map (lowerOne enumDefs enumCons records exportedU scalePaths scalarPaths) efs
           (errs, ok) = partitionEithers results
-      in if not (null errs)
-           then Left errs
+          allErrs    = descPathErrors mod' <> errs
+      in if not (null allErrs)
+           then Left allErrs
            else case checkCollisions (concatMap snd ok) of
              Left e     -> Left [e]
              Right vars ->
-               Right OFPackage
-                 { pkgSource     = moduleSource mod'
-                 , pkgEntities   = dedupOn (.entPy) (concatMap fst ok)
-                 , pkgVariables  = vars
-                 , pkgParameters = Map.elems scaleParams
-                 , pkgScalars    = Map.elems scalarParams
-                 , pkgEnums      = Map.elems enumDefs
-                 }
+               let pkg = OFPackage
+                     { pkgSource     = moduleSource mod'
+                     , pkgEntities   = dedupOn (.entPy) (concatMap fst ok)
+                     , pkgVariables  = vars
+                     , pkgParameters = Map.elems scaleParams
+                     , pkgScalars    = Map.elems scalarParams
+                     , pkgEnums      = Map.elems enumDefs
+                     }
+               in case validateIdents pkg of
+                    []    -> Right pkg
+                    vErrs -> Left vErrs
 
 -- | Lower a single exported decision into the entity it lives on plus the
 -- variables it introduces (its inputs + the computed variable itself).
@@ -445,13 +449,59 @@ collectScaleParams (MkModule _ _ section) = Map.fromList (goSection section)
     Section _ sub -> goSection sub
     _ -> []
 
--- | The dotted path from a @<keyword> a.b.c@ description annotation.
+-- | The dotted path from a @<keyword> a.b.c@ description annotation, when it
+-- is a valid one ('validatePath'). An invalid path is reported by
+-- 'descPathErrors' and the value is not registered as a parameter.
 descKeyword :: Text -> Decide Resolved -> Maybe Text
-descKeyword kw d = do
-  desc <- getAnno d ^. annDesc
-  case Text.words (getDesc desc) of
-    (w : rest) | w == kw, not (null rest) -> Just (Text.intercalate "." rest)
-    _                                     -> Nothing
+descKeyword kw d = case descWords d of
+  (w : rest) | w == kw -> either (const Nothing) Just (validatePath kw rest)
+  _                    -> Nothing
+
+-- | The words of a DECIDE's @\@desc@ annotation.
+descWords :: Decide Resolved -> [Text]
+descWords d = maybe [] (Text.words . getDesc) (getAnno d ^. annDesc)
+
+-- | Every @\@desc parameter@ / @\@desc scale@ annotation whose path is not
+-- valid, as an error naming the value.
+descPathErrors :: Module Resolved -> [LowerError]
+descPathErrors (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) _)
+      | (kw : rest) <- descWords d
+      , kw `elem` ["parameter", "scale"]
+      , Left e <- validatePath kw rest -> [LowerError (resolvedToText nameRes) e]
+    Section _ sub -> goSection sub
+    _ -> []
+
+-- | A parameter path is spliced into the emitted Python as
+-- @parameters(period).<path>@, so every segment must be a plain identifier:
+-- ASCII, starting with a letter (a leading underscore reaches OpenFisca's
+-- internal attributes, e.g. @_name@; a dunder reaches Python's), not a Python
+-- keyword, and not a key OpenFisca's parameter loader reserves.
+validatePath :: Text -> [Text] -> Either Text Text
+validatePath kind = \case
+  [p] -> case filter (not . okSegment) (Text.splitOn "." p) of
+    []        -> Right p
+    (bad : _) -> Left ("the @desc " <> kind <> " path `" <> p <> "` is not a valid OpenFisca parameter path: the segment `" <> bad
+                       <> "` must be an ASCII identifier that starts with a letter (letters, digits and `_`), must not be a Python keyword or a dunder, and must not be one of OpenFisca's reserved keys ("
+                       <> Text.intercalate ", " (Set.toList openFiscaReservedKeys) <> ")")
+  [] -> Left ("the @desc " <> kind <> " annotation needs a dotted path, e.g. `@desc " <> kind <> " taxes.rate`")
+  ws -> Left ("the @desc " <> kind <> " annotation takes exactly one dotted path (e.g. `@desc " <> kind <> " taxes.rate`), but has " <> tshow (length ws) <> " words: `" <> Text.unwords ws <> "`")
+ where
+  okSegment s = case Text.uncons s of
+    Just (h, rest) -> isAsciiLetter h
+                      && Text.all (\c -> isAsciiLetter c || isDigit c || c == '_') rest
+                      && not (s `Set.member` pythonKeywords)
+                      && not (s `Set.member` openFiscaReservedKeys)
+    Nothing -> False
+
+-- | Keys OpenFisca's parameter loader treats specially: metadata keys, which
+-- it skips as children, and the two keys that turn a node into a leaf.
+openFiscaReservedKeys :: Set Text
+openFiscaReservedKeys = Set.fromList
+  ["brackets", "description", "documentation", "metadata", "reference", "unit", "values"]
 
 scaleAnnotation, paramAnnotation :: Decide Resolved -> Maybe Text
 scaleAnnotation = descKeyword "scale"
@@ -777,16 +827,58 @@ pyReserved = Set.fromList
   , "elif","else","except","false","finally","for","from","global","if","import"
   , "in","is","lambda","nonlocal","none","not","or","pass","raise","return","true"
   , "try","while","with","yield","match","case"
-  , "period","parameters","entity","formula" ]
+  , "period","parameters","entity","formula"
+  , "np","build_entity" ]
+
+-- | The Python keywords, case-sensitively.
+pythonKeywords :: Set Text
+pythonKeywords = Set.fromList
+  [ "False","None","True","and","as","assert","async","await","break","class"
+  , "continue","def","del","elif","else","except","finally","for","from","global"
+  , "if","import","in","is","lambda","nonlocal","not","or","pass","raise","return"
+  , "try","while","with","yield" ]
 
 -- | A Python class/variable name for a type, preserving case (e.g. @Person@).
+-- Keyword-safe, and never one of the names the emitted module itself binds.
 pyType :: Text -> Text
 pyType raw =
   let cleaned = Text.map (\c -> if isAlphaNum c || c == '_' then c else '_') raw
-  in case Text.uncons cleaned of
-       Just (h, _) | isDigit h -> "T_" <> cleaned
-       Nothing                 -> "T"
-       _                       -> cleaned
+      base = case Text.uncons cleaned of
+        Just (h, _) | isDigit h -> "T_" <> cleaned
+        Nothing                 -> "T"
+        _                       -> cleaned
+  in if base `Set.member` pyTypeReserved then base <> "_" else base
+
+pyTypeReserved :: Set Text
+pyTypeReserved = pythonKeywords <> Set.fromList
+  [ "TaxBenefitSystem", "build_entity", "Variable", "MONTH", "YEAR", "ETERNITY"
+  , "Enum", "ParameterNode", "np", "L4TaxBenefitSystem", "CountryTaxBenefitSystem"
+  , "_PARAMETERS" ]
+
+-- | Every name the emitted module uses must be a valid ASCII Python
+-- identifier. 'pyIdent' and 'pyType' keep non-ASCII letters and digits (a
+-- @²@ is 'isAlphaNum'), which Python may reject, so the result is refused
+-- here, naming the L4 definition it came from.
+validateIdents :: OFPackage -> [LowerError]
+validateIdents pkg =
+     [ badIdent ("the record `" <> e.entLabel <> "`") n | e <- pkg.pkgEntities, n <- [e.entPy, e.entKey, e.entPlural], not (validIdent n) ]
+  <> [ badIdent ("the LIST OF field `" <> r.rolePlural <> "`") n | e <- pkg.pkgEntities, r <- e.entRoles, n <- [r.roleKey, r.rolePlural], not (validIdent n) ]
+  <> [ badIdent ("the enum `" <> en.enName <> "`") en.enName | en <- pkg.pkgEnums, not (validIdent en.enName) ]
+  <> [ badIdent ("the enum constructor `" <> l4 <> "`") mem | en <- pkg.pkgEnums, (mem, l4) <- en.enMembers, not (validIdent mem) ]
+  <> [ badIdent ("`" <> v.varL4 <> "`") v.varName | v <- pkg.pkgVariables, not (validIdent v.varName) ]
+ where
+  badIdent what py = LowerError "" (what <> " becomes the Python identifier `" <> py
+                            <> "`, which is not a valid ASCII Python identifier; OpenFisca names must be ASCII letters, digits and `_`. Rename it.")
+
+validIdent :: Text -> Bool
+validIdent t = case Text.uncons t of
+  Just (h, rest) -> (isAsciiLetter h || h == '_')
+                    && Text.all (\c -> isAsciiLetter c || isDigit c || c == '_') rest
+                    && not (t `Set.member` pythonKeywords)
+  Nothing -> False
+
+isAsciiLetter :: Char -> Bool
+isAsciiLetter c = isAsciiLower c || isAsciiUpper c
 
 -- ---------------------------------------------------------------------------
 -- Small utilities

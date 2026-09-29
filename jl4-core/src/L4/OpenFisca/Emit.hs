@@ -10,7 +10,9 @@ module L4.OpenFisca.Emit
 
 import Base
 import qualified Data.Map.Strict as Map
+import Data.Char (isControl, ord)
 import Data.Ratio (denominator, numerator)
+import Numeric (showHex)
 import qualified Data.Text as Text
 
 import L4.OpenFisca.IR
@@ -254,14 +256,21 @@ pyPeriod :: OFPeriod -> Text
 pyPeriod = \case
   OFMonth -> "MONTH"; OFYear -> "YEAR"; OFEternity -> "ETERNITY"
 
--- | A Python single-quoted string literal with minimal escaping.
+-- | A Python single-quoted string literal. Backslash, the quote and every
+-- control character are escaped: an unescaped carriage return (or any line
+-- break) ends the literal and the module will not load, and a NUL is refused
+-- by the Python tokenizer outright.
 pyStr :: Text -> Text
 pyStr t = "'" <> Text.concatMap esc t <> "'"
  where
   esc '\\' = "\\\\"
   esc '\'' = "\\'"
   esc '\n' = "\\n"
-  esc c    = Text.singleton c
+  esc '\r' = "\\r"
+  esc '\t' = "\\t"
+  esc c
+    | isControl c = "\\x" <> Text.justifyRight 2 '0' (Text.pack (showHex (ord c) ""))
+    | otherwise   = Text.singleton c
 
 -- | Render a rational as a clean Python numeric literal. Integers print bare;
 -- fractions that terminate in base 10 print as decimals; anything else prints
