@@ -62,7 +62,7 @@ programmer.
 | `person('salary', period)` | `p's salary` | field projection on the subject |
 | `entity('other_var', period)` | a call to another `@export` decision | decisions reference each other |
 | `+ - * /`, `< <= > >= ==` | same operators | vectorised numpy on the Python side |
-| `&` / `\|` / `~` (numpy boolean) | `AND` / `OR` / `NOT` | L4 keeps real Booleans |
+| `&` / `\|` / `np.logical_not` (numpy boolean) | `AND` / `OR` / `NOT` | L4 keeps real Booleans; `~` would invert a Python bool to -1 or -2, both true |
 | `np.where(cond, t, e)` | `IF cond THEN t ELSE e` | the readable form of the "vectorial if" |
 | **group entity** `build_entity(..., roles=[...])` | a record with `LIST OF Person` fields | each list field → a role |
 | `household.members('x', period)` | `m's x` inside `map (GIVEN m YIELD …)` | member-array read |
@@ -73,7 +73,7 @@ programmer.
 | `parameters(period).taxes.scale.calc(income)` | `scale tax OF income, brackets`, `brackets` annotated `@desc scale taxes.scale` | marginal-rate brackets, by year |
 | `formula_2016_12` and friends | a decision body `BRANCH IF period reaches OF period, 2016, 12 THEN …` | every arm guarded that way, newest first |
 
-What the bridge refuses, and why, is listed in [`doc/exports/openfisca.md`](../../../doc/exports/openfisca.md), with one file per refusal in `not-ok/`.
+What the bridge refuses, and why, is listed in [`doc/exports/openfisca.md`](../../../doc/exports/openfisca.md), with at least one file in `not-ok/` for each kind of refusal.
 
 ---
 
