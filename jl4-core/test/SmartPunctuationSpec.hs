@@ -91,15 +91,20 @@ spec = do
 
     it "names the glyph in its message, along with the ASCII character it looks like" $ do
       Just c <- pure (lookupConfusable '\x2019')
-      let msg = confusableMessage c
+      let msg = confusableMessage "" c
       msg `shouldSatisfy` Text.isInfixOf "Right Single Quotation Mark"
       msg `shouldSatisfy` Text.isInfixOf "U+2019"
-      msg `shouldSatisfy` Text.isInfixOf "word processor"
+      msg `shouldSatisfy` Text.isInfixOf "Word processors"
       msg `shouldNotSatisfy` Text.isInfixOf "expecting"
 
     it "shows the actual offending character, not just its name and code point (rustc/swiftc precedent)" $ do
       Just c <- pure (lookupConfusable '\x2019')
-      confusableMessage c `shouldSatisfy` Text.isInfixOf (Text.singleton '\x2019')
+      confusableMessage "" c `shouldSatisfy` Text.isInfixOf (Text.singleton '\x2019')
+
+    it "leads a dash's advice with the spelling the position heuristic picks" $ do
+      Just d <- pure (lookupConfusable '\x2013')
+      confusableMessage "" d `shouldSatisfy` Text.isInfixOf "Replace it with `--` if it starts a comment"
+      confusableMessage "x " d `shouldSatisfy` Text.isInfixOf "Replace it with `-`; if it was meant to start a comment"
 
   describe "the dash heuristic (dashReplacementFor)" $ do
     let enDash = fromMaybe (error "U+2013 must be a confusable") (lookupConfusable '\x2013')

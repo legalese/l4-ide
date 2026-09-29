@@ -979,7 +979,7 @@ confusableLexError input ParseErrorBundle{ bundleErrors, bundlePosState } = do
                else [singleFix, altFix]
       pairFixes = maybe [] (: []) (pairedQuoteFix input off ch startPos)
   pure PError
-    { message = SP.confusableMessage c
+    { message = SP.confusableMessage lineBefore c
     , range = span_
     , origin = "lexer"
     , fixes = pairFixes <> dashFixes

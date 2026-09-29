@@ -6,8 +6,8 @@ File: smart-dash-comment.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    This character — – — looks like `-`, but it is a different, similar-looking character: En Dash (U+2013).
+    This is – (En Dash, U+2013). It looks like `-`, but L4 only understands the plain one.
 
-    This usually happens when text is pasted in from a word processor — Word, Pages or Google Docs — which silently swaps plain punctuation for a fancier-looking lookalike as you type.
+    Word processors such as Word, Pages and Google Docs swap plain punctuation for curly lookalikes as you type, so this usually means the text was pasted in from one.
 
-    Replace it with `-`. (or with `--`, if this was meant to start a comment)
+    Replace it with `--` if it starts a comment, as it seems to here; if it was meant as a minus sign, use `-`.

@@ -118,24 +118,34 @@ lookupConfusable c = Map.lookup c confusableTable
 -- edited in a word processor, and say what to replace it with. No
 -- "expecting" list — that list is for a reader who already knows the
 -- grammar, and the whole point here is that they do not need to.
-confusableMessage :: Confusable -> Text
-confusableMessage c =
+confusableMessage :: Text -> Confusable -> Text
+confusableMessage lineBefore c =
   Text.unlines
-    [ "This character — " <> Text.singleton c.glyph <> " — looks like " <> quoted c.replacement
-        <> ", but it is a different, similar-looking character: "
-        <> c.unicodeName <> " (" <> codePointText c.glyph <> ")."
+    [ "This is " <> Text.singleton c.glyph <> " (" <> c.unicodeName <> ", "
+        <> codePointText c.glyph <> "). It looks like " <> quoted c.replacement
+        <> ", but L4 only understands the plain one."
     , ""
-    , "This usually happens when text is pasted in from a word processor —"
-        <> " Word, Pages or Google Docs — which silently swaps plain"
-        <> " punctuation for a fancier-looking lookalike as you type."
+    , "Word processors such as Word, Pages and Google Docs swap plain"
+        <> " punctuation for curly lookalikes as you type, so this usually"
+        <> " means the text was pasted in from one."
     , ""
-    , "Replace it with " <> quoted c.replacement <> "." <> altNote
+    , advice
     ]
   where
     quoted t = "`" <> t <> "`"
-    altNote = case c.altReplacement of
-      Nothing -> ""
-      Just (alt, _) -> " (or with " <> quoted alt <> ", if this was meant to start a comment)"
+    -- A dash leads with whichever spelling 'dashReplacementFor' picks for
+    -- this position, so the message agrees with the preferred quick fix and
+    -- with the whole-document straighten.
+    advice = case c.altReplacement of
+      Nothing -> "Replace it with " <> quoted c.replacement <> "."
+      Just (alt, _)
+        | dashReplacementFor lineBefore c == alt ->
+            "Replace it with " <> quoted alt <> " if it starts a comment, as it"
+              <> " seems to here; if it was meant as a minus sign, use "
+              <> quoted c.replacement <> "."
+        | otherwise ->
+            "Replace it with " <> quoted c.replacement <> "; if it was meant to"
+              <> " start a comment, use " <> quoted alt <> "."
 
 -- | @U+2019@, four hex digits, upper case, as rustc and swiftc both write it.
 codePointText :: Char -> Text
