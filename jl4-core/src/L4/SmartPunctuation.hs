@@ -110,16 +110,18 @@ lookupConfusable c = Map.lookup c confusableTable
 -- ----------------------------------------------------------------------------
 
 -- | The lexer diagnostic for a confusable character, written for a
--- non-technical first-time reader (doc/STYLE.md): name the glyph, its code
--- point and Unicode name, the ASCII character it looks like, say plainly that
--- this usually means the text was edited in a word processor, and say what to
--- replace it with. No "expecting" list — that list is for a reader who
--- already knows the grammar, and the whole point here is that they do not
--- need to.
+-- non-technical first-time reader (doc/STYLE.md): SHOW the glyph itself
+-- (the way rustc and swiftc both do — rustc's own wording is "Unicode
+-- character '“' (Left Double Quotation Mark) looks like '"' (Quotation
+-- Mark), but it is not"), name its code point and Unicode name, the ASCII
+-- character it looks like, say plainly that this usually means the text was
+-- edited in a word processor, and say what to replace it with. No
+-- "expecting" list — that list is for a reader who already knows the
+-- grammar, and the whole point here is that they do not need to.
 confusableMessage :: Confusable -> Text
 confusableMessage c =
   Text.unlines
-    [ "This character looks like " <> quoted c.replacement
+    [ "This character — " <> Text.singleton c.glyph <> " — looks like " <> quoted c.replacement
         <> ", but it is a different, similar-looking character: "
         <> c.unicodeName <> " (" <> codePointText c.glyph <> ")."
     , ""

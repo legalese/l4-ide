@@ -20,7 +20,9 @@ import System.Directory (createDirectoryIfMissing, getTemporaryDirectory)
 import System.FilePath ((</>))
 
 import Language.LSP.Protocol.Types
-  ( NormalizedUri
+  ( Diagnostic (..)
+  , DiagnosticSeverity (..)
+  , NormalizedUri
   , Position (..)
   , Range (..)
   , TextEdit (..)
@@ -38,6 +40,7 @@ import L4.Syntax (Name, Resolved, Type' (..), rawName, rawNameToText)
 import L4.TracePolicy (lspDefaultPolicy)
 import L4.TypeCheck (CheckError (..), CheckErrorWithContext (..))
 import qualified LSP.Core.Shake as Shake
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
 import LSP.L4.Actions
   ( QuickFix (..)
   , confusableDidYouMean
@@ -47,8 +50,8 @@ import LSP.L4.Actions
   , nbspQuickFix
   , straightenDocumentQuickFix
   )
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
-import LSP.L4.Rules (TypeCheckResult (..), pattern TypeCheck, srcRangeToLspRange)
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnostics, oneshotL4ActionAndErrors)
+import LSP.L4.Rules (GetLexTokens (..), TypeCheckResult (..), pattern TypeCheck, srcRangeToLspRange)
 
 import Test.Hspec
 
@@ -103,6 +106,23 @@ spec = do
         , edits = [ TextEdit (Range (Position 0 0) (Position 1 0)) final ]
         }
 
+    it "offers NOTHING when the repaired text would still fail to lex, even though n >= 2" $ do
+      -- An en-dash comment on line 1 (fixed cleanly) plus an OPENING curly
+      -- quote on line 2 whose closer is on neither the same line nor
+      -- anywhere else in the document -- pairedQuoteCloser only looks ahead
+      -- on the REST OF THE LINE, so straightenWith's fixed point turns this
+      -- single curly quote into a lone straight `"`, which manufactures an
+      -- unterminated string literal that swallows the rest of the file.
+      -- Two replacements are made (n == 2), but the result never lexes --
+      -- so the action must not claim a finished repair.
+      let src = "GIVEN x IS A NUMBER   \x2013 note\nDECIDE y IS \x201Chello\n"
+          (n, final) = straightenDocument specUri src
+      n `shouldSatisfy` (>= 2)
+      execLexer specUri final `shouldSatisfy` \case
+        Left _ -> True
+        Right _ -> False
+      straightenDocumentQuickFix specUri src `shouldBe` Nothing
+
   describe "lexErrorQuickFixes (pure, from a real confusable-character lexer error)" $ do
     it "offers a single replacement fix for an unpaired confusable (a genitive apostrophe)" $ do
       case execLexer specUri "DECIDE `x` IF p\x2019s age >= 18\n" of
@@ -111,14 +131,42 @@ spec = do
           let fixes = lexErrorQuickFixes pErr
           map (.title) fixes `shouldBe` ["Replace with `'`"]
 
-    it "offers the dash's alternative spelling alongside its default" $ do
-      case execLexer specUri "18   \x2013 plain comment\n" of
+    it "offers the dash's alternative spelling alongside its default, arithmetic-shaped preferred" $ do
+      -- "3 \x2013 4" -- a single space before the dash: dashReplacementFor
+      -- classifies this as arithmetic-shaped, so the plain hyphen leads.
+      case execLexer specUri "3 \x2013 4\n" of
         Right _ -> expectationFailure "expected this to fail lexing"
         Left (pErr :| _) -> do
           let fixes = lexErrorQuickFixes pErr
           map (.title) fixes `shouldBe`
             [ "Replace with `-`"
             , "Replace with `--` (start a comment)"
+            ]
+
+    it "offers the dash's alternative spelling alongside its default, comment-shaped preferred" $ do
+      -- "18   \x2013 plain comment": two-or-more spaces before the dash is
+      -- comment-shaped (dashReplacementFor), so `--` must be FIRST/preferred
+      -- here -- the per-diagnostic fix has to agree with what the
+      -- whole-document straighten would do for this identical position.
+      case execLexer specUri "18   \x2013 plain comment\n" of
+        Right _ -> expectationFailure "expected this to fail lexing"
+        Left (pErr :| _) -> do
+          let fixes = lexErrorQuickFixes pErr
+          map (.title) fixes `shouldBe`
+            [ "Replace with `--` (start a comment)"
+            , "Replace with `-`"
+            ]
+
+    it "offers the dash's alternative spelling alongside its default, start-of-line preferred" $ do
+      -- A dash as the very first character on its line is comment-shaped
+      -- too (empty `lineBefore`), matching smart-dash-comment.l4's fixture.
+      case execLexer specUri "\x2013 plain comment\n" of
+        Right _ -> expectationFailure "expected this to fail lexing"
+        Left (pErr :| _) -> do
+          let fixes = lexErrorQuickFixes pErr
+          map (.title) fixes `shouldBe`
+            [ "Replace with `--` (start a comment)"
+            , "Replace with `-`"
             ]
 
     it "offers ONE paired fix for an opening curly quote with a matching closer on the same line" $ do
@@ -138,6 +186,22 @@ spec = do
           fix = nbspQuickFix range
       fix.title `shouldBe` "Replace with an ordinary space"
       fix.edits `shouldBe` [TextEdit (srcRangeToLspRange (Just range)) " "]
+
+  describe "the NBSP lint's Rules.hs wiring, end to end (the GetLexTokens Shake rule itself, not just the pure scan/fix)" $ do
+    it "publishes a Warning diagnostic, source \"linter\", for a real no-break space" $ do
+      diags <- nbspDiagnosticsFor "nbsp-warning" $
+        T.pack "GIVEN\x00A0p IS A NUMBER\nGIVETH A NUMBER\nDECIDE f IS p\n"
+      case [ d | FileDiagnostic{fdLspDiagnostic = d} <- diags, d._source == Just "linter" ] of
+        [d] -> do
+          d._severity `shouldBe` Just DiagnosticSeverity_Warning
+          d._message `shouldSatisfy` T.isInfixOf "non-breaking space"
+        other -> expectationFailure ("expected exactly one \"linter\" diagnostic, got " <> show (length other))
+
+    it "publishes nothing when the document has no no-break space" $ do
+      diags <- nbspDiagnosticsFor "nbsp-clean" $
+        T.pack "GIVEN p IS A NUMBER\nGIVETH A NUMBER\nDECIDE f IS p\n"
+      [ () | FileDiagnostic{fdLspDiagnostic = d} <- diags, d._source == Just "linter" ]
+        `shouldBe` []
 
   describe "end to end: the did-you-mean fix through the real checker" $ do
     it "reference curly, declaration straight" $ do
@@ -159,6 +223,30 @@ spec = do
         , "DECIDE `check` IF `don't panic`"
         ]
       fmap (.title) mFix `shouldBe` Just "Replace with `don\x2019t panic`"
+
+-- | Lex a module written to a scratch file through the REAL 'GetLexTokens'
+-- Shake rule and hand back every diagnostic it published — the wiring in
+-- "LSP.L4.Rules" that scans lexed tokens for a no-break space and publishes
+-- the NBSP lint's Warning diagnostic, not just its pure halves
+-- ('L4.SmartPunctuation.nbspHitsInToken' and 'nbspQuickFix', which
+-- 'SmartPunctuationSpec' and the two describe blocks above already cover).
+-- Runs 'GetLexTokens' directly rather than 'TypeCheck', so this proves the
+-- diagnostic-publishing path even for a document nothing downstream would
+-- ever type-check.
+nbspDiagnosticsFor :: String -> T.Text -> IO [FileDiagnostic]
+nbspDiagnosticsFor stem source = do
+  tmp <- getTemporaryDirectory
+  let dir = tmp </> "jl4-smart-punctuation-actions-spec"
+      path = dir </> (stem <> ".l4")
+  createDirectoryIfMissing True dir
+  T.writeFile path source
+  evalConfig <- resolveEvalConfig Nothing (lspDefaultPolicy defaultGraphVizOptions)
+  (_, diags, ()) <- oneshotL4ActionAndDiagnostics evalConfig path \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    _ <- Shake.use GetLexTokens uri
+    pure ()
+  pure diags
 
 -- | Type-check a module written to a scratch file and hand back the
 -- did-you-mean fix the checker's first out-of-scope name earns — the same

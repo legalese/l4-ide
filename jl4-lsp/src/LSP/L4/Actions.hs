@@ -685,8 +685,11 @@ lexFixToQuickFix fix =
 
 -- | Every quick fix a confusable-character lexer error carries, in the order
 -- 'L4.Lexer.confusableLexError' built them: a paired-quote fix first (when
--- there is one), then the single-character replacement, then the dash's
--- alternative spelling. The handler marks the first one preferred.
+-- there is one), then the dash's two spellings — ordered by
+-- 'L4.SmartPunctuation.dashReplacementFor' so the comment-shaped spelling
+-- leads when this dash's own position calls for it — or, for every other
+-- confusable, just the single-character replacement. The handler marks the
+-- first one preferred.
 lexErrorQuickFixes :: PError -> [QuickFix]
 lexErrorQuickFixes pErr = map lexFixToQuickFix pErr.fixes
 
@@ -716,9 +719,22 @@ wholeDocumentRange contents =
 -- 'Nothing' below two replacements — a single confusable already has its own
 -- per-character fix, so a whole-document action earns its own menu entry
 -- only once it does more than that one fix would.
+--
+-- __Also 'Nothing' when the repaired text still would not lex.__
+-- 'Lexer.straightenDocument''s fixed-point loop can stop with the document
+-- still broken — most commonly when a curly quote's matching closer sits on
+-- a LATER line than 'SP.pairedQuoteCloser' looks ahead to, so straightening
+-- the opener alone turns the rest of the file into unterminated string
+-- content. Offering this action's title with a replacement count implies a
+-- finished repair; presenting that when the file would still fail to lex,
+-- under a diagnostic that no longer even mentions smart punctuation, is
+-- worse than not offering the action at all — the per-diagnostic quick fix
+-- on whatever error remains is still available either way. So this checks
+-- the real lexer on the candidate final text before ever promising success.
 straightenDocumentQuickFix :: NormalizedUri -> Text -> Maybe QuickFix
 straightenDocumentQuickFix uri contents
-  | n < 2     = Nothing
+  | n < 2                                       = Nothing
+  | Left _ <- Lexer.execLexer uri final          = Nothing
   | otherwise = Just MkQuickFix
       { title = "Straighten all smart punctuation in this file (" <> Text.pack (show n) <> " replacements)"
       , edits = [ TextEdit (wholeDocumentRange contents) final ]

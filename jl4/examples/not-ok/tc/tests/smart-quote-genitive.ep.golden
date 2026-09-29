@@ -6,7 +6,7 @@ File: smart-quote-genitive.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    This character looks like `'`, but it is a different, similar-looking character: Right Single Quotation Mark (U+2019).
+    This character — ’ — looks like `'`, but it is a different, similar-looking character: Right Single Quotation Mark (U+2019).
 
     This usually happens when text is pasted in from a word processor — Word, Pages or Google Docs — which silently swaps plain punctuation for a fancier-looking lookalike as you type.
 

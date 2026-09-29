@@ -201,7 +201,7 @@ all (GIVEN g YIELD g's age >= 18) (charity's governors)
 
 ### Curly quotes and dashes from a word processor
 
-**Error message:** `This character looks like ... but it is a different, similar-looking character`
+**Error message:** `This character — ... — looks like ... but it is a different, similar-looking character`
 
 **What you wrote:**
 
@@ -217,7 +217,7 @@ That apostrophe looks ordinary, but it is a Right Single Quotation Mark (`’`),
 **What went wrong:** L4 tells you exactly which character is the problem, rather than the generic "unexpected token" you would otherwise get:
 
 ```
-This character looks like `'`, but it is a different, similar-looking
+This character — ’ — looks like `'`, but it is a different, similar-looking
 character: Right Single Quotation Mark (U+2019).
 
 This usually happens when text is pasted in from a word processor — Word,
@@ -227,13 +227,22 @@ fancier-looking lookalike as you type.
 Replace it with `'`.
 ```
 
-The message names the glyph, its Unicode code point, and the plain character it is standing in for, so you do not have to guess. It never shows you the usual "expecting one of: ..." list, because that list is for someone who already knows the grammar — here the fix is simpler than that.
+The message shows you the actual character on your screen, not just its name — so if your editor's font makes it hard to tell `'` and `’` apart, the message itself doesn't ask you to. It also names the Unicode code point and the plain character the glyph is standing in for. It never shows you the usual "expecting one of: ..." list, because that list is for someone who already knows the grammar — here the fix is simpler than that.
 
-**How to fix it:** In the editor, click the lightbulb (or run the "Quick Fix" command) on the flagged character and choose the suggested replacement. For a whole file pasted in from a word processor, use "Straighten all smart punctuation in this file" instead — it walks the document fixing every occurrence in one go and tells you how many it changed.
+**How to fix it:** In the editor, click the lightbulb (or run the "Quick Fix" command) on the flagged character and choose the suggested replacement. For a whole file pasted in from a word processor, use "Straighten all smart punctuation in this file" instead — it walks the document fixing every occurrence in one go and tells you how many it changed. (If straightening would still leave the file with an error — most often an opening curly quote whose closer is on a different line than L4 looked for it — this whole-file action does not offer itself at all, so it never reports a count that implies a finished repair it did not make; fix the flagged character it does show you and try again.)
 
-**The dash is genuinely ambiguous, and you may need to pick.** Word turns both a minus sign surrounded by spaces and a double-hyphen comment marker into the same long dash, so L4 cannot always tell which one you meant. The quick fix on a single dash offers two choices — "Replace with `-`" (arithmetic) and "Replace with `--`" (start a comment) — and you choose. The whole-file straighten makes this call automatically using position: a dash that starts its line, or that has two or more spaces before it, is treated as the start of a comment; anywhere else it becomes a plain hyphen.
+**The dash is genuinely ambiguous, and you may need to pick.** Word turns both a minus sign surrounded by spaces and a double-hyphen comment marker into the same long dash, so L4 cannot always tell which one you meant. The quick fix on a single dash offers two choices — "Replace with `-`" (arithmetic) and "Replace with `--`" (start a comment) — and **the one that matches this dash's own position in the file is listed first and is the one your editor's default Quick Fix applies.** That is the same position rule the whole-file straighten uses: a dash that starts its line, or that has two or more spaces before it, is treated as the start of a comment and offered `--` first; anywhere else `-` is offered first. The other spelling is always there as the second choice, for the cases the heuristic cannot see (for instance a subtraction that happens to start a continuation line).
 
-**What is deliberately left alone:** curly quotes that already sit inside a string literal (quoting a clause of a statute, say) or inside a backtick-quoted name are not flagged at all, and the whole-file straighten does not touch them either. Those are legitimate typographical quotation marks in the middle of quoted prose — the corpus this project is built from has hundreds of lines like that — and L4 already lexes them without complaint. The diagnostic above fires only where the curly character is doing a JOB in the code itself: opening a string, standing in for `'s`, or replacing `...`. The one further exception is a name that fails to resolve — if straightening the curly characters out of it would make it match something already in scope, L4 offers that as a suggested fix too.
+**What is deliberately left alone:** curly quotes that already sit inside a string literal (quoting a clause of a statute, say) or inside a backtick-quoted name are not flagged at all, and the whole-file straighten does not touch them either. Those are legitimate typographical quotation marks in the middle of quoted prose — as of this writing the corpus this project is built from has 306 lines with a curly quote inside a backtick-quoted name and 52 more inside a string literal, all of them intentional — and L4 already lexes them without complaint. The diagnostic above fires only where the curly character is doing a JOB in the code itself: opening a string, standing in for `'s`, or replacing `...`. The one further exception is a name that fails to resolve — if straightening the curly characters out of it would make it match something already in scope, L4 offers that as a suggested fix too.
+
+**A related, gentler warning: an invisible non-breaking space.** A word processor (or a browser you copied text from) sometimes inserts a *non-breaking space* — U+00A0 — instead of an ordinary one, most often around a number or a unit, so a line does not wrap in the wrong place. It looks completely ordinary and L4 does not refuse it: L4 treats it as whitespace, your code keeps parsing, and indentation-sensitive layout still works. That is exactly why it is worth a warning rather than nothing at all — an invisible character that happens to work today is still a trap for a future search-and-replace or diff. You will see it as a yellow squiggle, not a red one:
+
+```
+non-breaking space (U+00A0) used where a normal space was expected — this
+usually comes from pasted text; replace it with an ordinary space.
+```
+
+**How to fix it:** click the lightbulb on the flagged space and choose "Replace with an ordinary space" — or run "Straighten all smart punctuation in this file", which replaces every non-breaking space in the document as well as any curly quotes, dashes and ellipses it finds.
 
 ---
 

@@ -939,6 +939,17 @@ execLexer uri input =
 -- character, in which case the caller falls back to megaparsec's own
 -- message: this is additive only on the failure path, so a document that
 -- lexes today keeps lexing exactly as it did.
+--
+-- __The dash's two spellings are ordered by 'SP.dashReplacementFor', not
+-- fixed.__ Whichever spelling that heuristic would pick for THIS dash's own
+-- position (comment-shaped, or not) is listed — and therefore preferred,
+-- see 'LSP.L4.Handlers.lexErrorCodeActions' — first, so the per-diagnostic
+-- quick fix agrees with what the whole-document straighten action
+-- ('L4.SmartPunctuation.straightenWith') would have done for the identical
+-- character in the identical position. Getting this wrong is not cosmetic:
+-- a client that auto-applies the preferred fix on a dash that starts a
+-- @--@ comment must not turn it into a plain hyphen, which would still fail
+-- to parse.
 confusableLexError :: Text -> ParseErrorBundle Text Void -> Maybe PError
 confusableLexError input ParseErrorBundle{ bundleErrors, bundlePosState } = do
   err <- case bundleErrors of
@@ -949,24 +960,29 @@ confusableLexError input ParseErrorBundle{ bundleErrors, bundlePosState } = do
   guard (off < Text.length input)
   let ch = Text.index input off
   c <- SP.lookupConfusable ch
-  let pst1     = reachOffsetNoLine off bundlePosState
-      pst2     = reachOffsetNoLine (off + 1) pst1
-      startPos = convertPos (pstateSourcePos pst1)
-      endPos   = convertPos (pstateSourcePos pst2)
-      span_    = MkSrcSpan startPos endPos
+  let pst1       = reachOffsetNoLine off bundlePosState
+      pst2       = reachOffsetNoLine (off + 1) pst1
+      startPos   = convertPos (pstateSourcePos pst1)
+      endPos     = convertPos (pstateSourcePos pst2)
+      span_      = MkSrcSpan startPos endPos
+      lineBefore = Text.takeWhileEnd (/= '\n') (Text.take off input)
       singleFix = MkLexFix
         { title = "Replace with `" <> c.replacement <> "`"
         , edits = [(span_, c.replacement)]
         }
-      altFixes = case c.altReplacement of
-        Nothing              -> []
-        Just (alt, altTitle) -> [MkLexFix altTitle [(span_, alt)]]
+      dashFixes = case c.altReplacement of
+        Nothing              -> [singleFix]
+        Just (alt, altTitle) ->
+          let altFix = MkLexFix altTitle [(span_, alt)]
+          in if SP.dashReplacementFor lineBefore c == alt
+               then [altFix, singleFix]
+               else [singleFix, altFix]
       pairFixes = maybe [] (: []) (pairedQuoteFix input off ch startPos)
   pure PError
     { message = SP.confusableMessage c
     , range = span_
     , origin = "lexer"
-    , fixes = pairFixes <> [singleFix] <> altFixes
+    , fixes = pairFixes <> dashFixes
     }
 
 -- | For an OPENING curly quote (@‘@ or @“@), look ahead on the REST OF THE

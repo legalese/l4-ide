@@ -1085,8 +1085,10 @@ outOfScopeConfusableQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithConte
 
 -- | Every quick-fix 'CodeAction' a confusable-character lexer error's
 -- 'PError' carries (see 'Actions.lexErrorQuickFixes'): a paired-quote fix
--- first when there is one, then the single-character replacement, then a
--- dash's alternative spelling. The first is preferred.
+-- first when there is one, then — for a dash — its two spellings in the
+-- order 'L4.SmartPunctuation.dashReplacementFor' picks for that dash's own
+-- position, or, for every other confusable, just the single-character
+-- replacement. The first is preferred.
 lexErrorCodeActions :: FileDiagnostic -> [CodeAction]
 lexErrorCodeActions fd = case fd ^. messageOfL @PError of
   Nothing -> []

@@ -7,7 +7,7 @@ File: smart-ellipsis.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    This character looks like `...`, but it is a different, similar-looking character: Horizontal Ellipsis (U+2026).
+    This character — … — looks like `...`, but it is a different, similar-looking character: Horizontal Ellipsis (U+2026).
 
     This usually happens when text is pasted in from a word processor — Word, Pages or Google Docs — which silently swaps plain punctuation for a fancier-looking lookalike as you type.
 

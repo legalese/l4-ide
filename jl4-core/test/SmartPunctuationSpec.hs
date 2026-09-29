@@ -97,6 +97,10 @@ spec = do
       msg `shouldSatisfy` Text.isInfixOf "word processor"
       msg `shouldNotSatisfy` Text.isInfixOf "expecting"
 
+    it "shows the actual offending character, not just its name and code point (rustc/swiftc precedent)" $ do
+      Just c <- pure (lookupConfusable '\x2019')
+      confusableMessage c `shouldSatisfy` Text.isInfixOf (Text.singleton '\x2019')
+
   describe "the dash heuristic (dashReplacementFor)" $ do
     let enDash = fromMaybe (error "U+2013 must be a confusable") (lookupConfusable '\x2013')
 
