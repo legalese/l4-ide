@@ -1,12 +1,22 @@
 -- | Lower a typechecked L4 module to the OpenFisca 'OFPackage' IR.
 --
--- v1 scope (see specs): the @\@export@-annotated @DECIDE@/@MEANS@ subset over a
--- /subject/ parameter (a @DECLARE@ record → the OpenFisca entity) and an
--- optional conventional @period@ parameter. Stored record fields and free
--- scalar parameters become input variables; the decision body becomes a
--- formula. Deontic/regulative/IO constructs, recursion, list/collection inputs,
--- and general function application are rejected with a diagnostic — they are not
--- expressible as OpenFisca variables.
+-- Scope: the @\@export@-annotated @DECIDE@/@MEANS@ subset over a /subject/
+-- parameter (a @DECLARE@ record → the OpenFisca entity) and an optional
+-- conventional @period@ parameter. Stored record fields and free scalar
+-- parameters become input variables; the decision body becomes a formula.
+-- A record with a @LIST OF <record>@ field becomes a group entity whose members
+-- are reached through the aggregations @sum@ / @count@ / @any@ / @all@.
+-- Values annotated @\@desc parameter <path>@ / @\@desc scale <path>@ become
+-- OpenFisca legislation parameters.
+--
+-- __The rule this module keeps:__ anything the lowering does not fully
+-- understand is a 'LowerError' that says what is unsupported and what to do
+-- instead. It never falls back to a guess. A guess is how a construct slightly
+-- outside the examples used to compile with exit 0 and return a different
+-- number from L4 (a @>@ read as @>=@, a call's arguments dropped, a
+-- @CONSIDER@ arm dropped, a @DATE@ field emitted as a float). Deontic,
+-- regulative and IO constructs, recursion, local bindings, nested records and
+-- general function application are all refused.
 module L4.OpenFisca.Lower
   ( lowerModule
   , LowerError (..)
@@ -14,23 +24,28 @@ module L4.OpenFisca.Lower
   ) where
 
 import Base
-import Control.Applicative ((<|>))
 import Data.Char (isAlphaNum, isAsciiLower, isAsciiUpper, isDigit, toLower)
 import Data.Either (partitionEithers)
 import qualified Data.Map.Strict as Map
+import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 import Optics ((^.))
 
 import L4.Annotation (getAnno)
-import L4.Export (ExportedFunction (..), getExportedFunctions)
+import L4.Export (ExportedFunction (..), enrichReturnTypes, getExportedFunctions)
 import L4.OpenFisca.IR
 import L4.Syntax
+import L4.TypeCheck.Environment
+  ( booleanUnique, emptyUnique, falseUnique, listUnique, numberUnique
+  , stringUnique, trueUnique )
+import L4.TypeCheck.Environment.TH (builtinUri)
+import L4.TypeCheck.Types (EntityInfo)
 
 -- | A reason a decision could not be compiled to OpenFisca.
 data LowerError = LowerError
-  { errFn  :: !Text  -- ^ the offending decision (empty = module-level)
+  { errFn  :: !Text  -- ^ the offending decision or parameter (empty = module-level)
   , errMsg :: !Text
   }
   deriving stock (Eq, Show)
@@ -40,44 +55,103 @@ renderLowerError e
   | Text.null e.errFn = e.errMsg
   | otherwise         = "in `" <> e.errFn <> "`: " <> e.errMsg
 
--- | Records reachable in the module, keyed by their L4 type name.
+-- ---------------------------------------------------------------------------
+-- What the module declares
+-- ---------------------------------------------------------------------------
+
+-- | Records declared in the module, keyed by their L4 type name.
 data RecordInfo = RecordInfo
-  { riKey    :: !Text
+  { riName   :: !Text  -- ^ the L4 name
+  , riKey    :: !Text
   , riPlural :: !Text
   , riPy     :: !Text
   , riFields :: ![FieldInfo]
   }
 
--- | A field of a record. @fiListElem = Just R@ marks a @LIST OF R@ field, which
--- makes the owning record a /group entity/ whose members are @R@s.
+-- | A field of a record. @fiListElem = Just R@ marks a @LIST OF R@ field (R a
+-- record declared in this module), which makes the owning record a /group
+-- entity/ whose members are @R@s. @fiType@ is 'Left' (the printed L4 type)
+-- when OpenFisca has no value type for it.
 data FieldInfo = FieldInfo
-  { fiName     :: !Text
+  { fiName     :: !Text  -- ^ the Python name
   , fiL4       :: !Text  -- ^ original (un-sanitised) field name
-  , fiType     :: !OFType
+  , fiType     :: !(Either Text OFType)
   , fiStored   :: !Bool
   , fiListElem :: !(Maybe Text)
   }
 
-lowerModule :: Module Resolved -> Either [LowerError] OFPackage
-lowerModule mod' =
-  case getExportedFunctions mod' of
+-- | An enum declared in the module.
+data EnumInfo = EnumInfo
+  { eiDef        :: !OFEnumDef
+  , eiL4         :: !Text
+  , eiWithFields :: ![Text]  -- ^ constructors that carry fields (an OpenFisca Enum cannot)
+  }
+
+-- | An enum constructor: its Python class and member.
+data EnumCon = EnumCon
+  { ecClass  :: !Text
+  , ecMember :: !Text
+  }
+
+-- | A legislation parameter (@\@desc parameter@ or @\@desc scale@).
+data ParamInfo = ParamInfo
+  { piL4       :: !Text
+  , piKind     :: !Text  -- ^ "parameter" or "scale"
+  , piPath     :: !Text
+  , piTakesYear :: !Bool -- ^ does the L4 definition take the year as its one input?
+  }
+
+-- | How an @\@export@ decision is called from another one.
+data Callee = Callee
+  { calName   :: !Text           -- ^ the OpenFisca variable name
+  , calL4     :: !Text
+  , calRoles  :: ![(ParamRole, Text)]  -- ^ each GIVEN, in order, with its L4 name
+  }
+
+data ParamRole = RoleSubject | RolePeriod | RoleOther
+  deriving stock Eq
+
+-- | Everything about the module that lowering a decision needs.
+data Ctx = Ctx
+  { ctxEnums        :: !(Map Text EnumInfo)
+  , ctxEnumCons     :: !(Map Unique EnumCon)
+  , ctxSynonyms     :: !(Map Text (Type' Resolved))
+  , ctxRecords      :: !(Map Text RecordInfo)
+  , ctxScalarParams :: !(Map Unique ParamInfo)
+  , ctxScaleParams  :: !(Map Unique ParamInfo)
+  , ctxCallees      :: !(Map Unique Callee)
+  }
+
+-- | The 'EntityInfo' supplies the inferred result type of a decision that has
+-- no GIVETH.
+lowerModule :: EntityInfo -> Module Resolved -> Either [LowerError] OFPackage
+lowerModule entInfo mod' =
+  case enrichReturnTypes entInfo (getExportedFunctions mod') of
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
     efs ->
-      let (enumDefs, enumCons) = collectEnums mod'
-          records      = collectRecords enumDefs mod'
-          scaleParams  = collectScaleParams mod'
-          scalarParams = collectScalarParams mod'
-          scalePaths   = Map.map (.spPath) scaleParams
-          scalarPaths  = Map.map (.spsPath) scalarParams
-          exportedU   = Map.fromList
-            [ (getUnique (decideName ef.exportDecide), pyIdent ef.exportName)
-            | ef <- efs
-            ]
-          results    = map (lowerOne enumDefs enumCons records exportedU scalePaths scalarPaths) efs
-          (errs, ok) = partitionEithers results
-          allErrs    = descPathErrors mod' <> errs
-      in if not (null allErrs)
-           then Left allErrs
+      let (enums, enumCons) = collectEnums mod'
+          synonyms    = collectSynonyms mod'
+          ctx0 = Ctx
+            { ctxEnums        = enums
+            , ctxEnumCons     = enumCons
+            , ctxSynonyms     = synonyms
+            , ctxRecords      = Map.empty
+            , ctxScalarParams = Map.empty
+            , ctxScaleParams  = Map.empty
+            , ctxCallees      = Map.empty
+            }
+          records = collectRecords ctx0 mod'
+          ctx1    = ctx0 { ctxRecords = records }
+          (paramErrs, _, scalars, scales) = collectParams mod'
+          ctx = ctx1
+            { ctxScalarParams = Map.map fst scalars
+            , ctxScaleParams  = Map.map fst scales
+            , ctxCallees      = Map.fromList
+                [ (getUnique (decideName ef.exportDecide), calleeOf ctx1 ef) | ef <- efs ]
+            }
+          (errs, ok) = partitionEithers (map (lowerOne ctx) efs)
+      in if not (null (paramErrs <> errs))
+           then Left (paramErrs <> errs)
            else case checkCollisions (concatMap snd ok) of
              Left e     -> Left [e]
              Right vars ->
@@ -85,94 +159,79 @@ lowerModule mod' =
                      { pkgSource     = moduleSource mod'
                      , pkgEntities   = dedupOn (.entPy) (concatMap fst ok)
                      , pkgVariables  = vars
-                     , pkgParameters = Map.elems scaleParams
-                     , pkgScalars    = Map.elems scalarParams
-                     , pkgEnums      = Map.elems enumDefs
+                     , pkgParameters = map snd (Map.elems scales)
+                     , pkgScalars    = map snd (Map.elems scalars)
+                     , pkgEnums      = map (.eiDef) (Map.elems enums)
                      }
                in case validateIdents pkg of
                     []    -> Right pkg
                     vErrs -> Left vErrs
 
--- | Lower a single exported decision into the entity it lives on plus the
+-- | Lower a single exported decision into the entities it lives on plus the
 -- variables it introduces (its inputs + the computed variable itself).
-lowerOne
-  :: Map Text OFEnumDef
-  -> Map Unique (Text, Text)  -- ^ enum constructors: unique → (class, member)
-  -> Map Text RecordInfo
-  -> Map Unique Text          -- ^ exported decisions: unique → variable name
-  -> Map Unique Text          -- ^ scale parameters: unique → dotted path
-  -> Map Unique Text          -- ^ scalar parameters: unique → dotted path
-  -> ExportedFunction
-  -> Either LowerError ([OFEntity], [OFVariable])
-lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
-  let MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes _ _) body = ef.exportDecide
-      fnName  = pyIdent ef.exportName
-      mSubj   = firstJust [ (g, ri) | g <- givens, ri <- maybeToList (givenRecord records g) ]
-      mSubjRi = snd <$> mSubj
-      mPeriod = find isPeriodGiven givens
-      subjU   = (getUnique . givenName . fst) <$> mSubj
-      periodU = (getUnique . givenName) <$> mPeriod
-      subjUs  = maybeToList subjU
-      periodUs = maybeToList periodU
-      others  = [ g | g <- givens
-                    , getUnique (givenName g) `notElem` (subjUs <> periodUs) ]
-      ent     = maybe defaultEntity recordEntity mSubjRi
-      ofPeriod = if isJust mPeriod then OFMonth else OFEternity
-      -- Member (person) entities reached via the subject's @LIST OF R@ fields.
-      memberRecords  = maybe [] (\ri -> mapMaybe (`Map.lookup` records)
-                                          (mapMaybe (.fiListElem) ri.riFields)) mSubjRi
-      memberEntities = map recordEntity memberRecords
-      subjListFields = maybe [] (\ri -> [ fi.fiName | fi <- ri.riFields, isJust fi.fiListElem ]) mSubjRi
+lowerOne :: Ctx -> ExportedFunction -> Either LowerError ([OFEntity], [OFVariable])
+lowerOne ctx ef = mapLeft (LowerError fnName) $ do
+  let MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ fnRes _ _) body = ef.exportDecide
+      sig = signatureOf ctx givens
+      ofPeriod = if isJust sig.sigPeriod then OFMonth else OFEternity
+
+  -- The GIVETH, or the type the typechecker inferred ('enrichReturnTypes').
+  resultTy <- case ef.exportReturnType of
+    Just ty -> resultType ty
+    Nothing -> Left "no GIVETH, and the typechecker inferred no result type: declare it (GIVETH A NUMBER, BOOLEAN or STRING) so the OpenFisca variable gets a value type"
+
+  let (ent, members) = entitiesFor ctx sig
 
   let env = LowerEnv
-        { envSubject    = subjU
-        , envPeriod     = periodU
+        { envCtx        = ctx
+        , envEntity     = ent.entPy
+        , envSubject    = (getUnique . givenName . fst) <$> sig.sigSubject
+        , envSubjectL4  = (givenText . fst) <$> sig.sigSubject
+        , envSubjectRi  = snd <$> sig.sigSubject
+        , envPeriod     = (getUnique . givenName) <$> sig.sigPeriod
         , envMember     = Nothing
-        , envScales     = scalePaths
-        , envScalarParams = scalarPaths
-        , envScalars    = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- others ]
-        , envExported   = exportedU
-        , envListFields = subjListFields
-        , envEnumCons   = enumCons
+        , envScalars    = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- sig.sigOthers ]
         }
-  (undatedF, datedF) <- mapLeft (LowerError fnName) (lowerBody env body)
+  (undatedF, datedF) <- lowerBody env body
 
   -- Stored scalar (non-list) fields of an entity-record become input variables.
-  let inputsFor e ri =
-        [ OFVariable
+  let inputsFor e ri = sequence
+        [ (\ty -> OFVariable
             { varName    = fi.fiName
             , varL4      = fi.fiL4
-            , varType    = fi.fiType
+            , varType    = ty
             , varEntity  = e.entPy
             , varEntKey  = e.entKey
             , varPeriod  = ofPeriod
             , varLabel   = fi.fiName
             , varFormula = Nothing
             , varDated   = []
-            }
+            }) <$> first (fieldTypeMsg ri fi) fi.fiType
         | fi <- ri.riFields, fi.fiStored, isNothing fi.fiListElem
         ]
-      subjectInputs = maybe [] (inputsFor ent) mSubjRi
-      memberInputs  = concat (zipWith inputsFor memberEntities memberRecords)
-      scalarInputs =
-        [ OFVariable
-            { varName    = pyIdent (givenText g)
-            , varL4      = givenText g
-            , varType    = maybe OFFloat (ofTypeOf enums) (givenType g)
-            , varEntity  = ent.entPy
-            , varEntKey  = ent.entKey
-            , varPeriod  = ofPeriod
-            , varLabel   = givenText g
-            , varFormula = Nothing
-            , varDated   = []
-            }
-        | g <- others
-        ]
-      computed =
+      scalarInput g = do
+        ty <- case givenType g of
+          Nothing -> Left ("input `" <> givenText g <> "` has no declared type; declare it IS A NUMBER, BOOLEAN or STRING")
+          Just t  -> first (unrepresentable ("input `" <> givenText g <> "`")) (ofTypeOf ctx t)
+        pure OFVariable
+          { varName    = pyIdent (givenText g)
+          , varL4      = givenText g
+          , varType    = ty
+          , varEntity  = ent.entPy
+          , varEntKey  = ent.entKey
+          , varPeriod  = ofPeriod
+          , varLabel   = givenText g
+          , varFormula = Nothing
+          , varDated   = []
+          }
+  subjectInputs <- maybe (pure []) (inputsFor ent . snd) sig.sigSubject
+  memberInputs  <- concat <$> traverse (uncurry inputsFor) members
+  scalarInputs  <- traverse scalarInput sig.sigOthers
+  let computed =
         OFVariable
           { varName    = fnName
           , varL4      = resolvedToText fnRes
-          , varType    = maybe OFFloat (ofTypeFromGiveth enums) mGiveth
+          , varType    = resultTy
           , varEntity  = ent.entPy
           , varEntKey  = ent.entKey
           , varPeriod  = ofPeriod
@@ -182,27 +241,76 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
           , varFormula = Just undatedF
           , varDated   = datedF
           }
-  pure (ent : memberEntities, subjectInputs <> memberInputs <> scalarInputs <> [computed])
+  pure (ent : map fst members, subjectInputs <> memberInputs <> scalarInputs <> [computed])
+ where
+  fnName = pyIdent ef.exportName
+  resultType ty
+    = first (unrepresentable "its result") (ofTypeOf ctx ty)
+
+-- | A decision's GIVENs, sorted into the subject (the first record-typed
+-- GIVEN that is not the period), the conventional @period@, and the rest.
+data Sig = Sig
+  { sigSubject :: !(Maybe (OptionallyTypedName Resolved, RecordInfo))
+  , sigPeriod  :: !(Maybe (OptionallyTypedName Resolved))
+  , sigOthers  :: ![OptionallyTypedName Resolved]
+  , sigRoles   :: ![(ParamRole, Text)]
+  }
+
+signatureOf :: Ctx -> [OptionallyTypedName Resolved] -> Sig
+signatureOf ctx givens =
+  let subj   = listToMaybe [ (g, ri) | g <- givens, not (isPeriodGiven g), Just ri <- [givenRecord ctx g] ]
+      subjU  = (getUnique . givenName . fst) <$> subj
+      roleOf g
+        | Just (getUnique (givenName g)) == subjU = RoleSubject
+        | isPeriodGiven g                         = RolePeriod
+        | otherwise                               = RoleOther
+  in Sig
+       { sigSubject = subj
+       , sigPeriod  = find isPeriodGiven givens
+       , sigOthers  = [ g | g <- givens, roleOf g == RoleOther ]
+       , sigRoles   = [ (roleOf g, givenText g) | g <- givens ]
+       }
+
+calleeOf :: Ctx -> ExportedFunction -> Callee
+calleeOf ctx ef =
+  let MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) _ _ = ef.exportDecide
+      sig = signatureOf ctx givens
+  in Callee
+       { calName   = pyIdent ef.exportName
+       , calL4     = ef.exportName
+       , calRoles  = sig.sigRoles
+       }
+
+-- | The entity a decision lives on, plus the member entities of a group
+-- subject (each with the record whose fields become its inputs).
+entitiesFor :: Ctx -> Sig -> (OFEntity, [(OFEntity, RecordInfo)])
+entitiesFor ctx sig = case sig.sigSubject of
+  Nothing      -> (defaultEntity, [])
+  Just (_, ri) ->
+    let members = mapMaybe (`Map.lookup` ctx.ctxRecords) (nubOrd (mapMaybe (.fiListElem) ri.riFields))
+    in (recordEntity ri, [ (recordEntity m, m) | m <- members ])
 
 -- ---------------------------------------------------------------------------
 -- Expression lowering
 -- ---------------------------------------------------------------------------
 
 data LowerEnv = LowerEnv
-  { envSubject    :: !(Maybe Unique)     -- ^ the subject (entity) parameter
-  , envPeriod     :: !(Maybe Unique)     -- ^ the conventional period parameter
-  , envMember     :: !(Maybe Unique)     -- ^ the lambda-bound member var, inside an aggregation
-  , envScales     :: !(Map Unique Text)  -- ^ scale-parameter values → dotted path
-  , envScalarParams :: !(Map Unique Text)  -- ^ scalar-parameter values → dotted path
-  , envScalars    :: !(Map Unique Text)  -- ^ free scalar params → input-variable names
-  , envExported   :: !(Map Unique Text)  -- ^ exported decisions → variable names
-  , envListFields :: ![Text]             -- ^ the subject's @LIST OF@ field names (roles)
-  , envEnumCons   :: !(Map Unique (Text, Text))  -- ^ enum constructor → (class, member)
+  { envCtx        :: !Ctx
+  , envEntity     :: !Text                 -- ^ the Python name of the entity the formula is on
+  , envSubject    :: !(Maybe Unique)       -- ^ the subject (entity) parameter
+  , envSubjectL4  :: !(Maybe Text)
+  , envSubjectRi  :: !(Maybe RecordInfo)
+  , envPeriod     :: !(Maybe Unique)       -- ^ the conventional period parameter
+  , envMember     :: !(Maybe (Unique, RecordInfo, Text))
+    -- ^ inside an aggregation: the lambda-bound member, its record, its entity
+  , envScalars    :: !(Map Unique Text)    -- ^ free scalar params → input-variable names
   }
 
 lowerExpr :: LowerEnv -> Expr Resolved -> Either Text OFExpr
 lowerExpr env = go
  where
+  ctx = env.envCtx
+
   go = \case
     And _ a b       -> OFAnd <$> go a <*> go b
     Or  _ a b       -> OFOr  <$> go a <*> go b
@@ -228,60 +336,122 @@ lowerExpr env = go
     other -> Left (unsupported other)
 
   -- @p's field@: on the subject → a variable read; on a member (inside an
-  -- aggregation lambda) → a member-array read.
+  -- aggregation lambda) → a member-array read; on the period → its start.
   lowerProj inner field = case inner of
-    App _ s [] | Just (getUnique s) == env.envSubject ->
-      Right (OFVarRef (pyIdent (resolvedToText field)))
-    App _ s [] | Just (getUnique s) == env.envMember ->
-      Right (OFMembersVar (pyIdent (resolvedToText field)))
-    App _ s [] | Just (getUnique s) == env.envPeriod ->
-      Right (OFPeriodField (pyIdent (resolvedToText field)))  -- period's year → period.start.year
-    _ -> Left "only projection off the subject, a member, or the period is supported (nested records are a later milestone)"
+    App _ s []
+      | Just (getUnique s) == env.envSubject, Just ri <- env.envSubjectRi ->
+          OFVarRef <$> fieldRead ri
+      | Just (mu, mri, _) <- env.envMember, getUnique s == mu ->
+          OFMembersVar <$> fieldRead mri
+      | Just (getUnique s) == env.envPeriod -> case fieldText of
+          "year"  -> Right (OFPeriodField "year")
+          "month" -> Right (OFPeriodField "month")
+          f       -> Left ("`period's " <> f <> "`: only `period's year` and `period's month` have an OpenFisca meaning (period.start.year / period.start.month)")
+    _ -> Left "only a field of the subject, of a member, or of the period can be read; nested records and fields of other values are not supported"
+   where
+    fieldText = resolvedToText field
+    fieldRead ri = case find (\fi -> fi.fiL4 == fieldText) ri.riFields of
+      -- The desugarer strips computed (MEANS) fields from the record and
+      -- turns each into a selector function, so a projection onto a name the
+      -- record does not list is a computed field.
+      Nothing -> Left computedMsg
+      Just fi
+        | isJust fi.fiListElem ->
+            Left ("`" <> fieldText <> "` is a LIST OF members; it can be used only as the member list of sum, count, any or all")
+        | not fi.fiStored -> Left computedMsg
+        | Left _ <- fi.fiType -> Left (fieldTypeMsg ri fi (either id (const "") fi.fiType))
+        | otherwise -> Right fi.fiName
+     where
+      computedMsg = "`" <> fieldText <> "` is a computed field (MEANS) of `" <> ri.riName
+                    <> "`; the export does not compile computed fields (it does not inline helpers). Make it an @export decision instead."
 
   -- After resolution L4 desugars operators to builtin applications
   -- (@a * b@ → @App __TIMES__ [a, b]@), so arithmetic/boolean/comparison ops
   -- arrive here rather than as 'Times'/'And'/… constructors.
-  lowerApp ref args =
-    let u  = getUnique ref
-        nm = resolvedToText ref
-        -- specialised recognisers, each returning Maybe (Either Text OFExpr)
-        recognised = scaleCall nm args <|> aggregation nm args <|> npFunc nm args
-    in case recognised of
-      Just res -> res
-      Nothing -> case builtinOp nm of
-        Just mk -> traverse go args >>= mk
-        Nothing
-          | Just b <- boolLit nm                      -> Right (OFBoolLit b)
-          -- a scalar legislation parameter, read by period (args ignored)
-          | Just path <- Map.lookup u env.envScalarParams -> Right (OFParamRef path)
-          -- a call to another @export decision: on a member (inside an
-          -- aggregation) it reads that member's variable; otherwise the entity's.
-          | Just name <- Map.lookup u env.envExported ->
-              Right $ case args of
-                (App _ x [] : _) | Just (getUnique x) == env.envMember -> OFMembersVar name
-                _                                                      -> OFVarRef name
-          | not (null args)                           -> Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
-          | Just name <- Map.lookup u env.envScalars  -> Right (OFVarRef name)
-          | Just u == env.envPeriod                   -> Right (OFLocal "period")
-          | Just u == env.envSubject                  -> Left "the subject entity cannot be used as a value"
-          | otherwise                                 -> Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
+  lowerApp ref args
+    | isBuiltinRef ref, Just mk <- builtinOp nm = traverse go args >>= mk
+    | isBuiltinRef ref, u == trueUnique,  null args = Right (OFBoolLit True)
+    | isBuiltinRef ref, u == falseUnique, null args = Right (OFBoolLit False)
+    | nm `elem` preludeRecognised = preludeCall
+    | nm `elem` conventionNames = conventionCall
+    | Just p <- Map.lookup u ctx.ctxScalarParams = OFParamRef p.piPath <$ paramArgs p args
+    | Just _ <- Map.lookup u ctx.ctxScaleParams =
+        Left ("`" <> nm <> "` is a marginal-rate scale (@desc scale); it can be used only as the brackets argument of `scale tax`")
+    | Just c <- Map.lookup u ctx.ctxCallees = exportedCall c args
+    | Just u == env.envPeriod =
+        Left "the period cannot be used as a value; pass it unchanged to another @export decision, or read `period's year` / `period's month`"
+    | Just u == env.envSubject = Left "the subject entity cannot be used as a value; read one of its fields, or pass it unchanged to another @export decision"
+    | Just (mu, _, _) <- env.envMember, u == mu =
+        Left "the member cannot be used as a value; read one of its fields, or pass it unchanged to an @export decision"
+    | Just name <- Map.lookup u env.envScalars, null args = Right (OFVarRef name)
+    | not (null args) = Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
+    | otherwise = Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
+   where
+    u  = getUnique ref
+    nm = resolvedToText ref
 
-  -- numpy elementwise functions reachable as plain L4 calls.
-  npFunc nm args = case nm of
-    "max" -> Just (OFNpCall "maximum" <$> traverse go args)
-    "min" -> Just (OFNpCall "minimum" <$> traverse go args)
-    _     -> Nothing
+    preludeCall = case nm of
+      "max" | [_, _] <- args -> OFNpCall "maximum" <$> traverse go args
+      "min" | [_, _] <- args -> OFNpCall "minimum" <$> traverse go args
+      "sum"   | [x] <- args      -> aggSum x
+      "count" | [x] <- args      -> aggCount x
+      "any"   | [l, x] <- args   -> aggPred OFAny l x
+      "all"   | [l, x] <- args   -> aggPred OFAll l x
+      "map" -> Left "`map` is supported only inside `sum (map (GIVEN m YIELD …) (<members>))`"
+      _ -> Left ("`" <> nm <> "` is called with an unsupported number of arguments")
 
-  -- Marginal-rate scale application. @scale tax OF <income>, <scaleRef>@ where
-  -- <scaleRef> is a @desc scale <path>@ value → @parameters(period).<path>.calc(<income>)@.
-  scaleCall nm args = case args of
-    -- the scale ref may be nullary (single-period) or applied to a year
-    -- (time-varying); either way OpenFisca resolves the brackets by period.
-    [income, App _ sref _scaleArgs]
-      | nm == "scale tax"
-      , Just path <- Map.lookup (getUnique sref) env.envScales ->
-          Just (OFScaleCalc path <$> go income)
-    _ -> Nothing
+    conventionCall = case nm of
+      "scale tax" ->
+        case args of
+          [income, App _ sref sargs]
+            | Just p <- Map.lookup (getUnique sref) ctx.ctxScaleParams -> do
+                paramArgs p sargs
+                OFScaleCalc p.piPath <$> go income
+          _ -> Left "`scale tax` must be called as `scale tax OF <income>, <a @desc scale value>`"
+      "members of" ->
+        Left "`members of` is supported only as the member list of sum, count, any or all"
+      _ ->  -- "period reaches"
+        Left "`period reaches` is compiled only as the guard of EVERY arm of a decision's top-level BRANCH, where each arm becomes an OpenFisca dated formula (formula_YYYY_MM). Anywhere else, write the condition with `period's year` and `period's month` instead."
+
+  -- A parameter call must read the parameter at the formula's own period.
+  paramArgs p args = case args of
+    [] | not p.piTakesYear -> Right ()
+    [Proj _ (App _ x []) f]
+      | p.piTakesYear
+      , Just (getUnique x) == env.envPeriod
+      , resolvedToText f == "year" -> Right ()
+    _ -> Left ("`" <> p.piL4 <> "` is a legislation parameter (@desc " <> p.piKind <> " " <> p.piPath
+               <> "). OpenFisca reads it at the formula's own period, so the only call the export can compile is `"
+               <> p.piL4 <> (if p.piTakesYear then " OF period's year" else "")
+               <> "`. Any other argument would be silently replaced by the current period's value, so it is refused.")
+
+  -- A call to another @export decision reads that decision's OpenFisca
+  -- variable at the same period. That is only the same thing as the L4 call
+  -- when the call passes the subject (or, in an aggregation, the member) and
+  -- the period through unchanged, so any other argument is refused.
+  exportedCall c args = do
+    when (length args /= length c.calRoles) $
+      Left ("`" <> c.calL4 <> "` is called with " <> tshow (length args) <> " argument(s) but takes "
+            <> tshow (length c.calRoles))
+    viaMember <- or . catMaybes <$> zipWithM checkArg [1 :: Int ..] (zip c.calRoles args)
+    pure (if viaMember then OFMembersVar c.calName else OFVarRef c.calName)
+   where
+    checkArg i ((role, pname), arg) = case (role, arg) of
+      (RoleSubject, App _ x [])
+        | Just (getUnique x) == env.envSubject -> Right (Just False)
+        | Just (mu, _, _) <- env.envMember, getUnique x == mu -> Right (Just True)
+      (RoleSubject, _) ->
+        Left ("argument " <> tshow i <> " of `" <> c.calL4 <> "` is its subject `" <> pname
+              <> "`. OpenFisca computes `" <> c.calL4 <> "` for the same entity, so the argument must be "
+              <> maybe "the subject" backtick env.envSubjectL4
+              <> " passed through unchanged (or, inside an aggregation, the member). Any other value would be silently replaced, so it is refused.")
+      (RolePeriod, App _ x [])
+        | Just (getUnique x) == env.envPeriod -> Right Nothing
+      (RolePeriod, _) ->
+        Left ("argument " <> tshow i <> " of `" <> c.calL4 <> "` is its period. OpenFisca computes every variable at the formula's own period, so the argument must be `period` passed through unchanged; a call at another period cannot be compiled.")
+      (RoleOther, _) ->
+        Left ("argument " <> tshow i <> " of `" <> c.calL4 <> "` supplies its input `" <> pname
+              <> "`, which is an OpenFisca input variable of its own; a value passed here would be ignored. Only the subject and the period can be passed to another @export decision.")
 
   -- Group-entity aggregations over a member list:
   --   sum (map (GIVEN m YIELD <body>) <members>) → <group>.sum(<body>[, role=…])
@@ -289,66 +459,77 @@ lowerExpr env = go
   --   all (GIVEN m YIELD <pred>) <members>        → <group>.all(<pred>[, role=…])
   --   count <members>                             → <group>.nb_persons([role])
   -- where <members> is `h's <role>` (role-restricted) or `members of OF h` (all).
-  aggregation nm args = case (nm, args) of
-    ("sum",   [mapApp])    -> Just (aggSum mapApp)
-    ("count", [lst])       -> Just (aggCount lst)
-    ("any",   [lam, lst])  -> Just (aggPred OFAny lam lst)
-    ("all",   [lam, lst])  -> Just (aggPred OFAll lam lst)
-    _                      -> Nothing
-
   aggSum = \case
     App _ mref [Lam _ (MkGivenSig _ [mp]) lbody, lst]
-      | resolvedToText mref == "map"
-      , Just role <- resolveMembers lst ->
-          OFSum role <$> lowerMember mp lbody
-    _ -> Left "`sum` is only supported as `sum (map (GIVEN m YIELD …) (<members>))`"
+      | resolvedToText mref == "map" -> do
+          (role, mri, ment) <- resolveMembers lst
+          OFSum role <$> lowerMember mp mri ment lbody
+    _ -> Left "`sum` is supported only as `sum (map (GIVEN m YIELD …) (<members>))`"
 
-  aggCount lst = case resolveMembers lst of
-    Just role -> Right (OFNbPersons role)
-    Nothing   -> Left "`count` expects a member list (`h's <role>` or `members of` OF h)"
+  aggCount lst = (\(role, _, _) -> OFNbPersons role) <$> resolveMembers lst
 
   aggPred mk lam lst = case lam of
-    Lam _ (MkGivenSig _ [mp]) pbody
-      | Just role <- resolveMembers lst -> mk role <$> lowerMember mp pbody
-    _ -> Left "`any`/`all` expect `(GIVEN m YIELD <pred>) (<members>)`"
+    Lam _ (MkGivenSig _ [mp]) pbody -> do
+      (role, mri, ment) <- resolveMembers lst
+      mk role <$> lowerMember mp mri ment pbody
+    _ -> Left "`any`/`all` are supported only as `any (GIVEN m YIELD <pred>) (<members>)`"
 
-  lowerMember mp body =
-    lowerExpr (env { envMember = Just (getUnique (givenName mp)) }) body
+  lowerMember mp mri ment body =
+    lowerExpr (env { envMember = Just (getUnique (givenName mp), mri, ment) }) body
 
-  -- Resolve a member-list expression to a role selection: @Just Nothing@ = all
-  -- members; @Just (Just role)@ = that role; @Nothing@ = not a member list.
-  -- A subject with a single role list treats it as "all members".
-  resolveMembers = \case
-    Proj _ (App _ s []) fieldRes
-      | Just (getUnique s) == env.envSubject
-      , let fld = pyIdent (resolvedToText fieldRes)
-      , fld `elem` env.envListFields ->
-          Just (if length env.envListFields <= 1 then Nothing else Just (singularize fld))
-    App _ ref [App _ s []]
-      | Just (getUnique s) == env.envSubject
-      , resolvedToText ref == "members of" -> Just Nothing
-    _ -> Nothing
-
-  boolLit t = case Text.toLower t of
-    "true"  -> Just True
-    "false" -> Just False
-    _       -> Nothing
+  -- Resolve a member-list expression to (role selection, member record,
+  -- member entity): a role of @Nothing@ means all members.
+  resolveMembers lst = case (lst, env.envSubjectRi) of
+        (Proj _ (App _ s []) fieldRes, Just ri)
+          | Just (getUnique s) == env.envSubject ->
+              case find (\fi -> fi.fiL4 == resolvedToText fieldRes) ri.riFields of
+                Just fi | Just elemNm <- fi.fiListElem, Just mri <- Map.lookup elemNm ctx.ctxRecords ->
+                  let listFields = filter (isJust . (.fiListElem)) ri.riFields
+                      role = if length listFields <= 1 then Nothing else Just (singularize fi.fiName)
+                  in Right (role, mri, mri.riPy)
+                _ -> Left ("`" <> resolvedToText fieldRes <> "` is not a LIST OF members field of `" <> ri.riName <> "`")
+        (App _ ref [App _ s []], Just ri)
+          | resolvedToText ref == "members of"
+          , Just (getUnique s) == env.envSubject ->
+              case mapMaybe (\fi -> fi.fiListElem >>= (`Map.lookup` ctx.ctxRecords)) ri.riFields of
+                (mri : _) -> Right (Nothing, mri, mri.riPy)
+                []        -> Left ("`" <> ri.riName <> "` has no LIST OF members field")
+        _ -> Left "expected a member list: `<the group>'s <members field>` or `members of OF <the group>`"
 
   -- @CONSIDER scrut WHEN C1 THEN v1 … OTHERWISE d@ over an enum becomes nested
-  -- @np.where(scrut == Class.c1, v1, …, d)@.
+  -- @np.where(scrut == Class.c1, v1, …, d)@. Every WHEN arm must be a bare
+  -- constructor of an enum declared in this module, and the OTHERWISE must be
+  -- the one last arm: an arm the export could not read used to be dropped.
   lowerConsider scrut branches = do
     scrutE <- go scrut
-    let whens  = [ (con, body) | MkBranch _ (When _ (PatApp _ con [])) body <- branches ]
-        others = [ body        | MkBranch _ (Otherwise _) body            <- branches ]
-    def <- case others of
-      (d : _) -> go d
-      []      -> Left "CONSIDER without an OTHERWISE is not supported for OpenFisca"
+    (whens, dflt) <- splitArms branches
+    def <- go dflt
     arms <- traverse (lowerArm scrutE) whens
     pure (foldr (\(c, v) acc -> OFCond c v acc) def arms)
 
-  lowerArm scrutE (con, body) = case Map.lookup (getUnique con) env.envEnumCons of
-    Just (cls, mem) -> (\v -> (OFCmp OFEq scrutE (OFEnumLit cls mem), v)) <$> go body
-    Nothing -> Left ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor (only enum CONSIDER is supported)")
+  splitArms = \case
+    [MkBranch _ (Otherwise _) d] -> Right ([], d)
+    [] -> Left "CONSIDER without an OTHERWISE is not supported for OpenFisca; add `OTHERWISE <value>` as the last arm"
+    (MkBranch _ (Otherwise _) _ : _) ->
+      Left "CONSIDER: OTHERWISE must be the last arm (arms after it never apply in L4, but the export would have compiled them)"
+    (MkBranch _ (When _ pat) body : rest) -> do
+      con <- case pat of
+        PatApp _ con []
+          | Map.member (getUnique con) ctx.ctxEnumCons -> Right con
+          | otherwise -> Left ("CONSIDER: `" <> resolvedToText con <> "` is not a constructor of an enum declared in this module; only CONSIDER over such an enum is supported")
+        PatApp _ con _ ->
+          Left ("CONSIDER: the arm `WHEN " <> resolvedToText con <> " …` binds the constructor's fields, which the export cannot compile (an OpenFisca Enum carries no fields). Only `WHEN <Constructor> THEN …` arms over an enum whose constructors have no fields are supported.")
+        PatVar _ v ->
+          Left ("CONSIDER: the arm `WHEN " <> resolvedToText v <> "` is a variable pattern; use OTHERWISE for the catch-all arm")
+        PatCons{} -> Left "CONSIDER: list patterns (`FOLLOWED BY`) are not supported for OpenFisca"
+        PatLit{}  -> Left "CONSIDER: literal patterns are not supported for OpenFisca; use BRANCH IF … EQUALS … instead"
+        PatExpr{} -> Left "CONSIDER: expression patterns are not supported for OpenFisca"
+      (ws, d) <- splitArms rest
+      pure ((con, body) : ws, d)
+
+  lowerArm scrutE (con, body) = case Map.lookup (getUnique con) ctx.ctxEnumCons of
+    Just ec -> (\v -> (OFCmp OFEq scrutE (OFEnumLit ec.ecClass ec.ecMember), v)) <$> go body
+    Nothing -> Left ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor")
 
   -- A general @BRANCH IF c THEN v … OTHERWISE d@ → nested @np.where@.
   lowerMultiWay guards oth = do
@@ -384,6 +565,26 @@ builtinOp nm = case nm of
   arity :: Int -> [OFExpr] -> Either Text OFExpr
   arity n xs = Left ("operator `" <> nm <> "` expected " <> tshow n <> " argument(s), got " <> tshow (length xs))
 
+-- | Binary operators, in either representation: the surface constructor or
+-- the builtin application it desugars to.
+binView :: Expr Resolved -> Maybe (Text, Expr Resolved, Expr Resolved)
+binView = \case
+  And _ a b       -> Just ("__AND__", a, b)
+  Or _ a b        -> Just ("__OR__", a, b)
+  Equals _ a b    -> Just ("__EQUALS__", a, b)
+  Leq _ a b       -> Just ("__LEQ__", a, b)
+  Geq _ a b       -> Just ("__GEQ__", a, b)
+  Lt _ a b        -> Just ("__LT__", a, b)
+  Gt _ a b        -> Just ("__GT__", a, b)
+  Plus _ a b      -> Just ("__PLUS__", a, b)
+  Minus _ a b     -> Just ("__MINUS__", a, b)
+  Times _ a b     -> Just ("__TIMES__", a, b)
+  DividedBy _ a b -> Just ("__DIVIDE__", a, b)
+  Modulo _ a b    -> Just ("__MODULO__", a, b)
+  App _ r [a, b]
+    | isBuiltinRef r, isJust (builtinOp (resolvedToText r)) -> Just (resolvedToText r, a, b)
+  _ -> Nothing
+
 unsupported :: Expr Resolved -> Text
 unsupported e = "unsupported construct for OpenFisca: " <> constructorName e
 
@@ -396,13 +597,13 @@ constructorName = \case
   Breach{}     -> "BREACH"
   RAnd{}       -> "regulative AND"; ROr{} -> "regulative OR"
   Implies{}    -> "IMPLIES"
-  Consider{}   -> "CONSIDER / pattern match (later milestone)"
-  MultiWayIf{} -> "multi-way IF (later milestone)"
-  Where{}      -> "WHERE binding (later milestone)"
-  LetIn{}      -> "LET binding (later milestone)"
-  Lam{}        -> "lambda"
-  List{}       -> "list literal (collections are a later milestone)"
-  Cons{}       -> "list cons (collections are a later milestone)"
+  Consider{}   -> "CONSIDER / pattern match"
+  MultiWayIf{} -> "multi-way IF"
+  Where{}      -> "WHERE binding (local bindings are not supported)"
+  LetIn{}      -> "LET binding (local bindings are not supported)"
+  Lam{}        -> "lambda (only as the per-member function of sum/any/all)"
+  List{}       -> "list literal (collections are not supported)"
+  Cons{}       -> "list cons (collections are not supported)"
   Concat{}     -> "string concat"; AsString{} -> "string coercion"
   AppNamed{}   -> "named-argument application"
   Inert{}      -> "inert scaffolding"
@@ -412,68 +613,145 @@ constructorName = \case
   _            -> "expression"
 
 -- ---------------------------------------------------------------------------
+-- Names recognised by the export
+-- ---------------------------------------------------------------------------
+
+-- | Prelude functions the export compiles to OpenFisca's own operations.
+preludeRecognised :: [Text]
+preludeRecognised = ["sum", "map", "count", "any", "all", "max", "min"]
+
+-- | Helpers the export recognises by name and compiles to an OpenFisca
+-- construct, which the MODULE defines (the prelude has none of them).
+conventionNames :: [Text]
+conventionNames = ["period reaches", "scale tax", "members of"]
+
+isBuiltinRef :: Resolved -> Bool
+isBuiltinRef r = (getUnique r).moduleUri == builtinUri
+
+-- ---------------------------------------------------------------------------
 -- Module scanning helpers
 -- ---------------------------------------------------------------------------
 
-collectRecords :: Map Text OFEnumDef -> Module Resolved -> Map Text RecordInfo
-collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
+topDecls :: Module Resolved -> [TopDecl Resolved]
+topDecls (MkModule _ _ section) = goSection section
  where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Declare _ (MkDeclare _ _ (MkAppForm _ recRes _ _) (RecordDecl _ _ fields)) ->
-      let nm = resolvedToText recRes
-      in [(nm, RecordInfo
-              { riKey    = Text.toLower (pyIdent nm)
-              , riPlural = Text.toLower (pyIdent nm) <> "s"
-              , riPy     = pyType nm
-              , riFields =
-                  [ fieldInfo enums fRes fTy mMeans
-                  | MkTypedName _ fRes fTy mMeans _ <- fields
-                  ]
-              })]
+  goSection (MkSection _ _ _ _ decls) = decls >>= \case
     Section _ sub -> goSection sub
-    _ -> []
+    d             -> [d]
 
--- | Scan for values annotated @\@desc scale <dotted.path>@ and read their
--- bracket tables. Returns a map keyed by the value's 'Unique' so that a
--- @scale tax@ call referencing the value can resolve its path.
-collectScaleParams :: Module Resolved -> Map Unique OFScaleParam
-collectScaleParams (MkModule _ _ section) = Map.fromList (goSection section)
+collectSynonyms :: Module Resolved -> Map Text (Type' Resolved)
+collectSynonyms m = Map.fromList
+  [ (resolvedToText tyRes, ty)
+  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes [] _) (SynonymDecl _ ty)) <- topDecls m ]
+
+collectRecords :: Ctx -> Module Resolved -> Map Text RecordInfo
+collectRecords ctx m = Map.fromList
+  [ (nm, RecordInfo
+       { riName   = nm
+       , riKey    = Text.toLower (pyIdent nm)
+       , riPlural = Text.toLower (pyIdent nm) <> "s"
+       , riPy     = pyType nm
+       , riFields =
+           [ fieldInfo ctx fRes fTy mMeans
+           | MkTypedName _ fRes fTy _ mMeans <- fields
+           ]
+       })
+  | Declare _ (MkDeclare _ _ (MkAppForm _ recRes _ _) (RecordDecl _ _ fields)) <- topDecls m
+  , let nm = resolvedToText recRes
+  ]
+
+fieldInfo :: Ctx -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
+fieldInfo ctx fRes fTy mMeans =
+  case listElemRecord ctx fTy of
+    Just elemName -> FieldInfo nm l4 (Right OFFloat) stored (Just elemName)
+    Nothing       -> FieldInfo nm l4 (ofTypeOf ctx fTy) stored Nothing
  where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) body)
-      | Just path <- scaleAnnotation d
-      , Just bs   <- readScale body ->
-          [(getUnique nameRes, OFScaleParam { spPath = path, spBrackets = bs })]
-    Section _ sub -> goSection sub
-    _ -> []
+  l4     = resolvedToText fRes
+  nm     = pyIdent l4
+  stored = isNothing mMeans
 
--- | The dotted path from a @<keyword> a.b.c@ description annotation, when it
--- is a valid one ('validatePath'). An invalid path is reported by
--- 'descPathErrors' and the value is not registered as a parameter.
-descKeyword :: Text -> Decide Resolved -> Maybe Text
-descKeyword kw d = case descWords d of
-  (w : rest) | w == kw -> either (const Nothing) Just (validatePath kw rest)
-  _                    -> Nothing
+-- | If a type is @LIST OF <R>@, return the element type's name.
+listElemRecord :: Ctx -> Type' Resolved -> Maybe Text
+listElemRecord ctx ty = case expandSynonyms ctx ty of
+  TyApp _ l [TyApp _ r _] | getUnique l == listUnique -> Just (resolvedToText r)
+  _ -> Nothing
+
+-- | Scan @DECLARE X IS ONE OF a, b, …@ enum declarations.
+collectEnums :: Module Resolved -> (Map Text EnumInfo, Map Unique EnumCon)
+collectEnums m =
+  ( Map.fromList [ (ty, ei) | (ty, ei, _) <- defs ]
+  , Map.fromList (concat [ cs | (_, _, cs) <- defs ])
+  )
+ where
+  defs =
+    [ ( ty
+      , EnumInfo
+          { eiDef = OFEnumDef
+              { enName    = enPy
+              , enMembers = [ (pyIdent (resolvedToText c), resolvedToText c) | MkConDecl _ c _ <- conDecls ]
+              }
+          , eiL4 = ty
+          , eiWithFields = [ resolvedToText c | MkConDecl _ c (_ : _) <- conDecls ]
+          }
+      , [ (getUnique c, EnumCon enPy (pyIdent (resolvedToText c))) | MkConDecl _ c _ <- conDecls ]
+      )
+    | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) <- topDecls m
+    , let ty   = resolvedToText tyRes
+          enPy = pyType ty
+    ]
+
+-- ---------------------------------------------------------------------------
+-- Legislation parameters
+-- ---------------------------------------------------------------------------
+
+-- | Scan values annotated @\@desc parameter <path>@ (a scalar parameter) or
+-- @\@desc scale <path>@ (a marginal-rate scale). A value carrying either
+-- annotation must be readable as that kind of parameter; one that is not is
+-- an error naming the value, rather than a value the export quietly does not
+-- register (its callers then failed with an unrelated message).
+collectParams
+  :: Module Resolved
+  -> ( [LowerError]
+     , Set Unique
+     , Map Unique (ParamInfo, OFScalarParam)
+     , Map Unique (ParamInfo, OFScaleParam) )
+collectParams m =
+  let results = mapMaybe one [ d | Decide _ d <- topDecls m ]
+      scalarRs = [ r | Left r  <- results ]
+      scaleRs  = [ r | Right r <- results ]
+      (errsA, scalars) = partitionEithers scalarRs
+      (errsB, scales)  = partitionEithers scaleRs
+      paths = [ (pinfo.piL4, pinfo.piPath) | (_, (pinfo, _)) <- scalars ] <> [ (pinfo.piL4, pinfo.piPath) | (_, (pinfo, _)) <- scales ]
+  in ( map snd (errsA <> errsB) <> pathConflicts paths
+     , Set.fromList (map fst (errsA <> errsB))
+     , Map.fromList scalars
+     , Map.fromList scales )
+ where
+  one d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) (MkAppForm _ nameRes _ _) body) =
+    let l4 = resolvedToText nameRes
+        u  = getUnique nameRes
+        err e = (u, LowerError l4 e)
+        common kind ws = do
+          path <- validatePath kind ws
+          yU <- case gs of
+            []  -> Right Nothing
+            [g] -> Right (Just (getUnique (givenName g)))
+            _   -> Left ("a @desc " <> kind <> " value takes at most one input, the year; `" <> l4 <> "` takes " <> tshow (length gs))
+          pure (ParamInfo l4 kind path (isJust yU), yU)
+    in case descWords d of
+         ("parameter" : ws) -> Just $ Left $ first err $ do
+           (pinfo, yU) <- common "parameter" ws
+           vs <- readScalarParam yU body
+           pure (u, (pinfo, OFScalarParam { spsPath = pinfo.piPath, spsValues = vs }))
+         ("scale" : ws) -> Just $ Right $ first err $ do
+           (pinfo, yU) <- common "scale" ws
+           bs <- readScale yU body
+           pure (u, (pinfo, OFScaleParam { spPath = pinfo.piPath, spBrackets = bs }))
+         _ -> Nothing
 
 -- | The words of a DECIDE's @\@desc@ annotation.
 descWords :: Decide Resolved -> [Text]
 descWords d = maybe [] (Text.words . getDesc) (getAnno d ^. annDesc)
-
--- | Every @\@desc parameter@ / @\@desc scale@ annotation whose path is not
--- valid, as an error naming the value.
-descPathErrors :: Module Resolved -> [LowerError]
-descPathErrors (MkModule _ _ section) = goSection section
- where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) _)
-      | (kw : rest) <- descWords d
-      , kw `elem` ["parameter", "scale"]
-      , Left e <- validatePath kw rest -> [LowerError (resolvedToText nameRes) e]
-    Section _ sub -> goSection sub
-    _ -> []
 
 -- | A parameter path is spliced into the emitted Python as
 -- @parameters(period).<path>@, so every segment must be a plain identifier:
@@ -503,45 +781,52 @@ openFiscaReservedKeys :: Set Text
 openFiscaReservedKeys = Set.fromList
   ["brackets", "description", "documentation", "metadata", "reference", "unit", "values"]
 
-scaleAnnotation, paramAnnotation :: Decide Resolved -> Maybe Text
-scaleAnnotation = descKeyword "scale"
-paramAnnotation = descKeyword "parameter"
+-- | Two parameters at one path, or one parameter at a path inside another's,
+-- would overwrite each other in the emitted parameter tree.
+pathConflicts :: [(Text, Text)] -> [LowerError]
+pathConflicts paths =
+  [ LowerError a ("the @desc path `" <> pa <> "` of `" <> a <> "` "
+                  <> (if pa == pb then "is also the path of `" else "contains the path of `")
+                  <> b <> "` (`" <> pb <> "`); every legislation parameter needs its own path, and no path may lie inside another")
+  | ((a, pa), i) <- zip paths [0 :: Int ..]
+  , ((b, pb), j) <- zip paths [0 ..]
+  , i /= j
+  , (pa == pb && i < j) || (pa /= pb && (pa <> ".") `Text.isPrefixOf` pb)
+  ]
 
--- | Scan @\@desc parameter <path>@ scalar legislation parameters. Their bodies
--- are a constant, a @IF y AT LEAST Y THEN v ELSE v0@, or a year-keyed BRANCH.
-collectScalarParams :: Module Resolved -> Map Unique OFScalarParam
-collectScalarParams (MkModule _ _ section) = Map.fromList (goSection section)
- where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) body)
-      | Just path <- paramAnnotation d
-      , Just vs   <- readScalarParam body ->
-          [(getUnique nameRes, OFScalarParam { spsPath = path, spsValues = vs })]
-    Section _ sub -> goSection sub
-    _ -> []
-
--- | Read a scalar parameter body into a date-indexed value series.
-readScalarParam :: Expr Resolved -> Maybe [(Text, Rational)]
-readScalarParam = \case
-  Lit _ (NumericLit _ v) -> Just [(epochDate, v)]
+-- | Read a scalar parameter body into a date-indexed value series. Supported:
+-- a constant, @IF y AT LEAST <year> THEN v ELSE v0@, or a BRANCH of such arms
+-- written newest first, where @y@ is the value's own year input.
+readScalarParam :: Maybe Unique -> Expr Resolved -> Either Text [(Text, Rational)]
+readScalarParam yU = \case
+  Lit _ (NumericLit _ v) -> Right [(epochDate, v)]
   IfThenElse _ cond thenE elseE -> do
-    y  <- guardYear cond
+    y  <- guardYear yU cond
     tv <- litNum thenE
     ev <- litNum elseE
     pure [(epochDate, ev), (isoYM y 1, tv)]
   MultiWayIf _ guards oth -> do
     arms <- traverse scalarArm guards
-    guard (strictlyDescDates (map fst arms))   -- first-match must equal latest-date
+    unless (strictlyDescDates (map fst arms)) $ Left newestFirstMsg
     ov   <- litNum oth
     pure ((epochDate, ov) : arms)
-  _ -> Nothing
+  _ -> Left parameterShapeMsg
  where
   scalarArm (MkGuardedExpr _ cond body) = do
-    y <- guardYear cond
+    y <- guardYear yU cond
     v <- litNum body
     pure (isoYM y 1, v)
-  litNum = \case Lit _ (NumericLit _ v) -> Just v; _ -> Nothing
+  litNum = \case
+    Lit _ (NumericLit _ v) -> Right v
+    _ -> Left ("each value of a @desc parameter must be a number literal. " <> parameterShapeMsg)
+
+parameterShapeMsg :: Text
+parameterShapeMsg =
+  "A @desc parameter value must be a number literal, `IF y AT LEAST <year> THEN <number> ELSE <number>`, or `BRANCH IF y AT LEAST <year> THEN <number> … OTHERWISE <number>` with the arms newest first, where y is the value's own (only) input, the year."
+
+newestFirstMsg :: Text
+newestFirstMsg =
+  "the year-guarded arms must be written newest first (strictly descending years): L4's BRANCH takes the first arm that holds, OpenFisca takes the latest date that has started, and the two agree only in that order"
 
 -- | Read a scale body into dated brackets. Two shapes:
 --
@@ -549,27 +834,44 @@ readScalarParam = \case
 --     (all values dated at a neutral epoch).
 --   * @BRANCH IF y AT LEAST <year> THEN LIST … …@    — a time-varying scale; each
 --     arm's @year@ becomes the effective date and brackets are aligned by index.
-readScale :: Expr Resolved -> Maybe [OFBracket]
-readScale = \case
+readScale :: Maybe Unique -> Expr Resolved -> Either Text [OFBracket]
+readScale yU = \case
   List _ elems -> do
-    rows <- traverse readRow elems
+    rows <- readRows elems
     pure [ OFBracket [(epochDate, t)] [(epochDate, r)] | (t, r) <- rows ]
   MultiWayIf _ guards otherwise' -> do
     arms    <- traverse readArm guards
     othRows <- readOtherwiseRows otherwise'
     -- arms as written must be strictly descending by date: L4 BRANCH is
     -- first-match, OpenFisca resolves by latest date — they agree only so.
-    guard (strictlyDescDates (map fst arms))
+    unless (strictlyDescDates (map fst arms)) $ Left newestFirstMsg
     -- the OTHERWISE brackets apply before the earliest dated arm.
     let allArms = arms <> [(epochDate, othRows)]
     -- a bracket may appear over time but must not vanish (OpenFisca can't drop one).
-    guard (nonShrinking allArms)
+    unless (nonShrinking allArms) $
+      Left "a later arm of a @desc scale has fewer brackets than an earlier one; OpenFisca cannot remove a bracket over time, so every arm must have at least as many brackets as the arms before it"
     pure (alignByIndex allArms)
-  _ -> Nothing
+  _ -> Left scaleShapeMsg
  where
+  readArm (MkGuardedExpr _ cond body) = do
+    yr   <- guardYear yU cond
+    rows <- case body of
+      List _ es -> readRows es
+      _         -> Left scaleShapeMsg
+    pure (isoDate yr, rows)
   readOtherwiseRows = \case
-    List _ es -> traverse readRow es
-    _         -> Just []   -- EMPTY / nil → no pre-dated brackets
+    List _ es -> readRows es
+    App _ e [] | getUnique e == emptyUnique -> Right []
+    _ -> Left ("the OTHERWISE of a time-varying @desc scale must be a LIST of brackets or EMPTY. " <> scaleShapeMsg)
+  readRows es = do
+    rows <- traverse readRow es
+    unless (and (zipWith (<) (map fst rows) (drop 1 (map fst rows)))) $
+      Left "the brackets of a @desc scale must be listed with strictly increasing thresholds, as OpenFisca's marginal-rate scale requires"
+    pure rows
+
+scaleShapeMsg :: Text
+scaleShapeMsg =
+  "A @desc scale value must be a LIST of brackets `(band OF <threshold>, <rate>)`, or `BRANCH IF y AT LEAST <year> THEN LIST … OTHERWISE <LIST … or EMPTY>` with the arms newest first, where y is the value's own (only) input, the year."
 
 -- | As-written dates strictly decreasing (so first-match == latest-date).
 strictlyDescDates :: [Text] -> Bool
@@ -583,26 +885,26 @@ nonShrinking arms =
 
 -- | @band OF threshold, rate@ → (threshold, rate). Name-agnostic: any 2-arg
 -- application of numeric literals (the bracket constructor).
-readRow :: Expr Resolved -> Maybe (Rational, Rational)
+readRow :: Expr Resolved -> Either Text (Rational, Rational)
 readRow = \case
-  App _ _ [Lit _ (NumericLit _ t), Lit _ (NumericLit _ r)] -> Just (t, r)
-  _ -> Nothing
+  App _ _ [Lit _ (NumericLit _ t), Lit _ (NumericLit _ r)] -> Right (t, r)
+  _ -> Left ("each bracket of a @desc scale must be `(band OF <threshold literal>, <rate literal>)`. " <> scaleShapeMsg)
 
--- | One @IF y AT LEAST <year> THEN LIST …@ arm → (effective date, bracket rows).
-readArm :: GuardedExpr Resolved -> Maybe (Text, [(Rational, Rational)])
-readArm (MkGuardedExpr _ cond body) = do
-  yr   <- guardYear cond
-  rows <- case body of
-    List _ es -> traverse readRow es
-    _         -> Nothing
-  pure (isoDate yr, rows)
-
--- | Pull the year from a @y AT LEAST <year>@ / @y >= <year>@ guard.
-guardYear :: Expr Resolved -> Maybe Integer
-guardYear = \case
-  App _ ref [_, Lit _ (NumericLit _ y)]
-    | resolvedToText ref `elem` ["__GEQ__", "__GT__"] -> Just (round y)
-  _ -> Nothing
+-- | A year guard in a parameter or scale body: @y AT LEAST <year>@, or
+-- @y GREATER THAN <year>@ (which, for whole years, is @y AT LEAST <year> + 1@).
+-- The left operand must be the value's own year input: anything else is not a
+-- date, and was once read as one.
+guardYear :: Maybe Unique -> Expr Resolved -> Either Text Integer
+guardYear yU cond = case binView cond of
+  Just (op, App _ v [], Lit _ (NumericLit _ n))
+    | Just (getUnique v) == yU, op `elem` ["__GEQ__", "__GT__"] -> do
+        unless (denominator n == 1) $
+          Left ("a year guard compares the year with a whole number; `" <> tshow (fromRational n :: Double) <> "` is not one")
+        let y = numerator n + (if op == "__GT__" then 1 else 0)
+        unless (y > 1900 && y <= 9999) $
+          Left ("a year guard's effective year must lie after 1900 and before 10000 (it is " <> tshow y <> ")")
+        pure y
+  _ -> Left ("a year guard must be `y AT LEAST <year>` or `y GREATER THAN <year>`, where y is the value's own year input and <year> a whole number. " <> parameterShapeMsg)
 
 isoDate :: Integer -> Text
 isoDate y = tshow y <> "-01-01"
@@ -625,79 +927,50 @@ alignByIndex arms =
 epochDate :: Text
 epochDate = "1900-01-01"
 
+-- ---------------------------------------------------------------------------
+-- Dated formulas
+-- ---------------------------------------------------------------------------
+
 -- | Lower a decision body, splitting a top-level @BRANCH IF period reaches …@
 -- into an undated @formula@ (the OTHERWISE) plus dated @formula_YYYY_MM@ arms.
 lowerBody :: LowerEnv -> Expr Resolved -> Either Text (OFExpr, [(Text, OFExpr)])
-lowerBody env body = case splitDated body of
-  Just (arms, oth)
-    | strictlyDescDates (map fst arms) ->
+lowerBody env body = case body of
+  MultiWayIf _ guards oth
+    | any (\(MkGuardedExpr _ c _) -> isPeriodReachesCall c) guards -> do
+        arms <- traverse datedArm guards
+        unless (strictlyDescDates (map fst arms)) $
+          Left "dated-formula BRANCH arms must be in strictly-descending date order \
+               \(OpenFisca selects the latest formula by date, but L4 BRANCH is first-match)"
         (,) <$> lowerExpr env oth
             <*> traverse (\(d, b) -> (,) d <$> lowerExpr env b) arms
-    | otherwise ->
-        Left "dated-formula BRANCH arms must be in strictly-descending date order \
-             \(OpenFisca selects the latest formula by date, but L4 BRANCH is first-match)"
-  Nothing -> (\b -> (b, [])) <$> lowerExpr env body
+  _ -> (\b -> (b, [])) <$> lowerExpr env body
+ where
+  datedArm (MkGuardedExpr _ cond b) = case cond of
+    App _ ref [App _ p [], Lit _ (NumericLit _ y), Lit _ (NumericLit _ mo)]
+      | resolvedToText ref == "period reaches" -> do
+          unless (Just (getUnique p) == env.envPeriod) $
+            Left "the first argument of `period reaches` must be the decision's own `period`"
+          unless (denominator y == 1 && denominator mo == 1 && mo >= 1 && mo <= 12 && y > 1900 && y <= 9999) $
+            Left "`period reaches OF period, <year>, <month>` needs a whole-number year after 1900 and a month from 1 to 12"
+          pure (isoYM (numerator y) (numerator mo), b)
+    _ | isPeriodReachesCall cond ->
+          Left "`period reaches` must be called as `period reaches OF period, <year>, <month>` with number literals for the year and month"
+      | otherwise ->
+          Left "this BRANCH mixes `period reaches` arms with other conditions; for OpenFisca's dated formulas every arm must be `IF period reaches OF period, <year>, <month> THEN …`"
 
--- | Recognise a dated-formula BRANCH: every arm guarded by @period reaches@.
-splitDated :: Expr Resolved -> Maybe ([(Text, Expr Resolved)], Expr Resolved)
-splitDated (MultiWayIf _ guards oth) = do
-  arms <- traverse datedArm guards
-  pure (arms, oth)
-splitDated _ = Nothing
-
-datedArm :: GuardedExpr Resolved -> Maybe (Text, Expr Resolved)
-datedArm (MkGuardedExpr _ cond body) = do
-  (y, m) <- periodReaches cond
-  pure (isoYM y m, body)
-
--- | @period reaches OF period, <year>, <month>@ → (year, month).
-periodReaches :: Expr Resolved -> Maybe (Integer, Integer)
-periodReaches = \case
-  App _ ref [_period, Lit _ (NumericLit _ y), Lit _ (NumericLit _ m)]
-    | resolvedToText ref == "period reaches" -> Just (round y, round m)
-  _ -> Nothing
+isPeriodReachesCall :: Expr Resolved -> Bool
+isPeriodReachesCall = \case
+  App _ ref _ -> resolvedToText ref == "period reaches"
+  _           -> False
 
 isoYM :: Integer -> Integer -> Text
 isoYM y m = tshow y <> "-" <> pad m <> "-01"
  where
   pad n = (if n < 10 then "0" else "") <> tshow n
 
-fieldInfo :: Map Text OFEnumDef -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
-fieldInfo enums fRes fTy mMeans =
-  case listElemRecord fTy of
-    Just elemName -> FieldInfo nm l4 OFFloat             stored (Just elemName)
-    Nothing       -> FieldInfo nm l4 (ofTypeOf enums fTy) stored Nothing
- where
-  l4     = resolvedToText fRes
-  nm     = pyIdent l4
-  stored = isNothing mMeans
-
--- | Scan @DECLARE X IS ONE OF a, b, …@ enum declarations. Returns the enum defs
--- keyed by L4 type name, plus a map from each constructor's 'Unique' to its
--- (Python enum class, Python member) — used to lower @CONSIDER@.
-collectEnums :: Module Resolved -> (Map Text OFEnumDef, Map Unique (Text, Text))
-collectEnums (MkModule _ _ section) =
-  ( Map.fromList [ (ty, ed) | (ty, ed, _)  <- defs ]
-  , Map.fromList (concat   [ cs | (_, _, cs) <- defs ])
-  )
- where
-  defs = goSection section
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
-    Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) ->
-      let ty      = resolvedToText tyRes
-          enPy    = pyType ty
-          members = [ (pyIdent (resolvedToText c), resolvedToText c)      | MkConDecl _ c _ <- conDecls ]
-          cons    = [ (getUnique c, (enPy, pyIdent (resolvedToText c)))   | MkConDecl _ c _ <- conDecls ]
-      in [(ty, OFEnumDef { enName = enPy, enMembers = members }, cons)]
-    Section _ sub -> goSection sub
-    _ -> []
-
--- | If a type is @LIST OF <Record>@, return the element record's name.
-listElemRecord :: Type' Resolved -> Maybe Text
-listElemRecord (TyApp _ lname [inner])
-  | Text.toLower (resolvedToText lname) `elem` ["list", "listof"] = typeRecordName inner
-listElemRecord _ = Nothing
+-- ---------------------------------------------------------------------------
+-- Entities
+-- ---------------------------------------------------------------------------
 
 -- | A stable, human-friendly provenance string for the file header: the
 -- source file's basename (so output does not depend on the invocation path).
@@ -759,37 +1032,75 @@ isPeriodGiven :: OptionallyTypedName Resolved -> Bool
 -- keyword-safe pyIdent, which would rename @period@ → @period_@).
 isPeriodGiven g = Text.toLower (Text.strip (givenText g)) == "period"
 
--- | If a GIVEN's type names a known record, return that record (it is a subject).
-givenRecord :: Map Text RecordInfo -> OptionallyTypedName Resolved -> Maybe RecordInfo
-givenRecord records g = do
+-- | If a GIVEN's type names a record declared in this module, return that
+-- record (it is a subject).
+givenRecord :: Ctx -> OptionallyTypedName Resolved -> Maybe RecordInfo
+givenRecord ctx g = do
   ty <- givenType g
-  nm <- typeRecordName ty
-  Map.lookup nm records
-
-typeRecordName :: Type' Resolved -> Maybe Text
-typeRecordName (TyApp _ name _) = Just (resolvedToText name)
-typeRecordName _                = Nothing
+  TyApp _ name [] <- Just (expandSynonyms ctx ty)
+  Map.lookup (resolvedToText name) ctx.ctxRecords
 
 -- ---------------------------------------------------------------------------
 -- Types
 -- ---------------------------------------------------------------------------
 
-ofTypeFromGiveth :: Map Text OFEnumDef -> GivethSig Resolved -> OFType
-ofTypeFromGiveth enums (MkGivethSig _ ty) = ofTypeOf enums ty
+-- | Expand a type synonym declared in this module (bounded, so a cycle the
+-- typechecker let through cannot loop).
+expandSynonyms :: Ctx -> Type' Resolved -> Type' Resolved
+expandSynonyms ctx = go (10 :: Int)
+ where
+  go 0 t = t
+  go n t = case t of
+    TyApp _ name [] | Just t' <- Map.lookup (resolvedToText name) ctx.ctxSynonyms -> go (n - 1) t'
+    _ -> t
 
-ofTypeOf :: Map Text OFEnumDef -> Type' Resolved -> OFType
-ofTypeOf enums = \case
-  TyApp _ name _ ->
-    let nm = resolvedToText name
-    in case Map.lookup nm enums of
-         Just ed | ((m, _) : _) <- ed.enMembers -> OFEnum ed.enName m
-         _ -> case Text.toLower nm of
-           t | t `elem` ["number", "float", "double", "money", "decimal"] -> OFFloat
-             | t `elem` ["int", "integer"]                                -> OFInt
-             | t `elem` ["boolean", "bool"]                               -> OFBool
-             | t `elem` ["string", "text"]                                -> OFStr
-           _ -> OFFloat
-  _ -> OFFloat
+enumOf :: Ctx -> Type' Resolved -> Maybe EnumInfo
+enumOf ctx ty = case expandSynonyms ctx ty of
+  TyApp _ name [] -> Map.lookup (resolvedToText name) ctx.ctxEnums
+  _               -> Nothing
+
+-- | The OpenFisca value type of an L4 type, or the printed type when there is
+-- none. Only the builtin NUMBER, BOOLEAN and STRING (recognised by identity,
+-- not name) and enums declared in this module whose constructors carry no
+-- fields have one.
+ofTypeOf :: Ctx -> Type' Resolved -> Either Text OFType
+ofTypeOf ctx ty = case expandSynonyms ctx ty of
+  TyApp _ name []
+    | u == numberUnique  -> Right OFFloat
+    | u == booleanUnique -> Right OFBool
+    | u == stringUnique  -> Right OFStr
+    | Just ei <- enumOf ctx ty ->
+        case (ei.eiWithFields, ei.eiDef.enMembers) of
+          ([], (m, _) : _) -> Right (OFEnum ei.eiDef.enName m)
+          (c : _, _)       -> Left (typeText ty <> ", an enum whose constructor `" <> c <> "` carries fields (an OpenFisca Enum cannot)")
+          (_, [])          -> Left (typeText ty <> ", an enum with no constructors")
+    | Map.member (resolvedToText name) ctx.ctxRecords ->
+        Left (typeText ty <> ", a record (nested records are not supported: put the fields you need on the entity's own record)")
+    where u = getUnique name
+  t -> Left (typeText t)
+
+-- | Print an L4 type for a message.
+typeText :: Type' Resolved -> Text
+typeText = \case
+  TyApp _ n []   -> resolvedToText n
+  TyApp _ n args -> resolvedToText n <> " OF " <> Text.intercalate ", " (map arg args)
+  Fun{}          -> "a function type"
+  Forall{}       -> "a polymorphic type"
+  _              -> "an unknown type"
+ where
+  arg t@(TyApp _ _ (_ : _)) = "(" <> typeText t <> ")"
+  arg t                     = typeText t
+
+unrepresentable :: Text -> Text -> Text
+unrepresentable what ty =
+  what <> " has type " <> ty <> ", which the OpenFisca export cannot represent. "
+  <> "OpenFisca variables hold NUMBER, BOOLEAN, STRING, or an enum declared in this module (DECLARE … IS ONE OF, constructors without fields)."
+
+fieldTypeMsg :: RecordInfo -> FieldInfo -> Text -> Text
+fieldTypeMsg ri fi ty =
+  "field `" <> fi.fiL4 <> "` of `" <> ri.riName <> "` has type " <> ty
+  <> ", which the OpenFisca export cannot represent as an input variable (supported: NUMBER, BOOLEAN, STRING, an enum declared in this module, and LIST OF a record declared in this module, which makes a group entity). "
+  <> "Give the OpenFisca-facing record a field of a supported type instead, e.g. a year as a NUMBER."
 
 -- ---------------------------------------------------------------------------
 -- Name helpers
@@ -801,9 +1112,13 @@ decideName (MkDecide _ _ (MkAppForm _ r _ _) _) = r
 resolvedToText :: Resolved -> Text
 resolvedToText = rawNameToText . rawName . getActual
 
+backtick :: Text -> Text
+backtick t = "`" <> t <> "`"
+
 -- | Sanitise an L4 name into a snake_case Python identifier. Must be a total,
 -- deterministic function: the same L4 name always yields the same identifier so
--- variable definitions and references stay in sync.
+-- variable definitions and references stay in sync. A name with non-ASCII
+-- letters or digits keeps them here, and 'validateIdents' refuses the result.
 pyIdent :: Text -> Text
 pyIdent raw =
   let cleaned = Text.map (\c -> if isIdentChar c then toLower c else ' ') raw
@@ -819,8 +1134,10 @@ pyIdent raw =
     | t `Set.member` pyReserved = t <> "_"
     | otherwise                 = t
 
--- | Python keywords (plus the formula-local names @period@/@parameters@/@entity@/
--- @formula@) that a variable name must not shadow; such names get a @_@ suffix.
+-- | Lowercase names a variable must not take, which get a @_@ suffix: the
+-- Python keywords (lowercased, since 'pyIdent' lowercases), the formula-local
+-- names @period@ / @parameters@ / @entity@ / @formula@, and the lowercase
+-- module-level names the emitted file binds (@np@, @build_entity@).
 pyReserved :: Set Text
 pyReserved = Set.fromList
   [ "and","as","assert","async","await","break","class","continue","def","del"
@@ -886,9 +1203,6 @@ isAsciiLetter c = isAsciiLower c || isAsciiUpper c
 
 tshow :: Show a => a -> Text
 tshow = Text.pack . show
-
-firstJust :: [a] -> Maybe a
-firstJust = listToMaybe
 
 mapLeft :: (e -> e') -> Either e a -> Either e' a
 mapLeft f = either (Left . f) Right
