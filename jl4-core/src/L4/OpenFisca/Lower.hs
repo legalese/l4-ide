@@ -105,6 +105,7 @@ data ParamInfo = ParamInfo
 data Callee = Callee
   { calName   :: !Text           -- ^ the OpenFisca variable name
   , calL4     :: !Text
+  , calEntity :: !Text           -- ^ the entity's Python name
   , calRoles  :: ![(ParamRole, Text)]  -- ^ each GIVEN, in order, with its L4 name
   }
 
@@ -131,6 +132,7 @@ lowerModule entInfo mod' =
     efs ->
       let (enums, enumCons) = collectEnums mod'
           synonyms    = collectSynonyms mod'
+          recordNames = collectRecordNames mod'
           ctx0 = Ctx
             { ctxEnums        = enums
             , ctxEnumCons     = enumCons
@@ -140,7 +142,7 @@ lowerModule entInfo mod' =
             , ctxScaleParams  = Map.empty
             , ctxCallees      = Map.empty
             }
-          records = collectRecords ctx0 mod'
+          records = collectRecords ctx0 recordNames mod'
           ctx1    = ctx0 { ctxRecords = records }
           (paramErrs, _, scalars, scales) = collectParams mod'
           ctx = ctx1
@@ -163,7 +165,7 @@ lowerModule entInfo mod' =
                      , pkgScalars    = map snd (Map.elems scalars)
                      , pkgEnums      = map (.eiDef) (Map.elems enums)
                      }
-               in case validateIdents pkg of
+               in case validateIdents pkg <> validatePackage (concatMap fst ok) pkg of
                     []    -> Right pkg
                     vErrs -> Left vErrs
 
@@ -180,7 +182,7 @@ lowerOne ctx ef = mapLeft (LowerError fnName) $ do
     Just ty -> resultType ty
     Nothing -> Left "no GIVETH, and the typechecker inferred no result type: declare it (GIVETH A NUMBER, BOOLEAN or STRING) so the OpenFisca variable gets a value type"
 
-  let (ent, members) = entitiesFor ctx sig
+  (ent, members) <- entitiesFor ctx sig
 
   let env = LowerEnv
         { envCtx        = ctx
@@ -278,17 +280,31 @@ calleeOf ctx ef =
   in Callee
        { calName   = pyIdent ef.exportName
        , calL4     = ef.exportName
+       , calEntity = maybe defaultEntity.entPy ((.riPy) . snd) sig.sigSubject
        , calRoles  = sig.sigRoles
        }
 
 -- | The entity a decision lives on, plus the member entities of a group
 -- subject (each with the record whose fields become its inputs).
-entitiesFor :: Ctx -> Sig -> (OFEntity, [(OFEntity, RecordInfo)])
+entitiesFor :: Ctx -> Sig -> Either Text (OFEntity, [(OFEntity, RecordInfo)])
 entitiesFor ctx sig = case sig.sigSubject of
-  Nothing      -> (defaultEntity, [])
-  Just (_, ri) ->
-    let members = mapMaybe (`Map.lookup` ctx.ctxRecords) (nubOrd (mapMaybe (.fiListElem) ri.riFields))
-    in (recordEntity ri, [ (recordEntity m, m) | m <- members ])
+  Nothing      -> Right (defaultEntity, [])
+  Just (_, ri) -> do
+    let elemNames = nubOrd (mapMaybe (.fiListElem) ri.riFields)
+    members <- case elemNames of
+      []   -> Right []
+      [nm] -> case Map.lookup nm ctx.ctxRecords of
+        Nothing  -> Left ("internal: member record `" <> nm <> "` not found")
+        Just mri
+          | any (isJust . (.fiListElem)) mri.riFields ->
+              Left ("the member record `" <> nm <> "` of the group `" <> ri.riName
+                    <> "` itself has a LIST OF field; nested group entities are not supported. "
+                    <> "Give `" <> nm <> "` scalar fields only.")
+          | otherwise -> Right [(recordEntity mri, mri)]
+      _ -> Left ("the group `" <> ri.riName <> "` has LIST OF fields of different record types ("
+                 <> Text.intercalate ", " (map backtick elemNames)
+                 <> "); an OpenFisca group entity has one member entity. Use one member record for every role.")
+    pure (recordEntity ri, members)
 
 -- ---------------------------------------------------------------------------
 -- Expression lowering
@@ -310,6 +326,7 @@ lowerExpr :: LowerEnv -> Expr Resolved -> Either Text OFExpr
 lowerExpr env = go
  where
   ctx = env.envCtx
+  inMember = isJust env.envMember
 
   go = \case
     And _ a b       -> OFAnd <$> go a <*> go b
@@ -340,7 +357,9 @@ lowerExpr env = go
   lowerProj inner field = case inner of
     App _ s []
       | Just (getUnique s) == env.envSubject, Just ri <- env.envSubjectRi ->
-          OFVarRef <$> fieldRead ri
+          if inMember
+            then Left (groupValueInMember ("`" <> fieldText <> "` of the subject"))
+            else OFVarRef <$> fieldRead ri
       | Just (mu, mri, _) <- env.envMember, getUnique s == mu ->
           OFMembersVar <$> fieldRead mri
       | Just (getUnique s) == env.envPeriod -> case fieldText of
@@ -383,7 +402,8 @@ lowerExpr env = go
     | Just u == env.envSubject = Left "the subject entity cannot be used as a value; read one of its fields, or pass it unchanged to another @export decision"
     | Just (mu, _, _) <- env.envMember, u == mu =
         Left "the member cannot be used as a value; read one of its fields, or pass it unchanged to an @export decision"
-    | Just name <- Map.lookup u env.envScalars, null args = Right (OFVarRef name)
+    | Just name <- Map.lookup u env.envScalars, null args =
+        if inMember then Left (groupValueInMember ("the input `" <> nm <> "`")) else Right (OFVarRef name)
     | not (null args) = Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
     | otherwise = Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
    where
@@ -430,11 +450,22 @@ lowerExpr env = go
   -- when the call passes the subject (or, in an aggregation, the member) and
   -- the period through unchanged, so any other argument is refused.
   exportedCall c args = do
+    when (not inMember && c.calEntity /= env.envEntity) $
+      Left ("cross-entity call: `" <> c.calL4 <> "` is a variable of the entity `" <> c.calEntity
+            <> "`, but this decision is computed on `" <> env.envEntity
+            <> "`. OpenFisca reads a member entity's variable only through an aggregation over the members, e.g. "
+            <> "sum (map (GIVEN m YIELD " <> backtickIfSpaced c.calL4 <> " OF m, period) (<the group>'s <members>)).")
     when (length args /= length c.calRoles) $
       Left ("`" <> c.calL4 <> "` is called with " <> tshow (length args) <> " argument(s) but takes "
             <> tshow (length c.calRoles))
     viaMember <- or . catMaybes <$> zipWithM checkArg [1 :: Int ..] (zip c.calRoles args)
-    pure (if viaMember then OFMembersVar c.calName else OFVarRef c.calName)
+    if viaMember
+      then case env.envMember of
+        Just (_, _, ment) | ment == c.calEntity -> Right (OFMembersVar c.calName)
+        _ -> Left ("cross-entity call: `" <> c.calL4 <> "` is a variable of `" <> c.calEntity <> "`, not of the member entity")
+      else if inMember
+        then Left (groupValueInMember ("the decision `" <> c.calL4 <> "` of the group"))
+        else Right (OFVarRef c.calName)
    where
     checkArg i ((role, pname), arg) = case (role, arg) of
       (RoleSubject, App _ x [])
@@ -474,18 +505,23 @@ lowerExpr env = go
       mk role <$> lowerMember mp mri ment pbody
     _ -> Left "`any`/`all` are supported only as `any (GIVEN m YIELD <pred>) (<members>)`"
 
-  lowerMember mp mri ment body =
-    lowerExpr (env { envMember = Just (getUnique (givenName mp), mri, ment) }) body
+  lowerMember mp mri ment body = do
+    e <- lowerExpr (env { envMember = Just (getUnique (givenName mp), mri, ment) }) body
+    unless (mentionsMember e) $
+      Left "the per-member expression inside the aggregation does not read the member; OpenFisca aggregates a per-member array, so read a field or @export decision of the member"
+    pure e
 
   -- Resolve a member-list expression to (role selection, member record,
   -- member entity): a role of @Nothing@ means all members.
-  resolveMembers lst = case (lst, env.envSubjectRi) of
+  resolveMembers lst
+    | inMember = Left "nested aggregations are not supported"
+    | otherwise = case (lst, env.envSubjectRi) of
         (Proj _ (App _ s []) fieldRes, Just ri)
           | Just (getUnique s) == env.envSubject ->
               case find (\fi -> fi.fiL4 == resolvedToText fieldRes) ri.riFields of
                 Just fi | Just elemNm <- fi.fiListElem, Just mri <- Map.lookup elemNm ctx.ctxRecords ->
                   let listFields = filter (isJust . (.fiListElem)) ri.riFields
-                      role = if length listFields <= 1 then Nothing else Just (singularize fi.fiName)
+                      role = if length listFields <= 1 then Nothing else Just (roleKey fi.fiName)
                   in Right (role, mri, mri.riPy)
                 _ -> Left ("`" <> resolvedToText fieldRes <> "` is not a LIST OF members field of `" <> ri.riName <> "`")
         (App _ ref [App _ s []], Just ri)
@@ -536,6 +572,21 @@ lowerExpr env = go
     d <- go oth
     arms <- traverse (\(MkGuardedExpr _ c b) -> (,) <$> go c <*> go b) guards
     pure (foldr (\(c, v) acc -> OFCond c v acc) d arms)
+
+-- | Does the expression read the aggregation's member?
+mentionsMember :: OFExpr -> Bool
+mentionsMember = \case
+  OFMembersVar _ -> True
+  OFBin _ a b    -> mentionsMember a || mentionsMember b
+  OFCmp _ a b    -> mentionsMember a || mentionsMember b
+  OFAnd a b      -> mentionsMember a || mentionsMember b
+  OFOr a b       -> mentionsMember a || mentionsMember b
+  OFNot a        -> mentionsMember a
+  OFNeg a        -> mentionsMember a
+  OFCond a b c   -> mentionsMember a || mentionsMember b || mentionsMember c
+  OFNpCall _ as  -> any mentionsMember as
+  OFScaleCalc _ a -> mentionsMember a
+  _              -> False
 
 -- | The builtin operators L4 desugars infix syntax into. Returns a combiner
 -- that consumes the already-lowered argument expressions.
@@ -639,20 +690,25 @@ topDecls (MkModule _ _ section) = goSection section
     Section _ sub -> goSection sub
     d             -> [d]
 
+collectRecordNames :: Module Resolved -> Set Text
+collectRecordNames m = Set.fromList
+  [ resolvedToText recRes
+  | Declare _ (MkDeclare _ _ (MkAppForm _ recRes _ _) (RecordDecl{})) <- topDecls m ]
+
 collectSynonyms :: Module Resolved -> Map Text (Type' Resolved)
 collectSynonyms m = Map.fromList
   [ (resolvedToText tyRes, ty)
   | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes [] _) (SynonymDecl _ ty)) <- topDecls m ]
 
-collectRecords :: Ctx -> Module Resolved -> Map Text RecordInfo
-collectRecords ctx m = Map.fromList
+collectRecords :: Ctx -> Set Text -> Module Resolved -> Map Text RecordInfo
+collectRecords ctx recordNames m = Map.fromList
   [ (nm, RecordInfo
        { riName   = nm
        , riKey    = Text.toLower (pyIdent nm)
        , riPlural = Text.toLower (pyIdent nm) <> "s"
        , riPy     = pyType nm
        , riFields =
-           [ fieldInfo ctx fRes fTy mMeans
+           [ fieldInfo ctx recordNames fRes fTy mMeans
            | MkTypedName _ fRes fTy _ mMeans <- fields
            ]
        })
@@ -660,9 +716,9 @@ collectRecords ctx m = Map.fromList
   , let nm = resolvedToText recRes
   ]
 
-fieldInfo :: Ctx -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
-fieldInfo ctx fRes fTy mMeans =
-  case listElemRecord ctx fTy of
+fieldInfo :: Ctx -> Set Text -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
+fieldInfo ctx recordNames fRes fTy mMeans =
+  case listElemRecord ctx recordNames fTy of
     Just elemName -> FieldInfo nm l4 (Right OFFloat) stored (Just elemName)
     Nothing       -> FieldInfo nm l4 (ofTypeOf ctx fTy) stored Nothing
  where
@@ -670,10 +726,14 @@ fieldInfo ctx fRes fTy mMeans =
   nm     = pyIdent l4
   stored = isNothing mMeans
 
--- | If a type is @LIST OF <R>@, return the element type's name.
-listElemRecord :: Ctx -> Type' Resolved -> Maybe Text
-listElemRecord ctx ty = case expandSynonyms ctx ty of
-  TyApp _ l [TyApp _ r _] | getUnique l == listUnique -> Just (resolvedToText r)
+-- | If a type is @LIST OF <R>@ for a record @R@ declared in this module,
+-- return @R@'s name. A list of anything else is not a member list.
+listElemRecord :: Ctx -> Set Text -> Type' Resolved -> Maybe Text
+listElemRecord ctx recordNames ty = case expandSynonyms ctx ty of
+  TyApp _ l [inner]
+    | getUnique l == listUnique
+    , TyApp _ r [] <- expandSynonyms ctx inner
+    , resolvedToText r `Set.member` recordNames -> Just (resolvedToText r)
   _ -> Nothing
 
 -- | Scan @DECLARE X IS ONE OF a, b, …@ enum declarations.
@@ -1004,15 +1064,67 @@ recordEntity ri =
 -- (naive) singular, so @adults@ → role @adult@ (constant @Entity.ADULT@).
 fieldRole :: FieldInfo -> OFRole
 fieldRole fi = OFRole
-  { roleKey    = singularize fi.fiName
+  { roleKey    = roleKey fi.fiName
   , rolePlural = fi.fiName
   , roleLabel  = fi.fiName
   }
 
-singularize :: Text -> Text
-singularize t = case Text.unsnoc t of
-  Just (pre, 's') | not (Text.null pre) -> pre
-  _                                     -> t
+-- | The role key of a LIST OF field: its singular, by stripping one trailing
+-- @s@. Words ending in @ss@, @us@ or @is@ are not English plurals of that shape
+-- (@status@, @class@, @basis@), so they keep their name rather than become
+-- @statu@. This is still a heuristic, and the key is only a label: OpenFisca
+-- situations name a role by its plural, which is the field name unchanged.
+roleKey :: Text -> Text
+roleKey t = case Text.unsnoc t of
+  Just (pre, 's')
+    | not (Text.null pre)
+    , not (any (`Text.isSuffixOf` pre) ["s", "u", "i"]) -> pre
+  _ -> t
+
+-- ---------------------------------------------------------------------------
+-- Checks over the whole package
+-- ---------------------------------------------------------------------------
+
+-- | What the emitted module needs to load in OpenFisca: one definition per
+-- entity name and exactly one person entity; distinct roles; and every Python
+-- name bound once ('validateIdents' checks that each is a valid identifier).
+validatePackage :: [OFEntity] -> OFPackage -> [LowerError]
+validatePackage allEnts pkg =
+     entityConflicts
+  <> personCount
+  <> concatMap roleChecks pkg.pkgEntities
+  <> topLevelClashes
+ where
+  mkErr = LowerError ""
+
+  entityConflicts =
+    [ mkErr ("the record `" <> e.entPy <> "` would be both a group entity (it has a LIST OF field) and the person entity; OpenFisca needs one definition per entity")
+    | e <- pkg.pkgEntities
+    , any (\e' -> e'.entPy == e.entPy && e' /= e) allEnts
+    ]
+
+  persons = [ e.entPy | e <- pkg.pkgEntities, e.entIsPerson ]
+  personCount = case persons of
+    [_] -> []
+    []  -> [mkErr "no person entity: OpenFisca needs exactly one entity whose members are individuals (a record without LIST OF fields)"]
+    ps  -> [mkErr ("OpenFisca allows exactly one person entity, but this module would declare "
+                   <> tshow (length ps) <> ": " <> Text.intercalate ", " (map backtick ps)
+                   <> ". Export them from separate modules, or make one of them a group entity (a record with a LIST OF field of the other).")]
+
+  roleChecks e =
+    let keys    = map (.roleKey) e.entRoles
+        plurals = map (.rolePlural) e.entRoles
+        varsOnE = [ v.varName | v <- pkg.pkgVariables, v.varEntity == e.entPy ]
+    in [ mkErr ("two roles of `" <> e.entPy <> "` share the key `" <> k <> "`; rename one of the LIST OF fields") | k <- dups keys ]
+       <> [ mkErr ("the role `" <> p <> "` of `" <> e.entPy <> "` has the same name as a variable of that entity; an OpenFisca situation could not tell them apart, so rename one")
+          | p <- plurals, p `elem` varsOnE ]
+
+  topLevelClashes =
+    [ mkErr ("two definitions would both be bound to the Python name `" <> n <> "` in the emitted module; rename one")
+    | n <- dups (map (.entPy) pkg.pkgEntities <> map (.enName) pkg.pkgEnums <> map (.varName) pkg.pkgVariables)
+    ]
+
+  dups xs = nubOrd [ x | (x, i) <- zip xs [0 :: Int ..], (y, j) <- zip xs [0 ..], x == y, i < j ]
 
 -- ---------------------------------------------------------------------------
 -- GIVEN parameter helpers
@@ -1102,6 +1214,11 @@ fieldTypeMsg ri fi ty =
   <> ", which the OpenFisca export cannot represent as an input variable (supported: NUMBER, BOOLEAN, STRING, an enum declared in this module, and LIST OF a record declared in this module, which makes a group entity). "
   <> "Give the OpenFisca-facing record a field of a supported type instead, e.g. a year as a NUMBER."
 
+groupValueInMember :: Text -> Text
+groupValueInMember what =
+  "inside an aggregation over members, the per-member expression can read only the member's own fields and @export decisions, the period, parameters and constants; "
+  <> what <> " is a value of the group, which OpenFisca would have to project onto the members (`project`), and the export does not compile that"
+
 -- ---------------------------------------------------------------------------
 -- Name helpers
 -- ---------------------------------------------------------------------------
@@ -1114,6 +1231,9 @@ resolvedToText = rawNameToText . rawName . getActual
 
 backtick :: Text -> Text
 backtick t = "`" <> t <> "`"
+
+backtickIfSpaced :: Text -> Text
+backtickIfSpaced t = if Text.any (== ' ') t then backtick t else t
 
 -- | Sanitise an L4 name into a snake_case Python identifier. Must be a total,
 -- deterministic function: the same L4 name always yields the same identifier so

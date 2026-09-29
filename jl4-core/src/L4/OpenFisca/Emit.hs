@@ -108,13 +108,56 @@ formulaLines v =
     let args = if usesParams body
                  then v.varEntKey <> ", period, parameters"
                  else v.varEntKey <> ", period"
+        rendered = emitExpr v.varEntKey v.varEntity body
+        -- An expression that reads no variable is a scalar. A bare Python
+        -- number broadcasts, but numpy's where/maximum/minimum over scalars
+        -- return a 0-d array, which OpenFisca rejects as soon as the entity
+        -- has two or more members ("its length is 1 while there are 2
+        -- persons"). Fill an array of the entity's size with it instead.
+        ret | needsBroadcast body = v.varEntKey <> ".filled_array(" <> rendered <> ")"
+            | otherwise           = rendered
     in [ ind 1 <> "def " <> name <> "(" <> args <> "):"
-       , ind 2 <> "return " <> emitExpr v.varEntKey v.varEntity body
+       , ind 2 <> "return " <> ret
        ]
   -- "YYYY-MM-DD" → "YYYY_MM" (OpenFisca dated-formula method suffix).
   dateSuffix d = case Text.splitOn "-" d of
     (y : m : _) -> y <> "_" <> m
     _           -> Text.replace "-" "_" d
+
+-- | Does a formula body produce a numpy 0-d array instead of an array of the
+-- entity's size? True when it reads no variable of any entity yet goes through
+-- a numpy call ('OFCond' is @np.where@; 'OFNpCall' is @np.maximum@ etc.).
+needsBroadcast :: OFExpr -> Bool
+needsBroadcast e = not (readsVariables e) && usesNumpy e
+ where
+  readsVariables = \case
+    OFVarRef _      -> True
+    OFMembersVar _  -> True
+    OFSum _ _       -> True
+    OFAny _ _       -> True
+    OFAll _ _       -> True
+    OFNbPersons _   -> True
+    OFBin _ a b     -> readsVariables a || readsVariables b
+    OFCmp _ a b     -> readsVariables a || readsVariables b
+    OFAnd a b       -> readsVariables a || readsVariables b
+    OFOr a b        -> readsVariables a || readsVariables b
+    OFNot a         -> readsVariables a
+    OFNeg a         -> readsVariables a
+    OFCond a b c    -> readsVariables a || readsVariables b || readsVariables c
+    OFNpCall _ as   -> any readsVariables as
+    OFScaleCalc _ a -> readsVariables a
+    _               -> False
+  usesNumpy = \case
+    OFCond _ _ _    -> True
+    OFNpCall _ _    -> True
+    OFBin _ a b     -> usesNumpy a || usesNumpy b
+    OFCmp _ a b     -> usesNumpy a || usesNumpy b
+    OFAnd a b       -> usesNumpy a || usesNumpy b
+    OFOr a b        -> usesNumpy a || usesNumpy b
+    OFNot a         -> usesNumpy a
+    OFNeg a         -> usesNumpy a
+    OFScaleCalc _ a -> usesNumpy a
+    _               -> False
 
 usesParams :: OFExpr -> Bool
 usesParams = \case
