@@ -78,3 +78,8 @@ jl4-mlir/parity-report/
 
 # local API-key files dropped into a worktree for a demo; never commit
 anthropic-apikey-*.api
+
+# The "<body of law>: go" pipeline: the private repository legalese/l4-pipeline,
+# cloned here by those who have it (see its README). Every path it names is
+# relative to this checkout's root, which is why it lives inside one.
+/etc/go/

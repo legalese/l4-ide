@@ -10,7 +10,7 @@ It sits between two other things:
 
 - **[`writing-l4-rules`](../writing-l4-rules/SKILL.md)** teaches the language: syntax, `IS` / `MEANS` / `IF`, regulative rules, dates, and the drafting idioms for statutory text (`references/drafting-patterns.md` and `references/source-patterns/` there).
   Everything in this skill that says "encode" means "encode the way that skill says".
-- **The `go` pipeline** in the `legalese/l4-ide` repository (the `go.sh` driver under `etc/go/`, and the `running-the-l4-pipeline` skill that lives only there) takes a _finished_ encoding and checks it, projects it to DMN, BPMN, a web wizard and so on, and writes a conversion report.
+- **The `go` pipeline** — Legalese's private repository `legalese/l4-pipeline`, run from `etc/go/` of an l4-ide checkout, with its own `running-the-l4-pipeline` skill — takes a _finished_ encoding and checks it, projects it to DMN, BPMN, a web wizard and so on, and writes a conversion report.
   It does not write L4.
   You do not need it to produce a good encoding, and nothing in this skill depends on it.
 
