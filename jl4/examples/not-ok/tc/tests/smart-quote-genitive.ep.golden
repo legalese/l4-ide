@@ -1,0 +1,13 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: smart-quote-genitive.l4
+  Hidden: no
+  Range: 16:23-16:24
+  Source: lexer
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This character looks like `'`, but it is a different, similar-looking character: Right Single Quotation Mark (U+2019).
+
+    This usually happens when text is pasted in from a word processor — Word, Pages or Google Docs — which silently swaps plain punctuation for a fancier-looking lookalike as you type.
+
+    Replace it with `'`.

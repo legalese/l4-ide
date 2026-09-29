@@ -15,6 +15,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Bare positional payload in sum types](#bare-positional-payload-in-sum-types)
   - [Boolean literal case](#boolean-literal-case)
   - [Parentheses required for field access](#parentheses-required-for-field-access)
+  - [Curly quotes and dashes from a word processor](#curly-quotes-and-dashes-from-a-word-processor)
 - [Indentation Errors](#indentation-errors)
   - [Body less indented than definition](#body-less-indented-than-definition)
   - [Multi-line function arguments](#multi-line-function-arguments)
@@ -195,6 +196,44 @@ all (GIVEN g YIELD g's age >= 18) charity's governors
 ```l4
 all (GIVEN g YIELD g's age >= 18) (charity's governors)
 ```
+
+---
+
+### Curly quotes and dashes from a word processor
+
+**Error message:** `This character looks like ... but it is a different, similar-looking character`
+
+**What you wrote:**
+
+If you drafted your contract in Microsoft Word, Pages or Google Docs and pasted the text into L4, the word processor has quietly swapped some of your punctuation for fancier-looking lookalikes as you typed. A straight apostrophe (`'`) becomes a curly one (`‘` or `’`). A straight quotation mark (`"`) becomes a curly pair (`“` and `”`). Two hyphens (`--`) become a long dash (`—` or `–`). Three dots (`...`) become a single ellipsis character (`…`). None of these look wrong to a human reader — that is the whole point of AutoFormat — but L4 does not recognize them:
+
+```l4
+GIVEN p IS A Person
+DECIDE `is adult` IF p’s age >= 18
+```
+
+That apostrophe looks ordinary, but it is a Right Single Quotation Mark (`’`), not the plain one L4's `'s` (the "read a field off something" operator) expects.
+
+**What went wrong:** L4 tells you exactly which character is the problem, rather than the generic "unexpected token" you would otherwise get:
+
+```
+This character looks like `'`, but it is a different, similar-looking
+character: Right Single Quotation Mark (U+2019).
+
+This usually happens when text is pasted in from a word processor — Word,
+Pages or Google Docs — which silently swaps plain punctuation for a
+fancier-looking lookalike as you type.
+
+Replace it with `'`.
+```
+
+The message names the glyph, its Unicode code point, and the plain character it is standing in for, so you do not have to guess. It never shows you the usual "expecting one of: ..." list, because that list is for someone who already knows the grammar — here the fix is simpler than that.
+
+**How to fix it:** In the editor, click the lightbulb (or run the "Quick Fix" command) on the flagged character and choose the suggested replacement. For a whole file pasted in from a word processor, use "Straighten all smart punctuation in this file" instead — it walks the document fixing every occurrence in one go and tells you how many it changed.
+
+**The dash is genuinely ambiguous, and you may need to pick.** Word turns both a minus sign surrounded by spaces and a double-hyphen comment marker into the same long dash, so L4 cannot always tell which one you meant. The quick fix on a single dash offers two choices — "Replace with `-`" (arithmetic) and "Replace with `--`" (start a comment) — and you choose. The whole-file straighten makes this call automatically using position: a dash that starts its line, or that has two or more spaces before it, is treated as the start of a comment; anywhere else it becomes a plain hyphen.
+
+**What is deliberately left alone:** curly quotes that already sit inside a string literal (quoting a clause of a statute, say) or inside a backtick-quoted name are not flagged at all, and the whole-file straighten does not touch them either. Those are legitimate typographical quotation marks in the middle of quoted prose — the corpus this project is built from has hundreds of lines like that — and L4 already lexes them without complaint. The diagnostic above fires only where the curly character is doing a JOB in the code itself: opening a string, standing in for `'s`, or replacing `...`. The one further exception is a name that fails to resolve — if straightening the curly characters out of it would make it match something already in scope, L4 offers that as a suggested fix too.
 
 ---
 
