@@ -201,7 +201,7 @@ all (GIVEN g YIELD g's age >= 18) (charity's governors)
 
 ### Curly quotes and dashes from a word processor
 
-**Error message:** `` This is ’ (Right Single Quotation Mark, U+2019). It looks like `'`, but L4 only understands the plain one. `` (or the same for another curly quote, dash or ellipsis)
+**Error message:** ``This is ’ (Right Single Quotation Mark, U+2019). It looks like `'`, but L4 only understands the plain one.`` (or the same for another curly quote, dash or ellipsis)
 
 **What you wrote:**
 
@@ -235,7 +235,7 @@ The message shows you the actual character on your screen, not just its name —
 
 **What is deliberately left alone:** curly quotes that already sit inside a string literal (quoting a clause of a statute, say) or inside a backtick-quoted name are not flagged at all, and the whole-file straighten does not touch them either. Those are legitimate typographical quotation marks in the middle of quoted prose — L4's own example library uses them that way on over 350 lines — and L4 already lexes them without complaint. The diagnostic above fires only where the curly character is doing a job in the code itself: opening a string, standing in for `'s`, or replacing `...`. The one further exception is a name that fails to resolve — if straightening the curly characters out of it would make it match something already in scope, L4 offers that as a suggested fix too.
 
-**A related, gentler warning: an invisible non-breaking space.** A word processor (or a browser you copied text from) sometimes inserts a *non-breaking space* — U+00A0 — instead of an ordinary one, most often around a number or a unit, so a line does not wrap in the wrong place. It looks completely ordinary and L4 does not refuse it: L4 treats it as whitespace, your code keeps parsing, and indentation-sensitive layout still works. That is exactly why it is worth a warning rather than nothing at all — an invisible character that happens to work today is still a trap for a future search-and-replace or diff. You will see it as a yellow squiggle, not a red one:
+**A related, gentler warning: an invisible non-breaking space.** A word processor (or a browser you copied text from) sometimes inserts a _non-breaking space_ — U+00A0 — instead of an ordinary one, most often around a number or a unit, so a line does not wrap in the wrong place. It looks completely ordinary and L4 does not refuse it: L4 treats it as whitespace, your code keeps parsing, and indentation-sensitive layout still works. That is exactly why it is worth a warning rather than nothing at all — an invisible character that happens to work today is still a trap for a future search-and-replace or diff. You will see it as a yellow squiggle, not a red one:
 
 ```
 non-breaking space (U+00A0) used where a normal space was expected — this
