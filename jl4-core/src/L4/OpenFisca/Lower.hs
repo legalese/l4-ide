@@ -87,10 +87,11 @@ data EnumInfo = EnumInfo
   , eiWithFields :: ![Text]  -- ^ constructors that carry fields (an OpenFisca Enum cannot)
   }
 
--- | An enum constructor: its Python class and member.
+-- | An enum constructor: its Python class and member, and its enum's L4 name.
 data EnumCon = EnumCon
   { ecClass  :: !Text
   , ecMember :: !Text
+  , ecEnumL4 :: !Text
   }
 
 -- | A legislation parameter (@\@desc parameter@ or @\@desc scale@).
@@ -114,19 +115,22 @@ data ParamRole = RoleSubject | RolePeriod | RoleOther
 
 -- | Everything about the module that lowering a decision needs.
 data Ctx = Ctx
-  { ctxEnums        :: !(Map Text EnumInfo)
+  { ctxSelfUri      :: !NormalizedUri
+  , ctxEnums        :: !(Map Text EnumInfo)
   , ctxEnumCons     :: !(Map Unique EnumCon)
   , ctxSynonyms     :: !(Map Text (Type' Resolved))
   , ctxRecords      :: !(Map Text RecordInfo)
+  , ctxDecides      :: !(Map Unique (Decide Resolved))  -- ^ every top-level DECIDE in the module
   , ctxScalarParams :: !(Map Unique ParamInfo)
   , ctxScaleParams  :: !(Map Unique ParamInfo)
   , ctxCallees      :: !(Map Unique Callee)
+  , ctxBadParams    :: !(Set Unique)  -- ^ @desc parameter/scale values refused (their own error says why)
   }
 
 -- | The 'EntityInfo' supplies the inferred result type of a decision that has
 -- no GIVETH.
 lowerModule :: EntityInfo -> Module Resolved -> Either [LowerError] OFPackage
-lowerModule entInfo mod' =
+lowerModule entInfo mod'@(MkModule _ selfUri _) =
   case enrichReturnTypes entInfo (getExportedFunctions mod') of
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
     efs ->
@@ -134,19 +138,23 @@ lowerModule entInfo mod' =
           synonyms    = collectSynonyms mod'
           recordNames = collectRecordNames mod'
           ctx0 = Ctx
-            { ctxEnums        = enums
+            { ctxSelfUri      = selfUri
+            , ctxEnums        = enums
             , ctxEnumCons     = enumCons
             , ctxSynonyms     = synonyms
             , ctxRecords      = Map.empty
+            , ctxDecides      = collectDecides mod'
             , ctxScalarParams = Map.empty
             , ctxScaleParams  = Map.empty
             , ctxCallees      = Map.empty
+            , ctxBadParams    = Set.empty
             }
           records = collectRecords ctx0 recordNames mod'
           ctx1    = ctx0 { ctxRecords = records }
-          (paramErrs, _, scalars, scales) = collectParams mod'
+          (paramErrs, badParams, scalars, scales) = collectParams ctx1 mod'
           ctx = ctx1
-            { ctxScalarParams = Map.map fst scalars
+            { ctxBadParams    = badParams
+            , ctxScalarParams = Map.map fst scalars
             , ctxScaleParams  = Map.map fst scales
             , ctxCallees      = Map.fromList
                 [ (getUnique (decideName ef.exportDecide), calleeOf ctx1 ef) | ef <- efs ]
@@ -247,7 +255,8 @@ lowerOne ctx ef = mapLeft (LowerError fnName) $ do
  where
   fnName = pyIdent ef.exportName
   resultType ty
-    = first (unrepresentable "its result") (ofTypeOf ctx ty)
+    | Just ei <- enumOf ctx ty = Left (enumResultMsg ei.eiL4)
+    | otherwise                = first (unrepresentable "its result") (ofTypeOf ctx ty)
 
 -- | A decision's GIVENs, sorted into the subject (the first record-typed
 -- GIVEN that is not the period), the conventional @period@, and the rest.
@@ -391,9 +400,13 @@ lowerExpr env = go
     | isBuiltinRef ref, Just mk <- builtinOp nm = traverse go args >>= mk
     | isBuiltinRef ref, u == trueUnique,  null args = Right (OFBoolLit True)
     | isBuiltinRef ref, u == falseUnique, null args = Right (OFBoolLit False)
-    | nm `elem` preludeRecognised = preludeCall
+    | Just ec <- Map.lookup u ctx.ctxEnumCons = Left (enumValueMsg nm ec.ecEnumL4)
+    | nm `elem` preludeRecognised =
+        if isPreludeRef ctx ref then preludeCall else Left (shadowedPreludeMsg ctx ref)
     | nm `elem` conventionNames = conventionCall
     | Just p <- Map.lookup u ctx.ctxScalarParams = OFParamRef p.piPath <$ paramArgs p args
+    | u `Set.member` ctx.ctxBadParams =
+        Left ("`" <> nm <> "` is a @desc parameter/scale value that the export refused (see its own error above), so calls to it cannot be compiled either")
     | Just _ <- Map.lookup u ctx.ctxScaleParams =
         Left ("`" <> nm <> "` is a marginal-rate scale (@desc scale); it can be used only as the brackets argument of `scale tax`")
     | Just c <- Map.lookup u ctx.ctxCallees = exportedCall c args
@@ -404,8 +417,8 @@ lowerExpr env = go
         Left "the member cannot be used as a value; read one of its fields, or pass it unchanged to an @export decision"
     | Just name <- Map.lookup u env.envScalars, null args =
         if inMember then Left (groupValueInMember ("the input `" <> nm <> "`")) else Right (OFVarRef name)
-    | not (null args) = Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
-    | otherwise = Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
+    | not (null args) = Left (helperCallMsg nm)
+    | otherwise = Left ("unbound reference `" <> nm <> "` (recursion, prelude values, and local bindings are not supported)")
    where
     u  = getUnique ref
     nm = resolvedToText ref
@@ -421,12 +434,16 @@ lowerExpr env = go
       _ -> Left ("`" <> nm <> "` is called with an unsupported number of arguments")
 
     conventionCall = case nm of
-      "scale tax" ->
+      "scale tax" -> do
+        checkConvention ctx "scale tax" ref
         case args of
           [income, App _ sref sargs]
             | Just p <- Map.lookup (getUnique sref) ctx.ctxScaleParams -> do
                 paramArgs p sargs
                 OFScaleCalc p.piPath <$> go income
+          [_, App _ sref _]
+            | getUnique sref `Set.member` ctx.ctxBadParams ->
+                Left ("`" <> resolvedToText sref <> "` is a @desc scale value that the export refused (see its own error above), so `scale tax` over it cannot be compiled either")
           _ -> Left "`scale tax` must be called as `scale tax OF <income>, <a @desc scale value>`"
       "members of" ->
         Left "`members of` is supported only as the member list of sum, count, any or all"
@@ -492,7 +509,7 @@ lowerExpr env = go
   -- where <members> is `h's <role>` (role-restricted) or `members of OF h` (all).
   aggSum = \case
     App _ mref [Lam _ (MkGivenSig _ [mp]) lbody, lst]
-      | resolvedToText mref == "map" -> do
+      | resolvedToText mref == "map", isPreludeRef ctx mref -> do
           (role, mri, ment) <- resolveMembers lst
           OFSum role <$> lowerMember mp mri ment lbody
     _ -> Left "`sum` is supported only as `sum (map (GIVEN m YIELD …) (<members>))`"
@@ -526,7 +543,8 @@ lowerExpr env = go
                 _ -> Left ("`" <> resolvedToText fieldRes <> "` is not a LIST OF members field of `" <> ri.riName <> "`")
         (App _ ref [App _ s []], Just ri)
           | resolvedToText ref == "members of"
-          , Just (getUnique s) == env.envSubject ->
+          , Just (getUnique s) == env.envSubject -> do
+              checkMembersOf ctx ref ri
               case mapMaybe (\fi -> fi.fiListElem >>= (`Map.lookup` ctx.ctxRecords)) ri.riFields of
                 (mri : _) -> Right (Nothing, mri, mri.riPy)
                 []        -> Left ("`" <> ri.riName <> "` has no LIST OF members field")
@@ -668,16 +686,158 @@ constructorName = \case
 -- ---------------------------------------------------------------------------
 
 -- | Prelude functions the export compiles to OpenFisca's own operations.
+-- They are recognised only when the call resolves to the PRELUDE's
+-- definition: a module that defines its own @sum@ gets a refusal, not
+-- OpenFisca's aggregation.
 preludeRecognised :: [Text]
 preludeRecognised = ["sum", "map", "count", "any", "all", "max", "min"]
 
 -- | Helpers the export recognises by name and compiles to an OpenFisca
--- construct, which the MODULE defines (the prelude has none of them).
+-- construct, which the MODULE defines (the prelude has none of them). Each is
+-- accepted only when its definition is the canonical one ('checkConvention',
+-- 'checkMembersOf'); a module whose definition differs gets a refusal rather
+-- than OpenFisca's semantics silently replacing its own.
 conventionNames :: [Text]
 conventionNames = ["period reaches", "scale tax", "members of"]
 
 isBuiltinRef :: Resolved -> Bool
 isBuiltinRef r = (getUnique r).moduleUri == builtinUri
+
+-- | Does the name resolve to a definition in the L4 prelude? Tested by the
+-- defining module's basename (the prelude reaches us as a @file:@ URI or as
+-- @jl4-embedded:/prelude.l4@ depending on the resolver), and never this module.
+isPreludeRef :: Ctx -> Resolved -> Bool
+isPreludeRef ctx r =
+  let uri = (getUnique r).moduleUri
+  in uri /= ctx.ctxSelfUri && uriBasename uri == "prelude.l4"
+
+uriBasename :: NormalizedUri -> Text
+uriBasename uri = case reverse (Text.splitOn "/" (getUri (fromNormalizedUri uri))) of
+  (b : _) -> b
+  []      -> ""
+
+-- | The canonical definitions of the name-recognised helpers, as L4 source.
+canonicalSource :: Text -> Text
+canonicalSource = \case
+  "period reaches" -> Text.unlines
+    [ "    GIVEN `the period` IS A Period, y IS A NUMBER, m IS A NUMBER"
+    , "    GIVETH A BOOLEAN"
+    , "    `period reaches` MEANS"
+    , "        (`the period`'s year GREATER THAN y)"
+    , "        OR (`the period`'s year EQUALS y AND `the period`'s month AT LEAST m)" ]
+  "scale tax" -> Text.unlines
+    [ "    GIVEN income IS A NUMBER, brackets IS A LIST OF Bracket"
+    , "    GIVETH A NUMBER"
+    , "    `scale tax` MEANS"
+    , "        CONSIDER brackets"
+    , "        WHEN EMPTY THEN 0"
+    , "        WHEN b FOLLOWED BY rest THEN"
+    , "            CONSIDER rest"
+    , "            WHEN EMPTY THEN b's rate TIMES (max 0 (income MINUS b's threshold))"
+    , "            WHEN nextB FOLLOWED BY anything THEN"
+    , "                  (b's rate TIMES (max 0 ((min income (nextB's threshold)) MINUS b's threshold)))"
+    , "                PLUS (`scale tax` OF income, rest)" ]
+  _ -> ""
+
+-- | The alpha-normalised shape ('shapeOf') of each canonical definition.
+canonicalShape :: Text -> Text
+canonicalShape = \case
+  "period reaches" ->
+    "(__OR__ (__GT__ (. $0 year) $1) (__AND__ (__EQUALS__ (. $0 year) $1) (__GEQ__ (. $0 month) $2)))"
+  "scale tax" ->
+    "(CONSIDER $1 (WHEN EMPTY 0) (WHEN (FOLLOWED_BY $2 $3) (CONSIDER $3 (WHEN EMPTY (__TIMES__ (. $2 rate) (@max 0 (__MINUS__ $0 (. $2 threshold))))) (WHEN (FOLLOWED_BY $4 $5) (__PLUS__ (__TIMES__ (. $2 rate) (@max 0 (__MINUS__ (@min $0 (. $4 threshold)) (. $2 threshold)))) (SELF $0 $3))))))"
+  _ -> ""
+
+-- | Accept a call to a name-recognised helper only when the module defines it
+-- canonically.
+checkConvention :: Ctx -> Text -> Resolved -> Either Text ()
+checkConvention ctx nm ref = case Map.lookup (getUnique ref) ctx.ctxDecides of
+  Just d | decideShape ctx d == canonicalShape nm -> Right ()
+  found ->
+    Left ("`" <> nm <> "` is recognised by name and compiled to "
+          <> (if nm == "scale tax" then "OpenFisca's marginal-rate `.calc()`" else "OpenFisca's dated formulas (formula_YYYY_MM)")
+          <> ", so the export accepts it only when this module defines it exactly as:\n"
+          <> canonicalSource nm
+          <> (if isJust found then "This module's definition differs (only the names of its inputs and local variables may change), so OpenFisca would compute something else; rename your helper."
+                              else "Here it is not defined in this module; copy the definition above into it."))
+
+-- | @members of@ must return every LIST OF members field of the group.
+checkMembersOf :: Ctx -> Resolved -> RecordInfo -> Either Text ()
+checkMembersOf ctx ref ri =
+  let listFields = [ fi.fiL4 | fi <- ri.riFields, isJust fi.fiListElem ]
+      canonical  = "`members of` MEANS concat (LIST " <> Text.intercalate ", " [ "h's " <> backtickIfSpaced f | f <- listFields ] <> ")"
+      bad = Left ("`members of` is recognised by name and compiled to all of the group's members, so the export accepts it only when this module defines it as `GIVEN h IS A "
+                  <> ri.riName <> "` and " <> canonical
+                  <> " (every LIST OF field of `" <> ri.riName <> "`, in any order). This module's definition differs; rename your helper.")
+  in case Map.lookup (getUnique ref) ctx.ctxDecides of
+       Just (MkDecide _ (MkTypeSig _ (MkGivenSig _ [g]) _) _ body) ->
+         let hU = getUnique (givenName g)
+             projOf = \case
+               Proj _ (App _ h []) f | getUnique h == hU -> Just (resolvedToText f)
+               _ -> Nothing
+             returned = case body of
+               App _ c [List _ es] | resolvedToText c == "concat", isPreludeRef ctx c -> traverse projOf es
+               e -> (: []) <$> projOf e
+         in case returned of
+              Just fs | sort fs == sort listFields -> Right ()
+              _ -> bad
+       _ -> bad
+
+-- | A DECIDE's body, alpha-normalised: see 'shapeOf'.
+decideShape :: Ctx -> Decide Resolved -> Text
+decideShape ctx (MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) (MkAppForm _ nameRes _ _) body) =
+  shapeOf ctx (getUnique nameRes) (map (getUnique . givenName) gs) body
+
+-- | Render an expression alpha-normalised, so that two definitions that differ
+-- only in the names of their inputs and local variables render the same: the
+-- inputs are @$0@, @$1@, …, names the body binds are numbered on from there,
+-- the definition itself is @SELF@, builtins print bare, prelude names print
+-- @\@name@ and anything else @#name@. A construct this does not know renders
+-- as @?@, which matches no canonical shape.
+shapeOf :: Ctx -> Unique -> [Unique] -> Expr Resolved -> Text
+shapeOf ctx self params body = go body
+ where
+  binders = nubOrd (params <> [ u | Def u _ <- toList body ])
+  idx     = Map.fromList (zip binders [0 :: Int ..])
+  nameOf r =
+    let u = getUnique r
+    in case Map.lookup u idx of
+         Just i -> "$" <> tshow i
+         Nothing
+           | u == self       -> "SELF"
+           | isBuiltinRef r  -> resolvedToText r
+           | isPreludeRef ctx r -> "@" <> resolvedToText r
+           | otherwise       -> "#" <> resolvedToText r
+  sx xs = "(" <> Text.unwords xs <> ")"
+  go e = case binView e of
+    Just (op, a, b) -> sx [op, go a, go b]
+    Nothing -> case e of
+      Not _ a            -> sx ["__NOT__", go a]
+      Proj _ a f         -> sx [".", go a, resolvedToText f]
+      App _ r []         -> nameOf r
+      App _ r as         -> sx (nameOf r : map go as)
+      AppNamed _ r nes _ -> sx ("WITH" : nameOf r : [ sx [resolvedToText f, go x] | MkNamedExpr _ f x <- nes ])
+      Lit _ (NumericLit _ n) -> renderRat n
+      Lit _ (StringLit _ t)  -> tshow t
+      List _ es          -> sx ("LIST" : map go es)
+      IfThenElse _ c t f -> sx ["IF", go c, go t, go f]
+      MultiWayIf _ gs o  -> sx ("BRANCH" : [ sx [go c, go b] | MkGuardedExpr _ c b <- gs ] <> [go o])
+      Consider _ s bs    -> sx ("CONSIDER" : go s : map branch bs)
+      _                  -> "?"
+  branch = \case
+    MkBranch _ (When _ p) b    -> sx ["WHEN", pat p, go b]
+    MkBranch _ (Otherwise _) b -> sx ["OTHERWISE", go b]
+  pat = \case
+    PatVar _ n      -> nameOf n
+    PatApp _ c []   -> nameOf c
+    PatApp _ c ps   -> sx (nameOf c : map pat ps)
+    PatCons _ a b   -> sx ["FOLLOWED_BY", pat a, pat b]
+    PatLit _ (NumericLit _ n) -> renderRat n
+    PatLit _ (StringLit _ t)  -> tshow t
+    PatExpr _ x     -> sx ["EXPR", go x]
+  renderRat n
+    | denominator n == 1 = tshow (numerator n)
+    | otherwise          = tshow (numerator n) <> "/" <> tshow (denominator n)
 
 -- ---------------------------------------------------------------------------
 -- Module scanning helpers
@@ -689,6 +849,10 @@ topDecls (MkModule _ _ section) = goSection section
   goSection (MkSection _ _ _ _ decls) = decls >>= \case
     Section _ sub -> goSection sub
     d             -> [d]
+
+collectDecides :: Module Resolved -> Map Unique (Decide Resolved)
+collectDecides m = Map.fromList
+  [ (getUnique (decideName d), d) | Decide _ d <- topDecls m ]
 
 collectRecordNames :: Module Resolved -> Set Text
 collectRecordNames m = Set.fromList
@@ -753,7 +917,7 @@ collectEnums m =
           , eiL4 = ty
           , eiWithFields = [ resolvedToText c | MkConDecl _ c (_ : _) <- conDecls ]
           }
-      , [ (getUnique c, EnumCon enPy (pyIdent (resolvedToText c))) | MkConDecl _ c _ <- conDecls ]
+      , [ (getUnique c, EnumCon enPy (pyIdent (resolvedToText c)) ty) | MkConDecl _ c _ <- conDecls ]
       )
     | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) <- topDecls m
     , let ty   = resolvedToText tyRes
@@ -770,12 +934,12 @@ collectEnums m =
 -- an error naming the value, rather than a value the export quietly does not
 -- register (its callers then failed with an unrelated message).
 collectParams
-  :: Module Resolved
+  :: Ctx -> Module Resolved
   -> ( [LowerError]
      , Set Unique
      , Map Unique (ParamInfo, OFScalarParam)
      , Map Unique (ParamInfo, OFScaleParam) )
-collectParams m =
+collectParams ctx m =
   let results = mapMaybe one [ d | Decide _ d <- topDecls m ]
       scalarRs = [ r | Left r  <- results ]
       scaleRs  = [ r | Right r <- results ]
@@ -805,7 +969,7 @@ collectParams m =
            pure (u, (pinfo, OFScalarParam { spsPath = pinfo.piPath, spsValues = vs }))
          ("scale" : ws) -> Just $ Right $ first err $ do
            (pinfo, yU) <- common "scale" ws
-           bs <- readScale yU body
+           bs <- readScale ctx yU body
            pure (u, (pinfo, OFScaleParam { spPath = pinfo.piPath, spBrackets = bs }))
          _ -> Nothing
 
@@ -894,8 +1058,8 @@ newestFirstMsg =
 --     (all values dated at a neutral epoch).
 --   * @BRANCH IF y AT LEAST <year> THEN LIST … …@    — a time-varying scale; each
 --     arm's @year@ becomes the effective date and brackets are aligned by index.
-readScale :: Maybe Unique -> Expr Resolved -> Either Text [OFBracket]
-readScale yU = \case
+readScale :: Ctx -> Maybe Unique -> Expr Resolved -> Either Text [OFBracket]
+readScale ctx yU = \case
   List _ elems -> do
     rows <- readRows elems
     pure [ OFBracket [(epochDate, t)] [(epochDate, r)] | (t, r) <- rows ]
@@ -924,7 +1088,7 @@ readScale yU = \case
     App _ e [] | getUnique e == emptyUnique -> Right []
     _ -> Left ("the OTHERWISE of a time-varying @desc scale must be a LIST of brackets or EMPTY. " <> scaleShapeMsg)
   readRows es = do
-    rows <- traverse readRow es
+    rows <- traverse (readRow ctx) es
     unless (and (zipWith (<) (map fst rows) (drop 1 (map fst rows)))) $
       Left "the brackets of a @desc scale must be listed with strictly increasing thresholds, as OpenFisca's marginal-rate scale requires"
     pure rows
@@ -943,12 +1107,32 @@ nonShrinking arms =
   let counts = map (length . snd) (sortOn fst arms)
   in and (zipWith (<=) counts (drop 1 counts))
 
--- | @band OF threshold, rate@ → (threshold, rate). Name-agnostic: any 2-arg
--- application of numeric literals (the bracket constructor).
-readRow :: Expr Resolved -> Either Text (Rational, Rational)
-readRow = \case
-  App _ _ [Lit _ (NumericLit _ t), Lit _ (NumericLit _ r)] -> Right (t, r)
+-- | @band OF threshold, rate@ → (threshold, rate). The bracket builder must be
+-- a two-input helper of this module that builds a record with its first input
+-- as @threshold@ and its second as @rate@: those are the two field names the
+-- canonical @scale tax@ reads, so a builder that swapped them would swap
+-- OpenFisca's thresholds and rates.
+readRow :: Ctx -> Expr Resolved -> Either Text (Rational, Rational)
+readRow ctx = \case
+  App _ f [Lit _ (NumericLit _ t), Lit _ (NumericLit _ r)]
+    | Just d <- Map.lookup (getUnique f) ctx.ctxDecides
+    , isBracketBuilder d -> Right (t, r)
+    | otherwise ->
+        Left ("`" <> resolvedToText f <> "` is not a bracket builder the export recognises: it must be defined in this module as `GIVEN t IS A NUMBER, r IS A NUMBER` and `Bracket WITH threshold IS t, rate IS r` (any record and input names; these two field names)")
   _ -> Left ("each bracket of a @desc scale must be `(band OF <threshold literal>, <rate literal>)`. " <> scaleShapeMsg)
+ where
+  isBracketBuilder (MkDecide _ (MkTypeSig _ (MkGivenSig _ [g1, g2]) _) _ body) =
+    let u1 = getUnique (givenName g1)
+        u2 = getUnique (givenName g2)
+        isVar v = \case App _ x [] -> getUnique x == v; _ -> False
+    in case body of
+         AppNamed _ _ nes _ ->
+           let fs = [ (resolvedToText fld, x) | MkNamedExpr _ fld x <- nes ]
+           in length fs == 2
+              && maybe False (isVar u1) (lookup "threshold" fs)
+              && maybe False (isVar u2) (lookup "rate" fs)
+         _ -> False
+  isBracketBuilder _ = False
 
 -- | A year guard in a parameter or scale body: @y AT LEAST <year>@, or
 -- @y GREATER THAN <year>@ (which, for whole years, is @y AT LEAST <year> + 1@).
@@ -1008,6 +1192,7 @@ lowerBody env body = case body of
   datedArm (MkGuardedExpr _ cond b) = case cond of
     App _ ref [App _ p [], Lit _ (NumericLit _ y), Lit _ (NumericLit _ mo)]
       | resolvedToText ref == "period reaches" -> do
+          checkConvention env.envCtx "period reaches" ref
           unless (Just (getUnique p) == env.envPeriod) $
             Left "the first argument of `period reaches` must be the decision's own `period`"
           unless (denominator y == 1 && denominator mo == 1 && mo >= 1 && mo <= 12 && y > 1900 && y <= 9999) $
@@ -1214,6 +1399,33 @@ fieldTypeMsg ri fi ty =
   <> ", which the OpenFisca export cannot represent as an input variable (supported: NUMBER, BOOLEAN, STRING, an enum declared in this module, and LIST OF a record declared in this module, which makes a group entity). "
   <> "Give the OpenFisca-facing record a field of a supported type instead, e.g. a year as a NUMBER."
 
+enumResultMsg :: Text -> Text
+enumResultMsg en =
+  "the result type is the enum `" <> en <> "`: the OpenFisca export compiles enums only as inputs matched by CONSIDER, "
+  <> "not as results. Return a BOOLEAN or a NUMBER instead, e.g. one BOOLEAN decision per constructor."
+
+enumValueMsg :: Text -> Text -> Text
+enumValueMsg con en =
+  "`" <> con <> "` is a constructor of the enum `" <> en <> "`; the OpenFisca export compiles enum values only as the arms of a CONSIDER over an enum input "
+  <> "(`CONSIDER p's status WHEN " <> con <> " THEN …`). Using one as a value, or returning one, is not supported."
+
+helperCallMsg :: Text -> Text
+helperCallMsg nm =
+  "cannot compile the call to `" <> nm <> "`: it is not an @export decision, and the export does not inline helpers "
+  <> "(an OpenFisca formula takes no arguments; it can only read other variables). Mark `" <> nm
+  <> "` @export if it has the decision shape (a subject and a period), or write its body out here."
+
+shadowedPreludeMsg :: Ctx -> Resolved -> Text
+shadowedPreludeMsg ctx r =
+  let nm = resolvedToText r
+      u  = getUnique r
+      wher | u.moduleUri == ctx.ctxSelfUri = "this module"
+           | otherwise                     = "`" <> uriBasename u.moduleUri <> "`"
+  in "`" <> nm <> "` here resolves to a definition in " <> wher <> ", not to the prelude's `" <> nm
+     <> "`. The export recognises `" <> nm <> "` only as the prelude function (it compiles it to OpenFisca's own "
+     <> (if nm `elem` ["max", "min"] then "np.maximum / np.minimum" else "aggregation")
+     <> "), so it cannot compile this call. Rename your definition, or use the prelude's."
+
 groupValueInMember :: Text -> Text
 groupValueInMember what =
   "inside an aggregation over members, the per-member expression can read only the member's own fields and @export decisions, the period, parameters and constants; "
@@ -1343,13 +1555,28 @@ dedupOn key = go Set.empty
 checkCollisions :: [OFVariable] -> Either LowerError [OFVariable]
 checkCollisions vs =
   case [ (nm, grp) | (nm, grp) <- Map.toList byName, length (nub grp) > 1 ] of
-    ((nm, grp) : _) ->
-      Left $ LowerError ""
-        ( "name collision: distinct L4 definitions ("
-        <> Text.intercalate ", " [ "`" <> v.varL4 <> "`" | v <- nub grp ]
-        <> ") both compile to the OpenFisca variable `" <> nm
-        <> "`. A decision, field, or parameter that shares a (sanitised) name "
-        <> "with another is unsafe in OpenFisca — rename one." )
+    ((nm, grp) : _) -> Left (LowerError "" (collisionMsg nm (nub grp)))
     [] -> Right (dedupOn (.varName) vs)
  where
-  byName = Map.fromListWith (<>) [ (v.varName, [v]) | v <- vs ]
+  byName = Map.fromListWith (flip (<>)) [ (v.varName, [v]) | v <- vs ]
+
+-- | Say what actually differs. The same L4 name read with two different
+-- definition periods is not a naming problem, and used to be reported as one.
+collisionMsg :: Text -> [OFVariable] -> Text
+collisionMsg nm grp
+  | [l4] <- nubOrd (map (.varL4) grp)
+  , length (nubOrd (map (pyPeriodName . (.varPeriod)) grp)) > 1 =
+      "the OpenFisca variable `" <> nm <> "` (from `" <> l4 <> "`) is needed with two definition periods: "
+      <> Text.intercalate " and " (nubOrd (map (pyPeriodName . (.varPeriod)) grp))
+      <> ". A decision with a `period` input is computed per MONTH, and one without is ETERNITY; "
+      <> "every @export decision that reads `" <> l4 <> "` must agree. Give them all a `period` input, or none."
+  | [l4] <- nubOrd (map (.varL4) grp) =
+      "the OpenFisca variable `" <> nm <> "` (from `" <> l4 <> "`) would be defined twice, differently (on different entities or with different types); rename one"
+  | otherwise =
+      "name collision: distinct L4 definitions ("
+      <> Text.intercalate ", " [ "`" <> l4 <> "`" | l4 <- nubOrd (map (.varL4) grp) ]
+      <> ") both compile to the OpenFisca variable `" <> nm
+      <> "`. A decision, field, or parameter that shares a (sanitised) name "
+      <> "with another is unsafe in OpenFisca — rename one."
+ where
+  pyPeriodName = \case OFMonth -> "MONTH"; OFYear -> "YEAR"; OFEternity -> "ETERNITY"
