@@ -1,0 +1,61 @@
+-- NOT and IMPLIES over a condition that reads no variable: the period's
+-- year, a legislation parameter, a literal. Such a condition is a Python
+-- bool, and Python's `~` on a bool is -1 or -2, both truthy, so NOT used
+-- to invert nothing. The export must emit np.logical_not.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.rate
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`rate` MEANS IF y AT LEAST 2015 THEN 0.15 ELSE 0.10
+
+@export Amount, before and after the 2020 reform
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`old amount` p period MEANS
+    IF NOT (period's year AT LEAST 2020) THEN 100 ELSE 200
+
+@export Whether the period is before the 2020 reform
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A BOOLEAN
+`pre reform` p period MEANS NOT (period's year AT LEAST 2020)
+
+@export After the reform, a person must earn over 5
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A BOOLEAN
+`reform test` p period MEANS
+    (period's year AT LEAST 2020) IMPLIES (p's salary GREATER THAN 5)
+
+@export Relief, unless the high rate is in force
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`relief` p period MEANS
+    IF NOT ((`rate` OF period's year) AT LEAST 0.15) THEN p's salary TIMES 0.05 ELSE 0
+
+@export Never
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`never` p period MEANS IF NOT TRUE THEN 1 ELSE 2
+
+`y2026` MEANS Period WITH year IS 2026, month IS 1
+`y2010` MEANS Period WITH year IS 2010, month IS 1
+`nobody` MEANS Person WITH salary IS 0
+`earner` MEANS Person WITH salary IS 1000
+
+#ASSERT (`old amount` OF `nobody`, `y2026`) EQUALS 200
+#ASSERT (`old amount` OF `nobody`, `y2010`) EQUALS 100
+#ASSERT (`pre reform` OF `nobody`, `y2026`) EQUALS FALSE
+#ASSERT (`pre reform` OF `nobody`, `y2010`) EQUALS TRUE
+#ASSERT (`reform test` OF `nobody`, `y2026`) EQUALS FALSE
+#ASSERT (`reform test` OF `nobody`, `y2010`) EQUALS TRUE
+#ASSERT (`relief` OF `earner`, `y2026`) EQUALS 0
+#ASSERT (`relief` OF `earner`, `y2010`) EQUALS 50
+#ASSERT (`never` OF `nobody`, `y2026`) EQUALS 2

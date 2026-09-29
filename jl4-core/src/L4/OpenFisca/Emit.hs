@@ -124,57 +124,36 @@ formulaLines v =
     (y : m : _) -> y <> "_" <> m
     _           -> Text.replace "-" "_" d
 
--- | Does a formula body produce a numpy 0-d array instead of an array of the
+-- | Does a formula body produce a numpy scalar instead of an array of the
 -- entity's size? True when it reads no variable of any entity yet goes through
--- a numpy call ('OFCond' is @np.where@; 'OFNpCall' is @np.maximum@ etc.).
+-- a numpy call ('OFCond' is @np.where@, 'OFNot' is @np.logical_not@, 'OFNpCall'
+-- is @np.maximum@ etc., and see 'scalarDivision' and 'OFScaleCalc').
 needsBroadcast :: OFExpr -> Bool
 needsBroadcast e = not (readsVariables e) && usesNumpy e
  where
-  readsVariables = \case
-    OFVarRef _      -> True
-    OFMembersVar _  -> True
-    OFSum _ _       -> True
-    OFAny _ _       -> True
-    OFAll _ _       -> True
-    OFNbPersons _   -> True
-    OFBin _ a b     -> readsVariables a || readsVariables b
-    OFCmp _ a b     -> readsVariables a || readsVariables b
-    OFAnd a b       -> readsVariables a || readsVariables b
-    OFOr a b        -> readsVariables a || readsVariables b
-    OFNot a         -> readsVariables a
-    OFNeg a         -> readsVariables a
-    OFCond a b c    -> readsVariables a || readsVariables b || readsVariables c
-    OFNpCall _ as   -> any readsVariables as
-    OFScaleCalc _ a -> readsVariables a
-    _               -> False
   usesNumpy = \case
     OFCond _ _ _    -> True
     OFNpCall _ _    -> True
-    OFBin _ a b     -> usesNumpy a || usesNumpy b
-    OFCmp _ a b     -> usesNumpy a || usesNumpy b
-    OFAnd a b       -> usesNumpy a || usesNumpy b
-    OFOr a b        -> usesNumpy a || usesNumpy b
-    OFNot a         -> usesNumpy a
-    OFNeg a         -> usesNumpy a
-    OFScaleCalc _ a -> usesNumpy a
-    _               -> False
+    OFNot _         -> True
+    OFScaleCalc _ _ -> True
+    x | scalarDivision x -> True
+      | otherwise        -> any usesNumpy (subExprs x)
 
-usesParams :: OFExpr -> Bool
-usesParams = \case
-  OFScaleCalc _ _ -> True
-  OFParamRef _    -> True
-  OFBin _ a b     -> usesParams a || usesParams b
-  OFCmp _ a b     -> usesParams a || usesParams b
-  OFAnd a b       -> usesParams a || usesParams b
-  OFOr a b        -> usesParams a || usesParams b
-  OFNot a         -> usesParams a
-  OFNeg a         -> usesParams a
-  OFSum _ a       -> usesParams a
-  OFAny _ a       -> usesParams a
-  OFAll _ a       -> usesParams a
-  OFNpCall _ as   -> any usesParams as
-  OFCond a b c    -> usesParams a || usesParams b || usesParams c
-  _               -> False
+-- | A division or MODULO whose operands both read no variable, by a divisor
+-- that is not a non-zero literal. Python raises ZeroDivisionError for such a
+-- division by zero, and @np.where@ evaluates both branches, so a guarded
+-- @IF d > 0 THEN n / d ELSE …@ would crash where L4 takes the other branch.
+-- It is emitted as @np.divide@ / @np.mod@, which, like the array case, warn
+-- and give inf or nan instead.
+scalarDivision :: OFExpr -> Bool
+scalarDivision = \case
+  OFBin op a b | op `elem` [OFDiv, OFMod] ->
+    not (readsVariables a) && not (readsVariables b) && not (nonZeroLiteral b)
+  _ -> False
+ where
+  nonZeroLiteral = \case
+    OFNum r -> r /= 0
+    _       -> False
 
 systemLines :: OFPackage -> [Text]
 systemLines pkg =
@@ -248,6 +227,7 @@ datedMap kvs =
 -- Compound nodes are fully parenthesised. This matters for numpy: the bitwise
 -- operators @& | ~@ (used for boolean and/or/not on arrays) bind /tighter/ than
 -- comparison operators in Python, so @a > b & c@ would misparse without parens.
+-- NOT is @np.logical_not@ rather than @~@, for the reason at its case.
 emitExpr :: Text -> Text -> OFExpr -> Text
 emitExpr ent entPy = go
  where
@@ -262,14 +242,21 @@ emitExpr ent entPy = go
     OFAny r e    -> ent <> ".any(" <> go e <> roleArg r <> ")"
     OFAll r e    -> ent <> ".all(" <> go e <> roleArg r <> ")"
     OFNbPersons r -> ent <> ".nb_persons(" <> maybe "" roleConst r <> ")"
-    OFBin op a b -> paren (go a <> " " <> binOp op <> " " <> go b)
+    x@(OFBin op a b)
+      | scalarDivision x -> "np." <> (if op == OFDiv then "divide" else "mod") <> "(" <> go a <> ", " <> go b <> ", dtype=float)"
+      | otherwise        -> paren (go a <> " " <> binOp op <> " " <> go b)
     OFCmp op a b -> paren (go a <> " " <> cmpOp op <> " " <> go b)
     OFAnd a b    -> paren (go a <> " & " <> go b)
     OFOr  a b    -> paren (go a <> " | " <> go b)
-    OFNot a      -> paren ("~" <> go a)
+    -- Not @~@: on a Python bool (a comparison that reads no variable, a
+    -- parameter, a literal) @~True@ is -2 and @~False@ is -1, both truthy.
+    OFNot a      -> "np.logical_not(" <> go a <> ")"
     OFNeg a      -> paren ("-" <> go a)
     OFCond c t e -> "np.where(" <> go c <> ", " <> go t <> ", " <> go e <> ")"
-    OFScaleCalc path income -> "parameters(period)." <> path <> ".calc(" <> go income <> ")"
+    -- @.calc@ needs an array; a scalar income is given as a one-element one.
+    OFScaleCalc path income
+      | readsVariables income -> "parameters(period)." <> path <> ".calc(" <> go income <> ")"
+      | otherwise             -> "parameters(period)." <> path <> ".calc(np.atleast_1d(" <> go income <> "))"
     OFEnumLit cls mem -> cls <> "." <> mem
     OFNpCall fn as -> "np." <> fn <> "(" <> Text.intercalate ", " (map go as) <> ")"
     OFPeriodField f -> "period.start." <> f

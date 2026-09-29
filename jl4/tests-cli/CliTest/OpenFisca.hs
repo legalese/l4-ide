@@ -47,6 +47,8 @@ positiveFixtures =
   , ("role-status",     "keeps the role key `status` (it used to become `statu`)")
   , ("carriage-return", "escapes a carriage return in a string literal")
   , ("python-keywords", "makes a record `class` and an enum `None` keyword-safe")
+  , ("not-scalar",      "compiles NOT and IMPLIES over a year, a parameter or a literal with np.logical_not, not `~`")
+  , ("scalar-arithmetic", "gives `scale tax` a constant income as an array, and survives a zero divisor in a branch the guard excludes")
   ]
 
 -- | Every refusal fixture, with a fragment of the message it must print.

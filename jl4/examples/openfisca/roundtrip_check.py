@@ -12,7 +12,7 @@ Usage (inside a venv with openfisca-core and numpy):
 where <case> is an example under jl4/examples/openfisca/ (flat-tax, benefit,
 household, roles, housing, agecheck, incometax, basic-income, dated, scale) or
 a fixture under jl4/tests-cli/fixtures/openfisca/ (gt-guard, scalar-formula,
-role-status, carriage-return, python-keywords).
+role-status, carriage-return, python-keywords, not-scalar, scalar-arithmetic).
 """
 import importlib.util
 import sys
@@ -158,6 +158,18 @@ def main():
     elif which == "python-keywords":
         check(tbs, "class_s", {"c": {"size": {"2026-01": 3}, "who": {"2026-01": "somebody"}}},
               "fee", "2026-01", 30.0)
+    elif which == "not-scalar":
+        # NOT / IMPLIES over a condition that reads no variable.
+        for var, per, sal, exp in [("old_amount", "2026-01", 0, 200.0), ("old_amount", "2010-01", 0, 100.0),
+                                   ("pre_reform", "2026-01", 0, 0), ("pre_reform", "2010-01", 0, 1),
+                                   ("reform_test", "2026-01", 0, 0), ("reform_test", "2010-01", 0, 1),
+                                   ("relief", "2026-01", 1000, 0.0), ("relief", "2010-01", 1000, 50.0),
+                                   ("never", "2026-01", 0, 2.0)]:
+            check(tbs, "persons", {"p": {"salary": {per: sal}}}, var, per, exp)
+    elif which == "scalar-arithmetic":
+        check(tbs, "persons", {"p": {"salary": {"2026-01": 7}}}, "notional_tax", "2026-01", 1000.0)
+        check(tbs, "persons", {"p": {"salary": {"2026-01": 7}}}, "guarded_share", "2026-01", 7.0)
+        check(tbs, "persons", {"p": {"salary": {"2031-01": 7}}}, "guarded_share", "2031-01", 200.0)
     else:
         raise SystemExit(f"unknown case: {which}")
     print("ROUND-TRIP OK")
