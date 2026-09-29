@@ -194,6 +194,16 @@ verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 
+-- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
+-- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
+-- carries its own control; see its header.
+verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture :: FilePath
+verifyUnfoldRecursiveFixture :: FilePath
+verifyUnfoldCallsFixture     = fixtureDir </> "verify-unfold-calls.l4"
+verifyUnfoldImportsFixture   = fixtureDir </> "verify-unfold-imports.l4"
+verifyUnfoldRulesFixture     = fixtureDir </> "verify-unfold-rules.l4"
+verifyUnfoldRecursiveFixture = fixtureDir </> "verify-unfold-recursive.l4"
+
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
 -- FOR BYTE — that equality is the whole reason the orchestrator's p7-tnr leg
@@ -272,6 +282,8 @@ coreFixtures =
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
+  , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource
   , assertRaisesFixture, assertAssumedFixture
@@ -1822,8 +1834,11 @@ spec bin = do
 
     -- Referential transparency. Four spellings of `m AND NOT m`, three of which
     -- put a limb behind a local name; all four must report the contradiction,
-    -- because they are the same rule. `parameterised` is the control: a binding
-    -- that takes arguments is NOT inlined, so it stays two atoms and clean.
+    -- because they are the same rule. `parameterised` was the control while a
+    -- binding that takes arguments stayed opaque; it is read through now (beta
+    -- reduction, WHERE-INLINING-SPEC.md §9) and is unsat like the rest. The
+    -- control is `parameterised, consistent`, which must stay clean — it is what
+    -- a substitution that dropped its arguments would falsely report.
     it "analyses a rule the same however its limbs are named" $ do
       env <- jsonEnvelope bin ["verify", verifyWhereTransparencyFixture, "--format", "json"]
       let unsats =
@@ -1835,13 +1850,59 @@ spec bin = do
             , any (\ f -> objField f "kind" == Just (String "unsat")) (toList fs)
             ]
       sort unsats `shouldBe`
-        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`"]
+        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`", "parameterised"]
 
     -- Termination, not correctness: a cycle among local bindings must be
     -- detected rather than substituted. A regression here hangs the suite.
     it "terminates on recursive and mutually recursive local bindings" $ do
       Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
+
+    -- Reading through calls. `the arrow is broken` asks for an exception and the
+    -- offence it defeats at once; with calls as opaque leaves that was two
+    -- unrelated atoms and no finding. Its twin over an offence that forgets the
+    -- exception is the control, and must stay clean: before this change the two
+    -- could not be told apart, which is the whole defect.
+    it "finds a contradiction that only appears once calls are read through" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldCallsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`the arrow is broken`" found `shouldBe` Just ["unsat"]
+      lookup "`the arrow is broken in the bad encoding`" found `shouldBe` Just []
+      case objField env "summary" >>= (`objField` "callsReadThrough") of
+        Just (Number n) -> n `shouldSatisfy` (> 0)
+        other -> expectationFailure ("expected summary.callsReadThrough, got " ++ show other)
+
+    -- Across an import, where the rules' return types are INFERRED: the imported
+    -- bodies must be zonked with their own module's substitution before they can
+    -- be recognised as boolean. Without that this finding is silently missed.
+    it "reads through calls to rules in an imported module" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldImportsFixture, "--format", "json"]
+      lookup "`the arrow is broken across an import`" (findingsByDecision env)
+        `shouldBe` Just ["unsat"]
+
+    -- A call whose meaning is too large to draw stays an opaque leaf. The rule
+    -- is still ANALYSED, every other call is still read through, and the one
+    -- left opaque is NAMED — on its rule and in the summary. What is lost is only
+    -- what that call would have shown: here, the contradiction.
+    it "leaves a call opaque, and names it, when its meaning is too large" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldCallsFixture, "--format", "json", "--max-nodes", "5"]
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "analysed" `shouldBe` Just (Number 5)
+          objField summ "callsLeftOpaque" `shouldBe` Just (Number 1)
+        Nothing -> expectationFailure "expected a summary"
+      lookup "`the arrow is broken`" (findingsByDecision env) `shouldBe` Just []
+      Output _ sout _ <- runL4 bin ["verify", verifyUnfoldCallsFixture, "--max-nodes", "5"]
+      sout `shouldSatisfy` ("call left as a leaf: `the offence is made out`" `isInfixOf`)
+
+    -- Termination: a recursive rule is never unfolded. Also a soundness guard: a
+    -- compound leaf's variable id once collided with a bare input's unique, so
+    -- `all hold xs AND b` read as ONE atom and both conjuncts were reported as
+    -- vacuous. It must be clean.
+    it "terminates on a recursive rule, and invents no finding around it" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyUnfoldRecursiveFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
 
     -- The corpus figure the p8-verify receipt now carries.
     it "reports the Reg CF corpus's own nested count" $ do
@@ -1881,3 +1942,19 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | Each decision in an @l4 verify@ JSON envelope, with the kinds of its
+-- findings, in report order. A decision that was not analysed has none.
+findingsByDecision :: Value -> [(String, [String])]
+findingsByDecision env =
+  [ ( T.unpack nm
+    , [ T.unpack k
+      | Just (Array fs) <- [objField d "findings"]
+      , f <- toList fs
+      , Just (String k) <- [objField f "kind"]
+      ]
+    )
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  ]

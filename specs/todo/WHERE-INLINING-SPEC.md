@@ -1,12 +1,14 @@
 # Referential transparency for the static analyses — inlining local `WHERE`/`LET` bindings
 
-_Status: **implemented in this PR** for `l4 verify`; the ladder default view and the exporter's
-descent are scoped out and reasoned about in §7. Written 2026-08-27 on branch
-`mengwong/where-inlining`._
+_Status: **implemented** for `l4 verify` — zero-arity local bindings on 2026-08-27 (branch
+`mengwong/where-inlining`), and on 2026-09-29 parameterised local bindings and calls to other
+boolean rules (branch `feat/verify-beta-reduction`, §9). The ladder default view and the
+exporter's descent are scoped out and reasoned about in §7._
 
 **One-line summary.** `x WHERE x MEANS e` and `e` mean the same thing to the evaluator and
-different things to the analyser. This spec makes them mean the same thing to the analyser too,
-by substituting zero-arity local bindings before analysis.
+different things to the analyser. This spec makes them mean the same thing to the analyser too:
+local bindings are substituted before analysis (§5), and a call to another rule is read through
+to what that rule means (§9).
 
 ---
 
@@ -75,12 +77,12 @@ Consequences, in order of importance:
 
 ## 3. What is deliberately _not_ inlined
 
-| Case                                                  | Why                                                                                                                                                                                                                                                                        | What happens instead                                                                       |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Bindings with parameters — `` `the smaller of` a b `` | Substituting a definiens at a call site that has arguments is beta reduction, and doing it correctly needs capture-avoiding substitution. Out of scope, and the payoff is small: a parameterised helper is genuinely a function, and reading it as one leaf is defensible. | Left opaque, exactly as today.                                                             |
-| Recursive and mutually recursive bindings             | Substitution does not terminate.                                                                                                                                                                                                                                           | Left opaque; the cycle is detected, not hit.                                               |
-| `LocalAssume`                                         | An `ASSUME` is uninterpreted by construction; there is no definiens to substitute.                                                                                                                                                                                         | Left opaque.                                                                               |
-| Bindings the body never references                    | Nothing to do.                                                                                                                                                                                                                                                             | Dropped from the residual `WHERE` only if every binding was inlined; otherwise left alone. |
+| Case                                                  | Why                                                                                                                                                                         | What happens instead                                                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Bindings with parameters — `` `the smaller of` a b `` | Substituted by beta reduction since 2026-09-29, at a call whose argument count matches (§9.2). A reference at another arity — the helper passed as a value — is not a call. | Left alone at other arities, and the binding it needs is kept.                             |
+| Recursive and mutually recursive bindings             | Substitution does not terminate.                                                                                                                                            | Left opaque; the cycle is detected, not hit.                                               |
+| `LocalAssume`                                         | An `ASSUME` is uninterpreted by construction; there is no definiens to substitute.                                                                                          | Left opaque.                                                                               |
+| Bindings the body never references                    | Nothing to do.                                                                                                                                                              | Dropped from the residual `WHERE` only if every binding was inlined; otherwise left alone. |
 
 > **The arity guard is new, and it matters.** `LSP.L4.Viz.Ladder.inlineExpr` — the interactive
 > "expand this leaf" gesture behind `l4/inlineExprs` — documents itself as inlining "only 'App of
@@ -177,5 +179,124 @@ not table-shaped. Separate change, separate spec.
   Argument against: nobody wants the less sound analysis, and a flag that only makes the tool
   worse is a flag that exists to be misread. _Proposed: no flag; the finding's own atoms list
   already shows what it saw._
-- **O2.** Parameterised bindings (§3) via proper beta reduction. Wanted eventually; wants a
-  capture-avoidance story first.
+- **O2.** Parameterised bindings (§3) via proper beta reduction. **ANSWERED 2026-09-29, see §9**
+  (Meng's BETAMAX, which also asked for calls to top-level rules, across imports). The
+  capture-avoidance story is §9.2: names are resolved to uniques first, so there is nothing to
+  capture.
+
+## 9. Reading through calls to other rules (2026-09-29)
+
+**What prompted it.** Textbook diagrams of the Penal Code — Woon's _Essential Criminal Law_ — end in an arrow: `[conditions] → not murder by reason of sudden fight`.
+The encoding carries that as a separate rule (`` `Exception 4 to section 300 applies` ``) that the offence calls as a defeater.
+The diagram's arrow is then a property of the encoding — the exception applying and the offence being made out never hold together — and `l4 verify` could not check it, because a call to another rule was an opaque leaf.
+Measured before this change on a two-rule probe: a correct encoding and a deliberately broken one (the offence forgets its exception) both reported **no findings**.
+The tool could not tell them apart.
+Meng's ruling (BETAMAX): substitute through calls, arguments included.
+
+### 9.1 The rule
+
+> **R2.** When a decision is analysed, each leaf that is a call to a rule returning `BOOLEAN` — in the same module or any module it imports, transitively — is read through: its **meaning** is the called rule's body, unfolded all the way down, arguments in place of parameters, and every satisfiability check the analysis makes uses that meaning in place of the leaf.
+>
+> **Findings are still reported only at the decision's own sites.** The leaf stays one leaf of the decision's ladder; what changes is what the analysis knows it means.
+
+The second paragraph is the design, and it is the one that took a measurement to find (§9.4).
+
+### 9.2 Beta reduction, and why nothing can be captured
+
+`L4.Transform.unfoldOnce` replaces a call `App _ r args` whose callee is known **and whose argument count equals the callee's parameter count** by the callee's body with each argument in place of its parameter.
+The arity check is the guard: a reference at another arity is the rule passed as a value, not a call, and is left alone.
+`inlineLocalBindings` uses the same step for local bindings, so a `WHERE` helper with parameters is now substituted too (§3's first row).
+
+Capture cannot happen, and this is the whole of the "capture-avoidance story" O2 was waiting for.
+Names are resolved to `Unique`s before any of this runs, and a parameter's unique belongs to its own definition, so an argument — built in the caller's scope — cannot contain the callee's parameter, and a binder inside the callee cannot bind anything the argument refers to.
+
+Two things stay opaque: a **recursive** rule (`pruneRecursive` removes every definition that can reach itself; its unfolding would not terminate) and a rule whose body **applies one of its own parameters** as a function (substitution is then no longer replacement of a value).
+Rules that do not return `BOOLEAN` are not candidates either: a numeric helper unfolded into a comparison leaves the comparison a leaf, with a longer label.
+
+### 9.3 Imported rules, and the zonk they need
+
+An imported body is carried into the importer's analysis.
+The checked program's annotations are not zonked when `LSP.L4.Rules` builds the result, and an importer starts from an **empty** substitution, so a rule whose return type was _inferred_ (no `GIVETH`) carries an inference variable only its own module can resolve.
+`l4 verify` therefore zonks each candidate body with its own module's substitution (`ApplySubst (Expr Resolved)`, new).
+Measured: without it, such an imported rule is never recognised as boolean, never read through, and a contradiction through it is silently missed.
+`tests-cli/fixtures/verify-unfold-rules.l4` omits `GIVETH` on purpose.
+
+### 9.4 What review changed: unfolding the whole rule was the wrong unit
+
+The first implementation substituted every call into the decision's body and analysed the result as one rule.
+On the fixtures it was right; on the Penal Code deposit it failed twice, and both failures are why §9.1 has its second paragraph.
+
+- **Noise.** `pc-body-b-sexual.l4` went from 102 findings to **787** (499 vacuous-guard, 288 dead-branch).
+  Copy a general helper into a rule that already narrows it, and the helper's own limbs become dead or redundant _in that context_.
+  True, and useless: it is how every genus-and-species rule is built, and the sites named (`body.and[4]`) do not exist in the caller's text.
+- **Size.** Unfolding copies a shared rule into every caller, and the ladder then converts the result to CNF.
+  `offence under s 325` has **four** atoms and an unfolded CNF past 4096 nodes; the homicide module went from 3 s to more than ten minutes.
+  Meng's observation holds exactly: legal rules have small _n_.
+  What grew was the representation.
+
+R2 fixes both at once.
+The caller's ladder is analysed as written, so the traversal and the sites are the caller's.
+A meaning is drawn as a ladder **without** the CNF simplification — the decision diagram needs no normal form — so it is linear in the unfolded body.
+Measured on the same three modules after the change: homicide 19 s (31 calls read through, none left opaque), hurt 11 s, sexual 30 s with the **same 102 findings** as before.
+
+### 9.5 How a meaning is built
+
+For each atom of the decision's ladder whose leaf (`LadderViz.getLeafExpr`, recorded as the ladder is drawn) is a call to a candidate:
+
+1. unfold it (`unfoldCalls`), then substitute local bindings;
+2. draw it as a ladder under the **caller's** name and parameters, so that a leaf such as `` f's `harm was caused` `` gets the same atomId it has in the caller, with CNF off;
+3. renumber its atoms into the caller's atom space by atomId, minting fresh numbers for atoms the caller never mentions.
+
+`satisfiable` replaces each call atom by its meaning before compiling the decision diagram.
+The atomId is the only identity that crosses a rule boundary, so reading through requires atom coalescing, and `--no-coalesce-atoms` turns it off.
+
+A call whose meaning cannot be drawn, or is over `--max-nodes` even without CNF, stays an opaque leaf.
+It is **named** on its rule (`call left as a leaf: … — reason`) and counted in `summary.callsLeftOpaque`.
+At that atom the analysis is the old, per-rule one, and it says so.
+
+### 9.6 A soundness bug this exposed, fixed in the same change
+
+Measured before this change, on no unfolding at all: `n > 3 AND b` was analysed as **one** atom, and `l4 verify` reported both conjuncts as vacuous — a false finding, from a tool whose findings are meant to be sound.
+Whether it happened depended only on how many inputs were declared before `b`.
+The ladder keyed a bare reference's variable by the name's unique and a compound leaf's by a fresh id from a counter that also started near zero, and nothing kept the two ranges apart.
+Fixed in `LSP.L4.Viz.Ladder`: fresh ids now start above every unique in the rule.
+
+Unfolding makes a second collision reachable.
+Each module numbers its own names from the same starting point — an importer does not continue its dependencies' supply (`unionCheckStates`) — so two different imported names can share an Int.
+A bare reference to a name from another module is therefore drawn as a compound leaf with a fresh id; coalescing by atomId still merges its occurrences.
+"Another module" means the URI the typechecker stamped on the module being drawn (`MkModule _ uri _`), not the `moduleUri` a caller derives from the document id it passes in.
+The first version compared against the latter; the service's query-plan tests pass a synthetic document id, so every name looked foreign, TYPICALLY defaults (keyed by the name's unique) were lost — two ask-order tests failed — and the suite then stalled in its ladder-budget group for 27 minutes before it was killed; with the fix the query-plan tests take 8 s.
+
+The same ladder module serves the web wizard's query plan (`jl4-service`), so both fixes reach it.
+
+### 9.7 The ladder's expand gesture
+
+`l4/inlineExprs` used to replace `f x y` by `f`'s bare body and drop the arguments; it was masked only because the gesture was offered on bare references alone.
+It now uses `unfoldOnce`, so it substitutes arguments and respects arity, and it is offered on a call **with** arguments to a rule of the same module (`callLeafTargets` maps the leaf's fresh id back to the rule).
+
+### 9.8 What this does to existing behaviour
+
+- Findings: a decision's findings now depend on what its calls mean.
+  The first corpus-wide differential is recorded in §9.9.
+- JSON: each analysed decision carries `callsReadThrough` and `callsLeftOpaque` (a list of names with reasons); the summary carries their totals.
+- `--decision NAME` now filters on the name as written **before** analysing.
+  It used to filter on the report's name, which the analysis produces, so every decision was analysed and most were thrown away — tolerable while analysis was cheap.
+
+### 9.9 Measured over the corpus (2026-09-29)
+
+Baseline `73a953821` against this branch, `l4 verify --format json` over every `.l4` under `jl4/examples/{ok,legal,canon}`, `jl4-core/libraries`, and the Penal Code first-cut deposit (`~/src/legalese/pc-encode/deposit`, not in this repository): 464 files.
+
+- Both binaries analysed the same 1,998 decisions; none moved between analysed and skipped.
+- 1,325 calls were read through, and none was left opaque.
+- Findings went from 186 to 219, in 28 decisions.
+  No finding was lost.
+- Because none was lost, the id collision of §9.6 produced no false finding anywhere in this corpus as it stands; its fixture is the only witness.
+- Of the 28 decisions, 23 were read against their source, and every finding is a true statement about the rule: most are literal `TRUE`/`FALSE` constants read through (the `ok/inert/` fixtures, `ok/set-operators-overloads.l4`, `ok/mixfix-*.l4`), and the rest are a call's meaning overlapping the caller's own conditions.
+  Examples: in the Penal Code deposit, s 336(b)'s negligent-act limb adds nothing, because s 26F(2) makes rashness negligence; s 325's carve-out for s 334A can never apply given s 322's fault element; s 386 restates what `commits extortion` already requires.
+  In canon, `robbery-390-392.l4`'s `liable under s 392` is a tautology over its facts, which its own comment says is by construction.
+- Not read: `canon/sg/succession/sg-wills.l4` (1), `canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4` (2), `canon/us/regcf/cleanroom/regcf-denovo.l4` (1), `canon/contracts/payments/sg-miles-card/dbs-womans-world.l4` (1).
+
+**Time.** Reading through costs an extra ladder drawing per call atom, and the satisfiability checks see bigger formulas.
+On the three Penal Code modules timed one by one: homicide 3–4 s → 18–19 s, hurt 2 s → 11 s, sexual offences 19–20 s → 30 s.
+`classify.l4` in the miles-card subject: 1.7 s → 2.7 s.
+The whole Penal Code deposit, 36 files run one after another: 147 s → 263 s.
