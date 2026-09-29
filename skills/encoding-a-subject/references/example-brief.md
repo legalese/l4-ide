@@ -75,8 +75,8 @@ example beneath it), transcribed and run.
   plausible default. A gap is a finding, not a bug.
 - **An assertion that fails is a finding.** Never edit an expected value to match what the
   code computed. Report it.
-- **Read the DIAGNOSTICS, not the exit code.** `l4 run` exits 0 when an `#ASSERT` fails; the
-  failure is a `DiagnosticSeverity_Error` line. Never report `checked: true` for a green you
+- **Read the DIAGNOSTICS, not the exit code.** An `l4` built before 2026-09-29 exits 0 when an
+  `#ASSERT` fails, and no exit code says which one; the failure is a `DiagnosticSeverity_Error` line. Never report `checked: true` for a green you
   did not see in the output.
 - **Dates** need `IMPORT daydate` (`YMD y m d`, `add months`, `add years`, `DATE_YEAR`).
   Arithmetic on dates without it produces an ambiguous-operator error, not a date.

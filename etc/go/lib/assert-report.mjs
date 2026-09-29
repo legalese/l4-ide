@@ -9,21 +9,21 @@
 //   $ echo $?
 //   0
 //
-// So: `l4 run` exits 0 on a failed #ASSERT — a clean FALSE — with ok:true. That
-// is the case this module exists for, and it still holds. RE-MEASURED
-// 2026-09-04: the exit code and `ok` DO go red on a directive that CRASHES —
-// a raising #EVAL (kind "error"; exit 1 already on the 2026-08-27 binary), and,
-// as of fix/assert-check-reporting, an #ASSERT that raises or is stuck on an
-// assumed term (kind "assertion", value null, the reason under "error"; exit 1)
-// — but the envelope is still written, so results[] stays the only
-// machine-readable verdict and is parsed here rather than inferred from the
-// process exit code. (A null value is `!== true`, so it is a finding below.)
+// That binary exited 0 on a failed #ASSERT — a clean FALSE — with ok:true, and
+// that is the case this module was written for. Since 2026-09-29 (ruled by
+// Meng) `l4 run` exits 1 with ok:false on a failed #ASSERT too, as it already
+// did on a directive that CRASHES: a raising #EVAL (kind "error"), or an
+// #ASSERT that raises or is stuck on an assumed term (kind "assertion", value
+// null, the reason under "error"). The envelope is written in every case.
 //
-// UPGRADE TRIPWIRE. `l4 run --fail-on-assert` does not exist today
-// (specs/todo/lexipedia-superset/CORPUS-TRACK.md proposes it). When it ships,
-// this whole module is dead weight — and etc/go/phases/p0-preflight.sh runs a
-// deliberately-failing fixture whose CONTINUED exit-0 is asserted, so the day
-// the CLI starts exiting 1 the tripwire goes red and tells you to delete this.
+// This module still reads results[] rather than the exit code. The exit code
+// cannot say WHICH directive failed, and it cannot count assertions, which
+// p6-tests' floor (min_assertions) and its vacuous-pass guard need: a module
+// with no #ASSERT at all also exits 0. Reading results[] also keeps the stage
+// correct on a binary built before 2026-09-29.
+//
+// etc/go/phases/p0-preflight.sh checks the contract this module relies on: a
+// deliberately failing fixture comes back as one assertion with value false.
 //
 // Usage:  node etc/go/lib/assert-report.mjs RUN.json [RUN.json…] [--json]
 // Exit:   0 every assertion true and no error result · 1 a finding · 2 usage

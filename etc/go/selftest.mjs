@@ -3041,7 +3041,7 @@ if (!process.argv.includes("--with-driver")) {
   // input to every stage and is declared by none, so it is the input that went
   // unnoticed — a run resumed against a rebuilt or substituted binary replayed
   // every leg without invoking it once, skipping p0's CLI-surface pin and its
-  // upgrade tripwire while the report still named the original binary.
+  // failing-#ASSERT tripwire while the report still named the original binary.
   {
     const stub = resolve(rundir, "fake-l4");
     writeFileSync(stub, "#!/bin/sh\nexit 1\n", { mode: 0o755 });

@@ -99,7 +99,9 @@ Write a tests module whose expected values come **from the source**: worked exam
 
 ### 7. The self-check loop — read the diagnostics
 
-**`l4 run` exits 0 when an `#ASSERT` fails.** The failure is a `DiagnosticSeverity_Error` line whose message is `assertion failed`. A run that "passed" by exit code can be carrying failed assertions.
+**Read the diagnostics, not only the exit code.**
+`l4 run` exits 1 when an `#ASSERT` fails, but a binary built before 2026-09-29 exits 0, and no binary's exit code says which assertion failed or how many ran.
+The failure is a `DiagnosticSeverity_Error` line whose message is `assertion failed`.
 
 Copy [`assets/check.sh`](assets/check.sh) into the encoding directory. It runs every module and prints, per module, errors, assertions satisfied, and assertions failed, and exits non-zero on any error or failed assertion:
 

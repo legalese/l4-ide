@@ -585,7 +585,8 @@ jobs:
       - name: Self-test (the lattice must still be able to refuse)
         run: node etc/go/selftest.mjs
 
-      # The `l4 run` workaround exists only because a failed #ASSERT exits 0.
+      # p6-tests reads `l4 run --json` results[] rather than the exit code; the
+      # top of etc/go/lib/assert-report.mjs says why.
       # This mutates a real captured envelope ten ways to prove the checker can
       # be red — a checker whose only observed behaviour is OK is
       # indistinguishable from one that has been quietly broken.

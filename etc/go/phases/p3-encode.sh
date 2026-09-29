@@ -26,8 +26,8 @@
 # skill's deposit runbook. The second the driver does (go.sh exports it). The third
 # belongs to P6, not here: this stage runs `l4 check`, whose exit code IS
 # load-bearing — only a typecheck error produces exit 1, which is exactly what
-# is being asked. `l4 run`'s exit code is the one that lies, and p6-tests.sh
-# reads results[] instead for precisely that reason.
+# is being asked. `l4 run`'s exit code cannot say which assertion failed or how
+# many ran, so p6-tests.sh reads results[] instead.
 
 # THE MODULE SET IS THE DRIVER'S, and this stage was the one that did not ask.
 #
