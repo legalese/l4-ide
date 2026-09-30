@@ -1,4 +1,5 @@
 import {
+  ProtocolError,
   arr,
   int,
   literal,
@@ -96,3 +97,51 @@ export const attachmentRef: Check<AttachmentRef> = obj({
   contentType: str({ min: 1, max: 255, pattern: /^[\w.+-]+\/[\w.+-]+$/ }),
   size: int({ min: 0, max: MAX_ATTACHMENT_BYTES }),
 })
+
+/**
+ * Where the seed came from on the user's machine, so every machine maps
+ * local files to the same `data/` paths: a local file at
+ * `<workspace folder named workspaceFolder>/<path>/<rel>` is
+ * `data/<rel>` in the session.
+ */
+export interface SeedBase {
+  /** The VS Code workspace folder's NAME (not a path). */
+  workspaceFolder: string
+  /** The base, relative to that folder, `/`-separated; `''` for the
+   *  folder root. */
+  path: string
+}
+
+export const seedBase: Check<SeedBase> = (v, path) => {
+  const out = obj({
+    workspaceFolder: str({ min: 1, max: 255, pattern: /^[^\0\r\n/\\]+$/ }),
+    path: str({ max: 1024 }),
+  })(v, path)
+  const p = out.path
+  if (p !== '') {
+    const parts = p.split('/')
+    if (
+      /^[A-Za-z]:/.test(p) ||
+      parts.some(
+        (x) =>
+          x === '' ||
+          x === '.' ||
+          x === '..' ||
+          x.length > 255 ||
+          /[\0\r\n\\]/.test(x)
+      )
+    ) {
+      throw new ProtocolError(
+        'expected a relative /-separated path without . or ..',
+        `${path}.path`
+      )
+    }
+  }
+  if (out.workspaceFolder === '.' || out.workspaceFolder === '..') {
+    throw new ProtocolError(
+      'invalid workspace folder name',
+      `${path}.workspaceFolder`
+    )
+  }
+  return out
+}

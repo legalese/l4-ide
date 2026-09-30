@@ -31,8 +31,10 @@ import {
   epochMs,
   mcpServerConfig,
   opaqueId,
+  seedBase,
   sessionId,
   type McpServerConfig,
+  type SeedBase,
 } from './common.js'
 import {
   ProtocolError,
@@ -93,6 +95,9 @@ export interface SessionFile {
   parkedReason?: AgentKeyFailure
   /** The user's HTTP/SSE MCP servers — names and URLs only (§6.4). */
   mcpServers: McpServerConfig[]
+  /** Where the seed came from locally (§10); later files map through
+   *  it on any machine. */
+  seedBase?: SeedBase
 }
 
 export const SESSION_TITLE_MAX = 200
@@ -109,6 +114,7 @@ export const sessionFile: Check<SessionFile> = obj({
   parkedReason: optional(
     literal('invalid_key', 'chain_expired', 'inactive', 'chain_forked')
   ),
+  seedBase: optional(seedBase),
   mcpServers: (v, path) => {
     const servers = arr(mcpServerConfig, { max: 32 })(v, path)
     const seen = new Set<string>()

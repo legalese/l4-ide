@@ -10,10 +10,12 @@ import {
   attachmentRef,
   epochMs,
   mcpServerConfig,
+  seedBase,
   sessionId,
   sessionState,
   type AttachmentRef,
   type McpServerConfig,
+  type SeedBase,
   type SessionState,
 } from './common.js'
 import { MAX_BATCH_FILES, repoDataPath } from './commands.js'
@@ -110,6 +112,8 @@ export interface CreateSessionRequest {
    *  be size-bound. */
   seedSize?: number
   attachments?: AttachmentRef[]
+  /** Where the seed came from locally; stored in `session.json` (§10). */
+  seedBase?: SeedBase
 }
 
 export const createSessionRequest: Check<CreateSessionRequest> = obj({
@@ -117,6 +121,7 @@ export const createSessionRequest: Check<CreateSessionRequest> = obj({
   mcpServers: optional(arr(mcpServerConfig, { max: 32 })),
   seedSize: optional(int({ min: 0, max: MAX_SEED_BYTES })),
   attachments: optional(arr(attachmentRef, { max: 50 })),
+  seedBase: optional(seedBase),
 })
 
 export interface CreateSessionResponse {
@@ -161,6 +166,8 @@ export interface SessionSummary {
   created: number
   lastActivity: number
   state: SessionState
+  /** From `session.json`, when set. */
+  seedBase?: SeedBase
 }
 
 const sessionSummary: Check<SessionSummary> = obj({
@@ -169,6 +176,7 @@ const sessionSummary: Check<SessionSummary> = obj({
   created: epochMs,
   lastActivity: epochMs,
   state: sessionState,
+  seedBase: optional(seedBase),
 })
 
 export interface ListSessionsResponse {

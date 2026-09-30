@@ -9,6 +9,7 @@ import {
   addFilesRequest,
   addFilesResponse,
   clientCommand,
+  listSessionsResponse,
   deletedCopyPath,
   isModelWritableRepoPath,
   decodeSealed,
@@ -427,6 +428,63 @@ describe('files added mid-session', () => {
         ''
       )
     )
+  })
+})
+
+describe('seed base', () => {
+  test('stored in session.json, sent on create, shown in reads', () => {
+    const base = { workspaceFolder: 'contracts', path: 'rules/tax' }
+    const file = parseSessionFile(
+      JSON.stringify({
+        sessionId: SID,
+        ownerUserId: 'u',
+        title: 't',
+        created: 1,
+        lastActivity: 2,
+        status: 'new',
+        mcpServers: [],
+        seedBase: base,
+      })
+    )
+    assert.deepEqual(file.seedBase, base)
+    assert.equal(
+      tryParse(createSessionRequest, {
+        seedBase: { workspaceFolder: 'contracts', path: '' },
+      }).ok,
+      true
+    )
+    assert.equal(
+      tryParse(listSessionsResponse, {
+        sessions: [
+          {
+            sessionId: SID,
+            title: 't',
+            created: 1,
+            lastActivity: 2,
+            state: 'sleeping',
+            seedBase: base,
+          },
+        ],
+      }).ok,
+      true
+    )
+    for (const bad of [
+      { workspaceFolder: 'a', path: '../x' },
+      { workspaceFolder: 'a', path: '/abs' },
+      { workspaceFolder: 'a', path: 'x//y' },
+      { workspaceFolder: 'a', path: 'C:/x' },
+      { workspaceFolder: 'a', path: 'x\\y' },
+      { workspaceFolder: '', path: '' },
+      { workspaceFolder: 'a/b', path: '' },
+      { workspaceFolder: '..', path: '' },
+      { workspaceFolder: 'a', path: 'x'.repeat(1025) },
+    ]) {
+      assert.equal(
+        tryParse(createSessionRequest, { seedBase: bad }).ok,
+        false,
+        JSON.stringify(bad)
+      )
+    }
   })
 })
 
