@@ -27,8 +27,8 @@ export const LM_TOOL_NAMES: ReadonlySet<string> = new Set(['l4_evaluate'])
 export function registerLanguageModelTools(
   outputChannel: vscode.OutputChannel
 ): vscode.Disposable {
-  // `vscode.lm.registerTool` landed in 1.95 (our engines floor), but
-  // forks built on older bases may still lack it — degrade silently.
+  // `vscode.lm.registerTool` landed in 1.95 (below our 1.106 engines
+  // floor), but forks may still lack it — degrade silently.
   if (typeof vscode.lm?.registerTool !== 'function') {
     outputChannel.appendLine(
       '[lm-tools] Language model tools API unavailable on this host — skipping'
