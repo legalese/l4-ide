@@ -128,7 +128,8 @@ export interface LeaseFile {
   /** ECS task id (or `dev-<pid>` in --dev mode). */
   taskId: string
   state: LeaseState
-  /** The running turn, while `busy` or `waiting`. */
+  /** The running turn, while `busy` or `waiting` (`waiting` = a
+   *  pending `ask-user` question). */
   turnId?: string
   /** Epoch ms; the lease is dead after this. */
   expiresAt: number

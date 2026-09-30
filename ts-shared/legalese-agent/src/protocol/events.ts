@@ -6,6 +6,12 @@
  * Every event is `{ seq, ts, type, … }`. The `type`s are the
  * {@link ChatServiceEvent} kinds (payload = the chat event minus `kind`)
  * plus the cloud-only ones below.
+ *
+ * Cloud sessions never ask for tool approval: every tool call runs
+ * (file changes are committed per turn and can be rolled back; MCP
+ * servers passed at start count as approved). So there is no
+ * approval event or command, and `tool-call` events never carry
+ * `status: 'pending-approval'`. Only `ask-user` questions wait.
  */
 import type { ChatServiceEvent } from '../events.js'
 import {
@@ -66,15 +72,6 @@ export type CloudOnlyEventPayload =
       callId: string
       question: string
       choices?: string[]
-    }
-  /** A tool call waiting for an `approve` command. */
-  | {
-      type: 'approval-request'
-      conversationId: string
-      turnId: string
-      callId: string
-      name: string
-      argsJson: string
     }
   /** Lifecycle. While `running`, carries the sealing public key for
    *  `mcp-credentials` (§6.4). */
@@ -188,14 +185,6 @@ const payloads: { [T in CloudEventType]: Check<Payload<T>> } = {
     callId: opaqueId,
     question: text,
     choices: optional(arr(str({ max: 4096 }), { max: 50 })),
-  }),
-  'approval-request': obj({
-    type: literal('approval-request'),
-    conversationId,
-    turnId: opaqueId,
-    callId: opaqueId,
-    name: str({ max: 256 }),
-    argsJson: text,
   }),
   'session-state': obj({
     type: literal('session-state'),

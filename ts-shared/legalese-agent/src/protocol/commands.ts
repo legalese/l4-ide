@@ -38,8 +38,6 @@ export type CommandPayload =
    *  mints one when absent. */
   | { type: 'inject'; turnId: string; injectionId?: string; text: string }
   | { type: 'abort'; turnId: string }
-  /** Answer to an `approval-request` event. */
-  | { type: 'approve'; callId: string; decision: 'allow' | 'deny' }
   /** Answer to an `ask-user` event (`''` = skipped). */
   | { type: 'answer'; callId: string; answer: string }
   /** Restore the files to before turn `turnId` (§9.4). */
@@ -97,11 +95,6 @@ const payloads: { [T in CommandType]: Check<Payload<T>> } = {
     text: str({ max: PROMPT_MAX }),
   }),
   abort: obj({ type: literal('abort'), turnId: opaqueId }),
-  approve: obj({
-    type: literal('approve'),
-    callId: opaqueId,
-    decision: literal('allow', 'deny'),
-  }),
   answer: obj({
     type: literal('answer'),
     callId: opaqueId,

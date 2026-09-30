@@ -35,7 +35,8 @@ export const epochMs: Check<number> = int({ min: 0 })
 /**
  * Session states as the Sessions API derives them (§7.3). `running`,
  * `busy` and `waiting` need a live lease; `parked` comes from
- * `session.json`.
+ * `session.json`. `waiting` means a turn is blocked on an `ask-user`
+ * question (there are no tool approvals in cloud sessions).
  */
 export type SessionState =
   | 'sleeping'

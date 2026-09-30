@@ -265,6 +265,35 @@ describe('commands', () => {
   })
 })
 
+describe('no tool approvals in cloud sessions', () => {
+  test('approval-request events and approve commands are rejected', () => {
+    assert.throws(
+      () =>
+        parseCloudEvent({
+          seq: 1,
+          ts: 1,
+          type: 'approval-request',
+          conversationId: 'c',
+          turnId: 't',
+          callId: 'k',
+          name: 'fs__delete_file',
+          argsJson: '{}',
+        }),
+      /unknown type/
+    )
+    assert.throws(
+      () =>
+        clientCommand({ type: 'approve', callId: 'k', decision: 'allow' }, ''),
+      /unknown type/
+    )
+    // Questions stay.
+    assert.equal(
+      clientCommand({ type: 'answer', callId: 'k', answer: 'yes' }, '').type,
+      'answer'
+    )
+  })
+})
+
 describe('Sessions API and agent keys', () => {
   test('create-session request', () => {
     const r = tryParse(createSessionRequest, {
