@@ -5,6 +5,7 @@ import {
   generateSealingKeyPair,
   mcpCredentialsContext,
   openSealed,
+  type AddFilesRequest,
   type ClientCommandPayload,
   type CloudEvent,
   type CreateSessionRequest,
@@ -99,6 +100,24 @@ class FakeApi implements SessionsApi {
   }
   async stopSession() {
     return 'running' as const
+  }
+  batches: AddFilesRequest[] = []
+  async addFiles(_sid: string, req: AddFilesRequest) {
+    this.log.push('add-files')
+    this.batches.push(req)
+    return {
+      batchId: '01K6B8Z6X9Q4M2N7P3R5T8B000',
+      uploads: req.files.map((f) => ({
+        path: f.path,
+        url: `https://bucket.example/${f.path}`,
+        method: 'PUT' as const,
+        headers: {},
+      })),
+    }
+  }
+  async commitFiles() {
+    this.log.push('commit-files')
+    return { commandId: 99, state: this.commandState }
   }
   async deleteSession() {
     this.log.push('delete')
@@ -414,5 +433,115 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
     ])
     // Listed in the start progress: their tools run without approval.
     assert.deepEqual(mcpListed, ['b'])
+  })
+})
+
+describe('CloudSessionManager files in later prompts (§10)', () => {
+  const ws = '/ws'
+  const file = (p: string, text: string) => ({ path: p, bytes: enc(text) })
+
+  test('first message names the seeded active file and mentions', async () => {
+    const { api, manager } = setup()
+    await manager.runInCloud({
+      turnId: 't1',
+      text: 'go',
+      seed: {
+        files: [
+          { path: 'rules/main.l4', bytes: enc('m') },
+          { path: 'shared/defs.l4', bytes: enc('d') },
+        ],
+        attachments: [],
+        root: ws,
+        activeFile: '/ws/rules/main.l4',
+        mentions: ['/ws/shared/defs.l4', '/elsewhere/x.l4'],
+      },
+    })
+    assert.deepEqual((api.commands[0] as { context?: unknown }).context, {
+      activeFile: 'data/rules/main.l4',
+      mentions: ['data/shared/defs.l4'],
+    })
+  })
+
+  test('adds only new or changed files, relative to the seed base', async () => {
+    const { api, manager, progress } = setup()
+    await manager.runInCloud({
+      turnId: 't1',
+      text: 'go',
+      seed: {
+        files: [{ path: 'main.l4', bytes: enc('v1') }],
+        attachments: [],
+        root: '/ws/rules',
+      },
+    })
+    api.log = []
+    progress.length = 0
+    api.commandState = 'busy'
+    await manager.sendMessage(SID, 't2', 'look at defs', {
+      sources: [
+        file('/ws/rules/main.l4', 'v1'), // unchanged: not sent
+        file('/ws/rules/lib/defs.l4', 'd'), // under the base
+        file('/ws/other/notes.md', 'n'), // outside the base: workspace-relative
+        file('/tmp/outside.l4', 'x'), // outside the workspace: skipped
+      ],
+      activeFile: '/ws/rules/main.l4',
+      mentions: ['/ws/rules/lib/defs.l4', '/ws/other/notes.md'],
+      workspaceRoots: [ws],
+    })
+    assert.deepEqual(api.log, [
+      'add-files',
+      'upload',
+      'upload',
+      'commit-files',
+      'command:message',
+    ])
+    assert.deepEqual(
+      api.batches[0]!.files.map((f) => f.path),
+      ['data/lib/defs.l4', 'data/other/notes.md']
+    )
+    assert.equal(progress[0], 'adding-files')
+    assert.deepEqual(api.commands[api.commands.length - 1], {
+      type: 'message',
+      turnId: 't2',
+      text: 'look at defs',
+      context: {
+        activeFile: 'data/main.l4',
+        mentions: ['data/lib/defs.l4', 'data/other/notes.md'],
+      },
+    })
+
+    // Same files again: nothing uploaded; an edit is.
+    api.log = []
+    await manager.sendMessage(SID, 't3', 'again', {
+      sources: [
+        file('/ws/rules/lib/defs.l4', 'd'),
+        file('/ws/rules/main.l4', 'v2'),
+      ],
+      workspaceRoots: [ws],
+    })
+    assert.deepEqual(api.log, [
+      'add-files',
+      'upload',
+      'commit-files',
+      'command:message',
+    ])
+    assert.deepEqual(
+      api.batches[1]!.files.map((f) => f.path),
+      ['data/main.l4']
+    )
+  })
+
+  test('declines files over the limits before uploading', async () => {
+    const { api, manager } = setup()
+    await assert.rejects(
+      manager.sendMessage(SID, 't', 'x', {
+        sources: [
+          { path: '/ws/big.pdf', bytes: new Uint8Array(10 * 1024 * 1024 + 1) },
+        ],
+        workspaceRoots: [ws],
+      }),
+      (err: unknown) =>
+        err instanceof SeedLimitError && /data\/big\.pdf/.test(err.message)
+    )
+    assert.deepEqual(api.log, [])
   })
 })

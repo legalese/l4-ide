@@ -11,6 +11,7 @@
  * Pure: works on `/`-separated paths (URI paths) and bytes. The
  * VS Code side (vscode-cloud.ts) reads the files.
  */
+import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import {
   FILE_NAME_RE,
@@ -283,4 +284,95 @@ export function createTar(files: SeedFile[], mtimeSeconds = 0): Buffer {
 
 export function createSeedTarGz(files: SeedFile[]): Buffer {
   return gzipSync(createTar(files, Math.floor(Date.now() / 1000)))
+}
+
+// ── Files added mid-session (§10) ────────────────────────────────────
+
+/** `p` relative to directory `root` (both absolute, `/`-separated), or
+ *  null when it isn't inside it. */
+export function relativeTo(p: string, root: string): string | null {
+  if (!isUnder(p, root)) return null
+  return splitPath(p).slice(splitPath(root).length).join('/')
+}
+
+/**
+ * Where a local file lives in a session's repo: `data/<path relative to
+ * the seed base>`, or — for files outside that base — `data/<path
+ * relative to its workspace folder>`. Null when neither applies or the
+ * path wouldn't pass the Sessions API's checks.
+ */
+export function dataPathFor(
+  absPath: string,
+  base: string | undefined,
+  workspaceRoots: string[]
+): string | null {
+  const candidates = [
+    ...(base ? [base] : []),
+    ...workspaceRoots.filter((r) => r !== base),
+  ]
+  for (const root of candidates) {
+    const rel = relativeTo(absPath, root)
+    if (rel === null) continue
+    const parts = rel.split('/')
+    if (!parts.every(safeComponent)) return null
+    const dataPath = `data/${rel}`
+    return Buffer.byteLength(dataPath, 'utf8') <= 1024 ? dataPath : null
+  }
+  return null
+}
+
+/** Hex SHA-256 of a file's bytes, to skip files already sent. */
+export function contentHash(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex')
+}
+
+const TEXT_EXTENSIONS = new Set([
+  'l4',
+  'md',
+  'txt',
+  'json',
+  'yaml',
+  'yml',
+  'csv',
+  'html',
+  'xml',
+])
+
+/** Content type for an added file (by extension). */
+export function contentTypeFor(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  if (ext === 'pdf') return 'application/pdf'
+  return TEXT_EXTENSIONS.has(ext) ? 'text/plain' : 'application/octet-stream'
+}
+
+/**
+ * Same limits as seeding: each added file at most 10 MB, a batch at
+ * most 50 MB. Declines before anything is uploaded, naming the files.
+ */
+export function checkAddFilesSizes(files: SeedFile[]): void {
+  const over = files.filter((f) => f.bytes.byteLength > MAX_ATTACHMENT_BYTES)
+  if (over.length > 0) {
+    throw new SeedLimitError(
+      `Files over ${formatSize(MAX_ATTACHMENT_BYTES)} can't be added to a cloud session: ` +
+        over
+          .map((f) => `${f.path} (${formatSize(f.bytes.byteLength)})`)
+          .join(', ') +
+        '.',
+      over.map((f) => f.path)
+    )
+  }
+  const total = files.reduce((n, f) => n + f.bytes.byteLength, 0)
+  if (total > MAX_SEED_BYTES) {
+    const largest = [...files]
+      .sort((a, b) => b.bytes.byteLength - a.bytes.byteLength)
+      .slice(0, 5)
+    throw new SeedLimitError(
+      `The files to add come to ${formatSize(total)}, over the ${formatSize(MAX_SEED_BYTES)} limit. Largest: ` +
+        largest
+          .map((f) => `${f.path} (${formatSize(f.bytes.byteLength)})`)
+          .join(', ') +
+        '.',
+      largest.map((f) => f.path)
+    )
+  }
 }

@@ -700,6 +700,7 @@ export async function activate(context: ExtensionContext) {
     mcp: vsMcpTools,
     emitChat: (event) => aiInteraction.emit(event),
     logger: aiLogger,
+    storage: context.globalState,
   })
   context.subscriptions.push(cloudSessions)
 

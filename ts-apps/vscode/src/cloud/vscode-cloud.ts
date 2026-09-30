@@ -22,6 +22,9 @@ import {
   CloudSessionManager,
   type CloudSeed,
   type CloudSessionListener,
+  type PromptFiles,
+  type SessionFilesRecord,
+  type SessionFilesStore,
 } from './cloud-session-manager.js'
 import type { McpServerSource } from './mcp-transfer.js'
 import { layoutSeed, type SeedSource } from './seed.js'
@@ -76,29 +79,35 @@ async function readUri(uri: vscode.Uri): Promise<Uint8Array> {
     : await vscode.workspace.fs.readFile(uri)
 }
 
+type PromptParams = Pick<
+  AiChatStartParams,
+  'activeFile' | 'includeActiveFile' | 'mentions' | 'attachments'
+>
+
 /**
- * The files for a new cloud session: the active file with its
- * transitive imports (from the language server), and @-mentioned
- * files, laid out relative to their common ancestor; plus the prompt
- * attachments. Files outside the workspace folders (and the active
- * file's own directory) are left out and logged.
+ * The files a prompt refers to: the active file (when included) with
+ * its transitive imports from the language server, and @-mentioned
+ * files — read from the editor (unsaved edits included).
  */
-export async function gatherCloudSeed(
-  params: Pick<
-    AiChatStartParams,
-    'activeFile' | 'includeActiveFile' | 'mentions' | 'attachments'
-  >,
+async function collectPromptSources(
+  params: PromptParams,
   client: VSCodeL4LanguageClient,
   logger: Logger
-): Promise<CloudSeed & { root: string; skipped: string[] }> {
+): Promise<{
+  sources: SeedSource[]
+  unreadable: string[]
+  activeFile?: string
+  mentions: string[]
+}> {
   const uris: vscode.Uri[] = []
-  let activeDir: string | undefined
+  let activeFile: string | undefined
+  const mentions: string[] = []
 
   if (params.includeActiveFile !== false && params.activeFile?.path) {
     const active = await resolveUserPath(params.activeFile.path)
     if (active) {
       uris.push(active)
-      activeDir = active.path.replace(/\/[^/]*$/, '')
+      activeFile = active.path
       if (active.path.endsWith('.l4')) {
         try {
           const doc = await vscode.workspace.openTextDocument(active)
@@ -119,25 +128,57 @@ export async function gatherCloudSeed(
   for (const m of params.mentions ?? []) {
     if (m.kind !== 'file') continue
     const uri = await resolveUserPath(m.label.replace(/^@/, ''))
-    if (uri) uris.push(uri)
+    if (uri) {
+      uris.push(uri)
+      mentions.push(uri.path)
+    }
   }
 
   const sources: SeedSource[] = []
   const unreadable: string[] = []
+  const seen = new Set<string>()
   for (const uri of uris) {
     if (uri.scheme !== 'file') {
       unreadable.push(uri.toString())
       continue
     }
+    if (seen.has(uri.path)) continue
+    seen.add(uri.path)
     try {
       sources.push({ path: uri.path, bytes: await readUri(uri) })
     } catch {
       unreadable.push(uri.toString())
     }
   }
+  return {
+    sources,
+    unreadable,
+    mentions,
+    ...(activeFile ? { activeFile } : {}),
+  }
+}
+
+function workspaceRoots(): string[] {
+  return (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.path)
+}
+
+/**
+ * The files for a new cloud session: the active file with its
+ * transitive imports (from the language server), and @-mentioned
+ * files, laid out relative to their common ancestor; plus the prompt
+ * attachments. Files outside the workspace folders (and the active
+ * file's own directory) are left out and logged.
+ */
+export async function gatherCloudSeed(
+  params: PromptParams,
+  client: VSCodeL4LanguageClient,
+  logger: Logger
+): Promise<CloudSeed & { root: string; skipped: string[] }> {
+  const { sources, unreadable, activeFile, mentions } =
+    await collectPromptSources(params, client, logger)
   const roots = [
-    ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.path),
-    ...(activeDir ? [activeDir] : []),
+    ...workspaceRoots(),
+    ...(activeFile ? [activeFile.replace(/\/[^/]*$/, '')] : []),
   ]
   const { files, root, skipped } = layoutSeed(sources, roots)
   const allSkipped = [...skipped, ...unreadable]
@@ -150,11 +191,53 @@ export async function gatherCloudSeed(
     files,
     root,
     skipped: allSkipped,
+    ...(activeFile ? { activeFile } : {}),
+    mentions,
     attachments: (params.attachments ?? []).map((a) => ({
       name: a.name,
       contentType: a.mediaType,
       bytes: Buffer.from(a.dataBase64, 'base64'),
     })),
+  }
+}
+
+/** The files a later prompt in a cloud session refers to (§10). */
+export async function gatherPromptFiles(
+  params: PromptParams,
+  client: VSCodeL4LanguageClient,
+  logger: Logger
+): Promise<PromptFiles> {
+  const { sources, unreadable, activeFile, mentions } =
+    await collectPromptSources(params, client, logger)
+  if (unreadable.length > 0) {
+    logger.info(
+      `cloud-sessions: could not read ${unreadable.length} file(s): ${unreadable.join(', ')}`
+    )
+  }
+  return {
+    sources,
+    ...(activeFile ? { activeFile } : {}),
+    mentions,
+    workspaceRoots: workspaceRoots(),
+  }
+}
+
+/** Per-session seed base and sent-file hashes, in extension storage. */
+export const SESSION_FILES_STORAGE_KEY = 'legaleseAi.cloudSessions.files'
+
+export function mementoFilesStore(memento: vscode.Memento): SessionFilesStore {
+  const all = (): Record<string, SessionFilesRecord> =>
+    memento.get<Record<string, SessionFilesRecord>>(
+      SESSION_FILES_STORAGE_KEY
+    ) ?? {}
+  return {
+    get: (sid) => all()[sid],
+    set: (sid, rec) => {
+      const next = { ...all() }
+      if (rec) next[sid] = rec
+      else delete next[sid]
+      return memento.update(SESSION_FILES_STORAGE_KEY, next)
+    },
   }
 }
 
@@ -168,6 +251,10 @@ export interface CloudSessions {
   gatherSeed(
     params: Parameters<typeof gatherCloudSeed>[0]
   ): ReturnType<typeof gatherCloudSeed>
+  /** Files a later prompt refers to (§10). */
+  gatherPromptFiles(
+    params: Parameters<typeof gatherPromptFiles>[0]
+  ): ReturnType<typeof gatherPromptFiles>
   /** Listeners for cloud-only events, state and progress (the webview
    *  UI plugs in here). */
   listener: Omit<CloudSessionListener, 'chat'>
@@ -184,6 +271,8 @@ export function createCloudSessions(deps: {
   mcp?: McpServerSource
   emitChat: (event: ChatServiceEvent) => void
   logger: Logger
+  /** Extension global state (per-session file hashes). */
+  storage: vscode.Memento
 }): CloudSessions & vscode.Disposable {
   const authDeps: AuthProxyDeps = {
     authBaseUrl: () => `https://${LEGALESE_CLOUD_DOMAIN}`,
@@ -200,6 +289,7 @@ export function createCloudSessions(deps: {
     api,
     mintAgentKey: (sid) => mintAgentKey(authDeps, sid),
     mcp: deps.mcp,
+    files: mementoFilesStore(deps.storage),
     logger: deps.logger,
     listener: {
       chat: deps.emitChat,
@@ -218,6 +308,8 @@ export function createCloudSessions(deps: {
     listener,
     isEnabled: isCloudSessionsEnabled,
     gatherSeed: (params) => gatherCloudSeed(params, deps.client, deps.logger),
+    gatherPromptFiles: (params) =>
+      gatherPromptFiles(params, deps.client, deps.logger),
     dispose: () => {
       authSub.dispose()
       manager.dispose()

@@ -31,6 +31,7 @@ import {
   type EventStreamResponse,
   type GetSessionResponse,
   type ListSessionsResponse,
+  type MessageContext,
   type PostCommandResponse,
   type SessionState,
 } from '@repo/legalese-agent/protocol'
@@ -43,16 +44,27 @@ import {
 } from './mcp-transfer.js'
 import {
   attachmentNames,
+  checkAddFilesSizes,
   checkAttachmentSizes,
   checkSeedSize,
+  contentHash,
+  contentTypeFor,
   createSeedTarGz,
+  dataPathFor,
+  relativeTo,
   type SeedAttachment,
   type SeedFile,
+  type SeedSource,
 } from './seed.js'
 import type { SessionsApi } from './sessions-api.js'
 
-/** Progress of {@link CloudSessionManager.runInCloud} (§12.2). */
-export type CloudStartPhase = 'uploading' | 'starting' | 'ready'
+/** Progress of {@link CloudSessionManager.runInCloud} (§12.2), and of
+ *  adding files before a later prompt (`adding-files`). */
+export type CloudStartPhase =
+  | 'uploading'
+  | 'starting'
+  | 'ready'
+  | 'adding-files'
 
 export interface CloudSessionListener {
   /** A chat-service event for the webview — the same path local chats use. */
@@ -78,6 +90,8 @@ export interface CloudSessionListener {
     /** With the first `uploading`: the MCP servers passed to the
      *  session. Their tools run without approval in the cloud. */
     mcpServers?: string[]
+    /** With `adding-files`: how many files are being added. */
+    fileCount?: number
     turnId: string
     sessionId?: string
     phase: CloudStartPhase
@@ -88,6 +102,44 @@ export interface CloudSeed {
   /** Files for `repo/data/`, relative to the seed root. */
   files: SeedFile[]
   attachments: SeedAttachment[]
+  /** The seed root (absolute, `/`-separated): the base later files are
+   *  placed relative to. */
+  root?: string
+  /** Absolute paths of the active file and @-mentioned files, for the
+   *  first message's `context`. */
+  activeFile?: string
+  mentions?: string[]
+}
+
+/** What a session has been sent: the seed base and a content hash per
+ *  `data/` path. Kept per session so a later prompt only uploads new or
+ *  changed files. */
+export interface SessionFilesRecord {
+  base?: string
+  sent: Record<string, string>
+}
+
+export interface SessionFilesStore {
+  get(sid: string): SessionFilesRecord | undefined
+  set(sid: string, record: SessionFilesRecord | undefined): unknown
+}
+
+/** Files referred to by a later prompt (§10): @-mentions and the active
+ *  file, by absolute path, with their current bytes. */
+export interface PromptFiles {
+  sources: SeedSource[]
+  activeFile?: string
+  mentions?: string[]
+  /** Workspace folders (absolute), for files outside the seed base. */
+  workspaceRoots: string[]
+}
+
+function memoryFilesStore(): SessionFilesStore {
+  const m = new Map<string, SessionFilesRecord>()
+  return {
+    get: (sid) => m.get(sid),
+    set: (sid, rec) => (rec ? m.set(sid, rec) : m.delete(sid)),
+  }
 }
 
 export interface CloudSessionManagerDeps {
@@ -95,6 +147,8 @@ export interface CloudSessionManagerDeps {
   /** Mint the first key of a key chain for `sid` (jl4-auth-proxy). */
   mintAgentKey(sid: string): Promise<{ token: string }>
   mcp?: McpServerSource
+  /** Per-session base and sent-file hashes (extension storage). */
+  files?: SessionFilesStore
   listener: CloudSessionListener
   logger: Logger
   /** Timer / clock overrides for the poller (tests). */
@@ -134,14 +188,29 @@ function titleFrom(text: string): string {
 
 const CONTENT_TYPE_RE = /^[\w.+-]+\/[\w.+-]+$/
 
+/** `context` for a message; undefined when it would be empty. */
+function messageContext(
+  activeFile: string | undefined,
+  mentions: Array<string | undefined>
+): MessageContext | undefined {
+  const m = [...new Set(mentions.filter((x): x is string => !!x))]
+  if (!activeFile && m.length === 0) return undefined
+  return {
+    ...(activeFile ? { activeFile } : {}),
+    ...(m.length > 0 ? { mentions: m } : {}),
+  }
+}
+
 export class CloudSessionManager {
   private readonly sessions = new Map<string, Tracked>()
   private readonly byConversation = new Map<string, string>()
   private readonly byTurn = new Map<string, string>()
   private readonly poller: EventPoller
   private readonly credentialJobs = new Map<string, Promise<void>>()
+  private readonly files: SessionFilesStore
 
   constructor(private readonly deps: CloudSessionManagerDeps) {
+    this.files = deps.files ?? memoryFilesStore()
     this.poller = new EventPoller({
       getEvents: (streams) => deps.api.getEvents(streams),
       onStream: (s) => this.handleStream(s),
@@ -266,6 +335,21 @@ export class CloudSessionManager {
     })
     const sid = created.sessionId
     this.byTurn.set(turnId, sid)
+    const sent: Record<string, string> = {}
+    for (const f of seed.files) sent[`data/${f.path}`] = contentHash(f.bytes)
+    this.files.set(sid, { ...(seed.root ? { base: seed.root } : {}), sent })
+    const seeded = new Set(Object.keys(sent))
+    const inSeed = (abs: string | undefined): string | undefined => {
+      if (!abs || !seed.root) return undefined
+      const rel = relativeTo(abs, seed.root)
+      return rel !== null && seeded.has(`data/${rel}`)
+        ? `data/${rel}`
+        : undefined
+    }
+    const context = messageContext(
+      inSeed(seed.activeFile),
+      (seed.mentions ?? []).map(inSeed)
+    )
     const t = this.track(sid)
     t.mcpNames = (mcp?.configs ?? []).map((c) => c.name)
     try {
@@ -292,6 +376,7 @@ export class CloudSessionManager {
         ...(attachments.length > 0
           ? { attachments: attachments.map((a) => a.name) }
           : {}),
+        ...(context ? { context } : {}),
       })
       this.deps.listener.progress?.({
         turnId,
@@ -302,6 +387,7 @@ export class CloudSessionManager {
       await this.resume(sid)
     } catch (err) {
       this.byTurn.delete(turnId)
+      this.files.set(sid, undefined)
       this.sessions.delete(sid)
       this.poller.unwatch(sid)
       void this.deps.api.deleteSession(sid).catch(() => undefined)
@@ -482,32 +568,108 @@ export class CloudSessionManager {
     return res
   }
 
-  sendMessage(
+  /**
+   * A later prompt (§10): add the @-mentioned files and the active file
+   * that are new or changed since they were last sent (a batch through
+   * `POST /sessions/:sid/files`, pre-signed PUTs and a commit), then
+   * send the message with `context` naming them by `data/` path.
+   */
+  async sendMessage(
     sid: string,
     turnId: string,
     text: string,
-    attachments?: string[]
+    files?: PromptFiles
   ): Promise<PostCommandResponse> {
+    const context = files
+      ? await this.addPromptFiles(sid, turnId, files)
+      : undefined
     return this.send(sid, {
       type: 'message',
       turnId,
       text,
-      ...(attachments?.length ? { attachments } : {}),
+      ...(context ? { context } : {}),
     })
   }
 
-  inject(
+  /** A prompt typed while turn `turnId` runs. Its files are added the
+   *  same way; `inject` carries no context. */
+  async inject(
     sid: string,
     turnId: string,
     text: string,
-    injectionId?: string
+    injectionId?: string,
+    files?: PromptFiles
   ): Promise<PostCommandResponse> {
+    if (files) await this.addPromptFiles(sid, turnId, files)
     return this.send(sid, {
       type: 'inject',
       turnId,
       text,
       ...(injectionId ? { injectionId } : {}),
     })
+  }
+
+  /** Upload what changed; returns the message context. Throws
+   *  `SeedLimitError` before uploading when a limit is hit. */
+  private async addPromptFiles(
+    sid: string,
+    turnId: string,
+    files: PromptFiles
+  ): Promise<MessageContext | undefined> {
+    const rec = this.files.get(sid) ?? { sent: {} }
+    const toData = (abs: string): string | null =>
+      dataPathFor(abs, rec.base, files.workspaceRoots)
+    const changed = new Map<string, SeedFile & { hash: string }>()
+    const skipped: string[] = []
+    for (const src of files.sources) {
+      const path = toData(src.path)
+      if (!path) {
+        skipped.push(src.path)
+        continue
+      }
+      const hash = contentHash(src.bytes)
+      if (rec.sent[path] !== hash && !changed.has(path)) {
+        changed.set(path, { path, bytes: src.bytes, hash })
+      }
+    }
+    if (skipped.length > 0) {
+      this.deps.logger.info(
+        `cloud-sessions: not adding ${skipped.length} file(s) outside the workspace: ${skipped.join(', ')}`
+      )
+    }
+    const batch = [...changed.values()]
+    if (batch.length > 0) {
+      checkAddFilesSizes(batch)
+      this.deps.listener.progress?.({
+        turnId,
+        sessionId: sid,
+        phase: 'adding-files',
+        fileCount: batch.length,
+      })
+      const res = await this.deps.api.addFiles(sid, {
+        files: batch.map((f) => ({
+          path: f.path,
+          size: f.bytes.byteLength,
+          contentType: contentTypeFor(f.path),
+        })),
+      })
+      await Promise.all(
+        batch.map((f) => {
+          const target = res.uploads.find((u) => u.path === f.path)
+          if (!target) throw new Error(`no upload URL for ${f.path}`)
+          return this.deps.api.upload(target, f.bytes)
+        })
+      )
+      await this.deps.api.commitFiles(sid, res.batchId)
+      const sent = { ...rec.sent }
+      for (const f of batch) sent[f.path] = f.hash
+      this.files.set(sid, { ...rec, sent })
+      this.poller.poke(sid)
+    }
+    return messageContext(
+      files.activeFile ? (toData(files.activeFile) ?? undefined) : undefined,
+      (files.mentions ?? []).map((m) => toData(m) ?? undefined)
+    )
   }
 
   abort(sid: string, turnId: string): Promise<PostCommandResponse> {
@@ -541,5 +703,6 @@ export class CloudSessionManager {
     const t = this.sessions.get(sid)
     if (t?.conversationId) this.byConversation.delete(t.conversationId)
     this.sessions.delete(sid)
+    this.files.set(sid, undefined)
   }
 }

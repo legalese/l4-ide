@@ -6,7 +6,10 @@ import {
   attachmentNames,
   checkAttachmentSizes,
   checkSeedSize,
+  checkAddFilesSizes,
   commonAncestor,
+  contentTypeFor,
+  dataPathFor,
   createSeedTarGz,
   createTar,
   layoutSeed,
@@ -163,5 +166,35 @@ describe('seed limits', () => {
       attachmentNames(['a.pdf', 'dir/a.pdf', '.hidden', '', 'x\n.png']),
       ['a.pdf', 'a-2.pdf', 'hidden', 'attachment', 'x.png']
     )
+  })
+})
+
+describe('files added mid-session', () => {
+  test('data paths: seed base first, then the workspace folder', () => {
+    assert.equal(dataPathFor('/ws/a/b.l4', '/ws/a', ['/ws']), 'data/b.l4')
+    assert.equal(dataPathFor('/ws/c/d.l4', '/ws/a', ['/ws']), 'data/c/d.l4')
+    assert.equal(dataPathFor('/ws/c/d.l4', undefined, ['/ws']), 'data/c/d.l4')
+    assert.equal(dataPathFor('/other/e.l4', '/ws/a', ['/ws']), null)
+    assert.equal(dataPathFor('/ws/.git/config', '/ws', ['/ws']), null)
+  })
+
+  test('content types and limits', () => {
+    assert.equal(contentTypeFor('data/a.l4'), 'text/plain')
+    assert.equal(contentTypeFor('data/a.pdf'), 'application/pdf')
+    assert.equal(contentTypeFor('data/a.bin'), 'application/octet-stream')
+    const mb = 1024 * 1024
+    assert.throws(
+      () =>
+        checkAddFilesSizes(
+          Array.from({ length: 6 }, (_, i) => ({
+            path: `data/f${i}.bin`,
+            bytes: new Uint8Array(9 * mb),
+          }))
+        ),
+      (err: unknown) =>
+        err instanceof SeedLimitError &&
+        /over the 50\.0 MB limit/.test(err.message)
+    )
+    checkAddFilesSizes([{ path: 'data/ok.l4', bytes: enc('x') }])
   })
 })

@@ -7,6 +7,8 @@
  */
 import {
   ProtocolError,
+  addFilesRequest,
+  addFilesResponse,
   apiError,
   clientCommand,
   createSessionRequest,
@@ -17,6 +19,8 @@ import {
   parseEventStream,
   postCommandResponse,
   sessionStateResponse,
+  type AddFilesRequest,
+  type AddFilesResponse,
   type Check,
   type ClientCommandPayload,
   type CreateSessionRequest,
@@ -96,6 +100,10 @@ export interface SessionsApi {
     command: ClientCommandPayload
   ): Promise<PostCommandResponse>
   stopSession(sid: string): Promise<SessionState>
+  /** Add files mid-session: pre-signed PUTs for a batch… */
+  addFiles(sid: string, req: AddFilesRequest): Promise<AddFilesResponse>
+  /** …then queue it for the harness (`add-files`). */
+  commitFiles(sid: string, batchId: string): Promise<PostCommandResponse>
   deleteSession(sid: string): Promise<void>
   getEvents(
     streams: EventStreamRequest[]
@@ -243,6 +251,26 @@ export class SessionsApiClient implements SessionsApi {
       `/sessions/${sid}/commands`,
       postCommandResponse,
       clientCommand(command, 'command')
+    )
+  }
+
+  async addFiles(sid: string, req: AddFilesRequest): Promise<AddFilesResponse> {
+    return this.request(
+      'POST',
+      `/sessions/${sid}/files`,
+      addFilesResponse,
+      addFilesRequest(req, 'request')
+    )
+  }
+
+  async commitFiles(
+    sid: string,
+    batchId: string
+  ): Promise<PostCommandResponse> {
+    return this.request(
+      'POST',
+      `/sessions/${sid}/files/${batchId}/commit`,
+      postCommandResponse
     )
   }
 
