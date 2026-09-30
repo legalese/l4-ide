@@ -26,6 +26,24 @@ import {
   AiPermissionsSet,
   AiUsageSubscribe,
   AiUsageUnsubscribe,
+  AiCloudCommand,
+  AiCloudDelete,
+  AiCloudGitAction,
+  AiCloudGitStatusRequest,
+  AiCloudOpen,
+  AiCloudResume,
+  AiCloudRollback,
+  AiCloudRun,
+  AiCloudSessionList,
+  AiCloudStop,
+  cloudConversationId,
+  cloudSessionIdOf,
+  type AiCloudCommandPayload,
+  type AiCloudEventPayload,
+  type AiCloudGitStatus,
+  type AiCloudSessionState,
+  type AiCloudSessionSummary,
+  type AiCloudStartPhase,
   type AiChatAttachment,
   type AiMcpCandidateInfo,
   type AiMcpServerInfo,
@@ -38,6 +56,18 @@ import {
   type AiPermissionValue,
 } from 'jl4-client-rpc'
 import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
+import {
+  CLONE_NOT_READY,
+  adoptTurn,
+  applyCloudEvent,
+  canCloneOrSync,
+  mergeHistory,
+  newCloudInfo,
+  rollbackOffer,
+  type CloudConversationInfo,
+  type HistoryEntry,
+  type RollbackOffer,
+} from '$lib/stores/cloud-chat'
 
 export interface PendingQuestion {
   callId: string
@@ -101,6 +131,18 @@ export interface RenderedTurn {
    *  on the assistant bubble as a small badge so users can see
    *  expensive turns + catch quota drift before the 429. */
   usage?: { promptTokens: number; completionTokens: number }
+  /** Cloud conversations, user turns: the turn id the prompt was sent
+   *  as (matches the harness's `user-message` echo). */
+  cloudTurnId?: string
+  /** Cloud conversations, assistant turns: the commit the harness
+   *  made for this turn's file changes (§9.4). */
+  cloudCommit?: { sha: string; parent: string }
+  /** Cloud conversations, assistant turns: the changes were rolled
+   *  back; the turn renders dimmed. */
+  rolledBack?: boolean
+  /** Cloud conversations, user turns: files added to the session for
+   *  this prompt (`data/…` paths, from `files-added`). */
+  filesAdded?: string[]
 }
 
 /** A chip echoed at the top of a user message — mirrors what was
@@ -238,6 +280,9 @@ interface ConversationState {
    *  `abort()` and on `onError()` since both reasons halt the
    *  pipeline server-side. */
   queuedInjections: Array<{ injectionId: string; userTurnId: string }>
+  /** Set on cloud conversations (id `cloud:<sessionId>`), and on the
+   *  pending buffer of a "Run in cloud" start. */
+  cloud?: CloudConversationInfo
 }
 
 /** Parse `_meta.blocks` saved by chat-service into the webview's
@@ -428,6 +473,11 @@ export function createAiChatStore(
   // successful dispatch (mirrors the stagedMentions flow). PDFs and
   // images only; the extension refuses spreadsheets.
   let stagedAttachments = $state<AiChatAttachment[]>([])
+  // Cloud sessions (spec §12), behind `legaleseAi.cloudSessions.enabled`
+  // — the extension says whether it's on (AiCloudConfig).
+  let cloudEnabled = $state<boolean>(false)
+  let cloudHistory = $state<AiCloudSessionSummary[]>([])
+  const cloudGit = $state<Record<string, AiCloudGitStatus>>({})
 
   function ensureCurrent(): ConversationState {
     if (currentId) return conversations[currentId]!
@@ -491,6 +541,8 @@ export function createAiChatStore(
   }
 
   async function loadConversation(id: string): Promise<void> {
+    const cloudSid = cloudSessionIdOf(id)
+    if (cloudSid) return loadCloudConversation(cloudSid)
     const m = getMessenger()
     if (!m) return
     // If we already have an in-memory state for this conversation,
@@ -561,6 +613,26 @@ export function createAiChatStore(
   async function deleteConversation(id: string): Promise<void> {
     const m = getMessenger()
     if (!m) return
+    const cloudSid = cloudSessionIdOf(id)
+    if (cloudSid) {
+      let res: { ok: boolean; error?: string } = { ok: false }
+      try {
+        res = await m.sendRequest(AiCloudDelete, HOST_EXTENSION, {
+          sessionId: cloudSid,
+        })
+      } catch (err) {
+        res = { ok: false, error: err instanceof Error ? err.message : '' }
+      }
+      if (!res.ok) {
+        const conv = conversations[id]
+        if (conv?.cloud) conv.cloud.notice = res.error ?? 'Delete failed.'
+        return
+      }
+      cloudHistory = cloudHistory.filter((s) => s.sessionId !== cloudSid)
+      delete conversations[id]
+      if (currentId === id) currentId = null
+      return
+    }
     try {
       await m.sendRequest(AiConversationDelete, HOST_EXTENSION, { id })
     } catch {
@@ -630,6 +702,17 @@ export function createAiChatStore(
     const m = getMessenger()
     if (!m || !text.trim()) return
     const conv = ensureCurrent()
+    if (conv.cloud) {
+      // A cloud conversation: prompts become commands to its session;
+      // a "Run in cloud" start that failed before the session existed
+      // starts again.
+      if (!conv.cloud.sessionId) {
+        // Still being created: one start at a time.
+        if (conv.streaming) return
+        return sendCloud(text, mentions)
+      }
+      return sendToCloudSession(conv, text, mentions)
+    }
 
     // A deployment-bound chat is a plain passthrough to the
     // deployment's model — it has no IDE tools and the extension
@@ -885,6 +968,19 @@ export function createAiChatStore(
     const conv = getConversation()
     if (!m || !conv) return
 
+    // Cloud: there's no "run again" command; re-send the last prompt
+    // as a new turn (after dropping the failed reply).
+    if (conv.cloud) {
+      const last = [...conv.turns].reverse().find((t) => t.role === 'user')
+      if (!last?.content.trim()) return
+      dropTrailingErroredAssistantTurns(conv)
+      if (!conv.cloud.sessionId) {
+        conv.turns = conv.turns.filter((t) => t.id !== last.id)
+      }
+      void send(last.content)
+      return
+    }
+
     // No server-assigned conversationId yet → the very first turn
     // failed before the proxy emitted its `metadata` SSE frame, so
     // there is no on-disk history to resume against. Fall back to
@@ -988,7 +1084,11 @@ export function createAiChatStore(
       conv.turns.find((t) => t.role === 'assistant' && t.streaming)?.turnId ??
       null
     if (!turnId) return
-    m.sendNotification(AiChatAbort, HOST_EXTENSION, { turnId })
+    if (conv.cloud?.sessionId) {
+      void cloudCommand(conv, { type: 'abort', turnId })
+    } else {
+      m.sendNotification(AiChatAbort, HOST_EXTENSION, { turnId })
+    }
     // Flip local streaming state right away. If the extension's
     // `done` event races or never arrives, the UI still unlocks.
     for (const t of conv.turns) {
@@ -1106,6 +1206,11 @@ export function createAiChatStore(
           : {}),
       }
     }
+    // A turn this webview didn't start (another window, a cloud
+    // session's replay or its harness): give it a bubble, or its
+    // deltas would have nowhere to go.
+    const started = conversations[params.conversationId]
+    if (started) adoptTurn(started, params.turnId)
   }
 
   /** A queued user message has spawned a fresh sub-turn under the
@@ -1238,6 +1343,9 @@ export function createAiChatStore(
       conv.streaming = false
       conv.activeTurnId = null
     }
+    // A finished cloud turn has no open question left (matters when
+    // replaying a log that contains answered questions).
+    if (conv.cloud) clearPendingQuestionFor(params.conversationId)
     void refreshHistory()
   }
 
@@ -1484,6 +1592,12 @@ export function createAiChatStore(
     /** Deployment id parsed from the MCP description trailer. */
     deploymentId?: string
   }): void {
+    if (
+      (params.status === 'done' || params.status === 'error') &&
+      pendingQuestionConvByCallId[params.callId]
+    ) {
+      clearPendingQuestionFor(pendingQuestionConvByCallId[params.callId]!)
+    }
     // Status updates for an EXISTING tool call must merge into the
     // block wherever it already lives — not just the latest turn or
     // the named conversation. When the user submits a new message
@@ -1573,6 +1687,7 @@ export function createAiChatStore(
     callId: string,
     decision: 'allow' | 'deny' | 'alwaysAllow'
   ): void {
+    // Local chats only: cloud sessions never ask for tool approval.
     const m = getMessenger()
     m?.sendNotification(AiChatApproveTool, HOST_EXTENSION, {
       callId,
@@ -1595,7 +1710,8 @@ export function createAiChatStore(
    *  it can surface Accept/Reject buttons in place of the spinner. */
   function getPendingApproval(): RenderedToolCall | null {
     const conv = getConversation()
-    if (!conv) return null
+    // Cloud sessions never ask for tool approval.
+    if (!conv || conv.cloud) return null
     for (const turn of conv.turns) {
       if (turn.role !== 'assistant' || !turn.blocks) continue
       for (const block of turn.blocks) {
@@ -1651,6 +1767,9 @@ export function createAiChatStore(
       usedToday = 0
       dailyLimit = 0
       blockOnOverage = false
+      cloudHistory = []
+      for (const k of Object.keys(cloudGit)) delete cloudGit[k]
+      if (params.signedIn && cloudEnabled) void refreshCloudHistory(true)
     }
   }
 
@@ -1710,6 +1829,11 @@ export function createAiChatStore(
     const q = pendingQuestionsByConv[currentId]
     if (!q) return
     clearPendingQuestionFor(currentId)
+    const conv = conversations[currentId]
+    if (conv?.cloud?.sessionId) {
+      void cloudCommand(conv, { type: 'answer', callId: q.callId, answer })
+      return
+    }
     const m = getMessenger()
     m?.sendNotification(AiChatAnswerUser, HOST_EXTENSION, {
       callId: q.callId,
@@ -1941,6 +2065,479 @@ export function createAiChatStore(
     }
   }
 
+  // ── Cloud sessions (spec §9.4, §12) ─────────────────────────────────
+
+  function newTurnId(): string {
+    return `turn_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  }
+
+  function newBubbleId(prefix: string): string {
+    return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`
+  }
+
+  /** Send a command to a conversation's session; failures show in the
+   *  cloud banner (and on the reply bubble for a new prompt). */
+  async function cloudCommand(
+    conv: ConversationState,
+    command: AiCloudCommandPayload
+  ): Promise<boolean> {
+    const m = getMessenger()
+    const sessionId = conv.cloud?.sessionId
+    if (!m || !sessionId) return false
+    let res: { ok: boolean; error?: string; state?: AiCloudSessionState }
+    try {
+      res = await m.sendRequest(AiCloudCommand, HOST_EXTENSION, {
+        sessionId,
+        command,
+      })
+    } catch (err) {
+      res = { ok: false, error: err instanceof Error ? err.message : '' }
+    }
+    if (!conv.cloud) return res.ok
+    if (conv.cloud.progress === 'adding-files') conv.cloud.progress = null
+    if (res.ok) {
+      conv.cloud.notice = null
+      if (res.state) conv.cloud.state = res.state
+      return true
+    }
+    conv.cloud.notice = res.error || 'The cloud session did not accept that.'
+    if (command.type === 'message') {
+      const reply = conv.turns.find(
+        (t) => t.role === 'assistant' && t.turnId === command.turnId
+      )
+      if (reply) {
+        reply.streaming = false
+        reply.error = { message: conv.cloud.notice, code: 'cloud_command' }
+      }
+      conv.streaming = false
+      conv.activeTurnId = null
+    }
+    return false
+  }
+
+  /** A prompt in an existing cloud conversation (§12.2): a `message`
+   *  command, or `inject` while a turn runs. */
+  function sendToCloudSession(
+    conv: ConversationState,
+    text: string,
+    mentions: AiChatStartParams['mentions'] = []
+  ): void {
+    if (stagedAttachments.length > 0) {
+      conv.cloud!.notice =
+        'Attachments can only be added when a cloud session starts.'
+      return
+    }
+    // The prompt's @-mentioned files (and the active file, when its
+    // chip is on) are added to the session first (§10).
+    const withFile =
+      includeActiveFile && activeFile.path && activeFile.name
+        ? { name: activeFile.name, path: activeFile.path }
+        : undefined
+    const refs = {
+      mentions: mentions.map((x) => ({ kind: x.kind, label: x.label })),
+      includeActiveFile: !!withFile,
+      ...(withFile ? { activeFile: withFile } : {}),
+    }
+    const chips: UserTurnChip[] = withFile
+      ? [{ kind: 'active-file', ...withFile }]
+      : []
+    if (withFile) includeActiveFile = false
+    dropTrailingErroredAssistantTurns(conv)
+    const userTurnId = newBubbleId('user')
+    if (conv.streaming && conv.activeTurnId) {
+      const injectionId = `inj_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      conv.turns.push({
+        id: userTurnId,
+        role: 'user',
+        content: text,
+        injectionId,
+        cloudTurnId: conv.activeTurnId,
+        ...(chips.length > 0 ? { chips } : {}),
+      })
+      conv.queuedInjections.push({ injectionId, userTurnId })
+      void cloudCommand(conv, {
+        type: 'inject',
+        turnId: conv.activeTurnId,
+        injectionId,
+        text,
+        ...refs,
+      }).then((ok) => {
+        if (ok) return
+        conv.queuedInjections = conv.queuedInjections.filter(
+          (q) => q.injectionId !== injectionId
+        )
+        const bubble = conv.turns.find((t) => t.id === userTurnId)
+        if (bubble) bubble.injectionId = undefined
+      })
+    } else {
+      for (const t of conv.turns) cancelInflightToolCalls(t)
+      const turnId = newTurnId()
+      conv.turns.push({
+        id: userTurnId,
+        role: 'user',
+        content: text,
+        cloudTurnId: turnId,
+        ...(chips.length > 0 ? { chips } : {}),
+      })
+      conv.turns.push({
+        id: newBubbleId('asst'),
+        turnId,
+        role: 'assistant',
+        content: '',
+        streaming: true,
+        blocks: [],
+      })
+      conv.streaming = true
+      conv.activeTurnId = turnId
+      void cloudCommand(conv, { type: 'message', turnId, text, ...refs })
+    }
+    clearCurrentDraft()
+    if (currentId) clearPendingQuestionFor(currentId)
+  }
+
+  /** Whether "Run in cloud" applies: a fresh chat (or a cloud start
+   *  that failed before its session existed). */
+  function canRunInCloud(): boolean {
+    if (!cloudEnabled || deploymentBinding) return false
+    if (currentId) return false
+    const conv = pendingConversation
+    return !conv || conv.turns.length === 0 || (!!conv.cloud && !conv.streaming)
+  }
+
+  /** "Run in cloud" (§10, §12.2): start a new cloud session with this
+   *  prompt. The extension gathers the files, creates and starts the
+   *  session, and reports progress; the conversation is keyed
+   *  `cloud:<sessionId>` once the session exists. */
+  async function sendCloud(
+    text: string,
+    mentions: AiChatStartParams['mentions'] = []
+  ): Promise<void> {
+    const m = getMessenger()
+    if (!m || !text.trim() || !cloudEnabled) return
+    if (currentId) newConversation()
+    const conv = ensureCurrent()
+    const cloud = (conv.cloud ??= newCloudInfo('', 'starting'))
+    cloud.progress = 'uploading'
+    cloud.notice = null
+    dropTrailingErroredAssistantTurns(conv)
+    const withFile =
+      includeActiveFile && activeFile.path && activeFile.name
+        ? { name: activeFile.name, path: activeFile.path }
+        : undefined
+    const turnId = newTurnId()
+    const chips: UserTurnChip[] = stagedAttachments.map((a) => ({
+      kind: a.kind,
+      name: a.name,
+    }))
+    if (withFile) chips.push({ kind: 'active-file', ...withFile })
+    conv.turns.push({
+      id: newBubbleId('user'),
+      role: 'user',
+      content: text,
+      cloudTurnId: turnId,
+      ...(chips.length > 0 ? { chips } : {}),
+    })
+    conv.turns.push({
+      id: newBubbleId('asst'),
+      turnId,
+      role: 'assistant',
+      content: '',
+      streaming: true,
+      blocks: [],
+    })
+    conv.streaming = true
+    conv.activeTurnId = turnId
+    m.sendNotification(AiCloudRun, HOST_EXTENSION, {
+      turnId,
+      text,
+      mentions: mentions.map((x) => ({ kind: x.kind, label: x.label })),
+      attachments: stagedAttachments.map((a) => ({
+        kind: a.kind,
+        name: a.name,
+        mediaType: a.mediaType,
+        dataBase64: a.dataBase64,
+      })),
+      includeActiveFile: !!withFile,
+      ...(withFile ? { activeFile: withFile } : {}),
+    })
+    stagedAttachments = []
+    if (withFile) includeActiveFile = false
+    clearCurrentDraft()
+  }
+
+  function onCloudProgress(params: {
+    turnId: string
+    sessionId?: string
+    phase: AiCloudStartPhase
+    error?: string
+    mcpServers?: string[]
+    fileCount?: number
+  }): void {
+    const conv =
+      pendingConversation?.activeTurnId === params.turnId
+        ? pendingConversation
+        : params.sessionId
+          ? conversations[cloudConversationId(params.sessionId)]
+          : Object.values(conversations).find(
+              (c) => c.activeTurnId === params.turnId
+            )
+    if (!conv?.cloud) return
+    if (params.sessionId && !conv.cloud.sessionId) {
+      // The session exists: key the conversation by it.
+      const key = cloudConversationId(params.sessionId)
+      conv.id = key
+      conv.cloud.sessionId = params.sessionId
+      conversations[key] = conv
+      if (pendingConversation === conv) {
+        pendingConversation = null
+        if (currentId === null) currentId = key
+      }
+    }
+    if (params.mcpServers) conv.cloud.mcpServers = params.mcpServers
+    if (params.phase === 'error') {
+      conv.cloud.progress = null
+      const reply = conv.turns.find(
+        (t) => t.role === 'assistant' && t.turnId === params.turnId
+      )
+      if (reply) {
+        reply.streaming = false
+        reply.error = {
+          message: params.error || 'The cloud session could not start.',
+          code: 'cloud_start',
+        }
+      }
+      conv.streaming = false
+      conv.activeTurnId = null
+      return
+    }
+    if (params.phase === 'adding-files') {
+      conv.cloud.progress = 'adding-files'
+      conv.cloud.addingFiles = params.fileCount ?? 0
+      return
+    }
+    conv.cloud.progress = params.phase === 'ready' ? null : params.phase
+    if (params.phase === 'starting') conv.cloud.state = 'starting'
+    if (params.phase === 'ready') void refreshCloudHistory(true)
+  }
+
+  /** Open a cloud conversation: its event log is replayed from the
+   *  start (§12.1), and polling continues while it runs. */
+  async function loadCloudConversation(sessionId: string): Promise<void> {
+    const m = getMessenger()
+    if (!m) return
+    const key = cloudConversationId(sessionId)
+    const summary = cloudHistory.find((s) => s.sessionId === sessionId)
+    // Always rebuild from the log: the replay would otherwise add to
+    // what is already on screen.
+    conversations[key] = {
+      id: key,
+      title: summary?.title ?? null,
+      turns: [],
+      streaming: false,
+      activeTurnId: null,
+      queuedInjections: [],
+      cloud: newCloudInfo(sessionId, summary?.state ?? 'sleeping'),
+    }
+    clearPendingQuestionFor(key)
+    currentId = key
+    includeActiveFile = false
+    deploymentBinding = null
+    let res: {
+      ok: boolean
+      error?: string
+      state?: AiCloudSessionState
+      title?: string
+    }
+    try {
+      res = await m.sendRequest(AiCloudOpen, HOST_EXTENSION, { sessionId })
+    } catch (err) {
+      res = { ok: false, error: err instanceof Error ? err.message : '' }
+    }
+    const conv = conversations[key]
+    if (!conv?.cloud) return
+    if (res.ok) {
+      if (res.state) conv.cloud.state = res.state
+      if (res.title) conv.title = res.title
+    } else {
+      conv.cloud.notice = res.error || 'Could not open the cloud session.'
+    }
+    void refreshCloudGit(sessionId)
+  }
+
+  function onCloudConfig(params: { enabled: boolean }): void {
+    cloudEnabled = params.enabled
+    if (cloudEnabled) void refreshCloudHistory(false)
+  }
+
+  function updateCloudHistoryState(
+    sessionId: string,
+    state: AiCloudSessionState
+  ): void {
+    const row = cloudHistory.find((s) => s.sessionId === sessionId)
+    if (row) row.state = state
+  }
+
+  function onCloudEvent(params: {
+    conversationId: string
+    sessionId: string
+    replay: boolean
+    event: AiCloudEventPayload
+  }): void {
+    const { event } = params
+    if (event.type === 'session-state') {
+      updateCloudHistoryState(params.sessionId, event.state)
+    }
+    const conv = conversations[params.conversationId]
+    if (!conv) return
+    const { question } = applyCloudEvent(conv, event)
+    if (question)
+      onAskUser({ conversationId: params.conversationId, ...question })
+    if (
+      event.type === 'git-committed' ||
+      event.type === 'rolled-back' ||
+      event.type === 'local-merged'
+    ) {
+      void refreshCloudGit(params.sessionId)
+    }
+  }
+
+  function onCloudState(params: {
+    sessionId: string
+    state: AiCloudSessionState | 'gone'
+  }): void {
+    const conv = conversations[cloudConversationId(params.sessionId)]
+    if (params.state === 'gone') {
+      cloudHistory = cloudHistory.filter(
+        (s) => s.sessionId !== params.sessionId
+      )
+      if (conv?.cloud) {
+        conv.cloud.state = 'gone'
+        conv.cloud.notice = 'This cloud session no longer exists.'
+      }
+      return
+    }
+    updateCloudHistoryState(params.sessionId, params.state)
+    if (conv?.cloud) conv.cloud.state = params.state
+  }
+
+  /** The cloud part of the history: cached first, then fresh. */
+  async function refreshCloudHistory(refresh: boolean): Promise<void> {
+    const m = getMessenger()
+    if (!m || !cloudEnabled) return
+    try {
+      if (!refresh || cloudHistory.length === 0) {
+        const cached = await m.sendRequest(AiCloudSessionList, HOST_EXTENSION, {
+          refresh: false,
+        })
+        cloudHistory = cached.items
+      }
+      if (refresh) {
+        const fresh = await m.sendRequest(AiCloudSessionList, HOST_EXTENSION, {
+          refresh: true,
+        })
+        cloudHistory = fresh.items
+      }
+    } catch {
+      // keep what we have
+    }
+  }
+
+  /** Rollback / restore for the assistant turn at `index` (§9.4). */
+  function rollbackOfferAt(index: number): RollbackOffer | null {
+    const conv = getConversation()
+    return conv ? rollbackOffer(conv, index) : null
+  }
+
+  async function rollbackCloudTurn(offer: RollbackOffer): Promise<void> {
+    const m = getMessenger()
+    const conv = getConversation()
+    const sessionId = conv?.cloud?.sessionId
+    if (!m || !conv?.cloud || !sessionId) return
+    try {
+      const res = await m.sendRequest(AiCloudRollback, HOST_EXTENSION, {
+        sessionId,
+        turnId: offer.turnId,
+        undoesLaterTurns: offer.undoesLaterTurns,
+        undoesLocalSync: offer.undoesLocalSync,
+      })
+      if (!res.ok && !res.cancelled) {
+        conv.cloud.notice = res.error || 'The rollback was not accepted.'
+      } else if (res.ok) {
+        conv.cloud.notice = null
+      }
+    } catch (err) {
+      conv.cloud.notice =
+        err instanceof Error ? err.message : 'Rollback failed.'
+    }
+  }
+
+  /** Resume (parked sessions, `auth-required`) or Stop. */
+  async function cloudLifecycle(action: 'resume' | 'stop'): Promise<void> {
+    const m = getMessenger()
+    const conv = getConversation()
+    const sessionId = conv?.cloud?.sessionId
+    if (!m || !conv?.cloud || !sessionId) return
+    try {
+      const res = await m.sendRequest(
+        action === 'resume' ? AiCloudResume : AiCloudStop,
+        HOST_EXTENSION,
+        { sessionId }
+      )
+      if (res.ok) {
+        conv.cloud.notice = null
+        if (action === 'resume') conv.cloud.authRequired = null
+        if (res.state) conv.cloud.state = res.state
+      } else {
+        conv.cloud.notice = res.error || `Could not ${action} the session.`
+      }
+    } catch (err) {
+      conv.cloud.notice =
+        err instanceof Error ? err.message : `${action} failed.`
+    }
+  }
+
+  async function refreshCloudGit(sessionId: string): Promise<void> {
+    const m = getMessenger()
+    if (!m || !cloudEnabled) return
+    try {
+      cloudGit[sessionId] = await m.sendRequest(
+        AiCloudGitStatusRequest,
+        HOST_EXTENSION,
+        { sessionId }
+      )
+    } catch {
+      // leave the last status
+    }
+  }
+
+  /** The prompt field's Clone / Sync button (§9.3). */
+  async function cloudGitAction(): Promise<void> {
+    const m = getMessenger()
+    const conv = getConversation()
+    const sessionId = conv?.cloud?.sessionId
+    if (!m || !conv?.cloud || !sessionId) return
+    if (!canCloneOrSync(conv.cloud)) {
+      conv.cloud.notice = CLONE_NOT_READY
+      return
+    }
+    const status = cloudGit[sessionId]
+    const action = status?.kind === 'cloned' ? 'sync' : 'clone'
+    try {
+      const res = await m.sendRequest(AiCloudGitAction, HOST_EXTENSION, {
+        sessionId,
+        action,
+      })
+      cloudGit[sessionId] = res.status
+      conv.cloud.notice = res.error ?? null
+    } catch (err) {
+      conv.cloud.notice = err instanceof Error ? err.message : 'Git failed.'
+    }
+  }
+
+  function onCloudReveal(params: { sessionId: string }): void {
+    void loadConversation(cloudConversationId(params.sessionId))
+  }
+
   return {
     // Reactive state exposed for components.
     get currentId() {
@@ -2010,6 +2607,37 @@ export function createAiChatStore(
     get stagedAttachments() {
       return stagedAttachments
     },
+    get cloudEnabled() {
+      return cloudEnabled
+    },
+    /** Local and cloud conversations, most recent first. */
+    get historyEntries(): HistoryEntry[] {
+      return mergeHistory(history, cloudEnabled ? cloudHistory : [])
+    },
+    get canRunInCloud() {
+      return canRunInCloud()
+    },
+    /** Clone / Sync is available: the first turn is committed (§9.3). */
+    get cloudGitReady(): boolean {
+      return canCloneOrSync(getConversation()?.cloud)
+    },
+    /** Clone / Sync state of the current cloud conversation. */
+    get cloudGitStatus(): AiCloudGitStatus | null {
+      const sid = getConversation()?.cloud?.sessionId
+      return sid ? (cloudGit[sid] ?? null) : null
+    },
+    sendCloud,
+    refreshCloudHistory,
+    rollbackOfferAt,
+    rollbackCloudTurn,
+    resumeCloud: () => cloudLifecycle('resume'),
+    stopCloud: () => cloudLifecycle('stop'),
+    cloudGitAction,
+    onCloudConfig,
+    onCloudEvent,
+    onCloudState,
+    onCloudProgress,
+    onCloudReveal,
     pickAttachment,
     removeAttachment,
     previewAttachment,
@@ -2089,6 +2717,41 @@ export type AiChatStore = {
   setIncludeActiveFile: (value: boolean) => void
   answerQuestion: (answer: string) => void
   readonly stagedAttachments: AiChatAttachment[]
+  readonly cloudEnabled: boolean
+  readonly historyEntries: HistoryEntry[]
+  readonly canRunInCloud: boolean
+  readonly cloudGitStatus: AiCloudGitStatus | null
+  readonly cloudGitReady: boolean
+  sendCloud: (
+    text: string,
+    mentions?: AiChatStartParams['mentions']
+  ) => Promise<void>
+  refreshCloudHistory: (refresh: boolean) => Promise<void>
+  rollbackOfferAt: (index: number) => RollbackOffer | null
+  rollbackCloudTurn: (offer: RollbackOffer) => Promise<void>
+  resumeCloud: () => Promise<void>
+  stopCloud: () => Promise<void>
+  cloudGitAction: () => Promise<void>
+  onCloudConfig: (params: { enabled: boolean }) => void
+  onCloudEvent: (params: {
+    conversationId: string
+    sessionId: string
+    replay: boolean
+    event: AiCloudEventPayload
+  }) => void
+  onCloudState: (params: {
+    sessionId: string
+    state: AiCloudSessionState | 'gone'
+  }) => void
+  onCloudProgress: (params: {
+    turnId: string
+    sessionId?: string
+    phase: AiCloudStartPhase
+    error?: string
+    mcpServers?: string[]
+    fileCount?: number
+  }) => void
+  onCloudReveal: (params: { sessionId: string }) => void
   pickAttachment: (
     accept: 'any' | 'text-or-pdf' | 'spreadsheet'
   ) => Promise<{ ok: boolean; note?: string }>
@@ -2223,3 +2886,4 @@ export type AiChatStore = {
 // Satisfy the TypeScript import of the standard-library shape we
 // construct above.
 export type { AiConversation, AiChatMessage }
+export type { HistoryEntry, RollbackOffer, CloudConversationInfo }

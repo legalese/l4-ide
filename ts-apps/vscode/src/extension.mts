@@ -63,6 +63,7 @@ import { VsCodeEditorContext } from './ai/editor-context.js'
 import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
 import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
 import { createCloudSessions } from './cloud/vscode-cloud.js'
+import { registerCloudHandlers } from './cloud/register-cloud.js'
 
 /***********************************************
      decode for RenderAsLadderInfo
@@ -733,6 +734,22 @@ export async function activate(context: ExtensionContext) {
       mcp: aiMcpClient,
       vsMcp: vsMcpTools,
       serviceClient,
+    })
+  )
+
+  context.subscriptions.push(
+    registerCloudHandlers({
+      messenger: sidebarMessenger,
+      frontend: sidebarWebviewFrontend,
+      cloud: cloudSessions,
+      logger: aiLogger,
+      storage: context.globalState,
+      visibility: sidebarProvider,
+      reveal: async () => {
+        await sidebarProvider.revealSidebar()
+        await sidebarProvider.waitUntilReady()
+        sidebarProvider.switchToTab('ai-chat')
+      },
     })
   )
 

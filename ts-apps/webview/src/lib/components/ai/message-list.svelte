@@ -7,6 +7,7 @@
     RenderedTurn,
     RenderedToolCall,
     PendingQuestion,
+    RollbackOffer,
   } from '$lib/stores/ai-chat.svelte'
 
   import type { Messenger } from 'vscode-messenger-webview'
@@ -23,6 +24,8 @@
     onAnswerQuestion,
     onOpenFile,
     onOpenFileDiff,
+    rollbackOfferAt,
+    onRollback,
   }: {
     turns: RenderedTurn[]
     /** True while the current conversation has an open stream. Drives
@@ -49,6 +52,10 @@
     onAnswerQuestion: (answer: string) => void
     onOpenFile: (callId: string) => void
     onOpenFileDiff: (callId: string) => void
+    /** Cloud conversations (§9.4): the rollback offer for the turn at
+     *  an index, and what to do when it's clicked. */
+    rollbackOfferAt?: (index: number) => RollbackOffer | null
+    onRollback?: (offer: RollbackOffer) => void
   } = $props()
 
   let scrollEl = $state<HTMLDivElement>()
@@ -162,19 +169,42 @@
         {userIndex}
         {pending}
       />
+      {#if turn.filesAdded?.length}
+        <div class="files-added" title={turn.filesAdded.join('\n')}>
+          Added to the session: {turn.filesAdded.join(', ')}
+        </div>
+      {/if}
     {:else}
-      <AssistantMessage
-        content={turn.content}
-        streaming={!!turn.streaming}
-        {pipelineActive}
-        error={turn.error}
-        blocks={turn.blocks}
-        usage={turn.usage}
-        {messenger}
-        {onRetry}
-        {onOpenFile}
-        {onOpenFileDiff}
-      />
+      {@const offer = rollbackOfferAt?.(i) ?? null}
+      <div class="assistant-turn" class:rolled-back={turn.rolledBack}>
+        <AssistantMessage
+          content={turn.content}
+          streaming={!!turn.streaming}
+          {pipelineActive}
+          error={turn.error}
+          blocks={turn.blocks}
+          usage={turn.usage}
+          {messenger}
+          {onRetry}
+          {onOpenFile}
+          {onOpenFileDiff}
+        />
+        {#if turn.rolledBack}
+          <div class="turn-note">
+            File changes of this turn were rolled back.
+          </div>
+        {:else if offer}
+          <div class="rollback-row">
+            <button
+              class="rollback-btn"
+              title={offer.label === 'Roll back'
+                ? "Undo this turn's file changes"
+                : 'Restore the files to how they were before this turn (undoes later turns too)'}
+              onclick={() => onRollback?.(offer)}>{offer.label}</button
+            >
+          </div>
+        {/if}
+      </div>
     {/if}
   {/each}
   <!-- Question card for an active meta__ask_user. Rendered above the
@@ -238,6 +268,39 @@
        rather than the viewport, since the AI chat lives in a sidebar
        whose height is independent of `vh`. */
     container-type: size;
+  }
+  .files-added {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin: -2px 0 8px;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .assistant-turn.rolled-back {
+    opacity: 0.55;
+  }
+  .turn-note {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin: -4px 0 8px;
+  }
+  .rollback-row {
+    display: flex;
+    justify-content: flex-start;
+    margin: -4px 0 10px;
+  }
+  .rollback-btn {
+    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+    background: transparent;
+    color: var(--vscode-descriptionForeground);
+    padding: 2px 10px;
+    font-size: 11px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .rollback-btn:hover {
+    color: var(--vscode-foreground);
+    border-color: var(--vscode-foreground);
   }
   .bottom-spinner {
     display: flex;

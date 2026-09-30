@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AiConversationSummary } from 'jl4-client-rpc'
+  import type { HistoryEntry } from '$lib/stores/cloud-chat'
 
   let {
     items,
@@ -9,7 +9,8 @@
     onDelete,
     onClose,
   }: {
-    items: AiConversationSummary[]
+    /** Local and cloud conversations, most recent first (§12.1). */
+    items: HistoryEntry[]
     currentId: string | null
     /** Ids of conversations currently attached to a live stream. The
      *  row for each shows a small spinner so the user can see which
@@ -23,8 +24,7 @@
 
   const streamingSet = $derived(new Set(streamingIds))
 
-  function relativeTime(iso: string): string {
-    const d = new Date(iso).getTime()
+  function relativeTime(d: number): string {
     const now = Date.now()
     const diff = Math.floor((now - d) / 1000)
     if (diff < 60) return 'just now'
@@ -34,8 +34,8 @@
     return new Date(d).toLocaleDateString()
   }
 
-  function groupKey(iso: string): string {
-    const d = new Date(iso)
+  function groupKey(ms: number): string {
+    const d = new Date(ms)
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const yesterday = new Date(today.getTime() - 86_400_000)
@@ -47,9 +47,9 @@
   }
 
   const grouped = $derived.by(() => {
-    const groups = new Map<string, AiConversationSummary[]>()
+    const groups = new Map<string, HistoryEntry[]>()
     for (const item of items) {
-      const key = groupKey(item.lastActiveAt)
+      const key = groupKey(item.lastActivity)
       let bucket = groups.get(key)
       if (!bucket) {
         bucket = []
@@ -88,20 +88,44 @@
                       title="A turn is still running in this conversation"
                     ></span>
                   {/if}
+                  {#if item.kind === 'cloud'}
+                    <svg
+                      class="cloud-icon"
+                      viewBox="0 0 16 16"
+                      aria-label="Cloud session"
+                      role="img"
+                    >
+                      <title>Cloud session</title>
+                      <path
+                        d="M4.6 12.5a2.6 2.6 0 0 1-.3-5.2 3.4 3.4 0 0 1 6.6-1 2.7 2.7 0 0 1 .6 6.2z"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        fill="none"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  {/if}
                   <span class="row-title-text">{item.title || 'Untitled'}</span>
+                  {#if item.kind === 'cloud'}
+                    <span class="state-badge state-{item.state}"
+                      >{item.state}</span
+                    >
+                  {/if}
                 </span>
-                {#if item.deploymentId}
+                {#if item.kind === 'local' && item.deploymentId}
                   <span class="row-subtitle" title="Deployment chat"
                     >{item.deploymentId}</span
                   >
                 {/if}
               </span>
-              <span class="row-meta">{relativeTime(item.lastActiveAt)}</span>
+              <span class="row-meta">{relativeTime(item.lastActivity)}</span>
             </button>
             <button
               class="row-delete"
               onclick={() => onDelete(item.id)}
-              title="Delete conversation"
+              title={item.kind === 'cloud'
+                ? 'Delete cloud session and its files'
+                : 'Delete conversation'}
               aria-label="Delete conversation">🗑</button
             >
           </div>
@@ -249,6 +273,32 @@
     50% {
       opacity: 1;
     }
+  }
+  .cloud-icon {
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    color: var(--vscode-descriptionForeground);
+  }
+  .state-badge {
+    flex-shrink: 0;
+    font-size: 9px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.4));
+    color: var(--vscode-descriptionForeground);
+    text-transform: lowercase;
+  }
+  .state-badge.state-busy,
+  .state-badge.state-starting {
+    color: #c8376a;
+    border-color: #c8376a;
+  }
+  .state-badge.state-waiting,
+  .state-badge.state-parked {
+    color: var(--vscode-editorWarning-foreground, #cca700);
+    border-color: var(--vscode-editorWarning-foreground, #cca700);
   }
   .row-meta {
     font-size: 10px;

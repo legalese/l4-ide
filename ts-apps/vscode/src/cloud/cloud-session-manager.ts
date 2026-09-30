@@ -71,8 +71,9 @@ export type CloudStartPhase =
   | 'adding-files'
 
 export interface CloudSessionListener {
-  /** A chat-service event for the webview — the same path local chats use. */
-  chat(event: ChatServiceEvent): void
+  /** A chat-service event for the webview — the same path local chats
+   *  use. `sessionId` says which session it came from. */
+  chat(event: ChatServiceEvent, sessionId: string): void
   /** A cloud-only event (`user-message`, `ask-user`,
    *  `session-state`, `git-committed`, `rolled-back`, `local-merged`,
    *  `local-merge-conflict`, `auth-required`). `conversationId` is set
@@ -490,7 +491,7 @@ export class CloudSessionManager {
       } else if (!t.conversationId && 'conversationId' in chat) {
         this.setConversation(sid, chat.conversationId)
       }
-      this.deps.listener.chat(chat)
+      this.deps.listener.chat(chat, sid)
       return
     }
     switch (event.type) {

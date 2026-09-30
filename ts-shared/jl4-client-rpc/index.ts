@@ -6,6 +6,7 @@ export * from './language-client.js'
 
 /* Message types for communication between VSCode extension and webview */
 export * from './vscode-and-webview-messages.js'
+export * from './cloud-sessions-messages.js'
 
 // Ladder Backend API
 export * from './ladder-api.js'
