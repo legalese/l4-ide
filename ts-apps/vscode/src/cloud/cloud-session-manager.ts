@@ -85,7 +85,7 @@ export interface CloudSessionListener {
 }
 
 export interface CloudSeed {
-  /** Files for `repo/`, relative to the seed root. */
+  /** Files for `repo/data/`, relative to the seed root. */
   files: SeedFile[]
   attachments: SeedAttachment[]
 }

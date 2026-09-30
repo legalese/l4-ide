@@ -1,6 +1,6 @@
 /**
  * Seeding a cloud session (spec §10): which files go in, where they
- * land in the session's `repo/`, the size limits, and the
+ * land in the session's `repo/data/`, the size limits, and the
  * `seed.tar.gz` itself.
  *
  * Paths are kept relative to the files' common ancestor, so an L4
