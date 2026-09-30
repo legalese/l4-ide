@@ -31,6 +31,9 @@ export interface CloudConversationInfo {
   localMergesAt: number[]
   /** Last command error to show in the banner. */
   notice: string | null
+  /** MCP servers passed at the start (their tools run without
+   *  approval in the cloud); shown while the session starts. */
+  mcpServers: string[]
 }
 
 /** The part of a rendered turn this module reads and writes. */
@@ -69,6 +72,7 @@ export function newCloudInfo(
     mergeConflict: null,
     localMergesAt: [],
     notice: null,
+    mcpServers: [],
   }
 }
 
@@ -211,35 +215,6 @@ export function applyCloudEvent(
           ...(event.choices ? { choices: event.choices } : {}),
         },
       }
-    case 'approval-request': {
-      // Show the approve / deny buttons on the tool row.
-      for (const t of conv.turns) {
-        for (const b of (t.blocks ?? []) as Array<{
-          kind: string
-          call?: { callId: string; status: string }
-        }>) {
-          if (b.kind === 'tool-call' && b.call?.callId === event.callId) {
-            b.call.status = 'pending-approval'
-            return {}
-          }
-        }
-      }
-      const target =
-        assistantOf(conv, event.turnId) ??
-        [...conv.turns].reverse().find((t) => t.role === 'assistant')
-      if (target) {
-        ;(target.blocks ??= []).push({
-          kind: 'tool-call',
-          call: {
-            callId: event.callId,
-            name: event.name,
-            argsJson: event.argsJson,
-            status: 'pending-approval',
-          },
-        })
-      }
-      return {}
-    }
     case 'session-state':
       info.state = event.state
       if (event.state === 'running' || event.state === 'busy') {

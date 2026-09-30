@@ -1682,25 +1682,7 @@ export function createAiChatStore(
     callId: string,
     decision: 'allow' | 'deny' | 'alwaysAllow'
   ): void {
-    const cloudConv = Object.values(conversations).find(
-      (c) =>
-        c.cloud?.sessionId &&
-        c.turns.some((t) =>
-          t.blocks?.some(
-            (b) => b.kind === 'tool-call' && b.call.callId === callId
-          )
-        )
-    )
-    if (cloudConv) {
-      // Cloud sessions follow the cloud policy; "always" isn't
-      // persisted from here.
-      void cloudCommand(cloudConv, {
-        type: 'approve',
-        callId,
-        decision: decision === 'deny' ? 'deny' : 'allow',
-      })
-      return
-    }
+    // Local chats only: cloud sessions never ask for tool approval.
     const m = getMessenger()
     m?.sendNotification(AiChatApproveTool, HOST_EXTENSION, {
       callId,
@@ -1723,7 +1705,8 @@ export function createAiChatStore(
    *  it can surface Accept/Reject buttons in place of the spinner. */
   function getPendingApproval(): RenderedToolCall | null {
     const conv = getConversation()
-    if (!conv) return null
+    // Cloud sessions never ask for tool approval.
+    if (!conv || conv.cloud) return null
     for (const turn of conv.turns) {
       if (turn.role !== 'assistant' || !turn.blocks) continue
       for (const block of turn.blocks) {
@@ -2259,6 +2242,7 @@ export function createAiChatStore(
     sessionId?: string
     phase: AiCloudStartPhase
     error?: string
+    mcpServers?: string[]
   }): void {
     const conv =
       pendingConversation?.activeTurnId === params.turnId
@@ -2280,6 +2264,7 @@ export function createAiChatStore(
         if (currentId === null) currentId = key
       }
     }
+    if (params.mcpServers) conv.cloud.mcpServers = params.mcpServers
     if (params.phase === 'error') {
       conv.cloud.progress = null
       const reply = conv.turns.find(
@@ -2720,6 +2705,7 @@ export type AiChatStore = {
     sessionId?: string
     phase: AiCloudStartPhase
     error?: string
+    mcpServers?: string[]
   }) => void
   onCloudReveal: (params: { sessionId: string }) => void
   pickAttachment: (

@@ -105,7 +105,7 @@ describe('cloud conversations in the chat store', () => {
     ])
   })
 
-  test('prompts, answers, approvals and stop become cloud commands', async () => {
+  test('prompts, answers and stop become cloud commands; no approvals', async () => {
     const { store, sent } = setup()
     await store.loadConversation(KEY)
     await store.send('Next step')
@@ -148,6 +148,8 @@ describe('cloud conversations in the chat store', () => {
     expect(store.pendingQuestion?.question).toBe('Which clause?')
     store.answerQuestion('4')
 
+    // No approvals in cloud sessions: no approval bar even if a tool
+    // row somehow says pending-approval.
     store.onToolCall({
       conversationId: KEY,
       callId: 'call-2',
@@ -155,24 +157,13 @@ describe('cloud conversations in the chat store', () => {
       argsJson: '{}',
       status: 'pending-approval',
     })
-    store.approveTool('call-2', 'alwaysAllow')
+    expect(store.pendingApproval).toBeNull()
     store.abort()
     await flush()
     const commands = sent
       .filter((s) => s.method === 'aiCloudCommand')
       .map((s) => (s.params as { command: { type: string } }).command)
-    expect(commands.map((c) => c.type)).toEqual([
-      'message',
-      'answer',
-      'approve',
-      'abort',
-    ])
-    expect(commands[2]).toEqual({
-      type: 'approve',
-      callId: 'call-2',
-      decision: 'allow',
-    })
-    expect(sent.some((s) => s.method === 'aiChatApproveTool')).toBe(false)
+    expect(commands.map((c) => c.type)).toEqual(['message', 'answer', 'abort'])
   })
 
   test('Run in cloud keys the conversation by its session once it exists', async () => {
@@ -184,8 +175,14 @@ describe('cloud conversations in the chat store', () => {
     expect(store.current?.cloud?.progress).toBe('uploading')
     expect(store.currentId).toBeNull()
 
-    store.onCloudProgress({ turnId, sessionId: SID, phase: 'uploading' })
+    store.onCloudProgress({
+      turnId,
+      sessionId: SID,
+      phase: 'uploading',
+      mcpServers: ['Docs'],
+    })
     expect(store.currentId).toBe(KEY)
+    expect(store.current?.cloud?.mcpServers).toEqual(['Docs'])
     store.onCloudProgress({ turnId, sessionId: SID, phase: 'starting' })
     expect(store.current?.cloud?.state).toBe('starting')
     // The harness's events land on the same bubble.

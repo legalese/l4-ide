@@ -2,7 +2,8 @@
  * Sidebar webview ⇄ cloud sessions (spec §12): the `AiCloud*` RPCs,
  * forwarding of cloud-only events, state and start progress, the
  * cached history list, Clone / Sync, and VS Code notifications when a
- * background cloud session asks a question or needs an approval.
+ * background cloud session asks a question or needs Resume (cloud
+ * sessions never ask for tool approval).
  *
  * Chat events of cloud sessions don't pass through here: they take the
  * ordinary `AiChat*` path (see `createCloudSessions`).
@@ -136,11 +137,6 @@ export function registerCloudHandlers(deps: {
         sessionId,
         `A cloud session has a question: ${event.question}`
       )
-    } else if (event.type === 'approval-request') {
-      void notify(
-        sessionId,
-        `A cloud session needs your approval to run ${event.name}.`
-      )
     } else if (event.type === 'auth-required' && event.reason !== 'mcp') {
       void notify(
         sessionId,
@@ -161,11 +157,12 @@ export function registerCloudHandlers(deps: {
       })
     )
   }
-  cloud.listener.progress = ({ turnId, sessionId, phase }) => {
+  cloud.listener.progress = ({ turnId, sessionId, phase, mcpServers }) => {
     messenger.sendNotification(AiCloudProgress, frontend, {
       turnId,
       ...(sessionId ? { sessionId } : {}),
       phase,
+      ...(mcpServers ? { mcpServers } : {}),
     })
   }
 

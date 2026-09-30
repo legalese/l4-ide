@@ -26,7 +26,6 @@
     onOpenFileDiff,
     rollbackOfferAt,
     onRollback,
-    cloud = false,
   }: {
     turns: RenderedTurn[]
     /** True while the current conversation has an open stream. Drives
@@ -57,9 +56,6 @@
      *  an index, and what to do when it's clicked. */
     rollbackOfferAt?: (index: number) => RollbackOffer | null
     onRollback?: (offer: RollbackOffer) => void
-    /** A cloud conversation: "Always accept" doesn't apply (the cloud
-     *  policy isn't the local settings). */
-    cloud?: boolean
   } = $props()
 
   let scrollEl = $state<HTMLDivElement>()
@@ -228,15 +224,12 @@
           onclick={() => onApproveTool(pendingApproval!.callId, 'allow')}
           >Accept</button
         >
-        {#if !cloud}
-          <button
-            class="approve-btn always"
-            title="Always allow this category of tool"
-            onclick={() =>
-              onApproveTool(pendingApproval!.callId, 'alwaysAllow')}
-            >Always accept</button
-          >
-        {/if}
+        <button
+          class="approve-btn always"
+          title="Always allow this category of tool"
+          onclick={() => onApproveTool(pendingApproval!.callId, 'alwaysAllow')}
+          >Always accept</button
+        >
         <button
           class="approve-btn deny"
           onclick={() => onApproveTool(pendingApproval!.callId, 'deny')}

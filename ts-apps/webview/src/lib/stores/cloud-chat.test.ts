@@ -118,33 +118,6 @@ describe('turns this webview did not start', () => {
     ])
   })
 
-  test('approval-request shows the approve buttons on the tool row', () => {
-    const c = conv()
-    adoptTurn(c, 't1')
-    c.turns[0]!.blocks = [
-      {
-        kind: 'tool-call',
-        call: {
-          callId: 'call-1',
-          name: 'fs__edit',
-          argsJson: '{}',
-          status: 'running',
-        },
-      },
-    ]
-    applyCloudEvent(c, {
-      type: 'approval-request',
-      conversationId: 'conv-1',
-      turnId: 't1',
-      callId: 'call-1',
-      name: 'fs__edit',
-      argsJson: '{}',
-    })
-    expect(c.turns[0]!.blocks).toMatchObject([
-      { call: { callId: 'call-1', status: 'pending-approval' } },
-    ])
-  })
-
   test('ask-user returns the question', () => {
     expect(
       applyCloudEvent(conv(), {

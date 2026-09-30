@@ -63,14 +63,6 @@ export type AiCloudEventPayload =
       question: string
       choices?: string[]
     }
-  | {
-      type: 'approval-request'
-      conversationId: string
-      turnId: string
-      callId: string
-      name: string
-      argsJson: string
-    }
   | { type: 'session-state'; state: AiCloudSessionState; publicKey?: string }
   | { type: 'git-committed'; turnId: string; sha: string; parent: string }
   | { type: 'rolled-back'; turnId: string; sha: string }
@@ -113,6 +105,9 @@ export const AiCloudProgress: NotificationType<{
   turnId: string
   sessionId?: string
   phase: AiCloudStartPhase
+  /** With the first `uploading`: MCP servers passed to the session;
+   *  their tools run without approval in the cloud. */
+  mcpServers?: string[]
   /** With `phase: 'error'`: what to tell the user. */
   error?: string
 }> = {
@@ -158,12 +153,12 @@ export const AiCloudOpen: RequestType<
   method: 'aiCloudOpen',
 }
 
-/** Commands a webview may send to a cloud session (§8). */
+/** Commands a webview may send to a cloud session (§8). Cloud
+ *  sessions never ask for tool approval, so there is no `approve`. */
 export type AiCloudCommandPayload =
   | { type: 'message'; turnId: string; text: string }
   | { type: 'inject'; turnId: string; injectionId?: string; text: string }
   | { type: 'abort'; turnId: string }
-  | { type: 'approve'; callId: string; decision: 'allow' | 'deny' }
   | { type: 'answer'; callId: string; answer: string }
 
 export const AiCloudCommand: RequestType<

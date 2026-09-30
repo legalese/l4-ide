@@ -291,7 +291,6 @@
         onAnswerQuestion={(answer) => store.answerQuestion(answer)}
         onOpenFile={(callId) => store.openFile(callId)}
         onOpenFileDiff={(callId) => store.openFileDiff(callId)}
-        cloud={!!store.current.cloud}
         rollbackOfferAt={store.current.cloud
           ? (i) => store.rollbackOfferAt(i)
           : undefined}

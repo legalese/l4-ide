@@ -60,6 +60,12 @@
   </div>
   {#if progressText}
     <div class="detail">{progressText}</div>
+    {#if cloud.mcpServers.length > 0}
+      <div class="detail">
+        MCP servers passed to this session: {cloud.mcpServers.join(', ')}. Their
+        tools run without approval in the cloud.
+      </div>
+    {/if}
   {/if}
   {#if cloud.authRequired?.reason === 'mcp'}
     <div class="detail warn">
