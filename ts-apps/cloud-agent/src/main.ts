@@ -22,6 +22,7 @@ import {
   type HarnessConfig,
 } from './config.js'
 import { initSessionFolder, sendCommand } from './dev.js'
+import { GitSync } from './git-sync.js'
 import { Jl4Lsp } from './jl4-lsp.js'
 import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
 import { JsonLogger } from './logger.js'
@@ -31,9 +32,9 @@ import { Runner, type ChainControl, type RunnerPlugin } from './runner.js'
 
 export const HARNESS_VERSION = '0.1.0'
 
-/** Plugins added by later items (git sync, MCP servers). */
-export function defaultPlugins(): RunnerPlugin[] {
-  return []
+/** The harness's plugins: git sync (§9). */
+export function defaultPlugins(env: NodeJS.ProcessEnv): RunnerPlugin[] {
+  return [new GitSync(env)]
 }
 
 /** The child's whole environment: nothing from the harness's own. */
@@ -145,7 +146,7 @@ export async function runHarness(
     l4: lsp,
     aiEndpoint: { url: cfg.aiProxyUrl, local: cfg.aiLocal },
     providers,
-    plugins: defaultPlugins(),
+    plugins: defaultPlugins(childEnv(env)),
     extensionVersion: `cloud-agent/${HARNESS_VERSION}`,
   })
   holder.runner = r

@@ -6,6 +6,7 @@ import { type AuthProvider } from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
 import { NodeWorkspace } from '../src/node-workspace.js'
+import { GitSync } from '../src/git-sync.js'
 import {
   Runner,
   type ChainControl,
@@ -14,6 +15,7 @@ import {
 } from '../src/runner.js'
 import {
   FakeAiProxy,
+  HOST_PATH,
   MemoryLogger,
   SID,
   StubL4,
@@ -600,5 +602,47 @@ describe('Runner', () => {
       .join('\n')
     assert.match(system, /<editor-context>[\s\S]*data\/a\.l4/)
     assert.match(system, /<mention-context>[\s\S]*data\/b\.l4/)
+  })
+
+  test('commits each turn and rolls it back through commands (git plugin)', async () => {
+    proxy.scripts.push([
+      metadata('conv5'),
+      toolCall('c1', 'fs__create_file', { path: 'data/rule.l4' }),
+      chunk({}, 'tool_calls'),
+    ])
+    proxy.scripts.push([chunk({ content: 'Created.' }), chunk({}, 'stop')])
+    const runner = build({
+      plugins: [new GitSync({ PATH: HOST_PATH })],
+    })
+    const done = runner.run()
+    await sendCommand(root, SID, {
+      type: 'message',
+      turnId: 't1',
+      text: 'Create a rule',
+    })
+    await waitUntil(
+      async () =>
+        (await readEvents(stateDir)).some((e) => e.type === 'git-committed'),
+      10_000,
+      'git-committed'
+    )
+    await sendCommand(root, SID, { type: 'rollback', turnId: 't1' })
+    await waitUntil(
+      async () =>
+        (await readEvents(stateDir)).some((e) => e.type === 'rolled-back'),
+      10_000,
+      'rolled-back'
+    )
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    const t = types(await readEvents(stateDir))
+    assert.ok(t.indexOf('done') < t.indexOf('git-committed'))
+    assert.ok(t.indexOf('git-committed') < t.indexOf('rolled-back'))
+    await assert.rejects(
+      readFile(path.join(sessionDir, 'repo', 'data', 'rule.l4'))
+    )
+    assert.ok(
+      (await readFile(path.join(stateDir, 'git', 'main.bundle'))).length > 0
+    )
   })
 })
