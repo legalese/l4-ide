@@ -9,8 +9,9 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import * as path from 'node:path'
+import { BuiltinTools } from '@repo/legalese-agent'
 import { NodeWorkspace } from '../src/node-workspace.js'
-import { MemoryLogger, tempDir } from './helpers.js'
+import { MemoryLogger, StubL4, tempDir } from './helpers.js'
 
 describe('repo layout: data/ and tmp/', () => {
   let dir: string
@@ -157,5 +158,44 @@ describe('repo layout: data/ and tmp/', () => {
     w2.setTurn('..')
     await w2.deleteFile(w2.resolvePath('data/sub/b.l4')).catch(() => undefined)
     await assert.rejects(stat(path.join(repo, 'tmp', 'sub')))
+  })
+
+  test('no git for the model: .git is not readable, listable or searchable', async () => {
+    await mkdir(path.join(repo, '.git', 'hooks'), { recursive: true })
+    await writeFile(
+      path.join(repo, '.git', 'config'),
+      '[core]\n\tsecret = needle\n'
+    )
+    await writeFile(path.join(repo, 'data', 'hay.l4'), 'no match here\n')
+    const w = ws()
+    for (const p of [
+      '.git',
+      '.git/config',
+      '.GIT/config',
+      'data/../.git/config',
+      path.join(repo, '.git', 'config'),
+    ]) {
+      assert.throws(
+        () => w.resolvePath(p),
+        /\.git, which the agent may not touch/
+      )
+    }
+    await assert.rejects(
+      w.readFile(path.join(repo, '.git', 'config')),
+      /outside/
+    )
+    await assert.rejects(w.readDirectory(path.join(repo, '.git')), /outside/)
+    await assert.rejects(w.stat(path.join(repo, '.git')), /outside/)
+    assert.ok(!(await w.readDirectory(repo)).some((e) => e.name === '.git'))
+    // Through the model's own tools: listing and keyword search skip it.
+    const tools = new BuiltinTools(w, new StubL4())
+    const listing = await tools.readFile({ path: '.' })
+    assert.ok(!listing.includes('.git'))
+    const search = await tools.readFile({
+      path: '.',
+      search_keywords: 'needle',
+    })
+    assert.ok(!search.includes('.git/config'))
+    await assert.rejects(tools.readFile({ path: '.git/config' }), /\.git/)
   })
 })
