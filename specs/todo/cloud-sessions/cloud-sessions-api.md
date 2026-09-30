@@ -36,17 +36,19 @@ Deviations:
 **Aligned with protocol** (l4-ide PR #509, commit `cf1ab7f`): the command,
 session.json, lease, cursor and `POST /sessions` validation now follow
 `ts-shared/legalese-agent/src/protocol/`. Changes: `inject` requires
-`turnId`, `injectionId` is optional; `approve` takes only `allow` or `deny`;
-`answer` may be `""`; `mcp-credentials` must be a sealed `v1.` string (body
-cap raised to about 1 MB); MCP servers need a valid name and an https URL
-without whitespace, with no duplicates; attachments need a content type; a
-title over 200 characters is refused; the agent-key pattern matches the
-package; `commands.seq` is written as `"<n>\n"`; a bare `<segment>` cursor is
-accepted; `parkedReason` is passed through; upload targets carry `maxBytes`.
+`turnId`, `injectionId` is optional; `answer` may be `""`; `mcp-credentials`
+must be a sealed `v1.` string (body cap about 1 MB); MCP servers need a valid
+name, an https URL and no duplicates; attachments need a content type; titles
+over 200 characters are refused; `commands.seq` is `"<n>\n"`; a bare
+`<segment>` cursor is accepted; upload targets carry `maxBytes`. Later
+(protocol `afc6926c5`): `approve` and `approval-request` are gone (400).
+**Layout** (`1d1ea8d1e`): `/init` makes `repo/data/`, `repo/tmp/` (no
+`.legalese/`), seeds `repo/data/`; the sweep clears `repo/tmp/` hourly when
+idle past `ABANDONED_TMP_DAYS` (fs only, no symlinks; §7.2 listing exception).
 
 ## Checks run
 
-`npm run format:check`, `lint`, `typecheck`, `test` (62 tests), `build` —
+`npm run format:check`, `lint`, `typecheck`, `test` (64 tests), `build` —
 pass locally (macOS) and in CI (Linux, where the `/proc/self/fd` check is
 exercised). Root `tsc`/vitest unaffected; root ESLint has 7 pre-existing
 errors on `main`, unchanged. Docker image not built (no Docker locally);

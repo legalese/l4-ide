@@ -60,3 +60,8 @@ https URLs).
 
 `src/mcp-servers.ts` (`handleCommand`, `rpc`, `reportAuth`), then
 `test/mcp-servers.test.ts`.
+
+## Follow-up (2026-09-30)
+
+Rebased onto #509 without approvals and the runner's `data/`/`tmp/` layout; no
+changes here beyond test merges.

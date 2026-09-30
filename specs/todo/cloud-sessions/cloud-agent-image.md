@@ -67,3 +67,8 @@ workflow wasn't run (per the task). No PR CI for stacked PRs.
 ## Where a reviewer should start
 
 `docker/entrypoint.sh`, then the workflow's `image` job, then `docker/smoke.sh`.
+
+## Follow-up (2026-09-30)
+
+Rebased onto #509 without approvals and the runner's `data/`/`tmp/` layout; no
+changes here beyond test merges and `smoke.sh` seeding `repo/data/`.

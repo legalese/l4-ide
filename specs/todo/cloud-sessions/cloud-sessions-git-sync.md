@@ -49,6 +49,8 @@ live VS Code; `git.d.ts` was checked against the copy in the scratchpad
   (e.g. after the first `git-committed` event).
 - P7: whether function URLs accept the single-request 5 MB push.
 
+- Follow-up 2026-09-30: rebased on the updated client branch; clones show `data/` and `tmp/`, and Open Folder opens the clone root; sync unaffected. Checks re-run locally, all pass.
+
 ## Where a reviewer should start
 
 `git-sync.ts` (`register`, `adopt`, `configure`, `sync`), then

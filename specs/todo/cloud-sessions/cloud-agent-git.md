@@ -58,3 +58,11 @@ commit → rollback → file restored, `git log` as expected.
 
 `src/git-sync.ts` (`rollback`, `applyBundle`), `src/git.ts` (the `-c`
 list), then `test/git-sync.test.ts`.
+
+## Follow-up: repo layout (2026-09-30)
+
+The earlier backup clearing and git-history restore are gone. `tmp/` and
+`tmp/deleted/` are committed like everything else and never cleared by the
+harness. At start, if every tracked file under `tmp/` is gone and nothing new
+is there (the Sessions API sweep cleared an abandoned session), the harness
+commits that alone: "Clear tmp of abandoned session". 1 test.

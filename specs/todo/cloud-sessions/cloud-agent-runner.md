@@ -6,12 +6,12 @@ l4-ide · branch `thomasgorissen/cloud-agent-runner` · base `cloud-session-prot
 
 `ts-apps/cloud-agent` (esbuild → `dist/cloud-agent.cjs`): `runner.ts` (lease →
 key chain → `session.json` running → `session-state`; 1 s command poll; queued
-`message`/`rollback`/`apply-bundle`, immediate `inject`/`abort`/`approve`/
+`message`/`rollback`/`apply-bundle`, immediate `inject`/`abort`/
 `answer`/`stop`/`mcp-credentials`; idle exit, `stop`, SIGTERM, parking;
 `RunnerPlugin` hooks), `event-log.ts`, `command-reader.ts`, `lease.ts`,
 `key-chain.ts` (+ 401 retry fetch wrapper), `node-workspace.ts`, `jl4-lsp.ts`,
 `interaction.ts`, `conversation-store.ts`, `session-file.ts`, `config.ts`,
-`main.ts` (`--dev`, `send`). 63 tests (fake LSP over in-process JSON-RPC, fake
+`main.ts` (`--dev`, `send`). 71 tests (fake LSP over in-process JSON-RPC, fake
 ai-proxy over HTTP, temp dirs) plus one opt-in test against a real `jl4-lsp`.
 
 ## Spec sections covered, and deviations (with reasons)
@@ -32,17 +32,11 @@ ai-proxy over HTTP, temp dirs) plus one opt-in test against a real `jl4-lsp`.
 - `inject` for a turn that already ended runs as its own turn
   (`<turnId>.<injectionId>`) and emits `queue-consumed`; `user-message` echoes
   of injects into a running turn carry the running turn's id.
-- Logger drops `args=`/`text=`/`body=` tails (the core logs tool arguments)
-  and caps messages at 500 chars.
+- Logger drops `args=`/`text=`/`body=` tails and caps messages at 500 chars.
 - Park waits ≤ 60 s for the current turn; SIGTERM during that can overrun 30 s.
 
-Coordinator checks (extension alignment): `started`/`git-committed`/
-`rolled-back` use the `message` command's root `turnId` (ChatService emits
-`started` once with it; sub-turns only `turn-spawn`) — confirmed. After an
-`approval-request`, the dispatcher's status update emits `tool-call`
-`running`/`error` once the decision lands — confirmed by a test. `message`
-context (active file, mentions) not added: the protocol and the API mirror
-strip unknown fields, so it needs a protocol + API change (follow-up).
+Extension alignment: events use the root `turnId`. `message` context (active file,
+mentions) needs a protocol + API change first (follow-up).
 
 ## Checks run
 
@@ -53,9 +47,7 @@ ai-proxy (message → `l4__evaluate` → `3 → 42` → `done` → `stop`, exit 
 
 ## Problems and how they were solved
 
-- Shutdown hung when the turn finished between reading `this.working` and
-  waiting on it (`waitFor(null)`); captured the promise first and made
-  `shutdown` always resolve.
+- Shutdown hung on `waitFor(null)` when a turn ended mid-shutdown; fixed.
 - Concurrent `session.json` and `commands.done` writes lost updates
   (conversation id vanished); both now serialise their writes.
 - LSP change notifications raced (`didClose` before `didChange`); they go out
@@ -65,15 +57,24 @@ ai-proxy (message → `l4__evaluate` → `3 → 42` → `done` → `stop`, exit 
 
 - Sessions API: may treat `state/commands.done` as harness-owned and ignore
   it. Nothing else new is written.
-- MCP item: `mcp-credentials` is an immediate command; replace credentials on
-  every one (the extension re-sends per public key and per `auth-required`).
 - Image item: entry point must pass `ECS_CONTAINER_METADATA_URI_V4` (validated
   as `http://169.254.170.2/v4/…`) for the lease task id; `jl4-lsp` at
   `/app/bin/jl4-lsp`.
-- Cloud tool policy is fixed (defaults + `fs.delete: always`); the user's
-  MCP permission settings aren't transferred.
 
 ## Where a reviewer should start
 
-`src/runner.ts`, then `src/command-reader.ts` and `src/key-chain.ts`, then
-`test/runner.test.ts`.
+`src/runner.ts`, `src/command-reader.ts`, `src/key-chain.ts`, tests.
+
+## Follow-up: repo layout and no approvals (2026-09-30)
+
+Supersedes the earlier backup tools. Workspace root = `repo/`; the model
+writes only in `data/` (session files, `jl4-lsp --cwd`) and `tmp/` (scratch,
+committed), per `isModelWritableRepoPath` (#509); the rest is readable
+metadata. Deleting a `data/` file in a turn first copies it to
+`tmp/deleted/t-<turnId>/…` (regular files, link-safe dirs, first copy wins,
+never cleared). A standing `<cloud-session-note>` rides on every prompt (no
+core change). Rebased on #509 without approvals: every tool is allowed, no
+`approval-request`/`pending-approval`/`approve`; `waiting` = `ask_user` only.
+No git for the model: `.git` unreadable/unlistable/unsearchable (tested).
+L4 on `data/` and `tmp/` alike: `--cwd repo/data` gives `IMPORT` data-first then
+sibling lookup (verified with real `jl4-lsp`; `--cwd repo/` breaks tmp/→data/).

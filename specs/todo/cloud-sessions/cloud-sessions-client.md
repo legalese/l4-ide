@@ -53,6 +53,8 @@ no Sessions API is deployed to try it against.
   first live state after the start).
 - `GET /sessions` rows have no `conversationId`; the UI keys cloud entries by sid.
 
+- Follow-up 2026-09-30: rebased on #509 `1d1ea8d1e`; `approve`/`approval-request` removed; start progress names the MCP servers passed (tools run without approval); seed lands in `repo/data/` (paths still relative to the common ancestor, no repo-root assumption). Checks re-run locally, all pass.
+
 ## Where a reviewer should start
 
 `cloud-session-manager.ts` (`runInCloud`, `handleEvent`,
