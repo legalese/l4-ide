@@ -162,6 +162,7 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
     UUID5Spec
     ExportValidationSpec
@@ -169,6 +170,7 @@ test-suite jl4-core-test
     DirectiveRenameSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
+    DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
