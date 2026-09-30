@@ -255,7 +255,8 @@ export class ToolDispatcher {
         return tools.createFile(args as { path: string })
       case 'fs__edit_file':
         return tools.editFile(
-          args as { path: string; old: string; new: string }
+          args as { path: string; old: string; new: string },
+          ctx
         )
       case 'fs__delete_file':
         return tools.deleteFile(args as { path: string })
@@ -265,7 +266,8 @@ export class ToolDispatcher {
             path: string
             timeoutMs?: number
             mode?: 'changed' | 'full'
-          }
+          },
+          ctx
         )
       case 'l4__refactor':
         return tools.refactor(args as L4RefactorArgs)

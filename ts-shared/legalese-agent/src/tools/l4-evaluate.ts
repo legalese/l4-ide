@@ -35,7 +35,7 @@ export interface L4EvaluateContext {
   l4: L4Language
   /** `l4__evaluate`'s private snapshot store. `fs__edit_file` uses its
    *  own so the two tools don't pollute each other's "what did I last
-   *  report" view. Per session: see {@link BuiltinTools}. */
+   *  report" view. Per conversation: see {@link BuiltinTools}. */
   evaluateStore: DirectiveSnapshotStore
 }
 

@@ -57,5 +57,7 @@ await service.start(params) // events arrive at interaction.emit
 ```
 
 `BuiltinTools` owns the directive snapshot stores behind `l4__evaluate` and
-`fs__edit_file`'s "what changed since I last reported" diffs, so each session
-has its own baseline.
+`fs__edit_file`'s "what changed since I last reported" diffs, keyed by
+conversation (the dispatcher passes `ToolCallContext.conversationId`) and by
+file, so each conversation's model gets diffs relative to what it was last
+told. Calls without a conversation use the instance's own stores.

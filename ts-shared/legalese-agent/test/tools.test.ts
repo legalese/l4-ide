@@ -2,12 +2,21 @@ import { describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import {
   BuiltinTools,
+  ToolDispatcher,
+  fixedPermissionPolicy,
   FS_CREATE_FILE_SEED,
   formatL4Diagnostics,
   offsetAt,
   positionAt,
 } from '../src/index.js'
-import { FakeL4Language, MemoryWorkspace, row, uriOf } from './fakes.js'
+import {
+  FakeL4Language,
+  MemoryWorkspace,
+  RecordingInteraction,
+  row,
+  silentLogger,
+  uriOf,
+} from './fakes.js'
 
 function session(files: Record<string, string>): {
   ws: MemoryWorkspace
@@ -149,6 +158,69 @@ describe('l4__evaluate', () => {
     assert.match(
       await two.evaluate({ path: 'a.l4', mode: 'changed' }),
       /1 changed, 1 removed, 1 unchanged/
+    )
+  })
+
+  test('snapshot stores are keyed by conversation as well as file', async () => {
+    const ws = new MemoryWorkspace({ 'a.l4': 'l1\nl2\nl3' })
+    const l4 = new FakeL4Language(ws)
+    const uri = uriOf('/ws/a.l4')
+    l4.directives.record(uri, [row(1, '1'), row(2, '2')])
+    const tools = new BuiltinTools(ws, l4)
+    const convA = { conversationId: 'conv-a' }
+    const convB = { conversationId: 'conv-b' }
+    const changed = { path: 'a.l4', mode: 'changed' as const }
+
+    // First call in a conversation gets every directive.
+    assert.match(
+      await tools.evaluate(changed, convA),
+      /--- L4 directives: 2 changed ---\n {2}1 → 1\n {2}2 → 2/
+    )
+    assert.match(await tools.evaluate(changed, convA), /2 unchanged/)
+
+    // Conversation B on the same file starts from nothing…
+    assert.match(
+      await tools.evaluate(changed, convB),
+      /--- L4 directives: 2 changed ---\n {2}1 → 1\n {2}2 → 2/
+    )
+    // …and calls without a conversation have their own baseline too.
+    assert.match(await tools.evaluate(changed), /2 changed/)
+
+    // A change only B has seen is still news to A.
+    l4.directives.record(uri, [row(1, '1'), row(2, '3')])
+    assert.match(await tools.evaluate(changed, convB), /1 changed, 1 removed/)
+    assert.match(await tools.evaluate(changed, convB), /2 unchanged/)
+    assert.match(
+      await tools.evaluate(changed, convA),
+      /1 changed, 1 removed, 1 unchanged ---\n {2}2 → 3/
+    )
+  })
+
+  test('the dispatcher passes the conversation to the tools', async () => {
+    const ws = new MemoryWorkspace({ 'a.l4': 'l1\nl2' })
+    const l4 = new FakeL4Language(ws)
+    l4.directives.record(uriOf('/ws/a.l4'), [row(1, 'x')])
+    const tools = new BuiltinTools(ws, l4)
+    const d = new ToolDispatcher({
+      logger: silentLogger,
+      tools,
+      permissions: fixedPermissionPolicy(),
+      interaction: new RecordingInteraction(),
+    })
+    const call = (conv: string, id: string) =>
+      d.run(
+        {
+          callId: id,
+          name: 'l4__evaluate',
+          argsJson: '{"path":"a.l4","mode":"changed"}',
+        },
+        { conversationId: conv, turnId: 't' }
+      )
+    assert.match(JSON.stringify(await call('c1', 'k1')), /1 changed/)
+    assert.match(JSON.stringify(await call('c1', 'k2')), /1 unchanged/)
+    assert.match(JSON.stringify(await call('c2', 'k3')), /1 changed/)
+    assert.ok(
+      tools.storesFor('c1').evaluateStore.hasSnapshot(uriOf('/ws/a.l4'))
     )
   })
 

@@ -14,7 +14,7 @@ export interface FsToolContext {
   /** `fs__edit_file`'s private directive snapshot store. Keeping this
    *  separate from `l4__evaluate`'s store means an edit can report
    *  "what changed since the last edit" independently from "what
-   *  changed since the last l4__evaluate call". Per session: see
+   *  changed since the last l4__evaluate call". Per conversation: see
    *  {@link BuiltinTools}. */
   editStore: DirectiveSnapshotStore
 }
