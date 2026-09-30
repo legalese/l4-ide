@@ -52,7 +52,11 @@ import {
   createSeedTarGz,
   dataPathFor,
   relativeTo,
+  seedBaseFor,
+  seedBaseLocalPath,
   type SeedAttachment,
+  type SeedBaseRef,
+  type WorkspaceFolderRef,
   type SeedFile,
   type SeedSource,
 } from './seed.js'
@@ -102,21 +106,25 @@ export interface CloudSeed {
   /** Files for `repo/data/`, relative to the seed root. */
   files: SeedFile[]
   attachments: SeedAttachment[]
-  /** The seed root (absolute, `/`-separated): the base later files are
-   *  placed relative to. */
+  /** The seed root (absolute, `/`-separated): the common ancestor the
+   *  seed paths are relative to. */
   root?: string
+  /** Open workspace folders, to express the root as a `seedBase`. */
+  workspaceFolders?: WorkspaceFolderRef[]
   /** Absolute paths of the active file and @-mentioned files, for the
    *  first message's `context`. */
   activeFile?: string
   mentions?: string[]
 }
 
-/** What a session has been sent: the seed base and a content hash per
- *  `data/` path. Kept per session so a later prompt only uploads new or
- *  changed files. */
+/** What this machine has sent to a session: a content hash per `data/`
+ *  path, so a later prompt only uploads new or changed files; and, when
+ *  the session's `seedBase` names a workspace folder that isn't open
+ *  here, the local folder the user picked for it. */
 export interface SessionFilesRecord {
-  base?: string
   sent: Record<string, string>
+  /** Absolute path of the local folder chosen for `seedBase.workspaceFolder`. */
+  localFolder?: string
 }
 
 export interface SessionFilesStore {
@@ -130,8 +138,9 @@ export interface PromptFiles {
   sources: SeedSource[]
   activeFile?: string
   mentions?: string[]
-  /** Workspace folders (absolute), for files outside the seed base. */
-  workspaceRoots: string[]
+  /** Open workspace folders: to find the session's seed base, and for
+   *  files outside it (workspace-relative paths). */
+  workspaceFolders: WorkspaceFolderRef[]
 }
 
 function memoryFilesStore(): SessionFilesStore {
@@ -147,8 +156,11 @@ export interface CloudSessionManagerDeps {
   /** Mint the first key of a key chain for `sid` (jl4-auth-proxy). */
   mintAgentKey(sid: string): Promise<{ token: string }>
   mcp?: McpServerSource
-  /** Per-session base and sent-file hashes (extension storage). */
+  /** Per-session sent-file hashes and folder choice (extension storage). */
   files?: SessionFilesStore
+  /** Ask the user which local folder corresponds to a session's seed
+   *  base workspace folder `name` (not open here). Undefined = cancelled. */
+  pickLocalFolder?(sessionId: string, name: string): Promise<string | undefined>
   listener: CloudSessionListener
   logger: Logger
   /** Timer / clock overrides for the poller (tests). */
@@ -179,6 +191,8 @@ interface Tracked {
   mcpNames?: string[]
   /** Turn started with `runInCloud`, until the session is live. */
   startingTurn?: string
+  /** `session.json` `seedBase`; `null` = known to be absent. */
+  seedBase?: SeedBaseRef | null
 }
 
 function titleFrom(text: string): string {
@@ -321,8 +335,13 @@ export class CloudSessionManager {
         (c) => mcp?.ids.get(c.name) ?? c.name
       ),
     })
+    const seedBase =
+      seed.root && seed.files.length > 0
+        ? seedBaseFor(seed.root, seed.workspaceFolders ?? [])
+        : undefined
     const created = await this.deps.api.createSession({
       title: (input.title ?? titleFrom(text)).slice(0, 200),
+      ...(seedBase ? { seedBase } : {}),
       mcpServers: mcp?.configs ?? [],
       ...(gz ? { seedSize: gz.byteLength } : {}),
       attachments: attachments.map(
@@ -337,7 +356,7 @@ export class CloudSessionManager {
     this.byTurn.set(turnId, sid)
     const sent: Record<string, string> = {}
     for (const f of seed.files) sent[`data/${f.path}`] = contentHash(f.bytes)
-    this.files.set(sid, { ...(seed.root ? { base: seed.root } : {}), sent })
+    this.files.set(sid, { sent })
     const seeded = new Set(Object.keys(sent))
     const inSeed = (abs: string | undefined): string | undefined => {
       if (!abs || !seed.root) return undefined
@@ -351,6 +370,7 @@ export class CloudSessionManager {
       (seed.mentions ?? []).map(inSeed)
     )
     const t = this.track(sid)
+    t.seedBase = seedBase ?? null
     t.mcpNames = (mcp?.configs ?? []).map((c) => c.name)
     try {
       this.deps.listener.progress?.({
@@ -419,6 +439,7 @@ export class CloudSessionManager {
       this.setConversation(sid, info.session.conversationId)
     }
     t.mcpNames = info.session.mcpServers.map((s) => s.name)
+    t.seedBase = info.session.seedBase ?? null
     t.replaying = true
     t.lastSeq = 0
     this.setState(sid, info.state)
@@ -609,6 +630,34 @@ export class CloudSessionManager {
     })
   }
 
+  /**
+   * The absolute local path of the session's seed base, from its
+   * `seedBase` (`session.json`, so any machine maps files the same
+   * way): the open workspace folder with that name, else the local
+   * folder the user picked for it before, else ask once and remember.
+   * Undefined when there is no seed base (workspace-relative fallback).
+   */
+  private async localSeedBase(
+    sid: string,
+    rec: SessionFilesRecord,
+    folders: WorkspaceFolderRef[]
+  ): Promise<string | undefined> {
+    const t = this.track(sid)
+    if (t.seedBase === undefined) {
+      t.seedBase =
+        (await this.deps.api.getSession(sid)).session.seedBase ?? null
+    }
+    const base = t.seedBase
+    if (!base) return undefined
+    const open = folders.find((f) => f.name === base.workspaceFolder)
+    if (open) return seedBaseLocalPath(base, open.path)
+    if (rec.localFolder) return seedBaseLocalPath(base, rec.localFolder)
+    const picked = await this.deps.pickLocalFolder?.(sid, base.workspaceFolder)
+    if (!picked) return undefined
+    this.files.set(sid, { ...rec, localFolder: picked })
+    return seedBaseLocalPath(base, picked)
+  }
+
   /** Upload what changed; returns the message context. Throws
    *  `SeedLimitError` before uploading when a limit is hit. */
   private async addPromptFiles(
@@ -616,9 +665,11 @@ export class CloudSessionManager {
     turnId: string,
     files: PromptFiles
   ): Promise<MessageContext | undefined> {
-    const rec = this.files.get(sid) ?? { sent: {} }
-    const toData = (abs: string): string | null =>
-      dataPathFor(abs, rec.base, files.workspaceRoots)
+    let rec = this.files.get(sid) ?? { sent: {} }
+    const base = await this.localSeedBase(sid, rec, files.workspaceFolders)
+    rec = this.files.get(sid) ?? rec
+    const roots = files.workspaceFolders.map((f) => f.path)
+    const toData = (abs: string): string | null => dataPathFor(abs, base, roots)
     const changed = new Map<string, SeedFile & { hash: string }>()
     const skipped: string[] = []
     for (const src of files.sources) {

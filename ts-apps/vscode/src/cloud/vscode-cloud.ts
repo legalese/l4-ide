@@ -27,7 +27,7 @@ import {
   type SessionFilesStore,
 } from './cloud-session-manager.js'
 import type { McpServerSource } from './mcp-transfer.js'
-import { layoutSeed, type SeedSource } from './seed.js'
+import { layoutSeed, type SeedSource, type WorkspaceFolderRef } from './seed.js'
 import { SessionsApiClient } from './sessions-api.js'
 
 export const CLOUD_SESSIONS_ENABLED_SETTING = 'legaleseAi.cloudSessions.enabled'
@@ -158,8 +158,46 @@ async function collectPromptSources(
   }
 }
 
-function workspaceRoots(): string[] {
-  return (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.path)
+function workspaceFolders(): WorkspaceFolderRef[] {
+  return (vscode.workspace.workspaceFolders ?? [])
+    .filter((f) => f.uri.scheme === 'file')
+    .map((f) => ({ name: f.name, path: f.uri.path }))
+}
+
+/**
+ * Ask once which local folder corresponds to a session's seed base
+ * workspace folder `name` when no open workspace folder has that name
+ * (the session was started on another machine or in another window).
+ */
+export async function pickLocalFolder(
+  name: string
+): Promise<string | undefined> {
+  const browse = 'Choose a folder…'
+  const open = workspaceFolders()
+  const choice =
+    open.length > 0
+      ? await vscode.window.showQuickPick(
+          [
+            ...open.map((f) => ({ label: f.name, description: f.path })),
+            { label: browse, description: '' },
+          ],
+          {
+            title: `Which local folder is "${name}"?`,
+            placeHolder: `This cloud session's files came from a workspace folder named "${name}". Pick the matching local folder so mentioned files land in the right place.`,
+            ignoreFocusOut: true,
+          }
+        )
+      : { label: browse, description: '' }
+  if (!choice) return undefined
+  if (choice.label !== browse) return choice.description
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFolders: true,
+    canSelectFiles: false,
+    canSelectMany: false,
+    openLabel: `Use as "${name}"`,
+    title: `Which local folder is "${name}"?`,
+  })
+  return picked?.[0]?.path
 }
 
 /**
@@ -176,8 +214,9 @@ export async function gatherCloudSeed(
 ): Promise<CloudSeed & { root: string; skipped: string[] }> {
   const { sources, unreadable, activeFile, mentions } =
     await collectPromptSources(params, client, logger)
+  const folders = workspaceFolders()
   const roots = [
-    ...workspaceRoots(),
+    ...folders.map((f) => f.path),
     ...(activeFile ? [activeFile.replace(/\/[^/]*$/, '')] : []),
   ]
   const { files, root, skipped } = layoutSeed(sources, roots)
@@ -190,6 +229,7 @@ export async function gatherCloudSeed(
   return {
     files,
     root,
+    workspaceFolders: folders,
     skipped: allSkipped,
     ...(activeFile ? { activeFile } : {}),
     mentions,
@@ -218,11 +258,12 @@ export async function gatherPromptFiles(
     sources,
     ...(activeFile ? { activeFile } : {}),
     mentions,
-    workspaceRoots: workspaceRoots(),
+    workspaceFolders: workspaceFolders(),
   }
 }
 
-/** Per-session seed base and sent-file hashes, in extension storage. */
+/** Per-session sent-file hashes and local folder choice, in extension
+ *  storage. */
 export const SESSION_FILES_STORAGE_KEY = 'legaleseAi.cloudSessions.files'
 
 export function mementoFilesStore(memento: vscode.Memento): SessionFilesStore {
@@ -290,6 +331,7 @@ export function createCloudSessions(deps: {
     mintAgentKey: (sid) => mintAgentKey(authDeps, sid),
     mcp: deps.mcp,
     files: mementoFilesStore(deps.storage),
+    pickLocalFolder: (_sid, name) => pickLocalFolder(name),
     logger: deps.logger,
     listener: {
       chat: deps.emitChat,

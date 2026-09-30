@@ -311,7 +311,10 @@ export function dataPathFor(
     ...workspaceRoots.filter((r) => r !== base),
   ]
   for (const root of candidates) {
-    const rel = relativeTo(absPath, root)
+    const rel =
+      splitPath(absPath).length > splitPath(root).length
+        ? relativeTo(absPath, root)
+        : null
     if (rel === null) continue
     const parts = rel.split('/')
     if (!parts.every(safeComponent)) return null
@@ -375,4 +378,54 @@ export function checkAddFilesSizes(files: SeedFile[]): void {
       largest.map((f) => f.path)
     )
   }
+}
+
+// ── Seed base (§10) ──────────────────────────────────────────────────
+
+/** A workspace folder: its name and absolute `/`-separated path. */
+export interface WorkspaceFolderRef {
+  name: string
+  path: string
+}
+
+/** The seed base as sent to the Sessions API (see protocol `SeedBase`). */
+export interface SeedBaseRef {
+  workspaceFolder: string
+  path: string
+}
+
+function isAtOrUnder(p: string, root: string): boolean {
+  const a = splitPath(p)
+  const r = splitPath(root)
+  return a.length >= r.length && r.every((seg, i) => a[i] === seg)
+}
+
+/**
+ * The seed base for `POST /sessions`: the seed root expressed as a
+ * workspace folder name plus a path inside it (the deepest folder that
+ * contains the root). Undefined when the root is outside every workspace
+ * folder (e.g. seeded from the active file's own directory) — later
+ * files then fall back to workspace-relative paths.
+ */
+export function seedBaseFor(
+  root: string,
+  folders: WorkspaceFolderRef[]
+): SeedBaseRef | undefined {
+  const folder = folders
+    .filter((f) => isAtOrUnder(root, f.path))
+    .sort((a, b) => splitPath(b.path).length - splitPath(a.path).length)[0]
+  if (!folder) return undefined
+  const rel = splitPath(root).slice(splitPath(folder.path).length)
+  if (!rel.every(safeComponent)) return undefined
+  return { workspaceFolder: folder.name, path: rel.join('/') }
+}
+
+/** The absolute local path of a seed base, given the local folder that
+ *  corresponds to its workspace folder. */
+export function seedBaseLocalPath(
+  base: SeedBaseRef,
+  folderPath: string
+): string {
+  const root = '/' + splitPath(folderPath).join('/')
+  return base.path ? `${root === '/' ? '' : root}/${base.path}` : root
 }

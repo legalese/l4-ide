@@ -34,10 +34,12 @@ class FakeApi implements SessionsApi {
   failInit = false
   conversationId: string | undefined
   mcpNames: string[] = []
+  seedBase: { workspaceFolder: string; path: string } | undefined
 
   async createSession(req: CreateSessionRequest) {
     this.log.push('create')
     this.created.push(req)
+    this.seedBase = req.seedBase
     const put = (name: string): PresignedUpload => ({
       url: `https://bucket.example/${name}`,
       method: 'PUT',
@@ -85,6 +87,7 @@ class FakeApi implements SessionsApi {
           url: `https://${name}.example/mcp`,
         })),
         ...(this.conversationId ? { conversationId: this.conversationId } : {}),
+        ...(this.seedBase ? { seedBase: this.seedBase } : {}),
       },
     }
   }
@@ -139,7 +142,12 @@ class FakeApi implements SessionsApi {
   }
 }
 
-function setup(opts: { mcp?: McpServerSource } = {}) {
+function setup(
+  opts: {
+    mcp?: McpServerSource
+    pick?: (sid: string, name: string) => Promise<string | undefined>
+  } = {}
+) {
   const api = new FakeApi()
   const clock = new FakeClock()
   const chat: ChatServiceEvent[] = []
@@ -155,6 +163,7 @@ function setup(opts: { mcp?: McpServerSource } = {}) {
     api,
     mintAgentKey: async () => ({ token: KEY }),
     mcp: opts.mcp,
+    ...(opts.pick ? { pickLocalFolder: opts.pick } : {}),
     logger,
     listener: {
       chat: (e) => chat.push(e),
@@ -438,6 +447,7 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
 
 describe('CloudSessionManager files in later prompts (§10)', () => {
   const ws = '/ws'
+  const folders = [{ name: 'ws', path: ws }]
   const file = (p: string, text: string) => ({ path: p, bytes: enc(text) })
 
   test('first message names the seeded active file and mentions', async () => {
@@ -471,7 +481,13 @@ describe('CloudSessionManager files in later prompts (§10)', () => {
         files: [{ path: 'main.l4', bytes: enc('v1') }],
         attachments: [],
         root: '/ws/rules',
+        workspaceFolders: folders,
       },
+    })
+    // The seed base is recorded in the session for every machine.
+    assert.deepEqual(api.created[0]!.seedBase, {
+      workspaceFolder: 'ws',
+      path: 'rules',
     })
     api.log = []
     progress.length = 0
@@ -485,7 +501,7 @@ describe('CloudSessionManager files in later prompts (§10)', () => {
       ],
       activeFile: '/ws/rules/main.l4',
       mentions: ['/ws/rules/lib/defs.l4', '/ws/other/notes.md'],
-      workspaceRoots: [ws],
+      workspaceFolders: folders,
     })
     assert.deepEqual(api.log, [
       'add-files',
@@ -516,7 +532,7 @@ describe('CloudSessionManager files in later prompts (§10)', () => {
         file('/ws/rules/lib/defs.l4', 'd'),
         file('/ws/rules/main.l4', 'v2'),
       ],
-      workspaceRoots: [ws],
+      workspaceFolders: folders,
     })
     assert.deepEqual(api.log, [
       'add-files',
@@ -537,11 +553,66 @@ describe('CloudSessionManager files in later prompts (§10)', () => {
         sources: [
           { path: '/ws/big.pdf', bytes: new Uint8Array(10 * 1024 * 1024 + 1) },
         ],
-        workspaceRoots: [ws],
+        workspaceFolders: folders,
       }),
       (err: unknown) =>
         err instanceof SeedLimitError && /data\/big\.pdf/.test(err.message)
     )
-    assert.deepEqual(api.log, [])
+    // Only the session lookup (for its seed base); nothing uploaded.
+    assert.deepEqual(api.log, ['get'])
+  })
+
+  test('another machine maps files through the session seedBase', async () => {
+    const { api, manager } = setup()
+    api.seedBase = { workspaceFolder: 'ws', path: 'rules' }
+    api.commandState = 'busy'
+    await manager.sendMessage(SID, 't', 'x', {
+      sources: [file('/home/me/code/ws/rules/lib/defs.l4', 'd')],
+      mentions: ['/home/me/code/ws/rules/lib/defs.l4'],
+      workspaceFolders: [{ name: 'ws', path: '/home/me/code/ws' }],
+    })
+    assert.deepEqual(
+      api.batches[0]!.files.map((f) => f.path),
+      ['data/lib/defs.l4']
+    )
+  })
+
+  test('asks once for the local folder when none has the name', async () => {
+    const asked: string[] = []
+    const { api, manager } = setup({
+      pick: async (_sid, name) => {
+        asked.push(name)
+        return '/home/me/elsewhere'
+      },
+    })
+    api.seedBase = { workspaceFolder: 'ws', path: '' }
+    api.commandState = 'busy'
+    const other = [{ name: 'other', path: '/home/me/other' }]
+    await manager.sendMessage(SID, 't1', 'x', {
+      sources: [file('/home/me/elsewhere/a.l4', 'a')],
+      workspaceFolders: other,
+    })
+    await manager.sendMessage(SID, 't2', 'y', {
+      sources: [file('/home/me/elsewhere/b.l4', 'b')],
+      workspaceFolders: other,
+    })
+    assert.deepEqual(asked, ['ws'])
+    assert.deepEqual(
+      api.batches.map((b) => b.files.map((f) => f.path)),
+      [['data/a.l4'], ['data/b.l4']]
+    )
+  })
+
+  test('without a seed base, files use workspace-relative paths', async () => {
+    const { api, manager } = setup()
+    api.commandState = 'busy'
+    await manager.sendMessage(SID, 't', 'x', {
+      sources: [file('/ws/rules/a.l4', 'a')],
+      workspaceFolders: folders,
+    })
+    assert.deepEqual(
+      api.batches[0]!.files.map((f) => f.path),
+      ['data/rules/a.l4']
+    )
   })
 })

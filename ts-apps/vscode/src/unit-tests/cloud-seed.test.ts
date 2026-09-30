@@ -10,6 +10,8 @@ import {
   commonAncestor,
   contentTypeFor,
   dataPathFor,
+  seedBaseFor,
+  seedBaseLocalPath,
   createSeedTarGz,
   createTar,
   layoutSeed,
@@ -196,5 +198,37 @@ describe('files added mid-session', () => {
         /over the 50\.0 MB limit/.test(err.message)
     )
     checkAddFilesSizes([{ path: 'data/ok.l4', bytes: enc('x') }])
+  })
+})
+
+describe('seed base', () => {
+  const folders = [
+    { name: 'ws', path: '/ws' },
+    { name: 'inner', path: '/ws/pkg' },
+  ]
+  test('deepest workspace folder containing the root', () => {
+    assert.deepEqual(seedBaseFor('/ws/a/b', folders), {
+      workspaceFolder: 'ws',
+      path: 'a/b',
+    })
+    assert.deepEqual(seedBaseFor('/ws/pkg/x', folders), {
+      workspaceFolder: 'inner',
+      path: 'x',
+    })
+    assert.deepEqual(seedBaseFor('/ws', folders), {
+      workspaceFolder: 'ws',
+      path: '',
+    })
+    assert.equal(seedBaseFor('/tmp/x', folders), undefined)
+  })
+  test('local path of a base', () => {
+    assert.equal(
+      seedBaseLocalPath({ workspaceFolder: 'ws', path: 'a/b' }, '/h/ws'),
+      '/h/ws/a/b'
+    )
+    assert.equal(
+      seedBaseLocalPath({ workspaceFolder: 'ws', path: '' }, '/h/ws'),
+      '/h/ws'
+    )
   })
 })
