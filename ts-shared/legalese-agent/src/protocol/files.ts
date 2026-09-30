@@ -7,7 +7,7 @@
  *       data/                       the session files (seed lands here; jl4-lsp --cwd)
  *       tmp/                        the model's scratch space (committed like the rest)
  *         deleted/t-<turnId>/<path> copies of data/ files the agent deleted in a turn
- *       .legalese/                  reserved for metadata; the model may not write here
+ *       <anything else>             platform metadata files; read-only to the model
  *     attachments/<name>            prompt attachments
  *     state/lease.json              LeaseFile            (harness; temp file + rename)
  *     state/head.json               HeadFile             (harness; temp file + rename)
@@ -236,7 +236,14 @@ function nonNegInt(n: number, what: string): number {
 export const REPO_DATA_DIR = 'data'
 export const REPO_TMP_DIR = 'tmp'
 export const REPO_DELETED_DIR = 'tmp/deleted'
-export const REPO_RESERVED_DIR = '.legalese'
+
+/** Repo-root directories the model may write in. Everything else at the
+ *  repo root (files or directories) is platform metadata, read-only to
+ *  the model. */
+export const MODEL_WRITABLE_REPO_DIRS: readonly string[] = [
+  REPO_DATA_DIR,
+  REPO_TMP_DIR,
+]
 
 /**
  * The Sessions API sweep clears `repo/tmp/` of sessions whose
@@ -267,10 +274,21 @@ export function deletedCopyPath(turnId: string, pathUnderData: string): string {
   return `${REPO_DELETED_DIR}/t-${turnId}/${relativePath(pathUnderData, 'path under data/')}`
 }
 
-/** Is a path (relative to `repo/`) inside the reserved `.legalese/`? */
-export function isReservedRepoPath(pathInRepo: string): boolean {
-  const first = pathInRepo.replace(/^\.\/+/, '').split('/')[0]
-  return first === REPO_RESERVED_DIR
+/**
+ * May the model write at `pathInRepo` (relative to `repo/`, `/`-separated,
+ * optional leading `./`)? True only for paths strictly inside `data/` or
+ * `tmp/`; false for the directories themselves, anything else at the repo
+ * root, absolute paths and paths with `.`/`..`/empty segments.
+ */
+export function isModelWritableRepoPath(pathInRepo: string): boolean {
+  const parts = pathInRepo.replace(/^(?:\.\/)+/, '').split('/')
+  if (parts.length < 2) return false
+  if (
+    parts.some((x) => x === '' || x === '.' || x === '..' || x.includes('\0'))
+  ) {
+    return false
+  }
+  return MODEL_WRITABLE_REPO_DIRS.includes(parts[0]!)
 }
 
 export function sessionPaths(sid: string): {
@@ -286,8 +304,6 @@ export function sessionPaths(sid: string): {
   repoDeleted: string
   /** `repo/tmp/deleted/t-<turnId>/<path under data/>`. */
   deletedCopy: (turnId: string, pathUnderData: string) => string
-  /** `repo/.legalese/`: reserved. */
-  repoReserved: string
   attachments: string
   attachment: (name: string) => string
   state: string
@@ -315,7 +331,6 @@ export function sessionPaths(sid: string): {
     repoDeleted: `${dir}/repo/${REPO_DELETED_DIR}`,
     deletedCopy: (turnId, pathUnderData) =>
       `${dir}/repo/${deletedCopyPath(turnId, pathUnderData)}`,
-    repoReserved: `${dir}/repo/${REPO_RESERVED_DIR}`,
     attachments: `${dir}/attachments`,
     attachment: (name) => {
       if (!FILE_NAME_RE.test(name)) {

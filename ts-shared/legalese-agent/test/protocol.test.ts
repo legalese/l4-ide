@@ -8,7 +8,7 @@ import {
   ABANDONED_TMP_DAYS,
   clientCommand,
   deletedCopyPath,
-  isReservedRepoPath,
+  isModelWritableRepoPath,
   decodeSealed,
   encodeSealed,
   cloudEventToChatEvent,
@@ -133,12 +133,11 @@ describe('session files', () => {
     assert.throws(() => p.command(-1))
   })
 
-  test('repo layout: data/, tmp/, deleted copies, reserved .legalese/', () => {
+  test('repo layout: data/, tmp/, deleted copies, writable paths', () => {
     const p = sessionPaths(SID)
     assert.equal(p.repoData, `sessions/${SID}/repo/data`)
     assert.equal(p.repoTmp, `sessions/${SID}/repo/tmp`)
     assert.equal(p.repoDeleted, `sessions/${SID}/repo/tmp/deleted`)
-    assert.equal(p.repoReserved, `sessions/${SID}/repo/.legalese`)
     assert.equal(
       deletedCopyPath('turn1', 'rules/tax.l4'),
       'tmp/deleted/t-turn1/rules/tax.l4'
@@ -150,9 +149,15 @@ describe('session files', () => {
     assert.throws(() => deletedCopyPath('turn1', '../x'))
     assert.throws(() => deletedCopyPath('turn1', '/etc/passwd'))
     assert.throws(() => deletedCopyPath('a/b', 'x'))
-    assert.equal(isReservedRepoPath('.legalese/meta.json'), true)
-    assert.equal(isReservedRepoPath('./.legalese'), true)
-    assert.equal(isReservedRepoPath('data/.legalese'), false)
+    assert.equal(isModelWritableRepoPath('data/rules/tax.l4'), true)
+    assert.equal(isModelWritableRepoPath('./tmp/notes.md'), true)
+    assert.equal(isModelWritableRepoPath('data/.hidden'), true)
+    assert.equal(isModelWritableRepoPath('data'), false)
+    assert.equal(isModelWritableRepoPath('tmp/'), false)
+    assert.equal(isModelWritableRepoPath('session-meta.json'), false)
+    assert.equal(isModelWritableRepoPath('.git/config'), false)
+    assert.equal(isModelWritableRepoPath('data/../x'), false)
+    assert.equal(isModelWritableRepoPath('/data/x'), false)
     assert.equal(ABANDONED_TMP_DAYS, 30)
   })
 
