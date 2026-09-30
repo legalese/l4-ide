@@ -114,7 +114,13 @@ describe('cloud conversations in the chat store', () => {
       .turnId
     expect(message.params).toEqual({
       sessionId: SID,
-      command: { type: 'message', turnId, text: 'Next step' },
+      command: {
+        type: 'message',
+        turnId,
+        text: 'Next step',
+        mentions: [],
+        includeActiveFile: false,
+      },
     })
     expect(sent.some((s) => s.method === 'aiChatStart')).toBe(false)
     // Its echo from the harness isn't shown twice.
@@ -247,5 +253,49 @@ describe('cloud conversations in the chat store', () => {
       },
     })
     expect(store.rollbackOfferAt(0)?.label).toBe('Roll back')
+  })
+
+  test('a later prompt sends its @-mentions and active file; shows adding-files', async () => {
+    const { store, sent } = setup()
+    await store.loadConversation(KEY)
+    store.onActiveFile({
+      uri: 'file:///ws/a.l4',
+      name: 'a.l4',
+      path: 'a.l4',
+      inWorkspace: true,
+    })
+    store.setIncludeActiveFile(true)
+    await store.send('Compare these', [{ kind: 'file', label: 'rules/b.l4' }])
+    const cmd = sent.find((s) => s.method === 'aiCloudCommand')!.params as {
+      command: Record<string, unknown>
+    }
+    expect(cmd.command).toMatchObject({
+      type: 'message',
+      mentions: [{ kind: 'file', label: 'rules/b.l4' }],
+      includeActiveFile: true,
+      activeFile: { name: 'a.l4', path: 'a.l4' },
+    })
+    const turnId = cmd.command.turnId as string
+    store.onCloudProgress({
+      turnId,
+      sessionId: SID,
+      phase: 'adding-files',
+      fileCount: 2,
+    })
+    expect(store.current?.cloud?.progress).toBe('adding-files')
+    expect(store.current?.cloud?.addingFiles).toBe(2)
+    store.onCloudEvent({
+      conversationId: KEY,
+      sessionId: SID,
+      replay: false,
+      event: {
+        type: 'files-added',
+        batchId: '01K6B8Z6X9Q4M2N7P3R5T8B000',
+        files: [{ path: 'data/a.l4' }, { path: 'data/rules/b.l4' }],
+      },
+    })
+    expect(store.current?.cloud?.progress).toBeNull()
+    const prompt = store.current!.turns.find((t) => t.role === 'user')!
+    expect(prompt.filesAdded).toEqual(['data/a.l4', 'data/rules/b.l4'])
   })
 })

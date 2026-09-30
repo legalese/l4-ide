@@ -206,3 +206,31 @@ describe('rollback offers (§9.4)', () => {
     expect(rollbackOffer(c, 3)?.undoesLocalSync).toBe(true)
   })
 })
+
+describe('files added mid-session (§10)', () => {
+  test('files-added shows under the latest prompt and ends the progress', () => {
+    const c = conv()
+    c.cloud!.progress = 'adding-files'
+    c.cloud!.addingFiles = 2
+    applyCloudEvent(c, {
+      type: 'user-message',
+      turnId: 't1',
+      text: 'a',
+      attachments: [],
+    })
+    applyCloudEvent(c, {
+      type: 'user-message',
+      turnId: 't2',
+      text: 'b',
+      attachments: [],
+    })
+    applyCloudEvent(c, {
+      type: 'files-added',
+      batchId: '01K6B8Z6X9Q4M2N7P3R5T8B000',
+      files: [{ path: 'data/a.l4' }, { path: 'data/b/c.md' }],
+    })
+    expect(c.turns[0]!.filesAdded).toBeUndefined()
+    expect(c.turns[1]!.filesAdded).toEqual(['data/a.l4', 'data/b/c.md'])
+    expect(c.cloud!.progress).toBeNull()
+  })
+})

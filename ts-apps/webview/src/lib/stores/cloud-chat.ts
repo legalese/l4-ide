@@ -19,8 +19,11 @@ export interface CloudConversationInfo {
   /** '' until "Run in cloud" has created the session. */
   sessionId: string
   state: AiCloudSessionState | 'gone'
-  /** Start progress of "Run in cloud"; null once ready. */
-  progress: 'uploading' | 'starting' | null
+  /** Start progress of "Run in cloud", or files being added before a
+   *  later prompt; null otherwise. */
+  progress: 'uploading' | 'starting' | 'adding-files' | null
+  /** With `progress: 'adding-files'`: how many. */
+  addingFiles: number
   /** Set by `auth-required` (the key chain or an MCP token failed);
    *  cleared when the session runs again. */
   authRequired: { reason: string; server?: string } | null
@@ -51,6 +54,8 @@ export interface CloudTurn {
   cloudCommit?: { sha: string; parent: string }
   /** Assistant turns: its file changes were rolled back. */
   rolledBack?: boolean
+  /** User turns: files added to the session for this prompt (§10). */
+  filesAdded?: string[]
 }
 
 export interface CloudConversation {
@@ -68,6 +73,7 @@ export function newCloudInfo(
     sessionId,
     state,
     progress: null,
+    addingFiles: 0,
     authRequired: null,
     mergeConflict: null,
     localMergesAt: [],
@@ -243,6 +249,18 @@ export function applyCloudEvent(
       info.localMergesAt.push(conv.turns.length)
       info.mergeConflict = null
       return {}
+    case 'files-added': {
+      // Shown under the prompt they were added for: the latest one.
+      const prompt = [...conv.turns].reverse().find((t) => t.role === 'user')
+      if (prompt) {
+        const paths = event.files.map((f) => f.path)
+        prompt.filesAdded = [
+          ...new Set([...(prompt.filesAdded ?? []), ...paths]),
+        ]
+      }
+      if (info.progress === 'adding-files') info.progress = null
+      return {}
+    }
     case 'local-merge-conflict':
       info.mergeConflict = event.files
       return {}

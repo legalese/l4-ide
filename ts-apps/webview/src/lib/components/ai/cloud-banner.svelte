@@ -26,11 +26,13 @@
         (!!cloud.authRequired && cloud.authRequired.reason !== 'mcp'))
   )
   const progressText = $derived(
-    cloud.progress === 'uploading'
-      ? 'Uploading files…'
-      : cloud.progress === 'starting' || cloud.state === 'starting'
-        ? 'Starting cloud compute (this can take up to a minute)…'
-        : null
+    cloud.progress === 'adding-files'
+      ? `Adding ${cloud.addingFiles} ${cloud.addingFiles === 1 ? 'file' : 'files'} to the session…`
+      : cloud.progress === 'uploading'
+        ? 'Uploading files…'
+        : cloud.progress === 'starting' || cloud.state === 'starting'
+          ? 'Starting cloud compute (this can take up to a minute)…'
+          : null
   )
 </script>
 
@@ -60,7 +62,7 @@
   </div>
   {#if progressText}
     <div class="detail">{progressText}</div>
-    {#if cloud.mcpServers.length > 0}
+    {#if cloud.mcpServers.length > 0 && cloud.progress !== 'adding-files'}
       <div class="detail">
         MCP servers passed to this session: {cloud.mcpServers.join(', ')}. Their
         tools run without approval in the cloud.

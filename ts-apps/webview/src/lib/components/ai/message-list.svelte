@@ -169,6 +169,11 @@
         {userIndex}
         {pending}
       />
+      {#if turn.filesAdded?.length}
+        <div class="files-added" title={turn.filesAdded.join('\n')}>
+          Added to the session: {turn.filesAdded.join(', ')}
+        </div>
+      {/if}
     {:else}
       {@const offer = rollbackOfferAt?.(i) ?? null}
       <div class="assistant-turn" class:rolled-back={turn.rolledBack}>
@@ -263,6 +268,13 @@
        rather than the viewport, since the AI chat lives in a sidebar
        whose height is independent of `vh`. */
     container-type: size;
+  }
+  .files-added {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin: -2px 0 8px;
+    text-align: right;
+    overflow-wrap: anywhere;
   }
   .assistant-turn.rolled-back {
     opacity: 0.55;

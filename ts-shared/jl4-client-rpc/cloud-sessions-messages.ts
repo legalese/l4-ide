@@ -68,6 +68,12 @@ export type AiCloudEventPayload =
   | { type: 'rolled-back'; turnId: string; sha: string }
   | { type: 'local-merged'; sha: string }
   | { type: 'local-merge-conflict'; files: string[] }
+  /** Files added mid-session landed in the repo (`data/…` paths). */
+  | {
+      type: 'files-added'
+      batchId: string
+      files: Array<{ path: string; sha?: string }>
+    }
   | { type: 'auth-required'; reason: string; server?: string }
 
 /** Extension → webview: whether cloud sessions are on. Sent when the
@@ -98,7 +104,13 @@ export const AiCloudState: NotificationType<{
   method: 'aiCloudState',
 }
 
-export type AiCloudStartPhase = 'uploading' | 'starting' | 'ready' | 'error'
+export type AiCloudStartPhase =
+  | 'uploading'
+  | 'starting'
+  | 'ready'
+  | 'error'
+  /** Before a later prompt: new or changed files are being added. */
+  | 'adding-files'
 
 /** Extension → webview: progress of an {@link AiCloudRun}. */
 export const AiCloudProgress: NotificationType<{
@@ -108,6 +120,8 @@ export const AiCloudProgress: NotificationType<{
   /** With the first `uploading`: MCP servers passed to the session;
    *  their tools run without approval in the cloud. */
   mcpServers?: string[]
+  /** With `adding-files`: how many files. */
+  fileCount?: number
   /** With `phase: 'error'`: what to tell the user. */
   error?: string
 }> = {
@@ -155,9 +169,21 @@ export const AiCloudOpen: RequestType<
 
 /** Commands a webview may send to a cloud session (§8). Cloud
  *  sessions never ask for tool approval, so there is no `approve`. */
+/** What a prompt refers to, for adding files mid-session (§10): the
+ *  extension uploads new or changed files before the message. */
+export type AiCloudPromptRefs = Pick<
+  AiChatStartParams,
+  'mentions' | 'includeActiveFile' | 'activeFile'
+>
+
 export type AiCloudCommandPayload =
-  | { type: 'message'; turnId: string; text: string }
-  | { type: 'inject'; turnId: string; injectionId?: string; text: string }
+  | ({ type: 'message'; turnId: string; text: string } & AiCloudPromptRefs)
+  | ({
+      type: 'inject'
+      turnId: string
+      injectionId?: string
+      text: string
+    } & AiCloudPromptRefs)
   | { type: 'abort'; turnId: string }
   | { type: 'answer'; callId: string; answer: string }
 

@@ -157,12 +157,19 @@ export function registerCloudHandlers(deps: {
       })
     )
   }
-  cloud.listener.progress = ({ turnId, sessionId, phase, mcpServers }) => {
+  cloud.listener.progress = ({
+    turnId,
+    sessionId,
+    phase,
+    mcpServers,
+    fileCount,
+  }) => {
     messenger.sendNotification(AiCloudProgress, frontend, {
       turnId,
       ...(sessionId ? { sessionId } : {}),
       phase,
       ...(mcpServers ? { mcpServers } : {}),
+      ...(fileCount !== undefined ? { fileCount } : {}),
     })
   }
 
@@ -220,7 +227,33 @@ export function registerCloudHandlers(deps: {
 
   messenger.onRequest(AiCloudCommand, ({ sessionId, command }) =>
     guard(command.type, async () => {
-      const res = await manager.send(sessionId, command)
+      let res
+      if (command.type === 'message' || command.type === 'inject') {
+        // Add the prompt's @-mentioned files and active file first (§10).
+        const files = await cloud.gatherPromptFiles({
+          mentions: command.mentions ?? [],
+          attachments: [],
+          includeActiveFile: command.includeActiveFile ?? false,
+          ...(command.activeFile ? { activeFile: command.activeFile } : {}),
+        })
+        res =
+          command.type === 'message'
+            ? await manager.sendMessage(
+                sessionId,
+                command.turnId,
+                command.text,
+                files
+              )
+            : await manager.inject(
+                sessionId,
+                command.turnId,
+                command.text,
+                command.injectionId,
+                files
+              )
+      } else {
+        res = await manager.send(sessionId, command)
+      }
       return { ok: true, state: manager.stateOf(sessionId) ?? res.state }
     })
   )

@@ -138,6 +138,9 @@ export interface RenderedTurn {
   /** Cloud conversations, assistant turns: the changes were rolled
    *  back; the turn renders dimmed. */
   rolledBack?: boolean
+  /** Cloud conversations, user turns: files added to the session for
+   *  this prompt (`data/…` paths, from `files-added`). */
+  filesAdded?: string[]
 }
 
 /** A chip echoed at the top of a user message — mirrors what was
@@ -706,7 +709,7 @@ export function createAiChatStore(
         if (conv.streaming) return
         return sendCloud(text, mentions)
       }
-      return sendToCloudSession(conv, text)
+      return sendToCloudSession(conv, text, mentions)
     }
 
     // A deployment-bound chat is a plain passthrough to the
@@ -2089,6 +2092,7 @@ export function createAiChatStore(
       res = { ok: false, error: err instanceof Error ? err.message : '' }
     }
     if (!conv.cloud) return res.ok
+    if (conv.cloud.progress === 'adding-files') conv.cloud.progress = null
     if (res.ok) {
       conv.cloud.notice = null
       if (res.state) conv.cloud.state = res.state
@@ -2111,12 +2115,31 @@ export function createAiChatStore(
 
   /** A prompt in an existing cloud conversation (§12.2): a `message`
    *  command, or `inject` while a turn runs. */
-  function sendToCloudSession(conv: ConversationState, text: string): void {
+  function sendToCloudSession(
+    conv: ConversationState,
+    text: string,
+    mentions: AiChatStartParams['mentions'] = []
+  ): void {
     if (stagedAttachments.length > 0) {
       conv.cloud!.notice =
         'Attachments can only be added when a cloud session starts.'
       return
     }
+    // The prompt's @-mentioned files (and the active file, when its
+    // chip is on) are added to the session first (§10).
+    const withFile =
+      includeActiveFile && activeFile.path && activeFile.name
+        ? { name: activeFile.name, path: activeFile.path }
+        : undefined
+    const refs = {
+      mentions: mentions.map((x) => ({ kind: x.kind, label: x.label })),
+      includeActiveFile: !!withFile,
+      ...(withFile ? { activeFile: withFile } : {}),
+    }
+    const chips: UserTurnChip[] = withFile
+      ? [{ kind: 'active-file', ...withFile }]
+      : []
+    if (withFile) includeActiveFile = false
     dropTrailingErroredAssistantTurns(conv)
     const userTurnId = newBubbleId('user')
     if (conv.streaming && conv.activeTurnId) {
@@ -2127,6 +2150,7 @@ export function createAiChatStore(
         content: text,
         injectionId,
         cloudTurnId: conv.activeTurnId,
+        ...(chips.length > 0 ? { chips } : {}),
       })
       conv.queuedInjections.push({ injectionId, userTurnId })
       void cloudCommand(conv, {
@@ -2134,6 +2158,7 @@ export function createAiChatStore(
         turnId: conv.activeTurnId,
         injectionId,
         text,
+        ...refs,
       }).then((ok) => {
         if (ok) return
         conv.queuedInjections = conv.queuedInjections.filter(
@@ -2150,6 +2175,7 @@ export function createAiChatStore(
         role: 'user',
         content: text,
         cloudTurnId: turnId,
+        ...(chips.length > 0 ? { chips } : {}),
       })
       conv.turns.push({
         id: newBubbleId('asst'),
@@ -2161,7 +2187,7 @@ export function createAiChatStore(
       })
       conv.streaming = true
       conv.activeTurnId = turnId
-      void cloudCommand(conv, { type: 'message', turnId, text })
+      void cloudCommand(conv, { type: 'message', turnId, text, ...refs })
     }
     clearCurrentDraft()
     if (currentId) clearPendingQuestionFor(currentId)
@@ -2243,6 +2269,7 @@ export function createAiChatStore(
     phase: AiCloudStartPhase
     error?: string
     mcpServers?: string[]
+    fileCount?: number
   }): void {
     const conv =
       pendingConversation?.activeTurnId === params.turnId
@@ -2279,6 +2306,11 @@ export function createAiChatStore(
       }
       conv.streaming = false
       conv.activeTurnId = null
+      return
+    }
+    if (params.phase === 'adding-files') {
+      conv.cloud.progress = 'adding-files'
+      conv.cloud.addingFiles = params.fileCount ?? 0
       return
     }
     conv.cloud.progress = params.phase === 'ready' ? null : params.phase
@@ -2706,6 +2738,7 @@ export type AiChatStore = {
     phase: AiCloudStartPhase
     error?: string
     mcpServers?: string[]
+    fileCount?: number
   }) => void
   onCloudReveal: (params: { sessionId: string }) => void
   pickAttachment: (
