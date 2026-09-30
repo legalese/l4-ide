@@ -6,10 +6,15 @@
 import {
   FILE_NAME_RE,
   MCP_SERVER_NAME_RE,
+  ULID_RE,
   epochMs,
   opaqueId,
 } from './common.js'
-import { isIncomingBundleName } from './files.js'
+import {
+  isIncomingBundleName,
+  isRepoDataPath,
+  repoRelativePath,
+} from './files.js'
 import { sealedString } from './sealed.js'
 import {
   ProtocolError,
@@ -24,6 +29,36 @@ import {
   type Check,
 } from './validate.js'
 
+/** At most this many files per `add-files` batch. */
+export const MAX_BATCH_FILES = 500
+
+/** A repo-relative path (validated like seed paths). */
+export const repoPath: Check<string> = (v, path) => {
+  if (typeof v !== 'string') throw new ProtocolError('expected a path', path)
+  try {
+    return repoRelativePath(v)
+  } catch {
+    throw new ProtocolError('invalid repo-relative path', path)
+  }
+}
+
+/** A repo-relative path strictly inside `data/`. */
+export const repoDataPath: Check<string> = (v, path) => {
+  if (!isRepoDataPath(v)) {
+    throw new ProtocolError('expected a path under data/', path)
+  }
+  return v
+}
+
+/** What the user referred to in a prompt: repo-relative paths (e.g.
+ *  `data/rules/tax.l4`). Tells the model which files were meant. */
+export interface MessageContext {
+  /** The file open in the user's editor when they sent the prompt. */
+  activeFile?: string
+  /** @-mentioned files. */
+  mentions?: string[]
+}
+
 export type CommandPayload =
   /** A new user prompt: starts turn `turnId`. `attachments` name files
    *  already in the session's `attachments/` folder. */
@@ -32,6 +67,7 @@ export type CommandPayload =
       turnId: string
       text: string
       attachments?: string[]
+      context?: MessageContext
     }
   /** A message typed while turn `turnId` is running (see ChatService
    *  inject). `injectionId` is echoed in `queue-consumed`; the harness
@@ -50,6 +86,10 @@ export type CommandPayload =
   /** Merge `state/git/incoming/<file>` (§9.1). Issued by the Sessions
    *  API after an accepted push, never by clients. */
   | { type: 'apply-bundle'; file: string }
+  /** Copy `incoming/files/<batchId>/<path>` into `repo/<path>` (§10).
+   *  Issued by the Sessions API on `POST /sessions/:sid/files/:batchId/
+   *  commit`, never by clients. */
+  | { type: 'add-files'; batchId: string; files: Array<{ path: string }> }
 
 export type CommandType = CommandPayload['type']
 
@@ -87,6 +127,12 @@ const payloads: { [T in CommandType]: Check<Payload<T>> } = {
     turnId: opaqueId,
     text: str({ max: PROMPT_MAX }),
     attachments: optional(arr(str({ pattern: FILE_NAME_RE }), { max: 50 })),
+    context: optional(
+      obj({
+        activeFile: optional(repoPath),
+        mentions: optional(arr(repoPath, { max: 200 })),
+      })
+    ),
   }),
   inject: obj({
     type: literal('inject'),
@@ -115,14 +161,26 @@ const payloads: { [T in CommandType]: Check<Payload<T>> } = {
       return v
     },
   }),
+  'add-files': obj({
+    type: literal('add-files'),
+    batchId: str({ pattern: ULID_RE }),
+    files: arr(obj({ path: repoDataPath }), { max: MAX_BATCH_FILES }),
+  }),
 }
 
 export const COMMAND_TYPES = Object.keys(payloads) as CommandType[]
 
-/** Command types a client may send; `apply-bundle` is internal. */
+/** Commands only the Sessions API issues. */
+export const INTERNAL_COMMAND_TYPES: readonly CommandType[] = [
+  'apply-bundle',
+  'add-files',
+]
+
+/** Command types a client may send; `apply-bundle` and `add-files`
+ *  are internal. */
 export type ClientCommandPayload = Exclude<
   CommandPayload,
-  { type: 'apply-bundle' }
+  { type: 'apply-bundle' | 'add-files' }
 >
 
 const commandPayload: Check<CommandPayload> = union(
@@ -133,8 +191,8 @@ const commandPayload: Check<CommandPayload> = union(
 /** Validate a `POST /sessions/:sid/commands` body. */
 export const clientCommand: Check<ClientCommandPayload> = (v, path) => {
   const c = commandPayload(v, path)
-  if (c.type === 'apply-bundle') {
-    throw new ProtocolError('apply-bundle is not a client command', path)
+  if (c.type === 'apply-bundle' || c.type === 'add-files') {
+    throw new ProtocolError(`${c.type} is not a client command`, path)
   }
   return c
 }

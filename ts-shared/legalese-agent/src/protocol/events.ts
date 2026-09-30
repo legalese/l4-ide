@@ -21,8 +21,9 @@ import {
   sessionState,
   type AttachmentRef,
   type SessionState,
+  ULID_RE,
 } from './common.js'
-import type { AgentKeyFailure } from './files.js'
+import { isRepoDataPath, type AgentKeyFailure } from './files.js'
 import {
   ProtocolError,
   arr,
@@ -85,6 +86,13 @@ export type CloudOnlyEventPayload =
   | { type: 'rolled-back'; turnId: string; sha: string }
   | { type: 'local-merged'; sha: string }
   | { type: 'local-merge-conflict'; files: string[] }
+  /** An `add-files` batch landed in `repo/` (§10). `sha` is the file's
+   *  git blob id, when known. */
+  | {
+      type: 'files-added'
+      batchId: string
+      files: Array<{ path: string; sha?: string }>
+    }
   /** The key chain failed (`reason` = the renew error), or an MCP
    *  server's token expired (`reason: 'mcp'`, with `server`). */
   | {
@@ -199,6 +207,22 @@ const payloads: { [T in CloudEventType]: Check<Payload<T>> } = {
   }),
   'rolled-back': obj({ type: literal('rolled-back'), turnId: opaqueId, sha }),
   'local-merged': obj({ type: literal('local-merged'), sha }),
+  'files-added': obj({
+    type: literal('files-added'),
+    batchId: str({ pattern: ULID_RE }),
+    files: arr(
+      obj({
+        path: (v, path) => {
+          if (!isRepoDataPath(v)) {
+            throw new ProtocolError('expected a path under data/', path)
+          }
+          return v
+        },
+        sha: optional(sha),
+      }),
+      { max: 500 }
+    ),
+  }),
   'local-merge-conflict': obj({
     type: literal('local-merge-conflict'),
     files: arr(str({ min: 1, max: 4096 }), { max: 1000 }),

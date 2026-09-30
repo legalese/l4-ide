@@ -6,6 +6,8 @@ import {
   agentKeyName,
   chatEventToPayload,
   ABANDONED_TMP_DAYS,
+  addFilesRequest,
+  addFilesResponse,
   clientCommand,
   deletedCopyPath,
   isModelWritableRepoPath,
@@ -321,6 +323,109 @@ describe('no tool approvals in cloud sessions', () => {
     assert.equal(
       clientCommand({ type: 'answer', callId: 'k', answer: 'yes' }, '').type,
       'answer'
+    )
+  })
+})
+
+describe('files added mid-session', () => {
+  const BATCH = '01J9Z8X7W6V5T4S3R2Q1P0N9MA'
+
+  test('paths, request, response, command and event', () => {
+    const p = sessionPaths(SID)
+    assert.equal(p.incomingFiles, `sessions/${SID}/incoming/files`)
+    assert.equal(
+      p.incomingFile(BATCH, 'data/rules/tax.l4'),
+      `sessions/${SID}/incoming/files/${BATCH}/data/rules/tax.l4`
+    )
+    assert.throws(() => p.incomingFile(BATCH, 'tmp/x'))
+    assert.throws(() => p.incomingFile('nope', 'data/x'))
+
+    const req = tryParse(addFilesRequest, {
+      files: [{ path: 'data/a.l4', size: 10, contentType: 'text/plain' }],
+    })
+    assert.equal(req.ok, true)
+    for (const bad of [
+      { files: [] },
+      { files: [{ path: 'a.l4', size: 1, contentType: 'text/plain' }] },
+      { files: [{ path: 'data/../x', size: 1, contentType: 'text/plain' }] },
+      {
+        files: [
+          { path: 'data/a', size: 1, contentType: 'text/plain' },
+          { path: 'data/a', size: 1, contentType: 'text/plain' },
+        ],
+      },
+      {
+        files: Array.from({ length: 6 }, (_, i) => ({
+          path: `data/f${i}`,
+          size: 10 * 1024 * 1024,
+          contentType: 'application/pdf',
+        })),
+      },
+    ]) {
+      assert.equal(tryParse(addFilesRequest, bad).ok, false)
+    }
+    assert.equal(
+      tryParse(addFilesResponse, {
+        batchId: BATCH,
+        uploads: [
+          {
+            path: 'data/a.l4',
+            url: 'https://s3.example/x',
+            method: 'PUT',
+            headers: {},
+            maxBytes: 10,
+          },
+        ],
+      }).ok,
+      true
+    )
+
+    // add-files is internal, like apply-bundle.
+    const cmd = {
+      type: 'add-files',
+      batchId: BATCH,
+      files: [{ path: 'data/a.l4' }],
+    }
+    assert.throws(() => clientCommand(cmd, ''), /not a client command/)
+    assert.equal(parseCloudCommand({ id: 1, ts: 1, ...cmd }).type, 'add-files')
+
+    const ev = parseCloudEvent({
+      seq: 1,
+      ts: 1,
+      type: 'files-added',
+      batchId: BATCH,
+      files: [{ path: 'data/a.l4', sha: 'c'.repeat(40) }],
+    })
+    assert.equal(ev.type, 'files-added')
+  })
+
+  test('message context names the files the user meant', () => {
+    const m = clientCommand(
+      {
+        type: 'message',
+        turnId: 't1',
+        text: 'check @tax.l4',
+        context: {
+          activeFile: 'data/main.l4',
+          mentions: ['data/rules/tax.l4'],
+        },
+      },
+      ''
+    )
+    assert.deepEqual((m as { context?: unknown }).context, {
+      activeFile: 'data/main.l4',
+      mentions: ['data/rules/tax.l4'],
+    })
+    assert.throws(() =>
+      clientCommand(
+        {
+          type: 'message',
+          turnId: 't1',
+          text: 'x',
+          context: { mentions: ['/etc/x'] },
+        },
+        ''
+      )
     )
   })
 })

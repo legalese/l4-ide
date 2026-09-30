@@ -9,6 +9,8 @@
  *         deleted/t-<turnId>/<path> copies of data/ files the agent deleted in a turn
  *       <anything else>             platform metadata files; read-only to the model
  *     attachments/<name>            prompt attachments
+ *     incoming/files/<batchId>/<path>  files added mid-session (Sessions API; outside repo/;
+ *                                   <path> is repo-relative, under data/)
  *     state/lease.json              LeaseFile            (harness; temp file + rename)
  *     state/head.json               HeadFile             (harness; temp file + rename)
  *     state/events/<n>.jsonl        CloudEvent lines     (harness; append)
@@ -291,6 +293,40 @@ export function isModelWritableRepoPath(pathInRepo: string): boolean {
   return MODEL_WRITABLE_REPO_DIRS.includes(parts[0]!)
 }
 
+/** Validated repo-relative path (`/`-separated, no `.`/`..`/empty
+ *  segments, each ≤ 255 chars, ≤ 1024 total). Throws. */
+export function repoRelativePath(p: string, what = 'path'): string {
+  const parts = p.split('/')
+  if (
+    p.length === 0 ||
+    p.length > 1024 ||
+    parts.some(
+      (x) =>
+        x === '' ||
+        x === '.' ||
+        x === '..' ||
+        x.length > 255 ||
+        /[\0\r\n\\]/.test(x)
+    )
+  ) {
+    throw new Error(`invalid ${what}`)
+  }
+  return p
+}
+
+/** Is `p` a valid repo-relative path strictly inside `data/` (e.g.
+ *  `data/rules/tax.l4`)? Files added mid-session must be. */
+export function isRepoDataPath(p: unknown): p is string {
+  if (typeof p !== 'string') return false
+  try {
+    repoRelativePath(p)
+  } catch {
+    return false
+  }
+  const parts = p.split('/')
+  return parts.length >= 2 && parts[0] === REPO_DATA_DIR
+}
+
 export function sessionPaths(sid: string): {
   dir: string
   sessionJson: string
@@ -318,6 +354,13 @@ export function sessionPaths(sid: string): {
   stopRequested: string
   gitLocal: string
   incomingBundle: (name: string) => string
+  /** `incoming/files/`: API-owned staging for files added mid-session
+   *  (outside `repo/`). */
+  incomingFiles: string
+  /** `incoming/files/<batchId>/` */
+  incomingFilesBatch: (batchId: string) => string
+  /** `incoming/files/<batchId>/<path>`, `path` repo-relative under `data/`. */
+  incomingFile: (batchId: string, path: string) => string
 } {
   if (!ULID_RE.test(sid)) throw new Error('invalid session id')
   const dir = `sessions/${sid}`
@@ -348,6 +391,16 @@ export function sessionPaths(sid: string): {
     initMarker: `${state}/init.json`,
     stopRequested: `${state}/stop-requested.json`,
     gitLocal: `${state}/git/local.json`,
+    incomingFiles: `${dir}/incoming/files`,
+    incomingFilesBatch: (batchId) => {
+      if (!ULID_RE.test(batchId)) throw new Error('invalid batch id')
+      return `${dir}/incoming/files/${batchId}`
+    },
+    incomingFile: (batchId, path) => {
+      if (!ULID_RE.test(batchId)) throw new Error('invalid batch id')
+      if (!isRepoDataPath(path)) throw new Error('invalid path under data/')
+      return `${dir}/incoming/files/${batchId}/${path}`
+    },
     incomingBundle: (name) => {
       if (!isIncomingBundleName(name)) throw new Error('invalid bundle name')
       return `${state}/git/incoming/${name}`

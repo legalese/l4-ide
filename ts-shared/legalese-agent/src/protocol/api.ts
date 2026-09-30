@@ -5,6 +5,7 @@
  */
 import {
   AGENT_KEY_RE,
+  MAX_ATTACHMENT_BYTES,
   MAX_SEED_BYTES,
   attachmentRef,
   epochMs,
@@ -15,6 +16,7 @@ import {
   type McpServerConfig,
   type SessionState,
 } from './common.js'
+import { MAX_BATCH_FILES, repoDataPath } from './commands.js'
 import { cloudEvent, type CloudEvent } from './events.js'
 import {
   SESSION_TITLE_MAX,
@@ -200,6 +202,73 @@ export interface StartSessionRequest {
 export const startSessionRequest: Check<StartSessionRequest> = obj({
   agentKey: str({ pattern: AGENT_KEY_RE }),
 })
+
+/**
+ * `POST /sessions/:sid/files` — add files to a running or sleeping
+ * session mid-conversation (e.g. @-mentioned in a later prompt, §10).
+ * `path` is repo-relative under `data/`. Same limits as seeding: 10 MB
+ * per file, 50 MB per batch. The API answers with pre-signed PUTs into
+ * `inbox/<sid>/files/<batchId>/…`.
+ */
+export interface AddFilesRequest {
+  files: Array<{ path: string; size: number; contentType: string }>
+}
+
+export const addFilesRequest: Check<AddFilesRequest> = (v, path) => {
+  const req = obj({
+    files: arr(
+      obj({
+        path: repoDataPath,
+        size: int({ min: 0, max: MAX_ATTACHMENT_BYTES }),
+        contentType: str({
+          min: 1,
+          max: 255,
+          pattern: /^[\w.+-]+\/[\w.+-]+$/,
+        }),
+      }),
+      { max: MAX_BATCH_FILES }
+    ),
+  })(v, path)
+  if (req.files.length === 0)
+    throw new ProtocolError('no files', `${path}.files`)
+  const seen = new Set<string>()
+  let total = 0
+  for (const f of req.files) {
+    if (seen.has(f.path)) {
+      throw new ProtocolError(`duplicate path ${f.path}`, `${path}.files`)
+    }
+    seen.add(f.path)
+    total += f.size
+  }
+  if (total > MAX_SEED_BYTES) {
+    throw new ProtocolError('batch larger than 50 MB', `${path}.files`)
+  }
+  return req
+}
+
+export interface AddFilesResponse {
+  /** ULID naming the batch. */
+  batchId: string
+  uploads: Array<{ path: string } & PresignedUpload>
+}
+
+export const addFilesResponse: Check<AddFilesResponse> = obj({
+  batchId: sessionId,
+  uploads: arr(
+    (v, path) => ({
+      ...obj({ path: repoDataPath })(v, path),
+      ...presignedUpload(v, path),
+    }),
+    { max: MAX_BATCH_FILES }
+  ),
+})
+
+/**
+ * `POST /sessions/:sid/files/:batchId/commit` (no body). The API copies
+ * the uploaded batch into `sessions/<sid>/incoming/files/<batchId>/…`
+ * and queues an `add-files` command; answers {@link PostCommandResponse}.
+ */
+export type CommitFilesResponse = PostCommandResponse
 
 /** `POST /sessions/:sid/commands` — body is a client command
  *  (`clientCommand` in commands.ts). */
