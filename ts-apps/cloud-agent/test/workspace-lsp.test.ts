@@ -246,9 +246,14 @@ describe('Jl4Lsp', () => {
       'textDocument/didOpen',
       'textDocument/didChange',
       'workspace/didChangeWatchedFiles',
+      // A written .l4 file that wasn't open is opened, so importers see it,
+      'textDocument/didOpen',
       'workspace/didChangeWatchedFiles',
+      // and the other open documents are re-sent to be checked again.
+      'textDocument/didChange',
       'textDocument/didClose',
       'workspace/didChangeWatchedFiles',
+      'textDocument/didChange',
     ])
     const change = received[2]!.params as {
       textDocument: { version: number }
@@ -256,7 +261,7 @@ describe('Jl4Lsp', () => {
     }
     assert.equal(change.textDocument.version, 2)
     assert.equal(change.contentChanges[0]!.text, 'DECIDE x IS 2\n')
-    const created = received[4]!.params as { changes: Array<{ type: number }> }
+    const created = received[5]!.params as { changes: Array<{ type: number }> }
     assert.equal(created.changes[0]!.type, 1)
     client.dispose()
     server.dispose()
@@ -348,7 +353,8 @@ describe('Jl4Lsp with many files', () => {
       assert.equal((await lsp.getDiagnostics(b))[0]!.message, 'problem in b.l4')
       lsp.onDidWrite(b, 'B2\n', false)
       assert.deepEqual(await lsp.openDocument(b), { lineCount: 2, version: 2 })
-      assert.deepEqual(await lsp.openDocument(a), { lineCount: 2, version: 1 })
+      // a (a possible importer of b) was re-sent unchanged.
+      assert.deepEqual(await lsp.openDocument(a), { lineCount: 2, version: 2 })
       // A move is a delete plus a create: the old URI is closed.
       lsp.onDidDelete(a)
       const moved = uriForPath(path.join(dir, 'tmp', 'a.l4'))

@@ -38,6 +38,8 @@ interface LspDiagnostic {
 interface OpenDoc {
   version: number
   lineCount: number
+  /** What the server has, to re-send when a dependency changes. */
+  text: string
 }
 
 interface DiagnosticsEntry {
@@ -226,10 +228,12 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   ): Promise<{ lineCount: number; version: number }> {
     const key = normalizeFileUri(uri)
     const existing = this.open.get(key)
-    if (existing) return { ...existing }
+    if (existing) {
+      return { lineCount: existing.lineCount, version: existing.version }
+    }
     this.assertRunning()
     const text = await fs.readFile(new URL(key), 'utf8')
-    const doc = { version: 1, lineCount: lineCount(text) }
+    const doc = { version: 1, lineCount: lineCount(text), text }
     this.open.set(key, doc)
     this.changedAt.set(key, this.diagnostics.get(key)?.generation ?? 0)
     this.enqueue(
@@ -240,7 +244,7 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
       'open'
     )
     await this.notifying
-    return { ...doc }
+    return { lineCount: doc.lineCount, version: doc.version }
   }
 
   async getDiagnostics(uri: string): Promise<L4Diagnostic[]> {
@@ -317,15 +321,35 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
 
   // ── WorkspaceChangeListener ────────────────────────────────────────
 
+  /**
+   * A file changed on disk. Written `.l4` files are kept open in the
+   * server's VFS (opened here if they weren't): jl4-lsp doesn't re-read
+   * an imported module from disk on its own, so an importer would keep
+   * seeing the old version otherwise.
+   */
   onDidWrite(uri: string, text: string, created: boolean): void {
     if (this.exited) return
     const key = normalizeFileUri(uri)
-    const doc = this.open.get(key)
     this.changedAt.set(key, this.diagnostics.get(key)?.generation ?? 0)
-    const version = doc ? ++doc.version : 0
-    if (doc) doc.lineCount = lineCount(text)
+    const isL4 = key.toLowerCase().endsWith('.l4')
+    let doc = this.open.get(key)
+    let opened = false
+    if (!doc && isL4) {
+      doc = { version: 1, lineCount: lineCount(text), text }
+      this.open.set(key, doc)
+      opened = true
+    } else if (doc) {
+      doc.version++
+      doc.lineCount = lineCount(text)
+      doc.text = text
+    }
+    const version = doc?.version ?? 0
     const send = async (): Promise<void> => {
-      if (doc) {
+      if (opened) {
+        await this.connection.sendNotification('textDocument/didOpen', {
+          textDocument: { uri: key, languageId: 'l4', version, text },
+        })
+      } else if (doc) {
         await this.connection.sendNotification('textDocument/didChange', {
           textDocument: { uri: key, version },
           contentChanges: [{ text }],
@@ -337,6 +361,32 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
       )
     }
     this.enqueue(send, 'change')
+    if (isL4) this.refreshImporters(key)
+  }
+
+  /**
+   * jl4-lsp re-checks a document (and pushes its directive results) only
+   * when that document changes, not when a module it imports does. After
+   * an `.l4` file changes, re-send every other open document unchanged
+   * so importers are checked against the new version.
+   */
+  private refreshImporters(changed: string): void {
+    const others = [...this.open].filter(
+      ([k]) => k !== changed && k.toLowerCase().endsWith('.l4')
+    )
+    for (const [k, doc] of others) {
+      doc.version++
+      this.changedAt.set(k, this.diagnostics.get(k)?.generation ?? 0)
+      const { version, text } = doc
+      this.enqueue(
+        () =>
+          this.connection.sendNotification('textDocument/didChange', {
+            textDocument: { uri: k, version },
+            contentChanges: [{ text }],
+          }),
+        'refresh'
+      )
+    }
   }
 
   onDidDelete(uri: string): void {
@@ -356,32 +406,28 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
       )
     }
     this.enqueue(send, 'delete')
+    if (key.toLowerCase().endsWith('.l4')) this.refreshImporters(key)
   }
 
   /**
-   * Forget every open document after files changed behind the language
-   * server's back (a git merge or rollback): close them, and tell the
-   * server which files changed so importers recompile.
+   * Files changed behind the server's back (a git merge or rollback):
+   * push each changed file's current content (so importers see it; the
+   * server doesn't re-read modules from disk), and close deleted ones.
    */
   async resync(changedUris: string[]): Promise<void> {
     if (this.exited) return
-    for (const key of [...this.open.keys()]) {
-      this.open.delete(key)
-      await this.connection.sendNotification('textDocument/didClose', {
-        textDocument: { uri: key },
-      })
+    for (const u of changedUris) {
+      const key = normalizeFileUri(u)
+      let text: string | null
+      try {
+        text = await fs.readFile(new URL(key), 'utf8')
+      } catch {
+        text = null
+      }
+      if (text === null) this.onDidDelete(key)
+      else this.onDidWrite(key, text, false)
     }
-    if (changedUris.length > 0) {
-      await this.connection.sendNotification(
-        'workspace/didChangeWatchedFiles',
-        {
-          changes: changedUris.map((u) => ({
-            uri: normalizeFileUri(u),
-            type: 2,
-          })),
-        }
-      )
-    }
+    await this.notifying
   }
 
   /** `shutdown` + `exit`, then kill the process if it lingers. */
