@@ -74,6 +74,21 @@ export type SessionsApiDetailCode =
   | 'start_failed'
   | 'unavailable'
   | 'internal'
+  /** 409 on every git route (§9.2) until the harness's first commit has
+   *  written `state/git/main.bundle`. */
+  | 'no_commits_yet'
+
+export const SESSIONS_API_DETAIL_CODES: readonly SessionsApiDetailCode[] = [
+  'not_initialized',
+  'already_initialized',
+  'too_many_sessions',
+  'invalid_seed',
+  'stopping',
+  'start_failed',
+  'unavailable',
+  'internal',
+  'no_commits_yet',
+]
 
 export interface ApiError {
   error: string

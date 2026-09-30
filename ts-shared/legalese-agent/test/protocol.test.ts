@@ -8,6 +8,8 @@ import {
   ABANDONED_TMP_DAYS,
   addFilesRequest,
   addFilesResponse,
+  SESSIONS_API_DETAIL_CODES,
+  apiError,
   clientCommand,
   listSessionsResponse,
   deletedCopyPath,
@@ -538,6 +540,13 @@ describe('Sessions API and agent keys', () => {
       ],
     })
     assert.equal(bad.ok, false)
+  })
+
+  test('error codes include no_commits_yet for git before the first commit', () => {
+    assert.ok(SESSIONS_API_DETAIL_CODES.includes('no_commits_yet'))
+    assert.deepEqual(apiError({ error: 'no_commits_yet' }, ''), {
+      error: 'no_commits_yet',
+    })
   })
 
   test('agent key names and errors', () => {
