@@ -71,14 +71,14 @@ hand-written runtime validators. A validator is a `Check<T>`
 fields, or throws `ProtocolError`; `tryParse(check, value)` returns a result
 instead.
 
-| Module                 | Contents                                                                                                                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `protocol/common.ts`   | ids (`ULID_RE`, `AGENT_KEY_RE`), `SessionState`, `McpServerConfig`, `AttachmentRef`, size limits                                                                                                 |
-| `protocol/files.ts`    | `SessionFile` (`session.json`), `LeaseFile`, `HeadFile`, cursors, `commands.seq`, `sessionPaths(sid)`                                                                                            |
-| `protocol/events.ts`   | `CloudEvent` (`{ seq, ts, type, … }`: chat-service kinds + cloud-only types), chat ⇄ cloud mapping, JSONL chunk parsing                                                                          |
-| `protocol/commands.ts` | `CloudCommand` (`{ id, ts, type, … }`), `clientCommand` (rejects internal `apply-bundle`), `McpCredentials`                                                                                      |
-| `protocol/api.ts`      | Sessions API requests/responses, `GET /events` query helpers, access-token and agent-key routes, key-name helpers, error codes                                                                   |
-| `protocol/sealed.ts`   | sealed secrets: `generateSealingKeyPair`, `seal`, `openSealed`, `encodeSealed`/`decodeSealed` (`v1.<epk>.<iv>.<ct>.<tag>`), `SealedEnvelope` (X25519 + HKDF-SHA256 + AES-256-GCM, context-bound) |
+| Module                 | Contents                                                                                                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `protocol/common.ts`   | ids (`ULID_RE`, `AGENT_KEY_RE`), `SessionState`, `McpServerConfig`, `AttachmentRef`, size limits                                                                                                                                                             |
+| `protocol/files.ts`    | `SessionFile` (`session.json`), `LeaseFile`, `HeadFile`, cursors, `commands.seq`, `sessionPaths(sid)`, repo layout (`REPO_DATA_DIR`, `REPO_TMP_DIR`, `REPO_DELETED_DIR`, `REPO_RESERVED_DIR`, `deletedCopyPath`, `isReservedRepoPath`, `ABANDONED_TMP_DAYS`) |
+| `protocol/events.ts`   | `CloudEvent` (`{ seq, ts, type, … }`: chat-service kinds + cloud-only types), chat ⇄ cloud mapping, JSONL chunk parsing                                                                                                                                      |
+| `protocol/commands.ts` | `CloudCommand` (`{ id, ts, type, … }`), `clientCommand` (rejects internal `apply-bundle`), `McpCredentials`                                                                                                                                                  |
+| `protocol/api.ts`      | Sessions API requests/responses, `GET /events` query helpers, access-token and agent-key routes, key-name helpers, error codes                                                                                                                               |
+| `protocol/sealed.ts`   | sealed secrets: `generateSealingKeyPair`, `seal`, `openSealed`, `encodeSealed`/`decodeSealed` (`v1.<epk>.<iv>.<ct>.<tag>`), `SealedEnvelope` (X25519 + HKDF-SHA256 + AES-256-GCM, context-bound)                                                             |
 
 The Sessions API (in `jl4-auth-proxy`) mirrors these shapes; this package is
 the reference.
