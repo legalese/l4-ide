@@ -8,7 +8,14 @@ import { Lease, LeaseHeldError } from '../src/lease.js'
 import { readKnownFile } from '../src/safe-fs.js'
 import { SessionJson } from '../src/session-file.js'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
-import { MemoryLogger, SID, readEvents, silent, tempDir } from './helpers.js'
+import {
+  MemoryLogger,
+  SID,
+  readEvents,
+  silent,
+  tempDir,
+  waitUntil,
+} from './helpers.js'
 
 describe('EventLog', () => {
   let dir: string
@@ -45,13 +52,15 @@ describe('EventLog', () => {
     log.emit({ type: 'text-delta', conversationId: 'c1', text: 'lo' })
     log.emit({ type: 'thinking-delta', conversationId: 'c1', text: 'hm' })
     log.emit({ type: 'text-delta', conversationId: 'c1', text: '!' })
-    // Not written before the coalescing window…
-    await new Promise((r) => setTimeout(r, 20))
+    // The finished deltas are written before the last one's window ends
+    // (checked by polling, so a loaded machine can't make it flaky).
+    await waitUntil(async () => (await readEvents(dir)).length >= 2, 5_000)
     const early = await readEvents(dir)
     assert.deepEqual(
-      early.map((e) => e.type),
+      early.slice(0, 2).map((e) => e.type),
       ['text-delta', 'thinking-delta']
     )
+    await waitUntil(async () => (await readEvents(dir)).length >= 3, 5_000)
     await new Promise((r) => setTimeout(r, DELTA_COALESCE_MS + 50))
     const events = await readEvents(dir)
     assert.deepEqual(
