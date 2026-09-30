@@ -607,7 +607,7 @@ describe('Runner', () => {
   test('commits each turn and rolls it back through commands (git plugin)', async () => {
     proxy.scripts.push([
       metadata('conv5'),
-      toolCall('c1', 'fs__create_file', { path: 'rule.l4' }),
+      toolCall('c1', 'fs__create_file', { path: 'data/rule.l4' }),
       chunk({}, 'tool_calls'),
     ])
     proxy.scripts.push([chunk({ content: 'Created.' }), chunk({}, 'stop')])
@@ -638,7 +638,9 @@ describe('Runner', () => {
     const t = types(await readEvents(stateDir))
     assert.ok(t.indexOf('done') < t.indexOf('git-committed'))
     assert.ok(t.indexOf('git-committed') < t.indexOf('rolled-back'))
-    await assert.rejects(readFile(path.join(sessionDir, 'repo', 'rule.l4')))
+    await assert.rejects(
+      readFile(path.join(sessionDir, 'repo', 'data', 'rule.l4'))
+    )
     assert.ok(
       (await readFile(path.join(stateDir, 'git', 'main.bundle'))).length > 0
     )
