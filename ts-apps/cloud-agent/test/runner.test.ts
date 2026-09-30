@@ -2,11 +2,7 @@ import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
-import {
-  fixedPermissionPolicy,
-  type AuthProvider,
-  type PermissionPolicy,
-} from '@repo/legalese-agent'
+import { type AuthProvider } from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
 import { NodeWorkspace } from '../src/node-workspace.js'
@@ -82,7 +78,6 @@ describe('Runner', () => {
     opts: {
       idleExitMs?: number
       plugins?: RunnerPlugin[]
-      permissions?: PermissionPolicy
     } = {}
   ): Runner {
     return new Runner({
@@ -96,7 +91,6 @@ describe('Runner', () => {
       l4,
       aiEndpoint: { url: proxyUrl, local: false },
       plugins: opts.plugins,
-      permissions: opts.permissions,
       extensionVersion: 'test',
       idleExitMs: opts.idleExitMs ?? 60_000,
       pollMs: 20,
@@ -118,7 +112,7 @@ describe('Runner', () => {
     proxy.scripts.push(
       [
         metadata('conv1'),
-        toolCall('call1', 'fs__create_file', { path: 'notes/a.l4' }),
+        toolCall('call1', 'fs__create_file', { path: 'data/notes/a.l4' }),
         chunk({}, 'tool_calls'),
       ],
       [chunk({ content: 'Done.' }), chunk({}, 'stop')]
@@ -150,8 +144,12 @@ describe('Runner', () => {
 
     // The file landed in the repo (fs__create_file writes a stub).
     assert.ok(
-      (await readFile(path.join(sessionDir, 'repo', 'notes', 'a.l4'), 'utf8'))
-        .length > 0
+      (
+        await readFile(
+          path.join(sessionDir, 'repo', 'data', 'notes', 'a.l4'),
+          'utf8'
+        )
+      ).length > 0
     )
     // ai-proxy saw the session header and the agent key.
     const chats = proxy.chatRequests()
@@ -443,55 +441,60 @@ describe('Runner', () => {
     )
   })
 
-  test('an approval waits for an approve command, then the tool row updates', async () => {
+  test('deletes run without approval; the model recovers from tmp/deleted and keeps notes in tmp', async () => {
+    const repo = path.join(sessionDir, 'repo')
+    await writeFile(path.join(repo, 'data', 'keep.l4'), 'precious\n')
     proxy.scripts.push(
       [
-        metadata('conv6'),
-        toolCall('c1', 'fs__create_file', { path: 'x.l4' }),
+        metadata('conv8'),
+        toolCall('d1', 'fs__delete_file', { path: 'data/keep.l4' }),
         chunk({}, 'tool_calls'),
       ],
-      [chunk({ content: 'ok' }), chunk({}, 'stop')]
+      [
+        toolCall('r1', 'fs__read_file', { path: 'tmp/deleted/t-t1/keep.l4' }),
+        chunk({}, 'tool_calls'),
+      ],
+      [
+        toolCall('n1', 'fs__create_file', { path: 'tmp/notes/ideas.md' }),
+        chunk({}, 'tool_calls'),
+      ],
+      [chunk({ content: 'Done.' }), chunk({}, 'stop')]
     )
-    const runner = build({
-      permissions: fixedPermissionPolicy({ 'fs.create': 'ask' }),
-    })
+    const runner = build()
     const done = runner.run()
-    await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'go' })
-    await waitUntil(
-      async () =>
-        (await readEvents(stateDir)).some((e) => e.type === 'approval-request'),
-      5_000,
-      'approval-request'
-    )
-    assert.equal((await lease()).state, 'waiting')
-    const req = (await readEvents(stateDir)).find(
-      (e) => e.type === 'approval-request'
-    ) as CloudEvent & { callId: string; name: string; turnId: string }
-    assert.deepEqual(
-      [req.callId, req.name, req.turnId],
-      ['c1', 'fs__create_file', 't1']
-    )
     await sendCommand(root, SID, {
-      type: 'approve',
-      callId: 'c1',
-      decision: 'allow',
+      type: 'message',
+      turnId: 't1',
+      text: 'oops',
     })
     await waitUntil(async () =>
       (await readEvents(stateDir)).some((e) => e.type === 'done')
     )
     await sendCommand(root, SID, { type: 'stop' })
     assert.equal(await done, 'stop')
+    // The standing note rides on the prompt.
+    const first = proxy.chatRequests()[0]!.body.messages as Array<{
+      role: string
+      content: string
+    }>
+    assert.match(first.at(-1)!.content, /tmp\/deleted\/t-t1\//)
+    assert.match(first.at(-1)!.content, /live in data\//)
+    // The delete ran without asking, and was copied first.
+    const read = proxy.chatRequests()[2]!.body.messages as Array<{
+      content: string
+    }>
+    assert.match(read[0]!.content, /precious/)
     const events = await readEvents(stateDir)
-    const after = events.filter((e) => e.seq > req.seq)
-    const statuses = after
-      .filter((e) => e.type === 'tool-call')
-      .map((e) => (e as { status: string }).status)
-    // Every client clears its buttons from the status update after the
-    // decision.
-    assert.deepEqual(statuses, ['running', 'done'])
-    const started = events.find((e) => e.type === 'started') as {
-      turnId: string
-    }
-    assert.equal(started.turnId, 't1')
+    assert.ok(
+      !events.some(
+        (e) =>
+          e.type === 'tool-call' &&
+          (e as { status: string }).status === 'pending-approval'
+      )
+    )
+    assert.ok(!types(events).includes('state:waiting'))
+    assert.ok(
+      (await readFile(path.join(repo, 'tmp', 'notes', 'ideas.md'))).length > 0
+    )
   })
 })

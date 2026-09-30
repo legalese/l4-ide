@@ -4,6 +4,7 @@ import {
   AiProxyClient,
   BuiltinTools,
   ChatService,
+  PERMISSION_CATEGORIES,
   ToolDispatcher,
   fixedPermissionPolicy,
   type AiEndpoint,
@@ -11,7 +12,6 @@ import {
   type L4Language,
   type Logger,
   type PermissionCategory,
-  type PermissionPolicy,
   type PermissionValue,
   type ToolProvider,
   type Workspace,
@@ -29,6 +29,12 @@ import { SessionConversationStore } from './conversation-store.js'
 import { EventLog } from './event-log.js'
 import { CloudInteraction } from './interaction.js'
 import { Lease, LeaseHeldError } from './lease.js'
+import {
+  DATA_DIR,
+  DELETED_DIR,
+  NodeWorkspace,
+  TMP_DIR,
+} from './node-workspace.js'
 import { SessionJson } from './session-file.js'
 
 /** Idle exit after this long with no running turn and no new command
@@ -42,15 +48,16 @@ export const SHUTDOWN_BUDGET_MS = 25_000
 export const PARK_TURN_GRACE_MS = 60_000
 
 /**
- * Cloud tool policy (spec §11): file and L4 tools run without prompts,
- * confined to `repo/` by the workspace. Only `fs.delete` differs from
- * the extension's defaults (there it asks).
+ * Cloud tool policy (spec §11): cloud sessions never ask for tool
+ * approval. Every category — file and L4 tools (confined to `repo/`),
+ * the l4-rules MCP tools and the user's MCP servers passed at start —
+ * runs without a prompt. File changes are backed up per turn and
+ * committed, so a turn can be rolled back.
  */
-export const CLOUD_PERMISSIONS: Partial<
-  Record<PermissionCategory, PermissionValue>
-> = {
-  'fs.delete': 'always',
-}
+export const CLOUD_PERMISSIONS: Record<PermissionCategory, PermissionValue> =
+  Object.fromEntries(
+    PERMISSION_CATEGORIES.map((c) => [c, 'always' as const])
+  ) as Record<PermissionCategory, PermissionValue>
 
 export type ExitReason = 'idle' | 'stop' | 'sigterm' | 'parked'
 
@@ -127,9 +134,6 @@ export interface RunnerOptions {
   workspace: Workspace
   l4: L4Language & { dispose?(): Promise<void> }
   aiEndpoint: AiEndpoint
-  /** Tool permissions; defaults to the cloud policy
-   *  ({@link CLOUD_PERMISSIONS}). */
-  permissions?: PermissionPolicy
   /** Built-in extra tool sources (the l4-rules MCP server). */
   providers?: ToolProvider[]
   plugins?: RunnerPlugin[]
@@ -201,7 +205,7 @@ export class Runner {
     const dispatcher = new ToolDispatcher({
       logger: opts.logger,
       tools: new BuiltinTools(opts.workspace, opts.l4),
-      permissions: opts.permissions ?? fixedPermissionPolicy(CLOUD_PERMISSIONS),
+      permissions: fixedPermissionPolicy(CLOUD_PERMISSIONS),
       interaction: this.interaction,
       providers: this.providers,
     })
@@ -260,6 +264,9 @@ export class Runner {
     try {
       await this.events.open()
       await this.commands.open()
+      if (this.opts.workspace instanceof NodeWorkspace) {
+        await this.opts.workspace.ensureLayout()
+      }
       const session = await this.session.read()
       this.conversationId = session.conversationId
       if (this.opts.chain && !(await this.opts.chain.start())) {
@@ -353,9 +360,6 @@ export class Runner {
           break
         case 'abort':
           this.abort(cmd.turnId)
-          break
-        case 'approve':
-          this.interaction.decide(cmd.callId, cmd.decision)
           break
         case 'answer':
           this.interaction.answer(cmd.callId, cmd.answer)
@@ -500,7 +504,11 @@ export class Runner {
         logger.error(`plugin ${p.name} beforeTurn failed`, err)
       }
     }
+    prefix += standingNote(cmd.turnId) + '\n\n'
     this.activeTurn = cmd.turnId
+    if (this.opts.workspace instanceof NodeWorkspace) {
+      this.opts.workspace.setTurn(cmd.turnId)
+    }
     await this.setState('busy', cmd.turnId)
     await this.session
       .update({ lastActivity: this.now() })
@@ -527,6 +535,9 @@ export class Runner {
       } catch (err) {
         logger.error(`plugin ${p.name} afterTurn failed`, err)
       }
+    }
+    if (this.opts.workspace instanceof NodeWorkspace) {
+      this.opts.workspace.setTurn(null)
     }
     await this.session
       .update({ lastActivity: this.now() })
@@ -682,4 +693,17 @@ function waitFor(p: Promise<unknown>, ms: number): Promise<void> {
       }
     )
   })
+}
+
+/**
+ * The standing note about the session layout, sent with every prompt
+ * (the core package has no per-turn system-note hook, and the harness
+ * doesn't change the core).
+ */
+export function standingNote(turnId: string): string {
+  return (
+    `<cloud-session-note>The session files live in ${DATA_DIR}/. ${TMP_DIR}/ is your scratch space for temporary work (notes, drafts, experiments) that shouldn't be in ${DATA_DIR}/; read, create, edit and delete there freely with the fs tools. ` +
+    `Files you delete from ${DATA_DIR}/ are first copied to ${DELETED_DIR}/t-${turnId}/<path> (this turn) — to restore one, read it there and write it back. ` +
+    'Changes from earlier turns can also be undone by the user rolling back a turn.</cloud-session-note>'
+  )
 }

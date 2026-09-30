@@ -76,7 +76,7 @@ export class Lease {
   }
 
   /** Update the state the lease advertises (`busy` while a turn runs,
-   *  `waiting` while a question or approval is pending). */
+   *  `waiting` while an ask_user question is pending). */
   async set(state: LeaseState, turnId?: string): Promise<void> {
     if (this.state === state && this.turnId === turnId) return
     this.state = state

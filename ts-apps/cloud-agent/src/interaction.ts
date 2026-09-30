@@ -14,8 +14,9 @@ import {
  * {@link UserInteraction} over the file relay (spec §8, §11):
  *
  * - chat-service events are appended to the event log;
- * - approvals become `approval-request` events and wait for an
- *   `approve` command; `meta__ask_user` questions become `ask-user`
+ * - there are no tool approvals in cloud sessions (the policy allows
+ *   every tool), so {@link requestApproval} allows without an event;
+ *   `meta__ask_user` questions become `ask-user`
  *   events and wait for an `answer` command (both through
  *   {@link PendingInteractions}, scoped to conversation and turn);
  * - dispatcher status updates become `tool-call` events carrying the
@@ -56,25 +57,10 @@ export class CloudInteraction implements UserInteraction {
     for (const l of this.listeners) l(event)
   }
 
-  async requestApproval(
-    call: { callId: string; name: string; argsJson: string },
-    ctx: ToolCallContext
-  ): Promise<'allow' | 'deny'> {
-    const decision = this.pending.requestApproval(call.callId, ctx)
-    this.sink({
-      type: 'approval-request',
-      conversationId: ctx.conversationId,
-      turnId: ctx.turnId,
-      callId: call.callId,
-      name: call.name,
-      argsJson: call.argsJson,
-    })
-    this.onWaitingChange(true)
-    try {
-      return await decision
-    } finally {
-      this.onWaitingChange(this.isWaiting())
-    }
+  /** Never reached with the cloud policy; allows without asking, since
+   *  the protocol has no approval event or command. */
+  async requestApproval(): Promise<'allow' | 'deny'> {
+    return 'allow'
   }
 
   async askUser(
@@ -118,22 +104,12 @@ export class CloudInteraction implements UserInteraction {
     if (status === 'done' || status === 'error') this.calls.delete(callId)
   }
 
-  /** `approve` command. */
-  decide(callId: string, decision: 'allow' | 'deny'): boolean {
-    const ctx = this.pending.contextFor(callId)
-    return this.pending.decide(callId, decision, ctx?.conversationId)
-  }
-
   /** `answer` command. */
   answer(callId: string, answer: string): boolean {
     return this.pending.answer(callId, answer)
   }
 
   isWaiting(): boolean {
-    return (
-      this.pending.pendingApprovalCount() +
-        this.pending.pendingQuestionCount() >
-      0
-    )
+    return this.pending.pendingQuestionCount() > 0
   }
 }

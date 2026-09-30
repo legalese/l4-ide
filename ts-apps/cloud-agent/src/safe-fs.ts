@@ -127,3 +127,35 @@ export async function appendToFile(
     await handle.close()
   }
 }
+
+/**
+ * Create every directory from `base` (exclusive) down to `dir`, refusing
+ * any component that exists as something other than a real directory
+ * (in particular a symlink).
+ */
+export async function ensureDirNoFollow(
+  base: string,
+  dir: string
+): Promise<void> {
+  const rel = path.relative(base, dir)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('directory outside its base')
+  }
+  let cur = base
+  for (const part of rel.split(path.sep).filter(Boolean)) {
+    cur = path.join(cur, part)
+    const st = await fs.lstat(cur).catch((err: unknown) => {
+      if (isErrno(err, 'ENOENT')) return null
+      throw err
+    })
+    if (st === null) {
+      await fs.mkdir(cur).catch((err: unknown) => {
+        if (!isErrno(err, 'EEXIST')) throw err
+      })
+      const again = await fs.lstat(cur)
+      if (!again.isDirectory()) throw new Error('not a directory')
+    } else if (!st.isDirectory()) {
+      throw new Error('not a directory')
+    }
+  }
+}
