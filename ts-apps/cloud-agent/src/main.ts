@@ -6,7 +6,7 @@
  *          LOG_LEVEL; the user's folder is mounted at /workspace.
  *   dev:   cloud-agent --dev --root <dir> --session <ulid> [...]
  */
-import { mkdtemp, stat } from 'node:fs/promises'
+import { stat } from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import {
@@ -23,7 +23,6 @@ import {
 } from './config.js'
 import { initSessionFolder, sendCommand } from './dev.js'
 import { Jl4Lsp } from './jl4-lsp.js'
-import { L4Router, prepareTmpLibraryAlias } from './l4-router.js'
 import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
 import { JsonLogger } from './logger.js'
 import { DATA_DIR, NodeWorkspace, TMP_DIR } from './node-workspace.js'
@@ -107,35 +106,19 @@ export async function runHarness(
     auth = new DevAuth(cfg.sessionId)
   }
 
-  // Two jl4-lsp instances (spec §5.4, see l4-router.ts): one rooted at
-  // repo/data for the session files, one rooted at repo/tmp (started on
-  // first use) for the model's drafts, which finds data/ modules through
-  // an XDG library alias.
+  // One jl4-lsp, project root repo/data (spec §5.4), for every .l4 file
+  // in data/ and tmp/. `IMPORT name` looks in data/ first, then next to
+  // the importing file: tmp/ drafts import data/ modules and their tmp/
+  // siblings, but a tmp/ module can't shadow a data/ module of the same
+  // name.
   const dataDir = path.join(repoDir, DATA_DIR)
-  const tmpDir = path.join(repoDir, TMP_DIR)
   await ensureDirNoFollow(repoDir, dataDir)
-  await ensureDirNoFollow(repoDir, tmpDir)
-  const scratch = await mkdtemp(path.join(os.tmpdir(), 'cloud-agent-'))
-  const tmpXdg = path.join(scratch, 'xdg-tmp')
-  const tmpLibraryAlias = await prepareTmpLibraryAlias(tmpXdg, dataDir)
-  const data = await Jl4Lsp.spawn({
+  await ensureDirNoFollow(repoDir, path.join(repoDir, TMP_DIR))
+  const lsp = await Jl4Lsp.spawn({
     command: cfg.lspCommand,
     root: dataDir,
     logger,
     env: childEnv(env),
-  })
-  const lsp = new L4Router({
-    repoDir,
-    data,
-    tmpLibraryAlias,
-    logger,
-    startTmp: () =>
-      Jl4Lsp.spawn({
-        command: cfg.lspCommand,
-        root: tmpDir,
-        logger,
-        env: { ...childEnv(env), XDG_DATA_HOME: tmpXdg },
-      }),
   })
   const workspace = new NodeWorkspace(repoDir, lsp, logger)
   const mcpUrl = cfg.mcpUrl

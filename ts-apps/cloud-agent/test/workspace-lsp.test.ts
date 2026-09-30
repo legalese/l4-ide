@@ -420,7 +420,7 @@ describe('Jl4Lsp against a real jl4-lsp', { skip: !realLsp }, () => {
     }
   })
 
-  test('resolves imports for data/ and tmp/ files with --cwd data/', async () => {
+  test('one server, --cwd data/: tmp/ drafts import data/, tmp/ siblings and prelude; importers see edits', async () => {
     const { dir, cleanup } = await tempDir()
     try {
       const repo = path.join(dir, 'repo')
@@ -428,10 +428,13 @@ describe('Jl4Lsp against a real jl4-lsp', { skip: !realLsp }, () => {
       await mkdir(path.join(repo, 'tmp'), { recursive: true })
       const files: Record<string, string> = {
         'data/money.l4': 'DECIDE `the fee` IS 40\n',
+        'data/shade.l4': 'DECIDE `the shade` IS 1\n',
         'data/sub/uses.l4': 'IMPORT money\n\n#EVAL `the fee` PLUS 2\n',
         'tmp/helper.l4': 'DECIDE `the bonus` IS 5\n',
+        // Same name as a data/ module: data/ wins.
+        'tmp/shade.l4': 'DECIDE `the shade` IS 100\n',
         'tmp/draft.l4':
-          'IMPORT money\nIMPORT helper\n\n#EVAL `the fee` PLUS `the bonus`\n',
+          'IMPORT prelude\nIMPORT money\nIMPORT helper\nIMPORT shade\n\n#EVAL `the fee` PLUS `the bonus` PLUS `the shade`\n',
       }
       for (const [f, t] of Object.entries(files)) {
         await writeFile(path.join(repo, f), t)
@@ -440,17 +443,22 @@ describe('Jl4Lsp against a real jl4-lsp', { skip: !realLsp }, () => {
         command: realLsp!,
         root: path.join(repo, 'data'),
         logger: silent,
-        env: { PATH: testEnv['PATH'] ?? '', HOME: testEnv['HOME'] ?? '' },
+        // An empty HOME, as in the task: prelude comes from the embedded
+        // core libraries.
+        env: { PATH: testEnv['PATH'] ?? '', HOME: path.join(dir, 'home') },
       })
-      const results: Record<string, string[]> = {}
-      for (const f of ['data/sub/uses.l4', 'tmp/draft.l4']) {
-        const d = await lsp.getDiagnostics(uriForPath(path.join(repo, f)))
-        results[f] = d.map((x) => `${x.severity}: ${x.message}`)
-      }
-      assert.deepEqual(results, {
-        'data/sub/uses.l4': ['info: 42'],
-        'tmp/draft.l4': ['info: 45'],
-      })
+      const diag = async (f: string): Promise<string[]> =>
+        (await lsp.getDiagnostics(uriForPath(path.join(repo, f)))).map(
+          (x) => `${x.severity}: ${x.message}`
+        )
+      assert.deepEqual(await diag('data/sub/uses.l4'), ['info: 42'])
+      assert.deepEqual(await diag('tmp/draft.l4'), ['info: 46'])
+      // Edit a module the importers never opened: both re-check.
+      const money = path.join(repo, 'data', 'money.l4')
+      await writeFile(money, 'DECIDE `the fee` IS 100\n')
+      lsp.onDidWrite(uriForPath(money), 'DECIDE `the fee` IS 100\n', false)
+      assert.deepEqual(await diag('tmp/draft.l4'), ['info: 106'])
+      assert.deepEqual(await diag('data/sub/uses.l4'), ['info: 102'])
       await lsp.dispose()
     } finally {
       await cleanup()
