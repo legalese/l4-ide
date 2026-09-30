@@ -3,7 +3,11 @@
  *
  *   sessions/<sid>/
  *     session.json                  SessionFile          (Sessions API creates; harness updates)
- *     repo/                         git working tree
+ *     repo/                         git root: the model's workspace root
+ *       data/                       the session files (seed lands here; jl4-lsp --cwd)
+ *       tmp/                        the model's scratch space (committed like the rest)
+ *         deleted/t-<turnId>/<path> copies of data/ files the agent deleted in a turn
+ *       .legalese/                  reserved for metadata; the model may not write here
  *     attachments/<name>            prompt attachments
  *     state/lease.json              LeaseFile            (harness; temp file + rename)
  *     state/head.json               HeadFile             (harness; temp file + rename)
@@ -20,6 +24,7 @@
  */
 import {
   FILE_NAME_RE,
+  OPAQUE_ID_RE,
   ULID_RE,
   epochMs,
   mcpServerConfig,
@@ -224,10 +229,65 @@ function nonNegInt(n: number, what: string): number {
  * access-point root, `/workspace` in the task). Every part is validated,
  * so the result never escapes `sessions/<sid>/`.
  */
+// ── Repository layout ────────────────────────────────────────────────
+
+/** Directories at the root of `repo/`, relative to it (the model's
+ *  workspace root). */
+export const REPO_DATA_DIR = 'data'
+export const REPO_TMP_DIR = 'tmp'
+export const REPO_DELETED_DIR = 'tmp/deleted'
+export const REPO_RESERVED_DIR = '.legalese'
+
+/**
+ * The Sessions API sweep clears `repo/tmp/` of sessions whose
+ * `session.json` `lastActivity` is older than this many days (while no
+ * task runs); the harness commits the deletion on its next start.
+ */
+export const ABANDONED_TMP_DAYS = 30
+export const ABANDONED_TMP_MS = ABANDONED_TMP_DAYS * 24 * 60 * 60 * 1000
+
+/** Validate a relative path (`/`-separated, no `.`/`..`/empty parts). */
+function relativePath(p: string, what: string): string {
+  const parts = p.split('/')
+  if (
+    p.length === 0 ||
+    p.length > 4096 ||
+    p.includes('\0') ||
+    parts.some((x) => x === '' || x === '.' || x === '..')
+  ) {
+    throw new Error(`invalid ${what}`)
+  }
+  return p
+}
+
+/** Where a deleted `data/` file is copied, relative to `repo/`:
+ *  `tmp/deleted/t-<turnId>/<path under data/>`. */
+export function deletedCopyPath(turnId: string, pathUnderData: string): string {
+  if (!OPAQUE_ID_RE.test(turnId)) throw new Error('invalid turn id')
+  return `${REPO_DELETED_DIR}/t-${turnId}/${relativePath(pathUnderData, 'path under data/')}`
+}
+
+/** Is a path (relative to `repo/`) inside the reserved `.legalese/`? */
+export function isReservedRepoPath(pathInRepo: string): boolean {
+  const first = pathInRepo.replace(/^\.\/+/, '').split('/')[0]
+  return first === REPO_RESERVED_DIR
+}
+
 export function sessionPaths(sid: string): {
   dir: string
   sessionJson: string
+  /** Git root and the model's workspace root. */
   repo: string
+  /** `repo/data/`: the session files (seed target, jl4-lsp `--cwd`). */
+  repoData: string
+  /** `repo/tmp/`: the model's scratch space. */
+  repoTmp: string
+  /** `repo/tmp/deleted/`: copies of deleted `data/` files. */
+  repoDeleted: string
+  /** `repo/tmp/deleted/t-<turnId>/<path under data/>`. */
+  deletedCopy: (turnId: string, pathUnderData: string) => string
+  /** `repo/.legalese/`: reserved. */
+  repoReserved: string
   attachments: string
   attachment: (name: string) => string
   state: string
@@ -250,6 +310,12 @@ export function sessionPaths(sid: string): {
     dir,
     sessionJson: `${dir}/session.json`,
     repo: `${dir}/repo`,
+    repoData: `${dir}/repo/${REPO_DATA_DIR}`,
+    repoTmp: `${dir}/repo/${REPO_TMP_DIR}`,
+    repoDeleted: `${dir}/repo/${REPO_DELETED_DIR}`,
+    deletedCopy: (turnId, pathUnderData) =>
+      `${dir}/repo/${deletedCopyPath(turnId, pathUnderData)}`,
+    repoReserved: `${dir}/repo/${REPO_RESERVED_DIR}`,
     attachments: `${dir}/attachments`,
     attachment: (name) => {
       if (!FILE_NAME_RE.test(name)) {

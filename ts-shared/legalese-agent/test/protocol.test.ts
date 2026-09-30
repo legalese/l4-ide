@@ -5,7 +5,10 @@ import {
   ProtocolError,
   agentKeyName,
   chatEventToPayload,
+  ABANDONED_TMP_DAYS,
   clientCommand,
+  deletedCopyPath,
+  isReservedRepoPath,
   decodeSealed,
   encodeSealed,
   cloudEventToChatEvent,
@@ -128,6 +131,29 @@ describe('session files', () => {
     assert.throws(() => p.attachment('../secret'))
     assert.throws(() => p.incomingBundle('x.bundle'))
     assert.throws(() => p.command(-1))
+  })
+
+  test('repo layout: data/, tmp/, deleted copies, reserved .legalese/', () => {
+    const p = sessionPaths(SID)
+    assert.equal(p.repoData, `sessions/${SID}/repo/data`)
+    assert.equal(p.repoTmp, `sessions/${SID}/repo/tmp`)
+    assert.equal(p.repoDeleted, `sessions/${SID}/repo/tmp/deleted`)
+    assert.equal(p.repoReserved, `sessions/${SID}/repo/.legalese`)
+    assert.equal(
+      deletedCopyPath('turn1', 'rules/tax.l4'),
+      'tmp/deleted/t-turn1/rules/tax.l4'
+    )
+    assert.equal(
+      p.deletedCopy('turn1', 'a.l4'),
+      `sessions/${SID}/repo/tmp/deleted/t-turn1/a.l4`
+    )
+    assert.throws(() => deletedCopyPath('turn1', '../x'))
+    assert.throws(() => deletedCopyPath('turn1', '/etc/passwd'))
+    assert.throws(() => deletedCopyPath('a/b', 'x'))
+    assert.equal(isReservedRepoPath('.legalese/meta.json'), true)
+    assert.equal(isReservedRepoPath('./.legalese'), true)
+    assert.equal(isReservedRepoPath('data/.legalese'), false)
+    assert.equal(ABANDONED_TMP_DAYS, 30)
   })
 
   test('cursors', () => {
