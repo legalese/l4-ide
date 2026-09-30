@@ -363,7 +363,14 @@ export function createCloudSessions(deps: {
     logger: deps.logger,
     listener: {
       chat: deps.emitChat,
-      cloudEvent: (e) => listener.cloudEvent?.(e),
+      cloudEvent: (e) => {
+        // Clone / Sync open up once the first turn is committed (§9.3);
+        // replayed events count, so reopening a session works.
+        if (e.event.type === 'git-committed') {
+          void git.markCommitted(e.sessionId)
+        }
+        listener.cloudEvent?.(e)
+      },
       state: (sid, s) => listener.state?.(sid, s),
       gone: (sid, err) => listener.gone?.(sid, err),
       progress: (e) => listener.progress?.(e),

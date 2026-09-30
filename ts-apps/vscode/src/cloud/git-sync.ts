@@ -103,6 +103,15 @@ export const GIT_POST_BUFFER = '5242880'
 export const GIT_PUSH_REFSPEC = 'refs/heads/main:refs/heads/local'
 
 export const CLONES_STORAGE_KEY = 'legaleseAi.cloudSessions.clones'
+/** Sessions known to have a first commit (a `git-committed` event was
+ *  seen, live or replayed). */
+export const COMMITTED_STORAGE_KEY = 'legaleseAi.cloudSessions.committed'
+
+/** Why Clone / Sync aren't offered yet (§9.3). */
+export const NOT_READY_MESSAGE =
+  "Available after the first turn: the session's files can be cloned once its first turn has been committed."
+
+const SESSION_GIT_PATH_RE = /\/git\/([0-9A-Z]{26})\.git(?:\/|$)/
 
 export interface CloneRecord {
   /** Absolute path of the clone. */
@@ -119,6 +128,9 @@ export interface KeyValueStorage {
 
 export type SyncStatus =
   | { kind: 'unavailable'; message: string }
+  /** The session has no commit yet (no `git-committed` event seen):
+   *  there is nothing to clone. */
+  | { kind: 'not-ready'; message: string }
   | { kind: 'not-cloned' }
   | {
       kind: 'cloned'
@@ -221,6 +233,29 @@ export class CloudGitSync<U extends GitUri> {
     return this.clones()[sid]
   }
 
+  /** Has the session's first turn been committed (a `git-committed`
+   *  event seen, live or replayed)? A clone implies it. */
+  hasFirstCommit(sid: string): boolean {
+    const committed =
+      this.deps.storage.get<Record<string, true>>(COMMITTED_STORAGE_KEY) ?? {}
+    return committed[sid] === true || this.cloneOf(sid) !== undefined
+  }
+
+  /** Record a `git-committed` event for `sid`. */
+  async markCommitted(sid: string): Promise<void> {
+    if (this.hasFirstCommit(sid)) return
+    const committed =
+      this.deps.storage.get<Record<string, true>>(COMMITTED_STORAGE_KEY) ?? {}
+    await this.deps.storage.update(COMMITTED_STORAGE_KEY, {
+      ...committed,
+      [sid]: true,
+    })
+  }
+
+  private requireFirstCommit(sid: string): void {
+    if (!this.hasFirstCommit(sid)) throw new GitSyncError(NOT_READY_MESSAGE)
+  }
+
   /**
    * Register the credentials and remote-source providers, and configure
    * clones VS Code opens (also those made through "Git: Clone"). Returns
@@ -236,6 +271,13 @@ export class CloudGitSync<U extends GitUri> {
         getCredentials: async (host) => {
           const ours = apiHost(this.deps.apiUrl())
           if (!ours || host.authority.toLowerCase() !== ours) return undefined
+          // VS Code usually passes only the host; when the session is
+          // known from the path, refuse before its first commit.
+          const m = SESSION_GIT_PATH_RE.exec(host.path ?? '')
+          if (m && !this.hasFirstCommit(m[1]!)) {
+            this.deps.logger.info(`cloud-sessions: ${NOT_READY_MESSAGE}`)
+            return undefined
+          }
           // Any username; the JWT is the password (§9.2). Fetched per
           // git operation, so an expired token is never reused.
           return {
@@ -251,11 +293,14 @@ export class CloudGitSync<U extends GitUri> {
           const apiUrl = this.deps.apiUrl()
           if (!apiUrl) return []
           const sessions = await this.deps.listSessions()
-          return sessions.map((s) => ({
-            name: s.title || s.sessionId,
-            description: s.state,
-            url: sessionGitUrl(apiUrl, s.sessionId),
-          }))
+          // Only sessions with a committed first turn can be cloned.
+          return sessions
+            .filter((s) => this.hasFirstCommit(s.sessionId))
+            .map((s) => ({
+              name: s.title || s.sessionId,
+              description: s.state,
+              url: sessionGitUrl(apiUrl, s.sessionId),
+            }))
         },
       }),
       api.onDidOpenRepository((repo) => {
@@ -331,6 +376,9 @@ export class CloudGitSync<U extends GitUri> {
       return { kind: 'unavailable', message: git.unavailable }
     }
     const rec = this.cloneOf(sid)
+    if (!rec && !this.hasFirstCommit(sid)) {
+      return { kind: 'not-ready', message: NOT_READY_MESSAGE }
+    }
     if (!rec) return { kind: 'not-cloned' }
     const repo = await this.repository(sid)
     if (!repo) {
@@ -353,6 +401,7 @@ export class CloudGitSync<U extends GitUri> {
   async clone(sid: string, parentPath: U): Promise<U> {
     const apiUrl = this.deps.apiUrl()
     if (!apiUrl) throw new GitSyncError('Cloud sessions are not configured.')
+    this.requireFirstCommit(sid)
     const api = await this.api()
     let folder: U | null
     try {
@@ -379,6 +428,7 @@ export class CloudGitSync<U extends GitUri> {
 
   /** Pull, then push (§9.3). Conflicts are left for VS Code's merge editor. */
   async sync(sid: string): Promise<SyncStatus> {
+    this.requireFirstCommit(sid)
     const repo = await this.repository(sid)
     if (!repo) throw new GitSyncError('Clone the cloud session first.')
     try {

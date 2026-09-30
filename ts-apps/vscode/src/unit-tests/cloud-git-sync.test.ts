@@ -3,6 +3,7 @@ import * as assert from 'node:assert/strict'
 import {
   CLONES_STORAGE_KEY,
   CloudGitSync,
+  NOT_READY_MESSAGE,
   GitSyncError,
   describeGitError,
   sessionIdFromGitUrl,
@@ -157,9 +158,12 @@ describe('CloudGitSync', () => {
     assert.equal(git.credentials, undefined)
   })
 
-  test('lists cloud sessions in the Git: Clone picker', async () => {
+  test('lists committed cloud sessions in the Git: Clone picker', async () => {
     const { git, sync } = setup()
     await sync.register()
+    // Before the first turn is committed: not offered.
+    assert.deepEqual(await git.sources!.getRemoteSources(), [])
+    await sync.markCommitted(SID)
     assert.deepEqual(await git.sources!.getRemoteSources(), [
       {
         name: 'Lease review',
@@ -171,6 +175,7 @@ describe('CloudGitSync', () => {
 
   test('clones without opening, configures, and remembers the folder', async () => {
     const { git, sync, store } = setup()
+    await sync.markCommitted(SID)
     const folder = await sync.clone(SID, fileUri('/home/u/src'))
     assert.equal(folder.fsPath, `/home/u/src/${SID}`)
     assert.deepEqual(git.cloned, [
@@ -199,6 +204,7 @@ describe('CloudGitSync', () => {
 
   test('sync pulls then pushes, and reports a pending push', async () => {
     const { git, sync } = setup()
+    await sync.markCommitted(SID)
     await sync.clone(SID, fileUri('/w'))
     const repo = git.repositories[0]!
     repo.head = { ahead: 2, behind: 1 }
@@ -220,6 +226,7 @@ describe('CloudGitSync', () => {
 
   test('a push over the body limit gets a clear message', async () => {
     const { git, sync } = setup()
+    await sync.markCommitted(SID)
     await sync.clone(SID, fileUri('/w'))
     const repo = git.repositories[0]!
     repo.head = { ahead: 1, behind: 0 }
@@ -251,6 +258,43 @@ describe('CloudGitSync', () => {
     for (const l of git.openListeners) l(other)
     await new Promise((r) => setImmediate(r))
     assert.equal(other.config.size, 0)
+  })
+})
+
+describe('Clone and Sync wait for the first commit (§9.3)', () => {
+  test('status, clone, sync and credentials refuse before it', async () => {
+    const { git, sync } = setup()
+    await sync.register()
+    assert.deepEqual(await sync.status(SID), {
+      kind: 'not-ready',
+      message: NOT_READY_MESSAGE,
+    })
+    await assert.rejects(sync.clone(SID, fileUri('/w')), (err: Error) =>
+      err.message.startsWith('Available after the first turn')
+    )
+    await assert.rejects(sync.sync(SID), (err: Error) =>
+      err.message.startsWith('Available after the first turn')
+    )
+    assert.deepEqual(git.cloned, [])
+    // A credential request naming the session is refused; a bare host
+    // (what VS Code usually passes) still gets a token.
+    assert.equal(
+      await git.credentials!.getCredentials(
+        uri(`https://sessions.example/git/${SID}.git`)
+      ),
+      undefined
+    )
+    assert.ok(
+      await git.credentials!.getCredentials(uri('https://sessions.example'))
+    )
+
+    await sync.markCommitted(SID)
+    assert.deepEqual(await sync.status(SID), { kind: 'not-cloned' })
+    assert.ok(
+      await git.credentials!.getCredentials(
+        uri(`https://sessions.example/git/${SID}.git`)
+      )
+    )
   })
 })
 
