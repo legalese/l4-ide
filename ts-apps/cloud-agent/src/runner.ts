@@ -703,6 +703,7 @@ function waitFor(p: Promise<unknown>, ms: number): Promise<void> {
 export function standingNote(turnId: string): string {
   return (
     `<cloud-session-note>The session files live in ${DATA_DIR}/. ${TMP_DIR}/ is your scratch space for temporary work (notes, drafts, experiments) that shouldn't be in ${DATA_DIR}/; read, create, edit and delete there freely with the fs tools. ` +
+    `L4 files in ${DATA_DIR}/ and ${TMP_DIR}/ both work with the L4 tools; \`IMPORT name\` finds ${DATA_DIR}/name.l4 first, then name.l4 next to the importing file (so a ${TMP_DIR}/ draft can import ${DATA_DIR}/ modules and its ${TMP_DIR}/ siblings). ` +
     `Files you delete from ${DATA_DIR}/ are first copied to ${DELETED_DIR}/t-${turnId}/<path> (this turn) — to restore one, read it there and write it back. ` +
     'Changes from earlier turns can also be undone by the user rolling back a turn.</cloud-session-note>'
   )
