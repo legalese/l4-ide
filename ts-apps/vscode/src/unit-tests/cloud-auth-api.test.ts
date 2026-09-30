@@ -6,7 +6,12 @@ import {
   mintAgentKey,
   type AuthProxyDeps,
 } from '../cloud/auth-proxy.js'
-import { SessionsApiClient, SessionsApiError } from '../cloud/sessions-api.js'
+import {
+  NO_COMMITS_YET_MESSAGE,
+  SessionsApiClient,
+  SessionsApiError,
+  describeSessionsApiError,
+} from '../cloud/sessions-api.js'
 
 const SID = '01K6B8Z6X9Q4M2N7P3R5T8V0WA'
 const KEY = 'sk_test_0123456789abcdef'
@@ -295,5 +300,15 @@ describe('SessionsApiClient', () => {
       sessionId: '01K6B8Z6X9Q4M2N7P3R5T8V0WB',
       error: 'not_found',
     })
+  })
+})
+
+describe('describeSessionsApiError', () => {
+  test('409 no_commits_yet reads as "Available after the first turn"', () => {
+    assert.equal(
+      describeSessionsApiError(409, 'no_commits_yet'),
+      NO_COMMITS_YET_MESSAGE
+    )
+    assert.match(NO_COMMITS_YET_MESSAGE, /^Available after the first turn/)
   })
 })

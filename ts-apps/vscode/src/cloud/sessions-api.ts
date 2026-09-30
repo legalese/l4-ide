@@ -48,6 +48,10 @@ export class SessionsApiError extends Error {
   }
 }
 
+/** 409 `no_commits_yet` (git before the first turn is committed). */
+export const NO_COMMITS_YET_MESSAGE =
+  "Available after the first turn: the session's files can be cloned once its first turn has been committed."
+
 /** A user-facing sentence for a Sessions API error. */
 export function describeSessionsApiError(status: number, code: string): string {
   switch (code) {
@@ -61,6 +65,8 @@ export function describeSessionsApiError(status: number, code: string): string {
       return 'The cloud session was not set up completely. Start a new one.'
     case 'stopping':
       return 'The cloud session is still stopping. Try again in a minute.'
+    case 'no_commits_yet':
+      return NO_COMMITS_YET_MESSAGE
     case 'invalid_seed':
       return 'The files for the cloud session were rejected.'
     case 'too_large':
