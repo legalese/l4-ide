@@ -289,6 +289,28 @@ describe('GitSync', () => {
     assert.equal(sh(repo, 'rev-parse', 'HEAD'), head)
   })
 
+  test('commits added files on their own and reports blob ids', async () => {
+    const g = git()
+    await g.start(ctx)
+    await write('data/work.l4', 'agent work in progress\n')
+    await write('data/added.l4', 'from the user\n')
+    const shas = await g.onFilesAdded(['data/added.l4'])
+    assert.equal(
+      sh(repo, 'log', '-1', '--format=%s'),
+      'Add files from the user'
+    )
+    assert.equal(
+      shas['data/added.l4'],
+      sh(repo, 'rev-parse', 'HEAD:data/added.l4')
+    )
+    // The agent's uncommitted work isn't swept into it.
+    assert.equal(sh(repo, 'status', '--porcelain'), '?? data/work.l4')
+    // Adding the same content again commits nothing.
+    const head = sh(repo, 'rev-parse', 'HEAD')
+    await g.onFilesAdded(['data/added.l4'])
+    assert.equal(sh(repo, 'rev-parse', 'HEAD'), head)
+  })
+
   test('commits leftovers and runs gc before sleeping', async () => {
     const g = git()
     await g.start(ctx)
