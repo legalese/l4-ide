@@ -23,6 +23,7 @@ import {
 } from './config.js'
 import { initSessionFolder, sendCommand } from './dev.js'
 import { GitSync } from './git-sync.js'
+import { McpServers } from './mcp-servers.js'
 import { Jl4Lsp } from './jl4-lsp.js'
 import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
 import { JsonLogger } from './logger.js'
@@ -32,9 +33,9 @@ import { Runner, type ChainControl, type RunnerPlugin } from './runner.js'
 
 export const HARNESS_VERSION = '0.1.0'
 
-/** The harness's plugins: git sync (§9). */
+/** The harness's plugins: git sync (§9) and the user's MCP servers (§6.4). */
 export function defaultPlugins(env: NodeJS.ProcessEnv): RunnerPlugin[] {
-  return [new GitSync(env)]
+  return [new GitSync(env), new McpServers()]
 }
 
 /** The child's whole environment: nothing from the harness's own. */
