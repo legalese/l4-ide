@@ -32,18 +32,21 @@ describe('NodeWorkspace', () => {
     ;({ dir, cleanup } = await tempDir())
     repo = path.join(dir, 'repo')
     await mkdir(path.join(repo, '.git'), { recursive: true })
-    await mkdir(path.join(repo, 'sub'))
-    await writeFile(path.join(repo, 'a.l4'), 'one\ntwo\nthree\n')
+    await mkdir(path.join(repo, 'data', 'sub'), { recursive: true })
+    await writeFile(path.join(repo, 'data', 'a.l4'), 'one\ntwo\nthree\n')
     await writeFile(path.join(dir, 'secret.txt'), 'outside')
   })
   afterEach(() => cleanup())
 
   test('resolves paths inside the repo and refuses everything else', () => {
     const ws = new NodeWorkspace(repo)
-    const r = ws.resolvePath('sub/../a.l4')
-    assert.equal(r.relative, 'a.l4')
-    assert.equal(r.uri, uriForPath(path.join(repo, 'a.l4')))
-    assert.equal(ws.resolvePath(path.join(repo, 'a.l4')).relative, 'a.l4')
+    const r = ws.resolvePath('data/sub/../a.l4')
+    assert.equal(r.relative, path.join('data', 'a.l4'))
+    assert.equal(r.uri, uriForPath(path.join(repo, 'data', 'a.l4')))
+    assert.equal(
+      ws.resolvePath(path.join(repo, 'data', 'a.l4')).relative,
+      path.join('data', 'a.l4')
+    )
     assert.throws(() => ws.resolvePath('../secret.txt'), /outside/)
     assert.throws(() => ws.resolvePath(path.join(dir, 'secret.txt')), /outside/)
     assert.throws(() => ws.resolvePath('.git/config'), /\.git/)
@@ -63,13 +66,13 @@ describe('NodeWorkspace', () => {
   test('hides .git from listings', async () => {
     const ws = new NodeWorkspace(repo)
     const names = (await ws.readDirectory(repo)).map((e) => e.name).sort()
-    assert.deepEqual(names, ['a.l4', 'sub'])
+    assert.deepEqual(names, ['data'])
   })
 
   test('creates files exclusively and tells the listener', async () => {
     const l = new RecordingListener()
     const ws = new NodeWorkspace(repo, l)
-    const target = ws.resolvePath('sub/deep/new.l4')
+    const target = ws.resolvePath('data/sub/deep/new.l4')
     await ws.createFile(target, 'hello')
     assert.equal(await readFile(target.fsPath, 'utf8'), 'hello')
     await assert.rejects(ws.createFile(target, 'again'), /EEXIST/)
@@ -79,9 +82,9 @@ describe('NodeWorkspace', () => {
   test('applies offset edits per file from the highest offset down', async () => {
     const l = new RecordingListener()
     const ws = new NodeWorkspace(repo, l)
-    const a = ws.resolvePath('a.l4')
-    await writeFile(path.join(repo, 'b.l4'), 'xyz')
-    const b = ws.resolvePath('b.l4')
+    const a = ws.resolvePath('data/a.l4')
+    await writeFile(path.join(repo, 'data', 'b.l4'), 'xyz')
+    const b = ws.resolvePath('data/b.l4')
     await ws.applyEdits([
       { uri: a.uri, startOffset: 0, endOffset: 3, newText: 'ONE' },
       { uri: a.uri, startOffset: 8, endOffset: 13, newText: 'THREE' },
@@ -94,7 +97,7 @@ describe('NodeWorkspace', () => {
 
   test('rejects overlapping edits without writing anything', async () => {
     const ws = new NodeWorkspace(repo)
-    const a = ws.resolvePath('a.l4')
+    const a = ws.resolvePath('data/a.l4')
     await assert.rejects(
       ws.applyEdits([
         { uri: a.uri, startOffset: 0, endOffset: 5, newText: 'x' },
@@ -108,11 +111,11 @@ describe('NodeWorkspace', () => {
   test('deletes files, not directories', async () => {
     const l = new RecordingListener()
     const ws = new NodeWorkspace(repo, l)
-    const a = ws.resolvePath('a.l4')
+    const a = ws.resolvePath('data/a.l4')
     assert.equal(await ws.deleteFile(a), 'deleted')
     assert.equal(await ws.stat(a.fsPath), null)
     assert.deepEqual(l.deletes, [a.uri])
-    await assert.rejects(ws.deleteFile(ws.resolvePath('sub')), /directory/)
+    await assert.rejects(ws.deleteFile(ws.resolvePath('data/sub')), /directory/)
   })
 })
 

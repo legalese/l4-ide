@@ -10,17 +10,17 @@ Built with esbuild into one file, `dist/cloud-agent.cjs` (`npm run build`).
 
 ## What it does
 
-| Module                  | Does                                                                                                                                |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `runner.ts`             | Main loop: lease, key chain, command poll (1 s), one turn at a time, idle exit (10 min), `stop`, SIGTERM, parking; plugin hooks     |
-| `event-log.ts`          | `state/events/<n>.jsonl` + `state/head.json` (temp + rename), 1 MB segments, 250 ms delta coalescing, seq recovery after a restart  |
-| `command-reader.ts`     | `state/commands.seq` → `state/commands/<n>.json` by known names only; monotonic high-water mark; `state/commands.done` progress     |
-| `lease.ts`              | `state/lease.json`, rewritten every 30 s with 90 s validity; refuses to run while another task's lease is live                      |
-| `key-chain.ts`          | `AuthProvider` over the agent key chain: renew at start, at 5 min left and on 401; `X-Legalese-Session`; parks when the chain ends  |
-| `node-workspace.ts`     | `Workspace` port confined to `repo/` (no `..`, no `.git`, no symlink escapes)                                                       |
-| `jl4-lsp.ts`            | `L4Language` port over `jl4-lsp` (diagnostics cache, `l4/directiveResultsUpdated`, references, semantic tokens, exported functions) |
-| `interaction.ts`        | `UserInteraction` port: events out, `approve` / `answer` commands in                                                                |
-| `conversation-store.ts` | Keeps no transcript (the event log is the transcript); records the conversation id and title in `session.json`                      |
+| Module                  | Does                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runner.ts`             | Main loop: lease, key chain, command poll (1 s), one turn at a time, idle exit (10 min), `stop`, SIGTERM, parking; plugin hooks                                                                                                                                                                                                                 |
+| `event-log.ts`          | `state/events/<n>.jsonl` + `state/head.json` (temp + rename), 1 MB segments, 250 ms delta coalescing, seq recovery after a restart                                                                                                                                                                                                              |
+| `command-reader.ts`     | `state/commands.seq` → `state/commands/<n>.json` by known names only; monotonic high-water mark; `state/commands.done` progress                                                                                                                                                                                                                 |
+| `lease.ts`              | `state/lease.json`, rewritten every 30 s with 90 s validity; refuses to run while another task's lease is live                                                                                                                                                                                                                                  |
+| `key-chain.ts`          | `AuthProvider` over the agent key chain: renew at start, at 5 min left and on 401; `X-Legalese-Session`; parks when the chain ends                                                                                                                                                                                                              |
+| `node-workspace.ts`     | `Workspace` port with the repo as root: `data/` (session files; `jl4-lsp` runs there), `tmp/` (the model's scratch space, committed); the model writes only there, the rest of the repo root is read-only metadata; no `..`, no `.git`, no symlink escapes. Deleting a `data/` file during a turn first copies it to `tmp/deleted/t-<turnId>/…` |
+| `jl4-lsp.ts`            | `L4Language` port over `jl4-lsp` (diagnostics cache, `l4/directiveResultsUpdated`, references, semantic tokens, exported functions)                                                                                                                                                                                                             |
+| `interaction.ts`        | `UserInteraction` port: events out, `answer` commands in; no tool approvals (every tool is allowed)                                                                                                                                                                                                                                             |
+| `conversation-store.ts` | Keeps no transcript (the event log is the transcript); records the conversation id and title in `session.json`                                                                                                                                                                                                                                  |
 
 Later items add plugins (`RunnerPlugin` in `runner.ts`): git sync
 (`cloud-agent-git`) and the user's MCP servers (`cloud-agent-mcp`).
@@ -51,8 +51,8 @@ tail -f /tmp/cs/sessions/$SID/state/events/1.jsonl
 ```
 
 `send` queues any client command the way the Sessions API does (`answer`,
-`approve`, `abort`, `stop`, …). Files the agent writes land in
-`/tmp/cs/sessions/$SID/repo/`.
+`abort`, `stop`, …). Files the agent writes land in
+`/tmp/cs/sessions/$SID/repo/` (`data/`, `tmp/`).
 
 ## Tests
 

@@ -25,7 +25,8 @@ import { initSessionFolder, sendCommand } from './dev.js'
 import { Jl4Lsp } from './jl4-lsp.js'
 import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
 import { JsonLogger } from './logger.js'
-import { NodeWorkspace } from './node-workspace.js'
+import { DATA_DIR, NodeWorkspace } from './node-workspace.js'
+import { ensureDirNoFollow } from './safe-fs.js'
 import { Runner, type ChainControl, type RunnerPlugin } from './runner.js'
 
 export const HARNESS_VERSION = '0.1.0'
@@ -105,13 +106,16 @@ export async function runHarness(
     auth = new DevAuth(cfg.sessionId)
   }
 
+  // jl4-lsp works on the session files: repo/data (spec §4.2).
+  const dataDir = path.join(repoDir, DATA_DIR)
+  await ensureDirNoFollow(repoDir, dataDir)
   const lsp = await Jl4Lsp.spawn({
     command: cfg.lspCommand,
-    root: repoDir,
+    root: dataDir,
     logger,
     env: childEnv(env),
   })
-  const workspace = new NodeWorkspace(repoDir, lsp)
+  const workspace = new NodeWorkspace(repoDir, lsp, logger)
   const mcpUrl = cfg.mcpUrl
   const providers = mcpUrl
     ? [

@@ -31,6 +31,8 @@ export async function initSessionFolder(
   const dir = path.join(root, p.dir)
   for (const d of [
     p.repo,
+    p.repoData,
+    p.repoTmp,
     p.attachments,
     `${p.state}/events`,
     `${p.state}/commands`,
