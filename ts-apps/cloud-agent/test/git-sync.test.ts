@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import type { CloudEventPayload } from '@repo/legalese-agent/protocol'
 import { GitSync, commitSubject } from '../src/git-sync.js'
@@ -259,6 +259,34 @@ describe('GitSync', () => {
     assert.deepEqual(events, [])
     assert.ok(logger.has('warn', /missing/))
     assert.ok(logger.has('warn', /fetching incoming bundle/))
+  })
+
+  test('commits a tmp/ cleared by the sweep at the next start, and nothing else', async () => {
+    await write('data/rules.l4', 'x\n')
+    await write('tmp/notes.md', 'n\n')
+    await write('tmp/deleted/t-t0/old.l4', 'o\n')
+    await git().start(ctx)
+    // The sweep deletes repo/tmp/ while the session sleeps.
+    await rm(path.join(repo, 'tmp'), { recursive: true, force: true })
+    await write('data/rules.l4', 'crash leftover\n')
+    await git().start(ctx)
+    assert.equal(
+      sh(repo, 'log', '-1', '--format=%s'),
+      'Clear tmp of abandoned session'
+    )
+    assert.equal(sh(repo, 'ls-files', 'tmp'), '')
+    // The unrelated leftover stays for the next turn's commit.
+    assert.equal(sh(repo, 'status', '--porcelain'), 'M data/rules.l4')
+    // A partial deletion under tmp/ is not committed at start.
+    await write('tmp/a.md', 'a\n')
+    await write('tmp/b.md', 'b\n')
+    const g = git()
+    await g.start(ctx)
+    await g.afterTurn({ turnId: 't1', prompt: 'p' })
+    await rm(path.join(repo, 'tmp', 'a.md'))
+    const head = sh(repo, 'rev-parse', 'HEAD')
+    await git().start(ctx)
+    assert.equal(sh(repo, 'rev-parse', 'HEAD'), head)
   })
 
   test('commits leftovers and runs gc before sleeping', async () => {
