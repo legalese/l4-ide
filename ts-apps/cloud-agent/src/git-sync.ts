@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import {
   GIT_SHA_RE,
+  REPO_TMP_DIR,
   isIncomingBundleName,
   type CloudCommand,
 } from '@repo/legalese-agent/protocol'
@@ -102,8 +103,46 @@ export class GitSync implements RunnerPlugin {
       await this.git.ok(['add', '-A'])
       await this.git.ok(['commit', '-q', '--allow-empty', '-m', 'Seed'])
       ctx.logger.info('git: committed the seed')
+    } else {
+      await this.commitClearedTmp()
     }
     await this.writeBundle()
+  }
+
+  /**
+   * The Sessions API sweep deletes `repo/tmp/` of abandoned sessions
+   * (filesystem only, no git). If every tracked file under `tmp/` is gone
+   * and nothing new is there, commit that deletion on its own ("Clear
+   * tmp of abandoned session"). Anything else stays for the next turn's
+   * commit.
+   */
+  private async commitClearedTmp(): Promise<void> {
+    const list = async (flag?: string): Promise<string[]> =>
+      (
+        await this.git.ok([
+          '--literal-pathspecs',
+          'ls-files',
+          '-z',
+          ...(flag ? [flag] : []),
+          '--',
+          REPO_TMP_DIR,
+        ])
+      )
+        .split('\0')
+        .filter((f) => f.length > 0)
+    const tracked = await list()
+    if (tracked.length === 0) return
+    const deleted = await list('--deleted')
+    const untracked = await list('--others')
+    if (deleted.length !== tracked.length || untracked.length > 0) return
+    await this.git.ok(
+      ['--literal-pathspecs', 'rm', '-q', '--cached', '-r', '--', REPO_TMP_DIR],
+      {}
+    )
+    await this.git.ok(['commit', '-q', '-m', 'Clear tmp of abandoned session'])
+    this.ctx.logger.info(
+      `git: committed the cleared tmp/ (${tracked.length} files)`
+    )
   }
 
   async beforeTurn(): Promise<string | undefined> {

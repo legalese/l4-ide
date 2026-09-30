@@ -31,7 +31,10 @@ Plugins (`RunnerPlugin` in `runner.ts`):
   merges `state/git/incoming/<ulid>.bundle` (`local ^main`) into `main`
   (`local-merged` / `local-merge-conflict`, the merge aborted on conflict);
   `rollback` restores the parent of the turn's commit and commits "Roll back: …"
-  (`rolled-back`); `git gc` on sleep. git runs with hooks and fsmonitor
+  (`rolled-back`); `git gc` on sleep. `tmp/` and its `tmp/deleted/` copies are
+  committed like the rest; if the Sessions API sweep cleared `tmp/` of an
+  abandoned session, the next start commits that ("Clear tmp of abandoned
+  session"). git runs with hooks and fsmonitor
   disabled, `core.createObject=rename` and `gc.auto=0` (`git.ts`).
 - The user's MCP servers arrive with `cloud-agent-mcp`.
 
