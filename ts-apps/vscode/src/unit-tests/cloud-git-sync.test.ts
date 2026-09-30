@@ -318,6 +318,25 @@ describe('git helpers', () => {
     )
   })
 
+  test('409 no_commits_yet from the Sessions API reads as not ready', () => {
+    for (const op of ['pull', 'push', 'clone'] as const) {
+      assert.equal(
+        describeGitError(
+          Object.assign(new Error('Failed to execute git'), {
+            stderr:
+              'fatal: unable to access: The requested URL returned error: 409',
+          }),
+          op
+        ),
+        NOT_READY_MESSAGE
+      )
+    }
+    assert.equal(
+      describeGitError(new Error('remote: no_commits_yet'), 'clone'),
+      NOT_READY_MESSAGE
+    )
+  })
+
   test('auth failures point at signing in', () => {
     assert.match(
       describeGitError(

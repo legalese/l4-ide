@@ -17,6 +17,7 @@
  * `vscode` import and can be unit-tested with fakes.
  */
 import { ULID_RE, type SessionSummary } from '@repo/legalese-agent/protocol'
+import { NO_COMMITS_YET_MESSAGE } from './sessions-api.js'
 
 // ── Git extension API subset (git.d.ts, API version 1) ────────────────
 
@@ -108,8 +109,7 @@ export const CLONES_STORAGE_KEY = 'legaleseAi.cloudSessions.clones'
 export const COMMITTED_STORAGE_KEY = 'legaleseAi.cloudSessions.committed'
 
 /** Why Clone / Sync aren't offered yet (§9.3). */
-export const NOT_READY_MESSAGE =
-  "Available after the first turn: the session's files can be cloned once its first turn has been committed."
+export const NOT_READY_MESSAGE = NO_COMMITS_YET_MESSAGE
 
 const SESSION_GIT_PATH_RE = /\/git\/([0-9A-Z]{26})\.git(?:\/|$)/
 
@@ -187,7 +187,10 @@ export function sessionIdFromGitUrl(
 }
 
 /** Turn a failed pull/push into a message a user can act on. */
-export function describeGitError(err: unknown, op: 'pull' | 'push'): string {
+export function describeGitError(
+  err: unknown,
+  op: 'pull' | 'push' | 'clone'
+): string {
   const text = err instanceof Error ? err.message : String(err)
   const detail = [
     text,
@@ -196,6 +199,9 @@ export function describeGitError(err: unknown, op: 'pull' | 'push'): string {
   ]
     .filter((x) => typeof x === 'string')
     .join('\n')
+  // The Sessions API answers 409 `no_commits_yet` before the first turn
+  // is committed (nothing to clone or pull yet).
+  if (/no_commits_yet|\b409\b/i.test(detail)) return NOT_READY_MESSAGE
   if (
     /\b413\b|too_large|Request Entity Too Large|body.*too large/i.test(detail)
   ) {
@@ -207,7 +213,9 @@ export function describeGitError(err: unknown, op: 'pull' | 'push'): string {
   if (/Conflict|CONFLICT|merge/i.test(detail) && op === 'pull') {
     return 'Pulling from the cloud session produced merge conflicts. Resolve them in the editor, commit, then sync again.'
   }
-  return `Git ${op} failed: ${text}`
+  return op === 'clone'
+    ? `Cloning the cloud session failed: ${text}`
+    : `Git ${op} failed: ${text}`
 }
 
 export class CloudGitSync<U extends GitUri> {
@@ -410,9 +418,7 @@ export class CloudGitSync<U extends GitUri> {
         postCloneAction: 'none',
       })
     } catch (err) {
-      throw new GitSyncError(
-        `Cloning the cloud session failed: ${err instanceof Error ? err.message : String(err)}`
-      )
+      throw new GitSyncError(describeGitError(err, 'clone'))
     }
     if (!folder)
       throw new GitSyncError('Cloning the cloud session was cancelled.')
