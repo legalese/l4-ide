@@ -6,8 +6,8 @@
  *          LOG_LEVEL; the user's folder is mounted at /workspace.
  *   dev:   cloud-agent --dev --root <dir> --session <ulid> [...]
  */
-import { stat } from 'node:fs/promises'
-import { hostname } from 'node:os'
+import { mkdtemp, stat } from 'node:fs/promises'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   McpToolClient,
@@ -23,9 +23,10 @@ import {
 } from './config.js'
 import { initSessionFolder, sendCommand } from './dev.js'
 import { Jl4Lsp } from './jl4-lsp.js'
+import { L4Router, prepareTmpLibraryAlias } from './l4-router.js'
 import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
 import { JsonLogger } from './logger.js'
-import { DATA_DIR, NodeWorkspace } from './node-workspace.js'
+import { DATA_DIR, NodeWorkspace, TMP_DIR } from './node-workspace.js'
 import { ensureDirNoFollow } from './safe-fs.js'
 import { Runner, type ChainControl, type RunnerPlugin } from './runner.js'
 
@@ -48,7 +49,7 @@ function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 
 async function taskIdFrom(cfg: HarnessConfig): Promise<string> {
   const fallback =
-    `${cfg.mode}-${hostname().replace(/[^A-Za-z0-9_.-]/g, '')}-${process.pid}`.slice(
+    `${cfg.mode}-${os.hostname().replace(/[^A-Za-z0-9_.-]/g, '')}-${process.pid}`.slice(
       0,
       120
     )
@@ -106,19 +107,35 @@ export async function runHarness(
     auth = new DevAuth(cfg.sessionId)
   }
 
-  // jl4-lsp's project root is repo/data (spec §5.4): `IMPORT name` looks
-  // in the project root first, then next to the importing file. So files
-  // anywhere in data/ import top-level data/ modules, and tmp/ drafts
-  // import both data/ modules and their tmp/ siblings (a data/ module
-  // shadows a tmp/ sibling of the same name). Documents outside the root
-  // (tmp/) are opened and checked like any other.
+  // Two jl4-lsp instances (spec §5.4, see l4-router.ts): one rooted at
+  // repo/data for the session files, one rooted at repo/tmp (started on
+  // first use) for the model's drafts, which finds data/ modules through
+  // an XDG library alias.
   const dataDir = path.join(repoDir, DATA_DIR)
+  const tmpDir = path.join(repoDir, TMP_DIR)
   await ensureDirNoFollow(repoDir, dataDir)
-  const lsp = await Jl4Lsp.spawn({
+  await ensureDirNoFollow(repoDir, tmpDir)
+  const scratch = await mkdtemp(path.join(os.tmpdir(), 'cloud-agent-'))
+  const tmpXdg = path.join(scratch, 'xdg-tmp')
+  const tmpLibraryAlias = await prepareTmpLibraryAlias(tmpXdg, dataDir)
+  const data = await Jl4Lsp.spawn({
     command: cfg.lspCommand,
     root: dataDir,
     logger,
     env: childEnv(env),
+  })
+  const lsp = new L4Router({
+    repoDir,
+    data,
+    tmpLibraryAlias,
+    logger,
+    startTmp: () =>
+      Jl4Lsp.spawn({
+        command: cfg.lspCommand,
+        root: tmpDir,
+        logger,
+        env: { ...childEnv(env), XDG_DATA_HOME: tmpXdg },
+      }),
   })
   const workspace = new NodeWorkspace(repoDir, lsp, logger)
   const mcpUrl = cfg.mcpUrl
