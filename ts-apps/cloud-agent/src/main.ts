@@ -106,7 +106,12 @@ export async function runHarness(
     auth = new DevAuth(cfg.sessionId)
   }
 
-  // jl4-lsp works on the session files: repo/data (spec §4.2).
+  // jl4-lsp's project root is repo/data (spec §5.4): `IMPORT name` looks
+  // in the project root first, then next to the importing file. So files
+  // anywhere in data/ import top-level data/ modules, and tmp/ drafts
+  // import both data/ modules and their tmp/ siblings (a data/ module
+  // shadows a tmp/ sibling of the same name). Documents outside the root
+  // (tmp/) are opened and checked like any other.
   const dataDir = path.join(repoDir, DATA_DIR)
   await ensureDirNoFollow(repoDir, dataDir)
   const lsp = await Jl4Lsp.spawn({

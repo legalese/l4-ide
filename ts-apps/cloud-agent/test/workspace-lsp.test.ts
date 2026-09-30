@@ -307,6 +307,74 @@ describe('Jl4Lsp', () => {
   })
 })
 
+describe('Jl4Lsp with many files', () => {
+  test('tracks documents and diagnostics per URI across data/ and tmp/', async () => {
+    const { dir, cleanup } = await tempDir()
+    try {
+      await mkdir(path.join(dir, 'data'), { recursive: true })
+      await mkdir(path.join(dir, 'tmp'), { recursive: true })
+      const a = uriForPath(path.join(dir, 'data', 'a.l4'))
+      const b = uriForPath(path.join(dir, 'tmp', 'b.l4'))
+      await writeFile(path.join(dir, 'data', 'a.l4'), 'A\n')
+      await writeFile(path.join(dir, 'tmp', 'b.l4'), 'B\nB\n')
+      const { client, server, received } = fakeServer()
+      server.onNotification(
+        'textDocument/didOpen',
+        (p: { textDocument: { uri: string } }) => {
+          received.push({ method: 'textDocument/didOpen', params: p })
+          void server.sendNotification('textDocument/publishDiagnostics', {
+            uri: p.textDocument.uri,
+            diagnostics: [
+              {
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: 0, character: 1 },
+                },
+                severity: 1,
+                message: `problem in ${path.basename(p.textDocument.uri)}`,
+              },
+            ],
+          })
+        }
+      )
+      const lsp = await Jl4Lsp.connect(
+        client,
+        uriForPath(path.join(dir, 'data')),
+        silent
+      )
+      assert.deepEqual(await lsp.openDocument(a), { lineCount: 2, version: 1 })
+      assert.deepEqual(await lsp.openDocument(b), { lineCount: 3, version: 1 })
+      assert.equal((await lsp.getDiagnostics(a))[0]!.message, 'problem in a.l4')
+      assert.equal((await lsp.getDiagnostics(b))[0]!.message, 'problem in b.l4')
+      lsp.onDidWrite(b, 'B2\n', false)
+      assert.deepEqual(await lsp.openDocument(b), { lineCount: 2, version: 2 })
+      assert.deepEqual(await lsp.openDocument(a), { lineCount: 2, version: 1 })
+      // A move is a delete plus a create: the old URI is closed.
+      lsp.onDidDelete(a)
+      const moved = uriForPath(path.join(dir, 'tmp', 'a.l4'))
+      lsp.onDidWrite(moved, 'A\n', true)
+      await new Promise((r) => setTimeout(r, 50))
+      const closes = received.filter(
+        (r) => r.method === 'textDocument/didClose'
+      )
+      assert.deepEqual(
+        closes.map(
+          (r) =>
+            (r.params as { textDocument: { uri: string } }).textDocument.uri
+        ),
+        [a]
+      )
+      // Reopening the deleted URI after it comes back opens it fresh.
+      await writeFile(path.join(dir, 'data', 'a.l4'), 'A\nA\nA\n')
+      assert.deepEqual(await lsp.openDocument(a), { lineCount: 4, version: 1 })
+      client.dispose()
+      server.dispose()
+    } finally {
+      await cleanup()
+    }
+  })
+})
+
 // Optional: a real jl4-lsp (set JL4_LSP=/path/to/jl4-lsp).
 const testEnv: NodeJS.ProcessEnv = process.env
 const realLsp = testEnv['JL4_LSP']
@@ -340,6 +408,43 @@ describe('Jl4Lsp against a real jl4-lsp', { skip: !realLsp }, () => {
       assert.equal(lsp.getDirectiveResults(uri)?.[0]?.prettyText, '42')
       const fns = await lsp.getExportedFunctions({ uri, version: 1 })
       assert.ok(Array.isArray(fns))
+      await lsp.dispose()
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('resolves imports for data/ and tmp/ files with --cwd data/', async () => {
+    const { dir, cleanup } = await tempDir()
+    try {
+      const repo = path.join(dir, 'repo')
+      await mkdir(path.join(repo, 'data', 'sub'), { recursive: true })
+      await mkdir(path.join(repo, 'tmp'), { recursive: true })
+      const files: Record<string, string> = {
+        'data/money.l4': 'DECIDE `the fee` IS 40\n',
+        'data/sub/uses.l4': 'IMPORT money\n\n#EVAL `the fee` PLUS 2\n',
+        'tmp/helper.l4': 'DECIDE `the bonus` IS 5\n',
+        'tmp/draft.l4':
+          'IMPORT money\nIMPORT helper\n\n#EVAL `the fee` PLUS `the bonus`\n',
+      }
+      for (const [f, t] of Object.entries(files)) {
+        await writeFile(path.join(repo, f), t)
+      }
+      const lsp = await Jl4Lsp.spawn({
+        command: realLsp!,
+        root: path.join(repo, 'data'),
+        logger: silent,
+        env: { PATH: testEnv['PATH'] ?? '', HOME: testEnv['HOME'] ?? '' },
+      })
+      const results: Record<string, string[]> = {}
+      for (const f of ['data/sub/uses.l4', 'tmp/draft.l4']) {
+        const d = await lsp.getDiagnostics(uriForPath(path.join(repo, f)))
+        results[f] = d.map((x) => `${x.severity}: ${x.message}`)
+      }
+      assert.deepEqual(results, {
+        'data/sub/uses.l4': ['info: 42'],
+        'tmp/draft.l4': ['info: 45'],
+      })
       await lsp.dispose()
     } finally {
       await cleanup()
