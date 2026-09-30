@@ -5,7 +5,8 @@
  *   session with the user's first prompt (§10 steps 2–8);
  * - {@link CloudSessionManager.open} replays a session's event log from
  *   the start and keeps polling while it runs (§12.1);
- * - commands (message, inject, abort, approve, answer, rollback, stop)
+ * - commands (message, inject, abort, answer, rollback, stop); cloud
+ *   sessions never ask for tool approval, so there is no `approve`
  *   are queued through the Sessions API; a command to a sleeping
  *   session starts it with a fresh key chain;
  * - polled events are turned back into the chat-service events the
@@ -56,7 +57,7 @@ export type CloudStartPhase = 'uploading' | 'starting' | 'ready'
 export interface CloudSessionListener {
   /** A chat-service event for the webview — the same path local chats use. */
   chat(event: ChatServiceEvent): void
-  /** A cloud-only event (`user-message`, `ask-user`, `approval-request`,
+  /** A cloud-only event (`user-message`, `ask-user`,
    *  `session-state`, `git-committed`, `rolled-back`, `local-merged`,
    *  `local-merge-conflict`, `auth-required`). `conversationId` is set
    *  once the session's first turn has one. */
@@ -74,6 +75,9 @@ export interface CloudSessionListener {
   gone?(sessionId: string, error: string): void
   /** Start progress for a turn started with `runInCloud`. */
   progress?(e: {
+    /** With the first `uploading`: the MCP servers passed to the
+     *  session. Their tools run without approval in the cloud. */
+    mcpServers?: string[]
     turnId: string
     sessionId?: string
     phase: CloudStartPhase
@@ -241,7 +245,13 @@ export class CloudSessionManager {
       )
     }
 
-    this.deps.listener.progress?.({ turnId, phase: 'uploading' })
+    this.deps.listener.progress?.({
+      turnId,
+      phase: 'uploading',
+      mcpServers: (mcp?.configs ?? []).map(
+        (c) => mcp?.ids.get(c.name) ?? c.name
+      ),
+    })
     const created = await this.deps.api.createSession({
       title: (input.title ?? titleFrom(text)).slice(0, 200),
       mcpServers: mcp?.configs ?? [],
@@ -381,7 +391,6 @@ export class CloudSessionManager {
         this.byTurn.set(event.turnId, sid)
         break
       case 'ask-user':
-      case 'approval-request':
         if (!t.conversationId) this.setConversation(sid, event.conversationId)
         break
       case 'session-state':
@@ -503,14 +512,6 @@ export class CloudSessionManager {
 
   abort(sid: string, turnId: string): Promise<PostCommandResponse> {
     return this.send(sid, { type: 'abort', turnId })
-  }
-
-  approve(
-    sid: string,
-    callId: string,
-    decision: 'allow' | 'deny'
-  ): Promise<PostCommandResponse> {
-    return this.send(sid, { type: 'approve', callId, decision })
   }
 
   answer(

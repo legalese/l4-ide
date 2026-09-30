@@ -130,6 +130,7 @@ function setup(opts: { mcp?: McpServerSource } = {}) {
     replay: boolean
   }> = []
   const progress: string[] = []
+  const mcpListed: string[] = []
   const logger = new MemoryLogger()
   const manager = new CloudSessionManager({
     api,
@@ -139,7 +140,10 @@ function setup(opts: { mcp?: McpServerSource } = {}) {
     listener: {
       chat: (e) => chat.push(e),
       cloudEvent: (e) => cloud.push(e),
-      progress: (e) => progress.push(e.phase),
+      progress: (e) => {
+        progress.push(e.phase)
+        if (e.mcpServers) mcpListed.push(...e.mcpServers)
+      },
     },
     poller: {
       now: clock.now,
@@ -147,7 +151,7 @@ function setup(opts: { mcp?: McpServerSource } = {}) {
       clearTimer: clock.clearTimer,
     },
   })
-  return { api, clock, chat, cloud, progress, manager, logger }
+  return { api, clock, chat, cloud, progress, mcpListed, manager, logger }
 }
 
 let seq = 0
@@ -394,7 +398,7 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
       ],
       headersFor: async () => ({}),
     }
-    const { api, manager } = setup({ mcp })
+    const { api, manager, mcpListed } = setup({ mcp })
     await manager.runInCloud({
       turnId: 't',
       text: 'x',
@@ -408,5 +412,7 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
         enabledTools: ['x'],
       },
     ])
+    // Listed in the start progress: their tools run without approval.
+    assert.deepEqual(mcpListed, ['b'])
   })
 })
