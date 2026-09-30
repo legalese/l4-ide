@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   adoptTurn,
   applyCloudEvent,
+  canCloneOrSync,
   mergeHistory,
   newCloudInfo,
   rollbackOffer,
@@ -232,5 +233,22 @@ describe('files added mid-session (§10)', () => {
     expect(c.turns[0]!.filesAdded).toBeUndefined()
     expect(c.turns[1]!.filesAdded).toEqual(['data/a.l4', 'data/b/c.md'])
     expect(c.cloud!.progress).toBeNull()
+  })
+})
+
+describe('Clone / Sync gating (§9.3)', () => {
+  test('only after a git-committed event', () => {
+    const c = conv()
+    expect(canCloneOrSync(c.cloud)).toBe(false)
+    applyCloudEvent(c, { type: 'session-state', state: 'running' })
+    expect(canCloneOrSync(c.cloud)).toBe(false)
+    applyCloudEvent(c, {
+      type: 'git-committed',
+      turnId: 't1',
+      sha: SHA,
+      parent: PARENT,
+    })
+    expect(canCloneOrSync(c.cloud)).toBe(true)
+    expect(canCloneOrSync(newCloudInfo(''))).toBe(false)
   })
 })

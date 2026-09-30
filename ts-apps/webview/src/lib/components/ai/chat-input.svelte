@@ -212,9 +212,13 @@
       .join(' ')
     return counts ? `Sync ${counts}` : 'Sync'
   })
+  const gitReady = $derived(store.cloudGitReady && git?.kind !== 'not-ready')
   const gitTitle = $derived.by(() => {
+    if (!gitReady) return 'Available after the first turn'
     if (!git) return "Clone this cloud session's files with git"
-    if (git.kind === 'unavailable') return git.message
+    if (git.kind === 'unavailable' || git.kind === 'not-ready') {
+      return git.message
+    }
     if (git.kind === 'not-cloned') {
       return "Clone this cloud session's files with git"
     }
@@ -438,7 +442,7 @@
           type="button"
           class="git-btn"
           onclick={gitAction}
-          disabled={gitBusy || git?.kind === 'unavailable'}
+          disabled={gitBusy || !gitReady || git?.kind === 'unavailable'}
           title={gitTitle}
         >
           <svg viewBox="0 0 16 16" aria-hidden="true" fill="none">

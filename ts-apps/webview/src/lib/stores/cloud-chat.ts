@@ -34,6 +34,9 @@ export interface CloudConversationInfo {
   localMergesAt: number[]
   /** Last command error to show in the banner. */
   notice: string | null
+  /** A `git-committed` event was seen (live or replayed): the session
+   *  has files to clone (§9.3). */
+  committed: boolean
   /** MCP servers passed at the start (their tools run without
    *  approval in the cloud); shown while the session starts. */
   mcpServers: string[]
@@ -79,6 +82,7 @@ export function newCloudInfo(
     localMergesAt: [],
     notice: null,
     mcpServers: [],
+    committed: false,
   }
 }
 
@@ -229,6 +233,7 @@ export function applyCloudEvent(
       }
       return {}
     case 'git-committed': {
+      info.committed = true
       const turn = assistantOf(conv, event.turnId)
       if (turn) turn.cloudCommit = { sha: event.sha, parent: event.parent }
       return {}
@@ -317,4 +322,14 @@ export function rollbackOffer(
     undoesLaterTurns,
     undoesLocalSync: conv.cloud.localMergesAt.some((i) => i > index),
   }
+}
+
+/** Why the prompt field's Clone / Sync button is disabled (§9.3). */
+export const CLONE_NOT_READY = 'Available after the first turn'
+
+/** Clone / Sync is offered once the session's first turn is committed. */
+export function canCloneOrSync(
+  info: CloudConversationInfo | undefined
+): boolean {
+  return !!info?.sessionId && info.committed
 }

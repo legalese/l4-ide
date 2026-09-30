@@ -239,6 +239,8 @@ export const AiCloudSessionList: RequestType<
 /** Clone / Sync button state (§9.3). */
 export type AiCloudGitStatus =
   | { kind: 'unavailable'; message: string }
+  /** No commit yet: Clone waits for the first turn (§9.3). */
+  | { kind: 'not-ready'; message: string }
   | { kind: 'not-cloned' }
   | {
       kind: 'cloned'

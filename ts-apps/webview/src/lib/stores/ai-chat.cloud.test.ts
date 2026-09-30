@@ -298,4 +298,26 @@ describe('cloud conversations in the chat store', () => {
     const prompt = store.current!.turns.find((t) => t.role === 'user')!
     expect(prompt.filesAdded).toEqual(['data/a.l4', 'data/rules/b.l4'])
   })
+
+  test('Clone / Sync wait for the first commit, replayed history counts', async () => {
+    const { store, sent } = setup()
+    await store.loadConversation(KEY)
+    expect(store.cloudGitReady).toBe(false)
+    await store.cloudGitAction()
+    expect(sent.some((s) => s.method === 'aiCloudGitAction')).toBe(false)
+    expect(store.current?.cloud?.notice).toBe('Available after the first turn')
+    // Replaying the log of a session that committed earlier.
+    store.onCloudEvent({
+      conversationId: KEY,
+      sessionId: SID,
+      replay: true,
+      event: {
+        type: 'git-committed',
+        turnId: 't1',
+        sha: 'a'.repeat(40),
+        parent: 'b'.repeat(40),
+      },
+    })
+    expect(store.cloudGitReady).toBe(true)
+  })
 })

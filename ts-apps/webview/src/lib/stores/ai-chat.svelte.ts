@@ -57,8 +57,10 @@ import {
 } from 'jl4-client-rpc'
 import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
 import {
+  CLONE_NOT_READY,
   adoptTurn,
   applyCloudEvent,
+  canCloneOrSync,
   mergeHistory,
   newCloudInfo,
   rollbackOffer,
@@ -2514,6 +2516,10 @@ export function createAiChatStore(
     const conv = getConversation()
     const sessionId = conv?.cloud?.sessionId
     if (!m || !conv?.cloud || !sessionId) return
+    if (!canCloneOrSync(conv.cloud)) {
+      conv.cloud.notice = CLONE_NOT_READY
+      return
+    }
     const status = cloudGit[sessionId]
     const action = status?.kind === 'cloned' ? 'sync' : 'clone'
     try {
@@ -2610,6 +2616,10 @@ export function createAiChatStore(
     },
     get canRunInCloud() {
       return canRunInCloud()
+    },
+    /** Clone / Sync is available: the first turn is committed (§9.3). */
+    get cloudGitReady(): boolean {
+      return canCloneOrSync(getConversation()?.cloud)
     },
     /** Clone / Sync state of the current cloud conversation. */
     get cloudGitStatus(): AiCloudGitStatus | null {
@@ -2711,6 +2721,7 @@ export type AiChatStore = {
   readonly historyEntries: HistoryEntry[]
   readonly canRunInCloud: boolean
   readonly cloudGitStatus: AiCloudGitStatus | null
+  readonly cloudGitReady: boolean
   sendCloud: (
     text: string,
     mentions?: AiChatStartParams['mentions']
