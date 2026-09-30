@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { type AuthProvider } from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
@@ -496,5 +496,109 @@ describe('Runner', () => {
     assert.ok(
       (await readFile(path.join(repo, 'tmp', 'notes', 'ideas.md'))).length > 0
     )
+  })
+
+  /** Queue a command the way the Sessions API does, internal ones too. */
+  async function queueInternal(
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    const seqFile = path.join(stateDir, 'commands.seq')
+    const n =
+      Number((await readFile(seqFile, 'utf8').catch(() => '0')).trim()) + 1
+    await writeFile(
+      path.join(stateDir, 'commands', `${n}.json`),
+      JSON.stringify({ ...payload, id: n, ts: 1 })
+    )
+    await writeFile(seqFile, `${n}\n`)
+  }
+
+  test('add-files copies a batch into data/, reports it and removes the batch', async () => {
+    const batch = '01J9Z3K4M5N6P7Q8R9S0T1V2W5'
+    const batchDir = path.join(sessionDir, 'incoming', 'files', batch)
+    await mkdir(path.join(batchDir, 'data', 'sub'), { recursive: true })
+    await writeFile(path.join(batchDir, 'data', 'new.l4'), 'DECIDE x IS 1\n')
+    await writeFile(path.join(batchDir, 'data', 'sub', 'notes.md'), 'notes')
+    await writeFile(path.join(sessionDir, 'repo', 'data', 'old.l4'), 'old')
+    await writeFile(path.join(batchDir, 'data', 'old.l4'), 'new version')
+    await writeFile(path.join(root, 'secret.txt'), 'secret')
+    await symlink(
+      path.join(root, 'secret.txt'),
+      path.join(batchDir, 'data', 'link.txt')
+    )
+    const runner = build()
+    const done = runner.run()
+    await queueInternal({
+      type: 'add-files',
+      batchId: batch,
+      files: [
+        { path: 'data/new.l4' },
+        { path: 'data/sub/notes.md' },
+        { path: 'data/old.l4' },
+        { path: 'data/link.txt' },
+        { path: 'data/missing.l4' },
+      ],
+    })
+    await waitUntil(async () =>
+      (await readEvents(stateDir)).some((e) => e.type === 'files-added')
+    )
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    const repo = path.join(sessionDir, 'repo')
+    assert.equal(
+      await readFile(path.join(repo, 'data', 'new.l4'), 'utf8'),
+      'DECIDE x IS 1\n'
+    )
+    assert.equal(
+      await readFile(path.join(repo, 'data', 'sub', 'notes.md'), 'utf8'),
+      'notes'
+    )
+    assert.equal(
+      await readFile(path.join(repo, 'data', 'old.l4'), 'utf8'),
+      'new version'
+    )
+    await assert.rejects(readFile(path.join(repo, 'data', 'link.txt')))
+    const ev = (await readEvents(stateDir)).find(
+      (e) => e.type === 'files-added'
+    ) as {
+      batchId: string
+      files: Array<{ path: string }>
+    }
+    assert.equal(ev.batchId, batch)
+    assert.deepEqual(
+      ev.files.map((f) => f.path),
+      ['data/new.l4', 'data/sub/notes.md', 'data/old.l4']
+    )
+    await assert.rejects(readFile(path.join(batchDir, 'data', 'new.l4')))
+  })
+
+  test('message context: the active file and mentions reach the model', async () => {
+    proxy.scripts.push([
+      metadata('conv9'),
+      chunk({ content: 'ok' }),
+      chunk({}, 'stop'),
+    ])
+    const runner = build()
+    const done = runner.run()
+    await sendCommand(root, SID, {
+      type: 'message',
+      turnId: 't1',
+      text: 'look at @data/b.l4',
+      context: { activeFile: 'data/a.l4', mentions: ['data/b.l4'] },
+    })
+    await waitUntil(async () =>
+      (await readEvents(stateDir)).some((e) => e.type === 'done')
+    )
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    const msgs = proxy.chatRequests()[0]!.body.messages as Array<{
+      role: string
+      content: string
+    }>
+    const system = msgs
+      .filter((m) => m.role === 'system')
+      .map((m) => m.content)
+      .join('\n')
+    assert.match(system, /<editor-context>[\s\S]*data\/a\.l4/)
+    assert.match(system, /<mention-context>[\s\S]*data\/b\.l4/)
   })
 })

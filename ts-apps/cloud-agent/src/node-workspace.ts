@@ -48,6 +48,8 @@ export const DATA_DIR = REPO_DATA_DIR
 export const TMP_DIR = REPO_TMP_DIR
 export const DELETED_DIR = REPO_DELETED_DIR
 
+/** Files the user adds mid-session are capped like attachments. */
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024
 /** Deleted files larger than this aren't copied. */
 const MAX_COPY_BYTES = 50 * 1024 * 1024
 const TURN_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/
@@ -307,6 +309,50 @@ export class NodeWorkspace implements Workspace {
         `workspace: could not copy a deleted file: ${(err as Error).message}`
       )
     }
+  }
+
+  /**
+   * Copy a file the user added (`add-files`, §10) from outside the repo
+   * to `repoRelPath` (under `data/`), overwriting what is there. The
+   * source must be a regular file (no symlink, ≤ 10 MB); the destination
+   * is confined like any write, its directories created without
+   * following links. Returns false when the file was skipped.
+   */
+  async importFile(sourcePath: string, repoRelPath: string): Promise<boolean> {
+    const dest = path.join(this.root, ...repoRelPath.split('/'))
+    this.assertInside(dest)
+    let bytes: Buffer
+    const src = await fs
+      .open(sourcePath, O_RDONLY | O_NOFOLLOW)
+      .catch(() => null)
+    if (!src) return false
+    try {
+      const st = await src.stat()
+      if (!st.isFile() || st.size > MAX_IMPORT_BYTES) return false
+      bytes = await src.readFile()
+    } finally {
+      await src.close()
+    }
+    const existing = await fs.lstat(dest).catch(() => null)
+    if (existing && !existing.isFile()) return false
+    await ensureDirNoFollow(this.root, path.dirname(dest))
+    this.assertRealPathInside(dest, repoRelPath)
+    const h = await fs.open(
+      dest,
+      O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+      0o644
+    )
+    try {
+      await h.writeFile(bytes)
+    } finally {
+      await h.close()
+    }
+    this.listener?.onDidWrite(
+      uriForPath(dest),
+      bytes.toString('utf8'),
+      !existing
+    )
+    return true
   }
 
   private rel(fsPath: string): string {

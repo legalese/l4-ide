@@ -16,12 +16,14 @@ import {
   type ToolProvider,
   type Workspace,
 } from '@repo/legalese-agent'
-import type {
-  AgentKeyFailure,
-  CloudCommand,
-  CloudEventPayload,
-  CommandType,
-  SessionState,
+import {
+  isRepoDataPath,
+  sessionPaths,
+  type AgentKeyFailure,
+  type CloudCommand,
+  type CloudEventPayload,
+  type CommandType,
+  type SessionState,
 } from '@repo/legalese-agent/protocol'
 import { loadAttachments } from './attachments.js'
 import { CommandReader } from './command-reader.js'
@@ -106,6 +108,12 @@ export interface RunnerPlugin {
   beforeTurn?(turn: TurnInfo, ctx: RunnerContext): Promise<string | undefined>
   /** After a turn finished (commit its changes). */
   afterTurn?(turn: TurnInfo, ctx: RunnerContext): Promise<void>
+  /** After an `add-files` batch was copied into `repo/` (commit it).
+   *  May return git blob ids by path for the `files-added` event. */
+  onFilesAdded?(
+    paths: string[],
+    ctx: RunnerContext
+  ): Promise<Record<string, string> | void>
   /** Before the harness exits (final commit, gc). */
   beforeExit?(reason: ExitReason, ctx: RunnerContext): Promise<void>
 }
@@ -115,6 +123,7 @@ export const QUEUED_COMMANDS: ReadonlySet<CommandType> = new Set<CommandType>([
   'message',
   'rollback',
   'apply-bundle',
+  'add-files',
 ])
 
 /** Controls the key chain (absent in `--dev`). */
@@ -221,6 +230,12 @@ export class Runner {
       dispatcher,
       interaction: this.interaction,
       l4: opts.l4,
+      // The file the user had open when they sent the prompt
+      // (`message.context.activeFile`), as the `<editor-context>`.
+      editor: {
+        describe: (chip) => (chip ? { activeFile: { path: chip.path } } : null),
+        activeL4Document: () => null,
+      },
       extensionVersion: opts.extensionVersion,
     })
     this.ctx = {
@@ -454,11 +469,94 @@ export class Runner {
       await this.runTurn(cmd)
       return
     }
+    if (cmd.type === 'add-files') {
+      try {
+        await this.addFiles(cmd)
+      } finally {
+        await this.commands.markHandled(cmd.id)
+      }
+      return
+    }
     try {
       await this.runPluginCommand(cmd)
     } finally {
       await this.commands.markHandled(cmd.id)
     }
+  }
+
+  /**
+   * `add-files` (§10): copy `incoming/files/<batchId>/<path>` into
+   * `repo/<path>` (under `data/`), let plugins commit it ("Add files from
+   * the user"), emit `files-added`, then remove the batch.
+   */
+  private async addFiles(
+    cmd: Extract<CloudCommand, { type: 'add-files' }>
+  ): Promise<void> {
+    const { logger } = this.opts
+    const ws = this.opts.workspace
+    // Validates the batch id; relative to the user folder.
+    sessionPaths(this.opts.sessionId).incomingFilesBatch(cmd.batchId)
+    const batchDir = path.join(
+      this.opts.sessionDir,
+      'incoming',
+      'files',
+      cmd.batchId
+    )
+    if (!(ws instanceof NodeWorkspace)) {
+      logger.warn('add-files needs the Node workspace; skipped')
+      return
+    }
+    const added: string[] = []
+    for (const f of cmd.files) {
+      if (!isRepoDataPath(f.path)) continue
+      const source = path.join(batchDir, ...f.path.split('/'))
+      // The batch folder is API-written but lives in the user's folder:
+      // refuse anything reached through a link.
+      const real = await fs.realpath(source).catch(() => null)
+      const realBatch = await fs.realpath(batchDir).catch(() => null)
+      if (
+        !real ||
+        !realBatch ||
+        real !== path.join(realBatch, ...f.path.split('/'))
+      ) {
+        logger.warn(
+          `add-files ${cmd.batchId}: a file is missing or a link; skipped`
+        )
+        continue
+      }
+      try {
+        if (await ws.importFile(source, f.path)) added.push(f.path)
+      } catch (err) {
+        logger.warn(
+          `add-files ${cmd.batchId}: copy failed: ${(err as Error).message}`
+        )
+      }
+    }
+    let shas: Record<string, string> = {}
+    if (added.length > 0) {
+      for (const plugin of this.plugins) {
+        if (!plugin.onFilesAdded || !this.started.has(plugin)) continue
+        try {
+          shas = {
+            ...shas,
+            ...((await plugin.onFilesAdded(added, this.ctx)) ?? {}),
+          }
+        } catch (err) {
+          logger.error(`plugin ${plugin.name} onFilesAdded failed`, err)
+        }
+      }
+    }
+    this.events.emit({
+      type: 'files-added',
+      batchId: cmd.batchId,
+      files: added.map((path) =>
+        shas[path] ? { path, sha: shas[path] } : { path }
+      ),
+    })
+    await fs.rm(batchDir, { recursive: true, force: true })
+    logger.info(
+      `add-files ${cmd.batchId}: ${added.length}/${cmd.files.length} file(s) added`
+    )
   }
 
   private async runPluginCommand(cmd: CloudCommand): Promise<void> {
@@ -519,9 +617,20 @@ export class Runner {
         conversationId: this.conversationId,
         turnId: cmd.turnId,
         text: prefix + cmd.text,
-        mentions: [],
+        mentions: (cmd.context?.mentions ?? []).map((label) => ({
+          kind: 'file' as const,
+          label,
+        })),
         attachments: loaded.map((a) => a.attachment),
-        includeActiveFile: false,
+        includeActiveFile: !!cmd.context?.activeFile,
+        ...(cmd.context?.activeFile
+          ? {
+              activeFile: {
+                path: cmd.context.activeFile,
+                name: path.posix.basename(cmd.context.activeFile),
+              },
+            }
+          : {}),
       })
     } finally {
       this.activeTurn = null
