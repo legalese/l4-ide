@@ -170,6 +170,43 @@ export class GitSync implements RunnerPlugin {
     })
   }
 
+  /**
+   * Commit files the user added mid-session on their own ("Add files
+   * from the user"), leaving any uncommitted agent work for its turn's
+   * commit. Returns each file's git blob id.
+   */
+  async onFilesAdded(paths: string[]): Promise<Record<string, string>> {
+    await this.git.ok(['--literal-pathspecs', 'add', '--', ...paths])
+    const staged = await this.git.run([
+      '--literal-pathspecs',
+      'diff',
+      '--cached',
+      '--quiet',
+      '--',
+      ...paths,
+    ])
+    if (staged.code !== 0) {
+      await this.git.ok([
+        '--literal-pathspecs',
+        'commit',
+        '-q',
+        '-m',
+        'Add files from the user',
+        '--',
+        ...paths,
+      ])
+      await this.writeBundle()
+      this.ctx.logger.info(`git: committed ${paths.length} added file(s)`)
+    }
+    const shas: Record<string, string> = {}
+    for (const p of paths) {
+      const r = await this.git.run(['rev-parse', '-q', '--verify', `HEAD:${p}`])
+      const sha = r.stdout.trim()
+      if (r.code === 0 && GIT_SHA_RE.test(sha)) shas[p] = sha
+    }
+    return shas
+  }
+
   async handleCommand(cmd: CloudCommand): Promise<void> {
     if (cmd.type === 'apply-bundle') await this.applyBundle(cmd.file)
     else if (cmd.type === 'rollback') await this.rollback(cmd.turnId)
