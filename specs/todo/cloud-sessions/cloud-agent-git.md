@@ -66,3 +66,5 @@ The earlier backup clearing and git-history restore are gone. `tmp/` and
 harness. At start, if every tracked file under `tmp/` is gone and nothing new
 is there (the Sessions API sweep cleared an abandoned session), the harness
 commits that alone: "Clear tmp of abandoned session". 1 test.
+`add-files`: `onFilesAdded` commits only the added paths ("Add files from
+the user") and returns blob ids for `files-added`. 1 test.

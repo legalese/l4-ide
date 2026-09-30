@@ -57,6 +57,7 @@ live VS Code; no deployed Sessions API to try it against.
   noise for long-running background sessions.
 
 - Follow-up 2026-09-30: no approval UI, commands or notifications for cloud sessions (local chats unchanged); notifications = questions and Resume; start banner lists passed MCP servers with the no-approval note; rollback unaffected by the `data/`/`tmp/` layout. Checks re-run locally, all pass.
+- Follow-up 2026-09-30 (files in later prompts): prompts send @-mentions and the active file; banner shows "Adding N files…"; `files-added` lists the paths under the prompt. 16 webview tests; checks pass.
 
 ## Where a reviewer should start
 

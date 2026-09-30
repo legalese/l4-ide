@@ -53,7 +53,9 @@ no Sessions API is deployed to try it against.
   first live state after the start).
 - `GET /sessions` rows have no `conversationId`; the UI keys cloud entries by sid.
 
-- Follow-up 2026-09-30: rebased on #509 `1d1ea8d1e`; `approve`/`approval-request` removed; start progress names the MCP servers passed (tools run without approval); seed lands in `repo/data/` (paths still relative to the common ancestor, no repo-root assumption). Checks re-run locally, all pass.
+- Follow-up 2026-09-30: rebased on #509 `b6ec4779d`; `approve`/`approval-request` removed; start progress names the MCP servers passed (tools run without approval); seed lands in `repo/data/` (paths still relative to the common ancestor, no repo-root assumption). Checks re-run locally, all pass.
+- Follow-up 2026-09-30 (files in later prompts): new/changed @-mentioned and active files (SHA-256 per `data/` path, seed base stored per session) are added via `POST …/files` + PUTs + commit before `message`/`inject`; `context { activeFile?, mentions? }` in `data/` paths; same limits as seeding. Rebased on #509 `b6ec4779d`.
+- Follow-up 2026-09-30 (seed base): `POST /sessions` sends `seedBase { workspaceFolder, path }`; later files map through the session's `seedBase` on any machine (open folder of that name, else a folder picked once and remembered); no seedBase → workspace-relative. Local base record dropped, hashes kept. 47 extension unit tests; checks pass.
 
 ## Where a reviewer should start
 

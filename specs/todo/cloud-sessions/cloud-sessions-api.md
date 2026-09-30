@@ -45,10 +45,13 @@ over 200 characters are refused; `commands.seq` is `"<n>\n"`; a bare
 **Layout** (`1d1ea8d1e`): `/init` makes `repo/data/`, `repo/tmp/` (no
 `.legalese/`), seeds `repo/data/`; the sweep clears `repo/tmp/` hourly when
 idle past `ABANDONED_TMP_DAYS` (fs only, no symlinks; §7.2 listing exception).
+**Add files** (`351982201`): `POST …/files` + `…/files/:batchId/commit` stage
+files in `incoming/files/<batchId>/`, queue `add-files`; `message.context`;
+`seedBase` (`b6ec4779d`) validated, stored in session.json, returned by GETs.
 
 ## Checks run
 
-`npm run format:check`, `lint`, `typecheck`, `test` (64 tests), `build` —
+`npm run format:check`, `lint`, `typecheck`, `test` (99 tests), `build` —
 pass locally (macOS) and in CI (Linux, where the `/proc/self/fd` check is
 exercised). Root `tsc`/vitest unaffected; root ESLint has 7 pre-existing
 errors on `main`, unchanged. Docker image not built (no Docker locally);
@@ -58,22 +61,19 @@ image workflow not run.
 
 - A git test hung: `execFileSync` blocked the event loop that served the
   in-process HTTP bridge. Network git calls are now async with timeouts.
-- User file names (spaces, Unicode) were too strict under a `[A-Za-z0-9._-]`
-  rule; replaced with a component validator (no separators, NUL, control
-  characters, `.`/`..`, ≤255 bytes).
+- A `[A-Za-z0-9._-]` name rule rejected real file names; replaced with a
+  component validator (no separators, NUL, control chars, `.`/`..`).
 - O_NOFOLLOW only protects the last component, so every directory on the way
   is `lstat`-checked and each opened descriptor is verified by path.
 
 ## Open questions and follow-ups for later items
 
-- `protocol.ts` is aligned with l4-ide PR #509 and stays a hand-kept mirror.
-  Re-check it if the package changes.
-- Harness (`cloud-agent-runner`/`-git`) should ignore `init.json`,
-  `stop-requested.json`, `git/local.json`, and may assume `repo/.git` exists.
-- `commands.seq` can regress briefly under concurrent writers.
-- P7 still open: function URL + chunked git pushes, 6 MB limits in practice.
+- `protocol.ts` is a hand-kept mirror of l4-ide #509; re-check on changes.
+- The harness ignores `init.json`, `stop-requested.json`, `git/local.json`,
+  `incoming/files/<batchId>.json`; it may assume `repo/.git` exists.
+- `commands.seq` can regress briefly under concurrent writers; P7 (function
+  URL + chunked git pushes, 6 MB limits) still open.
 
 ## Where a reviewer should start
 
-`src/safe-fs.ts` and `test/hostile.test.ts`, then `src/git.ts` and
-`src/sessions.ts` (`startSession`).
+`src/safe-fs.ts`, `test/hostile.test.ts`, `src/git.ts`, `src/sessions.ts`.

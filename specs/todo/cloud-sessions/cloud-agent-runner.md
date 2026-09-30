@@ -11,7 +11,7 @@ key chain → `session.json` running → `session-state`; 1 s command poll; queu
 `RunnerPlugin` hooks), `event-log.ts`, `command-reader.ts`, `lease.ts`,
 `key-chain.ts` (+ 401 retry fetch wrapper), `node-workspace.ts`, `jl4-lsp.ts`,
 `interaction.ts`, `conversation-store.ts`, `session-file.ts`, `config.ts`,
-`main.ts` (`--dev`, `send`). 71 tests (fake LSP over in-process JSON-RPC, fake
+`main.ts` (`--dev`, `send`). 73 tests (fake LSP over in-process JSON-RPC, fake
 ai-proxy over HTTP, temp dirs) plus one opt-in test against a real `jl4-lsp`.
 
 ## Spec sections covered, and deviations (with reasons)
@@ -47,34 +47,31 @@ ai-proxy (message → `l4__evaluate` → `3 → 42` → `done` → `stop`, exit 
 
 ## Problems and how they were solved
 
-- Shutdown hung on `waitFor(null)` when a turn ended mid-shutdown; fixed.
-- Concurrent `session.json` and `commands.done` writes lost updates
-  (conversation id vanished); both now serialise their writes.
+- Shutdown hung on `waitFor(null)`; concurrent `session.json` and
+  `commands.done` writes lost updates. Both fixed.
 - LSP change notifications raced (`didClose` before `didChange`); they go out
   through one queue and versions bump synchronously.
 
 ## Open questions and follow-ups for later items
 
-- Sessions API: may treat `state/commands.done` as harness-owned and ignore
-  it. Nothing else new is written.
-- Image item: entry point must pass `ECS_CONTAINER_METADATA_URI_V4` (validated
-  as `http://169.254.170.2/v4/…`) for the lease task id; `jl4-lsp` at
-  `/app/bin/jl4-lsp`.
+- Sessions API: ignore the harness-owned `state/commands.done`.
+- Image: pass `ECS_CONTAINER_METADATA_URI_V4` (Fargate form) for the lease.
 
 ## Where a reviewer should start
 
-`src/runner.ts`, `src/command-reader.ts`, `src/key-chain.ts`, tests.
+`src/runner.ts`, `src/command-reader.ts`, `src/key-chain.ts`, `src/jl4-lsp.ts`.
 
-## Follow-up: repo layout and no approvals (2026-09-30)
+## Follow-up (2026-09-30)
 
-Supersedes the earlier backup tools. Workspace root = `repo/`; the model
-writes only in `data/` (session files, `jl4-lsp --cwd`) and `tmp/` (scratch,
-committed), per `isModelWritableRepoPath` (#509); the rest is readable
-metadata. Deleting a `data/` file in a turn first copies it to
-`tmp/deleted/t-<turnId>/…` (regular files, link-safe dirs, first copy wins,
-never cleared). A standing `<cloud-session-note>` rides on every prompt (no
-core change). Rebased on #509 without approvals: every tool is allowed, no
-`approval-request`/`pending-approval`/`approve`; `waiting` = `ask_user` only.
-No git for the model: `.git` unreadable/unlistable/unsearchable (tested).
-L4 on `data/` and `tmp/` alike: `--cwd repo/data` gives `IMPORT` data-first then
-sibling lookup (verified with real `jl4-lsp`; `--cwd repo/` breaks tmp/→data/).
+- Layout (supersedes the backup tools): workspace root `repo/`; writes only
+  in `data/` and `tmp/` (`isModelWritableRepoPath`); deleting a `data/` file
+  copies it to `tmp/deleted/t-<turnId>/…`; standing note on every prompt;
+  `.git` invisible to the model. No approvals (#509). Stack rebased on #509
+  `b6ec4779d` (tolerates `seedBase`).
+- One `jl4-lsp` (`--cwd repo/data`) for `data/` and `tmp/` (a second,
+  tmp-rooted instance was tried and dropped by user decision); `tmp/`
+  modules can't shadow `data/` ones. jl4-lsp doesn't re-read changed
+  imports: written files stay open and other open files are re-sent.
+- `add-files` copies `incoming/files/<batchId>/data/…` into `repo/data/`
+  (no links, confined), `files-added`, batch removed; `message.context`
+  feeds `<editor-context>` and `<mention-context>`.
