@@ -2,12 +2,16 @@
   "name": "@repo/legalese-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "VS Code-free Legalese AI agent core: chat loop, ai-proxy client, tool dispatcher and built-in tools, reaching the platform through ports",
+  "description": "VS Code-free Legalese AI agent core (chat loop, ai-proxy client, tool dispatcher and built-in tools, reaching the platform through ports) and the cloud-session protocol (./protocol)",
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "default": "./dist/protocol/index.js"
     }
   },
   "files": [

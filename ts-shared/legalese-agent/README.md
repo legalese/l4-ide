@@ -61,3 +61,24 @@ await service.start(params) // events arrive at interaction.emit
 conversation (the dispatcher passes `ToolCallContext.conversationId`) and by
 file, so each conversation's model gets diffs relative to what it was last
 told. Calls without a conversation use the instance's own stores.
+
+## Cloud-session protocol (`@repo/legalese-agent/protocol`)
+
+The contracts between the cloud harness, the extension and the Sessions API
+(cloud-sessions spec §4.2, §6, §7.1, §8, §15.5), as TypeScript types plus
+hand-written runtime validators. A validator is a `Check<T>`
+(`(value, path) => T`) that returns a clean copy holding only the declared
+fields, or throws `ProtocolError`; `tryParse(check, value)` returns a result
+instead.
+
+| Module                 | Contents                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `protocol/common.ts`   | ids (`ULID_RE`, `AGENT_KEY_RE`), `SessionState`, `McpServerConfig`, `AttachmentRef`, `SeedBase`, size limits                                                                                                                                                                                                  |
+| `protocol/files.ts`    | `SessionFile` (`session.json`), `LeaseFile`, `HeadFile`, cursors, `commands.seq`, `sessionPaths(sid)`, repo layout (`REPO_DATA_DIR`, `REPO_TMP_DIR`, `REPO_DELETED_DIR`, `MODEL_WRITABLE_REPO_DIRS`, `deletedCopyPath`, `isModelWritableRepoPath`, `ABANDONED_TMP_DAYS`), `isRepoDataPath`, `incoming/files/` |
+| `protocol/events.ts`   | `CloudEvent` (`{ seq, ts, type, … }`: chat-service kinds + cloud-only types), chat ⇄ cloud mapping, JSONL chunk parsing                                                                                                                                                                                       |
+| `protocol/commands.ts` | `CloudCommand` (`{ id, ts, type, … }`), `clientCommand` (rejects internal `apply-bundle` / `add-files`), `MessageContext`, `McpCredentials`                                                                                                                                                                   |
+| `protocol/api.ts`      | Sessions API requests/responses (incl. `AddFilesRequest`/`AddFilesResponse`), `GET /events` query helpers, access-token and agent-key routes, key-name helpers, error codes                                                                                                                                   |
+| `protocol/sealed.ts`   | sealed secrets: `generateSealingKeyPair`, `seal`, `openSealed`, `encodeSealed`/`decodeSealed` (`v1.<epk>.<iv>.<ct>.<tag>`), `SealedEnvelope` (X25519 + HKDF-SHA256 + AES-256-GCM, context-bound)                                                                                                              |
+
+The Sessions API (in `jl4-auth-proxy`) mirrors these shapes; this package is
+the reference.
