@@ -150,21 +150,22 @@ That prior orders questions and never answers one, which is already the one beha
 ## 5. Rulings this needs
 
 R8 does not reach these.
-Each has a recommendation.
-Each is also a card on the bench "Unknowns and Defaults" (claude.ai artifact `XQk522h6PN2xv8YFPhogJc`, db collection `l4-unknowns-defaults-1001`), where an independent skeptic's objection revised it; where the card and this text differ, the card is current until the ruling is recorded here. T3 and T4 share cards with `UNKNOWN-EVALUATION-SPEC.md` U9 and U8.
+Each is also a card on the bench "Unknowns and Defaults" (claude.ai artifact `XQk522h6PN2xv8YFPhogJc`, db collection `l4-unknowns-defaults-1001`), where an independent skeptic's objection revised it; each ruling is recorded here when it is made, as the card printed it. T3 and T4 share cards with `UNKNOWN-EVALUATION-SPEC.md` U9 and U8.
 
 **T1. Every defaulted record field may be omitted, not only `MAYBE … TYPICALLY NOTHING`.**
+**RULED 2026-10-01.** Meng marked `accept` on bench card T1 at 09:50:46Z, with no note. The ruling, as printed on the card: Any field declared `TYPICALLY` may be omitted at construction _and_ may be absent in JSON (batch, service), taking its default. A `TYPICALLY` on a `MEANS` field becomes a check error. Lands with W4/W5 of #525, after R8's named-site half and after the enum-default scoping fix (p10). How to write a construction with every field defaulted is left open, for a later card.
 D7.3 ruled the `MAYBE` case and was silent on `timeout IS A NUMBER TYPICALLY 30`.
 Its principle, "the default is written where the field is declared, never inferred from the type", holds just as well for a literal.
-_Recommend: yes._ It is additive (p4: every such omission is a check error today), and it is what retires S3.
+It is additive (p4: every such omission is a check error today). It shortens canon's readings that override one field; the two all-defaults constants of S3 stay until a spelling for "every field defaulted" is ruled.
 
 **T2. `ASSUME … TYPICALLY` is honoured.**
-The alternative is to leave it ignored and make the deprecation warning say that moving the declaration switches its default on.
-_Recommend: honour it,_ at the root, without rewriting the `ASSUME` into a definition the ladder or schema can see. It is one behaviour, and `ASSUME` is being retired anyway. No golden answer moves: no directive in the three sites' files reads them (§2.1).
-It also makes the warning's "nothing is broken" true of the migration it recommends.
+**RULED 2026-10-01.** Meng marked `accept` on bench card T2 at 09:52:12Z, with no note. The ruling, as printed on the card: An `ASSUME … TYPICALLY d` takes `d` when unsupplied, filled at the root without turning the `ASSUME` into a definition the ladder or schema can see. Pass condition: `QueryPlanSpec`'s atomIds and `viz-adapter.real-module.test.ts` unchanged. In the same change: reword the deprecation warning and `errors/README.md:571`, and update `TYPICALLY.md:150-155` and `ASSUME.md:267`.
+No golden answer moves: no directive in the three sites' files reads them (§2.1).
+It makes the warning's "nothing is broken" true of the migration it recommends.
 `ok/typically-basic.l4` stays on `ASSUME` because `jl4-service/test/QueryPlanSpec.hs:878-891` and a TypeScript fixture pin its ladder atomIds; those must not move. Its header, which asserts the metadata-only reading, changes.
 
 **T3. Absent, `null` and `{}` on the wire are three different things.**
+**RULED 2026-10-01.** Meng marked `accept`, option B on bench card TU-wire at 09:53:17Z, with no note. The ruling, as printed on the card: Remove `fromMaybe FALSE` at all three sites (`CodeGen.hs:239, 335, 603`), so absent or `null` on the wrapper path is refused or an assumed term, exactly as on the direct path. `{}` means `null` and never takes a default. Retire `{}` after instrumenting the service to see who sends it, since its log does not record argument shapes. (Card TU-wire is shared with `UNKNOWN-EVALUATION-SPEC.md` U9.)
 They are the four-cell model of `RUNTIME-INPUT-STATE-SPEC.md` ("The Four-State Model"):
 
 | wire    | cell             | meaning                  | proposed                                                         |
@@ -175,26 +176,24 @@ They are the four-cell model of `RUNTIME-INPUT-STATE-SPEC.md` ("The Four-State M
 | `{}`    | (`FnUncertain`)  | "uncertain"              | as `null`, until a ruling gives "uncertain" a meaning of its own |
 | a value | `Right (Just v)` | answered                 | the value                                                        |
 
-Today absent and `null` are both refused on the direct path, and `{}` is silently FALSE (S1).
-_Recommend: as the table._
+Today absent and `null` are both refused on the direct path, and FALSE on the wrapper path, which one `{}` anywhere in a request reaches (S1).
 The assumed-term row is how a section `GIVEN` with no default already behaves at `#EVAL` (`doc/concepts/legal-modeling/non-answers.md` §3).
 It also keeps the reason the wrapper used `fromMaybe FALSE` at all (`CodeGen.hs:93-94`): an input the rule never reads costs nothing.
 `UNKNOWN-EVALUATION-SPEC.md` then changes "stuck" to "unknown" without touching this table.
 
 **T4. An exploration mode may switch defaults off.**
+**RULED 2026-10-01.** Meng marked `accept` on bench card TU-presume at 09:54:00Z, with no note. The ruling, as printed on the card: One switch on every evaluation, decide mode included, on by default, landing with W3/W4, not with explore mode. Off: an absent input with a default is treated as absent with none (stuck in decide mode, unknown in explore mode). `null` never takes a default either way. The "presuming _x_" mark is ALIBI's `presumed` list. With presumption off, only boolean defaults become planner priors. (Card TU-presume is shared with `UNKNOWN-EVALUATION-SPEC.md` U8.)
 An investigator, or anyone asking what is _established_ rather than what is _presumed_, needs to see `Left (Just d)` as unsettled.
 The ladder already has that switch (`respectDefaults`).
-_Recommend:_ the evaluator and the service get the same switch, defaulting to on, and `UNKNOWN-EVALUATION-SPEC.md` owns its spelling.
 Without it, honouring defaults everywhere (W3, W4) strengthens the conversation's original worry instead of answering it.
 
 **T5. Exporters: map or say.**
-_Recommend:_ each exporter maps a default to its target's own mechanism where one exists, and otherwise emits a fidelity note naming the dropped default.
-OpenFisca's `Variable` has a `default_value`; that is recalled, not checked here.
-DMN, OpenFisca and Blawx are the three to survey (§2).
+**RULED 2026-10-01.** Meng marked `accept` on bench card T5 at 09:52:35Z, with no note. The ruling, as printed on the card: Each exporter maps a default only where the target's mechanism means what T1–T4 rule `TYPICALLY` means, and otherwise emits a fidelity note. Where the target always has a default (OpenFisca), mapping is mandatory: writing the first member is asserting a different presumption. Survey all eight `l4 export` formats. Blawx keeps its §5.1 ruling.
+The evidence is §2: OpenFisca replaces a default with the first enum member, and DMN and Blawx drop a `GIVEN` default without a word.
 
 **T6. Where the "took its default" event shows.**
-R8 asks for it in every directive and trace output (`PROPS-REDTEAM-2026-09-03.md:367`).
-_Recommend:_ also as a top-level `presumed` field in the service response and in `l4 batch`'s NDJSON, listing only the defaults actually forced, built from W8's event (the response's `reasoning` is sent only when a trace is requested, `Backend/Api.hs:210-214`), since T4's question, "which answers rested on a presumption?", is one that service and batch callers ask without wanting a whole trace.
+**RULED 2026-10-01.** Meng marked `accept` on bench card T6 at 09:52:52Z, with no note. The ruling, as printed on the card: A top-level `presumed` field on every service response and every `l4 batch` row, listing only the defaulted inputs _actually forced_ during that evaluation. Built from W8's event, after it lands. Specified once, shared with #526 §5 / TU-presume.
+R8 already asks for it in every directive and trace output (`PROPS-REDTEAM-2026-09-03.md:367`); the service response's `reasoning` is sent only when a trace is requested (`Backend/Api.hs:210-214`), so the list is a field of its own.
 
 ---
 
