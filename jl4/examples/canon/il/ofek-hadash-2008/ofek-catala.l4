@@ -9,7 +9,7 @@ IMPORT daydate
 --   source/tables.py. Regenerate with
 --     OFEK_CORPUS=<checkout> python3 source/build-catala-module.py > ofek-catala.l4
 --
--- WHAT IT IS FOR. `l4 catala` compiles a SINGLE module: a reference into an
+-- WHAT IT IS FOR. `l4 export catala` compiles a SINGLE module: a reference into an
 -- imported module is rejected as unbound, and a type declared elsewhere is
 -- reported as outside the v1 fragment. The eight-module encoding beside this
 -- file is therefore not compilable as it stands. This module is that encoding
@@ -548,7 +548,7 @@ GIVETH A NUMBER
 -- were derived independently from the corpus, and they must agree here.
 --
 -- Each fixture is written out once per question rather than named and
--- reused. That is not redundancy for its own sake: `l4 catala` collects
+-- reused. That is not redundancy for its own sake: `l4 export catala` collects
 -- helpers in a single pass out from the exported decision, so a helper
 -- that calls an uncollected helper is dropped along with its directive.
 -- Inlining keeps every callee inside the exported closure. See

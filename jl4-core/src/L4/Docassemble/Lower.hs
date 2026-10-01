@@ -388,7 +388,7 @@ foldKey = Text.toLower . Text.unwords . Text.words
 --
 --   * an unbalanced @(@ or @[@ raises @re.error@ while the @Interview@ is being
 --     constructed, so the emitted interview cannot be loaded /at all/ — and
---     @l4 check@ and @l4 docassemble@ both report success;
+--     @l4 check@ and @l4 export docassemble@ both report success;
 --   * a balanced @(…)@ compiles to a capture group, so the pattern no longer
 --     matches the term that named it: the entry is dead, and the phrase it does
 --     match (parentheses stripped) occurs nowhere.

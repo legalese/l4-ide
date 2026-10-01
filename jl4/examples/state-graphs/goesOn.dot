@@ -23,10 +23,10 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#f8d7da"];
-    0 -> 1 [label="S MUST payment ... [2] IF n EQUALS 7"
+    0 -> 1 [label="S MUST payment n [2] IF n EQUALS 7\nthe rule binds `n`"
            ,color="#28a745"
            ,style=solid];
-    0 -> 2 [label=timeout
+    0 -> 2 [label="timeout [2]"
            ,color="#dc3545"
            ,style=dashed];
 }

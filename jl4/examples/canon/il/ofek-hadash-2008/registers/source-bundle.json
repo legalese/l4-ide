@@ -1,0 +1,136 @@
+{
+ "retrieved": "2026-09-07",
+ "origin": {
+  "repository": "https://github.com/morimovilimcatala/ofek-hadash-corpus",
+  "site": "https://morimovilimcatala.github.io/ofek-hadash-corpus/",
+  "commit": "f042ee5534e07c80f31d68a20164b0865012c653",
+  "note": "The corpus is a published site whose pages reconstruct each instrument from Akoma Ntoso 3.0 (OASIS LegalDocML). Digests are over the published HTML at the commit above, which is what this encoding actually read; they are NOT digests of the underlying ministry PDFs, which the corpus records separately in each page's own provenance block."
+ },
+ "annotations": {
+  "declared": false,
+  "note": "The corpus pages carry no in-force banner and no amendment markers, so there are no annotations to dispose of. What each page DOES carry is a provenance note saying how its text was recovered — read from a word-processor file, transcribed from a scan by a single reader, extracted from a PDF, or taken from a hand-verified CSV — and those notes are reproduced per document in document-register.json under `caveats`."
+ },
+ "documents": [
+  {
+   "file": "agreements/ofek-hadash/2008-12-25_ofek-hadash_base-agreement.html",
+   "role": "instrument",
+   "note": "The Ofek Hadash reform agreement. Articles 3-7 (application and definitions), 14-33 (the working week, the post, the hourly value), 35-39 (the tables, placement, seniority, promotion, the role supplements) are the encoded core.",
+   "title_he": "הסכם קיבוצי ליישום רפורמת \"אופק חדש\" במערכת החינוך",
+   "title_en": "Collective Agreement for the Implementation of the \"Ofek Hadash\" (New Horizon) Reform in the Education System",
+   "akn": "/akn/il/act/collectiveAgreement/2008-12-25/ofek-hadash-base",
+   "date": "2008-12-25",
+   "bytes": 340295,
+   "sha256": "sha256:fd97e7dc015f18959c64f353ccee6aef6bc1cd0b48295a8a5806d29588db299e"
+  },
+  {
+   "file": "agreements/ofek-hadash/2008-12-25_ofek-hadash_base-agreement_signed-registry-copy-with-annex-tables.html",
+   "role": "corroboration",
+   "note": "The signed registry copy, carrying the annex hour tables the plain text lacks. Read for the part-post hour patterns; not itself encoded.",
+   "title_he": "הסכם קיבוצי ליישום רפורמת \"אופק חדש\" במערכת החינוך",
+   "title_en": "Collective Agreement for the Implementation of the \"Ofek Hadash\" (New Horizon) Reform in the Education System",
+   "akn": "/akn/il/act/collectiveAgreement/2008-12-25/2008-12-25-ofek-hadash-base-agreement-signed-registry-copy-with-annex-tables",
+   "date": "2008-12-25",
+   "bytes": 453154,
+   "sha256": "sha256:9bc2a01d0c3efaa4367f01208752759ea1d1adb54061609bb11bc17e4071a5c8"
+  },
+  {
+   "file": "agreements/ofek-hadash/2022-10-19_ofek-hadash_wage-agreement_signed-appendices.html",
+   "role": "instrument",
+   "note": "The 2022 wage agreement in full. Sections 4 (new tables), 5 (Tosefet Ofek 2022), 10 (the shekel floors) and 22 (the school-role supplement) are encoded.",
+   "title_he": "הסכם קיבוצי (שכר) לעניין תנאי העסקה של עובדי הוראה ברפורמת \"אופק חדש\"",
+   "title_en": "Collective (Wage) Agreement on the employment terms of teaching staff under the 'Ofek Hadash' (New Horizon) reform — signed copy with appendices",
+   "akn": "/akn/il/act/collectiveAgreement/2022-10-19/2022-10-19-ofek-hadash-wage-agreement-signed-appendices",
+   "date": "2022-10-19",
+   "bytes": 283362,
+   "sha256": "sha256:32eb438825b9967b2ae4003aa90c66a0eafd105727c1f28c1005150fe37a8db7"
+  },
+  {
+   "file": "agreements/ofek-hadash/2022-10-19_ofek-hadash_wage-agreement.html",
+   "role": "corroboration",
+   "note": "The same agreement without its appendices; used to cross-read sections 4, 5 and 10.",
+   "title_he": "הסכם קיבוצי (שכר) לעניין תנאי העסקה של עובדי הוראה ברפורמת \"אופק חדש\"",
+   "title_en": "Collective (Wage) Agreement on the employment terms of teaching staff under the 'Ofek Hadash' (New Horizon) reform",
+   "akn": "/akn/il/act/collectiveAgreement/2022-10-19/2022-10-19-ofek-hadash-wage-agreement",
+   "date": "2022-10-19",
+   "bytes": 44666,
+   "sha256": "sha256:fbf5422c5c829d3692e718efd27a233169bdbeeaa7fa76e1d7b3bde88b65622d"
+  },
+  {
+   "file": "agreements/ofek-hadash/2025-01-14_ofek-hadash_vaadat-maakev_taut-sofer-correction_agorot-salary-tables.html",
+   "role": "instrument",
+   "note": "AUTHORITATIVE FOR EVERY NUMBER IN THE TABLES. The follow-up committee decision correcting a scribal error in the 2022 agreement and reissuing appendices alef-1/alef-2 (combined salary) and bet/gimel (Tosefet Ofek 2022) to the agora, effective 1.9.2022. source/tables.py parses this file and nothing else.",
+   "title_he": "החלטת ועדת מעקב מיום 14.01.25",
+   "title_en": "Follow-up Committee (vaadat maakav) decision of 14.1.2025 — scribal-error correction and agorot-precision salary tables",
+   "akn": "/akn/il/act/collectiveAgreement/2025-01-14/2025-01-14-ofek-hadash-vaadat-maakev-taut-sofer-correction-agorot-salary-tables",
+   "date": "2025-01-14",
+   "bytes": 31826,
+   "sha256": "sha256:18ccfc7e225b36ccc2eed2612f27cc0e7acd8f4b21e61be81f0229e7fee4a41a"
+  },
+  {
+   "file": "agreements/ofek-hadash/2026-06-29_ofek-hadash_approved-teacher-agreement_wage-reduction-2025-2026.html",
+   "role": "instrument",
+   "note": "The approved collective agreement giving effect to the 2025 fiscal-stabilisation law for teachers. Sections 6-9, 12, 15-20 and 24-26 are encoded; section 19 postpones the school-role supplement by a year.",
+   "title_he": "הסכם קיבוצי מאושר — הפחתת שכר 2025-2026, כקבוע בחוק",
+   "title_en": "Approved Collective Agreement — Wage Reduction 2025–2026, as Provided by Law",
+   "akn": "/akn/il/act/collectiveAgreement/2026-06-29/2026-06-29-ofek-hadash-approved-teacher-agreement-wage-reduction-2025-2026",
+   "date": "2026-06-29",
+   "bytes": 50354,
+   "sha256": "sha256:da5e90413e5840506c6e5bf800a3f645e8f39e76c47b0b772e127da811b4a425"
+  },
+  {
+   "file": "laws/2025-03-27_public-sector-wage-reduction-law_5785.html",
+   "role": "corroboration",
+   "note": "Chapter 9 of the Budget Objectives Act 5785-2025, the temporary provision the approved agreement is made under. READ BUT NOT ENCODED FROM: the corpus copy is a PDF extraction of the whole Budget Act and its Chapter 9 text is bidi-damaged, with the definition of \"the determining base\" interleaved with itself. The agreement carries the same definition cleanly and is the operative instrument for teachers.",
+   "title_he": "חוק להשגת יעדי התקציב וליישום המדיניות הכלכלית לשנת התקציב 2025 (תיקוני חקיקה), התשפ\"ה-2025 — פרק ט': חוק להשתתפותם של העובדים ובעלי תפקיד בשירות הציבורי, בצעדים לייצוב המצב הפיסקלי במדינה במהלך השנים 2025 ו־2026 (הוראת שעה), התשפ\"ה-2025",
+   "title_en": "Law for Achieving the Budget Targets and Implementing Economic Policy for Budget Year 2025 (Legislative Amendments), 5785-2025 — Chapter 9: Law on the Participation of Employees and Office-Holders in the Public Service in Measures to Stabilise the State's Fiscal Position during 2025 and 2026 (Hora'at Sha'a — Temporary Order), 5785-2025",
+   "akn": "/akn/il/act/act/2025-03-27/2025-03-27-public-sector-wage-reduction-law-5785",
+   "date": "2025-03-27",
+   "bytes": 387308,
+   "sha256": "sha256:cc2017c6e59de88c0400dea6ea9f0e4b552c5a607155da1a12f6a34d9ac61437"
+  },
+  {
+   "file": "tables/2022-09-01_ofek-hadash_salary-table_BA.html",
+   "role": "corroboration",
+   "note": "The shekel printing of the BA table. Read ONLY for the step percentages in its margins, which the corrected agorot printing does not carry.",
+   "title_he": "נספח א'1 — טבלת השכר למורים בעלי תואר BA (קוד דירוג 101)",
+   "title_en": "Appendix A1 — Salary Table for BA-Holding Teachers (Rank Code 101)",
+   "akn": "/akn/il/doc/salaryTable/2022-09-01/2022-09-01-ofek-hadash-salary-table-ba",
+   "date": "2022-09-01",
+   "bytes": 26295,
+   "sha256": "sha256:34c74696ab0b1622999851de5bab3f1d085994c1f27206f7f93d22cf064c0ba6"
+  },
+  {
+   "file": "tables/2022-09-01_ofek-hadash_salary-table_MA.html",
+   "role": "corroboration",
+   "note": "The shekel printing of the MA table, read for the same reason.",
+   "title_he": "נספח א'2 — טבלת השכר למורים בעלי תואר MA (קוד דירוג 102)",
+   "title_en": "Appendix A2 — Salary Table for MA-Holding Teachers (Rank Code 102)",
+   "akn": "/akn/il/doc/salaryTable/2022-09-01/2022-09-01-ofek-hadash-salary-table-ma",
+   "date": "2022-09-01",
+   "bytes": 26433,
+   "sha256": "sha256:2d922b3bfe9dabe2ee0a9785eb16a6a063bcd12fa82a814236a0d909c4b0fdb0"
+  },
+  {
+   "file": "tables/2016-09-01_ofek-hadash_salary-table_BA.html",
+   "role": "corroboration",
+   "note": "An earlier vintage, read to check that the staircase frontier is stable across printings. Not encoded.",
+   "title_he": "נספח א'1' — טבלת השכר למורים בעלי תואר BA (קוד דירוג 101), מעודכנת החל מיום 1.9.2016",
+   "title_en": "Appendix A1' — Salary Table for BA-Holding Teachers (Rank Code 101), Updated as of 1 September 2016",
+   "akn": "/akn/il/doc/salaryTable/2016-09-01/2016-09-01-ofek-hadash-salary-table-ba",
+   "date": "2016-09-01",
+   "bytes": 31511,
+   "sha256": "sha256:d9edb877f10824823d90444e0ffdbf9a67ed7689051972f1794aee2fcbc02ee5"
+  },
+  {
+   "file": "tables/2015-01-01_ofek-hadash_salary-tables_morim.html",
+   "role": "corroboration",
+   "note": "The 1.1.2015 tables, which print agorot and an 8.5% top-column step. Read to corroborate the generation rule at full precision. Not encoded.",
+   "title_he": "נספחים א'1'-א'7' — טבלאות השכר וטבלאות ההמרה למורים, מעודכנות החל מיום 1.1.2015",
+   "title_en": "Appendices A1'-A7' — Salary Tables and Conversion Tables for Teachers, Updated as of 1 January 2015",
+   "akn": "/akn/il/doc/salaryTable/2015-01-01/2015-01-01-ofek-hadash-salary-tables-morim",
+   "date": "2015-01-01",
+   "bytes": 233442,
+   "sha256": "sha256:6cd55a7a3f49f2a3972d9a5d44e38c55d6db944bbe13a5482b9c0a44bf46a9c7"
+  }
+ ]
+}

@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `s 28(2) — "Subsection (1) shall not apply where the grantee is the Public Trustee or a trust company."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2715`
+> — `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2715`
 
 **It is doing** switching something off — and the scale matters. A whole Act (a gate consulted
 first), one section (an outcome the caller must handle), one duty (an exemption), or one limb of a
@@ -106,7 +106,7 @@ GIVETH A BOOLEAN
    than replacing it — the snippet below.
 3. **The override in the name of the decision** —
    `` DECIDE `a British citizen notwithstanding cesser of the order — subsection (6)` ``
-   (`jl4/examples/legal/bna/bna.l4:572`), with assertions on both sides.
+   (`jl4/examples/canon/uk/bna-1981/bna.l4:572`), with assertions on both sides.
 
 ```l4
 GIVEN w IS A Will
@@ -121,12 +121,12 @@ GIVETH A BOOLEAN
 not the priority operator. Measured 2026-09-04 over the 26 files under `jl4/examples/legal/`: 173
 occurrences, of which 89 sit inside a backticked name — 21 distinct names, every one of them a
 **status** rather than a priority, headed by `` `subject to the requirement to file reports pursuant
-to section 13 or section 15(d) of the Exchange Act` `` (`jl4/examples/legal/regcf/regcf.l4:273`, and
+to section 13 or section 15(d) of the Exchange Act` `` (`jl4/examples/canon/us/regcf/regcf.l4:273`, and
 five more sites in that file). Every occurrence in `regcf.l4` is of that kind. The real priority
 operator does appear, in the succession files, and there it is handled by technique 3 above: the
 override is written into the **name** of the rule — `` `s 8(3) — probate may be granted to one or
 more of the persons so appointed, subject to section 6` ``
-(`jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:898`), whose first
+(`jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:898`), whose first
 rung carries the words themselves as an inert string, `"Subject to section 6,"` (`:899`). Read which
 one you have before encoding it.
 
@@ -148,7 +148,7 @@ X applies".
 
 > `s 5A(1): "This section applies where — (a) the court makes an order under section 5 (called in this section the access order) giving a person (X) access to a child; and (b) the order is breached by the person (Y) who is required by the order to give X access to the child."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4:587-592`
+> — `jl4/examples/canon/sg/succession/cleanroom/guardianship-of-infants-act.l4:587-592`
 
 **It is doing** stating the facts that have to hold before the provision has anything to say.
 Statutory "where" is almost always "if": it introduces a condition, not a place and not a scope.
@@ -243,7 +243,7 @@ GIVETH A BOOLEAN
 
 Keep the burden where the section puts it. The corpus says so in terms: the prohibition with an
 exception "must be encoded that way round, with the burden on the propounder, not softened into a
-permission" (`jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4:1176-1182`).
+permission" (`jl4/examples/canon/sg/succession/cleanroom/family-domain.l4:1176-1182`).
 
 **Not** a word-for-word transcription onto `UNLESS`. `A UNLESS B` is `A AND NOT B`, so
 
@@ -270,7 +270,7 @@ scopes a whole list and De Morgan's law is the thing to get right.
 
 > `"(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:"`
 >
-> — `jl4/examples/legal/regcf/regcf.l4:881`, quoting 17 CFR (the Code of Federal Regulations)
+> — `jl4/examples/canon/us/regcf/regcf.l4:881`, quoting 17 CFR (the Code of Federal Regulations)
 > § 227.100(a)
 
 **It is doing** one of two quite different things, and the encoding differs completely.
@@ -297,7 +297,7 @@ GIVETH A BOOLEAN
 For job 2, put the proviso arm first and say in a comment that the order is not the source's.
 § 227.201(t)(3) requires audited financial statements above $618,000 "provided, however, that" a
 first-time issuer up to $1,235,000 needs only reviewed ones — so the proviso **inverts its own main
-clause** (`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:1769-1777`):
+clause** (`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:1769-1777`):
 
 ```l4
 @ref 17 CFR 227.201(t)(1)-(3) — the (t)(3) proviso is tested before the (t)(3) main clause
@@ -334,7 +334,7 @@ Y`", for the proviso that only ever _subtracts_ (it is a limb, not an arm), and 
 **If the source says**
 
 > `"unless such securities are transferred:"` — the chapeau, carried verbatim into the encoding at
-> `jl4/examples/legal/regcf/regcf.l4:842`, over limbs `"(1)"` … `"(4)"` of 17 CFR § 227.501(a)
+> `jl4/examples/canon/us/regcf/regcf.l4:842`, over limbs `"(1)"` … `"(4)"` of 17 CFR § 227.501(a)
 
 **It is doing** distributing one condition over a numbered list. The chapeau tells you which
 operator: "any of the following" and a list ending "; or" are disjunctive; "all of the following"
@@ -358,7 +358,7 @@ GIVETH A BOOLEAN
 The conjunctive form takes `...` and `AND`. Where the limbs are themselves named rules rather than
 record fields, drop the inert scaffolding and write the plain conjunction. That is what the corpus
 does for the early-close conditions of 17 CFR § 227.304(b)
-(`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2367-2376`): each numbered condition is a rule of
+(`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2367-2376`): each numbered condition is a rule of
 its own, named for the paragraph it comes from, and the top rule applies those rules to `offering`
 rather than reading fields off it.
 
@@ -406,7 +406,7 @@ operators `...` and `..`".
 
 > `"The decomposition STOPS HERE. 17 CFR 227.501(c) defines 'member of the family of the purchaser or the equivalent' with 'includes' — an open list of 14 relationships plus adoptive ones. Enumerating them would encode an open term as a closed one, which is a worse fidelity loss than the one this decomposition repairs."`
 >
-> — the encoder's note at `jl4/examples/legal/regcf/regcf.l4:751-755`
+> — the encoder's note at `jl4/examples/canon/us/regcf/regcf.l4:751-755`
 
 **It is doing** naming examples without exhausting the category. "Includes" is not "means" (entry
 [1.1](01-definitions-and-scope.md#e1-1)); a list introduced by it stays open, and the residue is
@@ -468,7 +468,7 @@ kinship list, which is the shape this one is not.
 
 > `AMBIGUITY A1 — "sport that involves physical skill and exertion". Reading (i) CONJUNCTIVE: the sport must involve both physical skill and physical exertion. … Reading (ii) DISJUNCTIVE-ish / hendiadys … TAKEN: (i), conjunctive.`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:244-251`, on Charities (Jersey) Law 2014
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:244-251`, on Charities (Jersey) Law 2014
 > Article 6(2)(c)
 
 **It is doing** one of two jobs, and the word does not tell you which. "Cruel **and** unusual
@@ -536,7 +536,7 @@ readings through decided cases in which the same court read the same word both w
 
 > `s 5A(6): "In respect of a breach of an access order, X may do either, but not both, of the following: (a) make an application under subsection (2); (b) bring proceedings to punish Y for contempt of court in respect of that breach."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4:685`
+> — `jl4/examples/canon/sg/succession/cleanroom/guardianship-of-infants-act.l4:685`
 
 **It is doing** two different things depending on the three words after "either". Bare "either … or"
 is ordinary inclusive disjunction — write `OR` and stop. "Either, but not both" is an **election**:

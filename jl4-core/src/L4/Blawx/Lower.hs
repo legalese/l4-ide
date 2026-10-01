@@ -1132,7 +1132,7 @@ nlgChunks who rng vars sentence
   -- scanNlg above still sees @10\%and\%20@ rather than @10%and%20@ and does
   -- not cut a phantom slot at @%and%@ ('slotNameShaped' "and" is True).
   -- Once the slots are separated, the literal chunks are output, so the
-  -- escape has to come off here or @l4 blawx@ emits the backslash.
+  -- escape has to come off here or @l4 export blawx@ emits the backslash.
   chunks   = map (Text.strip . unescapeNlgText) rawChunks
   interior = drop 1 (take (max 0 (length chunks - 1)) chunks)
   err = blawxErr who rng (LEUnsupported "@nlg slot structure (Blawx)")

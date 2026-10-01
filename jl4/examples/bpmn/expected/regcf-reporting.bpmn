@@ -32,8 +32,8 @@
     <bpmn:exclusiveGateway id="Split_0" name="one of" gatewayDirection="Diverging">
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
-    <bpmn:task id="Task_1" name="MUST file a Form C-TR termination of reporting">
-      <bpmn:documentation>PARTY Issuer MUST file a Form C-TR termination of reporting WITHIN `business days to file Form C-TR`</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MUST `file a Form C-TR termination of reporting`">
+      <bpmn:documentation>PARTY Issuer MUST `file a Form C-TR termination of reporting` WITHIN `business days to file Form C-TR`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="timeout" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `business days to file Form C-TR`</bpmn:documentation>
@@ -45,8 +45,8 @@
     <bpmn:endEvent id="End_3" name="Breach">
       <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
     </bpmn:endEvent>
-    <bpmn:task id="Task_4" name="MUST file a Form C-AR annual report">
-      <bpmn:documentation>PARTY Issuer MUST file a Form C-AR annual report WITHIN `days to file the annual report after fiscal year end`</bpmn:documentation>
+    <bpmn:task id="Task_4" name="MUST `file a Form C-AR annual report`">
+      <bpmn:documentation>PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_4" name="timeout" attachedToRef="Task_4" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `days to file the annual report after fiscal year end`</bpmn:documentation>

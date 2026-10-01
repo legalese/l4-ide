@@ -154,13 +154,14 @@ have.
 
 **Model of record:** [`jl4/examples/ok/closing-the-loop/fristberechnung.l4`](../../jl4/examples/ok/closing-the-loop/fristberechnung.l4)
 
-| file                                                                                                                  | what it is                                                                |
-| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [`fristberechnung.l4`](../../jl4/examples/ok/closing-the-loop/fristberechnung.l4)                                     | the statute, the paper's arm, the fixtures, the invariants and the sweeps |
-| [`feiertage.l4`](../../jl4/examples/ok/closing-the-loop/feiertage.l4)                                                 | the German holiday calendar — computus, sixteen Länder, year-gated        |
-| [`fristbeginn-nonexhaustive-control.l4`](../../jl4/examples/ok/closing-the-loop/fristbeginn-nonexhaustive-control.l4) | the control fixture that makes a clean run mean something                 |
-| [`REPRODUCE.md`](REPRODUCE.md)                                                                                        | every computational claim above, mapped to the command that produces it   |
-| [`reproduce.sh`](reproduce.sh)                                                                                        | runs them                                                                 |
+| file                                                                                                                  | what it is                                                                      |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`fristberechnung.l4`](../../jl4/examples/ok/closing-the-loop/fristberechnung.l4)                                     | the statute, the paper's arm, the fixtures, the invariants and the sweeps       |
+| [`feiertage.l4`](../../jl4/examples/ok/closing-the-loop/feiertage.l4)                                                 | the German holiday calendar — computus, sixteen Länder, year-gated              |
+| [`fristbeginn-nonexhaustive-control.l4`](../../jl4/examples/ok/closing-the-loop/fristbeginn-nonexhaustive-control.l4) | the control fixture that makes a clean run mean something                       |
+| [`REPRODUCE.md`](REPRODUCE.md)                                                                                        | every computational claim above, mapped to the command that produces it         |
+| [`reproduce.sh`](reproduce.sh)                                                                                        | runs them                                                                       |
+| [`SIDEBAR-intuitionism.md`](SIDEBAR-intuitionism.md)                                                                  | why a trace is the answer rather than a report about it — conceptual, unsourced |
 
 These are linked, not copied. A second copy of a model is a claim with no way to learn it was
 corrected.

@@ -340,13 +340,13 @@ What else works:
 
 **What Catala makes of one, measured 2026-09-07.** The backends compile the
 module as you wrote it, not the rewritten one in which the section's `GIVEN` has
-become an ordinary input of every rule beneath the heading. So `l4 catala` meets
+become an ordinary input of every rule beneath the heading. So `l4 export catala` meets
 a section `GIVEN` as an `ASSUME` term — and it will only read an `ASSUME` term
 inside a rule marked `@export`. A plain helper that reads one is refused, the
 command exits 1, and no file is written:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable
     inside an @export decision's scope (where it becomes a scope `input`); pass
     it to this helper as a parameter instead (pay.l4:10:5-18)
@@ -365,12 +365,12 @@ today.
 published as a Catala _scope_, and Catala allows a scope to be called only from
 inside another scope. So if an `@export`ed rule is called by one that is **not**
 exported, the call would come out inside a plain top-level definition, which
-Catala rejects. `l4 catala` refuses that up front rather than writing a file the
+Catala rejects. `l4 export catala` refuses that up front rather than writing a file the
 next tool will throw out — it exits 1, names the rule and the rule that calls
 it, and tells you what to do:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala
     scope — and Catala allows a scope call only from inside another scope. This
     caller is not @export'd, so it compiles to a toplevel definition, and the
@@ -394,7 +394,7 @@ the condition costs you little, since every rule that reads the binder has to be
 exported anyway; if you are applying `@export` to an ordinary helper, it is the
 whole story.
 
-Until 2026-09-08 there was no refusal: `l4 catala` exited 0, printed nothing,
+Until 2026-09-08 there was no refusal: `l4 export catala` exited 0, printed nothing,
 and wrote a file `catala typecheck` then rejected — so the failure found you one
 tool later, with nothing pointing back at the rule that caused it. If you are
 reading an older note that says the export "is not composable", that is what it

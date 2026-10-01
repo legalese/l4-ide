@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../../..");
 const FIGURES = resolve(REPO, "jl4/examples/legal/regcf/figures");
-const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
+const CORPUS = resolve(REPO, "jl4/examples/canon/us/regcf/regcf.l4");
 
 /** The four carriers `demo/regcf.ts` writes for every subject. */
 const CARRIERS = [".svg", ".txt", ".mmd", ".sentences"] as const;

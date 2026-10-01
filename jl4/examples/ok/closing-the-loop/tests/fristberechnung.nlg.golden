@@ -1,54 +1,54 @@
 the number of items in `alle Arten des Fristbeginns` is equal to 3
 given `a` then `genau eine Regel des § 187 greift bei` with `a` holds for every item of `alle Arten des Fristbeginns`
 `§ 187 Abs. 1 ist einschlägig bei`
-`das Fristende zu` with `Beispiel 1` is equal to `YMD` with 2026, 6 and 15
-`das Fristende zu` with `Beispiel 2` is equal to `YMD` with 2026, 7 and 1
-`das Fristende zu` with `Beispiel 3a` is equal to `YMD` with 2026, 4 and 1
-`das Fristende zu` with `Beispiel 3b` is equal to `YMD` with 2026, 3 and 31
-`§ 187 — der Fristbeginn bei` with `Beispiel 3b` is equal to `YMD` with 2026, 3 and 1
-`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 4` is equal to `YMD` with 2026, 2 and 28
-`das Fristende zu` with `Beispiel 4` is equal to `YMD` with 2026, 3 and 2
-`das Fristende zu` with `Beispiel 5` is equal to `YMD` with 2024, 2 and 29
-`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 6` is equal to `YMD` with 2026, 2 and 28
-`das Fristende zu` with `Beispiel 6` is equal to `YMD` with 2026, 3 and 2
-`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 7` is equal to `YMD` with 2026, 3 and 1
-`das Fristende zu` with `Beispiel 7` is equal to `YMD` with 2026, 3 and 2
-`das Fristende zu` with `Beispiel 8` is equal to `YMD` with 2026, 5 and 4
-`das Fristende zu` with `Beispiel 8a` is equal to `YMD` with 2026, 6 and 5
-`das Fristende zu` with `Beispiel 8b` is equal to `YMD` with 2026, 6 and 4
-`das Fristende zu` with `Beispiel 8c` is equal to `YMD` with 2026, 11 and 19
-`das Fristende zu` with `Beispiel 8c in Berlin` is equal to `YMD` with 2026, 11 and 18
-`das Fristende zu` with `Beispiel 9` is equal to `YMD` with 2026, 9 and 19
-`der Beginn der Rechtsfolge zu` with `Beispiel 9` is equal to `YMD` with 2026, 9 and 20
-`das Fristende zu` with `Beispiel 9b` is equal to `YMD` with 2026, 2 and 28
-`der Beginn der Rechtsfolge zu` with `Beispiel 9b` is equal to `YMD` with 2026, 3 and 1
-`das Fristende zu` with `Beispiel 10` is equal to `YMD` with 2026, 10 and 18
-`das Fristende zu` with `Beispiel 10b` is equal to `YMD` with 2026, 10 and 19
-`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 11` is equal to `YMD` with 2005, 12 and 31
-`das Fristende zu` with `Beispiel 11` is equal to `YMD` with 2006, 1 and 2
+`das Fristende zu` with `Beispiel 1` is equal to 15 June 2026
+`das Fristende zu` with `Beispiel 2` is equal to 1 July 2026
+`das Fristende zu` with `Beispiel 3a` is equal to 1 April 2026
+`das Fristende zu` with `Beispiel 3b` is equal to 31 March 2026
+`§ 187 — der Fristbeginn bei` with `Beispiel 3b` is equal to 1 March 2026
+`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 4` is equal to 28 February 2026
+`das Fristende zu` with `Beispiel 4` is equal to 2 March 2026
+`das Fristende zu` with `Beispiel 5` is equal to 29 February 2024
+`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 6` is equal to 28 February 2026
+`das Fristende zu` with `Beispiel 6` is equal to 2 March 2026
+`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 7` is equal to 1 March 2026
+`das Fristende zu` with `Beispiel 7` is equal to 2 March 2026
+`das Fristende zu` with `Beispiel 8` is equal to 4 May 2026
+`das Fristende zu` with `Beispiel 8a` is equal to 5 June 2026
+`das Fristende zu` with `Beispiel 8b` is equal to 4 June 2026
+`das Fristende zu` with `Beispiel 8c` is equal to 19 November 2026
+`das Fristende zu` with `Beispiel 8c in Berlin` is equal to 18 November 2026
+`das Fristende zu` with `Beispiel 9` is equal to 19 September 2026
+`der Beginn der Rechtsfolge zu` with `Beispiel 9` is equal to 20 September 2026
+`das Fristende zu` with `Beispiel 9b` is equal to 28 February 2026
+`der Beginn der Rechtsfolge zu` with `Beispiel 9b` is equal to 1 March 2026
+`das Fristende zu` with `Beispiel 10` is equal to 18 October 2026
+`das Fristende zu` with `Beispiel 10b` is equal to 19 October 2026
+`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 11` is equal to 31 December 2005
+`das Fristende zu` with `Beispiel 11` is equal to 2 January 2006
 `die Fristberechnung zu` with `Beispiel 11` 's `§ 193 wurde nur entsprechend angewandt`
-`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 12` is equal to `YMD` with 2026, 5 and 30
-`das Fristende zu` with `Beispiel 12` is equal to `YMD` with 2026, 6 and 1
-`das Fristende zu` with `Beispiel 12b` is equal to `YMD` with 2026, 5 and 27
-`das Fristende zu` with `Beispiel 13` is equal to `YMD` with 2026, 4 and 15
+`§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 12` is equal to 30 May 2026
+`das Fristende zu` with `Beispiel 12` is equal to 1 June 2026
+`das Fristende zu` with `Beispiel 12b` is equal to 27 May 2026
+`das Fristende zu` with `Beispiel 13` is equal to 15 April 2026
 `§ 191 — die Zahl der Tage eines nicht zusammenhängenden Zeitraums von` with `sechs Monate` is equal to 180
 `§ 191 — die Zahl der Tage eines nicht zusammenhängenden Zeitraums von` with `ein Jahr` is equal to 365
-`§ 192 — der Tag des Termins _ im Monat _ des Jahres _` with `Anfang des Monats`, 10 and 2026 is equal to `YMD` with 2026, 10 and 1
-`§ 192 — der Tag des Termins _ im Monat _ des Jahres _` with `Mitte des Monats`, 10 and 2026 is equal to `YMD` with 2026, 10 and 15
-`§ 192 — der Tag des Termins _ im Monat _ des Jahres _` with `Ende des Monats`, 10 and 2026 is equal to `YMD` with 2026, 10 and 31
-`der Termintag zu` with `Beispiel 15` is equal to `YMD` with 2026, 11 and 2
-`das Fristende zu` with `Beispiel 16` is equal to `YMD` with 2025, 2 and 28
-`das Fristende zu` with `Beispiel 17` is equal to `YMD` with 2026, 3 and 16
+`§ 192 — der Tag des Termins _ im Monat _ des Jahres _` with `Anfang des Monats`, 10 and 2026 is equal to 1 October 2026
+`§ 192 — der Tag des Termins _ im Monat _ des Jahres _` with `Mitte des Monats`, 10 and 2026 is equal to 15 October 2026
+`§ 192 — der Tag des Termins _ im Monat _ des Jahres _` with `Ende des Monats`, 10 and 2026 is equal to 31 October 2026
+`der Termintag zu` with `Beispiel 15` is equal to 2 November 2026
+`das Fristende zu` with `Beispiel 16` is equal to 28 February 2025
+`das Fristende zu` with `Beispiel 17` is equal to 16 March 2026
 `die Fristberechnung zu` with `Beispiel 17` 's `eine abweichende Bestimmung geht vor`
 not `die Fristberechnung zu` with `Beispiel 17` 's `§ 188 Abs. 3 wurde angewandt`
 `die Fristberechnung zu` with `Beispiel 17` 's `§ 193 wurde angewandt`
-`die Fristberechnung zu` with `Beispiel 17` 's `der letzte Tag der Frist vor § 193` is equal to `YMD` with 2026, 3 and 15
+`die Fristberechnung zu` with `Beispiel 17` 's `der letzte Tag der Frist vor § 193` is equal to 15 March 2026
 `die Fristberechnung zu` with `Beispiel 17` 's `die Feiertagsangabe ist gesichert`
-`§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 1 and `YMD` with 2026, 1 and 31
-`§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 1 and `YMD` with 2026, 1 and 30
-not `§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 1 and `YMD` with 2026, 1 and 28
-`§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 216 and `YMD` with 2008, 2 and 29
-not `§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 48 and `YMD` with 2008, 2 and 29
+`§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 1 and 31 January 2026
+`§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 1 and 30 January 2026
+not `§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 1 and 28 January 2026
+`§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 216 and 29 February 2008
+not `§ 188 Abs. 3 — der maßgebende Tag fehlt nach _ Monaten ab _` with 48 and 29 February 2008
 `§ 189 Abs. 1 — ein halbes Jahr` 's `die Zahl` is equal to 6
 `§ 189 Abs. 1 — ein Vierteljahr` 's `die Zahl` is equal to 3
 `§ 189 Abs. 1 — ein halber Monat` 's `die Zahl` is equal to 15
@@ -71,15 +71,15 @@ not `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `Beispiel 17b`
 `das Fristende zu` with `§ 190 (verworfene Gegenlesart) — der Fristfall der um _ verlängerten Frist vor § 193 zu _` with `zehn Tage` and `Beispiel 4`
 `§§ 188, 189 — der letzte Tag der Frist vor § 193 bei` with `Beispiel 6`
 `Teil III.A — die rohe Frist (wohlwollend) bei` with `Beispiel 6`
-`Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 6` is equal to `YMD` with 2026, 2 and 27
+`Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 6` is equal to 27 February 2026
 `das Fristende zu` with `Beispiel 6c`
 `Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 6c`
 `Teil III.A — das Fristende (wörtlich) bei` with `Beispiel 6c`
 `das Fristende zu` with `Beispiel 6d`
 `Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 6d`
 `Teil III.A — das Fristende (wörtlich) bei` with `Beispiel 6d`
-`Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 9` is equal to `YMD` with 2026, 9 and 21
-`Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 10` is equal to `YMD` with 2026, 10 and 19
+`Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 9` is equal to 21 September 2026
+`Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 10` is equal to 19 October 2026
 the number of items in the items of `die Tage des Jahres` with 2026 for which given `d` then not `Gesetz und Teil III.A stimmen vor § 193 überein am` with `d` holds
 the items of `die Tage des Jahres` with 2026 for which given `d` then not `Gesetz und Teil III.A stimmen vor § 193 überein am` with `d` holds
 the items of `die Tage des Jahres` with 2026 for which given `d` then not `Gesetz und Teil III.A stimmen im Ergebnis überein am` with `d` holds

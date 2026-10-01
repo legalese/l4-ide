@@ -7,6 +7,11 @@
 > parser, no IR path, no diagnostic set, no golden. This document exists to answer one question —
 > _is an inline table worth designing?_ — and deliberately stops before answering _how_.
 >
+> **Update (2026-09-26): three design questions RULED, none implemented.**
+> Meng ruled on the "Tables, Trees, Prose" bench where the table code lives (§4.1, card T4), what a cell may contain (§5 item 3, card T5), and what conflicts and no-match mean (§5, "Conflicts and no-match", card T6).
+> The rest of the paragraph above stands: there is still no parser, IR path, diagnostic set or golden, and syntax, layout and exactprint (§5 items 1, 2 and 6) are still not worked.
+> The same bench ruled how a table is checked and rendered as prose (cards T1–T3); those rulings are recorded in `NLG-TNR-ROUNDTRIP-SPEC.md` §3.6 and §3.7.
+>
 > What **is** verified in-tree, and cited below: the export direction
 > (`jl4-core/src/L4/Dmn/Markdown.hs`, over `L4/Dmn/IR.hs` and `L4/Dmn/Lower.hs`), the GuardedRows
 > normal form as it actually ships (`jl4-core/src/L4/Viz/GuardedRows.hs`), columnar `BRANCH`
@@ -164,7 +169,8 @@ nothing and is available today. Read the sketch below as an argument about the r
 column headers, `-`, and an aligned domain — not about nesting.
 
 **Sketched as an inline table** — _ILLUSTRATIVE SYNTAX ONLY; the fence word, the header cells,
-the cell language and the binding form are all placeholders:_
+~~the cell language~~ and the binding form are all placeholders.
+The cell language is no longer a placeholder: it was ruled on 2026-09-26 (§5 item 3), and the input cells below conform to it._
 
 ```l4
 @ref 17 CFR 227.201(t)(1)-(3)
@@ -208,6 +214,33 @@ same posture the export side already takes: _"dmnmd's current behaviour is not a
 (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md`:2451-2456) — emit (and now read) within the grammar of the
 day, record every gap, depend on nothing.
 
+**Where the table code lives — RULED 2026-09-26 (T4).**
+Ruled by Meng on 2026-09-26, bench "Tables, Trees, Prose", card T4, marked accept: option C of three, with four conditions.
+Ruled, not implemented; none of the code it places exists.
+The table→tree compiler (`NLG-TNR-ROUNDTRIP-SPEC.md` §3.7) and the region checker (`≡_R`, its §3.6) live in l4-ide.
+The region enumerator and `#ASSERT` generation live in dmnmd.
+Both halves implement one written spec.
+Option A (both in l4-ide) and option B (both in dmnmd) were not taken.
+The four conditions, as printed on the card:
+
+1. The CI gate for the l4-ide compiler and checker is a per-region `cases.json` battery, run through the existing KIE + Camunda job (`.github/workflows/pr-checks.yml:1468`, "DMN Engine Checks (KIE + Camunda)").
+   The dmnmd leg is local evidence only.
+2. Fixing dmnmd's no-match crash, so that F and P answer null rather than crash (dmnmd's `symptom/eval-hp-first-no-match-crash`), comes before `emitAsserts`.
+3. The written spec names one canonical copy.
+   The precedent it avoids is `BUILD-SPEC-dmnmd-to-l4.md`, which exists in both repos, differs between them, and names no canonical copy.
+4. The `dmn-core` package option stays deferred, on the trigger dmnmd's `DMN-CORE-HACKAGE-FINDINGS.md` already sets: reopen it when `DMN-EXPORT-PROGRAM-MODEL-SPEC.md`'s status header stops saying "not yet implemented".
+   It still says so (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md:3`).
+
+This ruling adds to §4.1 and does not relax the paragraph above.
+Nothing in it makes dmnmd a dependency of l4-ide, and a differential against dmnmd can never gate CI here, because this repo may use dmnmd only as local evidence that skips silently (`etc/validate-dmn.mjs:25`, "THE dmnmd LEGS (local evidence, not CI)").
+That is why condition 1 puts the gate on the two foreign engines.
+
+**What review changed.**
+An independent skeptic argued that C's edge over A is a dmnmd differential that can never gate, while A's cross-check, KIE and Camunda, already gates CI; and that dmnmd's interpreter crashes on F and P tables with no match, which is exactly where a checker should look.
+The objection was taken: C stays, but now says plainly what gates and what is only evidence, and carries the four conditions.
+A's cost as printed: no second implementation at all, not even as local evidence.
+B's: l4-ide's renderer cannot use it without breaking `CLAUDE.md` §1.2, short of a published package.
+
 **4.2 The exporter already owns a serialiser, so a parser gets a fixture corpus free.** Every
 table `emitMarkdown` produces is, by construction, an input the reader must accept, which makes
 `parse . emit ≡ id` a property testable over the whole existing corpus with no fixtures written
@@ -238,9 +271,13 @@ Named so nobody mistakes their absence for triviality. Each is a design task in 
    whitespace-padded. How the two disciplines coexist is unresolved and is probably the hardest
    part.
 3. **Cell expression language** — FEEL, L4 expressions, or a deliberately impoverished third
-   thing. The export side has a `L4Verbatim` escape hatch; whether the read side should is open.
+   thing. The export side has a `L4Verbatim` escape hatch; ~~whether the read side should is open~~
+   the read side has none in its cells.
+   **ANSWERED 2026-09-26 (T5): S-FEEL unary tests with constant endpoints; see "The cell language" below.**
 4. **Hit policies beyond First / Unique** — `Priority`, `Any`, and especially `Collect`, which
    `BUILD-SPEC-dmnmd-to-l4.md` §1.6 has deferred throughout and which is not a `BRANCH` at all.
+   Still open.
+   T6 ("Conflicts and no-match", below) rules what a conflict means under Unique and Any, not which hit policies an inline table accepts.
 5. **Error reporting** — column/cell-accurate spans, and _not_ inheriting the misreported
    missing-newline failure described in §4.2.
 6. **Exactprint and round-trip fidelity** — alignment padding, ditto `^`, comment placement, and
@@ -249,6 +286,85 @@ Named so nobody mistakes their absence for triviality. Each is a design task in 
    witness (`GUARDED-ROWS.md` §3) and adding the consumer that validates a declared `U`/`F`
    against it. Independently useful, unbuilt, and **not** a free consequence of inline syntax; it
    is listed here because §2.4 used to smuggle it in as one.
+   Still open.
+   T4 (§4.1) places the region checker in l4-ide, and T6 (below) rules what happens when it finds a conflict; how a witness replaces `grDisjoint :: Bool` is not ruled.
 
-None of the seven is a reason not to design this. All seven are reasons this document is not the
-design.
+None of the seven is a reason not to design this. ~~All seven are~~ The six still open, all but
+item 3, are reasons this document is not the design.
+
+### The cell language — RULED 2026-09-26 (T5)
+
+Ruled by Meng on 2026-09-26, bench "Tables, Trees, Prose", card T5, marked accept: option A of four.
+It answers item 3 above, whose "is open" clause is struck, and it retires the §3 sketch's "cell language" placeholder.
+Ruled, not implemented: there is still no reader for any cell language.
+
+- **Cells are S-FEEL unary tests with constant endpoints** (literals, dates, constructors).
+  That is the fragment the export side already emits: "A /constant/ FEEL value: the only thing this exporter will ever put on the endpoint of a 'UnaryTest'" (`jl4-core/src/L4/Dmn/IR.hs:208-209`), whose cells "never leave the analysable fragment" (`:239`).
+- **A computed condition is its own column, bound in `WHERE`**, the way the §3 sketch binds its inputs.
+  The checker treats that column as opaque and reports the loss for that column only, the scope `D-UNDECOMPOSABLE` already uses (`jl4-core/src/L4/Dmn/Lower.hs:3417`), rather than downgrading the whole table.
+- **Named endpoints are refused**, for example `<= tier 1 ceiling`, with a message that says to write a computed column.
+
+**Not taken.**
+Option B, the alternative the card named, accepts named endpoints and downgrades that column to battery checking; a reader then cannot tell at a glance whether a cell is a value or a reference, which is the exporter's own reason (`IR.hs:211-216`).
+Option C, an L4 escape hatch in cells, costs the whole table its exact check for one computed cell.
+Option D, L4 expressions in cells, breaks §4.2's `parse . emit ≡ id` and the dmnmd round trip.
+
+**What review changed.**
+The card's first draft recommended C.
+An independent skeptic showed that l4-ide had already decided this for export, since cells hold constant endpoints and anything else becomes a column whose input expression carries it, and the recommendation moved to A in full.
+
+**One consequence to know before the first real table.**
+Reg CF's thresholds are not constants: they depend on the rule date (`jl4/examples/canon/us/regcf/regcf.l4:191`, `:201`, `:211`).
+So a faithful inline Reg CF table writes each threshold test as a computed column, as the DMN export already does (`jl4/examples/dmn/expected/regcf-corpus.dmn:1825`, `aggregate_offering_amount <= tier_1_ceiling`).
+The constant cells in the §3 sketch are the 2022 figures only.
+
+### Conflicts and no-match — RULED 2026-09-26 (T6)
+
+Ruled by Meng on 2026-09-26, bench "Tables, Trees, Prose", card T6, marked accept: option A of three.
+Ruled, not implemented, in either repo.
+It is the ruling that dmnmd's `DECISIONS.md` D-13 deferred: whether a trailing catch-all under U is "an authoring error, or an accepted idiom".
+dmnmd's full record of it belongs in that repo's `DECISIONS.md`; this note records the ruling for the inline design and keeps the card's list of what moves.
+It amends no earlier text in this document; items 4 and 7 above point here.
+
+- **A trailing catch-all under U is an accepted idiom.**
+  It is read as the DMN 1.3 §8.2.11 default output value, in dmnmd's interpreter too.
+- **Any other conflict region on scalar columns is refused.**
+  A conflict region is one where two rules are live under U, or where the live rules' outputs differ under A.
+  DMN 1.3 §8.2.10 says a U table "SHALL NOT contain overlapping rules", and that when A's outputs are non-equal "the result is undefined".
+  Collection-input U and A tables keep dmnmd's overlap warning until regions model membership.
+- **"No rule matched" is rendered, not papered over.**
+  It is `NOTHING` in L4, with a `MAYBE` result only where a no-match region exists, so total tables stay bare.
+  It is `null` in DMN, as DMN 1.3 §10.3.2.10 already says ("or null if no default output value is specified"), and "no rule applies" in prose.
+  dmnmd's interpreter answers null on no-match, not an error or a crash.
+
+Applied to an inline table, which is not built: a `U` table's trailing all-`-` row would become the §2.4 `grOtherwise`, a conflict region on a scalar column would be a located error rather than a first-match `BRANCH`, and a table with a no-match region would elaborate to a `MAYBE` result.
+
+**What moves, as printed on the card.**
+These are dmnmd corpus recordings under `languages/haskell/test/corpus/cases/`, each checked to exist on dmnmd `origin/trunk` at `db5311d`.
+Per this document's header, it does not restate dmnmd's behaviour; this is the ruling's list, and re-recording them is dmnmd's work.
+
+- `policy/l4-otherwise-sentinel-not-last-row`, `policy/list-output-l4-literal`, `policy/list-input-membership-l4` and `policy/md-eval-unique-conflict` move.
+  `md-eval-unique-conflict` is re-fixtured with a genuine overlap (`<= 20` / `>= 10`), so the refusal stays pinned.
+- The one table in `symptom/l4-hitpolicy-unique-silently-first` starts refusing.
+- Added after step 0, a throwaway measurement of 2026-09-26: five more `policy/` tables have a conflict region beyond any trailing catch-all, and would start refusing.
+  Four are U: `hp-unique-near-duplicate-rows-accepted` (rows 3 and 4 overlap on Winter), `md-prefix-comparisons` (`< 18` / `<= 21`), `md-multivalue-dash-reprocessed` (`4, -` / `8`) and `md-negation-in-numeric-column-emitted` (`not([1..5])` / `[10..20]`).
+  One is A: `eval-hp-any-two-rows-disagree`.
+  `symptom/hp-any-duplicate-rows-disagree-silent` starts refusing too, which is progress.
+- Those four U cases pin something else: D-13's guard against false refusals, prefix comparisons, a multi-value dash, and negation.
+  Each is re-fixtured with non-overlapping rows, keeping the property it was written for, and the overlap is pinned by the new refusal cases instead.
+  The A case becomes a refusal case.
+  This addition had no fresh skeptic.
+
+**What review changed.**
+An independent skeptic showed that the catch-all reading reverses the card's own exhibit: `md-eval-unique-conflict`'s only overlap is its trailing catch-all, so under that reading it answers `Spareribs` instead of refusing.
+The skeptic also showed that the draft decided D-13's deferred question without naming it, and that refusing "any conflict region" would refuse the collection-input U tables dmnmd deliberately only warns about.
+The objection was taken: the ruling names D-13, limits refusal to scalar columns, and lists the recordings step 0 found the draft had missed.
+
+**Not taken.**
+Option B, today's first-match resolution and type sentinel, gives silent wrong answers at exit 0 in both renderers, and four readings of one table.
+Option C, conflicts rendered as "undefined" leaves, publishes a provision with a hole in it.
+For a Boolean output, DMN `null` is observationally the `FALSE` sentinel, because it "reads as `false` in every consuming boolean position" (`jl4-core/src/L4/Dmn/Analysis.hs:14-16`).
+
+**A consequence for this repo, not ruled.**
+`L4.Dmn.Markdown` downgrades a U table that has a default to F with a final all-`-` row, because emitting `U` with a catch-all "would be a table dmnmd reads back as saying something else" (`jl4-core/src/L4/Dmn/Markdown.hs:164-171`).
+Once dmnmd implements T6, that premise stops holding; whether to emit U then is a separate question.

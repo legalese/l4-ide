@@ -1189,7 +1189,9 @@ instance LayoutPrinterWithName n => LayoutPrinter (Subject n) where
       <> foldMap (\ c -> [printWithLayout c]) mCast
       <> [ printWithLayout v ]
       <> foldMap (\ r -> [ "IN", parensIfNeeded r ]) mRoll
-      <> foldMap (\ f -> [ "WHO", parensIfNeeded f ]) mFilter
+      <> foldMap (\ f -> case f of
+                    Who _ e   -> [ "WHO", parensIfNeeded e ]
+                    Whose _ e -> [ "WHOSE", parensIfNeeded e ]) mFilter
 
 -- | @WITHIN@/@HENCE@/@LEST@ bodies are bracketed via 'parensIfNeeded'.
 --

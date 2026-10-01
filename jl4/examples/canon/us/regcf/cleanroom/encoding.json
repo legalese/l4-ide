@@ -1,0 +1,24 @@
+{
+  "id": "cleanroom-2026-08",
+  "encoder": "legalese",
+  "status": "draft",
+  "status_checked": "2026-09-23",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "display_name": "All 22 sections of Regulation Crowdfunding, encoded de novo from the eCFR",
+  "versions_encoded": "Part 227 as in force from 2023-03-01 (its latest_amendment_date per the eCFR versioner), read as of 2026-08-03. One `RULES EFFECTIVE DATE` site only (regcf-denovo.l4:223); the module does not answer about earlier versions of the part.",
+  "modules": [
+    "regcf-denovo.l4"
+  ],
+  "scope": "A SECOND, INDEPENDENT encoding of this subject, written de novo from ../../source/ without reading the 'legalese' row, so that registers/surface-map.json can drive a differential between two encodings rather than one encoding against itself. Addresses all 22 sections of the part (§§ 227.100, 201-206, 300-305, 400-404, 501-504); where a section is encoded at reduced surface the reduction is stated at the site. Every quoted string is verbatim from source/part227.txt. registers/ carries the source bundle (retrieved 2026-08-05), the sweep register (no binding modification found), 26 interpretive forks and the surface map. 39 assertions, none failing, with four goldens.",
+  "assertions": 39,
+  "not_reviewed": {
+    "gate": "HG1",
+    "state": "none recorded",
+    "note": "No HG1 grant or waiver was found for this encoding in legalese/l4-ide, where it was written."
+  }
+}

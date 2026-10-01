@@ -1,12 +1,12 @@
 the wage reduction rate applying on `a day in april 2025` is equal to 0
-the wage reduction rate applying on `a day in november 2025` is equal to 0.95 % 
-the wage reduction rate applying on `a day in march 2026` is equal to 1.2 % 
+the wage reduction rate applying on `a day in november 2025` is equal to 0.95%
+the wage reduction rate applying on `a day in march 2026` is equal to 1.2%
 the wage reduction rate applying on `a day in march 2027` is equal to 0
-the wage reduction rate applying on `YMD` with 2025, 5 and 1 is equal to 0.95 % 
-the wage reduction rate applying on `YMD` with 2025, 12 and 31 is equal to 0.95 % 
-the wage reduction rate applying on `YMD` with 2026, 1 and 1 is equal to 1.2 % 
-the wage reduction rate applying on `YMD` with 2026, 12 and 31 is equal to 1.2 % 
-the wage reduction rate applying on `YMD` with 2027, 1 and 1 is equal to 0
+the wage reduction rate applying on 1 May 2025 is equal to 0.95%
+the wage reduction rate applying on 31 December 2025 is equal to 0.95%
+the wage reduction rate applying on 1 January 2026 is equal to 1.2%
+the wage reduction rate applying on 31 December 2026 is equal to 1.2%
+the wage reduction rate applying on 1 January 2027 is equal to 0
 the monthly wage reduction on a determining base of 12000 with `a day in november 2025` is equal to 114
 the monthly wage reduction on a determining base of 12000 with `a day in march 2026` is equal to 144
 not `the component is in the determining base` with `the recreation payment`
@@ -19,18 +19,18 @@ not `the component is in the determining base` with `a reimbursement of expenses
 not `the reduction is ignored in computing` with `ordinary monthly pay`
 the study fund base after the section 12 reduction with 10000 and `a day in march 2026` is equal to 9880
 the section 16 withholding of a seniority step worth 130 with `TRUE` and `a day in november 2025` is equal to 130
-the section 16 withholding of a seniority step worth 130 with `TRUE` and `YMD` with 2026, 1 and 1 is equal to 0
+the section 16 withholding of a seniority step worth 130 with `TRUE` and 1 January 2026 is equal to 0
 the section 16 withholding of a seniority step worth 130 with `FALSE` and `a day in november 2025` is equal to 0
 the total shown on the single payslip line required by section 17 with 12000, 130, `TRUE` and `a day in november 2025` is equal to 244
 the total shown on the single payslip line required by section 17 with 12000, 130, `FALSE` and `a day in november 2025` is equal to 114
 the total shown on the single payslip line required by section 17 with 12000, 130, `TRUE` and `a day in march 2026` is equal to 144
 the one-off 2025 clothing allowance reduction with 2500, 2400 and 1 is equal to 191
-the one-off 2025 clothing allowance reduction with 2500, 2400 and 50 %  is equal to 95.5
+the one-off 2025 clothing allowance reduction with 2500, 2400 and 50% is equal to 95.5
 the pay for the additional substitution hour under section 25 with 64.15 and `FALSE` is equal to 16.0375
 the pay for the additional substitution hour under section 25 with 64.15 and `TRUE` is equal to 0
 `the additional hour is required of the teacher` with `FALSE`
 not `the additional hour is required of the teacher` with `TRUE`
-`the rate for the section 25 additional hour` is equal to 25 % 
+`the rate for the section 25 additional hour` is equal to 25%
 `the 2026 agreement applies to work` with `an education institution on Ofek Hadash terms`
 `the 2026 agreement applies to work` with `an ulpan on Ofek Hadash terms`
 not `the 2026 agreement applies to work` with `a teacher training college`

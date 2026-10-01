@@ -486,7 +486,7 @@ does not silence it — that set is precisely what a request would have to fill 
 3. **Remove the `@export`.** The rule still checks, runs and compiles; it is simply not published.
 
 Compiling to [Blawx](../../exports/blawx.md) is the one place this shape is fine as written, because
-a Blawx interview asks a person for the answer instead of receiving it in a request. `l4 blawx` will
+a Blawx interview asks a person for the answer instead of receiving it in a request. `l4 export blawx` will
 still compile such a file even though `l4 check` refuses to publish it.
 
 ---

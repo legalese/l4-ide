@@ -233,7 +233,7 @@ and the relational middle end turn a predicate written as
 `GIVEN p IS A Person` / ``ASSUME `is authorised` p IS A BOOLEAN`` into an input
 predicate — something a person answers in an interview rather than something a
 request sends. They are not publishing a web API, so the refusal above does not
-apply to them, and `l4 blawx` still compiles those files. What you cannot do is
+apply to them, and `l4 export blawx` still compiles those files. What you cannot do is
 publish one of them as a web API. The shipped Blawx seeds keep the `ASSUME`
 form for that reason and say so in their headers; see
 [L4 to Blawx](../../tutorials/blawx/l4-to-blawx.md).

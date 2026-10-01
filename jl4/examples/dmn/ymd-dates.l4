@@ -44,7 +44,7 @@
 -- triple that is not a real calendar day, and a day/month transposition -- are
 -- asserted there, and in `jl4/tests/DmnExport.hs`.
 --
--- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- The heading below is load-bearing: `l4 export dmn` with no
 -- `--model-name` takes the model name from the outermost `§`.
 
 IMPORT prelude

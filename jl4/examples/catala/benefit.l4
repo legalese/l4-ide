@@ -1,4 +1,4 @@
--- Appendix A of specs/todo/CATALA-EXPORT-SPEC.md, as `l4 catala` compiles it.
+-- Appendix A of specs/todo/CATALA-EXPORT-SPEC.md, as `l4 export catala` compiles it.
 --
 -- `@export` must sit ABOVE `GIVEN`: the annotation slot between `GIVETH` and
 -- `DECIDE` does not register the export (spec §10.2).

@@ -41,7 +41,7 @@ high-fidelity — and unusually useful as a cross-check.
 ## The command
 
 ```
-l4 catala FILE
+l4 export catala FILE
 ```
 
 Compiles the constitutive subset of `FILE` to a literate Catala module, printed to standard output.
@@ -53,7 +53,7 @@ Compiles the constitutive subset of `FILE` to a literate Catala module, printed 
 
 One sharp edge worth knowing before it bites: Catala takes a module's name from the **output
 file's** basename, capitalised — not CamelCased. A file named `flat-tax.catala_en` therefore
-cannot host any module at all, so `l4 catala --output` rejects a basename that could not be a legal
+cannot host any module at all, so `l4 export catala --output` rejects a basename that could not be a legal
 Catala module name rather than writing a file the toolchain would refuse.
 
 ## What it consumes
@@ -86,10 +86,10 @@ export reaches is emitted as a private **top-level definition**, which those too
 which is not meant to be published.
 
 Catala allows a scope to be called only from inside another scope. So if rule A is exported, rule B
-is not, and B calls A, there is nowhere valid for that call to go — and `l4 catala` refuses:
+is not, and B calls A, there is nowhere valid for that call to go — and `l4 export catala` refuses:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala scope — and Catala
     allows a scope call only from inside another scope. This caller is not @export'd, so it
     compiles to a toplevel definition, and the call would land outside any scope (`catala

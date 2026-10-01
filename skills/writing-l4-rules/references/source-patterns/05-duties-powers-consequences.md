@@ -23,7 +23,7 @@ be revoked".
 
 **Write** a `GIVETH A BOOLEAN` decision, in the source's own words, with no deontic in it. The
 corpus does this twice over: `` `probate may be granted to` `` above, and
-`` `registration may be granted` person … `` (`jl4/examples/legal/bna/bna.l4:461`).
+`` `registration may be granted` person … `` (`jl4/examples/canon/uk/bna-1981/bna.l4:461`).
 
 ```l4
 -- 6.—(1) The applicant may be granted a licence if the applicant is 18 years
@@ -80,7 +80,7 @@ is why they do not raise this trap and this entry does.
 > `"Upon the grant of any probate or letters of administration, the grantee shall take an oath in the prescribed form, faithfully to administer the estate and to account for the same."`
 >
 > — Probate and Administration Act 1934 s 28(1), quoted at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2715`
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2715`
 
 **It is doing** one of two quite different jobs, and the whole encoding turns on which. Either it
 **imposes a duty** — there is a party who owes it, an act they owe, and an omission that is a wrong
@@ -99,7 +99,7 @@ functions are implemented as passive evaluations as no actor is defined in the t
 implied obligation of the commission to act, but it is not written as such." On the third,
 § 227.100(a)(4) — "The issuer complies with the requirements in section 4A(b) of the Securities Act
 … and the related requirements in this part"
-(`jl4/examples/legal/regcf/denovo/source/part227.txt:120`) — is a duty imposed by another statute,
+(`source/part227.txt:120` of the `us/regcf` subject in `legalese/canon`) — is a duty imposed by another statute,
 but _here_ it is a condition of an exemption, so the encoding reads it off a record as a `BOOLEAN`
 field (`regcf-denovo.l4:1535-1536`, over the field declared at `:832`) and it is no obligation at
 all.
@@ -161,7 +161,7 @@ assert-the-boolean, trace-the-deontic division of labour.
 
 > `@ref § 227.206(a) last sentence — "No solicitation or acceptance of money or other consideration ... is permitted until the offering statement is filed"`
 >
-> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2068`, encoded at `:2078-2082`
+> — `jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2068`, encoded at `:2078-2082`
 
 **It is doing** forbidding an act, which is not the same as obliging an omission: for a prohibition,
 **doing the act is the failure**, and the deadline passing quietly is the good outcome. `SHANT`
@@ -192,7 +192,7 @@ LEST (BREACH …)` — probe `d02b-shant-noevent.l4`.)_
 **Not** a `WITHIN` borrowed from a neighbouring rule. **`SHANT … WITHIN n` sunsets at `n`**: after
 the deadline the prohibition is spent and the act is free. The same file, same events, with
 `WITHIN 365` added and the act at 400, returns `FULFILLED` (probe `d02-shant.l4`, second trace).
-This is not hypothetical — `jl4/examples/legal/regcf/regcf.l4:636-639` records it as a defect that
+This is not hypothetical — `jl4/examples/canon/us/regcf/regcf.l4:636-639` records it as a defect that
 shipped and was removed, in the encoder's own words:
 
 ```text
@@ -222,7 +222,7 @@ entry [5.7](#e5-7) for what to do with the penalty the prohibition attracts.
 > `"the LEST arm is therefore a PERMISSION and not a penalty — s 55(1) says letters "may be granted to the Public Trustee" — so it is a MAY, and an unexercised MAY collapses to FULFILLED rather than to a breach"`
 >
 > — the encoding's note at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2751-2754`, on
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2751-2754`, on
 > Probate and Administration Act 1934 s 55(1)(c)
 
 **It is doing** conferring a power on a **named actor** — the mark of the real permission, and what
@@ -285,10 +285,10 @@ which is not this.
 
 > `DECIDE \`entitled to be registered under subsection (4)\` person IF …`
 >
-> — `jl4/examples/legal/bna/bna.l4:433`, on British Nationality Act 1981 s 1(4); and, for the
+> — `jl4/examples/canon/uk/bna-1981/bna.l4:433`, on British Nationality Act 1981 s 1(4); and, for the
 > negative, `` `s 64(1) — it shall not be necessary for the Public Trustee to give notice of his
 intention to distribute the estate` `` at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2677`
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2677`
 
 **It is doing** stating a **status**, not conferring a power. "Is entitled to" says the applicant is
 inside a class; whatever the office-holder then does about it is a separate provision. "Is not
@@ -359,8 +359,8 @@ entry [5.1](#e5-1) for the passive "may", the commonest way an entitlement gets 
 > `"If the investor fails to reconfirm his or her investment within those five business days, the intermediary within five business days thereafter must: …"`
 >
 > — `17 CFR 227.304(c)(1)`, at
-> `jl4/examples/legal/regcf/denovo/source/part227.txt:632`, encoded at
-> `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2384-2404`, which the encoder calls "the richest
+> `source/part227.txt:632` of the `us/regcf` subject in `legalese/canon`, encoded at
+> `jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2384-2404`, which the encoder calls "the richest
 > deontic chain in the part: notice -> reconfirm within five business days -> else cancel, notify
 > and refund within a further five" (`:2386-2387`)
 
@@ -464,7 +464,7 @@ that shape, three rungs deep: pay, then pay with penalty, then pay everything ou
 > is a scope-out: that module lists "the s 42 offence" among the provisions it deliberately leaves
 > out (`probate-administration-act.l4:2883-2884`), as does its earlier draft (`sg-paa.l4:1082`), and
 > the Jersey charities module puts "offences" out of scope in its opening note
-> (`jl4/examples/legal/charities-cleanroom/charity-test.l4:21-23`). The count is of
+> (`jl4/examples/canon/je/charities-2014/charity-test.l4:21-23`). The count is of
 > `jl4/examples/legal/` and `jl4/examples/canon/` only. `jl4/experiments/`, which entry [5.10](#e5-10) draws on for the
 > housing grounds, holds offence vocabulary of its own — `macma2.l4` declares an `Offence` type and
 > predicates over it — but no offence-creating rule: not one of its files that mentions an offence
@@ -535,7 +535,7 @@ rather than one ceiling.
 
 > `@ref § 227.304(b)(3) — "at least five business days after the notice ... is provided"`
 >
-> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2353`, beside the three things the notice must
+> — `jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2353`, beside the three things the notice must
 > say at `:2353-2359`
 
 **It is doing** two things a drafter writes as one clause. The notice has **contents** the law
@@ -617,7 +617,7 @@ above depends on.
 > `"the probate shall be revoked, and a new probate shall be granted of the will and codicil together"`
 >
 > — Probate and Administration Act 1934 s 12(2), quoted at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2768` and encoded
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2768` and encoded
 > at `:2773-2779`
 
 **It is doing** imposing a duty and saying nothing about when. Most statutory duties are like this.

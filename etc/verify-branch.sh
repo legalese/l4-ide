@@ -28,8 +28,13 @@
 #
 # WHAT IT DOES NOT CHECK — stated because a green run must not be mistaken for
 # CI. See the memory note "local gate is not CI".
-#   DMN engine harnesses, the `go` selftest, jl4-mlir, the WASM build, Nix, and
-#   TypeScript. A PR that passes this can still go red in CI on any of those.
+#   Test suites NOT run here, although CI runs `cabal test all`: jl4-lsp-test,
+#   jl4-mlir-test, jl4-websessions-test, jl4-proleg-burden, jl4-proleg-roundtrip.
+#   Named as suites on purpose — this list used to say only `jl4-mlir`, between
+#   the WASM build and Nix, where it read as the MLIR backend among build targets
+#   rather than as a suite among suites, so five missing suites looked like one.
+#   Also not run: DMN engine harnesses, the `go` selftest, the WASM build, Nix,
+#   and TypeScript. A PR that passes this can still go red in CI on any of those.
 #
 set -uo pipefail
 
@@ -129,6 +134,10 @@ fi
 
 step "l4-cli-test"    bash -c "cd '$WT' && cabal test l4-cli-test 2>&1 | tee /tmp/vb-cli.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'l4-cli-test: PASS' /tmp/vb-cli.\$\$"
 step "jl4-core-test"  bash -c "cd '$WT' && cabal test jl4-core-test 2>&1 | tee /tmp/vb-core.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'jl4-core-test: PASS' /tmp/vb-core.\$\$"
+# jl4-service-test renders a state graph over the HTTP surface and asserts its captions
+# (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
+# lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
+step "jl4-service-test" bash -c "cd '$WT' && cabal test jl4-service-test 2>&1 | tee /tmp/vb-svc.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'jl4-service-test: PASS' /tmp/vb-svc.\$\$"
 
 step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
 
@@ -142,12 +151,32 @@ step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.m
 step "check-canon-citations --selftest" bash -c "cd '$WT' && node etc/check-canon-citations.mjs --selftest"
 step "check-canon-citations" bash -c "cd '$WT' && node etc/check-canon-citations.mjs"
 
+# The vendored mirror under jl4/examples/canon/ must equal legalese/canon at the
+# pin (CLAUDE.md §3.1). Nothing above looks at that: jl4-test compares the
+# mirror's files with the mirror's own goldens, so a mirror file edited together
+# with its golden stays green here and goes red only in CI's Canon Mirror job.
+# A merge makes exactly that edit, with no conflict, when one side moves a file
+# into the mirror and the other side edits it at its old path (measured
+# 2026-09-24 on #489). --check fetches canon at the pin; its exit 3 means canon
+# was unreachable, which offline is a normal state and not a branch defect, so
+# it is noted rather than failed.
+step "sync-canon --selftest" bash -c "cd '$WT' && node etc/sync-canon.mjs --selftest | tail -1; exit \${PIPESTATUS[0]}"
+printf '\n=== sync-canon --check (mirror = canon at the pin) ===\n'
+(cd "$WT" && node etc/sync-canon.mjs --check)
+case $? in
+  0) RESULTS+=("PASS  sync-canon --check (mirror = canon at the pin)") ;;
+  3) note "sync-canon --check SKIPPED: canon unreachable at the pin; CI's Canon Mirror job still runs it" ;;
+  *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
+esac
+
 step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6"
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
 # worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
-# not a formatting defect. Check the files this branch actually changed.
-CHANGED=$(git -C "$WT" diff --name-only "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
+# not a formatting defect. Check the files this branch actually changed, and
+# only those that still exist: `--diff-filter=d` leaves out deletions, which
+# prettier would otherwise report as "No files matching the pattern".
+CHANGED=$(git -C "$WT" diff --name-only --diff-filter=d "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
 if [ -n "$CHANGED" ]; then
   # shellcheck disable=SC2086
   step "prettier 3.4.2 (changed files)" bash -c "cd '$WT' && npx -y prettier@3.4.2 --check $(echo $CHANGED | tr '\n' ' ')"
@@ -182,8 +211,11 @@ banner
 echo "  RESULTS"
 for r in "${RESULTS[@]}"; do echo "    $r"; done
 echo
-echo "  NOT CHECKED: DMN engine harnesses, go selftest, jl4-mlir, WASM, Nix,"
+echo "  NOT CHECKED — suites CI runs and this does not: jl4-lsp-test,"
+echo "               jl4-mlir-test, jl4-websessions-test, jl4-proleg-burden,"
+echo "               jl4-proleg-roundtrip."
+echo "  NOT CHECKED — also: DMN engine harnesses, go selftest, WASM, Nix,"
 echo "               TypeScript. A green run here is not a green CI."
 echo "────────────────────────────────────────────────────────────────────"
-rm -f /tmp/vb-jl4-test.$$ /tmp/vb-cli.$$ /tmp/vb-core.$$
+rm -f /tmp/vb-jl4-test.$$ /tmp/vb-cli.$$ /tmp/vb-core.$$ /tmp/vb-svc.$$
 exit "$FAILED"

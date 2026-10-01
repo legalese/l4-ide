@@ -456,6 +456,26 @@ tag itself**, and it should not gate the tag.
 3. **Locale selection and fidelity.** `LinTree` as Reader-and-Writer; extend the fidelity channel
    to the `@nlg` consumers that have none.
 
+   **First cut BUILT 2026-09-26 (PHRASEBOOK), for `l4 nlg` only. It is not the design above.**
+   Selection was already a rewrite (`selectLanguage`), so the only missing piece was the frame
+   words, and those did not need a Reader. What was built instead:
+
+   - frame words became their own token type, `LinFrame`;
+   - a per-language table of English phrases, `L4.Nlg.Phrasebook`, is applied as one pass over
+     the finished `LinTree` (`L4.Nlg.localize`), longest phrase first.
+
+   With no `--lang`, the pass does not run, so every golden is untouched by construction. A frame
+   word with no entry stays English, and `l4 nlg` names it on stderr. That is the "recorded,
+   never silently substituted" requirement, met on stderr rather than in the fidelity channel.
+
+   Three things are **not** done:
+
+   - `l4 render` still prints English frame words, because `L4.Export.Document` builds its own
+     prose.
+   - Hebrew word order is not handled. A lexicon cannot move a possessive, so `'s` is left
+     English on purpose and reported.
+   - The Hebrew entries have had no Hebrew-speaking review.
+
 ## 4. Annotation escapes — `\%` and `\]` in `@nlg`, `\>` in `@ref` — IMPLEMENTED, not merged
 
 Independent of the language work and being landed first, because both are live defects today
@@ -1004,8 +1024,8 @@ It moves rather than copies: left on the input as well, the sentence printed twi
 **Three exclusions, each forced by a measurement rather than chosen.**
 
 - **A rule that heralds itself** keeps its own sentence; the lookup finds it before the appform.
-- **A herald written in the `GIVEN`** stays an input gloss. `l4 nlg` is RIGHT about that case and `l4 render` is wrong — measured, `GIVEN amount IS A NUMBER @nlg the sum of money` on a head with no input renders as "P seven holds if the sum of money." Agreement is not worth propagating a wrong answer, so each projection was fixed from whichever side was right. **This exclusion is not the one you would write first**: a head with no arguments does not arrive with an empty argument list, because `L4.TypeCheck.checkTermAppFormTypeSigConsistency` hoists the `GIVEN`'s term names into it. The hoist applies `clearSourceAnno`, so a hoisted argument has no source range, and that is the only thing telling the two apart. The first cut of the function did promote it.
-- **A head carrying an `AKA`** is untouched; the herald lands on the `AKA`'s name rather than on an argument, and no placement on such a head satisfies both projections. That is a different defect and needs its own issue.
+- **A herald written in the `GIVEN`** stays an input gloss, in every projection. `L4.Nlg.decideNlg` returns nothing for it (smucclaw/l4-ide#977), so for `GIVEN amount IS A NUMBER @nlg the sum of money` over a head with no input, `l4 render` describes the rule by its own body, `l4 nlg` prints the rule's bare name at a positional call, and the gloss labels `amount` in a `WITH` call's `where` clause. Row 14 of `ok/nlg-head-placement.l4` pins all three. **This exclusion is not the one you would write first**: a head with no arguments does not arrive with an empty argument list, because `L4.TypeCheck.checkTermAppFormTypeSigConsistency` hoists the `GIVEN`'s term names into it. The hoist applies `clearSourceAnno`, so a hoisted argument has no source range, and that is the only thing telling the two apart. The first cut of the function did promote it.
+- **A head carrying an `AKA`** reads the same way (smucclaw/l4-ide#978). A herald on its own line under the `AKA` lands on the alias NAME, which `L4.Nlg.decideNlgSite` searches as another spelling of the head (site `NlgOnHeadName`), and whose `%slots%` `L4.TypeCheck.Annotation.nlgAka` resolves so a call's arguments can fill them. A herald above such a head lands on the declaration rather than on the head name, so a `WITH` call reaches it only because `L4.Nlg.substituteNlgCalls` heads a named-argument call with the rule's herald, slots left as input names, and keeps the `where` clause that labels every argument. `nlgFnInfo` keys every spelling from `appFormHeads`, so a call through the alias reads the same sentence. Rows 10 and 11 of `ok/nlg-head-placement.l4` pin both placements at both call shapes. The table is built only from what `decideNlg` accepts, so a `GIVEN` gloss is never made the heading of a `WITH` call either.
 
 **What it moved, measured over every committed `.nlg.golden`** (420 unchanged, 10 changed, 99 not comparable because their modules do not typecheck and the CLI writes diagnostics to stderr while the golden appends them):
 

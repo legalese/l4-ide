@@ -131,6 +131,14 @@ export function classify(rel) {
  * vendored those by silent default and grown the mirror every time canon grew a
  * new sibling directory. The cost is that a genuinely new kind of file needs an
  * edit here; that is the intended cost.
+ *
+ * `registers/*.json` was the first such edit, ruled 2026-09-23 (LODGER, M1):
+ * the deposit registers are what etc/go reads — `natlang_sources`, `comparison`,
+ * an explainer's fork register — so a subject whose encoding lives in canon
+ * could not run p1-ingest, p2-sweep, p4-forks or p8-diff without them (the ofek
+ * sidecar recorded exactly that loss). ONE LEVEL ONLY: canon `main` keeps
+ * fetched source text under `registers/source-bundle/*.txt`, which is source,
+ * not a register, and stays out.
  */
 export function included(rel) {
   // `.l4` IS SCOPED BY DIRECTORY, not admitted at any depth.
@@ -150,6 +158,7 @@ export function included(rel) {
   if (rel.endsWith(".l4"))
     return !rel.includes("/") || rel.startsWith("cases/");
   if (rel.startsWith("tests/") && rel.endsWith(".golden")) return true;
+  if (/^registers\/[^/]+\.json$/.test(rel)) return true;
   return rel === "encoding.json" || rel === "SOURCE-LICENSE.md";
 }
 
@@ -423,13 +432,27 @@ function selftest() {
   // reject anyway tests nothing. This one fails against the unscoped rule.
   mk(join(canon, from, "report", "big.l4"), "ignored\n");
   mk(join(canon, from, "source", "_fragment.l4"), "ignored\n");
-  mk(join(canon, from, "registers", "r.json"), "ignored\n");
+  mk(join(canon, from, "registers", "r.json"), "{}\n");
+  // One level only, and JSON only: canon `main` keeps fetched text under
+  // registers/source-bundle/, which is source, not a register.
+  mk(join(canon, from, "registers", "source-bundle", "t.json"), "ignored\n");
+  mk(join(canon, from, "registers", "appendix.txt"), "ignored\n");
   const pin = { repo: "r", sha: "0".repeat(40), blessed: [{ from, to: "x" }] };
 
   const want = plan(canon, pin);
   ok(
-    "the allowlist keeps report/ and registers/ out of the mirror",
-    ![...want.keys()].some((k) => /report|registers/.test(k)),
+    "the allowlist keeps report/ out of the mirror",
+    ![...want.keys()].some((k) => /report/.test(k)),
+  );
+  ok(
+    "registers/*.json IS carried, at the path canon gave it (ruled 2026-09-23)",
+    want.has("x/registers/r.json"),
+  );
+  ok(
+    "...but only one level deep, and only .json",
+    !want.has("x/registers/source-bundle/t.json") &&
+      !want.has("x/registers/appendix.txt") &&
+      ![...want.keys()].some((k) => /source-bundle|appendix/.test(k)),
   );
   ok(
     "...including a .l4 inside them — the extension alone does not admit a file",

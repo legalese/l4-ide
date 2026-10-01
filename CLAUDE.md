@@ -29,50 +29,57 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
   mean. **The consequence that catches people: the shelf ships off `unstable`, so anything merged
   there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
 
-### 1.0 The authoring skill lives in TWO repos — correct here, port in the same session
+### 1.0 The skills live in TWO repos — correct here, port in the same session
 
-`skills/writing-l4-rules/` is duplicated verbatim in **`legalese/l4-plugin`**, at the same path,
-described there as "the L4 authoring skill packaged for use outside the l4-ide monorepo". This repo
-is upstream: `.github/workflows/release-l4-skill.yml` packages the skill into `l4-plugin.zip`, and
-the marketplace entry is `/plugin marketplace add legalese/l4-ide`.
+Every skill under `skills/` is duplicated in **`legalese/l4-plugin`**, at the same path: today
+`writing-l4-rules` (the language) and `encoding-a-subject` (encoding a whole body of law and filing
+it in canon). `.claude/skills/<name>` are symlinks to them. The pipeline skill,
+`running-the-l4-pipeline`, is in neither: Meng ruled on 2026-09-26 that it does not ship with the
+public plugin (recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout`
+branch), and on 2026-09-29 it left this repo with the `go` pipeline for the private
+`legalese/l4-pipeline`. That repo is cloned into `etc/go/`, which `.gitignore` excludes here, and
+ships the skill as its own plugin. **Nothing in this repo's CI runs the pipeline any more**; its
+own CI runs against `unstable` daily.
+This repo is upstream: `.github/workflows/release-l4-skill.yml` packages `skills/` into
+`l4-plugin.zip`. There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and
+`/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
 
-**So a correction to the skill lands here first**, per the user-level `CLAUDE.md` rule "when you
+**So a correction to a skill lands here first**, per the user-level `CLAUDE.md` rule "when you
 correct a document, find its other copies first". The bundle names this repo as its source, so the
-pointer home exists — what is missing is a working path back down.
+pointer home exists, and the path back down is the generator below.
 
-**The bundle is generated, not hand-maintained, and its generator is not in this repo.**
+**The bundle is generated, and its generator is in this repo: `etc/build-plugin-bundle.mjs`.**
 `l4-plugin`'s README says in terms: _"This directory is generated. Do not edit it by hand … Every
 file here was copied out of legalese/l4-ide by `etc/build-plugin-bundle.mjs`; edits made here are
-lost on the next build."_ That script is **not on `unstable`**. It lives on the local-only branch
-`ci/skills-layout` (6 commits ahead, never pushed), so as of 2026-09-11 it exists on one machine.
+lost on the next build."_
+So a skill fix is ported by regenerating the bundle, never by hand-copying files into it:
 
-The consequence, which anyone porting a skill fix needs to know: **there is no sanctioned mechanism
-available.** A hand-port to `l4-plugin` is a stopgap that the next regeneration silently reverts,
-and regeneration itself is unavailable to anyone without that branch. **Landing
-`etc/build-plugin-bundle.mjs` is the fix**; until then, say in the porting PR that it was
-hand-copied and will be superseded.
+1. Land the fix here first.
+2. From an l4-ide checkout at the commit to publish (normally `unstable`), with a clone of `legalese/l4-plugin` beside it, run `node etc/build-plugin-bundle.mjs <l4-plugin clone> --l4-release latest`.
+3. Review the diff in the clone and open a PR on `l4-plugin`. The bundle's README records the l4-ide commit it was generated from.
 
-One thing makes a hand-port survivable meanwhile: the relative links inside `references/` resolve
-in both, because the layout matches.
+What the script does, sorted by how its failures show up:
 
-**This paragraph used to claim a second thing — that the copies are byte-identical — and that is
-false.** Measured 2026-09-19 with `cmp`, on `origin/unstable` @ `ae74ae717`: `SKILL.md` is 799
-lines here and 796 there, differing on 21 lines, and `references/source-patterns/11-when-the-
-encoding-cannot-answer.md` and `specs/todo/IMPLICIT-PROPS-DESIGN.md` differ too. The bundle is
-BEHIND rather than divergent — its two most recent commits are `docs(skill): re-sync — ditto's
-positive case` and `docs(skill): re-sync — cite canon NOTES.md §9.2`, i.e. the hand-port stopgap
-this section warns about, actually happening, one file at a time.
+- It empties the output directory, keeping only `.git`, then copies the skills and every repo file their text cites, each at its original path (except `jl4-core/libraries/`, which the `l4` binary carries), and writes the bundle's README and manifests.
+- **Loud:** it then checks the bundle from the outside. Every citation and markdown link in the bundled skills must resolve, or it lists them and exits 1. That is a defect in the skill, not in the script.
+- **Loud, not fatal:** with `--l4-release`, it pins `scripts/install-l4.sh` to a release on `legalese/prereleases`; if the shelf cannot be reached, it prints `NO INSTALLER EMITTED` and builds the rest.
+- **Silent:** without `--l4-release`, no installer is written, and because the directory was emptied first, the bundle's existing `scripts/install-l4.sh` is deleted with no message. Pass the flag every time.
+
+**The copies are identical only just after a regeneration.** Measured 2026-09-27:
+`diff -rq skills <l4-plugin>/skills` is empty (28 files each), with `l4-plugin` at `cc907b5`
+(generated from `a3ebc0e76`) and `unstable` at `98a975c72`. Every skill change that lands here
+afterwards leaves the bundle BEHIND until the next regeneration.
 
 So `diff` is still the right instrument, but read it as **"how far behind is the bundle"** and not
-as "this should be empty". A non-empty diff is the NORMAL state until `etc/build-plugin-bundle.mjs`
-lands, and a reader who expects emptiness will conclude someone edited the bundle by hand when
-nobody has. What IS worth checking is whether a specific claim you are porting matches: the ofek
-citations, for instance, are identical in both trees even though the files around them are not
+as "this should be empty".
+Against today's tree a non-empty diff is normal between regenerations; to ask whether anyone edited the bundle by hand, diff it against the l4-ide commit its README names.
+What IS worth checking is whether a specific claim you are porting matches: the citations into
+canon, for instance
 (`etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` checks exactly that,
-and both trees resolve 7 of 7). One thing does not port: prose asserting something is "verifiable in situ" is false
+and both trees resolved 7 of 7 on 2026-09-27). One thing does not port: prose asserting something is "verifiable in situ" is false
 in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it. Say which tree a
-check needs. Note also that the README points at `.claude/skills/writing-l4-rules/`, which is the
-symlink; the tracked path is `skills/writing-l4-rules/` (see the skill-path symlink hazard).
+check needs. Edit the tracked path, `skills/<name>/`, not the `.claude/skills/<name>` symlink (see
+the skill-path symlink hazard).
 
 > **Why.** PR #382 corrected two claims in the skill — `#EVAL`'s `OF` form, and a provenance note
 > asserting the DMN exporter was not on `unstable`. Both were equally wrong in `l4-plugin`, and
@@ -80,6 +87,13 @@ symlink; the tracked path is `skills/writing-l4-rules/` (see the skill-path syml
 > the repo name. I then hand-edited the bundle, which its own README forbids on the first screen —
 > because I ported before reading it. The generator's absence from `unstable` was found only after
 > that, which is the more useful half of the finding.
+>
+> The generator landed on 2026-09-11 (`3c92bbc4e`), and this section went on saying it had not.
+> On 2026-09-25 legalese/l4-plugin#2 believed it and hand-copied the bundle, and the copy lost
+> `scripts/validate.sh`'s executable bit (`100755` here, `100644` there), so the command
+> `scripts/README.md` tells users to run failed with "Permission denied". legalese/l4-plugin#3
+> regenerated the bundle the next day and the bit came back. A hand-copy fails silently; the
+> generator does not.
 
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 
@@ -146,6 +160,52 @@ there.
 > with it. Same family as §3.2.1's snapshot rule — a probe that reads a name rather than a fact
 > reports confidently about a world it is not observing.
 
+### 2.2 Cloud sessions (claude.ai/code): the paths above do not exist, and neither does the toolchain on PATH
+
+A cloud session gets one fresh clone at `/home/user/l4-ide`, checked out on whatever branch the
+session was pointed at; there is no `~/src/legalese`. The rule survives the move, only the paths
+change: treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, e.g.
+`git -C /home/user/l4-ide worktree add -b <branch> /home/user/l4wt/<name> origin/unstable`. The
+clone is **shallow**, so `git log -S` and `git blame` answer from a truncated history — a pickaxe
+that finds only a merge commit is reporting the depth limit, not the origin of the change.
+
+**The toolchain is installed but not reachable.** Measured 2026-09-24 in a default cloud
+environment:
+
+| tool           | installed at            | on the agent's PATH?                                    |
+| -------------- | ----------------------- | ------------------------------------------------------- |
+| GHC 9.10.2     | `~/.ghcup/bin`          | **no** — `ghc: command not found`                       |
+| cabal 3.16.1.0 | `~/.ghcup/bin`          | **no**                                                  |
+| Node           | `/opt/node22/bin` (v22) | yes, and it is the **wrong** one                        |
+| nvm            | `/opt/nvm`              | loaded by `~/.bashrc`, which agent shells do not source |
+
+Node 22 fails `npm ci` outright with `EBADENGINE`: `package.json` requires `>=24` and `.npmrc`
+sets `engine-strict=true`. `nvm install 24` succeeds and sets the default alias, **and the next
+shell is still on 22**, because `/opt/node22/bin` is hard-coded in PATH and nothing loads nvm.
+`/root/.local/bin` is first on PATH, so linking into it is what works. Put this in the
+environment's setup script (tested by hand, not yet as a setup script):
+
+```bash
+source /opt/nvm/nvm.sh
+nvm install 24
+N="$(dirname "$(nvm which 24)")"
+for b in node npm npx corepack; do ln -sf "$N/$b" /root/.local/bin/$b; done
+for b in ghc ghc-pkg ghci cabal; do ln -sf /root/.ghcup/bin/$b /root/.local/bin/$b; done
+```
+
+With that, `npm ci` completes (40 s) and `npm run format:check` passes. Two things it does not fix:
+the cabal store starts **empty** — `cabal build all --dry-run` plans 254 units from scratch, so the
+first build is a cold one unless the setup script pre-builds dependencies (whether that is cached
+across sessions is unmeasured); and npm 11, which ships with Node 24, **skipped package install
+scripts** in that run, esbuild's among them, which has not been checked against the
+Vite/Svelte builds.
+
+> **Why.** On 2026-09-24 the pre-commit gate in `AGENTS.md` could not run in a cloud session at
+> either of its first two steps (`cabal test all`, then `npm ci`), while `etc/verify-branch.sh`'s
+> prettier step still worked — so a session that trusted the latter could believe it had run the
+> gate. `.nvmrc` said `20` at the time, contradicting `>=24`; nothing in the tree or in CI reads it
+> (every workflow pins `24.x`), which is how it drifted unnoticed.
+
 ---
 
 ## 3. Build and test facts
@@ -177,7 +237,8 @@ Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-l
 etc/verify-branch.sh [--quick] [--base <ref>] <ABSOLUTE-worktree-path>
 ```
 
-It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `check-corpus-goldens`,
+It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test`,
+`check-corpus-goldens`, `check-canon-citations`, the canon-mirror check (`sync-canon.mjs --check`),
 `doc/test-docs.sh` and prettier, pins `JL4_LIBRARY_PATH` for you, and exits non-zero on any failure.
 `--quick` skips `jl4-test`, which is the ~12-minute one.
 
@@ -239,6 +300,19 @@ deleting the stale golden and running the suite twice is right everywhere else a
 wrong move here, because it makes this repository's copy disagree with canon silently. Edit the
 file in canon, re-bless it there, then `node etc/sync-canon.mjs --bump <sha> --ref <branch>`. The
 `Canon Mirror` CI job fails when the mirror and canon at the pin disagree.
+
+**A merge can edit the mirror for you, with no conflict and no red test.** When one branch moves a
+file into the mirror and another edits it at its old path, git's rename detection carries the edit
+onto the mirror copy. `jl4-test` stays green, because the file and its `.ep.golden` moved and
+changed together, and the conflict list is silent, because nothing conflicted. After any merge that
+involves a branch moving subjects into canon, run `node etc/sync-canon.mjs --check`;
+`etc/verify-branch.sh` now does. To repair, restore the mirror copies (`--pull` when the pin is
+right) and make the intended edit in canon instead.
+
+> **Why.** 2026-09-24: #490 respelled two comments in `legal/miles-card/uob-ladys-solitaire.l4`,
+> and SUITCASE (#489) moved that file to `canon/contracts/payments/sg-miles-card/`. Merging the
+> first into the second put the respelled text into the mirror. The full local gate passed on the
+> merged tree, and only CI's `Canon Mirror` job caught it.
 
 > **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that
 > unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then

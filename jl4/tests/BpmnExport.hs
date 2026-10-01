@@ -486,7 +486,17 @@ sameDecideTwoArgsSrc =
 
 node :: StateId -> Text -> StateType -> FanKind -> ContractState
 node i nm ty fan =
-  ContractState {stateId = i, stateName = nm, stateType = ty, stateFan = fan}
+  -- A hand-built state records no rule construct and no obligation site: the
+  -- fixture is not extracted from source, so there is no range to correlate
+  -- with, and the renderer's suppression ('L4.StateGraph.stateSite') stays off.
+  ContractState
+    { stateId = i
+    , stateName = nm
+    , stateType = ty
+    , stateFan = fan
+    , stateConstruct = Nothing
+    , stateSite = Nothing
+    }
 
 -- | An obligation edge. The label is as plain as the type allows: any
 -- difference between two of these is the thing under test.
@@ -500,6 +510,7 @@ edge src dst ty act =
           { labelParty = Just "Alice"
           , labelModal = Just DMust
           , labelAction = act
+          , labelBinds = Nothing
           , labelOpening = Nothing
           , labelDeadline = Nothing
           , labelGuard = Nothing
@@ -968,13 +979,13 @@ graphWithDeadline due =
     { sgName = "unit"
     , sgDecide = Nothing
     , sgStates =
-        [ ContractState 0 "initial" InitialState Linear
-        , ContractState 1 "Fulfilled" TerminalFulfilled Linear
-        , ContractState 2 "Breach" TerminalBreach Linear
+        [ ContractState 0 "initial" InitialState Linear Nothing Nothing
+        , ContractState 1 "Fulfilled" TerminalFulfilled Linear Nothing Nothing
+        , ContractState 2 "Breach" TerminalBreach Linear Nothing Nothing
         ]
     , sgTransitions =
-        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" Nothing (Just due) Nothing Nothing Nothing Nothing) HenceTransition
-        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing Nothing) LestTransition
+        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" Nothing Nothing (Just due) Nothing Nothing Nothing Nothing) HenceTransition
+        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing Nothing Nothing) LestTransition
         ]
     , sgInitialState = 0
     }
@@ -2336,7 +2347,7 @@ spec = do
   -- arms do not line up with the table's rows, or quietly wiring nothing while
   -- the fidelity report still claimed a loss it no longer has.
   describe "the DMN wiring (PROCESS-TRACK.md §8.3)" $ do
-    let regcf = "legal" </> "regcf" </> "regcf.l4"
+    let regcf = "canon" </> "us" </> "regcf" </> "regcf.l4"
 
         wiredExport ruleName wiring = do
           dataDir <- Paths_jl4.getDataDir
@@ -2508,7 +2519,7 @@ spec = do
   -- regulative rules and a BPMN document holds exactly one process, so one
   -- source yields three pairs of goldens.
   --
-  -- The Reg CF rows read from @legal\/regcf\/regcf.l4@ — the corpus itself
+  -- The Reg CF rows read from @canon\/us\/regcf\/regcf.l4@ — the corpus itself
   -- (1,268 lines since the rule-version axis landed), not a fixture beside it. There used to be a hand-written
   -- @bpmn\/regcf.l4@ standing in for it, because the extractor could not see
   -- past an @IfThenElse@ to the deontic head and every corpus duty is written
@@ -2545,7 +2556,7 @@ spec = do
     , ("bpmn" </> "option.l4", "the option", "option")
     ]
 
-  regcfCorpus = "legal" </> "regcf" </> "regcf.l4"
+  regcfCorpus = "canon" </> "us" </> "regcf" </> "regcf.l4"
 
   goldenCase srcPath ruleName out ext render = do
     dataDir <- Paths_jl4.getDataDir

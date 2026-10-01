@@ -36,7 +36,7 @@
 -- the assumed name's ARITY and refuses both spellings at check time.
 --
 -- WHAT THAT MEANS HERE, CONCRETELY. `l4 check` on this file reports 21
--- refusals and nothing is wrong with it; `l4 blawx` compiles it unchanged, and
+-- refusals and nothing is wrong with it; `l4 export blawx` compiles it unchanged, and
 -- the committed goldens are byte-identical across the change. The two legs part
 -- company at exactly those two diagnostics, by name, through
 -- `L4.TypeCheck.Types.isExportPublicationRefusal`: they say a JSON request
@@ -49,7 +49,7 @@
 -- TWO TYPES ARE RENAMED, and the reason is a hard Blawx error, not taste.
 -- The original has both a TYPE `Conduct` and an accessor `conduct`, and both a
 -- TYPE `Effect` and an accessor `effect`. Measured on this tree, `l4 check`
--- accepts that and `l4 blawx` refuses it:
+-- accepts that and `l4 export blawx` refuses it:
 --
 --     in `conduct`: name collision (Blawx): distinct L4 definitions `Conduct`
 --     and `conduct` both mangle to the Blawx atom `conduct` — rename one

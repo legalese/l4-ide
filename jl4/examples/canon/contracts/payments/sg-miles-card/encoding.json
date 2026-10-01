@@ -1,0 +1,35 @@
+{
+  "encoder": "legalese",
+  "display_name": "Which card earns the most on this purchase — DBS yuu, DBS Woman's World, Citi Rewards, HSBC Revolution, UOB Lady's Solitaire, POSB PAssion, and two flat-rate cards with no held T&C",
+  "status": "draft",
+  "status_checked": "2026-09-21",
+  "version": "0.1.0",
+  "versions_encoded": "Each issuer's T&C as retrieved 2026-09-21; no rule-version axis (no dated arms — the encoding cannot answer about an earlier revision of any card's terms). See registers/source-bundle.json for each document's own currency statement.",
+  "license": "Apache-2.0",
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "modules": [
+    "miles-card-domain.l4",
+    "classify.l4",
+    "categorize.l4",
+    "dbs-yuu.l4",
+    "dbs-womans-world.l4",
+    "citi-rewards.l4",
+    "hsbc-revolution.l4",
+    "uob-ladys-solitaire.l4",
+    "posb-passion.l4",
+    "flat-cards.l4",
+    "miles-card.l4",
+    "miles-card-cases.l4",
+    "cheatsheet-claims.l4",
+    "miles-card-disputed.l4"
+  ],
+  "scope": "The reward-earning provisions ONLY of eight card products: what a transaction earns, under what cap, against what pool, subject to what conditions. NOT the credit facility itself — no interest, fees, credit limits or repayment terms. NOT the two flat-rate cards' full terms — UOB PRVI Miles and Citi PremierMiles have no held T&C, so every answer about them is Unconfirmed by declaration. An acceptance test (spec cheatsheet-2026-06, an additional non-primary encoding, cheatsheet-claims.l4) checks the household's own cheat sheet as 184 blind property assertions over this model: 129 satisfied, 55 failed, triaged in ../../ACCEPTANCE-TRIAGE.md and restated as 112 assertions in miles-card-disputed.l4. Zero of the 55 were classified as the encoding being wrong. 731 scenario assertions across the eight issuer modules plus the composer; 848 total with the disputed module. 56 goldens (4 per module x 14 modules).",
+  "assertions": 848,
+  "projections": {
+    "app": "projections/app/ — a generator (gen-d.mjs) projecting this encoding into the data table (D[]) of a consumer comparison app, against a hand-written fact side (scenarios.json) mirroring the app's own 51 rows. DIFF.md classifies every disagreement with the app's hand-edited array as of homelab commit 48c1bcc: 29 where the encoding disagrees (six findings, none conceded), 16 the domain cannot express (no cashback card, no fee-bearing rail, an unheld savings-account uplift), 319 rendering or curation only."
+  },
+  "hg1": "WAIVED, not signed — see gates/HG1.waiver.md. status above is draft, not reviewed, because of that waiver, notwithstanding that the machine gates (p6-tests, p7-catala, p3-check) all passed."
+}

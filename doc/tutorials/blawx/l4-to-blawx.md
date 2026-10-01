@@ -1,9 +1,9 @@
 # Exporting L4 to Blawx (and Importing Back)
 
 This tutorial walks the L4↔Blawx bridge end to end: compiling an L4 module
-into a Blawx project with `l4 blawx`, loading it into a running Blawx
+into a Blawx project with `l4 export blawx`, loading it into a running Blawx
 server, running the generated tests and interviews there, and lifting a
-Blawx-authored project back into L4 with `l4 blawx --import`.
+Blawx-authored project back into L4 with `l4 import blawx`.
 
 It assumes you know L4 and have read the companion explanation page,
 [Blawx and s(CASP): a Field Guide for L4 People](../../concepts/neighbours/blawx-and-scasp.md),
@@ -66,8 +66,8 @@ DECIDE `insurance covered` IF
 One command compiles it:
 
 ```bash
-$ l4 blawx jl4/examples/blawx/rodents.l4 -o rodents.blawx
-l4 blawx: s(CASP) dump written to rodents.pl
+$ l4 export blawx jl4/examples/blawx/rodents.l4 -o rodents.blawx
+l4 export blawx: s(CASP) dump written to rodents.pl
 ```
 
 Two artifacts come out:
@@ -277,7 +277,7 @@ a two-parameter, no-result input falls between the two shapes and is
 refused by name:
 
 ```
-l4 blawx: cannot compile these decisions to Blawx:
+l4 export blawx: cannot compile these decisions to Blawx:
   - arity-two.l4:31:1-33:43: in `severity exceeds`: input predicate with no
     category subject (Blawx): `severity exceeds` is an input of total arity 2,
     which Blawx has no declaration block for. …
@@ -386,7 +386,7 @@ rather than papered over.
 
 ## Importing from Blawx
 
-The bridge runs backwards too: `l4 blawx --import` parses a `.blawx`
+The bridge runs backwards too: `l4 import blawx` parses a `.blawx`
 project — the Blockly XML (Extensible Markup Language) is treated as
 canonical — and lifts the
 stratified ground fragment into an L4 module. The shipped worked example
@@ -395,7 +395,7 @@ example from the concepts page). Reproduce it from the container image:
 
 ```bash
 docker cp blawx:/app/blawx/blawx/static/blawx/examples/bird.yaml .
-l4 blawx --import bird.yaml -o bird.l4
+l4 import blawx bird.yaml -o bird.l4
 ```
 
 The import prints WARNING lines noting that the example's _stored_ s(CASP)

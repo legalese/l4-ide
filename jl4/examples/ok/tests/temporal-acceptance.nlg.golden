@@ -1,6 +1,6 @@
-`EVER BETWEEN` with `Date` with 5, 1 and 2024, `Date` with 7, 1 and 2024 and `weekend?`
-`ALWAYS BETWEEN` with `Date` with 6, 1 and 2024, `Date` with 7, 1 and 2024 and `weekend?`
-`EVER BETWEEN` with `Date` with 12, 1 and 2024, `add days` with `Date` with 12, 1 and 2024 and 2 and `weekend?`
-`WHEN LAST` with `Date` with 10, 1 and 2024 and `weekend?`
-`WHEN NEXT` with `Date` with 10, 1 and 2024 and `weekend?`
-`VALUE AT` with `Date` with 4, 7 and 1776 and given `d` then `d`
+`EVER BETWEEN` with 5 January 2024, 7 January 2024 and `weekend?`
+`ALWAYS BETWEEN` with 6 January 2024, 7 January 2024 and `weekend?`
+`EVER BETWEEN` with 12 January 2024, `add days` with 12 January 2024 and 2 and `weekend?`
+`WHEN LAST` with 10 January 2024 and `weekend?`
+`WHEN NEXT` with 10 January 2024 and `weekend?`
+`VALUE AT` with 4 July 1776 and given `d` then `d`

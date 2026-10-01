@@ -1430,7 +1430,7 @@ renderDoc ctx doc = do
   -- ------------------------------------------------------------------
   headerPara =
     Text.intercalate "\n" $
-      [ "-- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5)."
+      [ "-- Imported from Blawx by `l4 import blawx` (BLAWX-EXPORT-SPEC R14, §10 P5)."
       , "--"
       ]
         <> ["--   source        " <> ctx.lcSource | not (Text.null ctx.lcSource)]

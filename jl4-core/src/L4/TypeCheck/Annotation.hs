@@ -49,6 +49,12 @@ nlgDecide (MkDecide ann tySig appForm body) =
     <*> nlgAppForm appForm
     <*> nlgExpr body
 
+-- | The quantifier's filter, either spelling ('L4.Syntax.Filter').
+nlgFilter :: Filter Resolved -> Check (Filter Resolved)
+nlgFilter = \ case
+  Who ann e   -> Who ann <$> nlgExpr e
+  Whose ann e -> Whose ann <$> nlgExpr e
+
 nlgExpr :: Expr Resolved -> Check (Expr Resolved)
 nlgExpr = \ case
     And ann e1 e2 -> do
@@ -154,7 +160,7 @@ nlgExpr = \ case
       subj' <- case subj of
         Party sann party -> Party sann <$> nlgExpr party
         Every sann mCast v mRoll mFilter ->
-          Every sann mCast v <$> traverse nlgExpr mRoll <*> traverse nlgExpr mFilter
+          Every sann mCast v <$> traverse nlgExpr mRoll <*> traverse nlgFilter mFilter
       rule' <- nlgPattern rule
       provided' <- traverse nlgExpr provided
       let nlgAnchor = \ case
@@ -278,7 +284,16 @@ nlgAppForm (MkAppForm ann n ns maka) =
   MkAppForm ann
     <$> resolveNlgAnnotationInResolved n
     <*> traverse resolveNlgAnnotationInResolved ns
-    <*> traverse resolveNlgAnnotation maka
+    <*> traverse nlgAka maka
+
+-- | The @AKA@'s own annotation, and each alias name's. A herald on its own line
+-- under @\`r\` p AKA \`a\`@ lands on the alias name, and left parsed its
+-- @%slots%@ had no 'Unique' to splice a call's arguments into
+-- (smucclaw\/l4-ide#978).
+nlgAka :: Aka Resolved -> Check (Aka Resolved)
+nlgAka aka = do
+  MkAka ann ns <- resolveNlgAnnotation aka
+  MkAka ann <$> traverse resolveNlgAnnotationInResolved ns
 
 nlgTypeSig :: TypeSig Resolved -> Check (TypeSig Resolved)
 nlgTypeSig (MkTypeSig ann givenSig mGivethSig) =

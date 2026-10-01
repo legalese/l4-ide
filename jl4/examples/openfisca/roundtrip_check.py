@@ -1,4 +1,4 @@
-"""Defensibility round-trip: load a module emitted by `l4 openfisca`, run it in
+"""Defensibility round-trip: load a module emitted by `l4 export openfisca`, run it in
 a real OpenFisca simulation, and assert the results match the L4 #EVAL values.
 
 Usage (inside the openfisca venv):

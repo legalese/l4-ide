@@ -38,7 +38,15 @@
     # `README.md` and `PROJECTIONS.md`. Verified by replicating that script
     # against a loopback service, which reported `exportCount: 6` from
     # `regcf-wizard.l4` and `ready:1, total:1`.
-    services.jl4-service.bundles.regcf = ../../jl4/examples/legal/regcf;
+    #
+    # MOVED 2026-09-23 (LODGER): the corpus is now the vendored canon mirror.
+    # This directory holds the same two modules, byte-identical, plus `tests/`,
+    # `registers/`, `encoding.json`, `SOURCE-LICENSE.md` and the nested
+    # `cleanroom/` row. The old directory held its de novo module at `denovo/`
+    # in the same nested position, so the pre-seed hash and copy see the same
+    # modules as before. The loopback check above was NOT re-run against the
+    # new path.
+    services.jl4-service.bundles.regcf = ../../jl4/examples/canon/us/regcf;
 
     services.nginx.virtualHosts.${config.networking.domain}.locations = {
       ${config.services.regcf-wizard.path} = {

@@ -450,15 +450,15 @@ data Deonton n
 data Subject n
   = Party Anno (Expr n)
     -- ^ @PARTY e@: one party, an expression of the contract's party type.
-  | Every Anno (Maybe n) n (Maybe (Expr n)) (Maybe (Expr n))
-    -- ^ @EVERY [Cast] v [IN roll] [WHO filter]@: one obligation per member of
+  | Every Anno (Maybe n) n (Maybe (Expr n)) (Maybe (Filter n))
+    -- ^ @EVERY [Cast] v [IN roll] [WHO filter | WHOSE filter]@: one obligation per member of
     -- the cast, narrowed to those built by the constructor @Cast@ when it is
     -- given (@EVERY Tenant t@ — 'Tenant' is a /constructor/ of the party type
     -- under the value-actor encoding, not a type) and to those satisfying
     -- @filter@ when it is given.
     --
     -- The fields, in source and hole order: the cast, the variable, the @IN@
-    -- ROLL, the @WHO@ filter.
+    -- ROLL, the filter ('Filter': @WHO@ or @WHOSE@).
     --
     -- The variable @v@ is bound, at the party type, in the filter, the action,
     -- the act's @WITHIN@, @HENCE@ and @LEST@ — but NOT in the @IN@ roll, and
@@ -599,6 +599,44 @@ data Deadline n
 -- Mirrors 'Deadline': the fields, in source and hole order, are the offset
 -- (or instant), then the anchor; the @AFTER@ keyword is a token of this
 -- node's own 'Anno'.
+-- | The quantifier's filter clause — which members of the roll the rule
+-- speaks to. Two spellings of one thing (EVERY-EACH-QUANTIFIER-SPEC §13.6,
+-- RULED 2026-09-21):
+--
+-- > EVERY Tenant t IN tenants WHO   t's arrears AT LEAST 1000
+-- > EVERY Tenant t IN tenants WHOSE arrears     AT LEAST 1000
+--
+-- @WHO@ takes a Boolean expression in which the member is named explicitly.
+-- @WHOSE@ takes the same expression with one thing filled in for the drafter:
+-- the FIRST word of each operand is a field of the cast, and the checker
+-- rewrites it to @v's field@ — by POSITION, so no other bare name in the
+-- expression changes meaning, and nothing turns on what else is in scope
+-- ('L4.TypeCheck.checkQuantifierFilter'). Operands are the top-level @AND@ /
+-- @OR@ chain, so the asyndetic operators give the one-constraint-per-line
+-- layout for free:
+--
+-- > WHOSE arrears  AT LEAST 1000
+-- >   ... standing EQUALS   "current"
+--
+-- Anything whose first word is not a field of the cast is refused, naming the
+-- cast and its fields and pointing at @WHO@ — which stays the general form.
+--
+-- The keyword is a token of this node's own 'Anno', as in 'Opening'.
+data Filter n
+  = Who   Anno (Expr n)
+  | Whose Anno (Expr n)
+  deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The filter's expression, whichever word introduced it. By the time
+-- anything downstream of the checker looks, a @WHOSE@ operand's first word
+-- has already been rewritten to @v's field@, so the two spellings are one
+-- Boolean expression ('L4.TypeCheck.checkQuantifierFilter').
+filterExpr :: Filter n -> Expr n
+filterExpr = \ case
+  Who _ e   -> e
+  Whose _ e -> e
+
 data Opening n
   = MkOpening
   { anno :: Anno
@@ -1082,6 +1120,8 @@ deriving via L4Syntax (Deadline n)
   instance HasAnno (Deadline n)
 deriving via L4Syntax (Opening n)
   instance HasAnno (Opening n)
+deriving via L4Syntax (Filter n)
+  instance HasAnno (Filter n)
 deriving via L4Syntax (Anchor n)
   instance HasAnno (Anchor n)
 deriving via L4Syntax (RAction n)
@@ -1134,6 +1174,7 @@ deriving anyclass instance ToConcreteNodes PosToken UponEach
 deriving anyclass instance ToConcreteNodes PosToken (Threshold Name)
 deriving anyclass instance ToConcreteNodes PosToken (Deadline Name)
 deriving anyclass instance ToConcreteNodes PosToken (Opening Name)
+deriving anyclass instance ToConcreteNodes PosToken (Filter Name)
 deriving anyclass instance ToConcreteNodes PosToken (Anchor Name)
 -- DeonticModal has no source tokens, so return empty list
 instance ToConcreteNodes PosToken DeonticModal where
@@ -1193,6 +1234,7 @@ deriving anyclass instance ToConcreteNodes PosToken (Join Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Threshold Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Deadline Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Opening Resolved)
+deriving anyclass instance ToConcreteNodes PosToken (Filter Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Anchor Resolved)
 -- Manual instance for RAction to skip the modal field (which has no source tokens)
 instance ToConcreteNodes PosToken (RAction Resolved) where
@@ -1458,6 +1500,7 @@ deriving anyclass instance HasSrcRange UponEach
 deriving anyclass instance HasSrcRange (Threshold a)
 deriving anyclass instance HasSrcRange (Deadline a)
 deriving anyclass instance HasSrcRange (Opening a)
+deriving anyclass instance HasSrcRange (Filter a)
 deriving anyclass instance HasSrcRange (Anchor a)
 deriving anyclass instance HasSrcRange (LocalDecl a)
 deriving anyclass instance HasSrcRange (NamedExpr a)
@@ -1543,6 +1586,7 @@ deriving anyclass instance Serialise UponEach
 deriving anyclass instance Serialise n => Serialise (Threshold n)
 deriving anyclass instance Serialise n => Serialise (Deadline n)
 deriving anyclass instance Serialise n => Serialise (Opening n)
+deriving anyclass instance Serialise n => Serialise (Filter n)
 deriving anyclass instance Serialise n => Serialise (Anchor n)
 deriving anyclass instance Serialise DeonticModal
 deriving anyclass instance Serialise n => Serialise (RAction n)

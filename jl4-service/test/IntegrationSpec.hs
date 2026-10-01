@@ -1396,7 +1396,17 @@ spec = describe "integration" do
                     -- `the sale contract` is two nested MUSTs, each with a
                     -- WITHIN and an explicit LEST BREACH, so both LEST arms are
                     -- reached by the clock and both read "timeout".
-                    dotText `shouldSatisfy` Text.isInfixOf "label=timeout"
+                    --
+                    -- The caption names the deadline that TAKES the arm, so it
+                    -- is per-edge — 14 on the delivery, 30 on the invoice — and
+                    -- GraphViz then quotes it. This read `label=timeout` until
+                    -- 2026-09-21 and the deadline broke it: an unquoted
+                    -- `label=timeout` is exactly what the emitter stopped
+                    -- producing, and `Text.isInfixOf` on it went from true to
+                    -- false in a suite the change's author did not run. Assert
+                    -- the whole caption, so the next move is caught here too.
+                    dotText `shouldSatisfy` Text.isInfixOf "label=\"timeout [14]\""
+                    dotText `shouldSatisfy` Text.isInfixOf "label=\"timeout [30]\""
                     -- and nothing here is a prohibition or a deadline-less rule
                     dotText `shouldNotSatisfy` Text.isInfixOf "violation"
                     dotText `shouldNotSatisfy` Text.isInfixOf "unreachable"

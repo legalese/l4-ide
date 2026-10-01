@@ -200,6 +200,18 @@ in any of its formats. Both take `--lang`.
 In both, a call to a rule that carries a herald reads as that herald with the call's arguments in its `%slots%`: `#EVAL `is large` 150` linearizes as `the amount 150 is large`.
 An argument the herald does not mention is not dropped; it follows the sentence as `with …`, so a herald written without slots still shows every value the call supplied.
 
+`l4 nlg` writes a date given as literals as a date: `YMD 2025 7 16` and `Date 16 7 2025` both read `16 July 2025`.
+That covers only daydate's own `YMD` and `Date`, only when all three arguments are whole numbers, and only when they name a real day.
+Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
+A percentage reads `50%`.
+
+The words L4 itself puts around your sentences — "is equal to", "not", "with", a month's name — follow `--lang` in `l4 nlg`.
+For ``#EVAL `is large` 150 EQUALS TRUE`` over the rule above, `l4 nlg --lang he` prints ``150 עולה על הסף שווה ל־`TRUE` `` where `l4 nlg` prints ``the amount 150 is large is equal to `TRUE` ``.
+They come from a table of phrases, not a grammar, so the English word order stays: a Hebrew line is Hebrew words in the order English would put them.
+A word the table has no entry for stays English, and `l4 nlg` names it on stderr, so you can see what was not translated.
+The Hebrew table has not yet been reviewed by a Hebrew-speaking lawyer, and `l4 render` does not use it yet.
+Without `--lang`, nothing changes.
+
 In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
 `lang` is the `--lang` you asked for, or the module's `@lang` if you asked for nothing, or `en`.
 `dir="rtl"` is added for a right-to-left language — decided from the script subtag when the tag carries one, so `he-Latn` is left-to-right and `az-Arab` is not — and omitted for every other, left-to-right being HTML's own default.
@@ -318,15 +330,14 @@ Each row is one rule; the two `l4 nlg` columns are a positional call and a `WITH
 | 7   | name and input, then `MEANS`   | own line under input   | sentence            | sentence        | sentence    |
 | 8   | `DECIDE` name and input        | trailing the head      | sentence            | sentence        | sentence    |
 | 9   | name, then input, then `MEANS` | own line BEFORE input  | sentence            | sentence        | sentence    |
-| 10  | name and input with `AKA`      | own line after the AKA | sentence            | sentence        | **bare**    |
-| 11  | name and input with `AKA`      | own line above         | **bare name**       | **bare name**   | sentence    |
+| 10  | name and input with `AKA`      | own line after the AKA | sentence            | sentence        | sentence    |
+| 11  | name and input with `AKA`      | own line above         | sentence            | sentence        | sentence    |
 
-Rows 5, 7 and 8 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
+Rows 5, 7, 8, 10 and 11 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
 The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](../../../jl4/examples/ok/nlg-head-placement.l4), whose committed golden pins both `l4 nlg` columns, and a CLI test pins the `l4 render` one — so a change to any cell is a test failure rather than stale prose here.
 
-**A head carrying an `AKA` is the one shape where the two projections still disagree**, rows 10 and 11.
-The annotation lands on the `AKA`'s name rather than on an input, which is a different question from this one, and no placement on such a head satisfies both projections.
-Write the sentence above the head if the document matters more, under the `AKA` if `l4 nlg` does.
+**A head carrying an `AKA` reads the same way**, rows 10 and 11.
+Under the `AKA` the annotation lands on the alias name, and an alias is another name for the rule, so the annotation is the rule's sentence; a call through the alias reads it too.
 
 **Where the sentence goes when you write it in the `GIVEN` instead.**
 That is an input gloss and stays one — it labels the input in a `WITH` call's `where` clause, and it is not the rule's sentence.

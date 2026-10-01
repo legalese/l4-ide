@@ -1,0 +1,35 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-anchor-instances.l4:22:27-32:
+  I found a problem while checking the definition of `note within 3 of the cure`:
+    In this action, `alice` refers to
+    
+      alice (at run-anchor-instances.l4:17:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-anchor-instances.l4:23:32-35:
+  I found a problem while checking the definition of `note within 3 of the cure`:
+    In this action, `bob` refers to
+    
+      bob (at run-anchor-instances.l4:18:1-4)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-anchor-instances.l4:26:1-28:35:
+  DEONTIC BREACHED:
+    party
+      Person OF "Bob"
+    who did action
+      Note OF (Person OF "Bob")
+    at
+      9
+    surpassed the deadline of party
+      Person OF "Bob"
+    who had to do obligatory action
+      MUST Note bob
+    before their deadline, which was at
+      5
+run-anchor-instances.l4:31:1-33:35:
+  FULFILLED
+run-anchor-instances.l4:37:1-38:35:
+  PARTY bob MUST Note bob WITHIN 3 OF THE JOIN HENCE FULFILLED

@@ -64,7 +64,9 @@ Five things to notice, because they organise everything else:
 
 ## 3 · The “⟨law⟩: go” pipeline
 
-One instruction — _“SEC Regulation Crowdfunding: go”_, _“British Nationality Act: go”_ — names a body of law, and the pipeline takes it from source text to every artifact we can honestly produce:
+One instruction — _“SEC Regulation Crowdfunding: go”_, _“British Nationality Act: go”_ — names a body of law, and the pipeline takes it from source text to every artifact we can honestly produce.
+The pipeline is Legalese's own tooling and lives in a private repository, `legalese/l4-pipeline`; the language, the exporters and the corpus it runs over are all in this public one.
+Its stages:
 
 ```mermaid
 flowchart LR
@@ -223,13 +225,13 @@ The two notations are wired together: where a process forks on a decision, our e
 
 You know this field from the OPA side; here is where we sit among the neighbours, and why we transpile _to_ several of them rather than compete head-on:
 
-| system                                                              | what it is                                                                                      | our relationship                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [OPA / OIA](https://www.oracle.com/cx/service/intelligent-advisor/) | commercial natural-language rules + interviews; the strongest isomorphism tradition in industry | your expertise transfers near-verbatim; we add forks, formal checks, open standards, git                                                                                                                                               |
-| [OpenFisca](https://openfisca.org)                                  | open-source Python microsimulation; runs national benefit systems (France, NZ…)                 | **a compile target**: `l4 openfisca` emits it. Our NZ benefits pilot imported an OpenFisca rulebase and swept it with property tests — finding what a handful of hand tests could not                                                  |
-| [Blawx](https://www.blawx.com)                                      | visual, block-based rules-as-code over stable-model semantics (Jason Morris)                    | **a two-way interchange target**: `l4 blawx` emits decisions as s(CASP) with justification trees and interviews, and `l4 blawx --import` lifts Blawx projects back into L4 — see [Blawx and s(CASP)](../neighbours/blawx-and-scasp.md) |
-| [Catala](https://catala-lang.org)                                   | a French academic language pairing source text with default logic, aimed at tax code            | closest in spirit on literate isomorphism; we differ on deontics, projections and the review pipeline                                                                                                                                  |
-| [docassemble](https://docassemble.org)                              | open-source guided interviews and document assembly                                             | delivery-layer neighbour of the wizard leg                                                                                                                                                                                             |
+| system                                                              | what it is                                                                                      | our relationship                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [OPA / OIA](https://www.oracle.com/cx/service/intelligent-advisor/) | commercial natural-language rules + interviews; the strongest isomorphism tradition in industry | your expertise transfers near-verbatim; we add forks, formal checks, open standards, git                                                                                                                                                    |
+| [OpenFisca](https://openfisca.org)                                  | open-source Python microsimulation; runs national benefit systems (France, NZ…)                 | **a compile target**: `l4 export openfisca` emits it. Our NZ benefits pilot imported an OpenFisca rulebase and swept it with property tests — finding what a handful of hand tests could not                                                |
+| [Blawx](https://www.blawx.com)                                      | visual, block-based rules-as-code over stable-model semantics (Jason Morris)                    | **a two-way interchange target**: `l4 export blawx` emits decisions as s(CASP) with justification trees and interviews, and `l4 import blawx` lifts Blawx projects back into L4 — see [Blawx and s(CASP)](../neighbours/blawx-and-scasp.md) |
+| [Catala](https://catala-lang.org)                                   | a French academic language pairing source text with default logic, aimed at tax code            | closest in spirit on literate isomorphism; we differ on deontics, projections and the review pipeline                                                                                                                                       |
+| [docassemble](https://docassemble.org)                              | open-source guided interviews and document assembly                                             | delivery-layer neighbour of the wizard leg                                                                                                                                                                                                  |
 
 The positioning in one line: **L4 is the reviewed source of truth; everything else is a projection.** One encoding, checked once, signed once — then DMN for the BPM shops, OpenFisca for the benefits modellers, wizards for citizens, MCP for the AIs.
 
@@ -286,6 +288,9 @@ There are two ways to get the third, and **only one of them involves Haskell**. 
 git clone https://github.com/legalese/l4-ide.git
 cd l4-ide
 git checkout unstable
+
+# the pipeline itself: a private Legalese repository, which runs from here
+git clone git@github.com:legalese/l4-pipeline.git etc/go
 ```
 
 **Route one — download it.** Pick your platform from the prerelease shelf, [legalese/prereleases](https://github.com/legalese/prereleases/releases). The archives are named `l4-unstable-<date>-<commit>-<platform>.tar.gz`, one each for `darwin-arm64`, `linux-x64` and `win32-x64`:
@@ -325,7 +330,7 @@ claude
 > SEC Regulation Crowdfunding: go
 ```
 
-That phrasing is the trigger, not decoration. A skill in the repository (`.claude/skills/running-the-l4-pipeline`) matches on it and dispatches `etc/go/go.sh`, then supplies the judgements the script cannot make for itself. Any subject named the same way counts — the pipeline is subject-generic, and what is specific to one body of law lives in a sidecar under `etc/go/subjects/<subject>/`.
+That phrasing is the trigger, not decoration. A skill that ships with the pipeline, `running-the-l4-pipeline`, matches on it and dispatches `etc/go/go.sh`, then supplies the judgements the script cannot make for itself. Any subject named the same way counts — the pipeline is subject-generic, and what is specific to one body of law lives in a sidecar under `etc/go/subjects/<subject>/`.
 
 If you would rather see the machinery than talk to it, the driver is usable directly, and `plan` is the honest first command — it prints which stages will run and which are scaffolded entry points that refuse:
 

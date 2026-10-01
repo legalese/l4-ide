@@ -52,7 +52,7 @@ so write `IMPORT prelude` whenever you use a prelude name and no other library h
 
 **It is doing** nothing at all — which is the difficulty. "A reader who finds s 33 and then s 35
 cannot otherwise tell whether s 34 was overlooked or is not there to be encoded"
-(`jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2242-2246`).
+(`jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2242-2246`).
 
 **Write** a labelled stub carrying the repeal note as inert prose, with **no operative outcome** —
 nothing calls it.

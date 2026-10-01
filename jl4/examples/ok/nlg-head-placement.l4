@@ -41,10 +41,11 @@
 --   7  `r` p / herald / MEANS ...      own line BELOW the p    herald          herald     herald
 --   8  DECIDE `r` p IS ...             trailing the head       herald          herald     herald
 --   9  `r` / herald / p MEANS ...      own line ABOVE the p    herald          herald     herald
---  10  `r` p AKA `a` / herald / MEANS  own line below the AKA  herald          herald     BARE
---  11  herald / `r` p AKA `a` MEANS    own line above          BARE NAME       BARE NAME  herald
+--  10  `r` p AKA `a` / herald / MEANS  own line below the AKA  herald          herald     herald
+--  11  herald / `r` p AKA `a` MEANS    own line above          herald          herald     herald
 --  12  `r` p q / herald / MEANS ...    own line below the q    herald          herald     herald
 --  13  herald / `r` p / herald / MEANS both                    OUTER           OUTER      OUTER
+--  14  GIVEN p @nlg g / DECIDE `r` IF  trailing the GIVEN name  BARE NAME       gloss      rule's own body
 --
 -- Rows 5, 7, 8 and 12 are the repair. Before it they printed the bare rule name
 -- positionally; rows 1-4, 6 and 9 already read the herald and are unchanged,
@@ -65,11 +66,13 @@
 -- and the inner herald stays the input's gloss. An author who writes both meant
 -- two different things.
 --
--- (c) An `AKA` on the head is a SEPARATE axis and this change does not touch
--- it. Row 10 reaches `l4 nlg` (the AKA's name claims the herald) and not
--- `l4 render`; row 11 reaches `l4 render` and not `l4 nlg`. So on an `AKA` head
--- there is still no placement that satisfies both. That is not #972 -- the
--- herald there is not on an appform argument -- and it needs its own issue.
+-- (c) An `AKA` on the head is a SEPARATE axis (smucclaw/l4-ide#978). Row 10's
+-- herald lands on the AKA's NAME, which L4.Nlg.decideNlg searches as another
+-- spelling of the head. Row 11's herald lands on the declaration, which the
+-- head name does not carry, so a `WITH` call reaches it through the directive
+-- splice, which heads a named-argument call with the rule's herald. Both
+-- placements read as the rule's sentence everywhere, and a call through the
+-- alias name reads the same as one through the head name.
 --
 -- The prelude writes row 5's shape 67 times (`null list @nlg %list% is empty`),
 -- so those 67 sentences reach a positional `l4 nlg` call for the first time
@@ -169,10 +172,10 @@ GIVETH A BOOLEAN
 #EVAL `row nine` WITH amount IS 200
 
 -- Row 10: an AKA on the head, herald on a line of its own below it. The AKA's
--- name claims the herald, so it is not on an appform argument, nothing is
--- moved, and the pre-existing asymmetry stands: `l4 nlg` prints it and
--- `l4 render` prints its own paraphrase. Pinned so that a later change to the
--- AKA case has to notice this file.
+-- name claims the herald; it is not on an appform argument, so nothing is
+-- moved, and it reads as the rule's sentence because the alias is searched as
+-- a spelling of the head (smucclaw/l4-ide#978). The third call goes through
+-- the alias name.
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
 `row ten` amount AKA `row ten alias`
@@ -181,12 +184,13 @@ GIVETH A BOOLEAN
 
 #EVAL `row ten` 200
 #EVAL `row ten` WITH amount IS 200
+#EVAL `row ten alias` 200
 
--- Row 11: the same AKA head with the herald ABOVE it. `l4 render` finds it, and
--- so does `l4 nlg` -- not through the head-input repair (the herald is on no
--- appform argument) but through the directive splice, which reads a herald
--- wherever `decideNlg` finds one and fills its slots from the call. Row 10 is
--- now the one row in this table where the two projections still disagree.
+-- Row 11: the same AKA head with the herald ABOVE it. It lands on the
+-- declaration, not on the head name, so `l4 nlg` reaches it through the
+-- directive splice: a positional call fills its slots from the arguments, and
+-- a `WITH` call takes it as its heading and keeps its `where` clause
+-- (smucclaw/l4-ide#978).
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
 @nlg row eleven saw %amount%
@@ -222,3 +226,18 @@ GIVETH A BOOLEAN
 
 #EVAL `row thirteen` 200
 #EVAL `row thirteen` WITH amount IS 200
+
+-- Row 14: the herald is written on the GIVEN name and the head names NO input.
+-- That is a gloss for the input, not a sentence for the rule, and it must read
+-- that way: the bare rule name at a positional call, the gloss as the input's
+-- label in the `where` clause, and `l4 render` describing the rule by its own
+-- body. The type checker hoists GIVEN names into an empty head, so the gloss
+-- used to be found as though it sat on a head input: `l4 render` printed
+-- "Row fourteen holds if the sum of money.", and after #458 `l4 nlg` printed
+-- "the sum of money with 200" (smucclaw/l4-ide#977).
+GIVEN amount IS A NUMBER @nlg the sum of money
+GIVETH A BOOLEAN
+DECIDE `row fourteen` IF amount GREATER THAN 100
+
+#EVAL `row fourteen` 200
+#EVAL `row fourteen` WITH amount IS 200

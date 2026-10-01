@@ -8,7 +8,7 @@
 --     capture group whose pattern no longer matches the term that named it,
 --     and an UNBALANCED one raises re.error while the Interview is being
 --     constructed — the emitted interview then cannot be loaded at all, while
---     `l4 check` and `l4 docassemble` both report success. Expect
+--     `l4 check` and `l4 export docassemble` both report success. Expect
 --     DA-GLOSS-REGEX and no glossary entry.
 --
 --   * `notice` folds onto `Notice` under docassemble's own key normalisation

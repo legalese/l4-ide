@@ -22,7 +22,7 @@ clean answer rather than a diagnostic.
 
 > `-- AMBIGUITY A3 — 6(1)(p), "any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)".` … `-- TAKEN: (i). "may reasonably be regarded" is the language of judgement, and 6(2)(f) is expressed as one instance ..., not as an exhaustive definition. Encoded as an input judgement rather than a computed one: this module records WHO decided the analogy, it does not decide it. That is a real limit on what this formalisation can verify and it is stated here rather than papered over.`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:339-350`, on the Charities (Jersey)
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:339-350`, on the Charities (Jersey)
 > Law 2014.
 
 **It is doing** leaving a category **open**. A closing limb like "any other purpose analogous to the
@@ -135,7 +135,7 @@ permission.
 
 > `` `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations` IS A BOOLEAN ``
 >
-> — `jl4/examples/legal/regcf/regcf.l4:563`, a field of `IntermediaryArrangement`, read at `:603` as
+> — `jl4/examples/canon/us/regcf/regcf.l4:563`, a field of `IntermediaryArrangement`, read at `:603` as
 > the second limb of `` `the intermediary has discharged its investor-facing duties` ``.
 
 **It is doing** imposing a duty **on one party to have formed a view about another**. The subject of
@@ -190,7 +190,7 @@ distinction one level up.
 
 > `-- The Article 7 determination, as a record of what the determiner found and what the determiner did. Two of these fields are TRUTH-conditional (they can change whether the entity provides public benefit); four are PROCEDURAL (they record compliance with Article 7(2) and 7(3)(a), which bind the determiner's reasoning, not the entity's status).`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:156-160`, above `DECLARE
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:156-160`, above `DECLARE
 PublicBenefitFinding`.
 
 **It is doing** two jobs the same sentence usually hides. A determination has a **content** (what was

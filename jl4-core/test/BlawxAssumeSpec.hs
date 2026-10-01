@@ -11,7 +11,7 @@
 -- fallback needs to be pinned by. Each source below is a few lines, runs the
 -- REAL pipeline end to end (type check → 'lowerModule' → 'lowerBlawx' →
 -- 'renderBlawxYaml'), and asserts on the emitted text — so nothing here can
--- drift from what @l4 blawx@ writes.
+-- drift from what @l4 export blawx@ writes.
 --
 -- The relational half is pinned by @jl4\/examples\/relational\/expected\/@
 -- (@assumed@, @assumed-nullary@, @not-ok-assumed-signatures@,
@@ -45,7 +45,7 @@ import L4.TypeCheck.Types (Severity (..))
 -- API, and this leg does not serve one: an assumed predicate is what becomes an
 -- @#abducible@ the Blawx interview asks the user about, which is the very thing
 -- the modules below exist to pin. 'TC.isExportPublicationRefusal' names exactly
--- those two, @l4 blawx@ steps over the same pair at 'L4.Cli.Blawx.loadBlawxDoc',
+-- those two, @l4 export blawx@ steps over the same pair at 'L4.Cli.Blawx.loadBlawxDoc',
 -- and every other 'SError' still fails the spec. An earlier version of this
 -- comment warned that swallowing the error would "claim support for a spelling
 -- no user can compile"; that warning stands for every other diagnostic, and the
@@ -202,7 +202,7 @@ spec = do
   -- the section's position (@clean/clean.py:193@, @generate_section@), so a
   -- pinned number is the whole of what makes @according_to(sec_4_section, ...)@
   -- agree with the source. Everything below is asserted on the emitted YAML,
-  -- so it cannot drift from what @l4 blawx@ writes.
+  -- so it cannot drift from what @l4 export blawx@ writes.
   describe "the author pins the CLEAN section number (§11 W3)" $ do
     it "a leading CLEAN index picks the section, and is written only once" $ do
       out <- emitted pinnedModule
@@ -401,7 +401,7 @@ spec = do
     -- The verifier's counterexample to the first cut of this refusal (2026-09-02):
     -- the check tested the operand's sort for `RSRecord` at the TOP only, so a
     -- container of records walked straight through. Measured before the fix, on
-    -- exactly this module: `l4 blawx` exited 0 and emitted
+    -- exactly this module: `l4 export blawx` exited 0 and emitted
     -- `members(A,Members), members(B,Members2), Members = Members2.` — the same
     -- by-value/by-atom divergence the bare-record case has, with a green exit
     -- code. The corpus twin is `jl4/examples/blawx/not-ok/record-identity-list.l4`.

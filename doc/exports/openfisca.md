@@ -37,7 +37,7 @@ encoding. Compiling to it means:
 ## The command
 
 ```
-l4 openfisca FILE
+l4 export openfisca FILE
 ```
 
 Compiles the decision-rule subset of `FILE` to a single runnable OpenFisca Python module, printed

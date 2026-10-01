@@ -2175,7 +2175,9 @@ checkDeonton ann subject action opens due mjoin hence lest partyT actionT =
       -- action, the ACT's deadline, HENCE and LEST. The cast, when given, is a
       -- constructor of that party type (value-actor encoding: @Tenant@ is a
       -- constructor of @Actor@, not a type).
-      mCastR <- traverse (checkQuantifierCast partyT) mCast
+      mCastInfo <- traverse (checkQuantifierCast partyT) mCast
+      let mCastR     = fst <$> mCastInfo
+          mCastFields = (,) <$> mCast <*> (snd <$> mCastInfo)
       -- R-Q1 (RULED 2026-09-07): under a quantifier the join line is
       -- mandatory whenever there is a continuation. No default: a barrier
       -- default would silently reverse today's single-party @MAY … HENCE@.
@@ -2221,7 +2223,7 @@ checkDeonton ann subject action opens due mjoin hence lest partyT actionT =
       rv <- def v
       rv' <- setAnnResolvedTypeOfResolved partyT (Just Local) rv
       extendKnown (makeKnown rv (KnownTerm partyT Local)) do
-        filterR <- traverse (\e -> checkExpr ExpectQuantifierFilterContext e boolean) mFilter
+        filterR <- traverse (checkQuantifierFilter mCastFields v) mFilter
         -- The performer/actor agreement check ('checkRegulativeActorAgreement')
         -- is silent for a computed party (actors-and-actions.md §7); a bound
         -- variable is one, so it is not run here. Nor is it run at run time:
@@ -2489,17 +2491,141 @@ checkDeontonBody mPartyR partyT actionT action opens due joinHasDeadline hence l
 -- party type. A constructor with a payload (@Tenant HAS name IS A STRING@) has
 -- a function type; only its result must agree, since the quantifier ranges
 -- over the values it builds, not over its fields.
-checkQuantifierCast :: Type' Resolved -> Name -> Check Resolved
+checkQuantifierCast :: Type' Resolved -> Name -> Check (Resolved, [Name])
 checkQuantifierCast partyT c = do
   (rc, ct) <- resolveConstructor c
   t <- instantiate ct
   expect ExpectQuantifierCastContext partyT (resultType t)
-  setAnnResolvedTypeOfResolved t (Just Constructor) rc
+  rc' <- setAnnResolvedTypeOfResolved t (Just Constructor) rc
+  pure (rc', castFields ct)
   where
     resultType = \ case
       Forall _ _ t' -> resultType t'
       Fun _ _ t'    -> resultType t'
       t'            -> t'
+    -- The fields of the cast, in declaration order: a record constructor's
+    -- type is a function from its NAMED arguments, and those names are the
+    -- field names @WHOSE@ reads (§13.6).
+    castFields = \ case
+      Forall _ _ t' -> castFields t'
+      Fun _ onts _  -> [ getName n | MkOptionallyNamedType _ (Just n) _ <- onts ]
+      _             -> []
+
+-- | The quantifier's filter, @WHO@ or @WHOSE@ ('L4.Syntax.Filter'; §13.6,
+-- RULED 2026-09-21).
+--
+-- @WHO@ is checked as written. @WHOSE@ is the same expression with one thing
+-- filled in: the FIRST word of each operand is a field of the cast, and this
+-- rewrites it to @v's field@ before checking. The rule is POSITIONAL — only
+-- the first word of an operand is touched, so no other bare name changes
+-- meaning and nothing turns on what else is in scope. That is what lets
+-- @WHOSE@ exist without field-opening reaching regulatives (which would make
+-- every bare name in the rule a candidate: §11.7 of IMPLICIT-PROPS-DESIGN,
+-- and the interaction PATTERN-REFERENCE-RULE-SPEC §10 item 4 flags).
+--
+-- Operands are the top-level @AND@\/@OR@ chain, so the asyndetic operators
+-- (@...@, @..@) give one constraint per line for free.
+checkQuantifierFilter :: Maybe (Name, [Name]) -> Name -> Filter Name -> Check (Filter Resolved)
+checkQuantifierFilter mCastFields v = \ case
+  Who ann e   -> Who ann <$> checkExpr ExpectQuantifierFilterContext e boolean
+  Whose ann e -> do
+    (e', ok) <- rewriteWhose mCastFields v e
+    -- A word WHOSE could not read as a field has no meaning to fall back on:
+    -- checking it anyway makes the checker report the unknown name and then
+    -- the operator it could not disambiguate around it, and those two
+    -- generic errors arrive BEFORE the one that says what is wrong. So the
+    -- filter is checked as written only when every operand was read; when one
+    -- was not, this rule's filter is the constant TRUE for the rest of the
+    -- pass (the module is in error either way, and nothing runs).
+    Whose ann <$> checkExpr ExpectQuantifierFilterContext (if ok then e' else whoseTrue ann) boolean
+
+-- | Rewrite the first word of each operand of a @WHOSE@ filter into a
+-- projection on the member. Reports, and leaves the operand alone, when that
+-- word is not a field of the cast — or when the operand does not begin with a
+-- word at all.
+rewriteWhose :: Maybe (Name, [Name]) -> Name -> Expr Name -> Check (Expr Name, Bool)
+rewriteWhose mCastFields v = operands
+  where
+    -- the top-level AND/OR chain: each branch is its own constraint, which is
+    -- what makes the asyndetic operators (@...@, @..@) one line per field
+    operands = \ case
+      And ann e1 e2 -> do
+        (e1', ok1) <- operands e1
+        (e2', ok2) <- operands e2
+        pure (And ann e1' e2', ok1 && ok2)
+      Or ann e1 e2 -> do
+        (e1', ok1) <- operands e1
+        (e2', ok2) <- operands e2
+        pure (Or ann e1' e2', ok1 && ok2)
+      e -> operand e
+
+    operand e = case mCastFields of
+      Nothing -> do
+        addError (WhoseWithoutCast v e)
+        pure (e, False)
+      Just (cast, fields) -> leftmost cast fields e
+
+    -- The FIRST word of the operand, by source position: descend the left
+    -- spine, and into an application's first argument only when that argument
+    -- was written before the head (an infix operator like @AT LEAST@). A
+    -- projection is already explicit and is left alone, which is what makes
+    -- the printed form (@WHOSE t's arrears …@) read back the same.
+    leftmost cast fields e = case e of
+      App ann n []                          -> project ann cast fields n
+      App ann n (a : as) | startsBefore a n -> rebuild (\ a' -> App ann n (a' : as)) a
+      Equals ann a b                        -> rebuild (\ a' -> Equals ann a' b) a
+      Leq ann a b                           -> rebuild (\ a' -> Leq ann a' b) a
+      Geq ann a b                           -> rebuild (\ a' -> Geq ann a' b) a
+      Lt ann a b                            -> rebuild (\ a' -> Lt ann a' b) a
+      Gt ann a b                            -> rebuild (\ a' -> Gt ann a' b) a
+      Plus ann a b                          -> rebuild (\ a' -> Plus ann a' b) a
+      Minus ann a b                         -> rebuild (\ a' -> Minus ann a' b) a
+      Times ann a b                         -> rebuild (\ a' -> Times ann a' b) a
+      DividedBy ann a b                     -> rebuild (\ a' -> DividedBy ann a' b) a
+      Modulo ann a b                        -> rebuild (\ a' -> Modulo ann a' b) a
+      Cons ann a b                          -> rebuild (\ a' -> Cons ann a' b) a
+      Implies ann a b                       -> rebuild (\ a' -> Implies ann a' b) a
+      Proj {}                               -> pure (e, True)
+      _                                     -> do
+        addError (WhoseOperandNotBare e)
+        pure (e, False)
+      where
+        rebuild k a = do
+          (a', ok) <- leftmost cast fields a
+          pure (k a', ok)
+
+    project ann cast fields n
+      | rawName n `elem` map rawName fields = pure (whoseProjection ann v n, True)
+      | otherwise                           = do
+          addError (WhoseNotAField n cast fields)
+          pure (App ann n [], False)
+
+    startsBefore a n = case (rangeOf a, rangeOf n) of
+      (Just ra, Just rn) -> ra.start < rn.start
+      _                  -> False
+
+-- | The filter a @WHOSE@ falls back to when one of its operands could not be
+-- read: the constant @TRUE@, so that the words the checker could not make
+-- sense of raise ONE diagnostic — the one that explains them — instead of an
+-- unknown name and an ambiguous operator around it. Only ever reached in a
+-- module that is already in error.
+whoseTrue :: Anno -> Expr Name
+whoseTrue ann = App a (MkName a (NormalName "TRUE")) []
+  where
+    a = Anno mempty (rangeOf ann) [mkHoleWithSrcRangeHint (rangeOf ann)]
+
+-- | @v's f@ for a @WHOSE@ read, built exactly as field opening builds its own
+-- (@L4.Desugar.projectOn@): the read's range on the projection AND on its
+-- operand, two range-hinted token-free holes so the semantic-token pass
+-- reaches the label, and a range-less member occurrence so the read is not
+-- recorded as a reference at the EVERY line.
+whoseProjection :: Anno -> Name -> Name -> Expr Name
+whoseProjection ann v n =
+  Proj (Anno mempty (rangeOf ann) [ hole, mkHoleWithSrcRangeHint (rangeOf n) ])
+    (Var (Anno mempty (rangeOf ann) [hole]) (clearSourceAnno v))
+    n
+ where
+  hole = mkHoleWithSrcRangeHint (rangeOf ann)
 
 checkAction :: RAction Name -> Type' Resolved -> Check (RAction Resolved, [CheckInfo])
 checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
@@ -6220,7 +6346,10 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       -- The filter is a BOOLEAN context ('go True'); the roll is a LIST, so it
       -- is not one.
       Every ann mCast v mRoll mFilter ->
-        Every ann mCast v (fmap (go False ctx') mRoll) (fmap (go True ctx') mFilter)
+        Every ann mCast v (fmap (go False ctx') mRoll) (fmap (goFilter ctx') mFilter)
+    goFilter ctx' = \ case
+      Who ann e   -> Who ann (go True ctx' e)
+      Whose ann e -> Whose ann (go True ctx' e)
     goRAction ctx' (MkAction ann modal pat provided) =
       MkAction ann modal pat (fmap (go False ctx') provided)
     goBranch ctx' (MkBranch ann lhs e) = MkBranch ann lhs (go False ctx' e)
@@ -6853,6 +6982,48 @@ prettyCheckError (ContinuationWithoutJoin _) =
   , "on its own line between the act's WITHIN and the HENCE or LEST, indented"
   , "past the EVERY. There is no default: the two readings differ, and guessing"
   , "one would silently change the rule."
+  ]
+prettyCheckError (WhoseWithoutCast v _) =
+  [ "WHOSE reads the first word of each line as a FIELD of the cast — but this"
+  , "EVERY has no cast to take the fields from: it binds " <> quotedName v <> " over every"
+  , "member of the roll, whatever shape each one has."
+  , ""
+  , "Name the cast:"
+  , ""
+  , "  EVERY Tenant " <> prettyLayout v <> " IN tenants WHOSE arrears AT LEAST 1000"
+  , ""
+  , "or write the filter with WHO, where the member is named:"
+  , ""
+  , "  EVERY " <> prettyLayout v <> " IN tenants WHO " <> prettyLayout v <> "'s arrears AT LEAST 1000"
+  ]
+prettyCheckError (WhoseNotAField n cast fields) =
+  [ "WHOSE reads the first word of each line as a field of the cast, and"
+  , ""
+  , "  " <> quotedName n <> " is not a field of " <> prettyLayout cast <> "."
+  ]
+  <> (if null fields
+        then [ "", prettyLayout cast <> " has no fields to read." ]
+        else [ ""
+             , "Its fields are:"
+             , ""
+             ] <> [ "  " <> prettyLayout f | f <- fields ])
+  <> [ ""
+     , "Write one of those, or write this line with WHO, where every name is"
+     , "spelled out."
+     ]
+prettyCheckError (WhoseOperandNotBare _) =
+  [ "WHOSE reads the FIRST word of each line as a field of the cast, and this"
+  , "line does not begin with a word it can read that way."
+  , ""
+  , "One constraint per line, the field first:"
+  , ""
+  , "  WHOSE arrears  AT LEAST 1000"
+  , "    ... standing EQUALS   \"current\""
+  , ""
+  , "Anything else — a negation, a call, a parenthesis — is written with WHO,"
+  , "where the member is named:"
+  , ""
+  , "  WHO NOT (t's standing EQUALS \"current\")"
   ]
 prettyCheckError (AnchorUnavailable edge a reason) =
   case reason of

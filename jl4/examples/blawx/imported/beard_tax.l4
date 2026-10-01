@@ -1,4 +1,4 @@
--- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
+-- Imported from Blawx by `l4 import blawx` (BLAWX-EXPORT-SPEC R14, §10 P5).
 --
 --   source        beard_tax.yaml
 --   ruledoc       "Beard Tax Act"

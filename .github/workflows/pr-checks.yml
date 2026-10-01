@@ -34,7 +34,6 @@ jobs:
       dmn: ${{ steps.filter.outputs.dmn }}
       catala: ${{ steps.filter.outputs.catala }}
       bpmn: ${{ steps.filter.outputs.bpmn }}
-      go: ${{ steps.filter.outputs.go }}
     steps:
       # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
       # so the repo must be checked out with history. Without this, push events
@@ -71,22 +70,6 @@ jobs:
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
-              # `etc/go/**` is here for one reason: the step below runs the go
-              # selftest's four BINARY-GATED assertions, and they are worthless
-              # if the PRs most likely to break them cannot reach this job. The
-              # Go Orchestrator job is deliberately Node-only and builds no
-              # `l4`, so without this line a PR editing only `etc/go/selftest.mjs`
-              # would run the selftest WITHOUT a binary -- reporting "all checks
-              # passed (5 skipped)" -- and the four assertions would stay dark in
-              # their new home exactly as they were in their old one. Moving a
-              # check into a job the change cannot trigger does not un-dark it.
-              #
-              # The price is that a go-only PR now costs a full Haskell build.
-              # That is the same trade the `.mjs`, `etc/**` and `.claude/**`
-              # entries below already bought, and it is bought here for a
-              # sharper reason: those closed a gate that could not run at all,
-              # this one closes a gate that runs and says PASS.
-              - 'etc/go/**'
               - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
@@ -154,40 +137,6 @@ jobs:
               # untouched: `prettier --check .` skips extensions it has no
               # parser for.)
               - 'paper/**'
-            # The `go` orchestrator, and the skill that is its entry point.
-            # `.claude/**` matches NO other filter — not 'typescript' (which does
-            # carry etc/**) and not 'docs' (doc/** + specs/**) — so before this
-            # entry a skill-only PR ran ZERO jobs: unformatted, with its command
-            # table free to drift away from etc/go/go.sh unnoticed. The skill and
-            # the driver are one unit and are gated as one.
-            go:
-              - 'etc/go/**'
-              # ALL skills, not just the pipeline one. Narrowed to
-              # running-the-l4-pipeline, this filter left every other skill
-              # ungated: on 2026-08-09 writing-l4-rules was still exhibiting a
-              # corpus defect repaired that same day as the live present state,
-              # and nothing would have run on a PR that touched only it.
-              #
-              # THAT WIDENING NEVER ARRIVED, and the note that stood here -- "verified
-              # before widening that `.claude/skills/**/*.md` is prettier-clean, so this
-              # adds coverage without turning CI red" -- was true about the files and
-              # false about the coverage. `.claude/skills/writing-l4-rules` is a
-              # SYMLINK (mode 120000, target `../../skills/writing-l4-rules`), so that
-              # skill's 22 files are tracked under `skills/`, which this glob cannot
-              # match. Only `running-the-l4-pipeline` is a real directory under
-              # `.claude/`, and only it was ever gated. Both paths are named now: the
-              # symlink for the pipeline skill, the tracked tree for everything else.
-              #
-              # Worth knowing what this does and does not buy. Since `repo-wide` went
-              # unfiltered (f267cfb3), a skill-only PR ALREADY runs `prettier --check .`
-              # and the whole-tree link/anchor/orphan sweep -- so this is not the
-              # difference between some checks and none, as an earlier reading of the
-              # hole had it. `check-skill-drift.mjs` still hardcodes the pipeline
-              # skill. What `skills/**` buys today is that this filter's reach finally
-              # matches its claim, and that a future check over `skills/` fires.
-              - '.claude/skills/**'
-              - 'skills/**'
-              - 'specs/todo/single-instruction-demo/**'
             mlir:
               - 'jl4-mlir/**'
               # Re-trigger the mlir jobs when the jobs themselves change (e.g.
@@ -202,20 +151,23 @@ jobs:
             dmn:
               - 'jl4-core/src/L4/Dmn/**'
               - 'jl4/examples/dmn/**'
-              # The corpus SOURCE, for every subject whose sidecar declares a
-              # p7-dmn leg: since such a corpus gates on both engines (R12/R13),
+              # The corpus SOURCE, for every corpus with an engine-checked DMN
+              # golden: since such a corpus gates on both engines (R12/R13),
               # an edit to it must reach them directly, not only transitively
               # through a forced golden regen under dmn/expected.
               #
-              # A `paths:` filter is static YAML and cannot be derived from the
-              # sidecars, so this list is MAINTAINED BY HAND and CHECKED by
-              # etc/check-subject-ci-coverage.mjs, which fails naming the exact
-              # line to add when a subject declares p7-dmn and its encoding
-              # directory matches nothing here. Add the directory, do not
+              # A `paths:` filter is static YAML, so this list is MAINTAINED BY
+              # HAND. It is checked from the other side of a repository
+              # boundary: the go pipeline's subject sidecars, which say which
+              # corpus produces which golden, moved to the private
+              # legalese/l4-pipeline on 2026-09-29, and its
+              # check-subject-ci-coverage.mjs reads this file and names the
+              # line to add. It runs in that repository's CI, not on this PR.
+              # Add the directory, do not
               # broaden to `jl4/examples/legal/**` — that would run both Java
               # engines on every corpus edit in the repo, including subjects
               # with no DMN leg at all.
-              - 'jl4/examples/legal/regcf/**'
+              - 'jl4/examples/canon/us/regcf/**'
               - 'etc/kie-dmn-check/**'
               - 'etc/camunda-dmn-check/**'
               - 'etc/validate-dmn.mjs'
@@ -379,16 +331,7 @@ jobs:
       - name: Every corpus .l4 ships its four goldens
         run: node etc/check-corpus-goldens.mjs
 
-      # Same reasoning as the job above, one level up: the filters cannot see
-      # THIS failure either. A subject that declares a leg CI gates, but whose
-      # corpus directory no `paths:` filter matches, simply never triggers the
-      # job -- so the leg reports nothing, and reporting nothing looks exactly
-      # like passing. No filter, no build, no `needs`: it runs on every event
-      # precisely because the thing it checks is which events run what.
-      - name: Every subject's declared legs are exercised by CI
-        run: node etc/check-subject-ci-coverage.mjs
-
-      # Third instance of the same reasoning. `NOT` in L4 is delimited by
+      # Second instance of the same reasoning. `NOT` in L4 is delimited by
       # LAYOUT, not by precedence: on one line it swallows every operator that
       # follows it, so `NOT a AND b` means `NOT (a AND b)` and bracketing the
       # OPERAND -- `NOT (a) AND b` -- does not narrow it. The compiler now
@@ -561,235 +504,6 @@ jobs:
   # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
   # which is precisely what we want to hear about. Exit 4 is unsilenceable by
   # design and stays that way.
-  go:
-    name: Go Orchestrator
-    needs: changes
-    if: needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      # No `cache:` here, but setup-node@v5 caches anyway: `package-manager-cache`
-      # defaults to true and auto-detects npm. That is where most of the 28
-      # `node-cache-*` entries came from. See the long note in the TypeScript job.
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24.x"
-          package-manager-cache: ${{ github.event_name != 'merge_group' }}
-
-      # Proves the status lattice can still say no: every status producible, PASS
-      # rejected with a null, failing, or WEAK oracle, a BROKEN receipt unable to
-      # yield a COMPLETE run, and every way of editing the journal caught by
-      # the chain. Without this the lattice is one small edit from collapsing to
-      # PASS/FAIL, and nothing would notice. --with-driver is deliberately NOT
-      # passed: it needs a prebuilt `l4`, which this job does not build.
-      - name: Self-test (the lattice must still be able to refuse)
-        run: node etc/go/selftest.mjs
-
-      # The `l4 run` workaround exists only because a failed #ASSERT exits 0.
-      # This mutates a real captured envelope ten ways to prove the checker can
-      # be red — a checker whose only observed behaviour is OK is
-      # indistinguishable from one that has been quietly broken.
-      - name: Self-test (the assertion checker must still be able to fail)
-        run: node etc/go/lib/assert-report.selftest.mjs
-
-      # A skill that documents a command the driver does not dispatch is worse
-      # than no skill, because the reader believes it. Compared in BOTH
-      # directions, plus the one-file discipline that stops references/ growing a
-      # second, staler copy of the usage.
-      - name: The skill and the driver must agree
-        run: node etc/go/check-skill-drift.mjs
-
-      # Every phase script must be syntactically valid and must answer --inputs
-      # without side effects. A phase script that cannot be parsed fails the run
-      # at dispatch time with a shell error rather than a receipt.
-      - name: Every phase script parses
-        run: |
-          for f in etc/go/*.sh etc/go/phases/*.sh etc/go/lib/*.sh; do
-            bash -n "$f" || { echo "::error::$f does not parse"; exit 1; }
-          done
-
-      # The driver must be able to describe itself without a binary, a run
-      # directory, or a network. If `plan` needs any of those, resumability and
-      # dry-running are both broken.
-      #
-      # EVERY subject, not one: this step used to call `plan` bare, which worked
-      # only while exactly one sidecar existed -- go.sh defaults to the sole
-      # subject and refuses once there are two, so adding sg-succession turned
-      # this step red for a reason that had nothing to do with the change that
-      # tripped it. Enumerating from `subject.mjs --list` fixes that failure and
-      # buys the check a subject-independence property it did not have: a new
-      # sidecar whose `plan` cannot be printed fails here, on the PR that adds
-      # it, instead of on the next person's branch.
-      - name: The driver can describe itself with no L4 and no run dir
-        run: |
-          etc/go/go.sh help > /dev/null
-          subjects=$(node etc/go/lib/subject.mjs --list)
-          [ -n "$subjects" ] || { echo "::error::no subjects discovered"; exit 1; }
-          for s in $subjects; do
-            echo "--- plan --subject $s"
-            etc/go/go.sh plan --subject "$s" --encoding primary > /tmp/plan-$s-primary.txt
-            grep -q 'p0-preflight' /tmp/plan-$s-primary.txt
-            grep -q 'entry points that exist and refuse' /tmp/plan-$s-primary.txt
-            grep -q 'p9-explain' /tmp/plan-$s-primary.txt
-            # THE ENCODING ID IS ASKED FOR, NEVER HARD-CODED HERE. A subject's
-            # additional encoding is named in its own sidecar, and a workflow
-            # holding its own copy of that answer is the drift this file's
-            # subject enumeration above already refuses. `undeclared` is the
-            # third case and is what a subject declaring none resolves to.
-            enc=$(node etc/go/lib/subject.mjs "$s" --encodings | head -1)
-            enc=${enc:-undeclared}
-            etc/go/go.sh plan --subject "$s" --encoding "$enc" > /tmp/plan-$s-deposit.txt
-            grep -q 'p1-ingest' /tmp/plan-$s-deposit.txt
-            grep -q 'NOT WIRED' /tmp/plan-$s-deposit.txt
-            grep -q 'does NOT mean a de novo run happened' /tmp/plan-$s-deposit.txt
-            echo "ok $s: the primary and deposit paths both plan (deposit encoding: $enc)"
-          done
-          # A bare `plan` must still be a loud refusal, not a silent pick among
-          # several -- a run about an unnamed body of law is the thing the
-          # requirement exists to prevent.
-          if etc/go/go.sh plan > /tmp/plan-bare.txt 2>&1; then
-            n=$(printf '%s\n' $subjects | wc -l)
-            [ "$n" = "1" ] || { echo "::error::bare plan succeeded with $n subjects"; exit 1; }
-          else
-            grep -q 'subject is required' /tmp/plan-bare.txt \
-              || { echo "::error::bare plan failed without naming the reason"; cat /tmp/plan-bare.txt; exit 1; }
-            echo "ok a bare plan refuses and names --subject"
-          fi
-
-      # Every stage that is STILL scaffolded must refuse with exit 3 and name its
-      # blocker. A stage that exits 0 while doing nothing is the failure this
-      # whole design exists to prevent.
-      #
-      # p1-ingest, p2-sweep, p3-encode, p4-forks and p5-gate left this list: they
-      # are real stages now, each validating a deposit an agent produced, and
-      # their three outcomes (absent -> SKIPPED, invalid -> DEGRADED naming the
-      # rule, valid -> PASS) are exercised in etc/go/selftest.mjs, which this job
-      # already runs. Removing them here without that coverage would have deleted
-      # the only check they had.
-      #
-      # p8-verify left it the same way, one PR later: `l4 verify` landed, so it is
-      # an implemented stage and has the NEXT step's contract instead. A stage may
-      # leave this list only by being implemented — never by being made quieter.
-      - name: Every still-scaffolded stage refuses loudly
-        run: |
-          for s in p10-publish; do
-            out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0; a scaffolded stage must refuse"; exit 1; }
-            rc=$?
-            [ "$rc" = "3" ] || { echo "::error::$s exited $rc, expected 3"; exit 1; }
-            echo "$out" | grep -q 'BLOCKER' || { echo "::error::$s refused without naming a blocker"; exit 1; }
-            echo "ok $s refuses with exit 3 and names its blocker"
-          done
-
-      # An implemented stage has the opposite failure mode: not "exits 0 doing
-      # nothing" but "runs somewhere it cannot be measured". Launched outside the
-      # driver it has no run directory, no journal and no artifact hashes, so it
-      # must decline and say who launches it — and it must never exit 0. This job
-      # has no `l4` binary, which is precisely the environment that would tempt a
-      # stage into a vacuous success.
-      - name: An implemented stage declines to run outside the driver
-        run: |
-          for s in p8-verify; do
-            out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0 outside the driver"; exit 1; }
-            rc=$?
-            [ "$rc" != "0" ] || { echo "::error::$s exited 0"; exit 1; }
-            echo "$out" | grep -q 'go.sh' || { echo "::error::$s declined without naming the driver"; exit 1; }
-            echo "ok $s declines with exit $rc and names the driver"
-          done
-
-      # The report template may not carry a typed number. This is the mechanical
-      # form of the drift that put "114 blocking, 46 lossy, 18 advisory" into
-      # PROJECTIONS.md against an exporter that emits different figures.
-      # A number typed into the template is a claim with no evidence behind it,
-      # and it is how PROJECTIONS.md came to state a fidelity heading, a per-code
-      # table and two line counts that its own artifacts contradicted. (No count
-      # is given: this comment and two others once gave three different ones.) The
-      # renderer refuses such a template with 'TEMPLATE DEFECT' before it reads
-      # any journal at all, so an empty run directory is enough to reach the
-      # check — and the SECOND assertion proves the check was actually reached,
-      # rather than the renderer having bailed out earlier for another reason.
-      - name: The report template carries no transcribed measurement
-        run: |
-          mkdir -p /tmp/empty-run
-          printf '' > /tmp/empty-run/journal.ndjson
-          out=$(node etc/go/report/render-report.mjs /tmp/empty-run 2>&1) || true
-          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
-          echo "$out" | grep -q 'no run_begin' || {
-            echo "::error::expected the renderer to get past the template check and refuse the empty journal; it said: $out"
-            exit 1
-          }
-          echo "ok the template contains no literal measurement, and the renderer refuses a runless journal"
-
-      # The SAME check for the explainer's template, and it needs its own step:
-      # the leg above names render-report.mjs by path, so a sibling template
-      # gets no coverage from it. Same two assertions, for the same reason —
-      # the second proves the digit check was actually reached.
-      - name: The explainer template carries no transcribed measurement
-        run: |
-          mkdir -p /tmp/empty-run
-          printf '' > /tmp/empty-run/journal.ndjson
-          out=$(node etc/go/report/render-explainer.mjs /tmp/empty-run 2>&1) || true
-          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
-          echo "$out" | grep -q 'no run_begin' || {
-            echo "::error::expected the explainer renderer to get past the template check and refuse the empty journal; it said: $out"
-            exit 1
-          }
-          echo "ok the explainer template contains no literal measurement, and the renderer refuses a runless journal"
-
-      # Every figure in the shipped narrative must still resolve against the
-      # source line it cites. This is the check that stops the explainer from
-      # becoming a second place where numbers are typed: it re-reads every cited
-      # line, and it goes red when the corpus moves underneath the prose.
-      - name: Every citation in the shipped narrative resolves
-        run: |
-          node - <<'EOF'
-          import("./etc/go/lib/narrative.mjs").then(async (n) => {
-            const { readFileSync, readdirSync, existsSync } = await import("node:fs");
-            const { resolve } = await import("node:path");
-            let total = 0, unresolved = 0, lint = 0;
-            for (const sub of readdirSync("etc/go/subjects")) {
-              const dir = resolve("etc/go/subjects", sub, "explainer");
-              if (!existsSync(dir)) continue;
-              for (const f of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
-                const text = readFileSync(resolve(dir, f), "utf8");
-                for (const p of n.lintNarrative(text)) {
-                  lint++;
-                  console.log(`::error file=${dir}/${f},line=${p.line}::[${p.code}] ${p.message}`);
-                }
-                const r = n.resolveCitations(text, {
-                  resolveSrc: (p) => (existsSync(resolve(p)) ? resolve(p) : null),
-                  resolveArt: () => null,
-                });
-                total += r.total;
-                for (const c of r.findings) {
-                  // An `art:` citation names a RUN artifact and cannot resolve
-                  // outside a run; everything else must.
-                  if (c.code === "C-ARTIFACT-UNKNOWN") continue;
-                  unresolved++;
-                  console.log(`::error file=${dir}/${f}::[${c.code}] ${c.target} — ${c.detail}`);
-                }
-              }
-            }
-            console.log(`narrative: ${total} citation(s) checked, ${unresolved} unresolved, ${lint} lint finding(s)`);
-            process.exit(unresolved + lint === 0 ? 0 : 1);
-          });
-          EOF
-
-      # Provenance drift is a PROMPT TO RE-READ, not a defect, so this warns and
-      # does not block. The blocking check is the one above: a source that moved
-      # far enough to break a citation fails the build. A source that moved
-      # without breaking one means somebody should re-read the paragraph, and
-      # making that fatal would block every unrelated corpus PR and teach people
-      # to re-bless without reading — which is the one thing the provenance
-      # record exists to prevent.
-      - name: Narrative provenance is in step with its sources
-        run: |
-          for s in $(node etc/go/lib/subject.mjs --list); do
-            out=$(node etc/go/lib/narrative-provenance.mjs "$s" --check 2>&1) || true
-            echo "$out"
-            echo "$out" | grep -qE 'drifted, 0 narrative' && continue
-            echo "::warning::narrative provenance for '$s' has drifted; re-read the affected sections, then: node etc/go/lib/narrative-provenance.mjs $s --bless"
-          done
-
   bpmn:
     name: BPMN Soundness
     needs: changes
@@ -1092,7 +806,6 @@ jobs:
           zlib1g-dev
           liblzma-dev
           xz-utils
-          zip
       - name: Update git config
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5
@@ -1299,56 +1012,6 @@ jobs:
 
       - name: Run documentation tests
         run: ./doc/test-docs.sh
-
-      # The four assertions the Go Orchestrator job cannot reach. That job is
-      # Node-only by design and says so at its own selftest step; the cost of
-      # that design was four checks reporting `skip ... $L4 is unset or missing`
-      # on every run, which reads as a pass. Two of them name the cause in their
-      # own skip text ("CI's Go Orchestrator job builds no binary"), so the
-      # darkness was known to the code and invisible in the log.
-      #
-      # Measured on `bf567bd0`: bare, the selftest ends `all checks passed
-      # (5 skipped)`. Four of those five need only a binary on disk --
-      # `the identity run agrees with itself`, `the shipped Reg CF surface map
-      # validates`, `p3-encode typechecks a deposited module`, and `per-origin
-      # floor selection over a deposited module`. Here the binary already
-      # exists, so lighting them up costs a `cabal list-bin` and no build.
-      #
-      # `--with-driver` is STILL not passed, here or anywhere. The fifth skip
-      # (`idempotence under replay`) drives the whole G1 pipeline, which is a
-      # different order of cost and a separate decision. Do not fold it in
-      # because it is the last one left.
-      #
-      # `zip` is in the container's apt list above for this step and nothing
-      # else: the selftest's three `doctor` assertions for p7-mcp start by
-      # asking whether zip is on PATH (etc/go/lib/doctor.mjs:170), and when it
-      # is not, that finding pre-empts the service-URL checks the assertions
-      # are actually about. Measured on this PR's second run: all three failed
-      # in the container and all three pass on any machine that has zip. The
-      # doctor was right about the container; the assertions assume a machine
-      # that can build the deployable, so the container is given one.
-      #
-      # JL4_LIBRARY_PATH is safe to pin ONLY because the binary is built from
-      # this same tree in the step above. Pinning a path at a tree newer than
-      # the binary is the failure documented in CLAUDE.md 3.1, and it presents
-      # as the prelude having lost its definitions rather than as a mismatch.
-      #
-      # This job runs in a bare `ubuntu:24.04` container, which has no Node.
-      # Measured on this PR's first run: `node: not found`, exit 127 -- the
-      # one thing the step's author could not verify locally, and it failed
-      # loudly on its own PR, which is the right place. Same major as the Go
-      # Orchestrator job so the selftest sees one Node everywhere. No
-      # package-manager cache: this job runs no `npm install`, and a cache
-      # write per PR is the churn the cache-maintenance note below exists to
-      # prevent.
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24.x"
-          package-manager-cache: false
-      - name: The go selftest's binary-gated assertions
-        run: L4="$(cabal list-bin l4)" node etc/go/selftest.mjs
-        env:
-          JL4_LIBRARY_PATH: ${{ github.workspace }}/jl4-core/libraries
 
       # ---- Cache maintenance (base-branch push only) --------------------------
       # PR and merge_group runs are pure cache CONSUMERS: they RESTORE the base
@@ -1580,24 +1243,22 @@ jobs:
       # decision population (70/70 both ways, in every case), so a decision
       # added to the corpus without a pin, or a pin left behind by a dropped
       # decision, fails here rather than passing silently.
-      # EVERY subject that declares a p7-dmn leg, not one named in this file.
+      # EVERY engine-checked golden, not one named in this file.
       #
       # This step used to name `regcf-corpus.dmn`, `regcf-corpus.cases.json` and
       # two exact verdict strings inline, which made the engine gate structurally
-      # single-subject: a second subject declaring a p7-dmn leg had nowhere to
-      # put its goldens or its expected verdicts, so it would have been exercised
-      # by nothing and nothing would have said so. The sidecars already carry
-      # every path this needs; the workflow now reads them (`subject.mjs --ci`)
-      # instead of keeping a second copy of the answer under one subject's name.
-      # The verdicts moved to a committed baseline beside each golden, the same
-      # shape etc/bpmn-kie-baseline.txt already uses.
-      #
-      # A subject declaring p7-dmn with no engine_baseline is a FAILURE, not a
-      # skip: declaring the leg is the claim that this corpus is engine-checked,
-      # and a leg exercised by nothing that reports nothing is the exact silence
-      # this pipeline exists to prevent. etc/check-subject-ci-coverage.mjs says
-      # so before the job even builds.
-      - name: Every DMN-declaring subject -- both engines, end to end (R12/R13)
+      # single-subject. The verdicts then moved to a committed baseline beside
+      # each golden, the same shape etc/bpmn-kie-baseline.txt already uses, and
+      # the step enumerated the go pipeline's subject sidecars to find them.
+      # The sidecars left this repository with the pipeline on 2026-09-29, so
+      # the step now enumerates the baselines themselves: every
+      # `jl4/examples/dmn/expected/<stem>.engine-baseline.txt` runs both engines
+      # over `expected/<stem>.dmn` with the cases in `<stem>.cases.json`.
+      # A golden with a baseline and no cases file beside it is a FAILURE, not a
+      # skip. The baseline is the claim that the golden is engine-checked, and a
+      # claim exercised by nothing that reports nothing is the silence this step
+      # exists to prevent.
+      - name: Every engine-checked DMN golden -- both engines, end to end (R12/R13)
         env:
           KIE_CHECK_REQUIRED: "1"
           KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
@@ -1606,8 +1267,14 @@ jobs:
         run: |
           set -euo pipefail
           ran=0
-          while IFS=$'\t' read -r id golden cases baseline; do
-            [ -n "$id" ] || continue
+          for baseline in jl4/examples/dmn/expected/*.engine-baseline.txt; do
+            [ -e "$baseline" ] || continue
+            id=$(basename "$baseline" .engine-baseline.txt)
+            golden="jl4/examples/dmn/expected/$id.dmn"
+            cases="jl4/examples/dmn/$id.cases.json"
+            for f in "$golden" "$cases"; do
+              [ -f "$f" ] || { echo "::error::$baseline has no $f beside it"; exit 1; }
+            done
             echo "::group::$id -- KIE + Camunda over $golden"
             ran=$((ran + 1))
 
@@ -1628,20 +1295,9 @@ jobs:
             done < "$baseline"
             echo "ok $id: every line of $baseline was printed"
             echo "::endgroup::"
-          done < <(node etc/go/lib/subject.mjs --ci | node -e '
-            let s = "";
-            process.stdin.on("data", (d) => (s += d)).on("end", () => {
-              for (const subj of JSON.parse(s)) {
-                const dmn = subj.legs["p7-dmn"];
-                if (!dmn) continue;
-                process.stdout.write(
-                  [subj.id, dmn.golden, dmn.cases, dmn.engine_baseline].join("\t") + "\n",
-                );
-              }
-            });
-          ')
-          [ "$ran" -gt 0 ] || { echo "::error::no subject declares a p7-dmn leg; this job should not have run"; exit 1; }
-          echo "checked $ran subject(s) against both engines"
+          done
+          [ "$ran" -gt 0 ] || { echo "::error::no engine baseline under jl4/examples/dmn/expected/; this job should not have run"; exit 1; }
+          echo "checked $ran golden(s) against both engines"
 
       # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
       #

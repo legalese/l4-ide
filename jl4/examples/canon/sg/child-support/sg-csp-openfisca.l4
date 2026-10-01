@@ -10,7 +10,7 @@ IMPORT `sg-csp`
 -- sg-csp.l4 is written to be READ AGAINST THE SOURCE: dates are dates, the
 -- rule-version axis is explicit, and local bindings name the intermediate
 -- quantities a reader needs. That shape is right for review and wrong for
--- `l4 openfisca`, whose v1 lowering supports neither the date builtins
+-- `l4 export openfisca`, whose v1 lowering supports neither the date builtins
 -- (`YMD`, `DATE_YEAR`) nor `WHERE`/`LET` bindings, and which expects the
 -- OpenFisca formula shape: an entity and a period in, one number out.
 --

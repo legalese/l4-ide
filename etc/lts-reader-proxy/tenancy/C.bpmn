@@ -45,8 +45,8 @@
         <bpmn:loopDataInputRef>DataInput_Scope_0</bpmn:loopDataInputRef>
         <bpmn:inputDataItem id="DataItem_Scope_0" name="t" itemSubjectRef="Item_receipts_t_cast_member" />
       </bpmn:multiInstanceLoopCharacteristics>
-      <bpmn:task id="Task_0" name="MUST Pay ...">
-        <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay ... WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>
+      <bpmn:task id="Task_0" name="MUST Pay t theLandlord amount">
+        <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay t theLandlord amount WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>
       </bpmn:task>
       <bpmn:boundaryEvent id="Boundary_0" name="after P7D" attachedToRef="Task_0" cancelActivity="true">
         <bpmn:documentation>LEST: the obligation is not discharged within 7</bpmn:documentation>
@@ -54,8 +54,8 @@
           <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
         </bpmn:timerEventDefinition>
       </bpmn:boundaryEvent>
-      <bpmn:task id="Task_1" name="MUST Receipt ...">
-        <bpmn:documentation>PARTY theLandlord MUST Receipt ... WITHIN 5</bpmn:documentation>
+      <bpmn:task id="Task_1" name="MUST Receipt theLandlord t amount">
+        <bpmn:documentation>PARTY theLandlord MUST Receipt theLandlord t amount WITHIN 5</bpmn:documentation>
       </bpmn:task>
       <bpmn:boundaryEvent id="Boundary_1" name="after P5D" attachedToRef="Task_1" cancelActivity="true">
         <bpmn:documentation>LEST: the obligation is not discharged within 5</bpmn:documentation>

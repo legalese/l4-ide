@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: prelude from whose-without-cast.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from whose-without-cast.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: whose-without-cast.l4
+  Hidden: no
+  Range: 17:16-17:37
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WHOSE reads the first word of each line as a FIELD of the cast — but this
+    EVERY has no cast to take the fields from: it binds `t` over every
+    member of the roll, whatever shape each one has.
+
+    Name the cast:
+
+      EVERY Tenant t IN tenants WHOSE arrears AT LEAST 1000
+
+    or write the filter with WHO, where the member is named:
+
+      EVERY t IN tenants WHO t's arrears AT LEAST 1000

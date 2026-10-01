@@ -1,0 +1,130 @@
+-- Eight shapes an `l4 state-graph` caption has to survive. Each of them drew a
+-- caption that said something false in September 2026, and no golden could
+-- have caught any of them: NO golden captures state-graph DOT output at all
+-- (measured 2026-09-22: `grep -rl digraph jl4/examples --include=*.golden` is
+-- empty), which is why the assertions live in jl4/tests-cli/Main.hs beside
+-- this file.
+
+DECLARE Actor IS ONE OF
+    Chair    HAS name IS A STRING
+    Director HAS name IS A STRING
+
+DECLARE Act IS ONE OF
+    pay     HAS amount IS A NUMBER
+    deliver HAS who IS AN Actor
+    `settle the account with` HAS who IS AN Actor, sum IS A NUMBER
+
+theChair MEANS Chair OF "Ms Ng"
+a MEANS Director OF "A"
+b MEANS Director OF "B"
+board MEANS LIST a, b
+base MEANS 7
+
+-- 1. An inner obligation with no WITHIN, no PROVIDED, no AFTER, no binder and
+-- no quantifier. Its HENCE arm leaves the entry state of its OWN obligation,
+-- so party, modal and act are the second copy of what the node says — and
+-- nothing at all is left. Suppressing there drew a BLANK arrow, which says
+-- less than the caption it replaced: the arrow MEANS the act being performed.
+GIVETH A DEONTIC Actor Act
+`nothing new along the arm` MEANS
+    PARTY theChair
+    MUST pay 1
+    WITHIN 3
+    HENCE
+        PARTY a
+        MUST deliver (EXACTLY theChair)
+        HENCE FULFILLED
+        LEST BREACH
+    LEST BREACH
+
+-- 2. A pinned argument that is a COMPOUND expression. Printed without its
+-- brackets it reads as `pay` applied to two arguments rather than to one sum,
+-- and the EXACTLY the author wrote disappears.
+GIVETH A DEONTIC Actor Act
+`pinned compound argument` MEANS
+    PARTY theChair
+    MUST pay (EXACTLY base + 1)
+    WITHIN 3
+    HENCE FULFILLED
+    LEST BREACH
+
+-- 3. A barrier carrying a deadline of its OWN, distinct from the act's. Two
+-- clocks take the one red arm — a member missing 30, and the barrier not being
+-- met by 10 — so a caption naming one of them names the wrong one half the
+-- time.
+GIVETH A DEONTIC Actor Act
+`two clocks on one arm` MEANS
+    EVERY Director d IN board MUST deliver (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE WITHIN 10 HENCE FULFILLED
+
+-- 4. An act whose NAME contains spaces, beside a pinned reference and a
+-- binder. `settle the account with` is ONE name and the wrap may not break it
+-- across two lines; `a` is PINNED, so only that director discharges the act;
+-- `sum` is nowhere in scope, so it BINDS and any number discharges it.
+GIVETH A DEONTIC Actor Act
+`a name with spaces beside a binder` MEANS
+    PARTY theChair
+    MUST `settle the account with` (EXACTLY a) sum
+    WITHIN 3
+    HENCE FULFILLED
+    LEST BREACH
+
+-- 5. Two obligations over ONE act pattern, told apart only by their windows.
+-- The node has to carry the WITHIN or the two draw as the same string, which
+-- is the promissory note's shape (jl4/examples/legal/promissory-note.l4:87,
+-- :101, :111) in four lines.
+GIVETH A DEONTIC Actor Act
+`one act two windows` MEANS
+    PARTY theChair
+    MUST pay 1
+    WITHIN 3
+    HENCE FULFILLED
+    LEST
+        PARTY theChair
+        MUST pay 1
+        WITHIN 9
+        HENCE FULFILLED
+        LEST BREACH
+
+-- 6. Shape 1 with a BINDER in the inner act and nothing else. The binder
+-- clause is not the node's, so it survives the suppression and the arrow is
+-- not blank; what it says is the one thing the act text cannot — that ANY
+-- amount discharges this.
+GIVETH A DEONTIC Actor Act
+`a binder is what survives` MEANS
+    PARTY theChair
+    MUST pay 1
+    WITHIN 3
+    HENCE
+        PARTY a
+        MUST pay amount
+        HENCE FULFILLED
+        LEST BREACH
+    LEST BREACH
+
+-- 7. The counterpart to 6: the same act pattern, but `base` IS in scope, so R1
+-- resolves it and only 7 discharges the obligation. The act prints identically
+-- in both — `pay amount` and `pay base` — and the binder clause is the whole
+-- of what tells a reader which is which.
+GIVETH A DEONTIC Actor Act
+`pinned where six binds` MEANS
+    PARTY theChair
+    MUST pay base
+    WITHIN 3
+    HENCE FULFILLED
+    LEST BREACH
+
+-- 8. A caption carrying an ODD number of back quotes. The wrap keeps a
+-- back-quoted L4 name whole, which means it has to find the closing quote;
+-- until 2026-09-22 a quote with no closer glued everything after it into one
+-- unbreakable token, so one stray back quote in a string literal silently
+-- defeated the wrap for the rest of the line and the box grew with no
+-- diagnostic.
+GIVETH A DEONTIC Actor Act
+`an odd back quote in a guard` MEANS
+    PARTY theChair
+    MUST pay 1
+    PROVIDED "one ` quote and several more words after it" EQUALS "never"
+    WITHIN 3
+    HENCE FULFILLED
+    LEST BREACH

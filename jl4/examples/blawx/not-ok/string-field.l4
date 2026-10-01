@@ -49,7 +49,7 @@
 -- through the program-global string-atom table and stay usable for equality
 -- (BLAWX-EXPORT-SPEC §4.7). It is the typed field that has nowhere to go.
 --
--- Measured 2026-09-02 (spec §11 W2) with `l4 blawx` on this file:
+-- Measured 2026-09-02 (spec §11 W2) with `l4 export blawx` on this file:
 --   in `name`: STRING-sorted field or argument (Blawx): `name` has a
 --   STRING-sorted field, parameter or result, and Blawx's ontology has no
 --   string attribute type — …

@@ -9,7 +9,7 @@
 -- mints one object per OCCURRENCE, so a roster and its structural twin arrive
 -- as lists of different atoms.
 --
--- Measured before the refusal descended into containers: `l4 blawx` on the
+-- Measured before the refusal descended into containers: `l4 export blawx` on the
 -- first rule exited 0 and emitted `Members = Members2` inside
 -- `according_to(sec_1_section,same_roster,A,B)`. The refusal now covers any
 -- operand sort that CONTAINS a declared record, under any nesting of `LIST OF`

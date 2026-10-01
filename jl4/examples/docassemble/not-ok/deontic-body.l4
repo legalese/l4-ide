@@ -4,7 +4,7 @@
 -- the lowering must refuse the `Regulative{}` constructor by name and
 -- record a Blocking FidelityNote — never emit an interview that silently
 -- drops the obligation.
--- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+-- The file itself typechecks: the refusal belongs to `l4 export docassemble`.
 
 DECLARE Actor IS ONE OF Landlord, Tenant
 

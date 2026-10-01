@@ -1,14 +1,16 @@
--- | @l4 export --to=dmn|bpmn FILE@ — write an L4 module out in a foreign
+-- | @l4 export dmn|dmn-md|bpmn FILE@ — write an L4 module out in a foreign
 -- interchange notation, together with an account of what that notation could
 -- not carry.
 --
--- Two targets, three artifacts:
+-- Two notations, three formats, each its own @l4 export@ subcommand
+-- (CLI-SURFACE-SPEC C1; this was @l4 export --to=…@ until 2026-09-24):
 --
---   * @--to=dmn@    — DMN 1.3 XML   ('L4.Dmn.Lower' → 'L4.Dmn.Emit')
---   * @--to=dmn-md@ — dmnmd markdown, the same IR through a second emitter
---                     ('L4.Dmn.Markdown'), with its own, different loss list
---   * @--to=bpmn@   — BPMN 2.0 XML  ('L4.StateGraph' → 'L4.Bpmn.Lower' →
---                     'L4.Bpmn.Emit')
+--   * @l4 export dmn@    — DMN 1.3 XML   ('L4.Dmn.Lower' → 'L4.Dmn.Emit')
+--   * @l4 export dmn-md@ — dmnmd markdown, the same IR through a second
+--                          emitter ('L4.Dmn.Markdown'), with its own,
+--                          different loss list
+--   * @l4 export bpmn@   — BPMN 2.0 XML  ('L4.StateGraph' → 'L4.Bpmn.Lower' →
+--                          'L4.Bpmn.Emit')
 --
 -- The decision side reads the whole module; the process side reads one
 -- regulative rule, because a BPMN document holds one process and
@@ -24,7 +26,7 @@
 --   * with @--output FILE@, @--fidelity-report@ writes a sibling
 --     @FILE@-with-@.fidelity.txt@-extension and says so on stderr;
 --   * without @--output@ the artifact owns stdout, so the report goes to
---     __stderr__. @l4 export --to=bpmn f.l4 --fidelity-report > f.bpmn@ must
+--     __stderr__. @l4 export bpmn f.l4 --fidelity-report > f.bpmn@ must
 --     still produce an importable file.
 --
 -- == The report is never optional, but it is also not an error
@@ -54,7 +56,9 @@ module L4.Cli.Export
   ( ExportOptions (..)
   , ExportTarget (..)
   , FidelityGate (..)
-  , exportOptionsParser
+  , exportDmnOptionsParser
+  , exportDmnMarkdownOptionsParser
+  , exportBpmnOptionsParser
   , exportCmd
   ) where
 
@@ -98,8 +102,8 @@ data ExportTarget
     -- ^ DMN 1.3 XML
   | TargetDmnMarkdown
     -- ^ dmnmd markdown: the same 'L4.Dmn.IR.Drg', a second emitter, a
-    -- different loss list. Kept on the same @--to@ axis rather than behind a
-    -- separate flag because it is a target, not a formatting option.
+    -- different loss list. Its own @l4 export dmn-md@ format rather than a
+    -- flag on @dmn@, because it is a target, not a formatting option.
   | TargetBpmn
     -- ^ BPMN 2.0 XML
   deriving stock (Eq, Show)
@@ -124,17 +128,6 @@ data ExportOptions = ExportOptions
   , exportFailOn       :: FidelityGate
   , exportIncludeTests :: Bool
   }
-
-exportTargetReader :: ReadM ExportTarget
-exportTargetReader = eitherReader \input ->
-  case Text.toLower (Text.pack input) of
-    "dmn"      -> Right TargetDmn
-    "dmn-md"   -> Right TargetDmnMarkdown
-    "dmnmd"    -> Right TargetDmnMarkdown
-    "bpmn"     -> Right TargetBpmn
-    other      -> Left $
-      "Invalid export target: " <> Text.unpack other
-        <> " (expected dmn|dmn-md|bpmn)"
 
 -- | @drools@ is accepted as a synonym for @kie@ because that is what the engine
 -- is called in half its own documentation; @camunda@ means Camunda 8, which is
@@ -171,83 +164,152 @@ fidelityGateReader = eitherReader \input ->
       "Invalid --fail-on: " <> Text.unpack other
         <> " (expected none|blocking|lossy|advisory)"
 
-exportOptionsParser :: Parser ExportOptions
-exportOptionsParser = ExportOptions
-  <$> strArgument (metavar "FILE" <> help "Path to the .l4 file to export")
-  <*> option exportTargetReader
-        ( long "to"
-       <> metavar "TARGET"
-       <> help "Interchange notation: dmn (DMN 1.3 XML) | dmn-md (dmnmd markdown) | bpmn (BPMN 2.0 XML)"
-        )
-  <*> optional
-        ( strOption
-            ( long "output"
-           <> short 'o'
-           <> metavar "FILE"
-           <> help "Write the exported document to FILE instead of stdout"
-            )
-        )
-  <*> switch
-        ( long "fidelity-report"
-       <> help
-            "Also emit the full fidelity report: to FILE.fidelity.txt beside --output, \
-            \or to stderr when the document goes to stdout. A one-line tally is printed \
-            \either way."
-        )
-  <*> optional
-        ( strOption
-            ( long "rule"
-           <> metavar "NAME"
-           <> help "BPMN only: which regulative rule to export (required when the file has more than one)"
-            )
-        )
-  <*> optional
-        ( strOption
-            ( long "model-name"
-           <> metavar "NAME"
-           <> help "DMN only: the <definitions> name and namespace seed (default: the module's outermost section heading, else the file's base name)"
-            )
-        )
-  <*> optional
-        ( option dmnFlavorReader
-            ( long "flavor"
-           <> metavar "ENGINE"
-           <> showDefaultWith (const "camunda")
-           <> help
-                "DMN only: which engine to shape the document for. camunda (the default, \
-                \= Camunda 8) | kie (= Drools). The two differ on exactly one thing: whether a \
-                \<decisionService> may be the target of a <knowledgeRequirement>. Camunda 8 \
-                \rejects the whole file at parse() if it is, so that shape is kie-only."
-            )
-        )
-  <*> optional
-        ( option deadlineUnitReader
-            ( long "deadline-unit"
-           <> metavar "POLICY"
-           <> showDefaultWith (const "days")
-           <> help
-                "BPMN only: how to read a unitless WITHIN. days (the default) = P<n>D plus a \
-                \P-DEADLINE-UNIT note; refuse = no timer and a P-DEADLINE note."
-            )
-        )
-  <*> option fidelityGateReader
-        ( long "fail-on"
-       <> metavar "SEVERITY"
-       <> value GateNever
-       <> showDefaultWith (const "none")
-       <> help
-            "Exit non-zero when the fidelity report holds a note this severe or worse: \
-            \none|blocking|lossy|advisory. Default none, because Blocking describes the \
-            \target notation's limits and fires on every realistic export."
-        )
-  <*> switch
-        ( long "include-tests"
-       <> help
-            "DMN only: also emit decisions the population filter classifies as test \
-            \scaffolding (referenced only from directive argument positions, with no \
-            \callers). Default off: a fixture emitted as a <decision> misdescribes the \
-            \rule set."
-        )
+-- | One parser per format, each offering only the flags that format reads.
+--
+-- These were one parser behind @--to=dmn|dmn-md|bpmn@ until 2026-09-24, and
+-- five of its flags belonged to a proper subset of the targets. A runtime
+-- check refused each one given to the wrong target, because silently ignoring
+-- a flag the caller took the trouble to type is a small lie of the same family
+-- the fidelity report exists to stop. With a subcommand per format that
+-- refusal is optparse's own @Invalid option@, and @--help@ lists only what
+-- applies (CLI-SURFACE-SPEC C1).
+--
+-- __@--flavor@ is on @l4 export dmn@ only.__ It was briefly admitted on dmn-md
+-- too, on the theory that "the flavor lives in the @Drg@, which both emitters
+-- read". Review checked, and the markdown side reads it nowhere:
+-- @emitMarkdown@ mentions no field of it, and @markdownReport@ hard-codes the
+-- target string @"dmnmd"@ rather than naming the flavor the way 'dmnReport'
+-- does. So @--flavor=kie@ on dmn-md produced a byte-identical document /and/ a
+-- byte-identical fidelity report — the silent ignore described above. Nor does
+-- that self-heal at Phase 5: the one divergence is whether a
+-- @\<decisionService\>@ may be invocable, and dmnmd is a table format with no
+-- graph at all (it already says so, via @D-MD-NODRG@).
+exportDmnOptionsParser :: Parser ExportOptions
+exportDmnOptionsParser = ExportOptions
+  <$> fileArgument
+  <*> pure TargetDmn
+  <*> outputOption
+  <*> fidelityReportSwitch
+  <*> pure Nothing
+  <*> modelNameOption
+  <*> flavorOption
+  <*> pure Nothing
+  <*> failOnOption
+  <*> includeTestsSwitch
+
+exportDmnMarkdownOptionsParser :: Parser ExportOptions
+exportDmnMarkdownOptionsParser = ExportOptions
+  <$> fileArgument
+  <*> pure TargetDmnMarkdown
+  <*> outputOption
+  <*> fidelityReportSwitch
+  <*> pure Nothing
+  <*> modelNameOption
+  <*> pure Nothing
+  <*> pure Nothing
+  <*> failOnOption
+  <*> includeTestsSwitch
+
+exportBpmnOptionsParser :: Parser ExportOptions
+exportBpmnOptionsParser = ExportOptions
+  <$> fileArgument
+  <*> pure TargetBpmn
+  <*> outputOption
+  <*> fidelityReportSwitch
+  <*> ruleOption
+  <*> pure Nothing
+  <*> pure Nothing
+  <*> deadlineUnitOption
+  <*> failOnOption
+  <*> pure False
+
+fileArgument :: Parser FilePath
+fileArgument = strArgument (metavar "FILE" <> help "Path to the .l4 file to export")
+
+outputOption :: Parser (Maybe FilePath)
+outputOption = optional
+  ( strOption
+      ( long "output"
+     <> short 'o'
+     <> metavar "FILE"
+     <> help "Write the exported document to FILE instead of stdout"
+      )
+  )
+
+fidelityReportSwitch :: Parser Bool
+fidelityReportSwitch = switch
+  ( long "fidelity-report"
+ <> help
+      "Also emit the full fidelity report: to FILE.fidelity.txt beside --output, \
+      \or to stderr when the document goes to stdout. A one-line tally is printed \
+      \either way."
+  )
+
+ruleOption :: Parser (Maybe Text)
+ruleOption = optional
+  ( strOption
+      ( long "rule"
+     <> metavar "NAME"
+     <> help "Which regulative rule to export (required when the file has more than one)"
+      )
+  )
+
+modelNameOption :: Parser (Maybe Text)
+modelNameOption = optional
+  ( strOption
+      ( long "model-name"
+     <> metavar "NAME"
+     <> help "The <definitions> name and namespace seed (default: the module's outermost section heading, else the file's base name)"
+      )
+  )
+
+flavorOption :: Parser (Maybe DmnFlavor)
+flavorOption = optional
+  ( option dmnFlavorReader
+      ( long "flavor"
+     <> metavar "ENGINE"
+     <> showDefaultWith (const "camunda")
+     <> help
+          "Which engine to shape the document for. camunda (the default, \
+          \= Camunda 8) | kie (= Drools). The two differ on exactly one thing: whether a \
+          \<decisionService> may be the target of a <knowledgeRequirement>. Camunda 8 \
+          \rejects the whole file at parse() if it is, so that shape is kie-only."
+      )
+  )
+
+deadlineUnitOption :: Parser (Maybe DeadlineUnitPolicy)
+deadlineUnitOption = optional
+  ( option deadlineUnitReader
+      ( long "deadline-unit"
+     <> metavar "POLICY"
+     <> showDefaultWith (const "days")
+     <> help
+          "How to read a unitless WITHIN. days (the default) = P<n>D plus a \
+          \P-DEADLINE-UNIT note; refuse = no timer and a P-DEADLINE note."
+      )
+  )
+
+failOnOption :: Parser FidelityGate
+failOnOption = option fidelityGateReader
+  ( long "fail-on"
+ <> metavar "SEVERITY"
+ <> value GateNever
+ <> showDefaultWith (const "none")
+ <> help
+      "Exit non-zero when the fidelity report holds a note this severe or worse: \
+      \none|blocking|lossy|advisory. Default none, because Blocking describes the \
+      \target notation's limits and fires on every realistic export."
+  )
+
+includeTestsSwitch :: Parser Bool
+includeTestsSwitch = switch
+  ( long "include-tests"
+ <> help
+      "Also emit decisions the population filter classifies as test \
+      \scaffolding (referenced only from directive argument positions, with no \
+      \callers). Default off: a fixture emitted as a <decision> misdescribes the \
+      \rule set."
+  )
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -255,7 +317,6 @@ exportOptionsParser = ExportOptions
 
 exportCmd :: ExportOptions -> IO ()
 exportCmd opts = do
-  checkTargetFlags opts
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
   (errs, mTc) <- runOneshot evalConfig opts.exportFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
@@ -267,7 +328,7 @@ exportCmd opts = do
       -- Unlike `l4 state-graph`, surface non-fatal diagnostics even on the
       -- happy path. An export is an artifact handed to someone else, so a
       -- library-shadow warning that changed which prelude was compiled is
-      -- exactly what its author needs to see; `l4 render` and `l4 openfisca`
+      -- exactly what its author needs to see; `l4 render` and `l4 export openfisca`
       -- print them for the same reason.
       putDiagnostics errs
       report <- case opts.exportTarget of
@@ -346,65 +407,20 @@ moduleDecideNames (MkModule _ _ sec) = goSec sec
     Section _ s -> goSec s
     _ -> []
 
--- | Four of the flags belong to some proper subset of the three targets.
--- Silently ignoring one the caller took the trouble to type is a small lie of
--- the same family the fidelity report exists to stop, so say so and stop.
---
--- __@--flavor@ is legal on @--to=dmn@ only.__ It was briefly admitted on
--- @--to=dmn-md@ too, on the theory that "the flavor lives in the @Drg@, which
--- both emitters read". Review checked, and the markdown side reads it nowhere:
--- @emitMarkdown@ mentions no field of it, and @markdownReport@ hard-codes the
--- target string @"dmnmd"@ rather than naming the flavor the way 'dmnReport'
--- does. So @--flavor=kie --to=dmn-md@ produced a byte-identical document /and/
--- a byte-identical fidelity report — the exact silent ignore the paragraph
--- above refuses. Nor does that self-heal at Phase 5: the one divergence is
--- whether a @\<decisionService\>@ may be invocable, and dmnmd is a table format
--- with no graph at all (it already says so, via @D-MD-NODRG@).
-checkTargetFlags :: ExportOptions -> IO ()
-checkTargetFlags opts = case misplaced of
-  [] -> pure ()
-  fs -> do
-    for_ fs \(f, owner) ->
-      hPutStrLn stderr $
-        f <> ": no meaning for --to=" <> targetFlagName opts.exportTarget
-          <> "; it belongs to " <> owner
-    exitFailure
- where
-  -- flag, was it given, where it IS legal, and how to say that
-  candidates =
-    [ ("--model-name",    isJust opts.exportModelName,    [TargetDmn, TargetDmnMarkdown], "--to=dmn / --to=dmn-md")
-    , ("--flavor",        isJust opts.exportFlavor,       [TargetDmn],                    "--to=dmn")
-    , ("--rule",          isJust opts.exportRule,         [TargetBpmn],                   "--to=bpmn")
-    , ("--deadline-unit", isJust opts.exportDeadlineUnit, [TargetBpmn],                   "--to=bpmn")
-    , ("--include-tests", opts.exportIncludeTests,        [TargetDmn, TargetDmnMarkdown], "--to=dmn / --to=dmn-md")
-    ]
-  misplaced =
-    [ (f, owner)
-    | (f, given, legalOn, owner) <- candidates
-    , given
-    , opts.exportTarget `notElem` legalOn
-    ]
-
-targetFlagName :: ExportTarget -> String
-targetFlagName = \case
-  TargetDmn         -> "dmn"
-  TargetDmnMarkdown -> "dmn-md"
-  TargetBpmn        -> "bpmn"
-
 ----------------------------------------------------------------------------
 -- The decision side
 ----------------------------------------------------------------------------
 
--- | Lower the module to a decision graph, exactly as @--to=dmn@ would.
+-- | Lower the module to a decision graph, exactly as @l4 export dmn@ would.
 --
 -- Named and shared because __both__ targets need it: the DMN emitters obviously,
--- and @--to=bpmn@ because PROCESS-TRACK.md §8.3's @businessRuleTask@ has to name
+-- and @l4 export bpmn@ because PROCESS-TRACK.md §8.3's @businessRuleTask@ has to name
 -- the decision ids the DMN backend actually emitted. Re-deriving those on the
 -- process side is the failure this factoring exists to prevent — see
 -- "L4.Bpmn.Wiring".
 --
 -- It does not decide whether the result is worth emitting: a module with no
--- decisions is an error for @--to=dmn@ and a non-event for @--to=bpmn@, so that
+-- decisions is an error for @l4 export dmn@ and a non-event for @l4 export bpmn@, so that
 -- judgement stays with the callers.
 dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO Drg
 dmnDrgFor opts tcRes = do
@@ -484,7 +500,7 @@ exportDmn opts tcRes = do
 exportBpmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportBpmn opts tcRes = do
   sg <- selectGraph opts.exportRule (extractStateGraphs tcRes.module')
-  -- The same lowering @--to=dmn@ would perform, run for its NAMES rather than
+  -- The same lowering @l4 export dmn@ would perform, run for its NAMES rather than
   -- its XML: a gateway is wired only to a decision this graph actually contains
   -- (PROCESS-TRACK.md §8.3). Unconditional — a module with no decisions yields
   -- an empty table, which wires nothing and reports nothing, which is right.

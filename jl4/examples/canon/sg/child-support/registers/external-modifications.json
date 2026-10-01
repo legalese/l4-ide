@@ -1,0 +1,154 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "sg-child-support",
+  "swept": "2026-08-25",
+  "note": "THE SWEEP RUNS THE OTHER WAY ROUND FOR THIS SUBJECT. Normally P2 asks what has happened to a provision since it was printed. Here the primary source is two days old and the interesting question is the reverse: has anything happened YET -- has a Bill been introduced, has an agency published implementing detail, has any figure moved since the Rally? The answer to all three is no, and the searches below are what establishes that rather than assuming it. A sweep that found nothing and enumerates nothing is an assumption wearing a register's clothes.\n\nDISPOSITIONS IS EMPTY, AND THAT IS AN ANSWER. The disposition list disposes of the annotation markers a source bundle's inventory declares. This subject's sources are an announcement, four administrative web pages and a statute retrieved as structured JSON; none carries an amendment- or modification-marker scheme of the kind legislation.gov.uk's F/C lists provide, so the bundle declares no annotations and there is nothing to dispose of.",
+  "searches": [
+    {
+      "id": "S1",
+      "question": "Has a Bill been introduced to amend the Child Development Co-Savings Act 2001 to implement the SG Child Support Package or the merged childcare-leave entitlement?",
+      "method": "agency-index",
+      "scope": "lawplain bills corpus, full-text search for 'Child Development Co-Savings Amendment Bill', all years",
+      "query": "Child Development Co-Savings Amendment Bill 2026",
+      "performed": "2026-08-25",
+      "outcome": "findings",
+      "findings": [
+        "M1",
+        "M3"
+      ],
+      "coverage_note": "DOES NOT COVER: Bills introduced after the corpus snapshot, Bills not yet published, or amendments that might be carried in another Act (for instance a Budget or omnibus statute) rather than in a CDCSA amendment Bill. The negative result is therefore 'no CDCSA amendment Bill for this policy is on the record as at 2026-08-25', not 'no legislation exists anywhere'. OBSERVED: the only CDCSA amendment Bill on the record is B42-2024 (read the first time 15 October 2024, passed 13 November 2024), which implements enhanced paternity and shared parental leave and predates the Rally. Nothing implements the Package or the merged childcare-leave entitlement."
+    },
+    {
+      "id": "S2",
+      "question": "Has any 2026 Bill been introduced to implement the Package or the merged leave scheme?",
+      "method": "web-search",
+      "scope": "open web, Singapore Parliament and MSF/MOM sources",
+      "query": "\"Child Development Co-Savings (Amendment) Bill\" 2026 Singapore Parliament introduced childcare leave SG Child Support Package legislation",
+      "performed": "2026-08-25",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "DOES NOT COVER: material behind logins, Hansard published after the search date, or Parliamentary notice papers. Corroborates S1: every result returned concerned the 2024 amendment or the pre-existing 6-day childcare-leave entitlement, and none concerned a 2026 Bill."
+    },
+    {
+      "id": "S3",
+      "question": "Has any agency published implementing detail that would settle the transition mechanics the announcement leaves open -- in particular what happens to a co-matching cap already exceeded on 1 October 2027?",
+      "method": "publisher-page",
+      "scope": "life.gov.sg SG Child Support Package page, population.gov.sg NDR 2026 measures page, madeforfamilies.gov.sg Baby Bonus and Large Families pages, all retrieved 2026-08-25",
+      "query": "SG Child Support Package CDA co-matching cap transition 30 September 2027",
+      "performed": "2026-08-25",
+      "outcome": "findings",
+      "findings": [
+        "M2",
+        "M4"
+      ],
+      "coverage_note": "DOES NOT COVER: MSF's own media-room press release, which returned HTTP 403 to non-browser clients and was not retrieved; nor any FAQ published after 2026-08-25. If MSF's release settles the co-matching question, fork F1 is already settled and this encoding does not know it. OBSERVED: life.gov.sg states only that children born before 1 April 2027 'retain the existing co-matching cap until 30 September 2027' and that 'from 1 October 2027, all caps adjust to $5,000' -- it does not say whether the $5,000 is a lifetime total or fresh headroom. Both pages state that implementation detail will follow in early 2027."
+    },
+    {
+      "id": "S4",
+      "question": "Has any figure announced at the Rally been corrected or restated differently since 23 August 2026?",
+      "method": "web-search",
+      "scope": "open web, Singapore news and government sources, 23-25 August 2026",
+      "query": "NDR 2026 SG Child Support Package amounts cohort table childcare leave",
+      "performed": "2026-08-25",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "DOES NOT COVER: a two-day window is too short for a correction to surface. This search establishes that nothing had been corrected within 48 hours, which is weak evidence and is recorded as such."
+    }
+  ],
+  "entries": [
+    {
+      "id": "M1",
+      "class": "prospective",
+      "summary": "The SG Child Support Package requires legislation and system changes that have not happened. No Bill has been introduced; the Child Development Co-Savings Act 2001 is unamended as at 2026-08-25.",
+      "provenance": {
+        "source": "lawplain bills corpus and open-web search",
+        "url": "https://www.pmo.gov.sg/newsroom/ndr2026/",
+        "retrieved": "2026-08-25",
+        "citation": "NDR 2026 (Singapore), 23 August 2026; Child Development Co-Savings Act 2001, unamended"
+      },
+      "routing": {
+        "rule_version_arm": "sg-csp.l4 \u2014 `the Package commences` (YMD 2027 4 1); every announced figure sits on an arm dated at or after it",
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from": "2027-04-01"
+      },
+      "disposition": "encoded",
+      "disposition_note": "Encoded as the rule-version axis: every announced figure sits on an arm dated 2027-04-01 or later, and the pre-commencement arms state the law and administration in force today. A reader who does not pin a rule date cannot be handed an announced figure without knowing it is one.",
+      "found_by": [
+        "S1"
+      ]
+    },
+    {
+      "id": "M2",
+      "class": "prospective",
+      "summary": "Full implementation detail for the Package is stated to follow in early 2027, and no commencement date at all has been announced for the merged childcare-leave scheme.",
+      "provenance": {
+        "source": "life.gov.sg; population.gov.sg; NDR 2026 reporting",
+        "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package",
+        "retrieved": "2026-08-25",
+        "citation": "life.gov.sg, SG Child Support Package (implementation detail to follow early 2027)"
+      },
+      "routing": {
+        "rule_version_arm": "sg-childcare-leave.l4 \u2014 `the announced leave scheme commences`, an explicit placeholder",
+        "fork_ids": [
+          "F3"
+        ],
+        "currency_risk": true,
+        "effective_from_absent_reason": "No commencement date has been announced for the merged childcare-leave scheme. The encoding dates the arm at the Package's own commencement and labels that a placeholder in the module text."
+      },
+      "disposition": "encoded",
+      "disposition_note": "An UNDATED prospective change, flagged as a currency risk. The placeholder is visible in the source rather than silent: a reader who takes 2027-04-01 as the leave commencement date has been told, in the module, that the encoding invented it.",
+      "found_by": [
+        "S3"
+      ]
+    },
+    {
+      "id": "M3",
+      "class": "binding",
+      "binding_effect": "added",
+      "summary": "The Child Development Co-Savings (Amendment) Act 2024 (Bill 42/2024, passed 13 November 2024) added mandatory 4-week paternity leave and Shared Parental Leave, rising to 10 weeks from 2026. The Rally's promise that the Government will cover 'all child-related leave' extends to these, not only to childcare leave.",
+      "provenance": {
+        "source": "lawplain bills corpus, B42-2024; MSF media release",
+        "url": "https://www.msf.gov.sg/media-room/article/amendments-to-child-development-co-savings-act-enhanced-paternity-leave-and-new-shared-parental-leave-scheme-from-1-april-2025-to-strengthen-support-for-working-parents",
+        "retrieved": "2026-08-25",
+        "citation": "Child Development Co-Savings (Amendment) Act 2024 (Bill 42/2024)"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2025-04-01"
+      },
+      "disposition": "scoped-out",
+      "disposition_note": "This encoding covers CHILDCARE leave (CDCSA ss 12B, 12C, 12CA) and not maternity, paternity, adoption or shared parental leave. The employer-cost finding in the conversion report is therefore a LOWER BOUND on the reform's effect on an employer: it counts childcare leave only, and the same $500 reimbursement limit applies to leave types this encoding does not model.",
+      "found_by": [
+        "S1"
+      ]
+    },
+    {
+      "id": "M4",
+      "class": "interpretive",
+      "summary": "life.gov.sg states the co-matching transition ('retain the existing cap until 30 September 2027'; 'from 1 October 2027, all caps adjust to $5,000') without saying whether the harmonised $5,000 is a lifetime total or fresh headroom.",
+      "provenance": {
+        "source": "life.gov.sg, SG Child Support Package",
+        "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package",
+        "retrieved": "2026-08-25",
+        "citation": "life.gov.sg, SG Child Support Package (CDA co-matching transition)"
+      },
+      "routing": {
+        "rule_version_arm": "sg-csp.l4 \u2014 `the co-matching caps harmonise` (YMD 2027 10 1)",
+        "fork_ids": [
+          "F1"
+        ],
+        "currency_risk": true,
+        "effective_from": "2027-10-01"
+      },
+      "disposition": "encoded",
+      "disposition_note": "Both readings execute; the case suite asserts that they differ by $5,000 for a fifth child already co-matched $12,000, and that they agree before 1 October 2027. The fork opens on the day the caps harmonise and not before.",
+      "found_by": [
+        "S3"
+      ]
+    }
+  ],
+  "dispositions": []
+}

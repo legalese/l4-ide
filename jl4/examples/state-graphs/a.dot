@@ -8,12 +8,12 @@ digraph {
          ,fontsize=11];
     edge [fontname=Helvetica
          ,fontsize=10];
-    0 [label="initial\nALL OF"
+    0 [label="initial\nRAND: ALL OF"
       ,fillcolor=white
       ,style=filled
       ,shape=diamond
       ,fillcolor="#e6dcf5"];
-    1 [label="z\nONE OF"
+    1 [label="z\nROR: ONE OF"
       ,fillcolor=white
       ,style=filled
       ,shape=diamond
@@ -38,7 +38,7 @@ digraph {
       ,style=filled
       ,shape=ellipse
       ,fillcolor="#ffffff"];
-    6 [label="z\nONE OF"
+    6 [label="z\nROR: ONE OF"
       ,fillcolor=white
       ,style=filled
       ,shape=diamond
@@ -68,13 +68,13 @@ digraph {
     2 -> 3 [label="S MUST delivery [3]"
            ,color="#28a745"
            ,style=solid];
-    2 -> 4 [label=timeout
+    2 -> 4 [label="timeout [3]"
            ,color="#dc3545"
            ,style=dashed];
-    5 -> 3 [label="B MUST payment ... [5]"
+    5 -> 3 [label="B MUST payment n [5]"
            ,color="#28a745"
            ,style=solid];
-    5 -> 4 [label=timeout
+    5 -> 4 [label="timeout [5]"
            ,color="#dc3545"
            ,style=dashed];
     6 -> 7 [label=""
@@ -86,13 +86,13 @@ digraph {
     7 -> 3 [label="S MUST delivery [3]"
            ,color="#28a745"
            ,style=solid];
-    7 -> 4 [label=timeout
+    7 -> 4 [label="timeout [3]"
            ,color="#dc3545"
            ,style=dashed];
-    8 -> 3 [label="B MUST payment ... [5]"
+    8 -> 3 [label="B MUST payment n [5]"
            ,color="#28a745"
            ,style=solid];
-    8 -> 4 [label=timeout
+    8 -> 4 [label="timeout [5]"
            ,color="#dc3545"
            ,style=dashed];
 }

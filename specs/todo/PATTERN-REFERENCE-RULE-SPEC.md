@@ -488,9 +488,8 @@ pages outside `specs/` mention the keyword.
    entry updated. `doc/test-docs.sh` must pass with **this branch's** `l4` first on `PATH`
    (CLAUDE.md §3.1, the stale `~/.local/bin/l4` trap).
 4. **The skill.** `skills/writing-l4-rules/` (`SKILL.md`, `references/regulative.md`,
-   `source-patterns/05-…`, `06-…`) corrected here. The `legalese/l4-plugin` copy is generated and
-   its generator is not on `unstable` (CLAUDE.md §1.0); the PR says the port is owed and the GM
-   hand-ports after merge.
+   `source-patterns/05-…`, `06-…`) corrected here. The `legalese/l4-plugin` copy is generated:
+   after merge, port it by re-running `etc/build-plugin-bundle.mjs` (CLAUDE.md §1.0).
 5. **Checker comments.** `TypeCheck.hs:1966-1975` and `:2186-2212` describe the old world; rewrite
    them to describe R1.
 6. **Goldens.** After the sweep, one blessing pass: run `cabal test jl4-test`, read every changed
@@ -587,6 +586,23 @@ LSP golden covers a regulative rule at all); hover is a SHOULD if it is cheap in
    over tracked `.l4`: l4-ide `unstable` before #407: 205 tokens / 51 files (149 on code lines); after #407:
    47 / 17 (10 on code lines — 8 in fixtures whose purpose is the deprecation warning, 2 in `CONSIDER`);
    canon `main` 0; canon `mengwong/drafts` 7, all English prose in comments. `.md` outside `specs/`: 196 → 42.
+
+   **Re-measured 2026-09-23, from `lts/draw-what-it-means`: the figures above are right and they are
+   not the state the sweep will meet.** Both reproduce exactly — `git grep -o -w EXACTLY <ref> -- '*.l4'`
+   gives 205/51 at the base `5f132c8ce` and 47/17 at #407's own tip `29819243e`. The merge
+   commit `cb07560d9` is already **62 / 19**, because work that landed on `unstable` alongside #407
+   carried the keyword, and `origin/unstable` today is **86 tokens / 26 files**. Seven files newly
+   carry it in the week since the ruling; six of the seven are LTS-track commits
+   (`doc/reference/regulative/lts-list-example.l4`, the four `etc/lts-reader-proxy/*/probes.l4`,
+   `jl4/examples/bpmn/option.l4`) and the seventh is `jl4/examples/legal/miles-card/citi-rewards.l4`,
+   and `jl4/examples/bpmn/tenancy.l4` gained three more without being new. Nothing counts it: the
+   diagnostic is `SWarn`, so `l4 check` exits 0 and no gate reads it. **This branch swept
+   `jl4/examples/bpmn/tenancy.l4` on 2026-09-23 (10 tokens, the file's whole holding), leaving the
+   branch at 81 / 26** — done there because that file is the source of a §7.3 reader packet and of
+   the `receipts` review plate, not to pre-empt this sweep. The removal PR is owed a check that
+   `git grep -w EXACTLY -- '*.l4'` comes back empty and stays empty; without one, the next retirement
+   regrows the same way.
+
 2. **R5 severity.** RULED 2026-09-16 (Meng): stays **Info**; the diagnostic must say what to do. Wording,
    Meng's words verbatim (his verdict on the built text: _"is inscrutable"_; "free-variable pattern match"
    considered and withdrawn as non-standard — a pattern variable is the binding occurrence, the opposite of

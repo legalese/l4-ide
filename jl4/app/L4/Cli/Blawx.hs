@@ -1,7 +1,13 @@
--- | @l4 blawx FILE@ — compile the decision-rule subset of an L4 file to a
--- Blawx project: an import-shaped @.blawx@ fixture stream plus a sibling
+-- | @l4 export blawx FILE@ — compile the decision-rule subset of an L4 file to
+-- a Blawx project: an import-shaped @.blawx@ fixture stream plus a sibling
 -- @.pl@ dump of the concatenated s(CASP) (BLAWX-EXPORT-SPEC R1) — and
--- @l4 blawx --import FILE@, the other direction (R14).
+-- @l4 import blawx FILE@, the other direction (R14, whose CLI half was
+-- reversed by CLI-SURFACE-SPEC C1: it used to be @l4 blawx --import@).
+--
+-- One options record serves both directions, because both run through
+-- 'blawxCmd'. The two parsers below each set the direction and expose only
+-- that direction's flags, so @--scasp@ on an import, or @--parse-only@ on an
+-- export, is a parse error rather than a flag silently ignored.
 --
 -- Selection and relationalization live in the shared middle-end
 -- ('L4.Relational.Lower'); classification and emission live in
@@ -28,7 +34,8 @@
 -- boundary mid-tag.
 module L4.Cli.Blawx
   ( BlawxOptions(..)
-  , blawxOptionsParser
+  , blawxExportOptionsParser
+  , blawxImportOptionsParser
   , blawxCmd
   ) where
 
@@ -78,10 +85,10 @@ data BlawxOptions = BlawxOptions
   , bxRoundtrip :: Bool
   }
 
-blawxOptionsParser :: Parser BlawxOptions
-blawxOptionsParser = BlawxOptions
-  <$> strArgument (metavar "FILE" <> help "Path to the .l4 file to compile to a Blawx project \
-                                          \(or, with --import, the .blawx file to read)")
+-- | @l4 export blawx FILE@.
+blawxExportOptionsParser :: Parser BlawxOptions
+blawxExportOptionsParser = mk
+  <$> strArgument (metavar "FILE" <> help "Path to the .l4 file to compile to a Blawx project")
   <*> optional
         ( strOption
             ( long "output"
@@ -96,24 +103,42 @@ blawxOptionsParser = BlawxOptions
        <> help "Emit the concatenated s(CASP) dump instead of the .blawx YAML"
         )
   <*> switch
-        ( long "import"
-       <> help "Read a .blawx project and lift it to L4 (the other direction, R14)"
-        )
-  <*> switch
-        ( long "parse-only"
-       <> help "With --import: parse and report, without lifting. Prints one \
-               \CENSUS summary line to stdout and every diagnostic to stderr"
-        )
-  <*> switch
-        ( long "reemit"
-       <> help "With --import: write the .blawx re-emitted from the parsed \
-               \blocks (regenerated s(CASP) and XML) instead of the lifted L4"
-        )
-  <*> switch
         ( long "roundtrip"
        <> help "Self-check: emit the .blawx for FILE, parse it back, and assert \
                \that the block IR and the re-emitted bytes are unchanged"
         )
+  where
+    mk file out scasp roundtrip = BlawxOptions
+      { bxFile = file, bxOutput = out, bxScasp = scasp, bxImport = False
+      , bxParseOnly = False, bxReemit = False, bxRoundtrip = roundtrip }
+
+-- | @l4 import blawx FILE@: read a @.blawx@ project and lift it to L4.
+blawxImportOptionsParser :: Parser BlawxOptions
+blawxImportOptionsParser = mk
+  <$> strArgument (metavar "FILE" <> help "Path to the .blawx project to read")
+  <*> optional
+        ( strOption
+            ( long "output"
+           <> short 'o'
+           <> metavar "FILE"
+           <> help "Write the lifted L4 (or, with --reemit, the re-emitted .blawx) \
+                   \to FILE instead of stdout"
+            )
+        )
+  <*> switch
+        ( long "parse-only"
+       <> help "Parse and report, without lifting. Prints one CENSUS summary line \
+               \to stdout and every diagnostic to stderr"
+        )
+  <*> switch
+        ( long "reemit"
+       <> help "Write the .blawx re-emitted from the parsed blocks (regenerated \
+               \s(CASP) and XML) instead of the lifted L4"
+        )
+  where
+    mk file out parseOnly reemit = BlawxOptions
+      { bxFile = file, bxOutput = out, bxScasp = False, bxImport = True
+      , bxParseOnly = parseOnly, bxReemit = reemit, bxRoundtrip = False }
 
 blawxCmd :: BlawxOptions -> IO ()
 blawxCmd opts
@@ -133,7 +158,7 @@ exportCmd opts = do
   case opts.bxOutput of
     Just f | not opts.bxScasp, takeExtension f == ".pl" -> do
       hPutStrLn stderr
-        ( "l4 blawx: -o " <> f <> " without --scasp would overwrite the .blawx \
+        ( "l4 export blawx: -o " <> f <> " without --scasp would overwrite the .blawx \
           \YAML with its own sibling s(CASP) dump; pass --scasp for the dump, \
           \or choose a non-.pl output path" )
       exitFailure
@@ -147,7 +172,7 @@ exportCmd opts = do
   -- so say so on stderr, naming the construct.
   forM_ (blawxXmlGaps doc) \g ->
     hPutStrLn stderr
-      ("l4 blawx: WARNING no Blockly image, xml_content left empty — " <> Text.unpack g)
+      ("l4 export blawx: WARNING no Blockly image, xml_content left empty — " <> Text.unpack g)
   let source = Text.pack (takeFileName opts.bxFile)
       plDump = renderPlDump source doc
   if opts.bxScasp
@@ -161,7 +186,7 @@ exportCmd opts = do
           Text.writeFile f yaml
           let sibling = replaceExtension f ".pl"
           Text.writeFile sibling plDump
-          hPutStrLn stderr ("l4 blawx: s(CASP) dump written to " <> sibling)
+          hPutStrLn stderr ("l4 export blawx: s(CASP) dump written to " <> sibling)
         Nothing -> Text.putStr yaml
   exitSuccess
 
@@ -198,7 +223,7 @@ loadBlawxDoc file = do
     Just tc
       | all (TypeCheck.isExportPublicationRefusal . (.kind)) tc.errors -> do
           -- Surface non-fatal diagnostics, but proceed: a clean type-check is
-          -- the precondition that matters for lowering (`l4 openfisca` posture).
+          -- the precondition that matters for lowering (`l4 export openfisca` posture).
           putDiagnostics errs
           -- Without this line the command prints a wall of error-severity
           -- diagnostics and then exits 0, which reads as a failure that
@@ -206,7 +231,7 @@ loadBlawxDoc file = do
           case length (filter (TypeCheck.isExportPublicationRefusal . (.kind)) tc.errors) of
             0 -> pure ()
             n -> hPutStrLn stderr
-                   ( "l4 blawx: " <> show n <> " diagnostic(s) above refuse this module for \
+                   ( "l4 export blawx: " <> show n <> " diagnostic(s) above refuse this module for \
                      \publication as a web API, because an @export input must be a value and \
                      \an assumed rule is not one. That does not apply to Blawx, where such a \
                      \rule becomes an #abducible the interview asks about, so the export \
@@ -215,7 +240,7 @@ loadBlawxDoc file = do
                  >>= lowerBlawx of
             Left lerrs -> do
               putDiagnostics
-                ( "l4 blawx: cannot compile these decisions to Blawx:"
+                ( "l4 export blawx: cannot compile these decisions to Blawx:"
                 : map (("  - " <>) . renderLowerError) lerrs
                 )
               exitFailure
@@ -234,18 +259,18 @@ importCmd opts = do
   stream <- case raw of
     Left e -> do
       hPutStrLn stderr
-        ( "l4 blawx: ERROR blawx-parse/yaml: " <> opts.bxFile <> ": "
+        ( "l4 import blawx: ERROR blawx-parse/yaml: " <> opts.bxFile <> ": "
             <> Yaml.prettyPrintParseException e )
       exitFailure
     Right v -> pure v
   (src, ywarns) <- case readBlawxSource stream of
     Left m -> do
-      hPutStrLn stderr ("l4 blawx: ERROR " <> Text.unpack m)
+      hPutStrLn stderr ("l4 import blawx: ERROR " <> Text.unpack m)
       exitFailure
     Right ok -> pure ok
-  forM_ ywarns \w -> hPutStrLn stderr ("l4 blawx: WARNING " <> Text.unpack w)
+  forM_ ywarns \w -> hPutStrLn stderr ("l4 import blawx: WARNING " <> Text.unpack w)
   let (mDoc, diags) = parseBlawx src
-  forM_ diags \d -> hPutStrLn stderr ("l4 blawx: " <> Text.unpack (renderParseDiag d))
+  forM_ diags \d -> hPutStrLn stderr ("l4 import blawx: " <> Text.unpack (renderParseDiag d))
   let nErrs = length (filter diagIsError diags)
       nWarns = length diags - nErrs + length ywarns
   when opts.bxParseOnly $
@@ -261,7 +286,7 @@ importCmd opts = do
       | opts.bxReemit -> do
           forM_ (blawxXmlGaps doc) \g ->
             hPutStrLn stderr
-              ("l4 blawx: WARNING no Blockly image, xml_content left empty — " <> Text.unpack g)
+              ("l4 import blawx: WARNING no Blockly image, xml_content left empty — " <> Text.unpack g)
           let yaml = renderBlawxYaml doc
           case opts.bxOutput of
             Just f -> Text.writeFile f yaml
@@ -286,12 +311,12 @@ importCmd opts = do
           case liftBlawx ctx doc of
             Left lerrs -> do
               putDiagnostics
-                ( "l4 blawx --import: cannot lift this document to L4:"
+                ( "l4 import blawx: cannot lift this document to L4:"
                 : map (("  - " <>) . renderLiftDiag) lerrs
                 )
               exitFailure
             Right (lifted, lwarns) -> do
-              forM_ lwarns \w -> hPutStrLn stderr ("l4 blawx: " <> Text.unpack (renderLiftDiag w))
+              forM_ lwarns \w -> hPutStrLn stderr ("l4 import blawx: " <> Text.unpack (renderLiftDiag w))
               -- The identity the module is checked under. With --output it is
               -- the real destination; without one it is a sibling of the input
               -- that need not exist, because the text is fed through the VFS
@@ -367,14 +392,14 @@ recordOracles path src = do
               n = length [() | l <- Text.lines src, "#EVAL" `Text.isPrefixOf` l]
           unless (length vals == n) $
             hPutStrLn stderr
-              ( "l4 blawx --import: WARNING the lifted module has " <> show n
+              ( "l4 import blawx: WARNING the lifted module has " <> show n
                   <> " #EVAL directives but the engine returned " <> show (length vals)
                   <> " results; some oracle lines are missing" )
           pure (spliceOracles vals src)
         _ -> do
           putDiagnostics errs
           hPutStrLn stderr
-            "l4 blawx --import: the lifted module does not typecheck; refusing to \
+            "l4 import blawx: the lifted module does not typecheck; refusing to \
             \write an artifact that cannot be run (this is a lift bug, not a \
             \property of the input)"
           exitFailure
@@ -465,18 +490,18 @@ roundtripCmd opts = do
   (src, ywarns) <- either (die . ("re-reading our own YAML failed: " <>)) pure (readBlawxSource stream)
   unless (null ywarns) $ die ("our own YAML warns: " <> Text.intercalate "; " ywarns)
   let (mDoc, diags) = parseBlawx src
-  forM_ diags \d -> hPutStrLn stderr ("l4 blawx: " <> Text.unpack (renderParseDiag d))
+  forM_ diags \d -> hPutStrLn stderr ("l4 export blawx: " <> Text.unpack (renderParseDiag d))
   doc' <- maybe (die "parsing our own .blawx produced no document") pure mDoc
   let a = normaliseStacks (stripProvenance doc)
       b = normaliseStacks (stripProvenance doc')
   unless (a == b) $ die ("the parsed IR differs from the emitted one:\n" <> firstIrDiff a b)
   let yaml' = renderBlawxYaml doc'
   unless (yaml == yaml') $ die ("re-emission is not byte-identical:\n" <> firstLineDiff yaml yaml')
-  putStrLn ("l4 blawx --roundtrip: " <> opts.bxFile <> ": IR and bytes unchanged")
+  putStrLn ("l4 export blawx --roundtrip: " <> opts.bxFile <> ": IR and bytes unchanged")
   exitSuccess
  where
   die m = do
-    hPutStrLn stderr ("l4 blawx --roundtrip: " <> opts.bxFile <> ": " <> Text.unpack m)
+    hPutStrLn stderr ("l4 export blawx --roundtrip: " <> opts.bxFile <> ": " <> Text.unpack m)
     exitFailure
 
 -- | Name the first row that differs, so a failure points somewhere rather

@@ -41,7 +41,7 @@ for stem in $EXAMPLES; do
   src="$ROOT/jl4/examples/docassemble/$stem.l4"
   echo "═══════════════════════════════════════════════════════════════════"
   echo "── $stem"
-  if ! "$L4" docassemble "$src" -o "$OUT/$stem.yml" >"$OUT/$stem.emit.log" 2>&1; then
+  if ! "$L4" export docassemble "$src" -o "$OUT/$stem.yml" >"$OUT/$stem.emit.log" 2>&1; then
     echo "   EMIT REFUSED — the M4 construct this example exists for is not landed:"
     sed 's/^/   | /' "$OUT/$stem.emit.log"
     fails=$((fails + 1))
@@ -53,7 +53,7 @@ for stem in $EXAMPLES; do
   # it is exactly where a `content file:` template reference (which raises at
   # PARSE time when the file is absent) would break the BARE artifact while the
   # packaged one still worked.
-  if ! "$L4" docassemble "$src" --package "$OUT/pkg-$stem" \
+  if ! "$L4" export docassemble "$src" --package "$OUT/pkg-$stem" \
        >"$OUT/$stem.pkg.log" 2>&1; then
     echo "   PACKAGE FAILED:"
     sed 's/^/   | /' "$OUT/$stem.pkg.log"
@@ -73,9 +73,9 @@ done
 # DOES emit today — the redness is a wrong answer, not a refusal.
 echo "═══════════════════════════════════════════════════════════════════"
 echo "── citations (M2 inherited debt: a changed answer)"
-if "$L4" docassemble "$ROOT/jl4/examples/docassemble/citations.l4" \
+if "$L4" export docassemble "$ROOT/jl4/examples/docassemble/citations.l4" \
      -o "$OUT/citations.yml" >/dev/null 2>&1 \
-   && "$L4" docassemble "$ROOT/jl4/examples/docassemble/citations.l4" \
+   && "$L4" export docassemble "$ROOT/jl4/examples/docassemble/citations.l4" \
      --package "$OUT/pkg-citations" >/dev/null 2>&1; then
   if "$PY" "$ROOT/jl4/examples/docassemble/roundtrip_check.py" \
        "$OUT/citations.yml" citations "--also=$OUT/pkg-citations" --quiet; then

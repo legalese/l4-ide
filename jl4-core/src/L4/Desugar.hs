@@ -165,6 +165,11 @@ carameliseDeadline = \ case
   MkDeadline anno d ma -> MkDeadline anno (carameliseExpr d) (fmap carameliseAnchor ma)
   MkBefore anno e      -> MkBefore anno (carameliseExpr e)
 
+carameliseFilter :: HasName n => Filter n -> Filter n
+carameliseFilter = \ case
+  Who ann e   -> Who ann (carameliseExpr e)
+  Whose ann e -> Whose ann (carameliseExpr e)
+
 carameliseOpening :: HasName n => Syntax.Opening n -> Syntax.Opening n
 carameliseOpening (MkOpening anno d ma) =
   MkOpening anno (carameliseExpr d) (fmap carameliseAnchor ma)
@@ -178,7 +183,7 @@ carameliseSubject :: HasName n => Subject n -> Subject n
 carameliseSubject = \ case
   Party ann party -> Party ann (carameliseExpr party)
   Every ann mCast v mRoll mFilter ->
-    Every ann mCast v (fmap carameliseExpr mRoll) (fmap carameliseExpr mFilter)
+    Every ann mCast v (fmap carameliseExpr mRoll) (fmap carameliseFilter mFilter)
 
 carameliseRAction :: HasName n => RAction n -> RAction n
 carameliseRAction = \ case

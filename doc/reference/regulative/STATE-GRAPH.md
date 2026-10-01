@@ -87,31 +87,35 @@ The editor's offer and the command line produce the same map for the same rule.
 
 ## Reading the map
 
-Take `the tenancy` above. Its map has four places and four arrows:
+Take `the tenancy` above.
+Its map has four places and four arrows:
 
 - **initial**, where the rule starts;
-- an arrow out of it labelled `EVERY Tenant t IN tenants MUST Sign ... [14]` and, on a second line,
-  `ONCE ALL HAVE` — the tenants signing, all of them, within 14 days — leading to
-- a place labelled **theLandlord must Deliver ...**, the landlord's turn, with an arrow labelled
-  `theLandlord MUST Deliver ... [5]` leading to
-- **Fulfilled**, drawn with a double border, and from both of the earlier places a red dashed
-  arrow labelled `timeout` leading to
+- an arrow out of it labelled `EVERY Tenant t IN tenants MUST Sign t [14]`, with `ONCE ALL HAVE` on a line of its own below that — the tenants signing, all of them, within 14 days — leading to
+- a place labelled **theLandlord must Deliver theLandlord WITHIN 5**, the landlord's turn, with an arrow labelled `theLandlord MUST Deliver theLandlord [5]` leading to
+- **Fulfilled**, drawn with a double border, and from each of the earlier places a red dashed arrow — `timeout [14]` out of **initial**, `timeout [5]` out of the landlord's place — leading to
 - **Breach**, also double-bordered.
+
+The first arrow's caption is one sentence, not two: a caption longer than 36 characters is broken onto further lines, so `t [14]` arrives under `EVERY Tenant t IN tenants MUST Sign` and where that break falls means nothing.
+The `ONCE ALL HAVE` under it is different — that line is deliberate, and the table below says what it is for.
 
 So the conventions are:
 
-| you see                       | it means                                                                                                                                                                                                                                                   |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a circle                      | a place the rule can be: somebody owes something, or it is over                                                                                                                                                                                            |
-| a double-bordered circle      | it is over — `Fulfilled` (green) or `Breach` (red)                                                                                                                                                                                                         |
-| a solid green arrow           | the action was taken, and this is where the `HENCE` goes                                                                                                                                                                                                   |
-| a red dashed arrow            | the `LEST` path, captioned by what reaches it: `timeout` for a `MUST` whose deadline passed, `violation` for a `SHANT` whose forbidden thing was done, `lapses` for a `MAY` nobody exercised                                                               |
-| `[14]` on an arrow            | the `WITHIN` deadline                                                                                                                                                                                                                                      |
-| `ONCE ALL HAVE` / `UPON EACH` | for an `EVERY` rule, whether the next step waits for the whole group or fires for each member                                                                                                                                                              |
-| a diamond                     | a fork, captioned `ALL OF` for a `RAND` (every branch runs) or `ONE OF` for an `ROR` (exactly one does) or an `IF` choosing between rules                                                                                                                  |
-| a circle named after a rule   | a `HENCE` or `LEST` handed over to another rule in the same file; that rule's own places and arrows follow, drawn once on a path however many arrows on that path lead into it (the two branches of a `RAND` or `ROR` each get their own copy — see below) |
-| an arrow back to `initial`    | the rule renews itself, or hands over to a rule that hands back: a loop                                                                                                                                                                                    |
-| a heavy arrow                 | only with `--dominators --dot`: an act on every path to `FULFILLED` or to `BREACH`, and its caption says which — see [the picture, marked](#the-picture-marked---dominators---dot)                                                                         |
+| you see                                       | it means                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| a circle                                      | a place the rule can be: somebody owes something, or it is over                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| a double-bordered circle                      | it is over — `Fulfilled` (green) or `Breach` (red)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| a solid green arrow                           | the action was taken, and this is where the `HENCE` goes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| a red dashed arrow                            | the `LEST` path, captioned by what reaches it: `timeout` for a `MUST` whose deadline passed, `violation` for a `SHANT` whose forbidden thing was done, `lapses` for a `MAY` nobody exercised. `timeout` and `lapses` name the deadline that ran out — `timeout [14]` — unless two clocks could both take the arm, and then the caption is the bare word rather than a guess at which fired. `violation` never carries one: what reaches it is an act, not a clock                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `[14]` on an arrow                            | the `WITHIN` deadline                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `ONCE ALL HAVE` / `UPON EACH`                 | for an `EVERY` rule, whether the next step waits for the whole group or fires for each member                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| a diamond                                     | a fork, captioned with the keyword that wrote it and what that keyword does: `RAND: ALL OF` (every branch runs), `ROR: ONE OF` (exactly one does, and the obliged party picks), `IF: ONE OF` (exactly one does, and the facts pick). The two `ONE OF`s are drawn alike because they fan out alike; the keyword in front of the colon is what tells them apart                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| a circle named after an obligation            | the place where that obligation is owed, spelled as the rule wrote it and carrying its `WITHIN` — **theLandlord must Deliver theLandlord WITHIN 5**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| an arrow carrying only a guard or a join line | the place it leaves already names the obligation, so the arrow does not say it a second time. Where the arrow would then be blank it restates the obligation after all: an unlabelled arrow is worse than a repeated one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| a clause on its own line naming what is open  | what the act leaves open, said **beside** the act and never inside it, so it cannot be read as part of the act. `` the rule binds `price` `` — the act is known and one **argument** is open, so any value in that place discharges the obligation. `any act by this party would match this obligation` — the **act itself** is open, a bare name the rule never declared, so anything that party does discharges it. The two are different scopes, not two phrasings of one: read the second as the first and you will think far too little is open. `MUST payment price` (open) and `MUST payment n` (`n MEANS 2`, so only a payment of 2 will do) print exactly alike, and this clause is the only thing on the page that separates them. `l4 lts` draws the same distinction at length — ``this obligation's pattern matches any act by B: the rule binds `return` rather than naming an act`` — which is too long for an arrow, so the picture says the short form and the list says the long one |
+| a circle named after a rule                   | a `HENCE` or `LEST` handed over to another rule in the same file; that rule's own places and arrows follow, drawn once on a path however many arrows on that path lead into it (the two branches of a `RAND` or `ROR` each get their own copy — see below)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| an arrow back to `initial`                    | the rule renews itself, or hands over to a rule that hands back: a loop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| a heavy arrow                                 | only with `--dominators --dot`: an act on every path to `FULFILLED` or to `BREACH`, and its caption says which — see [the picture, marked](#the-picture-marked---dominators---dot)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Asking what has to happen: `--dominators`
 
@@ -124,7 +128,7 @@ Instead of a drawing, this prints an answer per rule, for each of its two end st
 ```
 the sale
   Every path to FULFILLED passes through:
-    - PARTY The Seller deliver the goods (MUST, WITHIN 10)
+    - PARTY The Seller `deliver the goods` (MUST, WITHIN 10)
   Every path to BREACH passes through: nothing in particular (there is more than one route).
 ```
 
@@ -148,14 +152,14 @@ collects:
 ```
 delivery and payment
   Every path to FULFILLED passes through:
-    - PARTY The Seller deliver the goods (MUST, WITHIN 10)
-    - PARTY The Buyer pay the price (MUST, WITHIN 30)
+    - PARTY The Seller `deliver the goods` (MUST, WITHIN 10)
+    - PARTY The Buyer `pay the price` (MUST, WITHIN 30)
   Every path to BREACH passes through: nothing in particular (there is more than one route).
 delivery or collection
   Every path to FULFILLED passes through: nothing in particular (there is more than one route).
   Every path to BREACH passes through:
-    - the deadline passing on PARTY The Seller deliver the goods (MUST, WITHIN 10)
-    - the deadline passing on PARTY The Buyer collect the goods (MUST, WITHIN 10)
+    - the deadline passing on PARTY The Seller `deliver the goods` (MUST, WITHIN 10)
+    - the deadline passing on PARTY The Buyer `collect the goods` (MUST, WITHIN 10)
 ```
 
 Under `RAND` both acts are required to fulfil, so both are listed; and either deadline passing
@@ -177,9 +181,9 @@ adds an answer for each intermediate state: what has to have happened for the co
 _there_. For the sale:
 
 ```
-  Every path to "The Buyer must pay the late fee" passes through:
-    - PARTY The Seller deliver the goods (MUST, WITHIN 10)
-    - the deadline passing on PARTY The Buyer pay the price (MUST, WITHIN 30)
+  Every path to "The Buyer must pay the late fee WITHIN 7" passes through:
+    - PARTY The Seller `deliver the goods` (MUST, WITHIN 10)
+    - the deadline passing on PARTY The Buyer `pay the price` (MUST, WITHIN 30)
 ```
 
 The start state answers "nothing has to happen to be there". A rule whose arms hand over to other
@@ -218,7 +222,9 @@ only, because a mark for every intermediate place would put several captions on 
 
 - An obligation is written as its party, its act, and in brackets the modal, the `WITHIN`
   deadline, the `PROVIDED` condition and, for an `EVERY`, the join line — for example
-  `PARTY The Buyer pay the price (MUST, WITHIN 30, PROVIDED price AT LEAST 20)`.
+  ``PARTY The Buyer `pay the price` (MUST, WITHIN 30, PROVIDED price AT LEAST 20)``.
+  A name the source wrote in back quotes keeps them, because that is the name — `sublet` below
+  is one word and needs none.
 - A prohibition's good arm is worded as **refraining** — for example
   `PARTY The Tenant refraining from sublet (SHANT, WITHIN 365)` — because that arm is taken by the
   deadline passing with the act _not_ done.
@@ -236,8 +242,7 @@ that can actually be taken. The fourth runs the other way.
 
 1. **Conditions are drawn, not decided.** A `PROVIDED` guard that could never be true still draws
    its arrow, so a route through it counts as a route.
-2. **One act, one arrow.** `pay 100` and `pay 5` are the same arrow in the drawing (`pay ...`),
-   though the running contract tells them apart.
+2. **One act as written, one arrow.** The drawing shows the act the way the rule wrote it, so `pay 100` and `pay 5` are two arrows; but `pay price` is a single arrow whatever `price` turns out to be at run time, and an act whose name the rule leaves open — the arrow says so — is a single arrow standing for every value that would discharge it.
 3. **Deadlines are labels.** Whether a deadline can be met given the ones before it is not worked
    out; the picture shows `WITHIN 30` as text.
 4. **A permission with no deadline cannot lapse, and draws nothing.** A `MAY` with no `WITHIN`
@@ -278,7 +283,8 @@ runs). (The named rule still has a map of its own, printed separately.) What the
 hand-over, not the arguments: a rule called with `amount` and the same rule called with
 `amount - 1` are the same place. A hand-over the map cannot follow — a rule from an `IMPORT`ed
 file, a `RECORD` step, or anything else that is not a rule of this file — is drawn as an arrow
-into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
+into a place named after the arm and the obligation it continues, `HENCE of alice must pay alice`
+or `LEST of alice must pay alice`, and stops there.
 
 **A `MAY` gets its red arrow from its deadline, not from a `LEST`.** A permission nobody exercises
 simply ends, so where it can expire the map draws a red arrow captioned `lapses` straight to

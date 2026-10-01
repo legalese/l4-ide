@@ -11,7 +11,7 @@
 -- and simply not be CALLED. Measured 2026-09-17: deleting every
 -- 'L4.Nlg.unescapeNlgText' call site left the corpus goldens, the round-trip
 -- property and all of 'NlgPercentSpec' green, while @l4 render@, the LSP
--- document webview and @l4 blawx@ each emitted a literal backslash to the
+-- document webview and @l4 export blawx@ each emitted a literal backslash to the
 -- reader. A unit test on the decoder cannot tell a wired decoder from an
 -- orphaned one; it has to be driven end to end.
 --

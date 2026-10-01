@@ -7,7 +7,7 @@
 -- Catala: `catala typecheck` rejects it with "Scope calls are not allowed
 -- outside of a scope" (catala 1.2.1, exit 123).
 --
--- Until the refusal this file pins, `l4 catala` emitted that module, printed
+-- Until the refusal this file pins, `l4 export catala` emitted that module, printed
 -- nothing at all on stderr, and exited 0 — the invalid output was discovered
 -- only by running Catala over it by hand.
 --

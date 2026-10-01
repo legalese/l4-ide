@@ -7,7 +7,7 @@
 --
 -- __What the corpus goldens cannot cover, and why this file exists.__ The
 -- four P1\/P3 seeds do round-trip end to end — @jl4\/tests-cli@ runs
--- @l4 blawx --roundtrip@ over each of them, through the YAML layer as well —
+-- @l4 export blawx --roundtrip@ over each of them, through the YAML layer as well —
 -- but "L4.Blawx.Lower" constructs NONE of the P5 extension constructors, so
 -- no seed exercises @object_declaration@, @overrules@, @unattributed_rule@,
 -- @applies@, @holds@, @according_to@, @new_object_category@ or the

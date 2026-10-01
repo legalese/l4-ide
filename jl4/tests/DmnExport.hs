@@ -1391,8 +1391,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       xml `shouldSatisfy` Text.isInfixOf "<text>annual_income</text>"
 
     it "gives a single-output table's <output> no @name and no @typeRef" $ do
-      -- READING, DMN 8.2.11: an output clause is named only so a MULTI-output
-      -- result can be keyed. MEASUREMENT: KIE fires ILLEGAL_USE_OF_NAME and
+      -- SPEC, DMN 1.3 §8.3.2 Table 34: a single-output table's OutputClause
+      -- SHALL NOT specify a name or a typeRef; only multi-output clauses are
+      -- named, so the result can be keyed. MEASUREMENT: KIE fires ILLEGAL_USE_OF_NAME and
       -- ILLEGAL_USE_OF_TYPEREF otherwise -- six warnings on the Reg CF exhibit
       -- alone -- and dropping both leaves Camunda 8's answers unchanged.
       let xml = emitDrg (drgOf spacedNames)
@@ -2234,7 +2235,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   -- one of those groups is renamed apart instead. The golden fidelity report
   -- shows the same thing; this says it as an invariant rather than as a diff.
   it "fires D-FEELNAME zero times on the Reg CF corpus, by construction" $ do
-    src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+    src <- Text.readFile (examplesRoot </> "canon" </> "us" </> "regcf" </> "regcf.l4")
     let notes = (dmnReport (drgAsCli "regcf.l4" src)).notes
     [n | n <- notes, n.code == "D-FEELNAME"] `shouldBe` []
     [n | n <- notes, n.code == "D-RENAME"] `shouldSatisfy` (not . null)
@@ -2247,7 +2248,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           src <- Text.readFile (examplesRoot </> "dmn" </> "gst-rate.l4")
           pure (drgAsCli "gst-rate.l4" src)
         corpusDrg = do
-          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          src <- Text.readFile (examplesRoot </> "canon" </> "us" </> "regcf" </> "regcf.l4")
           pure (drgAsCli "regcf.l4" src)
         notOkDrg n = do
           src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> n)
@@ -2806,7 +2807,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   ----------------------------------------------------------------------
   describe "the deontic verdict lowering (R13, §16)" $ do
     let corpusDrg = do
-          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          src <- Text.readFile (examplesRoot </> "canon" </> "us" </> "regcf" </> "regcf.l4")
           pure (drgAsCli "regcf.l4" src)
         verdictDrg = do
           src <- Text.readFile (examplesRoot </> "dmn" </> "deontic-verdict.l4")
@@ -4020,7 +4021,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 --
 -- There is deliberately no model-name column. The model's name comes from the
 -- module's own outermost @§@ heading, else from the file's base name — the
--- same precedence @l4 export --to=dmn@ applies — so these goldens are what a
+-- same precedence @l4 export dmn@ applies — so these goldens are what a
 -- bare CLI invocation writes, with no flag and no string retyped here. It used
 -- to be a hand-typed column, and the result was that the Reg CF corpus's model
 -- had three names at once: @SEC Regulation Crowdfunding — 17 CFR Part 227@ in
@@ -4048,7 +4049,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 --   It and @dmn\/ymd-dates.l4@ are the subjects whose engine cases FEED DATES;
 --   they divide the date surface between them, this one by CONSTRUCTOR
 --   (@Date d m y@) and that one by the other constructor (@YMD y m d@).
--- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
+-- * @canon\/us\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
 --   decisions since the rule-version axis landed — written
 --   in the house @GIVEN@ + record style. It is here to be honest about what
 --   that costs: a DMN decision is a 0-ary variable, so every cross-decision
@@ -4067,7 +4068,7 @@ goldenSubjects =
     , "gst-rate"
     , "the dated-regime exhibit"
     )
-  , ( "legal" </> "regcf" </> "regcf.l4"
+  , ( "canon" </> "us" </> "regcf" </> "regcf.l4"
     , "regcf-corpus"
     , "the Reg CF corpus"
     )
@@ -4167,7 +4168,7 @@ goldenOf examplesRoot srcPath name render = do
   src <- Text.readFile (examplesRoot </> srcPath)
   pure (mkGolden examplesRoot name (render (drgAsCli srcPath src)))
 
--- | 'goldenOf' at the KIE flavor: what `l4 export --to=dmn --flavor=kie FILE`
+-- | 'goldenOf' at the KIE flavor: what `l4 export dmn --flavor=kie FILE`
 -- writes, with the same model-name precedence.
 goldenKieOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text)
 goldenKieOf examplesRoot srcPath name render = do
@@ -4177,7 +4178,7 @@ goldenKieOf examplesRoot srcPath name render = do
               src
   pure (mkGolden examplesRoot name (render drg))
 
--- | Lower exactly as @l4 export --to=dmn FILE@ does with no @--model-name@:
+-- | Lower exactly as @l4 export dmn FILE@ does with no @--model-name@:
 -- the module's outermost @§@ heading if it has one, else the file's base name.
 -- Keeping this in step with 'L4.Cli.Export.exportDmn' is what makes every DMN
 -- golden reproducible from the command line.
