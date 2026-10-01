@@ -420,19 +420,20 @@ A ruling is recorded here when it is made.
 ### U2 — Step 0 ships in two-valued mode
 
 **The question.** Replace the `IF` rewrite of `AND`/`OR`/`IMPLIES`/`NOT` with frames even if the lift is never switched on?
-**Recommendation.** Yes, §4.4: it is the change Meng asked for, it stops traces showing code the author did not write, and it keeps the `IMPLIES` seam.
-**Cost.** The trace golden's `IF` sub-trees, the service's reasoning tree and jl4-mlir's mirrored trace shape (§2.4), if the measurement confirms that is all.
+**RULED 2026-10-01.** Meng marked `accept` on bench card U2 at 09:56:10Z, with no note. The ruling, as printed on the card: Give the built-in connectives their own frames, flag off, and delete or replace the unreachable rewrite at `Machine.hs:1198-1205`. In the same change, update the service's reasoning tree and jl4-mlir's mirrored trace shape and parity harness. Success: the `IF` sub-trees disappear from the golden and jl4-mlir parity holds.
+An amendment (frames inside the built-in values; the parity harness run and read) is open as bench card U2b.
 
 ### U3 — Where the decision diagram lives
 
 **The question.** Move `BoolExpr` and the diagram from `jl4-query-plan` into `jl4-core` (or a package below both), so the evaluator can recognise a tautology mid-evaluation and take the right `IF` arm?
-**Recommendation.** Not yet. Return residuals undecided from the evaluator and decide them at the boundary, where the planner already is; move it only if §7 shows conditionals on tautological residuals are common.
+**RULED 2026-10-01.** Meng marked `accept` on bench card U3 at 09:56:22Z, with no note. The ruling, as printed on the card: Residuals are decided at the boundary, for Boolean results only; non-Boolean conditionals lose the condition, and the spec says so. Add a §7 count of conditions whose residual is a tautology or contradiction, and make that count the trigger to decide small residuals locally by truth table.
+An amendment (ruled only after U4; the trigger as a lower bound) is open as bench card U3b.
 
 ### U4 — Unknown conditions: evaluate the arms, and under what budget
 
 **The question.** Does an `IF`/`BRANCH`/`CONSIDER` on an unknown evaluate its arms and join them (§4.5), and with what bound?
-**Recommendation.** Join for `IF` and `BRANCH`, bounded by a frame budget set from §7's measurement; `CONSIDER` returns unknown until enumeration atoms are ruled.
-**Sub-question.** Enumeration atoms `s = C`, with the exactly-one constraint, in the residual and the planner: now, or with `CONSIDER`?
+**RULED 2026-10-01.** Meng marked `accept`, option A on bench card U4 at 09:56:50Z, with no note. The ruling, as printed on the card: Join for `IF` and `BRANCH`. Add a cumulative step counter, explore mode only, set from §7's measurement of total steps (not depth). Running out returns an unknown naming the pending condition, never `StackOverflow`. Recursion guarded by an `IF` over an unknown always runs out, and the spec says so. `CONSIDER` on an unknown stays unknown for now.
+Option A answers the sub-question: enumeration atoms come with `CONSIDER`, not now. An amendment (non-Boolean joins keep their arms; guarded errors) is open as bench card U4b.
 
 ### U5 — Comparisons become atoms (the membrane)
 
