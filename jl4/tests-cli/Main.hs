@@ -25,6 +25,7 @@ import System.Directory
   , createDirectoryIfMissing
   , createFileLink
   , doesFileExist
+  , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
   , removeFile
@@ -1205,15 +1206,19 @@ spec bin = do
       -- if the path were ever handed to a shell. With a direct `proc` call it
       -- is just a literal (if unusual) directory name. The sentinel must not
       -- appear regardless of whether Graphviz's `dot` is installed.
+      -- The sentinel is relative, run from a scratch directory: an absolute
+      -- Windows path would put a drive colon into the directory name.
       tmp <- getTemporaryDirectory
-      let sentinel = tmp </> "l4-trace-injection-sentinel"
-          evilDir  = tmp </> ("l4trace$(touch " ++ sentinel ++ ").d")
-      removePathForcibly sentinel
-      removePathForcibly evilDir
-      createDirectoryIfMissing True evilDir
-      _ <- runL4 bin ["trace", evalTraceFixture, "--format", "png", "--output-dir", evilDir]
-      ranShell <- doesFileExist sentinel
-      removePathForcibly evilDir
+      let work     = tmp </> "l4-trace-injection"
+          sentinel = "l4-trace-injection-sentinel"
+          evilDir  = "l4trace$(touch " ++ sentinel ++ ").d"
+      removePathForcibly work
+      createDirectoryIfMissing True (work </> evilDir)
+      fixture <- makeAbsolute evalTraceFixture
+      _ <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> sentinel)
+      removePathForcibly work
       ranShell `shouldBe` False
 
     it "writes trace output into a directory whose path contains a space" $ do
@@ -1228,6 +1233,32 @@ spec bin = do
       wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
       removePathForcibly outDir
       wrote `shouldBe` True
+
+    it "hands dot an output dir beginning with '-' as a path, not an option" $ do
+      -- dot reads any argument starting with `-` as an option, and has no
+      -- `--` to stop that. Given `-out/evaltrace-eval1.dot` it reads
+      -- `-o ut/...`, takes the graph from stdin instead, and exits 0 having
+      -- written nothing, so `l4 trace` reported an empty SVG as generated.
+      -- Only a real `dot` shows this, so without one the test is pending.
+      mDot <- findExecutable "dot"
+      case mDot of
+        Nothing -> pendingWith "Graphviz `dot` is not on PATH"
+        Just _ -> do
+          tmp <- getTemporaryDirectory
+          let work    = tmp </> "l4-trace-dash-path"
+              svgFile = work </> "-out" </> "evaltrace-eval1.svg"
+          removePathForcibly work
+          createDirectoryIfMissing True work
+          fixture <- makeAbsolute evalTraceFixture
+          Output code _ _ <- runL4In (Just work) Nothing bin
+            ["trace", fixture, "--format", "svg", "--output-dir=-out"]
+          wrote <- doesFileExist svgFile
+          svg <- if wrote
+            then T.unpack . TE.decodeUtf8Lenient <$> BS.readFile svgFile
+            else pure ""
+          removePathForcibly work
+          code `shouldBe` ExitSuccess
+          svg `shouldSatisfy` ("<svg" `isInfixOf`)
 
   -- Regression tests for the import-cycle false-success bug: `l4 check`/`run`
   -- previously exited 0 on a 2-/3-module import ring because the engine's cycle

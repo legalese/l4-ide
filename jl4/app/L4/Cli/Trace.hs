@@ -160,7 +160,7 @@ renderWithDot formatFlag dotFile outFile = do
   result <-
     try (withBinaryFile outFile WriteMode \hOut -> do
           (_, _, _, ph) <- createProcess
-            (proc "dot" ["-T" <> formatFlag, dotFile]) { std_out = UseHandle hOut }
+            (proc "dot" ["-T" <> formatFlag, dotArg]) { std_out = UseHandle hOut }
           waitForProcess ph)
       :: IO (Either IOException ExitCode)
   case result of
@@ -173,6 +173,10 @@ renderWithDot formatFlag dotFile outFile = do
       hPutStrLn stderr
         ("Error: dot exited with code " <> show n <> " while rendering " <> dotFile)
       pure False
+  where
+    -- dot takes any argument starting with '-' as an option, "--" included, so
+    -- a (necessarily relative) path like "-out/x.dot" goes as "./-out/x.dot".
+    dotArg = case dotFile of { '-' : _ -> "." </> dotFile; _ -> dotFile }
 
 -- `l4 trace` uses its own EvalConfig with tracing switched on.
 makeTraceEvalConfig :: TraceOptions -> IO EvalConfig
