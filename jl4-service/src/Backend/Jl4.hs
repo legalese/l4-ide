@@ -36,7 +36,8 @@ import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 
 import Backend.Api
 import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..))
-import L4.Export (AssumeRewrite(..), extractAssumeParamTypes, extractAssumeParamResolveds, rewriteModuleAssumes)
+import L4.Export (AssumeRewrite(..), extractAssumeParamResolveds, rewriteModuleAssumes)
+import L4.Discharge (sectionBinders)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Scientific as Scientific
@@ -586,13 +587,13 @@ evaluateWithCompiledDeontic
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
   let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+      (binderParamTypes, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
 
   -- Generate deontic wrapper code with EVALTRACE
-  genCode <- case generateDeonticEvalWrapper fnDecl.name givenParamTypes assumeParamTypes inputJson startTime traceEvents mPartyType mActionType traceLevel of
+  genCode <- case generateDeonticEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes inputJson startTime traceEvents mPartyType mActionType traceLevel of
     Left err -> throwError $ InterpreterError err
     Right gc -> pure gc
 
@@ -717,6 +718,21 @@ handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case
 
 -- | Wrapper-based evaluation (fallback for FnObject parameters)
 -- Uses JSONDECODE to handle complex record types
+-- | The inputs a function reads that are not its own GIVENs, split into
+-- section GIVENs, which the wrapper supplies with WITH, and genuine ASSUMEs,
+-- which it can only shadow with a LET. Both arrive as ASSUMEs, because a
+-- section GIVEN is elaborated into one ('L4.Desugar.elaborateSectionBinder').
+splitAssumeParams
+  :: Module Resolved
+  -> Decide Resolved
+  -> ([(Text, Type' Resolved)], [(Text, Type' Resolved)])
+splitAssumeParams m decide =
+  let binders = sectionBinders m
+      named = [ (rawNameToText (rawName (getActual r)), ty, Map.member (getUnique r) binders)
+              | (r, ty) <- extractAssumeParamResolveds m decide ]
+  in ( [ (n, ty) | (n, ty, True) <- named ]
+     , [ (n, ty) | (n, ty, False) <- named ] )
+
 evaluateWithWrapper
   :: FilePath
   -> FunctionDeclaration
@@ -730,13 +746,13 @@ evaluateWithWrapper
 evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
   -- Extract parameter types from the compiled function definition
   let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+      (binderParamTypes, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
 
   -- Generate wrapper code using existing code generation
-  genCode <- case generateEvalWrapper fnDecl.name givenParamTypes assumeParamTypes inputJson traceLevel of
+  genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes inputJson traceLevel of
     Left err -> throwError $ InterpreterError err
     Right gc -> pure gc
 
@@ -936,7 +952,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 -- 2. Get function definition and extract parameter types
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
                 let givenParamTypes = extractParamTypes funDecide
-                    assumeParamTypes = extractAssumeParamTypes tcRes.module' funDecide
+                    (binderParamTypes, assumeParamTypes) = splitAssumeParams tcRes.module' funDecide
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting
@@ -946,7 +962,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 inputJson <- paramsToJson params'
 
                 -- 5. Generate wrapper code
-                genCode <- case generateEvalWrapper fnDecl.name givenParamTypes assumeParamTypes inputJson traceLevel of
+                genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes inputJson traceLevel of
                   Left err -> throwError $ InterpreterError err
                   Right gc -> pure gc
 
