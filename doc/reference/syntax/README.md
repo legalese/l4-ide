@@ -288,10 +288,9 @@ GIVETH A BOOLEAN
 DECIDE `is large` IF amount GREATER THAN 100
 ```
 
-**Trailing a line, it describes what is on that line. Starting a line of its
-own, it describes what follows.** That holds whether the thing is a rule, a
-parameter, a field or a type declaration, with two exceptions for lists of
-fields and of inputs, below.
+**Trailing a line, it describes what is on that line.**
+**Starting a line of its own, it describes what follows.**
+That holds whether the thing is a rule, a parameter, a field or a type declaration, with two exceptions, for a list of fields and a list of inputs, below.
 
 **One case the rule above does not settle on its own: a head that names its own inputs.**
 A rule may name its inputs twice, once in the `GIVEN` and again in the head, and an annotation written after an input's name in the head lands on that INPUT rather than on the rule.
@@ -320,28 +319,33 @@ If you are reading a document produced before that date and its headings are bar
 The measured table, in case you are reading this because output surprised you.
 Each row is one rule; the two `l4 nlg` columns are a positional call and a `WITH` call of that same rule.
 
-| #   | head shape                     | annotation placement                  | `l4 nlg` positional | `l4 nlg` `WITH` | `l4 render`       |
-| --- | ------------------------------ | ------------------------------------- | ------------------- | --------------- | ----------------- |
-| 1   | `DECIDE` name                  | trailing the head                     | sentence            | sentence        | sentence          |
-| 2   | `DECIDE` name                  | own line above                        | sentence            | sentence        | sentence          |
-| 3   | name, then `MEANS`             | trailing the head                     | sentence            | sentence        | sentence          |
-| 4   | name, then `MEANS`             | own line above                        | sentence            | sentence        | sentence          |
-| 5   | name and input, then `MEANS`   | trailing the head                     | sentence            | sentence        | sentence          |
-| 6   | name and input, then `MEANS`   | own line above                        | sentence            | sentence        | sentence          |
-| 7   | name and input, then `MEANS`   | own line under input                  | sentence            | sentence        | sentence          |
-| 8   | `DECIDE` name and input        | trailing the head                     | sentence            | sentence        | sentence          |
-| 9   | name, then input, then `MEANS` | own line BEFORE input                 | sentence            | sentence        | sentence          |
-| 10  | name and input with `AKA`      | own line after the AKA                | sentence            | sentence        | sentence          |
-| 11  | name and input with `AKA`      | own line above                        | sentence            | sentence        | sentence          |
-| 15  | `DECIDE` name after `GIVETH`   | under last input, indented            | bare name           | input's gloss   | rule's body       |
-| 16  | `DECIDE` name, no `GIVETH`     | under last input, indented            | bare name           | input's gloss   | rule's body       |
-| 17  | `DECIDE` name, no `GIVETH`     | under last input, at `GIVEN`'s column | sentence            | sentence        | sentence          |
-| 18  | inputs with `TYPICALLY`        | under each input, indented            | bare name           | inputs' glosses | rule's body       |
-| 19  | section `GIVEN`, then a rule   | under section input, indented         | bare name           | input's gloss   | gloss in the body |
+| #   | head shape                        | annotation placement                              | `l4 nlg` positional | `l4 nlg` `WITH` | `l4 render`       |
+| --- | --------------------------------- | ------------------------------------------------- | ------------------- | --------------- | ----------------- |
+| 1   | `DECIDE` name                     | trailing the head                                 | sentence            | sentence        | sentence          |
+| 2   | `DECIDE` name                     | own line above                                    | sentence            | sentence        | sentence          |
+| 3   | name, then `MEANS`                | trailing the head                                 | sentence            | sentence        | sentence          |
+| 4   | name, then `MEANS`                | own line above                                    | sentence            | sentence        | sentence          |
+| 5   | name and input, then `MEANS`      | trailing the head                                 | sentence            | sentence        | sentence          |
+| 6   | name and input, then `MEANS`      | own line above                                    | sentence            | sentence        | sentence          |
+| 7   | name and input, then `MEANS`      | own line under input                              | sentence            | sentence        | sentence          |
+| 8   | `DECIDE` name and input           | trailing the head                                 | sentence            | sentence        | sentence          |
+| 9   | name, then input, then `MEANS`    | own line BEFORE input                             | sentence            | sentence        | sentence          |
+| 10  | name and input with `AKA`         | own line after the AKA                            | sentence            | sentence        | sentence          |
+| 11  | name and input with `AKA`         | own line above                                    | sentence            | sentence        | sentence          |
+| 12  | name and two inputs, then `MEANS` | own line under the last input                     | sentence            | sentence        | sentence          |
+| 13  | name and input, then `MEANS`      | own line above, and under the input               | outer sentence      | outer sentence  | outer sentence    |
+| 14  | `DECIDE` name                     | trailing the `GIVEN` input                        | bare name           | input's gloss   | rule's body       |
+| 15  | `DECIDE` name after `GIVETH`      | under the last `GIVEN` input, indented            | bare name           | input's gloss   | rule's body       |
+| 16  | `DECIDE` name, no `GIVETH`        | under the last `GIVEN` input, indented            | bare name           | input's gloss   | rule's body       |
+| 17  | `DECIDE` name, no `GIVETH`        | under the last `GIVEN` input, at `GIVEN`'s column | sentence            | sentence        | sentence          |
+| 18  | inputs with `TYPICALLY`           | under each `GIVEN` input, indented                | bare name           | inputs' glosses | rule's body       |
+| 19  | section `GIVEN`, then a rule      | under the section's input, indented               | no positional call  | input's gloss   | gloss in the body |
 
-Rows 5, 7, 8, 10 and 11 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
+Rows 5, 7, 8, 10, 11 and 12 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
+Row 13 heralds the rule twice, above the head and under its input, and the outer sentence wins; row 14 is an input gloss written in the `GIVEN`, which stays one.
 Rows 15 to 19 are the `GIVEN`-list rule described below.
 In rows 15, 16, 18 and 19 the annotation is indented past `GIVEN`, so it is the input's gloss: a positional call shows the rule's bare name and a `WITH` call labels the input with it.
+Row 19 has no positional call, because a section's input can only be supplied by name.
 Row 17 is the control, at `GIVEN`'s column, where it is still the rule's sentence.
 The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](../../../jl4/examples/ok/nlg-head-placement.l4), whose committed golden pins both `l4 nlg` columns, and a CLI test pins the `l4 render` one — so a change to any cell is a test failure rather than stale prose here.
 
@@ -364,9 +368,8 @@ output rather than leave it alone. L4 drops it and warns instead.
 glosses the field and its type separately, because each annotation sits with
 the token it follows.
 
-**And a field list is an exception to "own line describes what
-follows".** Underneath a field, an annotation describes _that_ field — the one
-above it — not the next one:
+**And a field list is an exception to "own line describes what follows".**
+Underneath a field, an annotation describes _that_ field — the one above it — not the next one:
 
 ```l4
 DECLARE Employee
@@ -375,8 +378,7 @@ DECLARE Employee
       `start date` IS A DATE
 ```
 
-A field list is a column of things rather than a sequence of declarations, and
-writing the gloss under the field it belongs to is what authors do.
+A field list is a column of things rather than a sequence of declarations, and writing the gloss under the field it belongs to is what authors do.
 
 **A `GIVEN` list is the other exception, last input included.**
 Underneath an input, an annotation describes that input.
@@ -392,6 +394,8 @@ DECIDE `is large` IF amount GREATER THAN floor
 
 Here `the sum of money` is `amount`'s gloss and the second annotation is the rule's sentence.
 It is the `GIVEN` keyword's column that counts, not the left margin, so a `GIVEN` indented under a section heading or inside a `WHERE` reads the same way.
+The column is all it reads: a rule's sentence indented under the last input, by even one space, becomes that input's gloss, and nothing warns.
+When the head repeats the inputs, a gloss in the `GIVEN` reaches nothing, as explained above, so an annotation indented under the last input is lost without a warning; write the rule's sentence at `GIVEN`'s column there, or above the head.
 The exceptions are confined to those two lists: between `GIVETH` and `DECIDE`, an annotation on its own line describes the rule below it at any indentation.
 
 **The bare inline form cannot be tagged.** `[…]` has nowhere to put a subtag —

@@ -279,15 +279,16 @@ spec = describe "which node an @nlg attaches to" $ do
       [ () | NotAttached{} <- ws ] `shouldBe` []
 
     it "does not give a last input's default an annotation the input declined" $ do
-      -- A default that names something has a name that claims. Unclamped, it
-      -- would take the rule's sentence the input left alone.
+      -- A default that is a name — here an enum constructor, which
+      -- type-checks — claims. Unclamped, it would take the rule's sentence the
+      -- input left alone.
       (m, _) <- parsed
-        "DECIDE `usual amount` IS 50\n\
+        "DECLARE Colour IS ONE OF Red, Green\n\
         \\n\
-        \GIVEN amount IS A NUMBER TYPICALLY `usual amount`\n\
-        \@nlg the claim of %amount% is large\n\
-        \DECIDE `is large` IF amount GREATER THAN 100\n"
-      attachments m `shouldBe` [("is large", "the claim of `amount` is large")]
+        \GIVEN colour IS A Colour TYPICALLY Red\n\
+        \@nlg the colour %colour% is warm\n\
+        \DECIDE `is warm` IF colour EQUALS Red\n"
+      attachments m `shouldBe` [("is warm", "the colour `colour` is warm")]
 
     it "stops at a DECIDE, ASSUME, DECLARE or YIELD written on a line of its own" $ do
       -- Those keywords are tokens of the declaration, not nodes with a span,
@@ -319,6 +320,79 @@ spec = describe "which node an @nlg attaches to" $ do
         \        `twice` x)\n\
         \    xs\n"
       attachments lambda `shouldBe` [("twice", "after the YIELD keyword")]
+
+    it "measures from the GIVEN keyword, not from the inputs' column" $ do
+      -- Column 3 is past GIVEN (column 1) but left of the input (column 7).
+      (m, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \  @nlg the sum of money\n\
+        \DECIDE `is large` IF amount GREATER THAN 100\n"
+      attachments m `shouldBe` [("amount", "the sum of money")]
+
+    it "gives an annotation under an input before the last to that input, at any column" $ do
+      -- Only the last input has a column test; the next input bounds the rest.
+      (m, _) <- parsed
+        "GIVEN floor   IS A NUMBER\n\
+        \      @nlg the floor\n\
+        \      ceiling IS A NUMBER\n\
+        \@nlg the ceiling\n\
+        \      amount  IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `in range` IF amount GREATER THAN floor\n"
+      attachments m `shouldBe` [("floor", "the floor"), ("ceiling", "the ceiling")]
+
+    it "gives a gloss trailing a literal default to the input" $ do
+      -- A literal claims nothing, so the gloss would otherwise go past the
+      -- input: onto the next input, or onto the rule after the last one.
+      (m, ws) <- parsed
+        "GIVEN floor  IS A NUMBER TYPICALLY 100 @nlg the floor\n\
+        \      amount IS A NUMBER TYPICALLY 5 @nlg the sum of money\n\
+        \DECIDE `is large` IF amount GREATER THAN floor\n"
+      attachments m `shouldBe` [("floor", "the floor"), ("amount", "the sum of money")]
+      [ () | Ambiguous{} <- ws ] `shouldBe` []
+
+    it "attaches to the last input whatever follows the list" $ do
+      -- A MEANS rule, a section heading, a DECLARE and a directive each follow
+      -- a GIVEN list here; the indented annotation is the input's every time.
+      (means, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \      @nlg the sum of money\n\
+        \`is large` MEANS amount GREATER THAN 100\n"
+      attachments means `shouldBe` [("amount", "the sum of money")]
+      (heading, _) <- parsed
+        "§ `Rates`\n\
+        \    GIVEN rate IS A NUMBER\n\
+        \          @nlg the applicable rate\n\
+        \§ `Floors`\n\
+        \DECIDE `twice the floor` IS 10\n"
+      attachments heading `shouldBe` [("rate", "the applicable rate")]
+      (declare, _) <- parsed
+        "§ `Rates`\n\
+        \    GIVEN rate IS A NUMBER\n\
+        \          @nlg the applicable rate\n\
+        \DECLARE Thing HAS a IS A NUMBER\n"
+      attachments declare `shouldBe` [("rate", "the applicable rate")]
+      (directive, _) <- parsed
+        "§ `Rates`\n\
+        \    GIVEN rate IS A NUMBER\n\
+        \          @nlg the applicable rate\n\
+        \#EVAL 1 PLUS 1\n"
+      attachments directive `shouldBe` [("rate", "the applicable rate")]
+
+    it "attaches tagged renderings, and reaches past a type written over two lines" $ do
+      (tagged, ws) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \      @nlg:he הסכום\n\
+        \      @nlg:en the sum of money\n\
+        \DECIDE `is large` IF amount GREATER THAN 100\n"
+      attachments tagged `shouldBe` [("amount", "the sum of money")]
+      [ () | Ambiguous{} <- ws ] `shouldBe` []
+      (twoLines, _) <- parsed
+        "GIVEN amounts IS A LIST OF (\n\
+        \                  NUMBER)\n\
+        \      @nlg the amounts\n\
+        \DECIDE `same` IF amounts EQUALS amounts\n"
+      attachments twoLines `shouldBe` [("amounts", "the amounts")]
 
     it "does not give the first input an annotation written ABOVE the GIVEN" $ do
       (m, ws) <- parsed

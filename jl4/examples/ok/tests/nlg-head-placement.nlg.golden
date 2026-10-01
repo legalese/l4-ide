@@ -35,5 +35,4 @@ row seventeen saw 200
 row seventeen saw `amount` where `amount` is 200
 `row eighteen` with 100 and 200
 `row eighteen` where the floor is 100 and the sum of money is 200
-`row nineteen` with 200
 `row nineteen` where the section's floor is 100 and `amount` is 200

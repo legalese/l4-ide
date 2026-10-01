@@ -372,10 +372,9 @@ squared x MEANS x TIMES x
 
 ## Annotation fence
 
-All annotations begin with `@`. On its own line, an annotation applies to the **following**
-definition; trailing a line, it applies to what is on that line. `@nlg` follows that rule with
-two twists — a rule takes it only on the line above, and inside a field list or a `GIVEN` list an
-own-line annotation describes the field or input **above** it — which the next section measures.
+All annotations begin with `@`.
+On its own line, an annotation applies to the **following** definition; trailing a line, it applies to what is on that line.
+`@nlg` follows that rule with two twists — a rule takes it only on the line above, and inside a field list or a `GIVEN` list an own-line annotation describes the field or input **above** it — which the next section measures.
 Read it before writing one:
 
 | Annotation | Purpose                                                            |
@@ -397,6 +396,7 @@ implementation, and the three levers before you reach for one — is in
 This section is only about WHERE it goes and what it will not do. Every claim below was measured
 on 2026-09-21 on a build of `unstable` at `debf44d34`, which carries both `legalese/l4-ide#433`
 (attachment) and `#435` (field lists); the one-file probe is the measurement, not the merge log.
+The exception is the `GIVEN`-list section below, which was measured on 2026-10-02 on branch `lang/nlg-given-below`, the branch that implements that ruling.
 
 **A rule's herald goes on its own line, immediately above the definition.** That is the only
 placement that reaches a rule:
@@ -455,9 +455,11 @@ bare fallback — comes out the other end.
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
 herald is on a parameter line still renders as a bare name.
 
-**Or it goes on its own line BELOW the parameter, indented past `GIVEN`** — the last parameter included (ruled 2026-10-02: a `GIVEN` list is a column, like a field list).
-Under the last parameter the line is also the slot above the rule when no `GIVETH` comes between, and the column decides: indented further than the `GIVEN` keyword, it is the parameter's; at the keyword's column or left of it, it is the rule's.
-Measured on the build that implements the ruling:
+**Or it goes on its own line BELOW the parameter** (ruled 2026-10-02: a `GIVEN` list is a column, like a field list).
+Under a parameter that has another after it, any column works, because the next parameter bounds it.
+Under the LAST parameter, with no `GIVETH` before the rule, the same line is also the line above the rule, so the column decides.
+Indented further than the `GIVEN` keyword, it is the parameter's.
+At the keyword's column or left of it, it describes what follows: the rule's sentence, or, with a `GIVETH` next, nothing at all, with a "Not attached" warning.
 
 ```l4
 GIVEN floor  IS A NUMBER
@@ -467,27 +469,34 @@ GIVEN floor  IS A NUMBER
 DECIDE `is large` IF amount GREATER THAN floor
 ```
 
-``#EVAL `is large` WITH floor IS 100, amount IS 200`` prints ``the claim of `amount` is over `floor` where `floor` is 100 and the sum of money is 200``: the first annotation is `amount`'s, the second the rule's.
+`l4 nlg` writes ``#EVAL `is large` WITH floor IS 100, amount IS 200`` as ``the claim of `amount` is over `floor` where `floor` is 100 and the sum of money is 200``: the first annotation is `amount`'s, the second the rule's.
 The column is the `GIVEN` keyword's, not column 1, so a section `GIVEN` indented under its heading, or a `GIVEN` inside a `WHERE`, reads the same way.
-Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed and became the rule's sentence when none did (silently, unless the rule had a sentence of its own and the two collided), and one under an earlier parameter carrying a `TYPICALLY` default silently landed on the NEXT parameter, or on the default itself when that was a name such as `TRUE`.
-The column is all the rule reads: a `DECIDE` indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last parameter.
 A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own ends the list, so an annotation under one of those is not the parameter's.
-A herald TRAILING a `TYPICALLY` default on the parameter's own line still does not reach the parameter: it lands on the default itself when that is a name such as `FALSE`, and otherwise on the next parameter, or, after the last one, becomes the rule's sentence or is dropped with a warning; put it on the line below instead.
 
-**A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside
-a field list an annotation on its own line describes the field above it, an exception to
-"own line describes what follows", because a field list is a column). Trailing the field's line
-reaches the TYPE, not the field, and that is deliberate — a field and its type can be glossed
-separately on one line, and letting the field claim the whole line makes the two collide:
+The column is all it reads, and three consequences are silent:
+
+- A rule's sentence indented even one space past `GIVEN`, under the last parameter, becomes that parameter's gloss, and every projection changes with it: `l4 nlg`, `l4 render` and the Blawx export.
+- A `DECIDE` indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last parameter.
+- When the head repeats the inputs (`` `is large` amount MEANS … ``), the head is where the input is bound and a gloss on the `GIVEN` name is rendered nowhere, so an annotation indented under the last parameter vanishes. Write the rule's sentence at the `GIVEN` keyword's column, or above the head.
+
+A trailing gloss and an own-line one on the same parameter, in the same language, collide: L4 warns and drops both.
+A gloss trailing a `TYPICALLY` default reaches the parameter when the default is a number or a string; when the default is a name such as `FALSE`, that name takes it, silently, so put it on the line below.
+
+Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed, and became the rule's sentence when none did (colliding, with a warning, if the rule had a sentence of its own).
+One under an earlier parameter with a `TYPICALLY` default landed on the next parameter, or on the default when that was a name such as `TRUE`, and a gloss trailing a number or a string default went past its parameter too.
+
+**A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside a field list an annotation on its own line describes the field above it, an exception to "own line describes what follows", because a field list is a column).
+Trailing the field's line reaches the TYPE, not the field, and that is deliberate — a field and its type can be glossed separately on one line, and letting the field claim the whole line makes the two collide:
 
 ```l4
 DECLARE Payslip
-    HAS base  IS A NUMBER   @nlg the basic salary     -- describes NUMBER; `base` renders bare
+    HAS base  IS A NUMBER   @nlg the basic salary
         bonus IS A NUMBER
-        @nlg the bonus                                -- describes `bonus`; renders
+        @nlg the bonus
 ```
 
-`l4 nlg` prints ``where `base` is 100 and the bonus is 5``.
+`l4 nlg` prints ``where `base` is 100 and the bonus is 5``: the first annotation describes `NUMBER`, so `base` renders bare, and the second describes `bonus`.
+Never end an `@nlg` line with a `--` comment: the annotation runs to the end of the line, and the comment becomes part of the prose.
 
 > **A corpus written before 2026-09-19 will not reflect any of this.** Until `#433` merged, an
 > own-line herald under a `GIVEN` was captured by the signature and the rule rendered as a bare

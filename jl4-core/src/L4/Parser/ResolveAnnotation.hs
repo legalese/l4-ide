@@ -427,8 +427,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 --
 -- __The line, not the span, and that boundary is the whole rule.__ An
 -- annotation TRAILING a construct on the same line describes that construct;
--- an annotation starting a line of its own describes what FOLLOWS it. Those
--- are the two shapes authors actually write:
+-- an annotation starting a line of its own describes what FOLLOWS it, except
+-- inside a field list or a GIVEN list, where it describes the item above
+-- ('addNlgFieldName', 'addNlgInput'). Those are the two shapes authors
+-- actually write:
 --
 -- @
 -- GIVEN a IS A STRING \@nlg the amount    -- trailing: describes `a`
@@ -510,16 +512,21 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (OptionallyTypedName n) where
   addNlg = addNlgInput (const True)
 
 -- | One input of a GIVEN list. Its name claims what is on the input's own
--- lines, up to a TYPICALLY default if it has one, plus whatever on a LATER
--- line @claimsBelow@ accepts: everything, for an input with another after
--- it; only what is indented past the GIVEN keyword, for the last (see the
--- 'GivenSig' instance).
+-- lines, plus whatever on a LATER line @claimsBelow@ accepts: everything,
+-- for an input with another after it; only what is indented past the GIVEN
+-- keyword, for the last (see the 'GivenSig' instance).
+--
+-- On its own lines it stops at a TYPICALLY default that is a name — @TRUE@,
+-- an enum constructor — because a name claims, and a gloss trailing it is
+-- that name's. A literal default claims nothing, so behind one the name
+-- takes the rest of the line: @b IS A NUMBER TYPICALLY 5 \@nlg the bonus@
+-- glosses @b@, where it would otherwise go past @b@ to whatever comes next.
 --
 -- The default is 'unspanned' for the reason a record field's type is: so the
 -- name can reach the line below past it. Without that, a herald under
 -- @a IS A NUMBER TYPICALLY 5@ skips @a@ and lands on the NEXT input. The
 -- default still claims the rest of its own line, and is clamped there, so a
--- default that names something, @TYPICALLY x@, cannot take an annotation the
+-- default that is a name, @TYPICALLY Red@, cannot take an annotation the
 -- last input declined.
 addNlgInput ::
   (HasSrcRange n, HasNlg n) =>
@@ -532,9 +539,13 @@ addNlgInput claimsBelow o = extendNlgA o $ case o of
     pure $ MkOptionallyTypedName ann n' tys' mTypically'
    where
     claims w
-      | startsBelow o w = claimsBelow w
-      | otherwise       = maybe True (\ d -> startsBefore (Just d) w) defaultSpan
-    defaultSpan = fromSrcRange <$> (rangeOf =<< mTypically)
+      | startsBelow o w                     = claimsBelow w
+      | Just d <- mTypically, not (isLit d) =
+          all (\ s -> w.range.start < s.start) (fromSrcRange <$> rangeOf d)
+      | otherwise                           = True
+    isLit = \ case
+      Lit{} -> True
+      _     -> False
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of

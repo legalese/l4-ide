@@ -1708,6 +1708,14 @@ spec bin = do
       renOut `shouldSatisfy` ("Row eighteen holds if amount is more than floor" `isInfixOf`)
       renOut `shouldSatisfy` ("Row nineteen holds if amount is more than the section's floor" `isInfixOf`)
 
+    it "renders every other row the way the reference table says (rows 1-4, 6, 9, 13)" $ do
+      -- doc/reference/syntax/README.md promises that a change to any cell of
+      -- its table fails a test; these are the render cells nothing else pins.
+      Output _ renOut _ <- renderOf
+      for_ ["one", "two", "three", "four", "six", "nine"] \row ->
+        renOut `shouldSatisfy` (("row " <> row <> " saw amount") `isInfixOf`)
+      renOut `shouldSatisfy` ("Row thirteen holds if row thirteen the rule saw amount" `isInfixOf`)
+
     it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
