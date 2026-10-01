@@ -438,18 +438,19 @@ Option A answers the sub-question: enumeration atoms come with `CONSIDER`, not n
 ### U5 — Comparisons become atoms (the membrane)
 
 **The question.** Is a comparison over an unknown a residual atom, identified by its evaluated term (§4.6)?
-**Recommendation.** Yes; it matches the ladder's §23 and the planner's existing treatment of a call as an atom.
-**Known loss.** `n > 3 AND n < 2` stays undetermined rather than `FALSE`; sound, imprecise.
+**RULED 2026-10-01.** Meng marked `accept` on bench card U5 at 10:13:28Z, with no note. The ruling, as printed on the card: A comparison over an unknown is an atom identified by its evaluated term: the operator, the normal forms of the known operands, and the unknown inputs. An arithmetic unknown operand gets a fresh atom per evaluation. The spec's soundness claim is made conditional on this, and a helper-called-twice test is added. The spec states how evaluator atoms map to planner questions.
+An amendment (the operand's field path in the key; fresh atoms the planner never asks about) is open as bench card U5b.
 
 ### U6 — An unknown equals itself
 
 **The question.** Is `x EQUALS x` `TRUE` when `x` is unknown?
-**Recommendation.** Yes, for every type: an atom denotes one value, whatever it is.
+**RULED 2026-10-01.** Meng marked `accept` on bench card U6 at 10:14:10Z, with no note. The ruling, as printed on the card: An identity rule in `runBinOpEquals`: the same unknown input on both sides gives a literal `TRUE`, for numbers, strings, dates and times, lists and constructors. Functions and obligations keep today's error. Derived unknowns (`n PLUS 1 EQUALS n PLUS 1`) stay comparison atoms. Fix the right-operand misdiagnosis in build step 1.
+An amendment (decide the rule from the operand's type) is open as bench card U6b.
 
 ### U7 — The switch is per evaluation
 
 **The question.** CLI flag and service mode, no directive (§6)?
-**Recommendation.** Yes.
+**HELD 2026-10-01.** Meng marked `accept` on bench card U7 at 10:16:06Z with the note: _"This affects purity and feels tantamount to a dynamically chosen effect system. Footgun. Discuss."_ Not recorded as a ruling until that discussion concludes. Amendment card U7b is held with it.
 
 ### U8 — Presumptions in explore mode
 
@@ -464,17 +465,19 @@ Option A answers the sub-question: enumeration atoms come with `CONSIDER`, not n
 ### U10 — The ladder's TypeScript evaluator
 
 **The question.** Keep §3.4's second evaluator, or make the ladder ask the Haskell one?
-**Recommendation.** Pin them together with one shared truth-table fixture now; replace the TypeScript one with a call once the service has explore mode.
+**HELD 2026-10-01.** Meng marked `accept` on bench card U10 at 10:16:33Z with the note: _"Does this cure the objection?"_ Not recorded as a ruling until he has the answer. Amendment card U10b is open.
 
 ### U11 — An error on the right of an undecided left
 
 **The question.** `x AND (1 DIVIDED BY 0 > 0)` with `x` unknown: the right operand's error (as (b) gives), or unknown?
-**Recommendation.** The error. Errors stay loud; an unknown must never hide one. The cost is the regression §4.3 names, a less useful message on a directive that was already stuck.
+**RULED 2026-10-01.** Meng marked `accept`, option C on bench card U11 at 10:16:42Z, with no note. The ruling, as printed on the card: Add an error leaf to the residual: shown in the result, raised only if its guard becomes TRUE. Divergence on an unknown is caught by PETROL's step counter ("gave up; needed _x_"). The same rule covers an error in an `IF` arm.
+An amendment (typed unknowns carry the marker too; the error-leaf outcome survives the known-or-not reading) is open as bench card U11b.
 
 ### U12 — The ruling the negation-as-failure spec left open
 
 **The question.** `NEGATION-AS-FAILURE-SPEC.md` open question 2, whether `kand`/`kor`/`knot` ship as a library.
-**Recommendation.** No. With the lift, a `MAYBE BOOLEAN` that wants Kleene connectives is better served by leaving the input unsupplied; the experiment file stays as documentation of the semantics.
+**RULED 2026-10-01.** Meng marked `accept` on bench card U12 at 10:16:54Z, with no note. The ruling, as printed on the card: Decline the library if LIMBO and CLICKER are accepted. Record in `NEGATION-AS-FAILURE-SPEC.md` that this reverses its leaning, and that a data-borne `NOTHING` still needs `CONSIDER` (the library can be revisited if that demand appears). Update `negation-as-failure.md:60-63` in the same change, and move the experiment under a checked glob so it cannot rot.
+Its condition is open: LIMBO (U1) and CLICKER (U7) are both held. The answer is recorded in `specs/done/NEGATION-AS-FAILURE-SPEC.md` as well. An amendment (label the file as K3) is open as bench card U12b.
 
 ---
 

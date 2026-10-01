@@ -285,6 +285,7 @@ is already legible — but the experiment file declares it locally as a teaching
 2. **Ship the Kleene lift in the prelude or keep it as a documented pattern?** It introduces
    a second algebra; some users will want two-valued connectives only. Leaning: separate
    optional library module, not the core prelude.
+   **ANSWERED 2026-10-01, conditionally** (`UNKNOWN-EVALUATION-SPEC.md` §9 U12, accepted on bench card U12): `kand`/`kor`/`knot` do not ship as a library, provided the evaluator lift (U1) and its per-evaluation switch (U7) are accepted; both are held at the time of writing. This reverses the leaning above. A `NOTHING` that is data, a `MAYBE BOOLEAN` field or a lookup result, still needs `CONSIDER`; the library can be revisited if that demand appears.
 3. **Relationship to `TYPICALLY`.** `TYPICALLY` attaches a default to a _declaration_ site;
    `holds`/`presumed` apply a default at the _use_ site. They are complementary, not
    competing. Worth a cross-reference paragraph in both specs.
