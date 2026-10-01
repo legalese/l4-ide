@@ -7,6 +7,7 @@ Every statement about today's behaviour is a probe result or a `file:line` read 
 Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.12 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
 Probe files are in the session scratchpad, not in the tree.
 On 2026-10-02 the Track B audit, fifteen agents asking whether the recorded rulings suffice to build §8's seven steps, was applied under TIPPEX, and its one open semantic question, M1, was ruled as U13 under RAINCHECK and amended the same day as U13b under YOYO.
+The questions three reviews of that work raised for Meng, and the choices made overnight to keep build steps 1 to 3 buildable, are listed in §9's "Open for Meng (raised 2026-10-02)".
 Citations added that day were read on `unstable` at `6ed297629`, where no file under `jl4-core/src`, `jl4/app`, `jl4-service/src`, `jl4-lsp/src` or `jl4-mlir` differs from `f9a504b77` (`git diff --stat`, empty); probes added that day (`t01` to `t21`, and the TIPPEX fact-check's `c01` to `e04`, re-run) ran on a byte-identical snapshot of the installed `l4`, the store build `jl4-0.1-b69f17a4`, built 2026-09-28.
 
 **Trigger:** SCHRODINGER, widened by Meng on 2026-10-01: _"continue your investigation of the evaluator lift with kand. It sounds like we'll need to redo the rewriting-to-IF in favour of something more algebraically principled."_
@@ -126,7 +127,8 @@ So every field path on an unknown record is misdiagnosed, not only a `CONSIDER` 
 **A bare unknown as the result of an `#EVAL` is reported as a value.**
 `#EVAL TRUE AND x`, `#EVAL TRUE IMPLIES x` and `#EVAL x` each print `x` as if it were a value, with JSON `"kind":"value"`, `"ok":true` and exit 0 (probes `p11-implies.l4`, `p17-bare.l4`).
 `#ASSERT` on the same expression is reported as `Stuck`, because only the assertion arm handles a `ValAssumed` result (`EvaluateLazy.hs:306`).
-`#ASSERT REFUSED x` is misreported the other way, as "assertion failed: expected a refusal, but the expression produced a value" (the arm's wildcard, `EvaluateLazy.hs:319`; probe `t03`), which `l4 run` does not count as a crash (`Run.hs:156`).
+`#ASSERT REFUSED x` reports "assertion failed: expected a refusal, but the expression produced a value" (the arm's wildcard, `EvaluateLazy.hs:319`; probe `t03`), which `l4 run` does not count as a crash (`Run.hs:156`).
+That verdict is right, because an input is a value in every completion and never refuses; only the wording "produced a value" could be better (decided by Claude overnight 2026-10-02, pending Meng's review; §8 step 1).
 This, the catch-all `CONSIDER` above and the two regulative sites below are the paths found so far in two-valued mode where an unknown is silent; this one is the shape §2.5 finds again on the service.
 
 **Residue in the regulative frames.**
@@ -388,9 +390,9 @@ There is no evaluation mode and no flag.
 
 **Why it is conservative, and against which tree.**
 The claim is made against the tree as it stands after build step 1, not against today's.
-Step 1 deliberately changes four kinds of directive that end today in a value or an assertion outcome, each into `Stuck`: a catch-all `CONSIDER` taken on an unknown (§2.4, row 70), `#EVAL x` printed as a value with exit 0 (row 52), `#ASSERT REFUSED x` reported as a failed assertion (row 72), and a sub-pattern match that is right by luck (row 71).
+Step 1 deliberately changes four kinds of directive that end today in a value, each into `Stuck`: a catch-all `CONSIDER` taken on an unknown (§2.4, row 70), `#EVAL x` printed as a value with exit 0 (row 52), `EVERY`'s cast test dropping an unknown candidate (row 86) and the action matcher passing over an event with an unknown in its action (row 87); the last two are decided by Claude overnight 2026-10-02, pending Meng's review (§8 step 1).
 It also turns several misleading errors into `Stuck`, and those directives fail loudly before and after: the right-operand error of `EQUALS` (rows 12, 48), the no-branch message of an exhaustive `CONSIDER` and of a selector (rows 34, 35), the coercions `AS STRING`, `TOSTRING` and `JSONENCODE` (rows 83, 84), the temporal iterators' message (§2.2), and the regulative party check (§8 step 1).
-The fourth is a loss of precision, not a fix: step 1 raises `Stuck` at the first unknown a sub-pattern inspects, and the lift keeps that `CONSIDER` unknown (U4).
+Two cases it leaves as they are, both decided by Claude overnight 2026-10-02, pending Meng's review: `#ASSERT REFUSED x` stays "failed", exit 0 (row 72), and a sub-pattern match that is right by luck stays right, because the matcher checks already-evaluated later positions for a definite mismatch before it raises (row 71; §8 step 1).
 Against the tree after step 1: for every directive that does not end in `Stuck`, the lifted evaluator returns the same value, raises the same error, or fails to terminate, exactly as before.
 The lift adds transitions only at the sites in the table above, each of which raises `Stuck` once step 1 has landed, and `Stuck` cannot be caught in L4 and aborts the whole directive (`Machine.hs:699-704`, `:724-728`).
 So a run that never reaches one of those sites with a term takes the same transitions as before, and a run that does reach one ended in `Stuck`.
@@ -413,7 +415,8 @@ jl4-mlir's by-name mirror (`synthesizeBoolDesugar`, `synthesizeNotDesugar`) is d
 No golden or trace output may name the built-ins' parameters `a` and `b`, and the indirect-call golden is read before it is blessed.
 The lift of §4.3 lives in these frames; a lift written at `:1198` would never fire.
 `BRANCH` stays an `IF` chain, because its guards are a first-match ordering, which `IF` expresses exactly.
-What the trace loses: today a variable operand's value appears only as the `IF`'s `a` or `b` leaf (`lazytrace-exception.golden:57-58`, `:61-62`), so once those leaves are gone a connective whose operand is a parameter or a section `GIVEN` no longer shows that operand's value (assumed acceptable, not ruled: U2b bans naming the built-ins' parameters `a` and `b`, which those leaves do, and row 51 asks only for `FALSE OR TRUE`).
+What the trace keeps: today a variable operand's value appears only as the `IF`'s `a` or `b` leaf (`lazytrace-exception.golden:57-58`, `:61-62`), so each connective node gets a child per operand labelled with the operand's own source text and its value, such as `x` then `TRUE`, and an operand the connective skips is shown as skipped, not left out (decided by Claude overnight 2026-10-02, pending Meng's review).
+U2b allows this: it bans naming the built-ins' parameters `a` and `b`, not showing the operands.
 §8 step 2 states the other assumptions a builder needs: how the frames force their operands, the trace shape, and jl4-mlir's missing `IMPLIES` lowering.
 
 ### 4.5 Conditionals and the step counter (U4, U4b, U11)
@@ -442,7 +445,7 @@ It counts steps, not depth: the existing cap is on frame depth only (`maximumFra
 **Running out of steps** unwinds as today's exceptions do, restoring every thunk it passes (`restoreThunkOnUnwind`, `Machine.hs:818`), and becomes **`gave-up [c]`** at the join or connective that catches it, so no thunk ever caches a give-up (C4); `c` is the path condition that frame was working under: the conjunction of the term conditions whose unknownness caused the evaluation in progress, innermost last.
 That mechanism alone does not give C4's "no thunk ever caches a give-up": a thunk whose body contains the catching join is still written back (`UpdateThunk`'s backward arm, `Machine.hs:1919`), and an imported module's thunks outlive the directive (its base environment is "allocated once", `EvaluateLazy.hs:816`), so `UpdateThunk` must also decline to write back a value that carries a `gave-up` (assumed, not ruled; §8 step 5).
 Once the counter has run out nothing new is evaluated: every pending operand and arm becomes `gave-up` under its own path condition, and the values already computed combine with the leaves by the tables (C3).
-Row 59 is reachable only if "nothing new" is read as "no closure body is entered": literals, constructors, already-evaluated thunks and built-in operations still compute (assumed, not ruled).
+Row 59 is reachable only if "nothing new" is read as "no closure body is entered": literals, constructors, already-evaluated thunks and built-in operations still compute; that reading is pending the open question in §9 (O3).
 Read literally, it turns every operand of row 59 still pending into a leaf, so every assignment meets some guard and the report would be a bare "gave up" (traced by hand in the Track B audit, in either arm order).
 A strict operation, a comparison, an arithmetic operation or a selector, applied to a `gave-up` returns the leaf with its guard, never a `fresh` atom (C3).
 It is reported as "gave up; needed _i_" for the inputs in `c` (U11), and it is never a `StackOverflow`.
@@ -514,7 +517,7 @@ The residual's **support** is the set of inputs whose atoms can change its value
 **A guarded leaf is a hole, never a value**: a residual containing `error [c] e`, `refuses [c] r` or `gave-up [c]` is decided over the assignments in which no guard holds, and the report names the guards, as "FALSE unless `x`; errors if `x`" (U11b, U13).
 That outcome is its own, on the wire, in the K3 report and in every consumer listed under 4 below.
 If no assignment of the atoms escapes every guard, no assignment is left to decide over and both tests above would pass vacuously, so the directive is never `TRUE` or `FALSE` (U13b).
-When every leaf is a refusal with one reason, the outcome is that refusal, exit 0, as for `IF x THEN TBD ELSE TBD` (row 80); otherwise it is undetermined, listing each leaf, exit 1, as for `IF x THEN (1 DIVIDED BY 0 GREATER THAN 0) ELSE (2 DIVIDED BY 0 GREATER THAN 0)`.
+When every leaf is a refusal with one reason, the outcome is that refusal, exit 0, as for `IF x THEN TBD ELSE TBD` as a `BOOLEAN` (row 80), and whether the same holds for a join of any other type is pending the open question in §9 (O2); otherwise it is undetermined, listing each leaf, exit 1, as for `IF x THEN (1 DIVIDED BY 0 GREATER THAN 0) ELSE (2 DIVIDED BY 0 GREATER THAN 0)`.
 
 How it is computed: by truth table over the residual's atoms, which needs no solver and so runs the same on every host (DU3b); this is what decides rows 14, 36 and 38 `FALSE`.
 When every atom is a `BOOLEAN` input, the answer is also complete over the inputs; otherwise it can miss a decision that only the inputs' values force, which is the first gap above.
@@ -555,21 +558,24 @@ The computation is the same for every caller; the caller chooses only how an und
 
 | report   | an undetermined result shows as                                                                                                                                                                                                                                                                                                                                          | a decided residual shows as                                                                                                                                                        |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| default  | today's "I could not continue evaluating, because I needed to know the value of …", naming **every** input in the residual's support, not the first; when the directive's expression, or the body of the function it calls, is a top-level `IMPLIES` whose scope is undetermined, the value and a named scope-pending field, "`TRUE`; whether it applies needs _x_" (C5) | its value; a determined value with terms inside prints as today until the step counter starts (C4, row 60), and is undetermined after (§8 step 3)                                  |
+| default  | today's "I could not continue evaluating, because I needed to know the value of …", naming **every** input in the residual's support, not the first; when the directive's expression, or the body of the function it calls, is a top-level `IMPLIES` whose scope is undetermined, the value and a named scope-pending field, "`TRUE`; whether it applies needs _x_" (C5) | its value, if its only terms are bare inputs (C4, row 60); one that holds any other term is undetermined (§8 step 3)                                                               |
 | K3       | the K3 quotient of the residual: every atom `unknown`, so `x OR NOT x` and `age >= 18 OR age < 18` show `unknown`, agreeing with FEEL and `nodeValue`; error, refusal and give-up guards are kept, "unknown; errors if _x_" (C2, U11b, U13)                                                                                                                              | the K3 quotient too: the K3 report reads the residual through the K3 tables, never the boundary's decision, so `x IMPLIES TRUE` shows `TRUE` and `x OR NOT x` shows `unknown` (C2) |
 | residual | the residual, printed as L4 source (§4.9)                                                                                                                                                                                                                                                                                                                                | its value, with the residual                                                                                                                                                       |
 
 So `#ASSERT x OR NOT x` is satisfied under the default report and undetermined, exit 1, under K3 (C2).
 Under K3 a residual shows a value only where the K3 tables settle it: `x IMPLIES TRUE` is `TRUE` because U → T is T, as `nodeValue` gives (`layout.ts:241-254`), while `x OR NOT x` is settled only by the boundary; and K3 carries no scope-pending field, which C5 made a property of the default report.
-Under the default report a determined value with terms inside prints as today only while the step counter has not started, as `LIST n, 6` does (C4, row 60); once a §4.3 site has received a term in that directive, a result that holds a term is undetermined, naming its inputs (assumed, not ruled; §8 step 3).
+Under the default report a determined value whose only terms are bare unknown inputs, the kind today's evaluator already prints, prints as that value, spelling them, with exit 0, whether or not the step counter has started, as `LIST n, 6` does (C4, row 60).
+One that holds any other term, a field path, a comparison, a connective residual, an operation term or a join, is undetermined, naming its inputs, exit 1, batch status "undetermined", because each of those was stuck before the lift, after step 1 (decided by Claude overnight 2026-10-02, pending Meng's review, §8 step 3).
 The scope-pending field (C5) fires on the rule body's top-level `IMPLIES`, exactly where the planner reads its seam (`BooleanDecisionQuery.hs:193-199`), and not on the residual's root: `TRUE AND (x IMPLIES TRUE)` is `TRUE` with no field, because the expression's top-level connective is `AND`, even though §4.3's `TRUE AND r = r` leaves an `IMPLIES` at the residual's root.
 The value stands: exit 0, and an `#ASSERT` on it is satisfied, as `l4 verify`'s vacuity note already does; a nested `IMPLIES` does not fire it.
 A `gave-up` is reported as "gave up; needed _i_" under every report.
 A guarded refusal is undetermined under every report: exit 1, batch status undetermined, the refusal's reason listed, and never a determinate refusal with exit 0 (U13).
 The exception is U13b's case of §4.7.2, where no assignment escapes every guard and every leaf is a refusal with one reason: that is the refusal, exit 0, batch status "refused" (`Batch.hs:369-370`), and on the service today's refusal response, a 422 whose body says "The model refuses to answer" (`DataPlane.hs:696-701`, `Backend/Api.hs:267`).
+That is the default report's outcome; what the K3 and residual reports show for it is pending the open question in §9 (O1).
 A guarded error is its own outcome (U11b) and exits 1: U11b states no exit code, but U13b's error-leaf control does ("the same with `1 DIVIDED BY 0 GREATER THAN 0` for an error leaf", exit 1), as U13 (2) does for a guarded refusal.
 `#ASSERT REFUSED e` (`EvaluateLazy.hs:308-319`) on a residual that holds a guarded refusal holds where the guard holds and fails where it does not, so it is undetermined, exit 1, as U13 (2) rules for a directive whose refusal is reached only under an undetermined guard (row 81).
 `#ASSERT REFUSED e BECAUSE r` is undetermined too when `r` matches only some of several refusal leaves (row 82), as a consequence of U13b (2) and U1b (assumed, not ruled).
+`#ASSERT REFUSED e` on a residual with no guarded leaf fails, exit 0, since every completion produces a value, as `#ASSERT REFUSED x` does today (row 72; decided by Claude overnight 2026-10-02, pending Meng's review).
 The language server and the golden harness show the default report and have no setting (U7b).
 On the service the report is its own route or a rejected unknown key, never a silently dropped field, and every response states which report it carries; on MCP it is a separate tool or a listed capability (U7b).
 In `l4 batch` an undetermined row is a row status, not a failure, and never trips stop-on-error (`Batch.hs:247`, `:299`, `:319`) (U7b).
@@ -668,7 +674,7 @@ Rosette rows cite the Guide where a quotation in §4.10 covers them and say "rec
 
 Each row names the ruling it comes from, gives the L4 input, says what the `unstable` binary at `f9a504b77` does today, and states the expected report under this section.
 Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `n` and `age` are `IS A NUMBER`, `d IS A Person` with `DECLARE Person HAS age IS A NUMBER`, and `g` is `ASSUME g IS A FUNCTION FROM NUMBER TO BOOLEAN`, all unsupplied.
-"Today" is a probe result where a probe file is named (`reversegear/p01` to `p22` in the session scratchpad, run 2026-10-01 on the `f9a504b77` snapshot; `tippex/t01` to `t21`, run 2026-10-02 on a byte-identical snapshot of the installed `l4`, the store build `jl4-0.1-b69f17a4`, built 2026-09-28, with `DECLARE Kind IS ONE OF Retail, Wholesale` and `k IS A Kind` added to the section); a row with no probe name says where its "today" comes from.
+"Today" is a probe result where a probe file is named (`reversegear/p01` to `p22` in the session scratchpad, run 2026-10-01 on the `f9a504b77` snapshot; `tippex/t01` to `t21`, and the TIPPEX fact-check's `d01` to `d03`, `e03` and `e04`, re-run as `tippex/rv/`, all run 2026-10-02 on a byte-identical snapshot of the installed `l4`, the store build `jl4-0.1-b69f17a4`, built 2026-09-28, with `DECLARE Kind IS ONE OF Retail, Wholesale` and `k IS A Kind` added to the section); a row with no probe name says where its "today" comes from.
 "Expected" is the default report unless the row names another; "undetermined naming _i_" means the default report's "I needed to know the value of _i_"; "unchanged" means §4.3's conservativity claim, made against the tree after build step 1, covers the row.
 §8 says which build step each row belongs to.
 
@@ -744,8 +750,8 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 | 68  | U11b          | `r WITH x IS TRUE`, with `r MEANS x AND (1 DIVIDED BY 0 GREATER THAN 0)`                        | division by zero (t12)                                                                                                        | division by zero, unchanged: with row 19, the two halves of U11b's positive control                                                  |
 | 69  | U10           | `FALSE AND f TRUE`, with row 20's `f`                                                           | `FALSE` (t11)                                                                                                                 | `FALSE`, unchanged; U10's "`FALSE AND` a call that errors", a shared case for `eval.ts` and `nodeValue`                              |
 | 70  | §2.4, U4      | `CONSIDER m WHEN JUST y THEN 2, OTHERWISE 1`, with `m IS A MAYBE NUMBER`                        | `1`, as a value, exit 0 (t02; the coordinating session's probe of 2026-10-02)                                                 | build step 1: stuck naming `m`; from step 3: undetermined naming `m` (U7b), kept by step 5 (U4)                                      |
-| 71  | §2.4, U4      | `CONSIDER Claim k 5 WHEN Claim Retail 0 THEN "first" WHEN Claim kk a THEN "second"` (§2.4)      | `"second"` (t01), right for every `k`                                                                                         | build step 1: stuck naming `k`; from step 3: undetermined naming `k`, kept by step 5; a loss of precision (§4.3)                     |
-| 72  | U1b           | `#ASSERT REFUSED x`                                                                             | "assertion failed: expected a refusal, but the expression produced a value", not a crash (t03)                                | undetermined naming `x`, exit 1, from build step 1                                                                                   |
+| 71  | §2.4, U4      | `CONSIDER Claim k 5 WHEN Claim Retail 0 THEN "first" WHEN Claim kk a THEN "second"` (§2.4)      | `"second"` (t01), right for every `k`                                                                                         | `"second"`, exit 0, unchanged: the matcher sees `5` mismatch `0` before raising on `k` (overnight decision, §8 step 1)               |
+| 72  | U1b           | `#ASSERT REFUSED x`                                                                             | "assertion failed: expected a refusal, but the expression produced a value", not a crash (t03)                                | failed, exit 0, unchanged: an input never refuses, so only the wording could improve (overnight decision, §8 step 1)                 |
 | 73  | U13           | `x AND TBD`                                                                                     | stuck on `x` (t07)                                                                                                            | "`FALSE` unless `x`; refuses (TBD's reason) if `x`", exit 1, batch status undetermined; before step 5, as row 77                     |
 | 74  | U13, U4b      | `IF x THEN TBD ELSE FALSE`                                                                      | stuck on `x` (t08)                                                                                                            | as row 73                                                                                                                            |
 | 75  | U13           | `TBD AND x`                                                                                     | refuses, "TBD: this rule has not been written yet" (t09), exit 0 (`Run.hs:143-146`)                                           | unchanged: a refusal under no undetermined guard stays a determinate refusal                                                         |
@@ -759,8 +765,13 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 | 83  | §2.2          | `n AS STRING`                                                                                   | "AS STRING/TOSTRING can only convert …, but found: n" (t04)                                                                   | build step 1: stuck naming `n`; from step 3: undetermined naming `n`                                                                 |
 | 84  | §2.2          | `JSONENCODE n`                                                                                  | "Internal error … Cannot encode value to JSON: n" (t05)                                                                       | build step 1: stuck naming `n`; from step 3: undetermined naming `n`                                                                 |
 | 85  | §4.3          | `CONSIDER (x AND y) WHEN TRUE THEN 1, OTHERWISE 2`                                              | stuck on `x` (t21)                                                                                                            | from step 3: undetermined naming `x` and `y`, never `2`: step 3's interim, a step-3 control                                          |
+| 86  | §2.4          | `EVERY Tenant t IN LIST alice, u … MUST Sign t`, `u` an unsupplied `Actor`, `alice` signing     | `FULFILLED`, exit 0 (d01)                                                                                                     | build step 1: stuck naming `u`, exit 1 (overnight decision, §8 step 1)                                                               |
+| 87  | §2.4          | `PARTY alice MUST Deliver Retail`, event `PARTY alice DOES Deliver k`, `k` an unsupplied `Kind` | left pending, exit 0 (e03)                                                                                                    | build step 1: stuck naming `k`, exit 1 (overnight decision, §8 step 1)                                                               |
+| 88  | §2.4          | row 86 with a known second tenant, `Tenant OF "Bob"`, in place of `u`                           | Bob's obligation left pending, exit 0 (d02)                                                                                   | unchanged                                                                                                                            |
+| 89  | §2.4          | row 86 with no cast, `EVERY t IN LIST alice, u`                                                 | stuck on `u`, exit 1 (d03)                                                                                                    | unchanged                                                                                                                            |
+| 90  | §2.4          | row 87 with the event `PARTY alice DOES Deliver Retail`                                         | `FULFILLED`, exit 0 (e04)                                                                                                     | unchanged                                                                                                                            |
 
-Of the 85 rows, 79 were probed: rows 1 to 65 except 54, 55, 57, 58 and 61 on 2026-10-01, and rows 66 and 68 to 85 on 2026-10-02; rows 54, 55, 57, 58, 61 and 67 were not.
+Of the 90 rows, 84 were probed: rows 1 to 65 except 54, 55, 57, 58 and 61 on 2026-10-01, and rows 66 and 68 to 90 on 2026-10-02; rows 54, 55, 57, 58, 61 and 67 were not.
 
 ### 4.13 Conflicts for Meng
 
@@ -901,6 +912,7 @@ W1's own description gives the assumed term "for a non-`MAYBE` input", so the ex
 **The wrapper paths' root is a `MAYBE`.**
 The service's generated wrapper and `l4 batch` both evaluate `CONSIDER decodeArgs inputJson WHEN RIGHT args THEN` the call wrapped in `JUST` (`jl4-service/src/Backend/CodeGen.hs:268` at `6ed297629`, `:340` since #530, and `:350-351`; `jl4/app/L4/Cli/Batch.hs:689-691`), so the root of the `#EVAL` is a `MAYBE`, not the exported function's result.
 The boundary decision of §4.7.2 reads a Boolean root and C5 reads "the directive's expression, or the body of the function it calls", so on those paths neither fires: a residual the boundary would decide stays undetermined, and a scope-pending `TRUE` is never reported; on the service a single `{}` sends a request down that path (§2.5).
+Because a determined result that holds any term but a bare input is undetermined from step 3 (§8 step 3), an `l4 batch` or service-wrapper row whose answer is a residual inside the `JUST` is undetermined from step 3, not "success"; step 6, which applies the report to the function's own result, makes that output more precise.
 §8 step 6 states how this is closed, as an assumption.
 
 ---
@@ -941,18 +953,22 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
 1. **Two-valued fixes, no lift.** A `ValAssumed` scrutinee of a `CONSIDER` raises `Stuck`, naming it (§2.4); the selector path raises the same (§2.4, probe `p05-record.l4`); the right-operand misdiagnosis of `runBinOpEquals` is fixed (U6); and a bare assumed term as the result of an `#EVAL` is reported as `Stuck`, as `#ASSERT` already does (`EvaluateLazy.hs:306`; §2.4, probe `p17-bare.l4`).
    The last is covered by the rulings: U7b makes the default report today's "I needed to know the value of …", row 52 expects exactly that with exit 1, and the 2026-08-01 ruling makes `Stuck` exit 1 (`Run.hs:78-94`); only its timing was open, and it lands here so that the silent exit-0 path closes first.
    Independent; small.
-   Rows 12, 34, 35, 70 and 71 (their step-1 halves), 52, 56, 72, 83 and 84.
+   Rows 12, 34, 35 and 70 (their step-1 halves), 52, 56, 83, 84, 86 and 87, with rows 71, 72 and 88 to 90 as controls that do not change.
+   Four choices in this step are decided by Claude overnight 2026-10-02, pending Meng's review, and §9's "Open for Meng" lists them: the sub-pattern refinement and the two regulative sites below, and keeping `#ASSERT REFUSED x`'s verdict.
    This step changes directives that do not end in `Stuck` today (§4.3), so its PR reads every moved result before blessing (§6).
    It also carries the U12 and U12b work, which is independent and small and none of which is done on this branch: move `jl4/experiments/negation-as-failure-examples.l4` under a checked glob, shipping its four goldens if the glob is goldened (repo `CLAUDE.md` §3.1); relabel it, starting with its `:79` heading "The Kleene lift", as "truth-functional strong Kleene (#526 §4.1(a))"; add ``#ASSERT (NOTHING `kor` (knot NOTHING)) EQUALS NOTHING`` with the comment U12b asks for (row 56); turn the two doc links, `doc/reference/libraries/negation-as-failure.md:63` and `doc/reference/patterns/README.md:270`, which point at the experiments path on GitHub's `main`, into relative links to the new path; relabel the two passages that call the file a "Kleene three-valued lift", `negation-as-failure.md:61` and `patterns/README.md:269`, and rewrite `negation-as-failure.md:60-63` to say that the library is declined and that a data-borne `NOTHING` still needs `CONSIDER` (U12); and update the file's own line 2 and `specs/done/NEGATION-AS-FAILURE-SPEC.md` at `:3`, `:5`, `:23`, `:274` and `:285`, where its open question 2 still reads "Ship the Kleene lift".
    _Assumed, not ruled:_
    - The `CONSIDER` fix goes in the backward pattern frames, as `ValAssumed r -> stuckOnAssumed r` before the `patternMatchFailure` arm of `PatNil0`, `PatCons0` and `PatApp0` (`Machine.hs:1645-1689`), and not in `matchPattern`, so it covers a user `CONSIDER`, a nested sub-pattern and the selector at once; a literal pattern is fixed by the right-operand fix, through `PatLit1` (§2.4).
-   - `Stuck` is raised at the first unknown a sub-pattern inspects, in the matcher's existing left-to-right order, and later positions are not forced to look for a mismatch, since forcing them could raise or diverge where today's run does not.
-     That loses row 71's answer, which is right by luck today, and U4 keeps it lost after the lift (§4.3).
-   - In the regulative action matcher, which shares those frames (`Machine.hs:2271`), an unknown unwinds as `patternMatchFailure` does and raises `Stuck` only when the unwind reaches `ConsiderWhen1`, so `Contract11` still tries the next event.
+   - Before it raises `Stuck` at the first unknown a sub-pattern inspects, the matcher checks the branch's later positions whose cells are already evaluated, or hold a literal not yet evaluated, for a definite mismatch, and forces nothing else, since forcing could raise or diverge where today's run does not; on a mismatch the branch fails as today and the next one is tried (decided by Claude overnight 2026-10-02, pending Meng's review).
+     A literal argument is allocated as an unevaluated thunk (`allocateRecursive`, `Machine.hs:1128-1134`), so "already evaluated" alone would not see row 71's `5`; reading a literal forces nothing that can raise or diverge.
+     Row 71 so keeps `"second"`, exit 0, and the lift keeps it, since its scrutinee is a known constructor.
+   - In the regulative action matcher, which shares those frames (`Machine.hs:2271`), an unknown raises `Stuck` naming it, as it does in a `CONSIDER`, rather than failing the pattern so that `Contract11` tries the next event; and `EVERY`'s cast test raises `Stuck` naming an unknown candidate rather than dropping it (`:2423`).
+     Both are decided by Claude overnight 2026-10-02, pending Meng's review, loud over silent; they reach the regulative layer, which §4.6 otherwise leaves out of scope, so §9 lists them for Meng to reverse (rows 86 and 87, with controls 88 to 90).
      The ruled right-operand fix still changes the party check (`:2258-2260`) and a literal action argument, from one loud error to another; `PROVIDED` and `EVERY`'s `WHO` filter stay as §2.4's residue.
    - A `ValAssumed` on the right of `EQUALS` raises `Stuck` only when the left value is of a type equality supports; a closure, a built-in, an unapplied constructor or an obligation on the left keeps `EqualityOnUnsupportedType`, so `elem.golden` does not move.
    - `AS STRING`, `TOSTRING` and `JSONENCODE` raise `Stuck` on a `ValAssumed`, and so do the four temporal iterators on a predicate that returns one (§2.2); all of them error today, so only the text changes.
-   - The bare-result fix is one arm in the shared `NotAnAssert` classification (`EvaluateLazy.hs:278-285`), `Right (MkNF (ValAssumed a)) -> ReducedErrored (UserEvalException (Stuck a))`, so that every consumer agrees, the ladder's `l4/evalApp` included; the same arm goes into `AssertRefuses` (`:319`), which gives row 72.
+   - The bare-result fix is one arm in the shared `NotAnAssert` classification (`EvaluateLazy.hs:278-285`), `Right (MkNF (ValAssumed a)) -> ReducedErrored (UserEvalException (Stuck a))`, so that every consumer agrees, the ladder's `l4/evalApp` included.
+     `AssertRefuses` (`:319`) keeps its wildcard, so `#ASSERT REFUSED x` stays "failed", exit 0, the right verdict, since an input never refuses (row 72; decided by Claude overnight 2026-10-02, pending Meng's review); only its wording, "produced a value", could improve.
      Its JSON kind moves from "value" to "error" now, and to "undetermined" at step 3; the four `doc/reference/syntax/` examples of §6 are repaired in the same PR.
    - The selector's `Stuck` names the record input `d`; the field path arrives with step 3.
    - Tests: one new `ok/` corpus file carrying these cases, with `#EVAL LIST n, total` as C4's control and its four goldens read before blessing, and a `tests-cli` test that `#EVAL x` exits 1.
@@ -965,9 +981,9 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
      Probe `s2skeptic/flagmain.l4`, which imports a module whose section `GIVEN` has a `TYPICALLY`, shows both sides today: `TRUE AND` the imported Boolean reader is `TRUE`, while the imported numeric reader `PLUS 1` is an internal error, because a binary built-in forces both operands by `continueRef` (`Machine.hs:1572-1573`, `:1515-1517`).
      A two-file positive control beside `ok/section-given-import-def.l4` and `ok/section-given-import-call.l4` puts a bare imported reader in each operand position.
    - When a known left operand does not decide, the right operand continues in tail position, with no new frame and no Boolean check, which keeps the prelude's `x AND and xs` (`prelude.l4:227`) flat and does not implement step 1's bare-result change by accident.
-   - The frames emit no trace node of their own: the call site's application is the connective's node, so a skipped operand is absent and a variable operand's value is lost (§4.4), and an exception from the left operand shows as the bare `• ↯` node the arithmetic built-ins already produce (`lazytrace-exception.golden:145`).
+   - The frames emit no trace node of their own: the call site's application is the connective's node, with a child per operand labelled with its source text and value, and a skipped operand shown as skipped (§4.4, decided by Claude overnight 2026-10-02, pending Meng's review); an exception from the left operand shows as the bare `• ↯` node the arithmetic built-ins already produce (`lazytrace-exception.golden:145`).
      GraphViz draws a stub for a skipped operand only when `showUnevaluated` is on, and `l4 trace` leaves it off: it renders with `defaultGraphVizOptions` (`jl4/app/L4/Cli/Trace.hs:105-109`; `GraphVizOptions.hs:25`), and the `showUnevaluated = True` at `jl4/app/L4/Cli/Common.hs:206` sits in a `TraceOptions` field that nothing reads.
-     Where it is on, today's stub is labelled with the `IF`'s skipped arm, `b` (`GraphViz2.hs:332-353`), and the frames drop it; the PR records one DOT before and after.
+     Where it is on, today's stub is labelled with the `IF`'s skipped arm, `b` (`GraphViz2.hs:332-353`), and the frames label it with the skipped operand's source text instead; the PR records one DOT before and after.
    - The four rewrite arms of `forwardExpr` (`Machine.hs:1198-1205`) enter the same frames, so no `IF` rewrite is left anywhere.
    - jl4-mlir has no `__IMPLIES__` lowering (`jl4-mlir/src/L4/MLIR/Lower.hs:1936-1943` lowers `__AND__`, `__OR__` and `__NOT__` only), so this step adds one, short-circuiting on a `FALSE` left operand, and an `IMPLIES` schema special; the `NOT` special goes, its only consumer being the deleted synthesiser.
      What the fall-through does today, a compile failure or a refusal, is measured first.
@@ -975,7 +991,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - The indirect-call golden is a new `ok/connectives-indirect.l4`, the four connectives passed through a function parameter, with a short circuit over a division by zero as its control, and a test that no trace names `a` or `b`.
 3. **Atoms-only residuals, default report.** Input atoms, field paths, comparison atoms, Boolean assumed calls, operation terms over the total built-ins, the connective table of §4.3, the identity rule of §4.6, and the default report naming every input; no boundary decision yet.
    This is what U1b calls "true strong Kleene: atoms only".
-   Rows 1, 2, 3, 5, 6, 10, 11, 12, 13, 15 (without its count clause), 17, 18, 23, 24, 35, 37, 39, 40, 42, 44, 45, 46, 47, 48, 49, 50, 66, 69, 75, 76, 77 and 85 of §4.12; the "from step 3" halves of rows 34, 70, 71, 83 and 84; and rows 60 and 67, which hold at every step from this one.
+   Rows 1, 2, 3, 5, 6, 10, 11, 12, 13, 15 (without its count clause), 17, 18, 23, 24, 35, 37, 39, 40, 42, 44, 45, 46, 47, 48, 49, 50, 66, 69, 75, 76, 77 and 85 of §4.12; the "from step 3" halves of rows 34, 70, 83 and 84; and rows 60 and 67, which hold at every step from this one.
    Of those, the "residual" and "atom" clauses of rows 6, 11, 12, 13 and 46 are read at this step from the trace, where terms print as L4 source, and from step 4 in the residual report; row 37's "askable" is the planner's, step 6.
    Rows 4, 62 and 63 need step 4's decider, because the evaluator keeps `x IMPLIES TRUE` as a node (§4.2): at this step they are undetermined, naming `x` (and `y`), and C5's scope-pending field, which fires only on a decided value, arrives with step 4.
    It builds on steps 1 and 2: the lift lives in step 2's frames (§4.4), and rows 12 and 48 need step 1's right-operand fix.
@@ -1001,8 +1017,9 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
 
    _Assumed, not ruled:_
 
-   - A determined result that holds a term is undetermined, naming its inputs, exit 1, once the counter has started in that directive, that is, once a §4.3 site has received a term, which is where today's run raised `Stuck`; otherwise it prints as today (row 60).
-     This reproduces today's output for every directive that was stuck, so it needs no ruling.
+   - A determined result whose only terms are bare unknown inputs, the kind today's evaluator already prints (`LIST n, 6`, C4, row 60), prints as that value, spelling them, exit 0, whether or not the counter has started in that directive; one that holds any other term, a field path, a comparison, a connective residual, an operation term or a join, is undetermined under the default report, naming its inputs, exit 1, batch status "undetermined" (decided by Claude overnight 2026-10-02, pending Meng's review).
+     Each of those other terms was stuck before the lift, after step 1, so this keeps today's answer: `LIST n, (n PLUS 1)`, `LIST x, (n GREATER THAN 3)` and `JUST (x AND y)` are stuck today, and `LIST (d's age), 6` is after step 1, where today it gets the no-branch message (probes `t22` to `t25`, 2026-10-02, on the same snapshot).
+     So `#EVAL LIST x, (y OR TRUE)` prints `LIST x, TRUE`, exit 0, though the `OR` received a term and started the counter and the directive is stuck on `y` today (`t27`), while `#EVAL LIST n, (n PLUS 1)` and `#EVAL JUST (x AND y)` are undetermined.
      "As today" differs by surface: the CLI prints `LIST n, 6`, while the service raises "#EVAL produced ASSUME" (`Backend/Jl4.hs:1161`).
    - Terms are built only for first-order pure built-ins, and only the total ones: arithmetic, string and date operations and the comparisons, which excludes `AS STRING`, `TOSTRING` and `JSONENCODE`.
      The temporal-context switches, the iterators and the regulative clock keep `Stuck`, and so does a partial built-in applied to a term (§4.6), until step 5 can emit its guard.
@@ -1019,7 +1036,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
 
 4. **The boundary decider and the residual report.** §4.7.2 by truth table over the residual's atoms on every host (DU3b), the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results; C5's scope-pending field arrives here, with the first decided `TRUE`.
    Rows 4, 7, 8, 14, 15's count clause, 25, 26, 36, 38, 41, 43, 61, 62 and 63.
-   It builds U13b's decision for a residual no assignment of whose atoms escapes every guard (§4.7.2); the row that exercises it, row 80, is in step 5, because it needs that step's join and leaves, as rows 64 and 65 need its definedness guards.
+   It builds U13b's decision for a residual no assignment of whose atoms escapes every guard (§4.7.2), for the default report, while the K3 and residual reports' rendering of it is pending the open question in §9 (O1); the row that exercises it, row 80, is in step 5, because it needs that step's join and leaves, as rows 64 and 65 need its definedness guards.
    **Documentation:** U1b's wording on the DMN limits page, `doc/exports/dmn-bpmn.md`, whose "Limits, stated plainly" block (`:367`) has none of it yet: "propositional supervaluation of a Boolean residual", its two gaps (atoms are independent; non-Boolean results are not settled), and `x OR NOT x`, `TRUE` at L4's boundary and `null` in FEEL; and a page for the `--unknowns` flag and its three reports.
    _Assumed, not ruled:_
    - The decider is Shannon expansion with constant folding, stopping once one `TRUE` and one `FALSE` completion are found.
@@ -1038,16 +1055,16 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - The flag is `--unknowns default|k3|residual`, U1b having spelt `--unknowns k3`.
    - The extended differential runs under each report from a script under `etc/`, which `etc/verify-branch.sh` names where it already prints the §3.2.1 reminder; a one-line pointer in repo `CLAUDE.md` §3.2.1 is a `CLAUDE.md` edit and needs Meng's word.
 5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b, U13, U13b).
-   Rows 9, 16, 19 to 22, 27 to 34, 57, 59, 60, 64, 65, 67, 68, 73, 74, 78, 79, 80, 81 and 82, and rows 70 and 71, whose step-3 answers `CONSIDER` on a term keeps; row 80 exercises step 4's decision for a residual no assignment of whose atoms escapes every guard.
+   Rows 9, 16, 19 to 22, 27 to 34, 57, 59, 60, 64, 65, 67, 68, 73, 74, 78, 79, 80, 81 and 82, and row 70, whose step-3 answer `CONSIDER` on a term keeps; row 80 exercises step 4's decision for a residual no assignment of whose atoms escapes every guard.
    It builds joins, and `CONSIDER` on a term as a `fresh` unknown that carries the scrutinee's guarded leaves (U4, DU11), which ends step 3's interim for `IF`, `BRANCH` and `CONSIDER`.
    It builds U13b's carrying of a term's guarded leaves through the agreeing-arms rule and the identity rule (§4.5, §4.6).
+   How it reads C3 (2)'s "nothing new is evaluated" once the counter has run out, which row 59 depends on, is pending the open question in §9 (O3); row 59's expected text holds under the narrower reading, "no closure body is entered".
    This step's branch carries §7's measurement again: with the joins and the leaves built, §7's items 2, 3 and 5 run on that branch and set the limit anew before the branch merges.
    It builds U13's guarded refusal leaf, which ends U13's interim; the comment at `Machine.hs:838-849` already carries U13's restatement, from step 3.
    **Documentation:** the guarded-error, guarded-refusal and gave-up outcomes; and the DMN limits page records that FEEL takes the else arm on an `IF` over an unknown (U1b).
    _Assumed, not ruled:_
-   - C3 (2)'s "nothing new is evaluated" is read as "no closure body is entered once the counter has run out": literals, constructors, already-evaluated thunks and built-in operations still compute (§4.5).
-     Row 59 needs this reading, and it narrows C3's words, so it is recorded as an assumption and not as a ruling.
    - A non-Boolean join that holds a leaf is, at a result, U4b's opaque unknown, reported as undetermined with its guard (row 29, §4.5); row 33 holds as written.
+     Where every leaf of such a join is one refusal, the outcome is pending the open question in §9 (O2).
    - A leaf inside a guard is read as not `TRUE` when deciding whether another leaf can be reached, so an arm that can never run drops its leaf.
    - Error leaves come from every `UserEvalException` except `Stuck` and `StackOverflow`, so the `Stuck` fallbacks of steps 3 and 5 always reach the directive boundary; an `InternalEvalException` propagates as today; a `RefusalException` becomes U13's leaf.
      Each guard is stored relative to the join or connective that encloses its leaf, and the full guard is composed at the root.
@@ -1067,7 +1084,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - On every path, direct, service wrapper, deontic wrapper and `l4 batch`, the boundary decision, the report and C5 apply to the exported function's own result and body, not to the wrapper's `JUST` (§6): either the `JUST` is unwrapped before reporting, or a decode failure raises so that the `#EVAL` is the bare call.
    - Routes `…/evaluation/residual` and `…/evaluation/k3`, with batch equivalents; `/evaluation` keeps the default report, and `FnArguments` stays lenient.
      A top-level `"report"` goes on every evaluation and batch response.
-     The batch request's OPA-shaped `knownOutcomeStyle` and `unknownOutcomeStyle` (`jl4-service/src/Types.hs:392-393`) stay accepted, since a 400 would break clients written to that shape, and the response's `"report"` tells such a client which report it got.
+     What the batch request's OPA-shaped `knownOutcomeStyle` and `unknownOutcomeStyle` (`jl4-service/src/Types.hs:392-393`) do once reports exist is pending the open question in §9 (O4).
    - Under the default report an undetermined, guarded-leaf or gave-up result is a 422, with MCP's `isError`; the residual and K3 routes return 200; a scope-pending `TRUE` is 200.
      K3's unknown is a string tag, never JSON `null`, which the wire already uses for other things.
    - One three-way parse, absent, `null` or `{}`, or a value, is shared by `/evaluation`, batch and MCP, and an MCP argument that fails to parse is rejected with -32602, never read as absent.
@@ -1075,7 +1092,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
      An empty CSV cell stays `null`, so it is Declined and never defaulted, while a column left out is absent and takes its default; the doc page says so.
    - MCP gets one extra tool per function for the residual report, with `required: []`, mirrored in WebMCP; `needs` gives both the L4 name and the wire key, and the residual prints unsanitised.
      `l4 batch --validate-only` warns on an absent or `null` input, without marking the row invalid.
-     A case that hits the resource limit gets status "error" and does not abort the batch.
+     Whether a case that hits the resource limit stops failing the whole batch is not this step's to change; it is pending the open question in §9 (O5).
      Deontic functions are accepted, and their regulative sites stay `Stuck`.
    - The residual planner sits beside `/query-plan` on a route of its own, so the ladder's atom ids stay joinable with `GET /ladder`; the language server's and the browser's planners stay on the static tree.
      It re-evaluates with every supplied value, presumption off, and adds as assertions only answers to askable atoms that are not inputs (§4.7.3); it ranks by §25f's information gain with T4's priors, rolled up per input for atoms that cannot be asked.
@@ -1136,7 +1153,7 @@ Note (Track B audit, 2026-10-02): U2's "flag off" reads as "before the lift land
 **AMENDED 2026-10-01**, by bench card U4b, which an independent skeptic reviewed before it was folded in. Meng ruled in chat at 10:20Z: _"These are my rulings prior to SEQUEL. Please fold in any additional recommendations due to SEQUEL."_ The amendment, as the card printed it: Join for `IF` and `BRANCH` under the explore-only step counter, as ruled. Inside the evaluator, a non-Boolean join keeps `c ? t : e` and pushes a strict operation that returns a Boolean (a comparison) into each arm; at a result, a field or any non-strict consumer it falls back to the opaque unknown, so U3's boundary promise holds. An error in one arm joins as a guarded error, exactly as TRIPWIRE's error leaf does for `AND`/`OR`, and it always appears in the response with its guard.
 C4 (above) replaces "explore-only" here as it does in U4: the counter starts when a site in §4.3's table first receives a term operand.
 Note (2026-10-02): C4's "a site that raises `Stuck` today" is read against the tree after build step 1, which makes a `CONSIDER` on an unknown raise; §4.3's conservativity claim is made against the same tree.
-Note (Track B audit, 2026-10-02): C3's own control, row 59, is reachable only if C3 (2)'s "nothing new is evaluated" is read as "no closure body is entered once the counter has run out", with literals, constructors, already-evaluated thunks and built-in operations still computing; §4.5 and §8 step 5 state that reading as an assumption, and it is not a ruling.
+Note (Track B audit, 2026-10-02): C3's own control, row 59, is reachable only if C3 (2)'s "nothing new is evaluated" is read as "no closure body is entered once the counter has run out", with literals, constructors, already-evaluated thunks and built-in operations still computing; it is not a ruling, and Meng is asked to confirm it ("Open for Meng", O3, below).
 
 ### U5 — Comparisons become atoms (the membrane)
 
@@ -1265,6 +1282,52 @@ Clause (2) narrows U13's clauses 2 and 3 for the case in which no assignment esc
 **What it changes.** The lowering of §4.2 to SMT-LIB2 lands with the planner (§8 step 6) and serves `l4 prove`; by DU3b it decides nothing for an evaluation's own boundary, which stays propositional (§4.7.2). U3b's tautology count stays the trigger for moving the diagram, and its finite-domain and numeric counts become measurements (DU3b). `VERIFICATION-BACKEND-LOWERING-SPEC.md` R-V6 gains a paragraph saying its input now includes the residual term language.
 **What it costs.** A `z3` binary on every host that runs `jl4-service` with the planner, discovered as R-V6 says (`Z3_EXE`, then `PATH`), and a named degradation when it is absent.
 DU3b (recorded in full under U3b, 14:09:03Z) confirms the scope: z3 decides for these two consumers only, and every evaluation's boundary stays propositional on every host.
+
+### Open for Meng (raised 2026-10-02)
+
+These came out of three adversarial reviews of the TIPPEX commits, on 2026-10-02, while Meng was asleep.
+Each question below is undecided: the steps it names are written so that they do not depend on the answer, or they point here.
+The choices made overnight to keep steps 1 to 3 buildable follow the questions; each is labelled in the text "decided by Claude overnight 2026-10-02, pending Meng's review", and none is a ruling.
+
+**O1. Which reports show U13b's all-guarded refusal?**
+The question: under U13b (2), `IF x THEN TBD ELSE TBD` refuses, exit 0, which is a decision over every assignment; C2 has the K3 report read the residual "through the K3 tables, never the boundary's decision", and step 4's rule that the exit code follows the outcome as the chosen report shows it would then give exit 1 under K3.
+Options: (a) every report shows the refusal, exit 0; (b) the default report shows the refusal, exit 0, K3 shows the K3 quotient per C2, "unknown; refuses if x; refuses if not x", exit 1, and the residual report prints the residual with the default report's outcome.
+Recommendation: (b), which keeps C2 as ruled.
+Blocks: build step 4 (§4.7.4, §8 step 4).
+
+**O2. Does U13b (2) apply to a join of any type?**
+The question: YOYO's control, `IF x THEN TBD ELSE TBD`, names no type, and `TBD` is polymorphic (`GIVEN a IS A TYPE GIVETH AN a`, `jl4-core/libraries/prelude.l4:764-767`); row 80 types it as a `BOOLEAN`, and at any other type the same structure is U4b's opaque join at a result, undetermined, exit 1.
+Options: (a) Boolean results only; (b) any type whose every leaf is one refusal.
+Recommendation: (b), since every two-valued completion refuses with that reason whatever the type.
+Blocks: build step 5 (§4.7.2, §8 step 5).
+
+**O3. Confirm C3 (2)'s reading.**
+The question: C3 (2) says that once the counter runs out "nothing new is evaluated"; read literally, C3's own control, row 59, reports a bare "gave up", as the Track B audit traced by hand and the 2026-10-02 review re-traced.
+Options: (a) confirm the narrower reading, "no closure body is entered", under which literals, constructors, already-evaluated thunks and built-in operations still compute; (b) keep the literal reading and change row 59's expected text.
+Recommendation: (a); the note under U4 already records the reading.
+Blocks: build step 5 (§4.5, §8 step 5).
+
+**O4. What does the service do with `knownOutcomeStyle` and `unknownOutcomeStyle` once reports exist?**
+The question: the service batch request accepts both, each a `Maybe OutcomeStyle` over `ValueOnly`, `DecisionReport` and `BaseAttributes` (`jl4-service/src/Types.hs:386-400`), and nothing reads either; U7b says a report choice is never dropped silently, and a client that sets `unknownOutcomeStyle` is choosing one.
+Options: (a) keep accepting and ignoring them, with the response's `"report"` saying which report was used; (b) map each onto a report where it corresponds, and reject only a value that disagrees with the route's report, naming the route to use; (c) reject both with a 400.
+Recommendation: (b), a wire-compatibility trade-off that keeps clients written to the OPA shape working.
+Blocks: build step 6 (§8 step 6).
+
+**O5. Should a service batch case that hits the resource limit stop failing the whole batch?**
+The question: today the first failing case fails the whole batch (`jl4-service/src/DataPlane.hs:305-308`), and the resource limit is a 500 (`:689`); a per-case status would change inputs with no unknowns at all, outside every ruling and outside §4.3's claim.
+Options: (a) a per-case status "error" that does not abort the batch, built in step 6; (b) leave the batch as it is; (c) make it a service change of its own, separate from the lift.
+Recommendation: (c).
+Blocks: build step 6, which is written not to change it (§8 step 6).
+
+**Decided overnight, pending Meng's review.**
+
+- The two silent regulative sites, `EVERY`'s cast test and the action matcher, raise `Stuck` on an unknown from build step 1, loud over silent (§2.4, §8 step 1, rows 86 to 90).
+  This reaches the regulative layer, which §4.6 otherwise leaves out of scope; reversing it keeps today's silent behaviour as §2.4's residue.
+- Before it raises on an unknown, a sub-pattern match checks the branch's already-evaluated later positions, and its unevaluated literals, for a definite mismatch, so row 71 keeps `"second"` (§8 step 1).
+- `#ASSERT REFUSED x` keeps today's verdict, failed, exit 0, and `#ASSERT REFUSED e` on a residual with no guarded leaf fails the same way (§2.4, §4.7.4, row 72).
+- A determined result whose only terms are bare inputs prints as that value, exit 0, whether or not the counter has started; one that holds any other term is undetermined, exit 1, which keeps today's answer, since each such term was stuck before the lift (§4.7.4, §8 step 3).
+  So an `l4 batch` or service-wrapper row whose answer is a residual inside the wrapper's `JUST` is undetermined from step 3, and step 6 makes that output more precise (§6).
+- Traces keep each connective operand as a child labelled with its source text and value, and show a skipped operand as skipped (§4.4, §8 step 2).
 
 ---
 
