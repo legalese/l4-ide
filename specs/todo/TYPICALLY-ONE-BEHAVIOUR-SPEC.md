@@ -1,6 +1,6 @@
 # `TYPICALLY`: one behaviour
 
-**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530, the rest not built.
+**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in this branch (`feat/typically-w2w3`), with the minimum of W8 they need and the checking half of W5 (§4.1); the rest not built.
 This spec is an implementation plan, not a new design.
 The design was ruled on 2026-09-04 as **R8** (`IMPLICIT-PROPS-DESIGN.md` §11.5) and extended on 2026-09-06 by **D7.3** (`SURFACE-SUGAR-CLUSTER-2026-09.md`).
 R8 is the owning ruling, and anything this spec settles is recorded back there (repo `CLAUDE.md` §4).
@@ -64,7 +64,7 @@ And independently of the row:
 
 - **Only literals are accepted** (p5): `TYPICALLY phi` is "must be a literal". R8 rule 3 is not built.
 - **An enum constructor is refused on a `DECLARE` field and accepted on a `GIVEN`.** `colour IS A Colour TYPICALLY Red` checks on a rule `GIVEN` (p12) and a section `GIVEN` (p13), and on a record field fails twice: "must be a literal" and "I could not find a definition for the identifier Red" (p10). The second error is the real one: the field's default is checked where the enum's constructors are not in scope. The first is misleading, because `isTypicallyLiteral` (`TypeCheck.hs:1737`) accepts a nullary constructor and the message itself names nullary constructors as allowed.
-- **The service's published schema carries no default.** It lists both probes' defaulted inputs under `required` with no `default` key (p14, p15). `L4.FunctionSchema` does attach one (`FunctionSchema.hs:255`, `:280`, `:291`), but the service builds its schema through `paramToParameter` (`jl4-service/src/Compiler.hs:509-518`), which ignores the `paramDefault` its `ExportedParam` carries (`Export.hs:72`). So `TYPICALLY.md`'s statement that the published list of facts carries the JSON Schema `default` keyword holds in `jl4-core` and not over the wire.
+- **The service's published schema carries no default.** **Fixed by W2** (this branch): p15's `has capacity` is out of `required` and carries `"default": true` (§4.1). Before: it listed both probes' defaulted inputs under `required` with no `default` key (p14, p15). `L4.FunctionSchema` does attach one (`FunctionSchema.hs:255`, `:280`, `:291`), but the service builds its schema through `paramToParameter` (`jl4-service/src/Compiler.hs:509-518`), which ignores the `paramDefault` its `ExportedParam` carries (`Export.hs:72`). So `TYPICALLY.md`'s statement that the published list of facts carries the JSON Schema `default` keyword holds in `jl4-core` and not over the wire.
 - **Exporters disagree.** Catala lowers a default to a caller-overridable `context` variable (`Catala/Lower.hs:1295-1296`, R10 of `CATALA-EXPORT-SPEC.md`). Docassemble pre-fills the question with it (`Docassemble/IR.hs:130`, `default:`), so the user still answers. OpenFisca replaces the default with its own: `GIVEN status IS A Status TYPICALLY married` exports as `default_value = Status.single`, the first enum member, exit 0, no note (`OpenFisca/Emit.hs:95`, `OpenFisca/Lower.hs:735`). Blawx lowers through `Relational/Lower.hs`, whose `R-TYPICALLY` fidelity note (`:2843-2855`) covers `ASSUME` only, and `BLAWX-EXPORT-SPEC.md` §5.1 rules Blawx's default "dropped, disclosed". For `GIVEN rate … TYPICALLY 3`, the DMN fidelity report, OpenFisca (which has no fidelity report) and Blawx all drop the default without a word. dmn-md, bpmn and yscript were not surveyed.
 - **The ladder presumes a rule default the evaluator will not use.** `ladder-core` lifts each atom's wire `typically` into `ViewSpec.defaults` (`ts-shared/ladder-core/src/viz-adapter.ts:212-222`) and lays it under the user's answers, with `respectDefaults` true unless the caller says otherwise (`layout.ts:412`). For a rule `GIVEN` that is an answer `#EVAL` cannot produce.
 
@@ -102,8 +102,10 @@ Readers ration attention, so the silent failures come first (user `CLAUDE.md` ru
 
 - **L1.** A rule's own defaulted `GIVEN` cannot be omitted at a named site (p2).
 - **L2.** `l4 batch` and the service refuse an omitted section default that `#EVAL` honours (p7, p15).
+  **Fixed by W3** (this branch): both fill it, and list it in `presumed` (§4.1).
 - **L3.** A defaulted record field cannot be omitted at construction (p4).
 - **L4.** An enum default on a record field fails with a misleading message (p10).
+  **Fixed in this branch** (the checking half of W5, which W3 needs, §4.1): p10 checks clean, and a record built from it evaluates (`DECIDE p IS Paint Red 2`, then `#EVAL p's colour`, gives `Red`).
 - **L5.** An expression default is refused (p5).
 - **L6.** For a section `GIVEN` boolean sent as `{}`, the generated wrapper calls `fromMaybe` without importing the prelude, and the request fails with "could not find a definition for the identifier fromMaybe" (p15). It is not the obvious cause: `hasBooleans` counts booleans among both the rule's own and the section's inputs (`CodeGen.hs:131-133`), so the `IMPORT prelude` line is emitted.
   **Cause traced 2026-10-01:** the wrapper is appended after the source, so it lands inside the source's last `§` section, and an `IMPORT` inside a section does not resolve (`§` heading, then `IMPORT prelude`, then `fromMaybe` fails the same way in a plain `l4 run`).
@@ -129,15 +131,81 @@ Each is independently landable unless it names a dependency.
 | #   | item                                                                                                                                                                                                                                                                                                                                                                                                                                                     | closes       | where                                                                                                                                  |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | W1  | The service stops making `{}` and `null` FALSE. Under T3 both become an assumed term for a non-`MAYBE` input: stuck if the rule needs it, harmless if it short-circuits away. Under `UNKNOWN-EVALUATION-SPEC.md` they later become Unknown.                                                                                                                                                                                                              | S1, L6, S5   | **Built in #530.** `Backend/CodeGen.hs` (placeholder assumed terms; section `GIVEN`s by `WITH`); `Backend/Jl4.hs` `splitAssumeParams`  |
-| W2  | The service's schema carries `default` and leaves a defaulted input out of `required`.                                                                                                                                                                                                                                                                                                                                                                   | R8 surface   | `jl4-service/src/Compiler.hs:509-518`; `parametersFromExport`'s `required` at `:505`                                                   |
-| W3  | `l4 batch` and the service fill an absent defaulted input with its default, at the root. In `l4 batch` this covers JSON, YAML and CSV input, and an empty CSV cell is absent (T3c).                                                                                                                                                                                                                                                                      | L2           | batch decoder; `Backend/Jl4.hs:448` (`missing required parameter`), and the direct-AST path's `assumeExprs`                            |
+| W2  | The service's schema carries `default` and leaves a defaulted input out of `required`.                                                                                                                                                                                                                                                                                                                                                                   | R8 surface   | **Built in this branch** (§4.1). `Compiler.hs` `parametersFromExport`; `L4.Export.isRequiredInput`, `honouredDefault`                  |
+| W3  | `l4 batch` and the service fill an absent defaulted input with its default, at the root. In `l4 batch` this covers JSON, YAML and CSV input, and an empty CSV cell is absent (T3c).                                                                                                                                                                                                                                                                      | L2           | **Built in this branch** (§4.1). `L4/Cli/Batch.hs`; `Backend/Jl4.hs` root fills; the JSON decoder in `Machine.hs`                      |
 | W4  | A rule's own defaulted `GIVEN` may be omitted at a named site. R8's unbuilt half: thread the callee's `FunTypeSig` defaults to `supplyAppNamed` (`IMPLICIT-PROPS-DESIGN.md:2421`). Positional sites stay as they are (R8 rule 1).                                                                                                                                                                                                                        | L1, S4       | `TypeCheck.hs` named-application supply; `Discharge.hs`                                                                                |
 | W5  | Record fields: a defaulted field may be omitted at construction (D7.3, widened by T1); fix the field-default scoping defect and its message.                                                                                                                                                                                                                                                                                                             | L3, L4, S3   | `TypeCheck.hs` `IncompleteAppNamed` (raised at `:4279`; D7.3 cites `:3146`, which has since moved), `inferSelector`'s `checkTypically` |
 | W6  | `ASSUME … TYPICALLY` per T2.                                                                                                                                                                                                                                                                                                                                                                                                                             | S2           | `Discharge.hs` `fillInDefault` (`:281-295`), the deprecation message                                                                   |
 | W7  | Expression defaults with the cycle check (R8 rule 3).                                                                                                                                                                                                                                                                                                                                                                                                    | L5           | `TypeCheck.hs:1724-1745`; `FunctionSchema.typicallyToJson` must then carry source text                                                 |
-| W8  | The trace records "took its default", with the declaration line (R8 surface).                                                                                                                                                                                                                                                                                                                                                                            | —            | `L4.EvaluateLazy.Trace`                                                                                                                |
+| W8  | The trace records "took its default", with the declaration line (R8 surface).                                                                                                                                                                                                                                                                                                                                                                            | —            | **The event is built in this branch** (§4.1), not its trace rendering. `L4.EvaluateLazy.Trace`                                         |
 | W9  | Every exporter either maps the default to the target's own mechanism or emits a fidelity note (T5).                                                                                                                                                                                                                                                                                                                                                      | §2 exporters | `Dmn/`, `OpenFisca/`, `Blawx/` lowerings                                                                                               |
 | W10 | Documentation and stale records: `doc/reference/types/TYPICALLY.md` (one behaviour; delete the "everywhere else: metadata only" half), `typically-example.l4`, the header comment of `ok/typically-basic.l4`, the status headers of `TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`, the deferred list in `IMPLICIT-PROPS-DESIGN.md:2391`. Canon's restated constants (S3) can go once W5 lands; that is a canon change, not this repo's. | —            | —                                                                                                                                      |
+
+### 4.1 W2 and W3, as built (2026-10-02)
+
+Built in this branch on top of #530 (W1).
+Everything below was measured on the branch's own `l4` and `jl4-service`; the CLI tests in `jl4/tests-cli/Main.hs` ("l4 batch: TYPICALLY defaults (W3)") and the service tests in `jl4-service/test/IntegrationSpec.hs` ("TYPICALLY defaults (W2, W3 …)") pin it.
+
+**One mechanism for every fill site: the event is raised where the default is forced.**
+T6 lists only defaults "actually forced", so the fill sites do not raise the event themselves; they mark the place the default lives, and the evaluator raises W8's event the first time that place is forced (`L4.EvaluateLazy.Machine.Presumed`, `notePresumedForce`, called from `evalRef`).
+There are three such places:
+
+- a section binder's default, which discharge already turns into a 0-ary definition (`Discharge.hs` `fillInDefault`); `evalDecide` registers it;
+- a record field the JSON decoder filled from its `DECLARE` (`jsonValueToWHNFTyped`); the decoder registers it;
+- a default the service's direct path filled at the root, which it adds to the module as a 0-ary definition (`Backend/Jl4.hs` `RootFill`) and hands to the evaluator (`execEvalExprInContextOfModuleWith`'s `RootFills`).
+
+So T6b's "every other fill site emits W8's event itself" is met in substance, with one deviation of form: the fill site marks, and the force reports.
+The alternative, reporting at the fill site, lists a default the rule never read, which T6 rules out; measured, `is adult` FALSE leaves `has capacity` unread and `presumed` empty, on every path.
+Each event carries the path it landed at, the `SrcRange` of the `TYPICALLY` that supplied it, and which fill site made it (`PresumedOrigin`), and is reported once per directive (`EvalDirectiveResult.presumed`).
+
+**Where each tool fills.**
+
+- `l4 batch` decodes each row into a generated `InputArgs` record with one field per input, so a defaulted input is a field carrying its `TYPICALLY`, and the decoder fills it: one fill site for rule `GIVEN`s, section `GIVEN`s and record fields alike, and it survives the re-print (R6), because the wrapper is source text.
+  A section binder is therefore filled by the decoder in batch, not by discharge (batch drops the binder's `ASSUME` and rebinds it from the row, as before).
+- The service's direct path fills a rule `GIVEN` and a record field by root fill, and leaves a section `GIVEN` absent so that discharge fills it (T6b).
+- The service's wrapper path declares a defaulted rule `GIVEN` as an `InputArgs` field of its own type carrying the `TYPICALLY` (not lifted to `MAYBE`), and leaves a defaulted section `GIVEN` out of its `WITH`, for discharge.
+  It also sends `null` for every input the request left out that is not being defaulted, because on that path absent and `null` were always the same (W1) and the hard switch below would otherwise refuse the wrapper's own lifted `MAYBE`s.
+
+**T1b's decoder half.** All three decoders read a field's default from its `DECLARE`: the `Machine.hs` decoder from the evaluated module's records and, through `GetLazyEvaluationDependencies`, its transitive imports' (`execEvalModuleWithEnvAndImports`); the service's direct path from `compiledAllDeclares`; the wrapper through the first.
+A declared default wins over D7.3's `MAYBE` fallback, and with presumption off neither fires.
+`FunctionSchema.hs` and `JsonSchema.hs` drop a field with a `TYPICALLY` from `required`.
+Not covered: a field of an enum constructor that carries data (`JsonSchema.hs:333` still lists it as required, and no decoder fills it, because none decodes such a constructor from JSON); a record built inside L4 (W4/W5).
+
+**T3.** `null` on an input or field with a default is refused, naming it ("null means the value is not known, and it never takes the TYPICALLY default"); `{}` likewise, being `null` (T3).
+The decoder now names the field in every primitive mismatch (`Expected JSON boolean for field 'x' but got: Null`), where it used to name only the JSON kind.
+
+**T3c.** An empty CSV cell is dropped from the row (`Batch.hs` `parseBatchInput`), so it is absent exactly as a missing column is.
+Its `MAYBE` paragraph measured both ways: an empty cell for `GIVEN premium IS A MAYBE NUMBER` gives `NOTHING` under soft and "Missing required field 'premium'" under hard.
+
+**T4, and the names chosen for it** (assumptions, not rulings; Meng's soft and hard of T3c):
+
+- `l4 batch --presumption soft|hard`, default `soft`.
+- The service: `"presumption": "soft" | "hard"` in the request body, beside `arguments`, and on the batch endpoint's body for all its cases; absent means `soft`.
+- In the core: `EvalConfig.presumeDefaults`, read by discharge (`dischargeModuleWith`) and by the decoder.
+- T4b holds by construction: every default these paths fill is one a request can supply.
+  `#EVAL`, which no request reaches, takes `presumeDefaults` as on.
+
+**T6, and the shape chosen for `presumed`** (assumptions):
+
+- A list of strings: an input's name, or the path to a field below it, dot-joined, with a list element as its index (`people[0].age`).
+- `l4 batch`: a top-level `presumed` array on every evaluated row, in every format; with `--format csv` a `presumed` column, the names joined with `; `, empty when none. A `--validate-only` row evaluates nothing and has none.
+- The service: `presumed` beside `result` on every response, always present; `@presumed` on each case of the batch endpoint.
+- Only events belonging to the request count (T6b): a section binder's, a root fill's, or one from the wrapper's own `InputArgs` decode, and only for an input the function takes. A `JSONDECODE` the rules make of their own is not the request's.
+- D7.3's `MAYBE` → `NOTHING` is not listed: it is not a `TYPICALLY`. Whether T4b's "every default that took effect" should include it is open.
+
+**W2.** `isRequiredInput` (`L4.Export`): with presumption on, an input is required unless it is a `MAYBE` or has a default a request may omit.
+`honouredDefault` withholds a written `ASSUME`'s `TYPICALLY`: `#EVAL` does not honour it (W6), so neither the schema nor either tool does yet, which keeps R1's parity for it.
+`typicallyToJson` now publishes an enum default as its constructor's name and `NOTHING` as `null`.
+
+**The checking half of W5** (p10), which batch needs, because its `InputArgs` carries an input's `TYPICALLY` verbatim.
+Phase 1 checked a `DECLARE` while only type names were in scope, so `colour IS A Colour TYPICALLY Red` could not resolve `Red`; a field's default is now checked in phase 4 (`TypeCheck.hs` `checkFieldDefaults`).
+Omitting a defaulted field at a construction (L3) is still W5.
+
+**R1, parity with `#EVAL`.** Holds for section `GIVEN` defaults: batch, the service and `#EVAL` give the same answer with the binder omitted (`jl4/tests-cli/fixtures/batch-typically-section.l4`: ``#EVAL `can contract` TRUE`` is `TRUE`, and so is the batch row `{"is adult": true}`).
+It cannot yet hold for a rule `GIVEN` or a record field, because `#EVAL` refuses those omissions (p2, p4) until W4/W5; batch and the service fill them at the root, as W3 rules.
+
+**Also fixed on the way.** Batch's `InputArgs` printed one field per line with a leading `, `, and a field after one whose type is an application (`MAYBE NUMBER`) failed to parse ("incorrect indentation"), so an export with a `MAYBE` input before another input failed every row; it now prints the fields without separators.
+The service wrapper has the same layout and the same limit, listed in `jl4-service/README.md`; it is not changed here.
 
 W4 and W5 share a mechanism: a named supply site that can see the callee's defaults.
 W5's D7.3 half is recorded as blocked on W4, and should land with it or after it.

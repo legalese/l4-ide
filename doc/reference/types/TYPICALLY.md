@@ -4,9 +4,11 @@ Attaches a default value to a name. The default is a _rebuttable presumption_:
 it records what should be presumed when nobody supplies a value.
 
 **On a section `GIVEN` the default is used when nobody supplies a value.**
-Everywhere else it records what should be presumed without changing what the
-rules work out. That split is new, and the two halves are described separately
-below.
+**At the boundary — `l4 batch` and the decision service — it is also used for a
+rule's own `GIVEN` and for a record field, when a case leaves the fact out.**
+Inside a file, everywhere else, it records what should be presumed without
+changing what the rules work out. That split is new, and the parts are
+described separately below.
 
 ## Syntax
 
@@ -86,20 +88,40 @@ b)` is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
 - **On a section `GIVEN` it changes what a rule works out**: a rule that reads
-  the name, and is given no value for it, uses the default. Everywhere else it
-  does not. Nothing is substituted when such a rule is run; whatever reads the
-  file afterwards (a form generator, a decision service, a question-ordering
-  policy) decides how to use the stored default. The list of facts a published
-  rule asks for carries it as the JavaScript Object Notation (JSON) Schema
-  `default` keyword, and the defaulted name is still listed under `required`:
-  whoever asks the question must still send a value for it.
+  the name, and is given no value for it, uses the default. Inside a file,
+  everywhere else, it does not: a rule's own defaulted `GIVEN` still cannot be
+  left out at a call, and a record cannot be built with a defaulted field left
+  out.
 
-_Partly landed (2026-09-05). Of the four things proposed on 2026-09-04, one has
+## At the boundary: `l4 batch` and the decision service
+
+A case sent to `l4 batch`, or a request sent to the decision service, may leave
+out any fact that has a default, whether the `TYPICALLY` is on a section
+`GIVEN`, on the exported rule's own `GIVEN`, or on a field of a record the rule
+takes as an input. The default is filled in where the case arrives, and the
+answer lists it under **`presumed`**, by name (or, for a field, by its path, such
+as `config.timeout`) — but only if the answer actually used it. Three rules
+govern what counts as leaving a fact out:
+
+- **Leaving the name out** is leaving it out. So is an empty cell in a CSV file
+  given to `l4 batch`.
+- **`null` is not.** `null` means _not known_, and a fact that is not known never
+  takes its default: the case is refused, naming the fact.
+- **The presumption can be switched off.** `l4 batch --presumption hard`, or
+  `"presumption": "hard"` in a service request, uses no defaults: a fact left
+  out is missing, and the case is refused, naming it. The default is `soft`.
+
+The list of facts a published rule asks for carries each default as the
+JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
+is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
+either, and is not published.
+
+_Partly landed (2026-10-02). Of the four things proposed on 2026-09-04, two have
 landed: a **section** `GIVEN` may be left out, and a rule that reads it then uses
-the default. The other three have not. A rule's own `GIVEN` still cannot be left
-out at a call. The default still must be a fixed value written out, so it cannot
-name another `GIVEN`. And the published list of facts still asks for it as
-required rather than optional._
+the default; and the published list of facts asks for a defaulted fact as
+optional, which the boundary then honours. The other two have not. A rule's own
+`GIVEN` still cannot be left out at a call inside a file. The default still must
+be a fixed value written out, so it cannot name another `GIVEN`._
 
 ## Examples
 
@@ -138,8 +160,8 @@ DECIDE `contract is binding` IF
 ```
 
 Every rule in Part 3 reads those two names without re-declaring them. A
-published rule that reads them asks for both, and carries `"Singapore"` and
-`TRUE` as their JSON Schema defaults.
+published rule that reads them offers both as optional, carrying `"Singapore"`
+and `TRUE` as their JSON Schema defaults.
 
 ### In older files: `ASSUME`
 
@@ -157,7 +179,8 @@ longer carries this spelling.
 ## Behavior
 
 - TYPICALLY only adds, except on a section `GIVEN`, where it decides what a rule
-  that is given no value for the name works out.
+  that is given no value for the name works out, and at the boundary, where it
+  decides what a case that leaves the fact out works out.
 - The default must match the annotated type, or type checking fails.
 - The default must be a fixed value written out, like `18` or `"yes"`.
 - On a computed field (one with a MEANS clause), the MEANS definition governs

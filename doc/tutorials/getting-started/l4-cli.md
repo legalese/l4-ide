@@ -301,14 +301,52 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 ```
 
 ```
-{"diagnostics":[],"input":{"amount":1000,"days_overdue":12},"output":[{"result":20,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"amount":1000,"days_overdue":45},"output":[{"result":50,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"amount":2500,"days_overdue":0},"output":[{"result":0,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{"amount":1000,"days_overdue":12},"output":[{"result":20,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"amount":1000,"days_overdue":45},"output":[{"result":50,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"amount":2500,"days_overdue":0},"output":[{"result":0,"trace":null}],"presumed":[],"status":"success"}
 ```
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
+
+#### Facts a case leaves out
+
+A fact can carry a usual value, written with [`TYPICALLY`](../../reference/types/TYPICALLY.md): a rebuttable presumption that holds unless the case says otherwise. When a case leaves such a fact out, `l4 batch` uses the usual value, and the line says so under `presumed`:
+
+```l4
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Can contract
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`can contract` MEANS `is adult` AND `has capacity`
+```
+
+```
+$ cat cases.json
+[ {"is adult": true}, {"is adult": true, "has capacity": false}, {"is adult": false} ]
+
+$ l4 batch capacity.l4 --inputs cases.json
+{"diagnostics":[],"input":{"is adult":true},"output":[{"result":true,"trace":null}],"presumed":["has capacity"],"status":"success"}
+{"diagnostics":[],"input":{"has capacity":false,"is adult":true},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"is adult":false},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+```
+
+The first case took the usual value, and the answer rests on it. The second supplied the fact, so nothing was presumed. The third left the fact out too, but `presumed` is empty: someone who is not an adult cannot contract whatever their capacity, so the answer never needed it. `presumed` lists only what the answer actually used.
+
+What counts as leaving a fact out:
+
+- **The usual value works the same wherever the `TYPICALLY` is written**: on a section `GIVEN` as above, on a rule's own `GIVEN`, or on a field of a record the rule takes as an input. A field is listed by its path, such as `config.timeout`.
+- **Leaving the name out of the case is leaving the fact out.** In a CSV file, an empty cell means the same, so one file can let one row take the usual value while the next row supplies its own.
+- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact.
+- **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before.
+- **A `TYPICALLY` on an `ASSUME` is not used**, here or by `l4 run`; move the fact under its section's heading to make it count.
+
+To see what the rules establish without any usual values, pass `--presumption hard`. Every fact must then be in the case; one that is left out makes the line an error that names it, and `--validate-only` reports it the same way. The default is `--presumption soft`.
+
+`presumed` appears in every output format. With `--format csv` it is a column holding the names joined with `; `, empty when nothing was presumed. `--validate-only` evaluates nothing, so its lines have no `presumed`.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
