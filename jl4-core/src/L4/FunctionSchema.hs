@@ -296,13 +296,18 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
 
     givenParamList = map mkOne names
     givenNames = map fst givenParamList
-    -- Track which GIVEN params have MAYBE/Optional types (these are not required)
+    -- Required as the service publishes it ('L4.Export.isRequiredInput'): an
+    -- input with a MAYBE type or a default a request may omit is not.
     requiredGivenParams =
       [ resolvedNameText resolved
-      | MkOptionallyTypedName _ resolved mType _ <- names
+      | MkOptionallyTypedName _ resolved mType mTypically <- names
       , not (isMaybeType mType)
+      , Maybe.isNothing mTypically
       ]
     assumeParamList = map mkAssumeParam assumeParams
+    -- a section GIVEN with a default ('extractAssumeParamsWithDefaults' gives
+    -- a default for no other ASSUME) may be omitted
+    defaultedAssumes = [ n | (n, _, Just _, _) <- assumeParams ]
     implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing, Nothing)) implicitParams
 
     -- Combine all params, avoiding duplicates (explicit ASSUMEs take precedence)
@@ -316,7 +321,8 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
    in
     MkParameters
       { parameterMap = Map.fromList (givenParamList <> distinctAssumeParams)
-      , required = requiredGivenParams <> map fst distinctAssumeParams
+      , required = requiredGivenParams
+          <> [ n | (n, _) <- distinctAssumeParams, n `notElem` defaultedAssumes ]
       }
  where
   emptyParam :: Text -> Parameter
@@ -351,7 +357,9 @@ typicallyToJson = \case
     | getUnique r == trueUnique = Aeson.Bool True
     | getUnique r == falseUnique = Aeson.Bool False
     | getUnique r == nothingUnique = Aeson.Null
-    | otherwise = Aeson.String (resolvedNameText r)
+    -- the constructor's own name, as a request spells the value: a
+    -- section-qualified reference (`Light`.Red) is still "Red"
+    | otherwise = Aeson.String (unqualifiedRawNameToText (rawName (getActual r)))
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool

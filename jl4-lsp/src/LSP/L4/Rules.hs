@@ -961,7 +961,7 @@ jl4Rules evalConfig rootDirectory recorder = do
               in if Map.member depUri seen
                    then go seen ds
                    else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment importedModules tcRes.module')
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
     pure ([], Just (ownEnv <> environment, ownDirectives))
 
   define shakeRecorder $ \EvaluateLazy uri -> do

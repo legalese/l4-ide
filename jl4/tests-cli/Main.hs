@@ -126,7 +126,7 @@ batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
 -- output, so these are the guard; the S-numbers in the tests are the success
 -- criteria the W2+W3 slice was given.
 batchTySection, batchTyRule, batchTyRecord, batchTyMaybe, batchTyImported, batchTyImportedTypes
-  , batchTyOneCol, batchTyTwo :: FilePath
+  , batchTyOneCol, batchTyTwo, batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact :: FilePath
 batchTySection = fixtureDir </> "batch-typically-section.l4"
 batchTyRule    = fixtureDir </> "batch-typically-rule.l4"
 batchTyRecord  = fixtureDir </> "batch-typically-record.l4"
@@ -135,10 +135,15 @@ batchTyImported      = fixtureDir </> "batch-typically-imported.l4"
 batchTyImportedTypes = fixtureDir </> "batch-typically-config-types.l4"
 batchTyOneCol        = fixtureDir </> "batch-typically-onecol.l4"
 batchTyTwo           = fixtureDir </> "batch-typically-two.l4"
+batchTyString        = fixtureDir </> "batch-typically-string.l4"
+batchTyOwnDecode     = fixtureDir </> "batch-typically-own-decode.l4"
+batchTyEnum          = fixtureDir </> "batch-typically-enum.l4"
+batchTyExact         = fixtureDir </> "batch-typically-exact.l4"
 
 batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson
-  , batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain :: FilePath
+  , batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson :: FilePath
 batchTyOmitted    = fixtureDir </> "batch-typically-omitted.json"
 batchTySupplied   = fixtureDir </> "batch-typically-supplied.json"
 batchTyNull       = fixtureDir </> "batch-typically-null.json"
@@ -152,6 +157,12 @@ batchTyImportedJson = fixtureDir </> "batch-typically-imported.json"
 batchTyOneColCsv    = fixtureDir </> "batch-typically-onecol.csv"
 batchTyEmptyRow     = fixtureDir </> "batch-typically-emptyrow.json"
 batchTyUncertain    = fixtureDir </> "batch-typically-uncertain.json"
+batchTyBomCsv        = fixtureDir </> "batch-typically-bom.csv"
+batchTyCrlfCsv       = fixtureDir </> "batch-typically-crlf.csv"
+batchTyStringCsv     = fixtureDir </> "batch-typically-string.csv"
+batchTyOwnDecodeJson = fixtureDir </> "batch-typically-own-decode.json"
+batchTyEnumJson      = fixtureDir </> "batch-typically-enum.json"
+batchTyExactJson     = fixtureDir </> "batch-typically-exact.json"
 
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
@@ -313,6 +324,8 @@ coreFixtures =
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
   , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
+  , batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
@@ -1359,7 +1372,56 @@ spec bin = do
     it "reads {} as a value like null: it never takes the default" $ do
       Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUncertain]
       code `shouldSatisfy` (/= ExitSuccess)
-      sout `shouldSatisfy` ("Field 'has capacity' is null" `isInfixOf`)
+      sout `shouldSatisfy` ("Field 'has capacity' is {}, which means the value is not known" `isInfixOf`)
+
+    -- Review B1: Excel's "CSV UTF-8" export starts with a byte-order mark,
+    -- which used to rename the first column, so its input took its default.
+    -- The first column here has one: `has capacity` FALSE must win.
+    it "reads a CSV that starts with a UTF-8 byte-order mark" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyBomCsv]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    it "reads CRLF line ends, and a quoted cell holding a newline, as one row each" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyCrlfCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"]), (Just (Bool False), presumedOf []) ]
+      Output scode sstr _ <- runL4 bin ["batch", batchTyString, "--inputs", batchTyStringCsv, "--format", "json"]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray sstr
+      map resultAndPresumed srows `shouldBe`
+        [ (Just (Number 2), presumedOf ["n"]), (Just (Number 7), presumedOf []) ]
+      sstr `shouldSatisfy` ("\"note\":\"line one\\nline two\"" `isInfixOf`)
+
+    -- Review M3 / code #1, T4b: the switch reaches the request's decode only.
+    -- A decode the rule makes of its own fills its default in both modes;
+    -- under hard the answer says it rests on it, because no row could
+    -- supply it. Soft keeps T6b's filter, so it is not listed there.
+    it "lets a rule's own JSONDECODE fill its defaults in both modes" $ do
+      soft <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson]
+      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf [])
+      hard <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson, "--presumption", "hard"]
+      resultAndPresumed hard `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
+
+    -- T3: null on an enum with no default used to decode to NOTHING and
+    -- answer FALSE, status success. A synonym for MAYBE is a MAYBE.
+    it "refuses null on an enum by name, and reads a MAYBE synonym as a MAYBE" $ do
+      Output _ sout _ <- runL4 bin ["batch", batchTyEnum, "--inputs", batchTyEnumJson, "--format", "json", "--continue-on-error"]
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success"), Just (String "success")]
+      sout `shouldSatisfy` ("Field 'shade' is null, which means the value is not known" `isInfixOf`)
+      map resultAndPresumed (drop 1 rows) `shouldBe`
+        [ (Just (Bool True), presumedOf []), (Just (Bool True), presumedOf ["second"]) ]
+
+    -- Review m1: batch re-prints its module, and printed literals and the
+    -- record's TYPICALLY went through a Double. #EVAL says TRUE.
+    it "keeps a decimal default exact through the re-print" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExact, "--inputs", batchTyExactJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["r"]), (Just (Bool True), presumedOf []), (Just (Bool False), presumedOf []) ]
 
     -- With presumption hard every defaulted input left out is named in one
     -- run, as --validate-only names them, and as one with no default is.

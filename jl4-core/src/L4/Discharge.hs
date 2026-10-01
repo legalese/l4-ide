@@ -373,8 +373,10 @@ dischargeModuleWith presume mod'
   --
   -- This is the one place the pass mints a 'Unique'. They carry the sort char
   -- @\'d\'@, which no other minter uses (@\'c\'@ is 'L4.TypeCheck', @\'e\'@ the
-  -- evaluator, @\'b\'@ the builtins, @\'x\'@ 'L4.Relational.Lower'), so an
-  -- eta parameter cannot collide with a name the module already had.
+  -- evaluator, @\'b\'@ the builtins, @\'x\'@ 'L4.Relational.Lower', @\'l\'@
+  -- the evaluator's lifecycle names, @\'p\'@ the service's per-request root
+  -- fills in @jl4-service@ @Backend.Jl4@), so an eta parameter cannot collide
+  -- with a name the module already had. A new minter adds itself here.
   --
   -- Measured 2026-09-05: without this, @legal\/british-citizen-act.l4@ on the
   -- @ASSUME@ sweep's tree loses both its @#EVAL@s — it passes the 1-ary reader

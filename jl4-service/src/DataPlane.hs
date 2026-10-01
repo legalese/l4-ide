@@ -314,27 +314,31 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case comes back. An answer carries its result; a refusal is a
+    -- determinate answer too, and carries its reason and the defaults it
+    -- rests on (T6); an error carries its message, so that no case vanishes
+    -- into the count without a reason. Only answers and refusals count as
+    -- processed.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , presumed = r.presumed, outcome = CaseAnswered }
+      SimpleError (EvaluatorRefused reason presumedInputs) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = presumedInputs, outcome = CaseRefused reason }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, not (isErrored c.outcome) ]
     nIgnored = nCases - nSuccessful
+    isErrored = \case
+      CaseErrored _ -> True
+      _             -> False
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          , presumed = response.presumed
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful

@@ -286,21 +286,46 @@ emptyTree = emptyReasoning
 -- The error message may contain hints of what might have gone wrong.
 data EvaluatorError
   = InterpreterError !Text
-  | EvaluatorRefused !Text
+  | EvaluatorRefused !Text ![Text]
     -- ^ The L4 program REFUSED: it declined to answer, with the reason the
     -- author wrote. Deliberately NOT an 'InterpreterError' — that reads as a
     -- server fault, and a refusal is a designed answer of the model.
+    --
+    -- The list is the refusal's @presumed@ (T6: "every service response"):
+    -- a refusal that rests on a default is one that supplying the input might
+    -- turn into an answer, so the caller must be able to see it.
   | RequiredParameterMissing !ParameterMismatch
   | UnknownArguments ![Text]
   | CannotHandleParameterType !FnLiteral
   | CannotHandleUnknownVars
   deriving stock (Show, Read, Ord, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+
+-- | The derived encoding, except that a refusal keeps its reason as a string
+-- under @contents@, as it was before it carried @presumed@, and puts
+-- @presumed@ beside it: @{"tag": "EvaluatorRefused", "contents": reason,
+-- "presumed": [...]}@.
+instance ToJSON EvaluatorError where
+  toJSON = \case
+    EvaluatorRefused reason presumedInputs -> Aeson.object
+      [ "tag" .= ("EvaluatorRefused" :: Text)
+      , "contents" .= reason
+      , "presumed" .= presumedInputs
+      ]
+    other -> Aeson.genericToJSON Aeson.defaultOptions other
+
+instance FromJSON EvaluatorError where
+  parseJSON v = case v of
+    Object o | Just (String "EvaluatorRefused") <- Aeson.lookup "tag" o ->
+      EvaluatorRefused <$> o .: "contents" <*> (o .:? "presumed" .!= [])
+    _ -> Aeson.genericParseJSON Aeson.defaultOptions v
 
 prettyEvaluatorError :: EvaluatorError -> Text
 prettyEvaluatorError = \case
   InterpreterError msg -> msg
-  EvaluatorRefused reason -> "The model refuses to answer: " <> reason
+  EvaluatorRefused reason presumedInputs ->
+    "The model refuses to answer: " <> reason
+      <> (if null presumedInputs then ""
+          else " (resting on the defaults of " <> Text.intercalate ", " presumedInputs <> ")")
   RequiredParameterMissing pm ->
     "Required parameter missing: expected " <> Text.pack (show pm.expected)
     <> " parameter(s), but got " <> Text.pack (show pm.actual)

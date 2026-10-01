@@ -572,9 +572,10 @@ extractAssumeParamTypes
 extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
--- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
--- value (if any) declared on each ASSUME, and the ASSUME's own @\@desc@
--- text (if any). Used by the function schema to expose defaults and
+-- | Like 'extractAssumeParamTypes' but also returns the default a request may
+-- leave the input out for (a section @GIVEN@'s @TYPICALLY@; a written
+-- ASSUME's is not honoured yet, see 'honouredDefault'), and the ASSUME's own
+-- @\@desc@ text (if any). Used by the function schema to expose defaults and
 -- descriptions to API consumers.
 extractAssumeParamsWithDefaults
   :: Module Resolved
@@ -583,9 +584,11 @@ extractAssumeParamsWithDefaults
 extractAssumeParamsWithDefaults mod' decide =
   mapMaybe assumeInfo (assumesReadBy mod' (assumesFromModule mod') decide)
  where
+  binders = sectionBinderUniques mod'
   assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)
   assumeInfo (MkAssume ann _ (MkAppForm _ name _ _) (Just ty) mTypically) =
-    Just (resolvedToText name, ty, mTypically, getDesc <$> ann ^. annDesc)
+    let honoured = if getUnique name `Set.member` binders then mTypically else Nothing
+    in Just (resolvedToText name, ty, honoured, getDesc <$> ann ^. annDesc)
   assumeInfo _ = Nothing
 
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of

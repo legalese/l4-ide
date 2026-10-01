@@ -18,6 +18,7 @@ module Types (
   BatchResponse (..),
   InputCase (..),
   OutputCase (..),
+  CaseOutcome (..),
   OutputSummary (..),
   Outcomes (..),
   OutcomeObject (..),
@@ -414,7 +415,17 @@ data OutputCase = OutputCase
   , graphviz :: Maybe GraphVizResponse
   , presumed :: [Text]
     -- ^ the case's @presumed@ list ('Backend.Api.ResponseWithReason'), as @\@presumed@
+  , outcome :: CaseOutcome
+    -- ^ whether the case was answered; a refusal as @\@refused@, an error as @\@error@
   }
+  deriving stock (Show, Eq, Ord)
+
+-- | How one case of the batch endpoint ended. A refused or errored case is
+-- still returned, with its reason, rather than only counted.
+data CaseOutcome
+  = CaseAnswered
+  | CaseRefused Text
+  | CaseErrored Text
   deriving stock (Show, Eq, Ord)
 
 data BatchResponse = BatchResponse
@@ -510,12 +521,20 @@ instance FromJSON OutputCase where
     caseId <- o .: "@id"
     graphvizVal <- o .:? "@graphviz"
     presumedVal <- o .:? "@presumed" .!= []
+    refusedVal <- o .:? "@refused"
+    errorVal <- o .:? "@error"
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@error" $
+          Aeson.KeyMap.delete "@refused" $
           Aeson.KeyMap.delete "@presumed" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
+        outcomeVal = case (refusedVal, errorVal) of
+          (Just r, _)       -> CaseRefused r
+          (Nothing, Just e) -> CaseErrored e
+          _                 -> CaseAnswered
     parsedAttrs <- traverse parseJSON attrs
-    pure $ OutputCase caseId parsedAttrs graphvizVal presumedVal
+    pure $ OutputCase caseId parsedAttrs graphvizVal presumedVal outcomeVal
 
 instance ToJSON OutputCase where
   toJSON oc =
@@ -523,6 +542,10 @@ instance ToJSON OutputCase where
       [ "@id" .= oc.id
       , "@presumed" .= oc.presumed
       ] <> maybe [] (\gv -> ["@graphviz" .= gv]) oc.graphviz
+        <> case oc.outcome of
+             CaseAnswered  -> []
+             CaseRefused r -> ["@refused" .= r]
+             CaseErrored e -> ["@error" .= e]
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 
 instance FromJSON OutputSummary where

@@ -24,6 +24,8 @@ module L4.EvaluateLazy
 , Presumed (..)
 , PresumedOrigin (..)
 , renderPresumedPath
+, requestPresumed
+, moduleDeclares
 , prettyEvalException
 , prettyRefusal
 , Refusal(..)
@@ -53,6 +55,8 @@ import Base
 import L4.Discharge (dischargeModuleWith, sectionBinders, Binder (..))
 import qualified Base.DList as DList
 import qualified Base.Map as Map
+import qualified Base.Set as Set
+import qualified Data.IntMap.Strict as IntMap
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLog)
@@ -95,12 +99,22 @@ data EvalConfig = EvalConfig
     -- 'Just t' means use a fixed time (for tests / JL4_FIXED_NOW).
   , tracePolicy :: !TracePolicy
   , safeMode :: !Bool  -- ^ When True, HTTP operations (FETCH/POST) return errors instead of making requests
+  , requestRecord :: !(Maybe Text)
+    -- ^ The record type a wrapper decodes the request's arguments into, when
+    -- the evaluation has a request (@l4 batch@, the service's wrapper path):
+    -- 'L4.Presumption.requestRecordName'. 'Nothing' for @#EVAL@ and @l4 run@,
+    -- where every decode is the rules' own. See 'presumeDefaults'.
   , presumeDefaults :: !Bool
     -- ^ T4's presumption switch (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5), on by
     -- default. Off (\"hard\"): a @TYPICALLY@ default is not used where a
     -- value could be supplied, so a section @GIVEN@ that nothing supplies is
     -- an assumed term and an absent JSON field is a missing one. On
     -- (\"soft\"): defaults apply. @null@ never takes a default either way.
+    --
+    -- The switch withdraws a default only where a request can supply its
+    -- value (T4b): a section @GIVEN@ at the root, and a field of the request's
+    -- own decode ('requestRecord'). A decode the rules make of their own
+    -- always fills its defaults.
   }
 
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
@@ -108,7 +122,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe True)
+  pure (EvalConfig mTime tracePolicy safe Nothing True)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -164,7 +178,7 @@ withFreshLedger m = do
   fresh      <- liftIO (newIORef emptyStore)
   freshParty <- liftIO (newIORef Nothing)
   freshNotes <- liftIO (newIORef mempty)
-  freshPresumed <- liftIO (newIORef mempty)
+  freshPresumed <- liftIO (newIORef emptyPresumedLog)
   -- the run's notes ('tellNote') are per directive for the same reason the
   -- ledger is: a note belongs to the directive whose value it qualifies; so
   -- does a default it forced ('EvalState.presumed')
@@ -288,7 +302,7 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- early act, the empty window): read before the fresh ref is discarded
   directiveNotes <- map (\ (MkNote t) -> t) . toList <$> readEvalRef (.notes)
   -- and the defaults it forced (W8's event), for the same reason
-  directivePresumed <- toList <$> readEvalRef (.presumed)
+  directivePresumed <- presumedEvents <$> readEvalRef (.presumed)
   let
     v' = case assertKind of
       NotAnAssert -> Reduction
@@ -707,11 +721,12 @@ execEvalModuleWithDeonticLog = execEvalModuleWith (nfDirectiveWith True)
 execEvalModuleWith :: (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
 execEvalModuleWith = execEvalModuleWithDefaults noRootFills []
 
--- | 'execEvalModuleWithEnv', also told the modules @m@ imports, so that the
--- JSON decoder fills an absent field of a record declared in one of them from
--- its @DECLARE@ (T1b), as it does for a record declared in @m@ itself.
--- @l4 batch@ and the service's wrapper path decode their inputs this way.
-execEvalModuleWithEnvAndImports :: EvalConfig -> EntityInfo -> Environment -> [Module Resolved] -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
+-- | 'execEvalModuleWithEnv', also told the @DECLARE@s of the modules @m@
+-- imports, so that the JSON decoder fills an absent field of a record
+-- declared in one of them from its @DECLARE@ (T1b), as it does for a record
+-- declared in @m@ itself. @l4 batch@ and the service's wrapper path decode
+-- their inputs this way.
+execEvalModuleWithEnvAndImports :: EvalConfig -> EntityInfo -> Environment -> [Declare Resolved] -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithEnvAndImports evalConfig entityInfo env imported =
   execEvalModuleWithDefaults noRootFills imported nfDirective evalConfig entityInfo env
 
@@ -723,7 +738,7 @@ type RootFills = Map Unique Presumed
 noRootFills :: RootFills
 noRootFills = Map.empty
 
-execEvalModuleWithDefaults :: RootFills -> [Module Resolved] -> (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
+execEvalModuleWithDefaults :: RootFills -> [Declare Resolved] -> (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
 execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
   -- Discharge is a property of EVALUATION, not of the checked module: the
   -- checker's job is to say the program is well formed, and this pass says what
@@ -735,7 +750,7 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
   -- one that nothing supplies stays an assumed term.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig rootFills (m0 : imported) st0
+  let st = withDefaultsKnown evalConfig rootFills m0 imported st0
   r <- try (runEval st (evalModuleAndDirectivesWith runDirective env m))
   case r of
     Left exc -> do
@@ -761,30 +776,31 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   notes        <- newIORef mempty
   -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
   let deonticLog = Nothing
-  presumable <- newIORef Map.empty
-  presumed   <- newIORef mempty
+  presumable <- newIORef IntMap.empty
+  presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, deonticLog
     , presume = evalConfig.presumeDefaults
+    , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
     , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
     }
 
--- | Tell a run where defaults come from: the section binders of the module
--- whose default discharge fills (when presumption is on), the caller's own
--- root fills, and the field defaults of every record the given modules
--- declare. The first module is the one evaluated.
-withDefaultsKnown :: EvalConfig -> RootFills -> [Module Resolved] -> EvalState -> EvalState
-withDefaultsKnown evalConfig rootFills mods st =
+-- | Tell a run where defaults come from: the section binders of the evaluated
+-- module whose default discharge fills (when presumption is on), the caller's
+-- own root fills, and the field defaults of every record the module and the
+-- given @DECLARE@s (its imports') declare.
+withDefaultsKnown :: EvalConfig -> RootFills -> Module Resolved -> [Declare Resolved] -> EvalState -> EvalState
+withDefaultsKnown evalConfig rootFills m imported st =
   st { presumableDefs = binderDefaults <> rootFills
-     , recordDefaults = foldMap recordFieldDefaults mods
+     , recordDefaults = recordFieldDefaults (moduleDeclares m <> imported)
      }
  where
-  binderDefaults = case mods of
-    m : _ | evalConfig.presumeDefaults ->
+  binderDefaults
+    | evalConfig.presumeDefaults =
       Map.fromList
         [ ( u
           , MkPresumed
@@ -796,22 +812,56 @@ withDefaultsKnown evalConfig rootFills mods st =
         | (u, b) <- Map.toList (sectionBinders m)
         , Just d <- [b.typically]
         ]
-    _ -> Map.empty
+    | otherwise = Map.empty
 
--- | The field defaults of every record a module declares, keyed by the record
--- type's 'Unique', then by field name. Only fields with a @TYPICALLY@ appear.
-recordFieldDefaults :: Module Resolved -> Map Unique (Map Text (Expr Resolved))
-recordFieldDefaults (MkModule _ _ sect) = Map.fromList (goSection sect)
+-- | Every @DECLARE@ in a module, in any section.
+moduleDeclares :: Module Resolved -> [Declare Resolved]
+moduleDeclares (MkModule _ _ sect) = goSection sect
  where
   goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
   goDecl = \ case
-    Declare _ (MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ _ fields)) ->
-      let ds = Map.fromList
-                 [ (rawNameToText (rawName (getActual fn)), d)
-                 | MkTypedName _ fn _ (Just d) _ <- fields ]
-      in [ (getUnique tyName, ds) | not (Map.null ds) ]
+    Declare _ d -> [d]
     Section _ s -> goSection s
     _ -> []
+
+-- | The field defaults of every record among some @DECLARE@s, keyed by the
+-- record type's 'Unique', then by field name. Only fields with a @TYPICALLY@
+-- appear.
+recordFieldDefaults :: [Declare Resolved] -> Map Unique (Map Text (Expr Resolved))
+recordFieldDefaults decls = Map.fromList
+  [ (getUnique tyName, ds)
+  | MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ _ fields) <- decls
+  , let ds = Map.fromList
+               [ (rawNameToText (rawName (getActual fn)), d)
+               | MkTypedName _ fn _ (Just d) _ <- fields ]
+  , not (Map.null ds)
+  ]
+
+-- | The @presumed@ list of a request's answer (T6), from the events its
+-- evaluation forced: each as the input's name, or the path to a field below
+-- it. Shared by @l4 batch@ and the service.
+--
+-- Only events that belong to the request count (T6b): a section binder's or a
+-- root fill's for an input the function takes, and one from the request's own
+-- decode. A decode the RULES made is not the request's, and is listed only
+-- when presumption is hard (@presume@ False): there it is a default the switch
+-- could not withdraw, because no request can supply it, and the answer rests
+-- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
+-- naming the type the rules decoded.
+--
+-- @fieldName@ maps a wrapper's own field name back to the input's (the service
+-- suffixes them, 'Backend.CodeGen.inputFieldName').
+requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
+requestPresumed presume fieldName inputs events =
+  nubOrd (mapMaybe entry events)
+ where
+  entry p = case (p.origin, p.path) of
+    (FromDecode root, path)
+      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+      | otherwise   -> Nothing
+    (_, n : rest)
+      | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
+    _ -> Nothing
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching
 -- evaluation exceptions at the boundary.
@@ -945,7 +995,7 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig noRootFills [m0] st0
+  let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
   r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
     Left exc -> do
@@ -970,7 +1020,7 @@ execEvalExprInContextOfModule evalConfig entityInfo =
 -- it added to the module, each holding a default it filled for an input the
 -- request left out) and the modules whose record field defaults the JSON
 -- decoder should know beside the module's own.
-execEvalExprInContextOfModuleWith :: EvalConfig -> EntityInfo -> RootFills -> [Module Resolved] -> Expr Resolved -> (Environment, Module Resolved) -> IO (Maybe EvalDirectiveResult)
+execEvalExprInContextOfModuleWith :: EvalConfig -> EntityInfo -> RootFills -> [Declare Resolved] -> Expr Resolved -> (Environment, Module Resolved) -> IO (Maybe EvalDirectiveResult)
 execEvalExprInContextOfModuleWith evalConfig entityInfo rootFills imported expr (env, m) = do
   let
     evalExprDirective =

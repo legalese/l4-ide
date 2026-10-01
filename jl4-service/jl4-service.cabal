@@ -148,6 +148,7 @@ test-suite jl4-service-test
 
   build-depends:
     aeson,
+    async,
     bytestring,
     containers,
     directory,

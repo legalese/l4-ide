@@ -53,6 +53,8 @@ import qualified Data.Csv as Csv
 import qualified Data.Csv.Parser as CsvParser
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Control.Monad (void)
@@ -88,9 +90,7 @@ import L4.DirectiveFilter (filterIdeDirectives)
 import L4.EvaluateLazy
   ( EvalConfig(..)
   , EvalDirectiveResult(..)
-  , Presumed(..)
-  , PresumedOrigin(..)
-  , renderPresumedPath
+  , requestPresumed
   , EvalDirectiveValue(..)
   , AssertionOutcome(..)
   , ReductionOutcome(..)
@@ -98,9 +98,8 @@ import L4.EvaluateLazy
   , prettyRefusal
   )
 import L4.Lexer (showStringLit)
+import L4.Presumption (requestRecordName)
 import L4.Print (prettyLayout, restoreMixfixPatterns)
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import L4.Syntax
   ( AppForm(..), Assume(..), Decide(..), Expr, GivenSig(..), Module, Resolved
   , Type'(..), TypeSig(..), getUnique
@@ -223,7 +222,12 @@ batchCmd opts = do
   -- T4: one switch for the whole evaluation. The JSON decoder reads it for
   -- every input and record field it fills; discharge reads it for a section
   -- binder (which batch supplies through the decoder anyway, see below).
-  let evalConfig = evalConfig0 { presumeDefaults = opts.batchPresumption == PresumeSoft }
+  -- The wrapper decodes each row into 'requestRecordName'; that decode is the
+  -- request's, the one the switch reaches (T4b).
+  let evalConfig = evalConfig0
+        { presumeDefaults = opts.batchPresumption == PresumeSoft
+        , requestRecord   = Just requestRecordName
+        }
 
   -- Step 1: read & parse the input rows.
   let inferredFormat = case opts.batchInputs of
@@ -407,7 +411,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
         Shake.use Rules.EvaluateLazy uri
       let presumed = case mEval of
             Nothing          -> []
-            Just evalResults -> rowPresumed schema evalResults
+            Just evalResults -> rowPresumed opts.batchPresumption schema evalResults
           (status, outputJson, diags) = case mEval of
             Nothing ->
               -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
@@ -439,25 +443,14 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
 -- | The inputs whose default this row's answer rests on (T6): every default
 -- the evaluation forced that belongs to the request, as the input's name or,
 -- for a field inside an input, the path to it (@config.timeout@). The wrapper
--- decodes the row as an @InputArgs@ record, so the request's own events are
--- the ones that decode raised; one the module's own JSON decoding raised, or
--- a default of something the row could not have supplied, is not the row's.
-rowPresumed :: [ExportedParam] -> [EvalDirectiveResult] -> [Text]
-rowPresumed schema results =
-  List.nub
-    [ renderPresumedPath p.path
-    | r <- results
-    , p <- r.presumed
-    , ours p.origin
-    , n : _ <- [p.path]
-    , n `Set.member` inputs
-    ]
+-- decodes the row as the request record ('requestRecordName'), so the
+-- request's own events are the ones that decode raised. The filter is the
+-- service's too ('requestPresumed').
+rowPresumed :: Presumption -> [ExportedParam] -> [EvalDirectiveResult] -> [Text]
+rowPresumed presumption schema results =
+  requestPresumed (presumption == PresumeSoft) id inputs (concatMap (.presumed) results)
   where
     inputs = Set.fromList [ x.paramName | x <- schema ]
-    ours = \case
-      FromDecode root   -> root == "InputArgs"
-      FromSectionBinder -> True
-      FromRootFill      -> True
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
@@ -603,6 +596,11 @@ csvRows = AL.eitherResult . AL.parse file
   where
     comma = 44
     file = do
+      -- A UTF-8 byte-order mark is not part of the first column's name. Excel's
+      -- "CSV UTF-8" export writes one, and left in place it renamed the first
+      -- input, so every row took that input's default instead of its value
+      -- (review B1).
+      _ <- optional (A.string "\xEF\xBB\xBF")
       hdr <- CsvParser.header comma
       rs <- rows
       pure [ HashMap.fromList (zip (Vector.toList hdr) (Vector.toList r)) | r <- rs ]
@@ -791,7 +789,7 @@ generateAssumeBinding (name, _) = Text.unlines
 -- with a @MAYBE@ input before another input used to fail every time.
 generateInputRecord :: Map.Map Text (Expr Resolved) -> [(Text, Maybe (Type' Resolved))] -> Text
 generateInputRecord defaults params = Text.unlines $
-  ["DECLARE InputArgs HAS"] ++
+  ["DECLARE " <> requestRecordName <> " HAS"] ++
   map formatField params
   where
     formatField (name, mty) =
@@ -802,7 +800,7 @@ generateInputRecord defaults params = Text.unlines $
 generateDecoder :: Text
 generateDecoder = Text.unlines
   [ "GIVEN jsn IS A STRING"
-  , "GIVETH AN EITHER STRING InputArgs"
+  , "GIVETH AN EITHER STRING " <> requestRecordName
   , "decodeArgs jsn MEANS JSONDECODE jsn"
   ]
 
