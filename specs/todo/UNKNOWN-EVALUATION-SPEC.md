@@ -7,7 +7,7 @@ Every statement about today's behaviour is a probe result or a `file:line` read 
 Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.12 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
 Probe files are in the session scratchpad, not in the tree.
 On 2026-10-02 the Track B audit, fifteen agents asking whether the recorded rulings suffice to build §8's seven steps, was applied under TIPPEX, and its one open question, M1, was ruled as U13 under RAINCHECK.
-Citations added that day were read on `unstable` at `6ed297629`, where no file under `jl4-core/src`, `jl4/app`, `jl4-service/src`, `jl4-lsp/src` or `jl4-mlir` differs from `f9a504b77` (`git diff --stat`, empty); probes added that day (`t01` to `t14`) ran on a snapshot of the installed `l4`, a store build of 2026-09-28.
+Citations added that day were read on `unstable` at `6ed297629`, where no file under `jl4-core/src`, `jl4/app`, `jl4-service/src`, `jl4-lsp/src` or `jl4-mlir` differs from `f9a504b77` (`git diff --stat`, empty); probes added that day (`t01` to `t20`) ran on a snapshot of the installed `l4`, a store build of 2026-09-28.
 
 **Trigger:** SCHRODINGER, widened by Meng on 2026-10-01: _"continue your investigation of the evaluator lift with kand. It sounds like we'll need to redo the rewriting-to-IF in favour of something more algebraically principled."_
 §4 was added under REVERSEGEAR, fired by Meng the same day on the observation _"We seem to be backing our way into symbolic evaluation by fits and starts."_
@@ -355,7 +355,7 @@ The connective table, for `AND`; `OR` is dual, and `IMPLIES` and `NOT` build the
 | term `p` | ⊥             | the step counter, §4.5                                                 |
 
 The last three rows need the leaves and the counter of §4.5, which build step 5 builds.
-Until then, an error, a refusal or running out of steps in the right operand under a term on the left is re-raised as `Stuck` naming the left's inputs, which is today's answer for those directives (U13's interim for a refusal; assumed, not ruled, for the other two; §8 step 3).
+Until then, an error, a refusal or running out of steps in the right operand under a term on the left is re-raised as `Stuck` naming the left's inputs, which is today's answer for those directives except that it names every input of the left, as U7b's default report does, where today's names only the first it reaches (U13's interim for a refusal; assumed, not ruled, for the other two; §8 step 3).
 Nothing inside the evaluator decides a residual beyond these tables, the identity rule of §4.6 and the agreeing-arms rule of §4.5.
 In particular no tautology is recognised mid-evaluation (U3): `IF (x OR NOT x) THEN 1 ELSE 2` builds the join `(x OR NOT x) ? 1 : 2`.
 
@@ -402,6 +402,7 @@ What the trace loses: today a variable operand's value appears only as the `IF`'
 **A join.**
 `IF c THEN t ELSE e` with `c` a term evaluates both arms and builds the join `c ? t : e`.
 If both arms are the same determined value, by the equality `runBinOpEquals` already supports, the result is that value: `IF x THEN 1 ELSE 1` is `1`.
+That value first carries the condition's guarded leaves, error and refusal alike, as DU11 has a `CONSIDER` carry its scrutinee's (U13b): `IF (x AND TBD) THEN 1 ELSE 1` is "1 unless `x`; refuses (TBD: this rule has not been written yet) if `x`", exit 1 (row 78).
 If the arms are Boolean, the join is the residual `(c AND t) OR (NOT c AND e)`, so `IF x THEN TRUE ELSE TRUE` is `TRUE` and `IF x THEN y ELSE FALSE` is `x AND y`.
 Otherwise the join is kept as a term, and a strict built-in that returns a `BOOLEAN` applied to it is pushed into each arm (U4b): `(IF x THEN 1 ELSE 2) GREATER THAN 1` is `x ? FALSE : TRUE`, which is `NOT x`.
 At a result, in a field, or under any consumer that is not such an operation, the join is an opaque unknown whose atom set is the union of the condition's and both arms' (U3, U4b).
@@ -460,6 +461,7 @@ Arithmetic reasoning over these atoms belongs to a solver (§4.7.3), which the p
 
 **Equality.**
 `runBinOpEquals` gains an identity rule before anything else (U6, U6b, extended by C1): the same keyed term on both sides is `TRUE` when the term's declared type has no function or `CONTRACT` component anywhere inside it, with a type variable or an unsolved inference variable counting as excluded, and with any partial built-in in the term having emitted its guard first; so `x EQUALS x`, `d's age EQUALS d's age` and `n PLUS 1 EQUALS n PLUS 1` are `TRUE`.
+That `TRUE` first carries the term's guarded leaves, error and refusal alike (U13b), as row 65's "`TRUE` unless `n EQUALS 0`" already does for C1's guard.
 The unknown carries its declared type for this (`ValAssumed` gains the type `evalAssume` already has).
 An excluded type stays unknown rather than becoming an error, except a bare function or `CONTRACT` type, which raises today's unsupported-equality error; so `elem g (LIST g)` with `g` an unknown function errors and never returns `TRUE`.
 `typeHasFunctionComponent` is lifted out of the DMN exporter's `where` clause for this.
@@ -488,7 +490,8 @@ Because those extra completions can only prevent a decision and never force one,
 **Non-Boolean results are not settled** (U1b, the second gap): a join at the root is reported undetermined even when its condition is a tautology, so `IF (x OR NOT x) THEN 1 ELSE 2` reports "I needed to know `x`" and counts toward the trigger below.
 **A guarded leaf is a hole, never a value**: a residual containing `error [c] e`, `refuses [c] r` or `gave-up [c]` is decided over the assignments in which no guard holds, and the report names the guards, as "FALSE unless `x`; errors if `x`" (U11b, U13).
 That outcome is its own, on the wire, in the K3 report and in every consumer listed under 4 below.
-When every assignment makes some guard hold, as in `IF x THEN (1 DIVIDED BY 0 GREATER THAN 0) ELSE (2 DIVIDED BY 0 GREATER THAN 0)`, no assignment is left to decide over and both tests above would pass vacuously; the outcome is then the leaves alone, exit 1, and never a value (assumed, not ruled; §8 step 5).
+If no assignment of the atoms escapes every guard, no assignment is left to decide over and both tests above would pass vacuously, so the directive is never `TRUE` or `FALSE` (U13b).
+When every leaf is a refusal with one reason, the outcome is that refusal, exit 0, as for `IF x THEN TBD ELSE TBD` (row 80); otherwise it is undetermined, listing each leaf, exit 1, as for `IF x THEN (1 DIVIDED BY 0 GREATER THAN 0) ELSE (2 DIVIDED BY 0 GREATER THAN 0)`.
 
 How it is computed: by truth table over the residual's atoms, which needs no solver and so runs the same on every host (DU3b); this is what decides rows 14, 36 and 38 `FALSE`.
 When every atom is a `BOOLEAN` input, the answer is also complete over the inputs; otherwise it can miss a decision that only the inputs' values force, which is the first gap above.
@@ -539,6 +542,8 @@ The scope-pending field (C5) fires on the rule body's top-level `IMPLIES`, exact
 The value stands: exit 0, and an `#ASSERT` on it is satisfied, as `l4 verify`'s vacuity note already does; a nested `IMPLIES` does not fire it.
 A `gave-up` is reported as "gave up; needed _i_" under every report.
 A guarded refusal is undetermined under every report: exit 1, batch status undetermined, the refusal's reason listed, and never a determinate refusal with exit 0 (U13).
+A guarded error is undetermined in the same way, exit 1; U11b states no exit code for it, so this is assumed, not ruled, as a consequence of U1b's "An undetermined assertion exits 1" and of U7b.
+`#ASSERT REFUSED e` (`EvaluateLazy.hs:308-319`) on a residual that holds a guarded refusal holds where the guard holds and fails where it does not, so it is undetermined, exit 1 (row 81), and so is `#ASSERT REFUSED e BECAUSE r` when `r` matches only some of several refusal leaves (row 82); both are assumed, not ruled, as consequences of U1b.
 The language server and the golden harness show the default report and have no setting (U7b).
 On the service the report is its own route or a rejected unknown key, never a silently dropped field, and every response states which report it carries; on MCP it is a separate tool or a listed capability (U7b).
 In `l4 batch` an undetermined row is a row status, not a failure, and never trips stop-on-error (`Batch.hs:247`, `:299`, `:319`) (U7b).
@@ -635,7 +640,7 @@ Rosette rows cite the Guide where a quotation in §4.10 covers them and say "rec
 
 Each row names the ruling it comes from, gives the L4 input, says what the `unstable` binary at `f9a504b77` does today, and states the expected report under this section.
 Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `n` and `age` are `IS A NUMBER`, `d IS A Person` with `DECLARE Person HAS age IS A NUMBER`, and `g` is `ASSUME g IS A FUNCTION FROM NUMBER TO BOOLEAN`, all unsupplied.
-"Today" is a probe result where a probe file is named (`reversegear/p01` to `p22` in the session scratchpad, run 2026-10-01 on the `f9a504b77` snapshot; `tippex/t01` to `t14`, run 2026-10-02 on a snapshot of the installed `l4`, a store build of 2026-09-28, with `DECLARE Kind IS ONE OF Retail, Wholesale` and `k IS A Kind` added to the section); a row with no probe name says where its "today" comes from.
+"Today" is a probe result where a probe file is named (`reversegear/p01` to `p22` in the session scratchpad, run 2026-10-01 on the `f9a504b77` snapshot; `tippex/t01` to `t20`, run 2026-10-02 on a snapshot of the installed `l4`, a store build of 2026-09-28, with `DECLARE Kind IS ONE OF Retail, Wholesale` and `k IS A Kind` added to the section); a row with no probe name says where its "today" comes from.
 "Expected" is the default report unless the row names another; "undetermined naming _i_" means the default report's "I needed to know the value of _i_"; "unchanged" means §4.3's conservativity claim, made against the tree after build step 1, covers the row.
 §8 says which build step each row belongs to.
 
@@ -713,12 +718,18 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 | 70  | §2.4, U4      | `CONSIDER m WHEN JUST y THEN 2, OTHERWISE 1`, with `m IS A MAYBE NUMBER`                        | `1`, as a value, exit 0 (t02; the coordinating session's probe of 2026-10-02)                                                 | build step 1: stuck naming `m`; lifted: undetermined naming `m`                                                                      |
 | 71  | §2.4, U4      | `CONSIDER Claim k 5 WHEN Claim Retail 0 THEN "first" WHEN Claim kk a THEN "second"` (§2.4)      | `"second"` (t01), right for every `k`                                                                                         | build step 1: stuck naming `k`; lifted: undetermined naming `k`; a loss of precision (§4.3)                                          |
 | 72  | U1b           | `#ASSERT REFUSED x`                                                                             | "assertion failed: expected a refusal, but the expression produced a value", not a crash (t03)                                | undetermined naming `x`, exit 1, from build step 1                                                                                   |
-| 73  | U13           | `x AND TBD`                                                                                     | stuck on `x` (t07)                                                                                                            | "`FALSE` unless `x`; refuses (TBD's reason) if `x`", exit 1, batch status undetermined; stuck naming `x` until step 5                |
+| 73  | U13           | `x AND TBD`                                                                                     | stuck on `x` (t07)                                                                                                            | "`FALSE` unless `x`; refuses (TBD's reason) if `x`", exit 1, batch status undetermined; before step 5, as row 77                     |
 | 74  | U13, U4b      | `IF x THEN TBD ELSE FALSE`                                                                      | stuck on `x` (t08)                                                                                                            | as row 73                                                                                                                            |
 | 75  | U13           | `TBD AND x`                                                                                     | refuses, "TBD: this rule has not been written yet" (t09), exit 0 (`Run.hs:143-146`)                                           | unchanged: a refusal under no undetermined guard stays a determinate refusal                                                         |
 | 76  | U13           | `FALSE AND TBD`                                                                                 | `FALSE` (t10)                                                                                                                 | `FALSE`, unchanged: the refusal is never reached                                                                                     |
+| 77  | U13           | `x AND TBD`, before build step 5                                                                | stuck on `x` (t07)                                                                                                            | undetermined naming `x`, exit 1, never "refuses" and never an error: U13's interim (C), a step-3 control                             |
+| 78  | U13b          | `IF (x AND TBD) THEN 1 ELSE 1`                                                                  | stuck on `x` (t15)                                                                                                            | "1 unless `x`; refuses (TBD's reason) if `x`", exit 1                                                                                |
+| 79  | U13b          | `IF (x AND (1 DIVIDED BY 0 GREATER THAN 0)) THEN 1 ELSE 1`                                      | stuck on `x` (t16)                                                                                                            | "1 unless `x`; errors (division by zero) if `x`", exit 1                                                                             |
+| 80  | U13b          | `IF x THEN TBD ELSE TBD`, as a `BOOLEAN`                                                        | stuck on `x` (t17)                                                                                                            | refuses (TBD's reason), exit 0: no assignment escapes every guard, and every leaf is one refusal                                     |
+| 81  | U1b, U13      | `#ASSERT REFUSED (x AND TBD)`                                                                   | "assertion could not be evaluated", naming `x`, exit 1 (t18)                                                                  | undetermined, exit 1: holds if `x` and fails if not (assumed, not ruled)                                                             |
+| 82  | U1b, U13b     | `#ASSERT REFUSED (IF x THEN TBD ELSE nope) BECAUSE` TBD's reason, `nope MEANS REFUSE "nope"`    | "assertion could not be evaluated", naming `x`, exit 1 (t19)                                                                  | undetermined, exit 1: the reason matches one of two leaves (assumed, not ruled)                                                      |
 
-Of the 76 rows, 70 were probed: rows 1 to 65 except 54, 55, 57, 58 and 61 on 2026-10-01, and rows 66 and 68 to 76 on 2026-10-02; rows 54, 55, 57, 58, 61 and 67 were not.
+Of the 82 rows, 76 were probed: rows 1 to 65 except 54, 55, 57, 58 and 61 on 2026-10-01, and rows 66 and 68 to 82 on 2026-10-02; rows 54, 55, 57, 58, 61 and 67 were not.
 
 ### 4.13 Conflicts for Meng
 
@@ -931,15 +942,17 @@ Row 58, every corpus directive not stuck today, holds at every step and is measu
    - The indirect-call golden is a new `ok/connectives-indirect.l4`, the four connectives passed through a function parameter, with a short circuit over a division by zero as its control, and a test that no trace names `a` or `b`.
 3. **Atoms-only residuals, default report.** Input atoms, field paths, comparison atoms, Boolean assumed calls, operation terms over the total built-ins, the connective table of §4.3, the identity rule of §4.6, and the default report naming every input; no boundary decision yet.
    This is what U1b calls "true strong Kleene: atoms only".
-   Rows 1, 2, 3, 5, 6, 11, 12, 13, 15 (without its count clause), 17, 18, 23, 24, 35, 37, 39, 40, 44, 45, 46, 47, 48, 49, 50, 69, 75 and 76 of §4.12.
+   Rows 1, 2, 3, 5, 6, 11, 12, 13, 15 (without its count clause), 17, 18, 23, 24, 35, 37, 39, 40, 44, 45, 46, 47, 48, 49, 50, 69, 75, 76 and 77 of §4.12.
    Rows 4, 62 and 63 need step 4's decider, because the evaluator keeps `x IMPLIES TRUE` as a node (§4.2): at this step they are undetermined, naming `x` (and `y`), and C5's scope-pending field, which fires only on a decided value, arrives with step 4.
    It builds on steps 1 and 2: the lift lives in step 2's frames (§4.4), and rows 12 and 48 need step 1's right-operand fix.
    **Interims this step carries**, because it builds §4.3's connective table while the leaves and the counter are step 5's:
 
    - The step counter, as instrumentation with a named provisional limit.
      Without it, a right operand that diverges under a term on the left, `x AND (loop 1 GREATER THAN 0)`, would hang or overflow the frame cap where today it is `Stuck` at once, which U4 rules out; §7 sets the real limit on step 5's branch.
-   - An error, a refusal or running out of steps in the right operand under a term on the left is re-raised as `Stuck` naming the left's inputs, and the right's too if it was itself `Stuck`, which is today's answer for those directives.
+   - An error, a refusal or running out of steps in the right operand under a term on the left is re-raised as `Stuck` naming the left's inputs, and the right's too if it was itself `Stuck`.
+     That is today's answer for those directives, except that it names every input, as U7b's default report does, where today's names only the first it reaches (row 23).
      For a refusal this is U13's interim (C); for the other two it is assumed, not ruled.
+     The rewrite must cover a refusal explicitly: without it, `x AND TBD` would reach the directive as `ReducedRefused` (`EvaluateLazy.hs:283`), which exits 0 (`Run.hs:146`) and gives a batch row the status "refused" (`Batch.hs:369-370`), U13's forbidden option B; row 77 is the control.
      It is done by rewriting the exception as it unwinds through the connective's frame, never by catching it and resuming.
      The comment at `Machine.hs:840-849` says nothing between a `Refuse` and its directive can observe it, "not a boolean connective", so this change amends it to describe the rewrite; U13's restatement of the invariant is made at step 5.
    - Every outcome consumer listed in §4.7.4 gets an explicit arm for the undetermined outcome, with no wildcard, and renders it exactly as today's `Stuck`, `l4 batch` excepted.
@@ -964,6 +977,7 @@ Row 58, every corpus directive not stuck today, holds at every step and is measu
 
 4. **The boundary decider and the residual report.** §4.7.2 by truth table over the residual's atoms on every host (DU3b), the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results; C5's scope-pending field arrives here, with the first decided `TRUE`.
    Rows 4, 7, 8, 10, 14, 15's count clause, 25, 26, 36, 38, 41, 42, 43, 61, 62, 63 and 66; rows 10, 42 and 66 already answer at step 3, through the identity rule.
+   It builds U13b's decision for a residual no assignment of whose atoms escapes every guard (§4.7.2); the row that exercises it, row 80, is in step 5, because it needs that step's join and leaves, as rows 64 and 65 need its definedness guards.
    **Documentation:** U1b's wording on the DMN limits page, `doc/exports/dmn-bpmn.md`, whose "Limits, stated plainly" block (`:367`) has none of it yet: "propositional supervaluation of a Boolean residual", its two gaps (atoms are independent; non-Boolean results are not settled), and `x OR NOT x`, `TRUE` at L4's boundary and `null` in FEEL; and a page for the `--unknowns` flag and its three reports.
    _Assumed, not ruled:_
    - The decider is Shannon expansion with constant folding, stopping once one `TRUE` and one `FALSE` completion are found.
@@ -981,8 +995,9 @@ Row 58, every corpus directive not stuck today, holds at every step and is measu
    - When the boundary decides, the trace gains one final step, such as "`TRUE` whatever `x` is", so that `l4 run --trace` and the service's reasoning tree agree with the printed value.
    - The flag is `--unknowns default|k3|residual`, U1b having spelt `--unknowns k3`.
    - The extended differential runs under each report from a script under `etc/`, which `etc/verify-branch.sh` names where it already prints the §3.2.1 reminder; a one-line pointer in repo `CLAUDE.md` §3.2.1 is a `CLAUDE.md` edit and needs Meng's word.
-5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b, U13).
-   Rows 9, 16, 19 to 22, 27 to 34, 57, 59, 60, 64, 65, 67, 68, 73 and 74.
+5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b, U13, U13b).
+   Rows 9, 16, 19 to 22, 27 to 34, 57, 59, 60, 64, 65, 67, 68, 73, 74, 78, 79, 80, 81 and 82; row 80 exercises step 4's decision for a residual no assignment of whose atoms escapes every guard.
+   It builds U13b's carrying of a term's guarded leaves through the agreeing-arms rule and the identity rule (§4.5, §4.6).
    This step's branch carries §7's measurement: the joins, the leaves and the counter are built with the limit a named provisional constant, §7's items 2, 3 and 5 run on that branch, the constant is set from item 3, and only then does the branch merge, never with the provisional value.
    That replaces "after the measurement of §7", which was circular, since §7 needs this step's counter.
    It builds U13's guarded refusal leaf, which ends U13's interim, and makes the change to the comment at `Machine.hs:840-849` that U13 rules: its invariant is restated as "a refusal is never turned into a value".
@@ -991,16 +1006,14 @@ Row 58, every corpus directive not stuck today, holds at every step and is measu
    - C3 (2)'s "nothing new is evaluated" is read as "no closure body is entered once the counter has run out": literals, constructors, already-evaluated thunks and built-in operations still compute (§4.5).
      Row 59 needs this reading, and it narrows C3's words, so it is recorded as an assumption and not as a ruling.
    - A non-Boolean join that holds a leaf is, at a result, U4b's opaque unknown, reported as undetermined with its guard (row 29, §4.5); row 33 holds as written.
-   - When every assignment makes some guard hold, the outcome is the leaves alone, exit 1 (§4.7.2).
-     The agreeing-arms rule applies only when the condition carries no leaf.
-     A leaf inside a guard is read as not `TRUE` when deciding whether another leaf can be reached, so an arm that can never run drops its leaf.
+   - A leaf inside a guard is read as not `TRUE` when deciding whether another leaf can be reached, so an arm that can never run drops its leaf.
    - Error leaves come from every `UserEvalException` except `Stuck` and `StackOverflow`, so the `Stuck` fallbacks of steps 3 and 5 always reach the directive boundary; an `InternalEvalException` propagates as today; a `RefusalException` becomes U13's leaf.
      Each guard is stored relative to the join or connective that encloses its leaf, and the full guard is composed at the root.
    - A step is one transition of the machine, `nf` included, counted per directive and reset where the directive starts; the limit is a constant beside `maximumFrameDepth`, with no flag or setting (U7b), and below the frame cap's headroom, so depth cannot overflow first; a `StackOverflow` after the counter has started counts as gave-up.
      Running out with no catching frame gives `gave-up [TRUE]` at the directive, and `UpdateThunk` never writes back a value that carries a `gave-up` (§4.5).
    - The then-arm is evaluated first, in source order.
      A ledger write, or a regulative or deontic frame, reached under a pending condition raises `Stuck` naming the guard's inputs, and so does a join or a leaf that reaches a site outside §4.3's table.
-     A result holding a leaf or a `gave-up` exits 1 for `#EVAL` and `#ASSERT` and gets its own JSON kind; a trace shows each arm as a child labelled with its path condition.
+     A result holding a leaf or a `gave-up` exits 1 for `#EVAL` and `#ASSERT` and gets its own JSON kind (§4.7.4), except U13b's single refusal under every assignment, which is that refusal; a trace shows each arm as a child labelled with its path condition.
    - T6's `presumed` counts a default forced in any arm, with W8's event tagged by the arm's path condition (§5).
 6. **Service and MCP report routes**, the batch row status, the planner reading residuals from evaluation instead of only from the static ladder tree, and the counts reported (U7b, U3b).
    The planner's questions go to the solver through the same lowering (§4.7.3, D1); every evaluation's own boundary stays propositional (DU3b).
@@ -1177,6 +1190,13 @@ Option C is close to today's output but not the same: today's `Stuck` names only
 **What it changes.** §4.2's grammar gains the leaf `refuses [c] r`, §4.3's connective table gains its row with the interim beside it, §4.5 covers the join case, §4.7.2's hole rule and §4.7.4's reports carry it, rows 73 to 76 of §4.12 test it, §8 step 3 carries the interim and step 5 builds the leaf.
 The restatement of the invariant is a ruling about the comment at `Machine.hs:840-849`, to be made in the change that builds the leaf, build step 5; recording it here edits no code.
 On its wording, the restated invariant lets a frame between a `Refuse` and its directive observe the refusal, which the leaf and the interim both need, and forbids only turning it into a value; whether the static refusal analysis that the comment names stays sound under it is for step 5 to check (§10).
+
+**AMENDED 2026-10-02 (YOYO, in chat).** Meng fired YOYO, amending U13 at its skeptic's recommendation (the skeptic's verdict: weakens).
+The amendment, as stated when the word was fired:
+
+> U13b, amending RAINCHECK's U13 per its skeptic (verdict weakens), recorded in #526 §9 beside U13 and pushed with TIPPEX: (1) any rule that returns a determined value from a term (§4.5's agreeing arms, §4.6's identity rule) first carries that term's guarded leaves, error and refusal alike, into its result, as DU11 does for CONSIDER; positive controls `IF (x AND TBD) THEN 1 ELSE 1` = "1 unless x; refuses (TBD …) if x", exit 1, and the same with `1 DIVIDED BY 0 GREATER THAN 0` for an error leaf; (2) if no assignment of a residual's atoms escapes every guard, the directive is never TRUE or FALSE: when every leaf is a refusal with one reason it is that refusal, exit 0; otherwise undetermined, listing each leaf; positive control `IF x THEN TBD ELSE TBD` refuses, exit 0; built in steps 4-5
+
+**What U13b changes.** §4.5's agreeing arms and §4.6's identity rule carry the term's guarded leaves, §4.7.2 states the case in which no assignment escapes every guard, rows 78 to 80 of §4.12 are its positive controls, and §8 step 4 builds the decision while step 5 builds the leaves.
 
 ### D1 — Build the evaluator, buy the solver
 
