@@ -196,18 +196,14 @@ class HasNlg a where
   -- based on the 'SrcSpan' of 'a' and its neighbours.
   addNlg :: a -> NlgA a
 
-  -- | The claim a RECORD FIELD's name makes, given the span of its type.
-  --
-  -- Two disjoint regions, which is why it needs the type's span rather than
-  -- just a range: everything BEFORE the type (the field's own trailing
-  -- gloss, as always), plus everything on a LATER LINE than the field
-  -- (ruled 2026-09-19 — an annotation written underneath a field describes
-  -- that field). What falls between — trailing the type on the field's own
-  -- line — is left for the type, which runs next.
+  -- | The ordinary claim, narrowed to the annotations that satisfy a
+  -- predicate; the rest stay for a later node. This is how a name claims a
+  -- region that is not one contiguous range — see 'addNlgFieldName' and
+  -- 'addNlgInput'.
   --
   -- Defaults to the ordinary claim, so only the 'Name' instance has to care.
-  addNlgFieldName :: Maybe SrcSpan -> a -> NlgA a
-  addNlgFieldName _ = addNlg
+  addNlgWhere :: (NlgWithSpan -> Bool) -> a -> NlgA a
+  addNlgWhere _ = addNlg
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
   addNlg a = extendNlgA a $ case a of
@@ -385,11 +381,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
     -- and on purpose, both TRAILING, and letting the name take the whole
     -- line would make them collide and lose both.
     --
-    -- This is the one exception to "own line describes what follows". A
-    -- field list is a column of things rather than a sequence of
-    -- declarations, and all three independently generated Hebrew encodings
-    -- measured in 2026-09 annotate fields this way — 100 heralds, every one
-    -- below its field.
+    -- This is one of the two exceptions to "own line describes what
+    -- follows"; the other is a GIVEN list ('addNlgInput'). A field list is a
+    -- column of things rather than a sequence of declarations, and all three
+    -- independently generated Hebrew encodings measured in 2026-09 annotate
+    -- fields this way — 100 heralds, every one below its field.
     MkTypedName ann n ty mTypically mExpr -> do
       n' <- addNlgFieldName (fromSrcRange <$> rangeOf ty) n
       ty' <- unspanned (addNlg ty)
@@ -435,7 +431,9 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 -- the last child of the last child reaches as far as the enclosing context
 -- allows. That is how a @GIVEN@ parameter came to claim an annotation written
 -- on its own line BELOW the whole signature, in a rule with no @GIVETH@ whose
--- span would have stopped it.
+-- span would have stopped it. The last input of a GIVEN list now takes such an
+-- annotation only when it is indented past the keyword ('addNlgInput'), and
+-- this clamp is what keeps the input's TYPICALLY default from taking the rest.
 confineToEndOfLine :: HasSrcRange e => e -> NlgA a -> NlgA a
 confineToEndOfLine e = hoistNlgA (inLocRange r)
  where
@@ -452,21 +450,73 @@ confineToEndOfLine e = hoistNlgA (inLocRange r)
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivenSig n) where
   addNlg a = extendNlgA a $ case a of
-    MkGivenSig ann tys -> confineToEndOfLine a $ do
-      -- A GIVEN block's annotations stay inside the GIVEN block. Without this,
-      -- the last parameter claims everything up to the next node with a span —
-      -- which, in a rule with no GIVETH, is the rule's own name, so an @nlg
-      -- written on its own line above the DECIDE landed on a parameter.
-      tys' <- traverse addNlg tys
-      pure $ MkGivenSig ann tys'
+    -- A GIVEN list is a column, like a record's field list, so an annotation
+    -- on its own line UNDER an input describes that input — the last input
+    -- included (ruled 2026-10-02, Meng):
+    --
+    -- @
+    -- GIVEN floor  IS A NUMBER
+    --       amount IS A NUMBER
+    --       \@nlg the sum of money          -- describes `amount`
+    -- \@nlg the claim of %amount% is large  -- describes the rule
+    -- DECIDE `is large` IF amount GREATER THAN floor
+    -- @
+    --
+    -- An input before the last gets that for free: the input after it bounds
+    -- its range. The last input is bounded only by whatever follows the list,
+    -- and with no GIVETH between them the slot under it is also the slot above
+    -- the rule — so it takes only an annotation indented further than the
+    -- GIVEN keyword, and one at the keyword's column or left of it describes
+    -- what follows, as it always did. The keyword's column, not column 1, so
+    -- a GIVEN indented under a section heading or a WHERE works the same way.
+    --
+    -- The range still starts at the keyword: an annotation written ABOVE the
+    -- GIVEN is not the first input's to take.
+    MkGivenSig ann tys
+      | Just (inputs, lastInput) <- List.unsnoc tys
+      , Just sigSpan <- fromSrcRange <$> rangeOf a ->
+          hoistNlgA (inLocRange (locRangeFrom (Just sigSpan.start))) $ do
+            inputs' <- traverse addNlg inputs
+            lastInput' <- addNlgInput (indentedPast sigSpan) lastInput
+            pure $ MkGivenSig ann (inputs' <> [lastInput'])
+      | otherwise -> confineToEndOfLine a $ do
+          tys' <- traverse addNlg tys
+          pure $ MkGivenSig ann tys'
+
+-- | Does this annotation start at a column further right than where @span'@
+-- starts?
+indentedPast :: SrcSpan -> NlgWithSpan -> Bool
+indentedPast span' w = w.range.start.column > span'.start.column
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (OptionallyTypedName n) where
-  addNlg a = extendNlgA a $ case a of
-    MkOptionallyTypedName ann n mty mTypically -> do
-      n' <- addNlg n
-      tys' <- traverse unclaimedSignatureType mty
-      mTypically' <- traverse addNlg mTypically
-      pure $ MkOptionallyTypedName ann n' tys' mTypically'
+  addNlg = addNlgInput (const True)
+
+-- | One input of a GIVEN list. Its name claims what is on the input's own
+-- lines, up to a TYPICALLY default if it has one, plus whatever on a LATER
+-- line @claimsBelow@ accepts: everything, for an input with another after
+-- it; only what is indented past the GIVEN keyword, for the last (see the
+-- 'GivenSig' instance).
+--
+-- The default is 'unspanned' for the reason a record field's type is: so the
+-- name can reach the line below past it. Without that, a herald under
+-- @a IS A NUMBER TYPICALLY 5@ skips @a@ and lands on the NEXT input. The
+-- default still claims the rest of its own line, and is clamped there, so a
+-- default that names something, @TYPICALLY x@, cannot take an annotation the
+-- last input declined.
+addNlgInput ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> OptionallyTypedName n -> NlgA (OptionallyTypedName n)
+addNlgInput claimsBelow o = extendNlgA o $ case o of
+  MkOptionallyTypedName ann n mty mTypically -> do
+    n' <- addNlgWhere claims n
+    tys' <- traverse unclaimedSignatureType mty
+    mTypically' <- unspanned (confineToEndOfLine o (traverse addNlg mTypically))
+    pure $ MkOptionallyTypedName ann n' tys' mTypically'
+   where
+    claims w
+      | startsBelow o w = claimsBelow w
+      | otherwise       = maybe True (\ d -> startsBefore (Just d) w) defaultSpan
+    defaultSpan = fromSrcRange <$> (rangeOf =<< mTypically)
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of
@@ -519,8 +569,19 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
 
 instance HasNlg Name where
   addNlg = addNlgNameWhere (const True)
-  addNlgFieldName mTySpan a =
-    addNlgNameWhere (\ w -> startsBefore mTySpan w || startsBelow a w) a
+  addNlgWhere = addNlgNameWhere
+
+-- | The claim a RECORD FIELD's name makes, given the span of its type.
+--
+-- Two disjoint regions, which is why it needs the type's span rather than
+-- just a range: everything BEFORE the type (the field's own trailing
+-- gloss, as always), plus everything on a LATER LINE than the field
+-- (ruled 2026-09-19 — an annotation written underneath a field describes
+-- that field). What falls between — trailing the type on the field's own
+-- line — is left for the type, which runs next.
+addNlgFieldName :: (HasSrcRange a, HasNlg a) => Maybe SrcSpan -> a -> NlgA a
+addNlgFieldName mTySpan a =
+  addNlgWhere (\ w -> startsBefore mTySpan w || startsBelow a w) a
 
 -- | The shared body of both of 'Name'\'s claims.
 addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name

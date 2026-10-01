@@ -205,10 +205,10 @@ nlgRegcfGolden  = "examples/canon/us/regcf/tests/regcf.nlg.golden"
 nlgWizardSource = "examples/canon/us/regcf/regcf-wizard.l4"
 nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 
--- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
--- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
--- the tree, so the tests below are the only thing pinning that the two
--- projections agree (smucclaw/l4-ide#972).
+-- The placement rows for an @nlg on a rule's head, and under a GIVEN list's
+-- last input. Its `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no
+-- golden anywhere in the tree, so the tests below are the only thing pinning
+-- that the two projections agree (smucclaw/l4-ide#972).
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 
@@ -1687,6 +1687,32 @@ spec bin = do
       nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
       renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
       renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
+
+    it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15-19)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Ruled 2026-10-02: indented past the GIVEN keyword, it describes the
+      -- input above it, with a GIVETH next (row 15) or without (row 16), past
+      -- TYPICALLY defaults (row 18), and under a section GIVEN (row 19). Before,
+      -- row 15's was dropped, row 16's became the rule's sentence, and row 18's
+      -- first landed on the second input.
+      nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row sixteen` with 200\n`row sixteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row eighteen` where the floor is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row nineteen` where the section's floor is 100" `isInfixOf`)
+      -- Render describes each rule by its own body; only a section input's
+      -- gloss shows up in it.
+      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eighteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row nineteen holds if amount is more than the section's floor" `isInfixOf`)
+
+    it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      nlgOut `shouldSatisfy` ("row seventeen saw 200\n" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

@@ -46,6 +46,11 @@
 --  12  `r` p q / herald / MEANS ...    own line below the q    herald          herald     herald
 --  13  herald / `r` p / herald / MEANS both                    OUTER           OUTER      OUTER
 --  14  GIVEN p @nlg g / DECIDE `r` IF  trailing the GIVEN name  BARE NAME       gloss      rule's own body
+--  15  GIVEN p q / GIVETH / DECIDE     under q, indented        BARE NAME       gloss      rule's own body
+--  16  GIVEN p / DECIDE `r` IF         under p, indented        BARE NAME       gloss      rule's own body
+--  17  GIVEN p / DECIDE `r` IF         under p, GIVEN's column  herald          herald     herald
+--  18  GIVEN p q, both TYPICALLY       under each, indented     BARE NAME       glosses    rule's own body
+--  19  section GIVEN p / GIVEN q ...   under p, indented        BARE NAME       gloss      gloss in body
 --
 -- Rows 5, 7, 8 and 12 are the repair. Before it they printed the bare rule name
 -- positionally; rows 1-4, 6 and 9 already read the herald and are unchanged,
@@ -77,6 +82,20 @@
 -- The prelude writes row 5's shape 67 times (`null list @nlg %list% is empty`),
 -- so those 67 sentences reach a positional `l4 nlg` call for the first time
 -- under this change. That is the intended effect, not a side effect.
+--
+-- (d) Rows 15 to 19 are a different question: not which name a herald lands
+-- on inside the head, but whether an own-line annotation under the LAST input
+-- of a GIVEN list is that input's gloss or the rule's sentence. Ruled
+-- 2026-10-02 (Meng): a GIVEN list is a column, like a record's field list, so
+-- the annotation under an input describes that input, the last one included,
+-- when it is indented further than the GIVEN keyword (rows 15, 16, 18, 19).
+-- At the keyword's column or left of it, it describes what follows (row 17).
+-- Measured before the change: row 15's gloss was dropped with "Not attached
+-- to any valid syntax node", row 16's silently became the rule's sentence,
+-- row 18's first gloss landed on the SECOND input while its second was dropped,
+-- and row 19's was dropped.
+-- Row 19 is a section GIVEN, whose keyword sits at column 5: the tie-break is
+-- the keyword's column, not column 1.
 
 -- Row 1: DECIDE, trailing the head.
 GIVEN amount IS A NUMBER
@@ -241,3 +260,59 @@ DECIDE `row fourteen` IF amount GREATER THAN 100
 
 #EVAL `row fourteen` 200
 #EVAL `row fourteen` WITH amount IS 200
+
+-- Row 15: an own-line gloss under the LAST input, indented past the GIVEN
+-- keyword, with a GIVETH next. It describes `amount`, exactly as one under
+-- `floor` would describe `floor`.
+GIVEN floor  IS A NUMBER
+      amount IS A NUMBER
+      @nlg the sum of money
+GIVETH A BOOLEAN
+DECIDE `row fifteen` IF amount GREATER THAN floor
+
+#EVAL `row fifteen` 100 200
+#EVAL `row fifteen` WITH floor IS 100, amount IS 200
+
+-- Row 16: the same with no GIVETH, so the slot under the last input is also
+-- the slot above the rule. Indented past GIVEN, it is still the input's gloss.
+GIVEN amount IS A NUMBER
+      @nlg the sum of money
+DECIDE `row sixteen` IF amount GREATER THAN 100
+
+#EVAL `row sixteen` 200
+#EVAL `row sixteen` WITH amount IS 200
+
+-- Row 17: the control for row 16. At the GIVEN keyword's column it describes
+-- what follows, so it is the rule's sentence, as it always was.
+GIVEN amount IS A NUMBER
+@nlg row seventeen saw %amount%
+DECIDE `row seventeen` IF amount GREATER THAN 100
+
+#EVAL `row seventeen` 200
+#EVAL `row seventeen` WITH amount IS 200
+
+-- Row 18: both inputs carry a TYPICALLY default. The gloss under each is that
+-- input's; the default does not stand between an input and the line below it.
+GIVEN floor  IS A NUMBER TYPICALLY 100
+      @nlg the floor
+      amount IS A NUMBER TYPICALLY 0
+      @nlg the sum of money
+GIVETH A BOOLEAN
+DECIDE `row eighteen` IF amount GREATER THAN floor
+
+#EVAL `row eighteen` 100 200
+#EVAL `row eighteen` WITH floor IS 100, amount IS 200
+
+-- Row 19: a section GIVEN, whose keyword is indented under the heading. The
+-- gloss is indented past THAT keyword, so it describes `floor`. This row has to
+-- be last: a section runs to the end of the file.
+§ `Row nineteen`
+    GIVEN floor IS A NUMBER
+          @nlg the section's floor
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `row nineteen` IF amount GREATER THAN floor
+
+#EVAL `row nineteen` 200
+#EVAL `row nineteen` WITH floor IS 100, amount IS 200

@@ -374,9 +374,9 @@ squared x MEANS x TIMES x
 
 All annotations begin with `@`. On its own line, an annotation applies to the **following**
 definition; trailing a line, it applies to what is on that line. `@nlg` follows that rule with
-two twists — a rule takes it only on the line above, and inside a field list an own-line
-annotation describes the field **above** it — which the next section measures. Read it before
-writing one:
+two twists — a rule takes it only on the line above, and inside a field list or a `GIVEN` list an
+own-line annotation describes the field or input **above** it — which the next section measures.
+Read it before writing one:
 
 | Annotation | Purpose                                                            |
 | ---------- | ------------------------------------------------------------------ |
@@ -455,8 +455,24 @@ bare fallback — comes out the other end.
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
 herald is on a parameter line still renders as a bare name.
 
+**Or it goes on its own line BELOW the parameter, indented past `GIVEN`** — the last parameter included (ruled 2026-10-02: a `GIVEN` list is a column, like a field list).
+Under the last parameter the line is also the slot above the rule when no `GIVETH` comes between, and the column decides: indented further than the `GIVEN` keyword, it is the parameter's; at the keyword's column or left of it, it is the rule's.
+Measured on the build that implements the ruling:
+
+```l4
+GIVEN floor  IS A NUMBER
+      amount IS A NUMBER
+      @nlg the sum of money
+@nlg the claim of %amount% is over %floor%
+DECIDE `is large` IF amount GREATER THAN floor
+```
+
+``#EVAL `is large` WITH floor IS 100, amount IS 200`` prints ``the claim of `amount` is over `floor` where `floor` is 100 and the sum of money is 200``: the first annotation is `amount`'s, the second the rule's.
+The column is the `GIVEN` keyword's, not column 1, so a section `GIVEN` indented under its heading, or a `GIVEN` inside a `WHERE`, reads the same way.
+Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed and silently became the rule's sentence when none did, and one under any earlier parameter carrying a `TYPICALLY` default silently landed on the NEXT parameter.
+
 **A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside
-a field list an annotation on its own line describes the field above it, the one exception to
+a field list an annotation on its own line describes the field above it, an exception to
 "own line describes what follows", because a field list is a column). Trailing the field's line
 reaches the TYPE, not the field, and that is deliberate — a field and its type can be glossed
 separately on one line, and letting the field claim the whole line makes the two collide:
