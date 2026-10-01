@@ -71,11 +71,15 @@ for a stated reason.
   Singapore Acts as fetched from SSO. Their source terms are undetermined, so canon pins them by
   `sha256` and does not hold them. The source bundles vendored under `../canon/sg/succession/`
   name these paths, which is why the digest checks still run.
-- **`miles-card/source/`** (M2). These are the eight issuers' T&C PDFs, their text extractions
-  and the two table generators. Canon's row names this directory as the authoritative copy, for
-  the same reason.
 - **`chubb/denovo/*.json`, `chubb/denovo/source/`**. These are chubb's deposit data, which stayed
   on 2026-09-16 and were not part of LODGER.
+
+`miles-card/source/` also stayed under M2, until Meng superseded M2 for it on 2026-10-01: an
+openly published document is cited by its authoritative URL and `sha256` and fetched from its
+publisher, not redistributed. The eight issuers' PDFs and their text extractions left this tree
+then (git history still holds them). Canon's row pins each by URL and digest, and
+legalese/canon#5 adds the row's `source/fetch.sh`, which re-creates them and refuses any whose
+bytes differ, and moves the two table generators beside it.
 
 This is the ruling working as written, not an exception to it: *"there would also be some
 corpora left inside jl4/examples/legal that are not in canon, and that's ok too."*

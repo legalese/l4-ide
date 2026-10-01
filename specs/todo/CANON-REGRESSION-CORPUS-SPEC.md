@@ -335,6 +335,7 @@ SUITCASE, also 2026-09-23, fired it with rulings on the plan's open points:
 
 - **M1: the mirror carries `registers/*.json`.** This answers §4's boarded question.
 - **M2: source texts stay in l4-ide.** That covers the Singapore Acts, the card issuers' terms, and `miles-card/source/`.
+  PARTLY SUPERSEDED 2026-10-01 (UNDERWEAR), for the card issuers' terms. Meng ruled that an openly published document is cited by its authoritative URL and `sha256` and fetched from its publisher, not redistributed, and that a public repository does not point into a private one. `miles-card/source/` left the tree; legalese/canon#5 pins the documents by URL and digest and adds the row's `source/fetch.sh`. The ruling's principle reaches the Singapore Acts too, but `sg-succession/source/` and `sg-succession/cleanroom-2026-08/source/` have not moved yet, so M2 still describes them.
 - **M3: Reg CF keeps `README.md`, `PROJECTIONS.md` and `figures/` in l4-ide.** Canon gets its own `NOTES.md`.
 - **M4: the explainer's README citations stay on the l4-ide copy.** This follows from M3.
 - **M5: deposit Jersey's `SOURCE-EXTRACT.md`.** Meng: "you can find the jersey charities act online, it's public law."
