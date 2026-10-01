@@ -42,6 +42,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Scientific as Scientific
 import qualified Data.Vector as Vector
+import Data.Either (lefts, rights)
 
 -- | Map from file path to file content for module resolution
 type ModuleContext = Map FilePath Text
@@ -492,6 +493,9 @@ rootInputExpr mi ctx defaults name ty supplied =
   case supplied of
     Absent
       | ctx.fcSoft, Just d <- mDefault -> rootFill ctx [name] d
+      -- D7.3's NOTHING for a MAYBE input left out is a presumption too (T1b
+      -- puts it under the switch), so it is filled, and reported, the same way.
+      | ctx.fcSoft, Just _ <- stripMaybe ty -> rootFill ctx [name] nothingExpr
       | not ctx.fcSoft, Just _ <- mDefault ->
           fillError "missing required parameter (it has a TYPICALLY default, but presumption is hard, so the default is not used)"
       | not ctx.fcSoft, Just _ <- stripMaybe ty ->
@@ -504,6 +508,16 @@ rootInputExpr mi ctx defaults name ty supplied =
     Supplied v -> fnLiteralToExprTyped mi ctx [name] ty (Just v)
   where
     mDefault = Map.lookup name defaults
+
+nothingExpr :: Expr Resolved
+nothingExpr = App emptyAnno TypeCheck.nothingRef []
+
+-- | Run a conversion, keeping its failure as a value, so that every input's
+-- failure can be reported together rather than only the first.
+attempt :: Fills a -> Fills (Either Text a)
+attempt act = StateT \ st -> case runStateT act st of
+  Left err       -> Right (Left err, st)
+  Right (a, st') -> Right (Right a, st')
 
 -- | Convert an 'FnLiteral' (possibly missing) to an L4 AST expression
 -- that matches the expected 'Type' Resolved'. Handles MAYBE wrapping /
@@ -599,6 +613,7 @@ nonMaybeValue mi ctx path ty = \case
           in case Map.lookup fname fieldMap of
             Nothing
               | ctx.fcSoft, Just d <- mDefault -> rootFill ctx fieldPath d
+              | ctx.fcSoft, Just _ <- stripMaybe fty -> rootFill ctx fieldPath nothingExpr
               | not ctx.fcSoft, isJust mDefault || isJust (stripMaybe fty) ->
                   fillError ("field '" <> Eval.renderPresumedPath fieldPath <> "' is missing, and presumption is hard, so no default is used")
             mv -> fnLiteralToExprTyped mi ctx fieldPath fty mv
@@ -756,22 +771,22 @@ wrapperDefaults presumption defaults params
 -- that withdrawal is about a MAYBE the author declared, and these MAYBEs are
 -- the wrapper's own.
 --
--- So an input the AUTHOR declared MAYBE is left absent when presumption is
--- hard: T1b withdraws its NOTHING, and the decoder refuses it, naming it, as
+-- So an input the AUTHOR declared MAYBE is left absent: its NOTHING is D7.3's
+-- presumption, which the decoder fills (and reports) while presumption is
+-- soft, and withdraws when it is hard (T1b), refusing the input by name as
 -- the direct path does ('rootInputExpr').
 wrapperArguments
-  :: Presumption
-  -> [(Text, Type' Resolved)]     -- ^ every input the function takes
+  :: [(Text, Type' Resolved)]     -- ^ every input the function takes
   -> Map Text (Expr Resolved)     -- ^ those taking their default ('wrapperDefaults')
   -> [(Text, Maybe FnLiteral)]
   -> [(Text, Maybe FnLiteral)]
-wrapperArguments presumption inputs filled params =
+wrapperArguments inputs filled params =
   params <>
     [ (n, Nothing)
     | (n, ty) <- inputs
     , n `notElem` map fst params
     , not (Map.member n filled)
-    , presumption == PresumeSoft || isNothing (stripMaybe ty)
+    , isNothing (stripMaybe ty)
     ]
 
 -- | Evaluate a deontic function with startTime and events via EVALTRACE wrapper.
@@ -800,7 +815,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
       inputTypes = givenParamTypes <> binderParamTypes0 <> assumeParamTypes
 
   -- Convert input parameters to JSON
-  inputJson <- paramsToJson (wrapperArguments presumption inputTypes filled params)
+  inputJson <- paramsToJson (wrapperArguments inputTypes filled params)
 
   -- Generate deontic wrapper code with EVALTRACE
   genCode <- case generateDeonticEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson startTime traceEvents mPartyType mActionType traceLevel of
@@ -858,7 +873,7 @@ evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presum
   ((argExprs, assumeExprList), (_, fills)) <- either (throwError . InterpreterError) pure $ convert
     ( do
         args <- forM paramTypes $ \(name, ty) ->
-          withPrefix ("Parameter '" <> name <> "': ") $
+          attempt $ withPrefix ("Parameter '" <> name <> "': ") $
             rootInputExpr moduleInfo ctx defaults name ty (suppliedIn inputMap name)
         assumes <- forM assumeRefs $ \(assumeRes, assumeTy) -> do
           let nm = nameOf assumeRes
@@ -868,10 +883,13 @@ evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presum
             Absent
               | soft
               , Map.member (getUnique assumeRes) binders
-              , Map.member nm defaults -> pure Nothing
-            _ -> withPrefix ("ASSUME '" <> nm <> "': ") $
+              , Map.member nm defaults -> pure (Right Nothing)
+            _ -> attempt $ withPrefix ("ASSUME '" <> nm <> "': ") $
                    Just . (getUnique assumeRes,) <$> rootInputExpr moduleInfo ctx defaults nm assumeTy supplied
-        pure (args, catMaybes assumes)
+        -- every input that cannot be converted is named, not just the first
+        case lefts args <> lefts assumes of
+          []   -> pure (rights args, catMaybes (rights assumes))
+          errs -> fillError (Text.intercalate "\n" errs)
     ) (0, [])
   let assumeExprs = Map.fromList assumeExprList
 
@@ -1005,7 +1023,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
       inputTypes = givenParamTypes <> binderParamTypes0 <> assumeParamTypes
 
   -- Convert input parameters to JSON
-  inputJson <- paramsToJson (wrapperArguments presumption inputTypes filled params)
+  inputJson <- paramsToJson (wrapperArguments inputTypes filled params)
 
   -- Generate wrapper code using existing code generation
   genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson traceLevel of
@@ -1224,7 +1242,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 let filteredSource = filterIdeDirectivesText fnImpl
 
                 -- 4. Convert input parameters to JSON
-                inputJson <- paramsToJson (wrapperArguments presumption inputTypes filled params')
+                inputJson <- paramsToJson (wrapperArguments inputTypes filled params')
 
                 -- 5. Generate wrapper code
                 genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson traceLevel of

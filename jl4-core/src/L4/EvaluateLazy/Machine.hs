@@ -4514,34 +4514,56 @@ jsonValueToWHNFTyped at jsonValue ty = do
                       presumeOn <- asks (.presume)
                       declared <- asks (.recordDefaults)
                       let defaults = Map.findWithDefault Map.empty (getUnique tyRef) declared
-                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType) -> do
+                      -- What the object says about each field. @{}@ on a
+                      -- field that is not a record means "not known", exactly
+                      -- like @null@ (T3: it never takes a default); on a record
+                      -- field it is a record that supplies nothing.
+                      fields <- forM fieldNamesAndTypes $ \(fieldName, fieldType) -> do
+                        given <- case KeyMap.lookup (Key.fromText fieldName) obj of
+                          Just (Aeson.Object o) | KeyMap.null o -> do
+                            isRecord <- isRecordType fieldType
+                            pure (Just (if isRecord then Aeson.Object o else Aeson.Null))
+                          other -> pure other
                         let fieldAt  = at { fieldPath = at.fieldPath <> [fieldName] }
-                            fieldTxt = renderPresumedPath fieldAt.fieldPath
-                            mDefault = Map.lookup fieldName defaults
-                        case KeyMap.lookup (Key.fromText fieldName) obj of
+                            mDefault = Map.lookup fieldName defaults >>= \ d -> (d,) <$> typicallyLiteralValue d
+                        pure (fieldName, fieldType, fieldAt, mDefault, given)
+                      -- Every field that is absent and that nothing fills,
+                      -- named together, so that one run names them all (as
+                      -- @l4 batch --validate-only@ does), rather than the
+                      -- first and then the next on the following run.
+                      let fillsAbsent fieldType mDefault =
+                            presumeOn && (isJust mDefault || isMaybeFieldTy fieldType)
+                          missing =
+                            [ ( renderPresumedPath fieldAt.fieldPath
+                              , withheldDefault presumeOn (isJust mDefault) (isMaybeFieldTy fieldType) )
+                            | (_, fieldType, fieldAt, mDefault, Nothing) <- fields
+                            , not (fillsAbsent fieldType mDefault)
+                            ]
+                      unless (null missing) $
+                        userException $ UserError $ missingFieldsMessage missing
+                      fieldRefs <- forM fields $ \(_fieldName, fieldType, fieldAt, mDefault, given) -> do
+                        let fieldTxt = renderPresumedPath fieldAt.fieldPath
+                        case given of
+                          -- An ABSENT field takes the default its DECLARE
+                          -- gives it, and a declared default wins over the
+                          -- MAYBE fallback below (T1b). It is reported when
+                          -- it is forced, not here: a field the rule never
+                          -- reads did not shape the answer (T6).
                           Nothing
-                            -- An ABSENT field takes the default its DECLARE
-                            -- gives it, and a declared default wins over the
-                            -- MAYBE fallback below (T1b). It is reported when
-                            -- it is forced, not here: a field the rule never
-                            -- reads did not shape the answer (T6).
-                            | presumeOn
-                            , Just d <- mDefault
-                            , Just v <- typicallyLiteralValue d -> do
+                            | presumeOn, Just (d, v) <- mDefault -> do
                               rf <- allocateValue v
                               registerPresumable rf
                                 MkPresumed { path = fieldAt.fieldPath, declaredAt = rangeOf d, origin = FromDecode at.decodeFrom }
                               pure rf
-                            | presumeOn, isMaybeFieldTy fieldType ->
-                              -- MAYBE field missing in JSON: treat as NOTHING
-                              -- (D7.3). With presumption off this fallback does
-                              -- not fire, like any other default (T1b).
-                              allocateValue $ ValConstructor TypeCheck.nothingRef []
+                            -- A MAYBE field missing in JSON is NOTHING (D7.3).
+                            -- That is a presumption too: with presumption off
+                            -- it does not fire (T1b), so it is reported like
+                            -- any other default, with no TYPICALLY behind it.
                             | otherwise -> do
-                              -- Required field missing in JSON: error
-                              userException $ UserError $
-                                "Missing required field '" <> fieldTxt <> "' in JSON object"
-                                <> withheldDefault presumeOn (isJust mDefault) (isMaybeFieldTy fieldType)
+                              rf <- allocateValue $ ValConstructor TypeCheck.nothingRef []
+                              registerPresumable rf
+                                MkPresumed { path = fieldAt.fieldPath, declaredAt = Nothing, origin = FromDecode at.decodeFrom }
+                              pure rf
                           -- @null@ means "not known", and never takes a
                           -- default (T3). Said here, naming the field, rather
                           -- than left to the primitive decoder's "got: Null".
@@ -4565,6 +4587,37 @@ jsonValueToWHNFTyped at jsonValue ty = do
 
     -- For other types, fall back to generic decoding
     _ -> jsonValueToWHNF jsonValue
+
+-- | The error for the fields an object leaves out that nothing fills. One
+-- field keeps the message the documentation quotes; several are listed in it.
+missingFieldsMessage :: [(Text, Text)] -> Text
+missingFieldsMessage = \ case
+  [(f, why)] -> "Missing required field '" <> f <> "' in JSON object" <> why
+  fs -> "Missing required fields " <> Text.intercalate ", " [ "'" <> f <> "'" <> why | (f, why) <- fs ]
+          <> " in JSON object"
+
+-- | Whether the decoder builds this type, under any MAYBEs, from a JSON
+-- object: a type whose constructor bears its name and takes fields.
+isRecordType :: Type' Resolved -> Machine Bool
+isRecordType = \ case
+  TyApp _ maybeRef [inner]
+    | nameToText (TypeCheck.getName maybeRef) == "MAYBE" -> isRecordType inner
+  TyApp _ tyRef [] -> do
+    entityInfo <- getEntityInfo
+    pure $ case Map.lookup (getUnique tyRef) entityInfo of
+      Nothing -> False
+      Just (typeNameRef, _) ->
+        or [ True
+           | (_, (name, TypeCheck.KnownTerm conType Constructor)) <- Map.toList entityInfo
+           , nameToText (TypeCheck.getName name) == nameToText (TypeCheck.getName typeNameRef)
+           , takesFields conType
+           ]
+  _ -> pure False
+  where
+    takesFields = \ case
+      Forall _ _ t -> takesFields t
+      Fun {}       -> True
+      _            -> False
 
 -- | What a "missing field" error adds when presumption is off and the field
 -- would otherwise have been filled: by its own default, or, for a MAYBE, by

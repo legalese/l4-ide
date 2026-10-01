@@ -33,6 +33,7 @@ executable l4
     jl4-query-plan,
     aeson,
     aeson-pretty,
+    attoparsec,
     bytestring,
     cassava,
     containers,

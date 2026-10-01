@@ -29,6 +29,8 @@ module TestData (
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
+  sectionSecondJL4,
+  twoDefaultsJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -580,4 +582,35 @@ GIVETH A NUMBER
   CONSIDER premium
     WHEN JUST p THEN p
     WHEN NOTHING THEN 0
+|]
+
+-- | A section GIVEN with a default that the rule reads SECOND, so that
+-- @is adult@ FALSE never forces it: the test that @presumed@ lists a default
+-- only when it is read, not when discharge binds it at the root (T6).
+sectionSecondJL4 :: Text
+sectionSecondJL4 =
+  [i|
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export default may contract
+GIVEN `is adult`    IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity`
+|]
+
+-- | Two defaulted inputs, a section GIVEN and a rule GIVEN, for the test that
+-- presumption hard names every one a request leaves out.
+twoDefaultsJL4 :: Text
+twoDefaultsJL4 =
+  [i|
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export default may contract
+GIVEN `is adult`     IS A BOOLEAN
+      `of sound mind` IS A BOOLEAN TYPICALLY TRUE
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity` AND `of sound mind`
 |]

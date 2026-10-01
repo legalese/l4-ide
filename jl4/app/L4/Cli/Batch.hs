@@ -15,8 +15,8 @@
 -- @{ input, output, status, presumed, diagnostics }@ (validate-only mode emits
 -- @{ input, status, errors }@ instead). @presumed@ lists the inputs whose
 -- @TYPICALLY@ default the row's answer rests on: those the row left out, that
--- took their default, and that the evaluation actually read (T6 of
--- @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@).
+-- took their default (or, for a MAYBE input with none, NOTHING), and that the
+-- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@).
 --
 -- An input the row leaves out takes its default while presumption is on
 -- (@--presumption soft@, the default); with @--presumption hard@ it is a
@@ -47,11 +47,15 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.Attoparsec.ByteString as A
+import qualified Data.Attoparsec.ByteString.Lazy as AL
 import qualified Data.Csv as Csv
+import qualified Data.Csv.Parser as CsvParser
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
+import Control.Monad (void)
 import Data.Char (isAlpha, isAlphaNum)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Options.Applicative
@@ -569,9 +573,9 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
     Right val -> case val of
       Aeson.Array arr -> Right (Vector.toList arr)
       single          -> Right [single]
-  "csv" -> case Csv.decodeByName bytes of
+  "csv" -> case csvRows bytes of
     Left err -> Left err
-    Right (_, rows) -> Right (map rowToJson (Vector.toList rows))
+    Right rows -> Right (map rowToJson rows)
       where
         -- An EMPTY cell is left out of the row, exactly as if its column were
         -- not there (T3c): the input is absent, so with presumption soft it
@@ -585,6 +589,36 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
           , not (Text.null (Text.strip (decodeUtf8 v)))
           ]
   other -> Left ("Unsupported format: " ++ Text.unpack other)
+
+-- | The rows of a CSV file with a header, as named cells, in file order.
+--
+-- Not 'Csv.decodeByName': cassava drops every record that parses to a single
+-- empty field (@removeBlankLines@), and a blank line and a line holding only
+-- @""@ both parse to that. Under T3c the second is a row whose one cell is
+-- empty, so absent, and it must be evaluated like any other row: dropping it
+-- turned two rows in into one row out, with exit 0. A blank line is still not
+-- a row. Each record is named against the header the way cassava names it.
+csvRows :: BSL.ByteString -> Either String [Csv.NamedRecord]
+csvRows = AL.eitherResult . AL.parse file
+  where
+    comma = 44
+    file = do
+      hdr <- CsvParser.header comma
+      rs <- rows
+      pure [ HashMap.fromList (zip (Vector.toList hdr) (Vector.toList r)) | r <- rs ]
+    rows = do
+      done <- A.atEnd
+      if done
+        then pure []
+        else do
+          blank <- (True <$ endOfLine) <|> pure False
+          if blank
+            then rows
+            else do
+              r <- CsvParser.record comma
+              endOfLine <|> A.endOfInput
+              (r :) <$> rows
+    endOfLine = void (A.string "\r\n") <|> void (A.word8 10) <|> void (A.word8 13)
 
 -- | Infer a JSON value for a raw, non-empty CSV cell (an empty one never gets
 -- here: it is left out of the row, see 'parseBatchInput'):
@@ -673,16 +707,14 @@ flattenEnvelope (Aeson.Object o) =
         Just (Aeson.Object inp) -> [ (Key.toText k, cellText v) | (k, v) <- KeyMap.toList inp ]
         Just other              -> [ ("value", cellText other) ]
         Nothing                 -> []
+      -- @presumed@ is a list, so its cell is the same list as compact JSON,
+      -- @[]@ when nothing was presumed: an input's name may contain a comma or
+      -- a semicolon, so no separator could be read back.
       envFields =
-        [ (Key.toText k, envCell (Key.toText k) v)
+        [ (Key.toText k, cellText v)
         | (k, v) <- KeyMap.toList o
         , Key.toText k /= "input"
         ]
-      -- @presumed@ is a list of input names, so a cell gets them joined with
-      -- "; ", and an empty cell when nothing was presumed.
-      envCell "presumed" (Aeson.Array xs) =
-        Text.intercalate "; " [ t | Aeson.String t <- Vector.toList xs ]
-      envCell _ v = cellText v
   in (inputFields, envFields)
 flattenEnvelope other = ([], [("value", cellText other)])
 

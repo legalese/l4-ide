@@ -125,16 +125,20 @@ batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
 -- @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@). No golden captures batch
 -- output, so these are the guard; the S-numbers in the tests are the success
 -- criteria the W2+W3 slice was given.
-batchTySection, batchTyRule, batchTyRecord, batchTyMaybe, batchTyImported, batchTyImportedTypes :: FilePath
+batchTySection, batchTyRule, batchTyRecord, batchTyMaybe, batchTyImported, batchTyImportedTypes
+  , batchTyOneCol, batchTyTwo :: FilePath
 batchTySection = fixtureDir </> "batch-typically-section.l4"
 batchTyRule    = fixtureDir </> "batch-typically-rule.l4"
 batchTyRecord  = fixtureDir </> "batch-typically-record.l4"
 batchTyMaybe   = fixtureDir </> "batch-typically-maybe.l4"
 batchTyImported      = fixtureDir </> "batch-typically-imported.l4"
 batchTyImportedTypes = fixtureDir </> "batch-typically-config-types.l4"
+batchTyOneCol        = fixtureDir </> "batch-typically-onecol.l4"
+batchTyTwo           = fixtureDir </> "batch-typically-two.l4"
 
 batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
-  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson :: FilePath
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson
+  , batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain :: FilePath
 batchTyOmitted    = fixtureDir </> "batch-typically-omitted.json"
 batchTySupplied   = fixtureDir </> "batch-typically-supplied.json"
 batchTyNull       = fixtureDir </> "batch-typically-null.json"
@@ -145,6 +149,9 @@ batchTyEmpty      = fixtureDir </> "batch-typically-empty.csv"
 batchTyRecordJson = fixtureDir </> "batch-typically-record.json"
 batchTyMaybeCsv   = fixtureDir </> "batch-typically-maybe.csv"
 batchTyImportedJson = fixtureDir </> "batch-typically-imported.json"
+batchTyOneColCsv    = fixtureDir </> "batch-typically-onecol.csv"
+batchTyEmptyRow     = fixtureDir </> "batch-typically-emptyrow.json"
+batchTyUncertain    = fixtureDir </> "batch-typically-uncertain.json"
 
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
@@ -305,6 +312,7 @@ coreFixtures =
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
+  , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
@@ -1317,15 +1325,49 @@ spec bin = do
       Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull, "--validate-only"]
       vout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
 
-    it "S7: --format csv carries a presumed column" $ do
+    -- The cell is the same list as compact JSON, because a name may hold the
+    -- characters a separator would need (`of sound mind; sober`).
+    it "S7: --format csv carries a presumed column, as a JSON list" $ do
       Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyOmitted, "--format", "csv"]
       code `shouldBe` ExitSuccess
       -- cassava ends each record with CRLF
       case map (filter (/= '\r')) (lines sout) of
         header : row : _ -> do
           header `shouldBe` "input_is adult,output,status,presumed,diagnostics"
-          row `shouldSatisfy` (",success,has capacity," `isInfixOf`)
+          row `shouldSatisfy` (",success,\"[\"\"has capacity\"\"]\"," `isInfixOf`)
         other -> expectationFailure ("expected a header and a row, got: " ++ show other)
+      Output _ tout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--format", "csv"]
+      tout `shouldSatisfy` ("\"[\"\"has capacity\"\",\"\"of sound mind; sober\"\"]\"" `isInfixOf`)
+
+    -- T3c: a quoted "" is a row whose one cell is empty, so absent; cassava's
+    -- own decoder drops it as if it were a blank line (two rows in, one out,
+    -- exit 0). A blank line is still not a row, and a cell of spaces is empty.
+    it "evaluates a one-column CSV row whose only cell is \"\"" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyOneCol, "--inputs", batchTyOneColCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"])
+        , (Just (Bool False), presumedOf [])
+        , (Just (Bool True), presumedOf ["has capacity"])
+        ]
+
+    it "takes every default for a JSON row {} that supplies nothing" $ do
+      env <- jsonEnvelope bin ["batch", batchTyOneCol, "--inputs", batchTyEmptyRow]
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "reads {} as a value like null: it never takes the default" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUncertain]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Field 'has capacity' is null" `isInfixOf`)
+
+    -- With presumption hard every defaulted input left out is named in one
+    -- run, as --validate-only names them, and as one with no default is.
+    it "with --presumption hard names every defaulted input left out" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--presumption", "hard"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required fields 'of sound mind; sober'" `isInfixOf`)
+      sout `shouldSatisfy` ("'has capacity' (it has a TYPICALLY default" `isInfixOf`)
 
     -- T1b: the decoder fills a record field from its DECLARE, and an enum
     -- default resolves on a field (p10, which used to fail to check) as it
@@ -1354,8 +1396,10 @@ spec bin = do
       Output code sout _ <- runL4 bin ["batch", batchTyMaybe, "--inputs", batchTyMaybeCsv, "--format", "json"]
       code `shouldBe` ExitSuccess
       rows <- decodeArray sout
+      -- NOTHING for a left-out MAYBE is a presumption (T1b puts it under the
+      -- switch), so it is listed like a default.
       map resultAndPresumed rows `shouldBe`
-        [ (Just (Number 0), presumedOf []), (Just (Number 7), presumedOf []) ]
+        [ (Just (Number 0), presumedOf ["premium"]), (Just (Number 7), presumedOf []) ]
       Output hcode hout _ <-
         runL4 bin [ "batch", batchTyMaybe, "--inputs", batchTyMaybeCsv
                   , "--presumption", "hard", "--format", "json", "--continue-on-error" ]

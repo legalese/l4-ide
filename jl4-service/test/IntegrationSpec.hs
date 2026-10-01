@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -555,14 +555,59 @@ spec = describe "integration" do
     -- on both paths.
     it "with presumption hard, refuses a left-out MAYBE input on both paths" do
       withServiceFromSources "ty-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        -- NOTHING for a left-out MAYBE is a presumption, listed like a default
         soft <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False])
-        expectAnswer soft (FnLitInt 0) []
+        expectAnswer soft (FnLitInt 0) ["premium"]
         softWrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= uncertain])
-        expectAnswer softWrapped (FnLitInt 0) []
+        expectAnswer softWrapped (FnLitInt 0) ["premium"]
+        -- null is a value, not an omission: NOTHING, and nothing presumed
+        nulled <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False, "premium" Aeson..= Aeson.Null])
+        expectAnswer nulled (FnLitInt 0) []
         direct <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= False])
         expectError direct "a MAYBE input left out is NOTHING only while presumption is soft"
         wrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= uncertain])
         expectError wrapped "Missing required field 'premium (input)'"
+
+    -- T6: a section default counts when the rule first READS it, not when
+    -- discharge binds it at the root. `FALSE AND <defaulted input>`.
+    it "lists a section default only when the rule reads it, on both paths" do
+      withServiceFromSources "ty-sec-read" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        unread <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer unread (FnLitBool False) []
+        unreadWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= uncertain])
+        expectAnswer unreadWrapped (FnLitBool False) []
+        readWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer readWrapped (FnLitBool True) ["has capacity"]
+
+    -- T3's four cells, on the wrapper path: absent takes the default, null and
+    -- {} do not. (The direct path's null is the "never takes a default for
+    -- null" test above.)
+    it "keeps null apart from absent on the wrapper path" do
+      withServiceFromSources "ty-null-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        absent <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer absent (FnLitBool True) ["has capacity"]
+        nulled <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+        uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
+        expectError uncertainCap "has capacity (not supplied)"
+
+    it "keeps null apart from absent for a section GIVEN on the wrapper path" do
+      withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        nulled <- evalFunction baseUrl mgr "ty-null-sec" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+
+    it "with presumption hard, names every defaulted input left out" do
+      withServiceFromSources "ty-hard-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-two" "may contract" (hard ["is adult" Aeson..= True])
+        expectError resp "Parameter 'of sound mind': missing required parameter"
+        expectError resp "ASSUME 'has capacity': missing required parameter"
 
     it "carries presumed on each case of the batch endpoint" do
       withServiceFromSources "ty-batch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
