@@ -293,6 +293,11 @@ decodeArray sout =
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
+batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson :: FilePath
+batchEscapeFixture = fixtureDir </> "batch-escape.l4"
+batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
+batchEscapeRoundtripJson = fixtureDir </> "batch-escape-roundtrip.json"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -303,6 +308,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson
        , evalTraceFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -642,12 +648,18 @@ spec bin = do
 
       -- Not a change: the new reader has to keep reading what cassava read. CRLF
       -- line ends are not part of a cell, and a quoted cell may hold a line break.
-      -- The result is not asserted here: until the generated wrapper quotes a
-      -- line break exactly, a rule is handed the echo of that cell as null.
+      -- The rule `echoCode` returns the cell, so the line break must also survive
+      -- the generated wrapper, which needs the exact quoting this change adds
+      -- (see the round-trip test further down).
       it "reads CRLF line ends, and a quoted cell holding a line break, as one row each" $ do
         (code, _, rows) <- csvRowsOf [batchCodeFixture, "--inputs", batchCrlfCsv]
         code `shouldBe` ExitSuccess
         map (`inputOf` "code") rows
+          `shouldBe` [Just (String "plain"), Just (String "line one\nline two")]
+        let resultOf row = case objField row "output" of
+              Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+              _ -> Nothing
+        map resultOf rows
           `shouldBe` [Just (String "plain"), Just (String "line one\nline two")]
 
     -- A CSV file that cannot be read stops the command before any case runs.
@@ -716,6 +728,42 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
       sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- Regression tests for the generated wrapper's string quoting.
+    it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
+      -- The payload holds a Windows path, embedded quotes, a newline, a tab,
+      -- an apostrophe, braces and a percent sign. This pins the LOUD half of
+      -- the escaping only: `echoFixed` ignores its payload, so a quote-only
+      -- escaper fails here just because an unescaped `"` ends the wrapper's
+      -- string literal early and the wrapper no longer lexes. A backslash, a
+      -- tab or a line break does not break the lexing, and is pinned by the
+      -- next test. (`l4 batch` runs no shell, so no shell metacharacter is
+      -- involved.)
+      env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
+      objField env "status" `shouldBe` Just (String "success")
+
+    -- The silent half. With a quote-only escaper a backslash reaches the lexer
+    -- unescaped, which reads it as the start of an escape of its own, so the
+    -- rule is handed JSON that is not the JSON that was sent, and the row is
+    -- still a success. Measured on plain main: `\u0041` (a backslash, then
+    -- u0041) comes back as `A`, `\\n` (two backslashes and an n) as a
+    -- backslash and an n, and a Windows path, a tab and a line break as null.
+    -- `echoCode` returns its input, so a payload the wrapper changed shows as a
+    -- result that is not the one sent.
+    it "hands every payload to the rule and back unchanged: backslashes, tabs, line breaks, escape-looking text" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchEscapeRoundtripJson, "--continue-on-error"]
+      let rows = [ row | l <- map (filter (/= '\r')) (lines sout)
+                       , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ]
+          sent = [ objField r "input" >>= (`objField` "code") | r <- rows ]
+          result r = case objField r "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+      code `shouldBe` ExitSuccess
+      map (`objField` "status") rows `shouldBe` replicate 6 (Just (String "success"))
+      sent `shouldBe` map (Just . String . T.pack)
+        [ "C:\\Users\\x", "back\\slash", "tab\there", "line\nbreak", "\\u0041", "\\\\n" ]
+      map result rows `shouldBe` sent
 
     -- A value is read by the type its input declares. Main's `coerceInputTypes`
     -- (f6ebc282e) did that; #47's `inferCsvCell` types a CSV cell by how it

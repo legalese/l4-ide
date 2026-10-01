@@ -113,7 +113,7 @@ Validation messages (`:386-414`): `Missing required field: '<p>'`, `Field '<p>' 
 - Correctness rests on `prettyLayout` reproducing the module's meaning; the printed text is the program that runs.
 - Fatal errors go to stdout, not stderr, as one line starting `Error:` (a cases file or rules file that does not exist is the exception: the operating system's message goes to stderr).
 - The wrapper adds the top-level names `InputArgs`, `decodeArgs` and `inputJson`; a module that already defines one was not probed.
-- The row JSON is put into the wrapper by `escapeAsL4String` (`:916-920`), which escapes only the double quote; a separate change replaces it.
+- The row JSON is put into the wrapper by `escapeAsL4String` (`Batch.hs:917-931` in this tree), which quotes it with the lexer's `showStringLit`; on the batch-cli change alone it escaped only the double quote, and `cli-quoting.md` describes the change.
 
 ## What changes against `main`
 

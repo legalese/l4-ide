@@ -76,6 +76,7 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , prettyEvalException
   )
+import L4.Lexer (showStringLit)
 import L4.Print (prettyLayout)
 import L4.Syntax
   ( AppForm(..), Declare(..), Module(..), Resolved, Section(..), TopDecl(Declare, Section)
@@ -913,11 +914,21 @@ generateJsonPayload :: Aeson.Value -> Text
 generateJsonPayload json =
   "DECIDE inputJson IS " <> escapeAsL4String json
 
+-- | Render a JSON value as an L4 string literal.
+--
+-- Delegates to the lexer's own 'showStringLit', which emits Haskell-style
+-- escapes that the lexer reads back with @charLiteral@. (The lexer's own note
+-- calls it "not truly precise"; the round trip of backslashes, tabs, line
+-- breaks and escape-looking text is pinned by the CLI tests.) A hand-rolled
+-- @"@-only replacement loses a payload that holds a backslash, a tab or a line
+-- break: the lexer reads the backslash as the start of an escape of its own, so
+-- the rule is handed text that is not what was sent (@\\u0041@ arrives as @A@,
+-- a Windows path as null) and the row is still marked success. A @"@ ends the
+-- literal early, and then the wrapper fails to lex.
 escapeAsL4String :: Aeson.Value -> Text
 escapeAsL4String val =
   let jsonText = Text.Lazy.toStrict $ Text.Lazy.Encoding.decodeUtf8 $ Aeson.encode val
-      escaped  = Text.replace "\"" "\\\"" jsonText
-  in "\"" <> escaped <> "\""
+  in showStringLit jsonText
 
 generateEvalDirective :: Text -> [(Text, Maybe (Type' Resolved))] -> Text
 generateEvalDirective funName params = Text.unlines
