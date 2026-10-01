@@ -1,16 +1,24 @@
-import type { McpProxy } from '../mcp-proxy.js'
-import type { AiLogger } from './logger.js'
-import type { AiProxyTool } from './ai-proxy-client.js'
+import type { AiProxyTool, Logger, ToolProvider } from './ports.js'
 
 /**
- * Thin client over the local MCP proxy at `http://127.0.0.1:{port}/mcp`.
- *
- * The proxy forwards to the user's connected jl4-service on `/.mcp`,
- * so its `tools/list` returns whichever rules the user currently has
- * deployed. We translate those into OpenAI function-tool shape with a
- * `l4-rules__` prefix so they land in the same dispatcher path as the
- * built-in tools (`fs__read_file`, etc.).
+ * Thin MCP (streamable HTTP, JSON responses) client for the L4 Rules
+ * server. In VS Code it talks to the local MCP proxy at
+ * `http://127.0.0.1:{port}/mcp`, which forwards to the user's connected
+ * jl4-service on `/.mcp`; a headless host points it at
+ * `mcp.legalese.cloud` with its own credentials. Either way `tools/list`
+ * returns whichever rules the user currently has deployed. We translate
+ * those into OpenAI function-tool shape with a `l4-rules__` prefix so
+ * they land in the same dispatcher path as the built-in tools
+ * (`fs__read_file`, etc.).
  */
+
+/** Where the MCP endpoint is. `getLocalUrl` returns undefined while it
+ *  isn't available (no tools are listed then). */
+export interface McpEndpoint {
+  getLocalUrl(): string | undefined
+  /** Extra request headers (e.g. Authorization for a remote server). */
+  getHeaders?(): Promise<Record<string, string>>
+}
 
 /** JSON-RPC id counter, unique per process. */
 let rpcIdCounter = 1
@@ -38,7 +46,9 @@ interface McpCallResult {
 
 export const MCP_L4_RULES_PREFIX = 'l4-rules__'
 
-export class McpToolClient {
+export class McpToolClient implements ToolProvider {
+  readonly prefix = MCP_L4_RULES_PREFIX
+
   /** Short in-process cache so a chat turn's tools/list call doesn't
    *  hammer the proxy if several turns are fired in quick succession. */
   private cache: { at: number; tools: AiProxyTool[] } | null = null
@@ -54,8 +64,8 @@ export class McpToolClient {
   private initialized = false
 
   constructor(
-    private readonly proxy: McpProxy,
-    private readonly logger: AiLogger
+    private readonly proxy: McpEndpoint,
+    private readonly logger: Logger
   ) {}
 
   /**
@@ -187,9 +197,10 @@ export class McpToolClient {
     params: Record<string, unknown>
   ): Promise<T | null> {
     const id = rpcIdCounter++
+    const extra = (await this.proxy.getHeaders?.()) ?? {}
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...extra, 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
     })
     if (!res.ok) {

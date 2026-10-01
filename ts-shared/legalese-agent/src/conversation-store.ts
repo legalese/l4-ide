@@ -1,20 +1,20 @@
-import * as vscode from 'vscode'
-import * as path from 'path'
-import { promises as fs } from 'fs'
+import * as path from 'node:path'
+import { promises as fs } from 'node:fs'
 import type {
   AiConversation,
   AiConversationSummary,
   AiChatMessage,
 } from 'jl4-client-rpc'
-import type { AiLogger } from './logger.js'
+import type { ConversationStore, Logger } from './ports.js'
 
 /**
  * File-backed local mirror of conversation state for UI restoration.
  * The ai-proxy owns the canonical LLM history; this store is just for
- * rendering and history navigation. Layout:
+ * rendering and history navigation. Layout under `rootDir` (VS Code:
+ * `{globalStorageUri}/ai/conversations`):
  *
- *   {globalStorageUri}/ai/conversations/{userKey}/{id}.json           — live
- *   {globalStorageUri}/ai/conversations/{userKey}/{id}.deleted-{ms}.json — tombstoned
+ *   {rootDir}/{userKey}/{id}.json              — live
+ *   {rootDir}/{userKey}/{id}.deleted-{ms}.json — tombstoned
  *
  * `userKey` mirrors the ai-proxy's `creatorId` (api-key hash or
  * WorkOS user id) so each silo on the server has a matching local
@@ -23,20 +23,12 @@ import type { AiLogger } from './logger.js'
  * gated on `isAiUsable()` upstream so this only fires on misuse.
  * Deletion renames; a future cleanup job reaps tombstones.
  */
-export class ConversationStore {
-  private readonly rootDir: string
-
+export class FileConversationStore implements ConversationStore {
   constructor(
-    context: vscode.ExtensionContext,
-    private readonly logger: AiLogger,
+    private readonly rootDir: string,
+    private readonly logger: Logger,
     private readonly getUserKey: () => string | undefined
-  ) {
-    this.rootDir = path.join(
-      context.globalStorageUri.fsPath,
-      'ai',
-      'conversations'
-    )
-  }
+  ) {}
 
   /** Per-user subdirectory resolved on every call so user switches
    *  take effect immediately without requiring the store to be
