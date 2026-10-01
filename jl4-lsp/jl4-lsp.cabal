@@ -161,6 +161,7 @@ test-suite jl4-lsp-test
     HoverDisplaySpec
     ImportDiagnosticSpec
     ImportUriSpec
+    LadderAtomIdSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     StateGraphLensSpec
