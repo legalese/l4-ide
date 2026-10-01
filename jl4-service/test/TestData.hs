@@ -25,6 +25,7 @@ module TestData (
   sectionBooleanJL4,
   deonticBooleanJL4,
   maybeInputsJL4,
+  timeInputsJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -507,4 +508,19 @@ dated MEANS
       flag
   AND NOT `start date` EQUALS NOTHING
   AND NOT count EQUALS NOTHING
+|]
+
+-- | A TIME and a DATETIME input. The wrapper decodes each from a JSON string and
+-- parses it with TOTIME or TODATETIME; it used to declare the record field as
+-- TIME or DATETIME, so the parse was applied to a value that was not a string.
+timeInputsJL4 :: Text
+timeInputsJL4 =
+  [i|
+@export default timed
+GIVEN flag   IS A BOOLEAN
+      unused IS A BOOLEAN
+      t      IS A TIME
+      dt     IS A DATETIME
+GIVETH A BOOLEAN
+timed MEANS flag
 |]

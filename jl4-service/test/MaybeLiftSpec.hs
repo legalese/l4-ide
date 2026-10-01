@@ -76,5 +76,18 @@ spec = describe "MaybeLift" $ do
     it "lifts prettyLayout's LIST OF (MAYBE OF NUMBER) without a double MAYBE" $ do
       liftTypeText "LIST OF (MAYBE OF NUMBER)" `shouldBe` "MAYBE (LIST OF (MAYBE NUMBER))"
 
+    -- TIME and DATETIME arrive as JSON strings too, parsed by TOTIME and TODATETIME
+    it "lifts TIME to MAYBE STRING" $ do
+      liftTypeText "TIME" `shouldBe` "MAYBE STRING"
+
+    it "lifts DATETIME to MAYBE STRING" $ do
+      liftTypeText "DATETIME" `shouldBe` "MAYBE STRING"
+
+    it "converts prettyLayout's MAYBE OF TIME to MAYBE STRING" $ do
+      liftTypeText "MAYBE OF TIME" `shouldBe` "MAYBE STRING"
+
+    it "converts prettyLayout's MAYBE OF DATETIME to MAYBE STRING" $ do
+      liftTypeText "MAYBE OF DATETIME" `shouldBe` "MAYBE STRING"
+
     it "brackets a type application with more than one argument" $ do
       liftTypeText "EITHER OF STRING, NUMBER" `shouldBe` "MAYBE (EITHER OF STRING, NUMBER)"

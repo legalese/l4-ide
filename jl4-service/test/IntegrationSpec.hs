@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -425,6 +425,20 @@ spec = describe "integration" do
                 , "count" Aeson..= (3 :: Int)
                 , "flag" Aeson..= True
                 , "unused" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "parses a TIME and a DATETIME input" do
+      withServiceFromSources "time-inputs" [("timed.l4", timeInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "time-inputs" "timed"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "flag" Aeson..= True
+                , "unused" Aeson..= uncertain
+                , "t" Aeson..= ("10:00:00" :: Text)
+                , "dt" Aeson..= ("2020-01-01T10:00:00Z" :: Text)
                 ]
             ])
         assertSuccess resp \r ->

@@ -22,14 +22,18 @@ import L4.Syntax (Type'(..), Resolved)
 import L4.Print (prettyLayout)
 
 -- | Check if a type name is a primitive that should be lifted
--- Note: DATE is not included here because it needs special handling
--- (converted to STRING for JSON, then parsed with TODATE)
+-- Note: DATE, TIME and DATETIME are not included here because they need special
+-- handling (converted to STRING for JSON, then parsed with TODATE, TOTIME or TODATETIME)
 isPrimitiveType :: Text -> Bool
 isPrimitiveType name = name `elem` ["BOOLEAN", "NUMBER", "STRING"]
 
--- | Check if a type name is DATE
-isDateType :: Text -> Bool
-isDateType name = Text.toUpper (Text.strip name) == "DATE"
+-- | Check if a type arrives as a JSON string that the wrapper parses:
+-- DATE, TIME and DATETIME, the three types 'Backend.CodeGen.stringConversionFn'
+-- converts. Lifting only DATE left TIME and DATETIME inputs typed as themselves
+-- in the wrapper's record, so TOTIME and TODATETIME were applied to a value that
+-- was not a string, and the wrapper failed to type-check.
+isStringCodedType :: Text -> Bool
+isStringCodedType name = Text.toUpper (Text.strip name) `elem` ["DATE", "TIME", "DATETIME"]
 
 -- | The inner type of a MAYBE type, in either spelling: @MAYBE BOOLEAN@, or
 -- @MAYBE OF BOOLEAN@, which is how 'prettyLayout' prints every type application
@@ -76,7 +80,7 @@ bracketIfNeeded t
 
 -- | Lift a type to MAYBE, handling primitives and complex types
 --
--- For primitives (BOOLEAN, NUMBER, STRING, DATE):
+-- For primitives (BOOLEAN, NUMBER, STRING, and DATE, TIME, DATETIME as STRING):
 --   lift BOOLEAN = MAYBE BOOLEAN
 --
 -- For records (represented as type applications with field types):
@@ -99,9 +103,9 @@ liftTypeText tyText0
       let innerUpper = Text.toUpper inner
       in if isPrimitiveType innerUpper
          then "MAYBE " <> inner  -- MAYBE primitive - already fully lifted
-         else if isDateType inner
-              -- MAYBE DATE -> MAYBE STRING (JSON doesn't have date type)
-              -- CodeGen handles the string→date conversion with TODATE
+         else if isStringCodedType inner
+              -- MAYBE DATE / TIME / DATETIME -> MAYBE STRING (JSON has none of them)
+              -- CodeGen handles the conversion with TODATE, TOTIME or TODATETIME
               then "MAYBE STRING"
          else if "LIST OF " `Text.isPrefixOf` innerUpper
               -- MAYBE (LIST OF x) - recurse into list element
@@ -109,9 +113,9 @@ liftTypeText tyText0
                    in "MAYBE (LIST OF (" <> liftTypeText elemType <> "))"
               -- MAYBE complex - keep as is (record fields handled by JSON decoder)
               else "MAYBE " <> bracketIfNeeded inner
-  -- DATE type - convert to STRING for JSON compatibility
-  -- The CodeGen module will add TODATE conversion when unwrapping
-  | isDateType tyText =
+  -- DATE, TIME, DATETIME - convert to STRING for JSON compatibility
+  -- The CodeGen module will add the TODATE/TOTIME/TODATETIME conversion when unwrapping
+  | isStringCodedType tyText =
       "MAYBE STRING"
   -- Primitive types - wrap in MAYBE
   | isPrimitiveType (Text.toUpper tyText) =
