@@ -1113,6 +1113,7 @@ T4: one switch turns presumption off for every evaluation.
 T5: exporters map a default or report dropping it.
 T6: responses list the defaults actually forced.
 The rulings, with their conditions, are recorded there; this section remains the ruling they extend.
+Each was amended the same day by its bench amendment card (T1b, T2b, T5b, T6b, TU-wire-b, TU-presume-b), recorded under the ruling it amends.
 
 ### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
 
