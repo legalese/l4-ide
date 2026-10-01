@@ -453,13 +453,12 @@ A ruling is recorded here when it is made.
 ### U8 — Presumptions in explore mode
 
 **The question.** When the lift is on, does an unsupplied `TYPICALLY` input take its default (marked as presumed) or stay an atom whose default is a prior (§5)?
-**Recommendation.** Both, as a flag, defaulting to presuming, because that is what R8 and the ladder's `respectDefaults: true` already do; the investigator turns it off.
+**RULED 2026-10-01**, on bench card TU-presume, shared with `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T4: Meng marked `accept` at 09:54:00Z, with no note. The ruling is recorded in full at T4. In short, one presumption switch applies to every evaluation, decide mode included. It is on by default and lands with that spec's W3/W4, not with explore mode. With it off, an absent input with a default is treated as absent with none: stuck in decide mode, unknown in explore mode. `null` never takes a default. The "presuming _x_" mark is the `presumed` list of T6. With presumption off, only boolean defaults become planner priors.
 
 ### U9 — The wire's three absences
 
 **The question.** The service distinguishes a missing field, `null` and `{}` (§2.5). What does each mean?
-**Recommendation.** Missing is `Left`: not asked, so a default may apply. `null` is `Right Nothing`: asked, and the answer is "don't know", so no default applies. `{}` is retired in favour of `null`, after measuring who sends it.
-**Why this is Meng's.** It is a wire contract with external callers.
+**RULED 2026-10-01**, on bench card TU-wire, shared with `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T3: Meng marked `accept`, option B, at 09:53:17Z, with no note. The ruling is recorded in full at T3. Missing is `Left`: not asked, so a default applies. `null` is `Right Nothing`, "don't know", and never takes a default. `{}` means `null` until it is retired, which happens after the service is instrumented to show who sends it. The cause of today's silent FALSE, `fromMaybe FALSE` at `CodeGen.hs:239, 335, 603`, is removed.
 
 ### U10 — The ladder's TypeScript evaluator
 
