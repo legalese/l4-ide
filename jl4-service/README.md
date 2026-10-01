@@ -172,8 +172,10 @@ The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an a
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
 Every response says which defaults the answer rests on, in `presumed`, beside `result`: the names of inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
 A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same way.
-An error response has no `presumed`, since it carries no answer.
+A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
+Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so it is refused by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`.
 For this rule:
 
 ```l4
@@ -193,7 +195,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 # {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
 ```
 
-**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
+**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
 
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
@@ -213,7 +215,8 @@ Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on th
 Limits, measured 2026-10-02:
 
 - **A `CONSIDER` with an `OTHERWISE` branch does not stop.** It reads an assumed term, matches none of its `WHEN` patterns, and takes the `OTHERWISE` branch, with no error: `ASSUME x IS A BOOLEAN` then `CONSIDER x WHEN TRUE THEN 1 OTHERWISE 2` gives `2`. So on the wrapper path, a missing `BOOLEAN` that the rule reads only through such a `CONSIDER` gets the catch-all answer. Build step 1 (§8) of `UNKNOWN-EVALUATION-SPEC.md`, proposed in legalese/l4-ide#526 and not landed, makes such a `CONSIDER` stop and name the input.
-- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE` fails the whole request with `Evaluation produced unknown value`, which does not name the input, even when the rule would never have read it.
+- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it: `Missing required field 'unused' in JSON object`.
+- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. This extends the early/late split above; it did not create it.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
@@ -264,6 +267,10 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
     ]
   }'
 ```
+
+Every case comes back, under its `@id`, with its own `@presumed`.
+A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
+Neither has a result.
 
 ### Query Planning
 

@@ -323,8 +323,9 @@ What else works:
 - **The list of facts a published rule asks for.** A name that an `@export`ed
   rule reads — directly or through anything it relies on — becomes a request
   input, carrying its `@desc` if it has one and its `TYPICALLY` value as the
-  JavaScript Object Notation (JSON) Schema `default`. A name with no
-  `TYPICALLY` value is `required`; one with a value is optional.
+  JavaScript Object Notation (JSON) Schema `default`. A name with a
+  `TYPICALLY` value is optional, and so is one whose type is a `MAYBE`, which
+  a request may leave out to mean `NOTHING`; any other name is `required`.
 - **`l4 batch` and `jl4-service`**, which supply the names a rule reads from the
   request the same way they supply a read `ASSUME`, and fill in a name's
   `TYPICALLY` value when the request leaves it out (see

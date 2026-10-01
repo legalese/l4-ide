@@ -111,11 +111,16 @@ govern what counts as leaving a fact out:
 - **The presumption can be switched off.** `l4 batch --presumption hard`, or
   `"presumption": "hard"` in a service request, uses no defaults: a fact left
   out is missing, and the case is refused, naming it. The default is `soft`.
+  The switch reaches only the facts a case can supply. A record the rules
+  decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
+  under `hard` the answer lists them under `presumed` as
+  `JSONDECODE <type>: <field>`, because nothing the case says could replace
+  them.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
-either, and is not published.
+either, and is not published, in the service's schema or in the query plan's.
 
 _Partly landed (2026-10-02). Of the four things proposed on 2026-09-04, two have
 landed: a **section** `GIVEN` may be left out, and a rule that reads it then uses
