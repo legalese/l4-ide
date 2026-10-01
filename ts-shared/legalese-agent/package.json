@@ -1,0 +1,43 @@
+{
+  "name": "@repo/legalese-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VS Code-free Legalese AI agent core: chat loop, ai-proxy client, tool dispatcher and built-in tools, reaching the platform through ports",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "git clean -fdx dist out || echo 'git not available'",
+    "build": "npm run clean && tsc",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "tsc -p tsconfig.test.json && node --test 'out/test/**/*.test.js'",
+    "lint": "eslint --max-warnings=0 .",
+    "lint-fix": "eslint . --fix"
+  },
+  "packageManager": "npm@11.0.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "prettier": "@repo/prettier-config",
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/prettier-config": "*",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.16.0"
+  },
+  "dependencies": {
+    "jl4-client-rpc": "*"
+  }
+}

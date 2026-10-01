@@ -1,23 +1,25 @@
-import * as vscode from 'vscode'
-import * as path from 'path'
-import { promises as fs, existsSync } from 'fs'
+import * as path from 'node:path'
+import type { L4Language, ResolvedPath, Workspace } from '../ports.js'
+import { positionAt } from '../text-positions.js'
 import { fetchL4Diagnostics } from './lsp.js'
 import {
-  awaitDirectiveResults,
-  createDirectiveSnapshotStore,
-  getCachedDirectiveResults,
   renderDirectiveResults,
+  type DirectiveSnapshotStore,
 } from './directive-snapshot.js'
 
-/**
- * Per-tool directive snapshot store for `fs__edit_file`. Keeping this
- * separate from `l4__evaluate`'s store means an edit can report
- * "what changed since the last edit" independently from
- * "what changed since the last l4__evaluate call".
- */
-const editStore = createDirectiveSnapshotStore()
+/** What the fs tools need from the host. */
+export interface FsToolContext {
+  workspace: Workspace
+  l4: L4Language
+  /** `fs__edit_file`'s private directive snapshot store. Keeping this
+   *  separate from `l4__evaluate`'s store means an edit can report
+   *  "what changed since the last edit" independently from "what
+   *  changed since the last l4__evaluate call". Per conversation: see
+   *  {@link BuiltinTools}. */
+  editStore: DirectiveSnapshotStore
+}
 
-/** How long to wait (ms) after applyEdit for the LSP to push fresh
+/** How long to wait (ms) after an edit for the LSP to push fresh
  *  directive results before computing the diff. The LSP normally
  *  finishes a small file in under 100ms; we give it a bit more
  *  headroom but bail rather than block the tool turn. */
@@ -25,78 +27,10 @@ const DIRECTIVE_PUSH_WAIT_MS = 1000
 
 /**
  * Built-in filesystem tools. All paths are workspace-relative; absolute
- * paths outside any workspace folder are rejected. Each tool returns a
- * string (tool result). Errors throw — the dispatcher wraps them into
- * a tool-result `{ error: ... }`.
+ * paths outside the workspace are rejected by {@link Workspace.resolvePath}.
+ * Each tool returns a string (tool result). Errors throw — the
+ * dispatcher wraps them into a tool-result `{ error: ... }`.
  */
-
-interface ResolvedPath {
-  relative: string
-  uri: vscode.Uri
-  fsPath: string
-}
-
-/**
- * Resolve a user-supplied path to a workspace-rooted URI, rejecting
- * anything that escapes the workspace. Accepts both absolute paths
- * (inside the workspace) and relative paths (resolved against the
- * first workspace folder).
- */
-function resolveWorkspacePath(p: string): ResolvedPath {
-  if (!p || typeof p !== 'string') {
-    throw new Error('path is required')
-  }
-  const folders = vscode.workspace.workspaceFolders ?? []
-  if (folders.length === 0) {
-    throw new Error(
-      'No workspace folder is open. fs tools only operate on files inside a loaded workspace folder.'
-    )
-  }
-  // Candidate roots for relative paths. Active file's folder wins the
-  // tiebreak so a tool call from inside a multi-root workspace lands
-  // next to the file the user is looking at.
-  const active = vscode.window.activeTextEditor?.document.uri
-  const activeFolder = active
-    ? vscode.workspace.getWorkspaceFolder(active)
-    : undefined
-  const roots: string[] = []
-  if (activeFolder) roots.push(activeFolder.uri.fsPath)
-  for (const f of folders) {
-    if (!roots.includes(f.uri.fsPath)) roots.push(f.uri.fsPath)
-  }
-  const preferredBase = roots[0]!
-
-  let absolute: string
-  if (path.isAbsolute(p)) {
-    absolute = p
-  } else {
-    // Try each root; first hit wins. If none exist, fall through to
-    // the preferred base so create can land in a sensible location.
-    let picked: string | null = null
-    for (const root of roots) {
-      const candidate = path.resolve(root, p)
-      if (existsSync(candidate)) {
-        picked = candidate
-        break
-      }
-    }
-    absolute = picked ?? path.resolve(preferredBase, p)
-  }
-  const insideWorkspace = folders.some(
-    (f) =>
-      absolute === f.uri.fsPath || absolute.startsWith(f.uri.fsPath + path.sep)
-  )
-  if (!insideWorkspace) {
-    throw new Error(
-      `Path is outside every loaded workspace folder: ${p}. fs tools only operate on files inside a loaded workspace folder — ask the user to add the target folder to the workspace first.`
-    )
-  }
-  return {
-    relative: path.relative(preferredBase, absolute) || path.basename(absolute),
-    uri: vscode.Uri.file(absolute),
-    fsPath: absolute,
-  }
-}
 
 export interface FsReadArgs {
   path: string
@@ -140,12 +74,13 @@ const PATTERN_CONTEXT_LINES = 2
  * important than the diagnostic annotation.
  */
 async function appendL4Diagnostics(
+  ctx: FsToolContext,
   r: ResolvedPath,
   body: string
 ): Promise<string> {
   if (!r.fsPath.toLowerCase().endsWith('.l4')) return body
   try {
-    const diagnostics = await fetchL4Diagnostics(r.uri)
+    const diagnostics = await fetchL4Diagnostics(ctx.l4, r.uri)
     // Errors gate everything: the model needs to fix them before any
     // directive-level diff is meaningful. Return the diagnostics block
     // verbatim — same payload `l4__evaluate` surfaces in that case.
@@ -155,7 +90,7 @@ async function appendL4Diagnostics(
     // Clean compile: emit a compact directive diff against the
     // edit-tool's snapshot. A fully-clean call with zero changes
     // collapses to a single header line.
-    const diffBlock = await computeEditDiff(r)
+    const diffBlock = await computeEditDiff(ctx, r)
     return `${body}\n${diffBlock}`
   } catch {
     return body
@@ -170,17 +105,20 @@ async function appendL4Diagnostics(
  *  catalog would drown. Waits briefly for the LSP to push fresh
  *  directive results post-edit; falls back to whatever's in the cache
  *  on timeout. */
-async function computeEditDiff(r: ResolvedPath): Promise<string> {
-  const uriStr = r.uri.toString()
+async function computeEditDiff(
+  ctx: FsToolContext,
+  r: ResolvedPath
+): Promise<string> {
+  const uriStr = r.uri
   // After applyEdit + save the LSP recompiles and pushes a fresh
   // result set. We always wait for the next push (even if a stale
   // cache entry exists) so the diff reflects post-edit state. The
   // timeout caps the worst-case tool latency.
-  await awaitDirectiveResults(uriStr, DIRECTIVE_PUSH_WAIT_MS)
-  const results = getCachedDirectiveResults(uriStr) ?? []
+  await ctx.l4.awaitDirectiveResults(uriStr, DIRECTIVE_PUSH_WAIT_MS)
+  const results = ctx.l4.getDirectiveResults(uriStr) ?? []
   return renderDirectiveResults({
     results,
-    store: editStore,
+    store: ctx.editStore,
     uri: uriStr,
     mode: 'changed',
   })
@@ -213,19 +151,17 @@ const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
  * `<relative-path>:<lineno>: <text>` rows — file contents, not just
  * entry names.
  */
-export async function fsReadFile(args: FsReadArgs): Promise<string> {
-  const r = resolveWorkspacePath(args.path)
-  let stat: Awaited<ReturnType<typeof fs.stat>>
-  try {
-    stat = await fs.stat(r.fsPath)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error(`No such file or directory: ${r.relative}`)
-    }
-    throw err
+export async function fsReadFile(
+  ctx: Pick<FsToolContext, 'workspace'>,
+  args: FsReadArgs
+): Promise<string> {
+  const r = ctx.workspace.resolvePath(args.path)
+  const stat = await ctx.workspace.stat(r.fsPath)
+  if (!stat) {
+    throw new Error(`No such file or directory: ${r.relative}`)
   }
 
-  const isDir = stat.isDirectory()
+  const isDir = stat.isDirectory
   const hasKeywords =
     typeof args.search_keywords === 'string' &&
     args.search_keywords.trim().length > 0
@@ -236,7 +172,7 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   // burn memory on a big repo) — `grepDirRecursive` walks
   // file-by-file and stops once the cap is hit.
   if (isDir && hasKeywords) {
-    return grepDirRecursive(r, args.search_keywords!)
+    return grepDirRecursive(ctx.workspace, r, args.search_keywords!)
   }
 
   // Materialise the target as a list of lines regardless of kind.
@@ -247,16 +183,16 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   // explicitly.
   let lines: string[]
   if (isDir) {
-    const raw = await fs.readdir(r.fsPath, { withFileTypes: true })
+    const raw = await ctx.workspace.readDirectory(r.fsPath)
     const filtered = raw.filter((e) => !DIR_IGNORES.has(e.name))
     filtered.sort((a, b) => {
-      const rank = (e: typeof a): number => (e.isDirectory() ? 0 : 1)
+      const rank = (e: typeof a): number => (e.isDirectory ? 0 : 1)
       const d = rank(a) - rank(b)
       return d !== 0 ? d : a.name.localeCompare(b.name)
     })
-    lines = filtered.map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+    lines = filtered.map((e) => (e.isDirectory ? `${e.name}/` : e.name))
   } else {
-    const buf = await fs.readFile(r.fsPath, 'utf-8')
+    const buf = await ctx.workspace.readFile(r.fsPath)
     lines = buf.replace(/\r\n/g, '\n').split('\n')
   }
 
@@ -475,6 +411,7 @@ function clampInt(n: number, lo: number, hi: number): number {
  * as `shown=X/total`. Stops the walk early once the cap is hit.
  */
 async function grepDirRecursive(
+  workspace: Workspace,
   r: ResolvedPath,
   keywordsRaw: string
 ): Promise<string> {
@@ -493,14 +430,14 @@ async function grepDirRecursive(
   const baseRel = r.relative
   while (stack.length > 0) {
     const dir = stack.pop()!
-    let entries: Array<import('fs').Dirent>
+    let entries: Awaited<ReturnType<Workspace['readDirectory']>>
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true })
+      entries = await workspace.readDirectory(dir)
     } catch {
       continue
     }
     entries.sort((a, b) => {
-      const rank = (e: typeof a): number => (e.isDirectory() ? 0 : 1)
+      const rank = (e: typeof a): number => (e.isDirectory ? 0 : 1)
       const d = rank(a) - rank(b)
       return d !== 0 ? d : a.name.localeCompare(b.name)
     })
@@ -510,14 +447,14 @@ async function grepDirRecursive(
     for (const e of entries) {
       if (DIR_IGNORES.has(e.name)) continue
       const full = path.join(dir, e.name)
-      if (e.isDirectory()) {
+      if (e.isDirectory) {
         subdirs.push(full)
         continue
       }
-      if (!e.isFile()) continue
+      if (!e.isFile) continue
       let buf: string
       try {
-        buf = await fs.readFile(full, 'utf-8')
+        buf = await workspace.readFile(full)
       } catch {
         continue
       }
@@ -592,84 +529,11 @@ export const FS_CREATE_HTML_SEED = `<!DOCTYPE html>
 </html>
 `
 
-/** True for files we render in the built-in browser preview rather
- *  than opening as a source text tab. */
-function isHtmlPath(fsPath: string): boolean {
+/** True for files we render in a browser preview rather than opening
+ *  as a source text tab. */
+export function isHtmlPath(fsPath: string): boolean {
   const ext = path.extname(fsPath).toLowerCase()
   return ext === '.html' || ext === '.htm'
-}
-
-// A single reused webview panel acts as the "built-in browser" for
-// AI-created HTML files. Reused across creates so a new document
-// replaces the previous preview instead of stacking tabs. The
-// save-watcher keeps the rendered page in sync as follow-up
-// `fs__edit_file` calls build the document up (each one saves the
-// buffer, firing onDidSaveTextDocument).
-let htmlPreviewPanel: vscode.WebviewPanel | undefined
-let htmlPreviewUri: vscode.Uri | undefined
-let htmlPreviewWatcher: vscode.Disposable | undefined
-
-/**
- * Open (or refocus) the built-in browser preview on an HTML file and
- * point it at `uri`. Renders the file's current contents in a webview
- * panel beside the chat, and live-refreshes whenever that file is
- * saved so the user watches the document take shape.
- */
-async function openHtmlPreview(uri: vscode.Uri): Promise<void> {
-  const title = `Preview: ${path.basename(uri.fsPath)}`
-  if (!htmlPreviewPanel) {
-    htmlPreviewPanel = vscode.window.createWebviewPanel(
-      'l4.htmlPreview',
-      title,
-      // Beside the chat, without stealing focus from the conversation.
-      { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots:
-          vscode.workspace.workspaceFolders?.map((f) => f.uri) ?? [],
-      }
-    )
-    htmlPreviewPanel.onDidDispose(() => {
-      htmlPreviewPanel = undefined
-      htmlPreviewUri = undefined
-      htmlPreviewWatcher?.dispose()
-      htmlPreviewWatcher = undefined
-    })
-    // Manual saves (Cmd+S) also refresh — the edit tool path refreshes
-    // explicitly via refreshHtmlPreviewIfShowing, but this keeps the
-    // preview honest for any other writer too.
-    htmlPreviewWatcher = vscode.workspace.onDidSaveTextDocument((doc) =>
-      refreshHtmlPreviewIfShowing(doc.uri)
-    )
-  }
-  htmlPreviewUri = uri
-  htmlPreviewPanel.title = title
-  htmlPreviewPanel.webview.html = await readFileText(uri)
-  htmlPreviewPanel.reveal(vscode.ViewColumn.Active, true)
-}
-
-/** Read a workspace file as UTF-8 text. */
-async function readFileText(uri: vscode.Uri): Promise<string> {
-  const bytes = await vscode.workspace.fs.readFile(uri)
-  return Buffer.from(bytes).toString('utf8')
-}
-
-/**
- * Reload the built-in browser preview from disk when it is currently
- * showing `uri`. No-op when the preview panel is closed or pointed at a
- * different file — so an edit to an HTML file that happens to have a
- * live preview tab open refreshes it, and an edit to any other file
- * does nothing.
- */
-async function refreshHtmlPreviewIfShowing(uri: vscode.Uri): Promise<void> {
-  if (
-    htmlPreviewPanel &&
-    htmlPreviewUri &&
-    uri.toString() === htmlPreviewUri.toString()
-  ) {
-    htmlPreviewPanel.webview.html = await readFileText(uri)
-  }
 }
 
 /**
@@ -680,56 +544,23 @@ async function refreshHtmlPreviewIfShowing(uri: vscode.Uri): Promise<void> {
  * whole file inline" pattern that wastes tokens / risks max_tokens
  * truncation mid-payload.
  */
-export async function fsCreateFile(args: FsCreateArgs): Promise<string> {
-  const r = resolveWorkspacePath(args.path)
-  try {
-    await fs.access(r.fsPath)
+export async function fsCreateFile(
+  ctx: Pick<FsToolContext, 'workspace'>,
+  args: FsCreateArgs
+): Promise<string> {
+  const r = ctx.workspace.resolvePath(args.path)
+  if (await ctx.workspace.stat(r.fsPath)) {
     throw new Error(`File already exists: ${r.relative}`)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      // Either the file exists (handled above) or something else — rethrow.
-      if ((err as Error).message?.startsWith('File already exists:')) throw err
-    }
-    // ENOENT → proceed to create.
   }
-  // Route through VSCode's WorkspaceEdit so the LSP picks up the new
-  // file via its normal didOpen path (otherwise a silent Node write
-  // doesn't get didChange/didOpen events, and l4__evaluate can
-  // return stale results for a freshly-created file).
-  // HTML files get a full (plain-white) document skeleton so the
-  // built-in browser preview renders a real page from the start;
-  // everything else gets the one-line code seed.
+  // HTML files get a full (plain-white) document skeleton so a browser
+  // preview renders a real page from the start; everything else gets
+  // the one-line code seed. The workspace creates parent directories,
+  // routes the write through the editor where there is one (so the
+  // LSP sees the new file via didOpen and l4__evaluate isn't stale),
+  // and may reveal it (VS Code opens a tab, or the HTML preview).
   const isHtml = isHtmlPath(r.fsPath)
   const seed = isHtml ? FS_CREATE_HTML_SEED : FS_CREATE_FILE_SEED
-  await fs.mkdir(path.dirname(r.fsPath), { recursive: true })
-  const edit = new vscode.WorkspaceEdit()
-  edit.createFile(r.uri, { overwrite: false })
-  edit.insert(r.uri, new vscode.Position(0, 0), seed)
-  const ok = await vscode.workspace.applyEdit(edit)
-  if (!ok) {
-    throw new Error(
-      `fs__create_file: VSCode refused to create ${r.relative} (readonly workspace or similar).`
-    )
-  }
-  // Persist to disk so subsequent non-VSCode readers (including our
-  // own fs__read_file / fs.readFile) see the new content immediately.
-  const doc = await vscode.workspace.openTextDocument(r.uri)
-  if (doc.isDirty) await doc.save()
-  if (isHtml) {
-    // Open the rendered page in the built-in browser preview rather
-    // than a source tab — and live-refresh it as follow-up edits land.
-    await openHtmlPreview(r.uri)
-  } else {
-    // Surface the new file as a visible tab so the user sees what the
-    // model just created without having to expand the tool-call row and
-    // click. `preserveFocus: true` keeps the cursor wherever the user
-    // was — usually the chat input — instead of stealing focus into the
-    // editor mid-conversation.
-    await vscode.window.showTextDocument(doc, {
-      preview: false,
-      preserveFocus: true,
-    })
-  }
+  await ctx.workspace.createFile(r, seed)
   // Skip the appendL4Diagnostics tail — a freshly-created file has no
   // real content to type-check, and the Edit tool the model uses next
   // will run diagnostics naturally.
@@ -763,14 +594,17 @@ export interface FsEditArgs {
  * unique text anchors fail fast. Matches the pattern used by Cursor,
  * Claude Code, Aider.
  *
- * Routed through `workspace.applyEdit` so the L4 language server sees
- * the change via didChange (keeps l4__evaluate fresh) and the
- * edit joins the VSCode undo stack. We save the buffer afterwards so
- * disk-based readers (`fs__read_file`, other extensions) see the new
- * content immediately.
+ * Routed through {@link Workspace.applyEdits}: in VS Code that is
+ * `workspace.applyEdit` + save, so the L4 language server sees the
+ * change via didChange (keeps l4__evaluate fresh), the edit joins the
+ * undo stack, and disk-based readers (`fs__read_file`, other
+ * extensions) see the new content immediately.
  */
-export async function fsEditFile(args: FsEditArgs): Promise<string> {
-  const r = resolveWorkspacePath(args.path)
+export async function fsEditFile(
+  ctx: FsToolContext,
+  args: FsEditArgs
+): Promise<string> {
+  const r = ctx.workspace.resolvePath(args.path)
   if (typeof args.old !== 'string') {
     throw new Error(
       "fs__edit_file: 'old' must be a non-empty string identifying the snippet to replace."
@@ -802,30 +636,28 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
   // at fs__create_file. openTextDocument can otherwise be coerced
   // (e.g. on `untitled:` schemes) into producing an in-memory buffer
   // that then races with the model's expectations.
-  try {
-    await fs.access(r.fsPath)
-  } catch {
+  if (!(await ctx.workspace.stat(r.fsPath))) {
     throw new Error(
       `fs__edit_file: ${r.relative} does not exist. Use fs__create_file to create it first, then call fs__edit_file to add content.`
     )
   }
-  const doc = await vscode.workspace.openTextDocument(r.uri)
+  const doc = await ctx.workspace.readDocument(r.uri)
   // Preserve the file's line-ending style across the edit. The model
   // always sends LF in `args.old` / `args.new`; if the document is
   // CRLF we normalize both to CRLF so (a) byte offsets computed from
-  // the search match the live document text (positionAt walks the
-  // raw buffer including \r), and (b) the inserted snippet stays
+  // the search match the live document text (offsets count the raw
+  // buffer including \r), and (b) the inserted snippet stays
   // uniformly CRLF instead of dropping LF runs into a CRLF file.
   // Without this, a single edit to a CRLF file silently flattened
   // the whole file to LF — the LF-only `args.new` was spliced in
   // as-is and applyEdit + save preserved the result wholesale.
   // `replace(/\r?\n/g, …)` accepts whichever form the model sent.
-  const docEol = doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n'
+  const docEol = doc.eol
   const oldNormalized = args.old.replace(/\r?\n/g, docEol)
   const newNormalized = args.new.replace(/\r?\n/g, docEol)
   // Search the raw document text (no LF normalization) so offsets
-  // line up 1:1 with what positionAt expects below.
-  const currentText = doc.getText()
+  // line up 1:1 with what the workspace applies below.
+  const currentText = doc.text
 
   // When `startLine` is set, drop the lines at/before it from the
   // search window. The replace still applies to the real document
@@ -868,9 +700,6 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
     }
   }
 
-  // Compute the Range to replace. Using the live document's positionAt
-  // keeps the offset-to-(line,col) mapping authoritative — works the
-  // same way the LSP sees text.
   const hit = searchWindow.indexOf(oldNormalized)
   if (hit === -1) {
     throw new Error(
@@ -881,22 +710,15 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
   }
   const startOffset = searchOffset + hit
   const endOffset = startOffset + oldNormalized.length
-  const range = new vscode.Range(
-    doc.positionAt(startOffset),
-    doc.positionAt(endOffset)
-  )
-  const edit = new vscode.WorkspaceEdit()
-  edit.replace(r.uri, range, newNormalized)
-  const ok = await vscode.workspace.applyEdit(edit)
-  if (!ok) {
+  try {
+    await ctx.workspace.applyEdits([
+      { uri: r.uri, startOffset, endOffset, newText: newNormalized },
+    ])
+  } catch (err) {
     throw new Error(
-      `fs__edit_file: VSCode refused to apply edit to ${r.relative} (file may be read-only).`
+      `fs__edit_file: could not apply edit to ${r.relative} (file may be read-only): ${err instanceof Error ? err.message : String(err)}`
     )
   }
-  if (doc.isDirty) await doc.save()
-  // If this file is an HTML doc currently shown in the built-in browser
-  // preview, reload the rendered page so it tracks the edit.
-  if (isHtmlPath(r.fsPath)) await refreshHtmlPreviewIfShowing(r.uri)
   // `[<path> <start>-<end>]` prefix carries the post-edit line range
   // so the chat row can render it as a muted "Lines 23-45" suffix
   // (matches fs__read_file's surfacing). No `/total` segment here —
@@ -904,10 +726,11 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
   // absence tells the webview parser this is an edit-anchor range
   // (always shown) rather than a read range (suppressed when it
   // covers the whole file).
-  const editStartLine = range.start.line + 1
+  const editStartLine = positionAt(currentText, startOffset).line + 1
   const editEndLine = editStartLine + args.new.split('\n').length - 1
   return withDocsHintOnError(
     await appendL4Diagnostics(
+      ctx,
       r,
       `[${r.relative} ${editStartLine}-${editEndLine}] (Edited ${args.old.split('\n').length} → ${args.new.split('\n').length} lines)`
     )
@@ -932,14 +755,17 @@ export interface FsDeleteArgs {
   path: string
 }
 
-export async function fsDeleteFile(args: FsDeleteArgs): Promise<string> {
-  const r = resolveWorkspacePath(args.path)
-  // Use VSCode's FS so the Trash is honored (user can recover).
-  await vscode.workspace.fs.delete(r.uri, {
-    recursive: false,
-    useTrash: true,
-  })
-  return `Moved ${r.relative} to trash`
+export async function fsDeleteFile(
+  ctx: Pick<FsToolContext, 'workspace'>,
+  args: FsDeleteArgs
+): Promise<string> {
+  const r = ctx.workspace.resolvePath(args.path)
+  // VS Code moves the file to the Trash so the user can recover it; a
+  // headless host deletes it (git keeps the history).
+  const how = await ctx.workspace.deleteFile(r)
+  return how === 'trashed'
+    ? `Moved ${r.relative} to trash`
+    : `Deleted ${r.relative}`
 }
 
 function countOccurrences(haystack: string, needle: string): number {
@@ -954,13 +780,12 @@ function countOccurrences(haystack: string, needle: string): number {
 }
 
 /**
- * Resolve a tool-call's `path` argument to a workspace-rooted URI for
- * the register layer to open in the editor. Used by the AiFileOpen
- * RPC handler.
+ * Resolve a tool-call's `path` argument to its workspace URI, or null
+ * when it can't be resolved (outside the workspace, no workspace).
  */
-export function resolveFileUri(p: string): vscode.Uri | null {
+export function resolveFileUri(workspace: Workspace, p: string): string | null {
   try {
-    return resolveWorkspacePath(p).uri
+    return workspace.resolvePath(p).uri
   } catch {
     return null
   }
@@ -972,24 +797,11 @@ export function resolveFileUri(p: string): vscode.Uri | null {
  * The tool dispatcher calls this BEFORE running fs__create / fs__edit
  * so the "before" side of the applied-diff view has something to show.
  */
-export async function resolveCurrentContents(p: string): Promise<string> {
-  const r = resolveWorkspacePath(p)
-  try {
-    return (await fs.readFile(r.fsPath, 'utf-8')).replace(/\r\n/g, '\n')
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return ''
-    throw err
-  }
-}
-
-/** Workspace-relative display path for a resolved uri. */
-export function workspaceRelative(uri: vscode.Uri): string {
-  const folders = vscode.workspace.workspaceFolders ?? []
-  for (const f of folders) {
-    if (uri.fsPath === f.uri.fsPath) return path.basename(uri.fsPath)
-    if (uri.fsPath.startsWith(f.uri.fsPath + path.sep)) {
-      return path.relative(f.uri.fsPath, uri.fsPath)
-    }
-  }
-  return uri.fsPath
+export async function resolveCurrentContents(
+  workspace: Workspace,
+  p: string
+): Promise<string> {
+  const r = workspace.resolvePath(p)
+  if (!(await workspace.stat(r.fsPath))) return ''
+  return (await workspace.readFile(r.fsPath)).replace(/\r\n/g, '\n')
 }

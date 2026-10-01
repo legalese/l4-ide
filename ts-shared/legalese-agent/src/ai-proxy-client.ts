@@ -1,21 +1,8 @@
 import type { AiChatMessage } from 'jl4-client-rpc'
-import type { AuthManager } from '../auth.js'
-import type { AiLogger } from './logger.js'
-import { buildCurrentTimeBlock } from './editor-context.js'
+import { buildCurrentTimeBlock } from './context-messages.js'
+import type { AiProxyTool, AuthProvider, Logger } from './ports.js'
 
-/**
- * Client-declared tool definition in the OpenAI function-tool shape the
- * ai-proxy expects. Phase 1 sends no tools; the field exists so the
- * chat-service API is stable.
- */
-export interface AiProxyTool {
-  type: 'function'
-  function: {
-    name: string
-    description?: string
-    parameters: Record<string, unknown>
-  }
-}
+export type { AiProxyTool }
 
 export interface AiProxyChatRequest {
   messages: AiChatMessage[]
@@ -37,7 +24,7 @@ export interface AiProxyChatRequest {
   /** Deployment-scoped base URL override
    *  (`https://ai.legalese.cloud/{orgSlug}/{deploymentId}`). When set,
    *  `stream()` / `reattach()` POST/GET against this instead of
-   *  `getAiEndpoint()`. The deployment endpoint is the same ai-proxy
+   *  the default endpoint. The deployment endpoint is the same ai-proxy
    *  stack, path-scoped, so the SSE `metadata` frame and turn-reattach
    *  protocol work identically. Local-mode is ignored when this is
    *  set (a deployment chat always needs real cloud auth). */
@@ -131,57 +118,53 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
+ * Where requests go. `local` marks a developer's local ai-proxy, which
+ * ignores Authorization but still requires the header: the client
+ * stamps `Bearer dev-local` when the auth provider has no credential.
+ */
+export interface AiEndpoint {
+  url: string
+  local: boolean
+}
+
+/**
  * Production ai-proxy URL. The `LEGALESE_AI_ENDPOINT` env var stays as
  * an undocumented escape hatch for developers running on a non-default
- * port. End users flip the `legaleseAi.localMode` setting instead —
- * see `getAiEndpoint` below.
+ * port. VS Code users flip the `legaleseAi.localMode` setting instead,
+ * which the extension passes in as {@link AiProxyClientOptions.endpoint}.
  */
-const PROD_AI_ENDPOINT = (
+export const PROD_AI_ENDPOINT = (
   process.env.LEGALESE_AI_ENDPOINT ?? 'https://ai.legalese.cloud'
 ).replace(/\/$/, '')
 
-/** Local ai-proxy URL used when `legaleseAi.localMode` is enabled. */
-const LOCAL_AI_ENDPOINT = 'http://127.0.0.1:3000'
-
-/**
- * True when the user has flipped `legaleseAi.localMode` on. Read fresh
- * each request so toggling the setting takes effect without a reload.
- */
-export function isLocalMode(): boolean {
-  try {
-    // Lazy import: this module is also pulled into non-extension
-    // contexts (tests) where `vscode` isn't on the runtime path.
-    // Falling back to false there is the right default.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const vscode = require('vscode') as typeof import('vscode')
-    return (
-      vscode.workspace
-        .getConfiguration()
-        .get<boolean>('legaleseAi.localMode') === true
-    )
-  } catch {
-    return false
-  }
-}
-
-/**
- * Resolve the active ai-proxy base URL. Re-evaluated per call so the
- * setting toggle applies immediately to subsequent requests.
- */
-export function getAiEndpoint(): string {
-  return isLocalMode() ? LOCAL_AI_ENDPOINT : PROD_AI_ENDPOINT
-}
-
-/** Back-compat: callers that want a snapshot of the production URL. */
-export const AI_ENDPOINT = PROD_AI_ENDPOINT
+/** Local ai-proxy URL used in local (developer) mode. */
+export const LOCAL_AI_ENDPOINT = 'http://127.0.0.1:3000'
 
 export interface AiProxyClientOptions {
-  auth: AuthManager
-  logger: AiLogger
+  auth: AuthProvider
+  logger: Logger
+  /** Resolve the ai-proxy base URL. Called per request so a setting
+   *  toggle applies immediately. Defaults to {@link PROD_AI_ENDPOINT}. */
+  endpoint?: () => AiEndpoint
 }
 
 export class AiProxyClient {
   constructor(private readonly opts: AiProxyClientOptions) {}
+
+  /** The endpoint requests currently go to. */
+  getEndpoint(): AiEndpoint {
+    return this.opts.endpoint?.() ?? { url: PROD_AI_ENDPOINT, local: false }
+  }
+
+  /** Auth headers for a request to the default endpoint, with the
+   *  dev-local stand-in in local mode. */
+  async getAuthHeaders(): Promise<Record<string, string>> {
+    const headers = await this.opts.auth.getAiAuthHeaders()
+    if (!headers.Authorization && this.getEndpoint().local) {
+      headers.Authorization = 'Bearer dev-local'
+    }
+    return headers
+  }
 
   /**
    * POST /v1/chat/completions and stream SSE events as an async iterator.
@@ -194,8 +177,9 @@ export class AiProxyClient {
     abortSignal: AbortSignal,
     cursor?: SseCursor
   ): AsyncGenerator<AiProxyStreamEvent> {
-    const endpoint = request.apiBaseUrl ?? getAiEndpoint()
-    const local = request.apiBaseUrl ? false : isLocalMode()
+    const defaultEndpoint = this.getEndpoint()
+    const endpoint = request.apiBaseUrl ?? defaultEndpoint.url
+    const local = request.apiBaseUrl ? false : defaultEndpoint.local
     const url = `${endpoint}/v1/chat/completions`
     const headers = await this.opts.auth.getAiAuthHeaders()
     let hasAuth = !!headers.Authorization
@@ -273,13 +257,14 @@ export class AiProxyClient {
     cursor?: SseCursor,
     apiBaseUrl?: string
   ): AsyncGenerator<AiProxyStreamEvent> {
-    const endpoint = apiBaseUrl ?? getAiEndpoint()
+    const defaultEndpoint = this.getEndpoint()
+    const endpoint = apiBaseUrl ?? defaultEndpoint.url
     const sinceId = cursor?.lastEventId ?? 0
     const url =
       `${endpoint}/v1/chat/turns/${encodeURIComponent(turnId)}/stream` +
       (sinceId > 0 ? `?since=${sinceId}` : '')
     const headers = await this.opts.auth.getAiAuthHeaders()
-    if (!headers.Authorization && !apiBaseUrl && isLocalMode()) {
+    if (!headers.Authorization && !apiBaseUrl && defaultEndpoint.local) {
       headers.Authorization = 'Bearer dev-local'
     }
     if (!headers.Authorization) {
@@ -357,7 +342,7 @@ export class AiProxyClient {
         const backoff =
           REATTACH_BACKOFF_MS[
             Math.min(reattaches, REATTACH_BACKOFF_MS.length - 1)
-          ]
+          ] ?? 8000
         reattaches++
         this.opts.logger.warn(
           `stream interrupted (${err instanceof Error ? err.message : String(err)}); ` +
@@ -389,11 +374,8 @@ export class AiProxyClient {
    * conversation files on the server.
    */
   async summarizeTitle(firstUserMessage: string): Promise<string | null> {
-    const url = `${getAiEndpoint()}/v1/chat/completions`
-    const headers = await this.opts.auth.getAiAuthHeaders()
-    if (!headers.Authorization && isLocalMode()) {
-      headers.Authorization = 'Bearer dev-local'
-    }
+    const url = `${this.getEndpoint().url}/v1/chat/completions`
+    const headers = await this.getAuthHeaders()
     const body = {
       model: 'legalese-summize-4',
       messages: [
@@ -440,11 +422,8 @@ export class AiProxyClient {
    * surfaces a friendly message.
    */
   async describeIntendedUse(functionsJson: string): Promise<string | null> {
-    const url = `${getAiEndpoint()}/v1/chat/completions`
-    const headers = await this.opts.auth.getAiAuthHeaders()
-    if (!headers.Authorization && isLocalMode()) {
-      headers.Authorization = 'Bearer dev-local'
-    }
+    const url = `${this.getEndpoint().url}/v1/chat/completions`
+    const headers = await this.getAuthHeaders()
     const body = {
       model: 'legalese-summize-4',
       messages: [
@@ -595,7 +574,7 @@ function extractErrorCode(body: string): string | undefined {
  */
 async function* parseSse(
   body: ReadableStream<Uint8Array>,
-  logger?: AiLogger,
+  logger?: Logger,
   cursor?: SseCursor
 ): AsyncGenerator<AiProxyStreamEvent> {
   const reader = body.getReader()
@@ -671,7 +650,7 @@ function parseFrame(raw: string): SseFrame | null {
 
 function* interpretFrame(
   frame: SseFrame,
-  logger?: AiLogger
+  logger?: Logger
 ): Generator<AiProxyStreamEvent> {
   logger?.debug(
     `frame event=${frame.event ?? '<default>'} data[0..80]=${frame.data.slice(0, 80)}`
