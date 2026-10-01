@@ -37,7 +37,7 @@ import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import Backend.Api
 import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..))
 import L4.Export (AssumeRewrite(..), extractAssumeParamResolveds, rewriteModuleAssumes)
-import L4.Discharge (sectionBinders)
+import L4.Discharge (Binder (..), sectionBinders)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Scientific as Scientific
@@ -358,8 +358,8 @@ readInt t = case reads (Text.unpack t) of
 -- declaration order) and 'FnLitString' into an enum constructor ref
 -- when the expected type is an enum.
 data ModuleInfo = ModuleInfo
-  { miRecords      :: Map Unique (Resolved, [(Text, Type' Resolved)])
-    -- ^ record type unique -> (type-constructor ref, [(field name, field type)])
+  { miRecords      :: Map Unique (Resolved, [(Text, Type' Resolved, Maybe (Expr Resolved))])
+    -- ^ record type unique -> (type-constructor ref, [(field name, field type, its TYPICALLY)])
   , miEnumVariants :: Map Unique [(Text, Resolved)]
     -- ^ enum type unique -> [(variant name, variant constructor ref)]
   }
@@ -384,7 +384,7 @@ buildModuleInfo decls = ModuleInfo
   }
   where
 
-    recordFor :: Declare Resolved -> Maybe (Unique, (Resolved, [(Text, Type' Resolved)]))
+    recordFor :: Declare Resolved -> Maybe (Unique, (Resolved, [(Text, Type' Resolved, Maybe (Expr Resolved))]))
     -- A 'RecordDecl' carries its value-level constructor in the 'Maybe n'
     -- slot — *not* the type name in the outer 'AppForm'. The evaluator
     -- binds the record builder under that constructor's unique in
@@ -393,7 +393,7 @@ buildModuleInfo decls = ModuleInfo
     recordFor (MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ (Just ctor) fields)) =
       Just (getUnique tyName, (ctor, map fieldOf fields))
       where
-        fieldOf (MkTypedName _ fn fty _ _) = (rawNameToText (rawName (getActual fn)), fty)
+        fieldOf (MkTypedName _ fn fty mTypically _) = (rawNameToText (rawName (getActual fn)), fty, mTypically)
     recordFor _ = Nothing
 
     enumFor :: Declare Resolved -> Maybe (Unique, [(Text, Resolved)])
@@ -417,94 +417,196 @@ lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
 lookupEnum mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miEnumVariants
 lookupEnum _ _                 = Nothing
 
-lookupRecord :: ModuleInfo -> Type' Resolved -> Maybe (Resolved, [(Text, Type' Resolved)])
+lookupRecord :: ModuleInfo -> Type' Resolved -> Maybe (Resolved, [(Text, Type' Resolved, Maybe (Expr Resolved))])
 lookupRecord mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miRecords
 lookupRecord _ _                 = Nothing
+
+-- | A @TYPICALLY@ default the direct path filled at the root, for an input
+-- (or a record field inside one) the request left out (W3, T1b). It becomes a
+-- 0-ary definition added to the module, and the input refers to it, so that
+-- the evaluator reports the default when, and only when, it is forced (T6;
+-- 'L4.EvaluateLazy.RootFills').
+data RootFill = RootFill
+  { fillRef      :: Resolved
+  , fillBody     :: Expr Resolved
+  , fillPresumed :: Eval.Presumed
+  }
+
+-- | Converting a request's values to AST, collecting the root fills it made.
+-- The 'Int' numbers the fills, so that each gets its own 'Unique'.
+type Fills = StateT (Int, [RootFill]) (Either Text)
+
+fillError :: Text -> Fills a
+fillError = lift . Left
+
+-- | Where fills are minted, and whether they may be (T4).
+data FillCtx = FillCtx
+  { fcSoft :: Bool
+  , fcUri  :: NormalizedUri
+  }
+
+-- | Fill a default at the root: a fresh 0-ary definition holding it, which
+-- the input refers to.
+rootFill :: FillCtx -> [Text] -> Expr Resolved -> Fills (Expr Resolved)
+rootFill ctx path d = do
+  (i, fills) <- get
+  let -- Sort char @'p'@: no other minter uses it (see the list in
+      -- 'L4.Discharge.dischargeModule'), so a fill cannot collide with a name
+      -- the module already has.
+      ref = Def (MkUnique 'p' i ctx.fcUri)
+              (MkName emptyAnno (NormalName ("presumed " <> Eval.renderPresumedPath path)))
+      fill = RootFill
+        { fillRef = ref
+        , fillBody = d
+        , fillPresumed = Eval.MkPresumed
+            { Eval.path = path
+            , Eval.declaredAt = rangeOf d
+            , Eval.origin = Eval.FromRootFill
+            }
+        }
+  put (i + 1, fill : fills)
+  pure (App emptyAnno ref [])
+
+-- | What a request said about one input: nothing (the key is absent),
+-- @null@, or a value. Absent and @null@ differ: absent may take a default,
+-- and @null@ never does (T3).
+data Supplied = Absent | SuppliedNull | Supplied FnLiteral
+
+suppliedIn :: Map Text (Maybe FnLiteral) -> Text -> Supplied
+suppliedIn m name = case Map.lookup name m of
+  Nothing       -> Absent
+  Just Nothing  -> SuppliedNull
+  Just (Just v) -> Supplied v
+
+-- | Convert one top-level input of the request, filling its default if it is
+-- absent, has one, and presumption is soft.
+rootInputExpr
+  :: ModuleInfo
+  -> FillCtx
+  -> Map Text (Expr Resolved)   -- ^ the defaults a request may leave an input out for
+  -> Text
+  -> Type' Resolved
+  -> Supplied
+  -> Fills (Expr Resolved)
+rootInputExpr mi ctx defaults name ty supplied =
+  case supplied of
+    Absent
+      | ctx.fcSoft, Just d <- mDefault -> rootFill ctx [name] d
+      | not ctx.fcSoft, Just _ <- mDefault ->
+          fillError "missing required parameter (it has a TYPICALLY default, but presumption is hard, so the default is not used)"
+      | not ctx.fcSoft, Just _ <- stripMaybe ty ->
+          fillError "missing required parameter (a MAYBE input left out is NOTHING only while presumption is soft)"
+      | otherwise -> fnLiteralToExprTyped mi ctx [name] ty Nothing
+    SuppliedNull
+      | Just _ <- mDefault, Nothing <- stripMaybe ty ->
+          fillError "null means the value is not known, and it never takes the TYPICALLY default: supply a value, or leave the argument out to use the default"
+      | otherwise -> fnLiteralToExprTyped mi ctx [name] ty Nothing
+    Supplied v -> fnLiteralToExprTyped mi ctx [name] ty (Just v)
+  where
+    mDefault = Map.lookup name defaults
 
 -- | Convert an 'FnLiteral' (possibly missing) to an L4 AST expression
 -- that matches the expected 'Type' Resolved'. Handles MAYBE wrapping /
 -- unwrapping, record construction (via declaration-order field lookup),
 -- enum constructor coercion from 'FnLitString', and nested lists /
--- records. Returns 'Left' for cases that can't be represented as a pure
+-- records. Fails for cases that can't be represented as a pure
 -- AST value ('FnUnknown' / 'FnUncertain' against a non-MAYBE type) —
 -- callers can then fall back to the wrapper path.
+--
+-- A record field the value leaves out takes its @DECLARE@'s @TYPICALLY@ while
+-- presumption is soft (T1b), as a root fill named by its path.
 fnLiteralToExprTyped
   :: ModuleInfo
+  -> FillCtx
+  -> [Text]          -- ^ the path to this value, from the request's argument
   -> Type' Resolved
   -> Maybe FnLiteral
-  -> Either Text (Expr Resolved)
-fnLiteralToExprTyped mi ty mVal
+  -> Fills (Expr Resolved)
+fnLiteralToExprTyped mi ctx path ty mVal
   -- MAYBE type: map missing / null / explicit NOTHING literal to NOTHING,
   -- anything else to JUST <recurse with inner type>.
   | Just inner <- stripMaybe ty =
       case mVal of
-        Nothing                  -> Right (App emptyAnno TypeCheck.nothingRef [])
-        Just FnUnknown           -> Right (App emptyAnno TypeCheck.nothingRef [])
+        Nothing                  -> pure (App emptyAnno TypeCheck.nothingRef [])
+        Just FnUnknown           -> pure (App emptyAnno TypeCheck.nothingRef [])
         Just (FnLitString "NOTHING") ->
-          Right (App emptyAnno TypeCheck.nothingRef [])
+          pure (App emptyAnno TypeCheck.nothingRef [])
         Just v -> do
-          e <- fnLiteralToExprTyped mi inner (Just v)
-          Right (App emptyAnno TypeCheck.justRef [e])
+          e <- fnLiteralToExprTyped mi ctx path inner (Just v)
+          pure (App emptyAnno TypeCheck.justRef [e])
   | otherwise = case mVal of
-      Nothing          -> Left "missing required parameter"
-      Just FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
-      Just FnUncertain -> Left "uncertain value is not supported in direct evaluation"
-      Just v           -> nonMaybeValue mi ty v
+      Nothing          -> fillError "missing required parameter"
+      Just FnUnknown   -> fillError "unknown value for a non-MAYBE parameter"
+      Just FnUncertain -> fillError "uncertain value is not supported in direct evaluation"
+      Just v           -> nonMaybeValue mi ctx path ty v
 
 nonMaybeValue
   :: ModuleInfo
+  -> FillCtx
+  -> [Text]
   -> Type' Resolved
   -> FnLiteral
-  -> Either Text (Expr Resolved)
-nonMaybeValue mi ty = \case
-  FnLitInt i     -> Right (Lit emptyAnno (NumericLit emptyAnno (fromIntegral i)))
-  FnLitDouble d  -> Right (Lit emptyAnno (NumericLit emptyAnno
+  -> Fills (Expr Resolved)
+nonMaybeValue mi ctx path ty = \case
+  FnLitInt i     -> pure (Lit emptyAnno (NumericLit emptyAnno (fromIntegral i)))
+  FnLitDouble d  -> pure (Lit emptyAnno (NumericLit emptyAnno
                             (toRational (Scientific.fromFloatDigits d))))
-  FnLitBool True  -> Right (App emptyAnno TypeCheck.trueRef [])
-  FnLitBool False -> Right (App emptyAnno TypeCheck.falseRef [])
+  FnLitBool True  -> pure (App emptyAnno TypeCheck.trueRef [])
+  FnLitBool False -> pure (App emptyAnno TypeCheck.falseRef [])
   FnLitString s
     -- If the expected type is an enum, resolve the string to a variant.
     | Just variants <- lookupEnum mi ty ->
         case lookup s variants of
-          Just ref -> Right (App emptyAnno ref [])
-          Nothing  -> Left ("unknown enum variant: " <> s)
+          Just ref -> pure (App emptyAnno ref [])
+          Nothing  -> fillError ("unknown enum variant: " <> s)
     -- ISO date / time / datetime strings against a temporal parameter.
     -- The wire format mirrors JSON Schema ('date', 'time', 'date-time'
     -- formats); parse here and emit the primitive constructor so the
     -- evaluator sees a real temporal value instead of a rejected
     -- STRING literal.
     | isTypeUnique TypeCheck.dateUnique ty, Just (y, m, d) <- parseIsoDate s ->
-        Right (App emptyAnno TypeCheck.dateFromDMYRef
+        pure (App emptyAnno TypeCheck.dateFromDMYRef
                  [numLit d, numLit m, numLit y])
     | isTypeUnique TypeCheck.timeUnique ty, Just (h, m, sec) <- parseIsoTime s ->
-        Right (App emptyAnno TypeCheck.timeFromHMSRef
+        pure (App emptyAnno TypeCheck.timeFromHMSRef
                  [numLit h, numLit m, numLit sec])
     | isTypeUnique TypeCheck.datetimeUnique ty
     , Just ((yy, mo, dd), (hh, mn, ss), tz) <- parseIsoDatetime s ->
-        Right (App emptyAnno TypeCheck.datetimeFromDTZRef
+        pure (App emptyAnno TypeCheck.datetimeFromDTZRef
                  [ App emptyAnno TypeCheck.dateFromDMYRef [numLit dd, numLit mo, numLit yy]
                  , App emptyAnno TypeCheck.timeFromHMSRef [numLit hh, numLit mn, numLit ss]
                  , Lit emptyAnno (StringLit emptyAnno tz)
                  ])
     -- Otherwise treat as a plain STRING literal.
-    | otherwise -> Right (Lit emptyAnno (StringLit emptyAnno s))
+    | otherwise -> pure (Lit emptyAnno (StringLit emptyAnno s))
   FnArray xs ->
     case stripList ty of
-      Just elemTy -> List emptyAnno <$> traverse (\v -> fnLiteralToExprTyped mi elemTy (Just v)) xs
-      Nothing     -> Left "FnArray but expected type is not LIST"
+      Just elemTy ->
+        List emptyAnno <$> traverse
+          (\ (i, v) -> fnLiteralToExprTyped mi ctx (path <> ["[" <> Text.textShow i <> "]"]) elemTy (Just v))
+          (zip [0 :: Int ..] xs)
+      Nothing     -> fillError "FnArray but expected type is not LIST"
   FnObject fields
     | Just (ctorRef, decl) <- lookupRecord mi ty -> do
         -- Walk the record's fields in declaration order and pick each
-        -- value from the supplied FnObject (missing fields are handled
-        -- by the MAYBE branch above via 'Nothing').
+        -- value from the supplied FnObject. A field it leaves out takes
+        -- the field's TYPICALLY while presumption is soft (T1b); without
+        -- one, a MAYBE field is NOTHING (D7.3) while presumption is soft,
+        -- and anything else is missing.
         let fieldMap = Map.fromList fields
-        argExprs <- forM decl $ \(fname, fty) ->
-          fnLiteralToExprTyped mi fty (Map.lookup fname fieldMap)
-        Right (App emptyAnno ctorRef argExprs)
+        argExprs <- forM decl $ \(fname, fty, mDefault) ->
+          let fieldPath = path <> [fname]
+          in case Map.lookup fname fieldMap of
+            Nothing
+              | ctx.fcSoft, Just d <- mDefault -> rootFill ctx fieldPath d
+              | not ctx.fcSoft, isJust mDefault || isJust (stripMaybe fty) ->
+                  fillError ("field '" <> Eval.renderPresumedPath fieldPath <> "' is missing, and presumption is hard, so no default is used")
+            mv -> fnLiteralToExprTyped mi ctx fieldPath fty mv
+        pure (App emptyAnno ctorRef argExprs)
     | otherwise ->
-        Left "FnObject but expected type is not a known record"
-  FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
-  FnUncertain -> Left "uncertain value is not supported in direct evaluation"
+        fillError "FnObject but expected type is not a known record"
+  FnUnknown   -> fillError "unknown value for a non-MAYBE parameter"
+  FnUncertain -> fillError "uncertain value is not supported in direct evaluation"
 
 -- | Get the function's Resolved name from the compiled decide
 getFunctionResolved :: Decide Resolved -> Resolved
@@ -535,6 +637,65 @@ requiresWrapperEvaluation = any (\(_, mVal) -> maybe False needsWrapper mVal)
     needsWrapper (FnObject kvs) = any (needsWrapper . snd) kvs
     needsWrapper _              = False
 
+-- | The defaults a request may leave an input out for, by input name: the
+-- export's own GIVENs that carry a TYPICALLY, and the section GIVENs it reads
+-- that carry one (W3 of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). A written
+-- ASSUME's TYPICALLY is not one yet, because @#EVAL@ does not honour it either
+-- (W6; 'L4.Export.honouredDefault').
+inputDefaults :: Module Resolved -> Decide Resolved -> Map Text (Expr Resolved)
+inputDefaults m decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ _) =
+  Map.fromList $
+    [ (nameText r, d) | MkOptionallyTypedName _ r _ (Just d) <- otns ]
+    <> [ (nameText r, d)
+       | (r, _) <- extractAssumeParamResolveds m decide
+       , Just b <- [Map.lookup (getUnique r) binders]
+       , Just d <- [b.typically]
+       ]
+  where
+    binders = sectionBinders m
+    nameText r = rawNameToText (rawName (getActual r))
+
+-- | The response's @presumed@ list (T6): the defaults the evaluation forced
+-- that belong to the request, each as the input's name or the path to a
+-- field inside one. Only a default some fill site of THIS request made
+-- counts — a section binder's (discharge), a root fill (the direct path), or
+-- the wrapper's @InputArgs@ decode — and only for an input the function
+-- takes. An L4 program may decode JSON of its own.
+presumedInputs :: Set.Set Text -> [Eval.Presumed] -> [Text]
+presumedInputs inputs events =
+  nubOrd
+    [ Eval.renderPresumedPath path
+    | p <- events
+    , ours p.origin
+    , n : rest <- [p.path]
+    , let path = stripInputSuffix n : rest
+    , stripInputSuffix n `Set.member` inputs
+    ]
+  where
+    ours = \case
+      Eval.FromSectionBinder -> True
+      Eval.FromRootFill      -> True
+      Eval.FromDecode root   -> root == "InputArgs"
+    -- the wrapper's InputArgs names a field @x (input)@ ('Backend.CodeGen.inputFieldName')
+    stripInputSuffix n = fromMaybe n (Text.stripSuffix " (input)" n)
+
+-- | Every input name a function takes: its GIVENs and the ASSUMEs (section
+-- GIVENs included) it reads.
+functionInputs :: CompiledModule -> Set.Set Text
+functionInputs compiled =
+  Set.fromList $
+    map fst (extractParamTypes compiled.compiledDecide)
+    <> [ rawNameToText (rawName (getActual r))
+       | (r, _) <- extractAssumeParamResolveds compiled.compiledModule compiled.compiledDecide ]
+
+-- | The evaluator's configuration for one request: the presumption switch
+-- (T4) goes to discharge and the JSON decoder alike.
+requestEvalConfig :: TracePolicy -> Presumption -> IO Eval.EvalConfig
+requestEvalConfig policy presumption = do
+  fixedNow <- Eval.readFixedNowEnv
+  cfg <- Eval.resolveEvalConfig fixedNow policy
+  pure cfg { Eval.presumeDefaults = presumption == PresumeSoft }
+
 -- | Evaluate using precompiled module (fast path) - direct AST evaluation
 -- This avoids the text round-trip through prettyLayout and re-parsing
 -- Falls back to wrapper-based evaluation for FnObject parameters or missing params
@@ -547,8 +708,9 @@ evaluateWithCompiled
   -> [(Text, Maybe FnLiteral)]
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
-evaluateWithCompiled filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
+evaluateWithCompiled filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption = do
   -- Fill in missing parameters with Nothing
   -- The input params may only contain provided parameters; we need explicit Nothing
   -- entries for missing parameters so requiresWrapperEvaluation can detect them
@@ -566,8 +728,40 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
   -- as AST (FnObject / FnUncertain / FnUnknown / missing non-MAYBE). ASSUMEs
   -- are handled directly via LetIn bindings.
   if requiresWrapperEvaluation (fullParams ++ assumeValues)
-    then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz
-    else evaluateDirectAST compiled fullParams assumeRefs assumeValues traceLevel includeGraphViz
+    then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
+    else evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presumption
+
+-- | The inputs the wrapper path fills with their default, and so does not
+-- supply (W3): those the request left out (absent, not @null@) that have one,
+-- while presumption is soft. A GIVEN among them becomes an InputArgs field
+-- carrying its TYPICALLY ('Backend.CodeGen.generateEvalWrapper'); a section
+-- GIVEN is left to discharge, which fills it at the root (T6b).
+wrapperDefaults
+  :: Presumption
+  -> Map Text (Expr Resolved)
+  -> [(Text, Maybe FnLiteral)]
+  -> Map Text (Expr Resolved)
+wrapperDefaults presumption defaults params
+  | presumption == PresumeHard = Map.empty
+  | otherwise = Map.filterWithKey (\ n _ -> n `notElem` map fst params) defaults
+
+-- | The arguments the wrapper decodes: the request's, plus @null@ for every
+-- other input except those taking their default (which must stay absent, so
+-- that their TYPICALLY fills them).
+--
+-- The wrapper lifts each input to MAYBE and binds NOTHING to "not supplied"
+-- (W1), and on that path a left-out input and a @null@ one were always the
+-- same. Saying @null@ outright keeps them the same when presumption is hard,
+-- where the decoder no longer turns an ABSENT MAYBE field into NOTHING (T1b):
+-- that withdrawal is about a MAYBE the author declared, and these MAYBEs are
+-- the wrapper's own.
+wrapperArguments
+  :: [Text]                       -- ^ every input the function takes
+  -> Map Text (Expr Resolved)     -- ^ those taking their default ('wrapperDefaults')
+  -> [(Text, Maybe FnLiteral)]
+  -> [(Text, Maybe FnLiteral)]
+wrapperArguments inputs filled params =
+  params <> [ (n, Nothing) | n <- inputs, n `notElem` map fst params, not (Map.member n filled) ]
 
 -- | Evaluate a deontic function with startTime and events via EVALTRACE wrapper.
 -- Always uses the wrapper path since events need to go through L4 typechecking.
@@ -584,27 +778,33 @@ evaluateWithCompiledDeontic
   -> Maybe Text               -- ^ Action type name (for formatting events)
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
-evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
+evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz presumption = do
   let givenParamTypes = extractParamTypes compiled.compiledDecide
-      (binderParamTypes, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
+      (binderParamTypes0, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
+      filled = wrapperDefaults presumption (inputDefaults compiled.compiledModule compiled.compiledDecide) params
+      binderParamTypes = filter (\ (n, _) -> not (Map.member n filled)) binderParamTypes0
+      givenDefaults = Map.map prettyLayout (Map.filterWithKey (\ n _ -> n `elem` map fst givenParamTypes) filled)
+      inputNames = map fst (givenParamTypes <> binderParamTypes0 <> assumeParamTypes)
 
   -- Convert input parameters to JSON
-  inputJson <- paramsToJson params
+  inputJson <- paramsToJson (wrapperArguments inputNames filled params)
 
   -- Generate deontic wrapper code with EVALTRACE
-  genCode <- case generateDeonticEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes inputJson startTime traceEvents mPartyType mActionType traceLevel of
+  genCode <- case generateDeonticEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson startTime traceEvents mPartyType mActionType traceLevel of
     Left err -> throwError $ InterpreterError err
     Right gc -> pure gc
 
   -- Evaluate the wrapper in the context of the precompiled module
-  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext filepath genCode.generatedWrapper sourceText modContext
+  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext presumption filepath genCode.generatedWrapper sourceText modContext
 
   -- Handle result
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
-    Just [Eval.MkEvalDirectiveResult{result, trace}] ->
+    Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
       handleEvalResult compiled.compiledEntityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz compiled.compiledModule
+        (presumedInputs (functionInputs compiled) r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -616,35 +816,53 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
 -- call, so all of them see the supplied value. A LET around the call (or
 -- around the inlined body) would not: a helper's closure captures the
 -- module environment, where the ASSUME is still 'ValAssumed'.
+--
+-- An input the request left out that has a default takes it while
+-- presumption is soft (W3): a GIVEN, or a record field inside any input, by a
+-- root fill ('RootFill'), and a section GIVEN by leaving its ASSUME in place,
+-- so that discharge fills it at the root as it does for @#EVAL@ (T6b). Either
+-- way the evaluator reports the default only if it is forced.
 evaluateDirectAST
   :: CompiledModule
-  -> [(Text, Maybe FnLiteral)]            -- ^ GIVEN params (positional for the call)
+  -> Map Text (Maybe FnLiteral)           -- ^ the request's arguments: absent, @null@ ('Nothing'), or a value
   -> [(Resolved, Type' Resolved)]         -- ^ ASSUMEs read by the export (transitively)
-  -> [(Text, Maybe FnLiteral)]            -- ^ ASSUME values (keyed by name)
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
-evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGraphViz = do
+evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presumption = do
   -- Build once per call: a lookup of every record / enum declaration in
   -- the compiled module so 'fnLiteralToExprTyped' can construct record
   -- literals and enum variants without re-running the typechecker.
   let moduleInfo = buildModuleInfo compiled.compiledAllDeclares
       paramTypes = extractParamTypes compiled.compiledDecide
-      paramMap   = Map.fromList [(name, val) | (name, Just val) <- params]
-      assumeMap  = Map.fromList [(name, val) | (name, Just val) <- assumeValues]
+      defaults   = inputDefaults compiled.compiledModule compiled.compiledDecide
+      binders    = sectionBinders compiled.compiledModule
+      soft       = presumption == PresumeSoft
+      MkModule _ moduleUri _ = compiled.compiledModule
+      ctx        = FillCtx { fcSoft = soft, fcUri = moduleUri }
+      nameOf r   = rawNameToText (rawName (getActual r))
+      convert    = runStateT
 
-  argExprs <- forM paramTypes $ \(name, ty) ->
-    case fnLiteralToExprTyped moduleInfo ty (Map.lookup name paramMap) of
-      Left err ->
-        throwError $ InterpreterError ("Parameter '" <> name <> "': " <> err)
-      Right e -> pure e
-
-  assumeExprs <- fmap Map.fromList $ forM assumeRefs $ \(assumeRes, assumeTy) -> do
-    let nm = rawNameToText (rawName (getActual assumeRes))
-    case fnLiteralToExprTyped moduleInfo assumeTy (Map.lookup nm assumeMap) of
-      Left err ->
-        throwError $ InterpreterError ("ASSUME '" <> nm <> "': " <> err)
-      Right valueExpr -> pure (getUnique assumeRes, valueExpr)
+  ((argExprs, assumeExprList), (_, fills)) <- either (throwError . InterpreterError) pure $ convert
+    ( do
+        args <- forM paramTypes $ \(name, ty) ->
+          withPrefix ("Parameter '" <> name <> "': ") $
+            rootInputExpr moduleInfo ctx defaults name ty (suppliedIn inputMap name)
+        assumes <- forM assumeRefs $ \(assumeRes, assumeTy) -> do
+          let nm = nameOf assumeRes
+              supplied = suppliedIn inputMap nm
+          case supplied of
+            -- a section GIVEN the request left out, with a default: discharge fills it
+            Absent
+              | soft
+              , Map.member (getUnique assumeRes) binders
+              , Map.member nm defaults -> pure Nothing
+            _ -> withPrefix ("ASSUME '" <> nm <> "': ") $
+                   Just . (getUnique assumeRes,) <$> rootInputExpr moduleInfo ctx defaults nm assumeTy supplied
+        pure (args, catMaybes assumes)
+    ) (0, [])
+  let assumeExprs = Map.fromList assumeExprList
 
   -- The replacement DECIDE keeps the ASSUME's own type signature and app
   -- form (hence its Resolved and Unique), so every reference in the
@@ -653,7 +871,8 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
         case Map.lookup (getUnique r) assumeExprs of
           Nothing        -> KeepAssume
           Just valueExpr -> ReplaceAssume (Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr))
-      boundModule = rewriteModuleAssumes bindAssume compiled.compiledModule
+      boundModule = addRootFills fills (rewriteModuleAssumes bindAssume compiled.compiledModule)
+      rootFills = Map.fromList [ (getUnique f.fillRef, f.fillPresumed) | f <- fills ]
       callExpr = buildFunctionCallExpr (getFunctionResolved compiled.compiledDecide) argExprs
 
   -- Configure evaluation with tracing based on trace level
@@ -665,23 +884,41 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
           }
 
   -- Evaluate the expression directly using the precompiled module
-  fixedNow <- liftIO Eval.readFixedNowEnv
-  evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow evalTracePolicy
+  evalConfig <- liftIO $ requestEvalConfig evalTracePolicy presumption
 
   -- Pass the pre-computed import environment
   -- The module's own definitions are evaluated fresh each time, but imports
   -- need their References to be pre-allocated
-  mResult <- liftIO $ Eval.execEvalExprInContextOfModule
+  mResult <- liftIO $ Eval.execEvalExprInContextOfModuleWith
     evalConfig
     compiled.compiledEntityInfo
+    rootFills
+    []
     callExpr
     (compiled.compiledImportEnv, boundModule)
 
   -- Handle result
   case mResult of
     Nothing -> throwError $ InterpreterError "L4: Expression evaluation failed."
-    Just Eval.MkEvalDirectiveResult{result, trace} ->
+    Just r@Eval.MkEvalDirectiveResult{result, trace} ->
       handleEvalResultDirect compiled.compiledEntityInfo result trace traceLevel includeGraphViz compiled.compiledModule
+        (presumedInputs (functionInputs compiled) r.presumed)
+  where
+    withPrefix prefix act = StateT \ st -> either (Left . (prefix <>)) Right (runStateT act st)
+
+-- | Add each root fill to the module as a 0-ary definition of its default.
+-- At the top of the module, so nothing it is appended to can capture it.
+addRootFills :: [RootFill] -> Module Resolved -> Module Resolved
+addRootFills [] m = m
+addRootFills fills (MkModule ann uri (MkSection sann n aka g decls)) =
+  MkModule ann uri (MkSection sann n aka g (map fillDecl (reverse fills) <> decls))
+  where
+    fillDecl f =
+      Decide emptyAnno
+        (MkDecide emptyAnno
+          (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+          (MkAppForm emptyAnno f.fillRef [] Nothing)
+          f.fillBody)
 
 -- | Handle evaluation result (simplified version for direct evaluation)
 handleEvalResultDirect
@@ -691,8 +928,9 @@ handleEvalResultDirect
   -> TraceLevel
   -> Bool
   -> Module Resolved
+  -> [Text]
   -> ExceptT EvaluatorError IO ResponseWithReason
-handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case result of
+handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule presumed = case result of
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
   Eval.Reduction (Eval.ReducedRefused ref) -> throwError $ EvaluatorRefused ref.message
   Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
@@ -714,6 +952,7 @@ handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case
                 )
                 trace
             else Nothing
+      , presumed = presumed
       }
 
 -- | Wrapper-based evaluation (fallback for FnObject parameters)
@@ -742,42 +981,50 @@ evaluateWithWrapper
   -> [(Text, Maybe FnLiteral)]
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
-evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
+evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption = do
   -- Extract parameter types from the compiled function definition
   let givenParamTypes = extractParamTypes compiled.compiledDecide
-      (binderParamTypes, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
+      (binderParamTypes0, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
+      filled = wrapperDefaults presumption (inputDefaults compiled.compiledModule compiled.compiledDecide) params
+      -- a section GIVEN that takes its default is not supplied: discharge fills it
+      binderParamTypes = filter (\ (n, _) -> not (Map.member n filled)) binderParamTypes0
+      givenDefaults = Map.map prettyLayout (Map.filterWithKey (\ n _ -> n `elem` map fst givenParamTypes) filled)
+      inputNames = map fst (givenParamTypes <> binderParamTypes0 <> assumeParamTypes)
 
   -- Convert input parameters to JSON
-  inputJson <- paramsToJson params
+  inputJson <- paramsToJson (wrapperArguments inputNames filled params)
 
   -- Generate wrapper code using existing code generation
-  genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes inputJson traceLevel of
+  genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson traceLevel of
     Left err -> throwError $ InterpreterError err
     Right gc -> pure gc
 
   -- The wrapper contains JSONDECODE and function application
   -- We evaluate the wrapper in the context of the precompiled module
   -- This avoids re-parsing and re-typechecking the main module
-  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext filepath genCode.generatedWrapper sourceText modContext
+  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext presumption filepath genCode.generatedWrapper sourceText modContext
 
   -- Handle result
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
-    Just [Eval.MkEvalDirectiveResult{result, trace}] ->
+    Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
       handleEvalResult compiled.compiledEntityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz compiled.compiledModule
+        (presumedInputs (functionInputs compiled) r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
 -- | Evaluate wrapper code in the context of a precompiled module
 -- This combines the wrapper (small) with the precompiled module and evaluates
 evaluateWrapperInContext
-  :: FilePath
+  :: Presumption
+  -> FilePath
   -> Text  -- ^ Wrapper code containing #EVAL directive
   -> Text  -- ^ Original source text (preserves layout)
   -> ModuleContext  -- ^ Module context for IMPORT resolution
   -> IO ([Text], Maybe [Eval.EvalDirectiveResult])
-evaluateWrapperInContext filepath wrapperCode sourceText modContext = do
+evaluateWrapperInContext presumption filepath wrapperCode sourceText modContext = do
   -- Use original source text to preserve layout-sensitive formatting
   -- L4 is layout-sensitive (like Python), so prettyLayout can break indentation
   -- We filter IDE directives (#EVAL, #TRACE, etc.) using text-based filtering
@@ -786,7 +1033,7 @@ evaluateWrapperInContext filepath wrapperCode sourceText modContext = do
 
   -- Evaluate the combined program using the original module context
   -- This ensures IMPORT statements can be resolved correctly
-  evaluateModule filepath combinedProgram modContext
+  evaluateModule presumption filepath combinedProgram modContext
 
 -- | Filter IDE directives from source text while preserving layout
 -- Removes lines starting with #EVAL, #TRACE, #EVALTRACE, #ASSERT, #CHECK
@@ -872,8 +1119,9 @@ handleEvalResult
   -> TraceLevel
   -> Bool
   -> Module Resolved
+  -> [Text]
   -> ExceptT EvaluatorError IO ResponseWithReason
-handleEvalResult ei result trace _sentinel traceLevel includeGraphViz mModule = case result of
+handleEvalResult ei result trace _sentinel traceLevel includeGraphViz mModule presumed = case result of
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
   Eval.Reduction (Eval.ReducedRefused ref) -> throwError $ EvaluatorRefused ref.message
   Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
@@ -915,6 +1163,7 @@ handleEvalResult ei result trace _sentinel traceLevel includeGraphViz mModule = 
                 )
                 trace
             else Nothing
+      , presumed = presumed
       }
 
 createFunction ::
@@ -933,15 +1182,15 @@ createFunction filepath fnDecl fnImpl moduleContext = do
       -- Fast path: use precompiled module
       -- Capture fnImpl and moduleContext in the closure for wrapper fallback
       let runFn = RunFunction
-            { runFunction = \params' _outFilter traceLevel includeGraphViz ->
-                evaluateWithCompiled filepath fnDecl compiled fnImpl moduleContext params' traceLevel includeGraphViz
+            { runFunction = \params' _outFilter traceLevel includeGraphViz presumption ->
+                evaluateWithCompiled filepath fnDecl compiled fnImpl moduleContext params' traceLevel includeGraphViz presumption
             }
       pure (runFn, Just compiled)
 
     Left _err -> do
       -- Slow path fallback: use original implementation
       let runFn = RunFunction
-            { runFunction = \params' _outFilter traceLevel includeGraphViz -> do
+            { runFunction = \params' _outFilter traceLevel includeGraphViz presumption -> do
                 -- 1. Typecheck original source to get function signature
                 (initErrs, mTcRes) <- typecheckModule filepath fnImpl moduleContext
 
@@ -952,17 +1201,21 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 -- 2. Get function definition and extract parameter types
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
                 let givenParamTypes = extractParamTypes funDecide
-                    (binderParamTypes, assumeParamTypes) = splitAssumeParams tcRes.module' funDecide
+                    (binderParamTypes0, assumeParamTypes) = splitAssumeParams tcRes.module' funDecide
+                    filled = wrapperDefaults presumption (inputDefaults tcRes.module' funDecide) params'
+                    binderParamTypes = filter (\ (n, _) -> not (Map.member n filled)) binderParamTypes0
+                    givenDefaults = Map.map prettyLayout (Map.filterWithKey (\ n _ -> n `elem` map fst givenParamTypes) filled)
+                    inputs = Set.fromList (map fst givenParamTypes <> map fst binderParamTypes0 <> map fst assumeParamTypes)
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting
                 let filteredSource = filterIdeDirectivesText fnImpl
 
                 -- 4. Convert input parameters to JSON
-                inputJson <- paramsToJson params'
+                inputJson <- paramsToJson (wrapperArguments (Set.toList inputs) filled params')
 
                 -- 5. Generate wrapper code
-                genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes inputJson traceLevel of
+                genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson traceLevel of
                   Left err -> throwError $ InterpreterError err
                   Right gc -> pure gc
 
@@ -970,13 +1223,14 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 let l4Program = filteredSource <> genCode.generatedWrapper
 
                 -- 7. Evaluate
-                (errs, mEvalRes) <- evaluateModule filepath l4Program moduleContext
+                (errs, mEvalRes) <- evaluateModule presumption filepath l4Program moduleContext
 
                 -- 8. Handle result
                 case mEvalRes of
                   Nothing -> throwError $ InterpreterError (mconcat errs)
-                  Just [Eval.MkEvalDirectiveResult{result, trace}] ->
+                  Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
                     handleEvalResult tcRes.entityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz tcRes.module'
+                      (presumedInputs inputs r.presumed)
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
             }
@@ -988,8 +1242,8 @@ createFunction filepath fnDecl fnImpl moduleContext = do
 createRunFunctionFromCompiled :: FilePath -> FunctionDeclaration -> CompiledModule -> Text -> ModuleContext -> RunFunction
 createRunFunctionFromCompiled filepath fnDecl compiled sourceText modContext =
   RunFunction
-    { runFunction = \params' _outFilter traceLevel includeGraphViz ->
-        evaluateWithCompiled filepath fnDecl compiled sourceText modContext params' traceLevel includeGraphViz
+    { runFunction = \params' _outFilter traceLevel includeGraphViz presumption ->
+        evaluateWithCompiled filepath fnDecl compiled sourceText modContext params' traceLevel includeGraphViz presumption
     }
 
 -- | Extract parameter names and types from a DECIDE's GIVEN clause
@@ -1393,10 +1647,9 @@ typecheckModule file input moduleContext = do
     _ <- Shake.addVirtualFile nfp input
     Shake.use Rules.TypeCheck uri
 
-evaluateModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
-evaluateModule file input moduleContext = do
-  fixedNow <- liftIO Eval.readFixedNowEnv
-  evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
+evaluateModule :: (MonadIO m) => Presumption -> FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
+evaluateModule presumption file input moduleContext = do
+  evalConfig <- liftIO $ requestEvalConfig apiDefaultPolicy presumption
   liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp

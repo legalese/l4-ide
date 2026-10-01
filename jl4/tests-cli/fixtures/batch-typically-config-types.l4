@@ -1,0 +1,6 @@
+-- Imported by batch-typically-imported.l4: a record whose field default
+-- lives in another module than the export that takes it.
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER

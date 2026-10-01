@@ -26,6 +26,8 @@ module TestData (
   deonticBooleanJL4,
   maybeInputsJL4,
   timeInputsJL4,
+  ruleDefaultJL4,
+  recordDefaultJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -523,4 +525,41 @@ GIVEN flag   IS A BOOLEAN
       dt     IS A DATETIME
 GIVETH A BOOLEAN
 timed MEANS flag
+|]
+
+-- | A rule GIVEN with a TYPICALLY default, beside an unread input that lets a
+-- test send the request down the wrapper path with a @{}@ (W3 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+ruleDefaultJL4 :: Text
+ruleDefaultJL4 =
+  [i|
+@export default may contract
+GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+      `is adult`     IS A BOOLEAN
+      `unused flag`  IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity`
+|]
+
+-- | Record-field defaults, one of them an enum constructor, and an enum
+-- default on a rule GIVEN (W3, T1b). A request that leaves @timeout@ out of
+-- @cfg@ gets 30, and @presumed@ names it @cfg.timeout@.
+recordDefaultJL4 :: Text
+recordDefaultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+  colour  IS A Colour TYPICALLY Red
+
+@export default budget
+GIVEN cfg   IS A Config
+      shade IS A Colour TYPICALLY Green
+GIVETH A NUMBER
+budget MEANS
+  IF cfg's colour EQUALS Red AND shade EQUALS Green
+  THEN cfg's timeout PLUS cfg's retries
+  ELSE 0
 |]

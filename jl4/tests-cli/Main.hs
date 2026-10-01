@@ -121,6 +121,43 @@ batchAssumeHelperFixture = fixtureDir </> "batch-assume-helper.l4"
 batchAssumeFullJson      = fixtureDir </> "batch-assume-full.json"
 batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
 
+-- | @TYPICALLY@ defaults in @l4 batch@ (W3 of
+-- @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@). No golden captures batch
+-- output, so these are the guard; the S-numbers in the tests are the success
+-- criteria the W2+W3 slice was given.
+batchTySection, batchTyRule, batchTyRecord, batchTyMaybe, batchTyImported, batchTyImportedTypes :: FilePath
+batchTySection = fixtureDir </> "batch-typically-section.l4"
+batchTyRule    = fixtureDir </> "batch-typically-rule.l4"
+batchTyRecord  = fixtureDir </> "batch-typically-record.l4"
+batchTyMaybe   = fixtureDir </> "batch-typically-maybe.l4"
+batchTyImported      = fixtureDir </> "batch-typically-imported.l4"
+batchTyImportedTypes = fixtureDir </> "batch-typically-config-types.l4"
+
+batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson :: FilePath
+batchTyOmitted    = fixtureDir </> "batch-typically-omitted.json"
+batchTySupplied   = fixtureDir </> "batch-typically-supplied.json"
+batchTyNull       = fixtureDir </> "batch-typically-null.json"
+batchTyUnread     = fixtureDir </> "batch-typically-unread.json"
+batchTyYaml       = fixtureDir </> "batch-typically-omitted.yaml"
+batchTyNoCol      = fixtureDir </> "batch-typically-nocol.csv"
+batchTyEmpty      = fixtureDir </> "batch-typically-empty.csv"
+batchTyRecordJson = fixtureDir </> "batch-typically-record.json"
+batchTyMaybeCsv   = fixtureDir </> "batch-typically-maybe.csv"
+batchTyImportedJson = fixtureDir </> "batch-typically-imported.json"
+
+-- | The @output@ result and @presumed@ list of one batch envelope.
+resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
+resultAndPresumed env =
+  ( case objField env "output" of
+      Just (Array rs) | [r] <- toList rs -> objField r "result"
+      _                                  -> Nothing
+  , objField env "presumed"
+  )
+
+presumedOf :: [String] -> Maybe Value
+presumedOf = Just . Array . foldr (\ x acc -> pure (String (T.pack x)) <> acc) mempty
+
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
 decodeArray sout =
@@ -266,6 +303,10 @@ coreFixtures =
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+  , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
+  , batchTyImported, batchTyImportedTypes, batchTyImportedJson
+  , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
@@ -1198,6 +1239,130 @@ spec bin = do
       -- round-trips every byte as an L4 string literal.
       env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
       objField env "status" `shouldBe` Just (String "success")
+
+  describe "l4 batch: TYPICALLY defaults (W3)" $ do
+    -- Before W3 every one of these rows came back "Missing required field",
+    -- although #EVAL honours the section default (R1: batch must agree).
+    it "S1: a row that leaves a section GIVEN out takes its default and lists it in presumed" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyOmitted]
+      objField env "status" `shouldBe` Just (String "success")
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "S2: a value the row supplies wins, and nothing is presumed" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTySupplied]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    -- The positive control for `presumed`: it lists defaults the evaluation
+    -- FORCED (T6), not inputs the row left out. `is adult` FALSE short-circuits
+    -- `has capacity` away, so the same omission presumes nothing.
+    it "lists only a default the evaluation actually read" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyUnread]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    it "S3: a row that leaves a rule GIVEN out takes its default" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyOmitted]
+      objField env "status" `shouldBe` Just (String "success")
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    -- R3: a row that evaluates must also validate. Before: "invalid",
+    -- "Missing required field".
+    it "S3: --validate-only accepts the row that evaluates" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyOmitted, "--validate-only"]
+      objField env "status" `shouldBe` Just (String "valid")
+
+    it "S4: YAML with the field left out gives the same row as JSON" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyYaml]
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "S4: CSV with the column left out gives the same row as JSON, section and rule alike" $ do
+      envS <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyNoCol]
+      resultAndPresumed envS `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+      envR <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyNoCol]
+      resultAndPresumed envR `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    -- T3c: an empty cell is a left-out input, not null, so one file can let
+    -- one row take the default while the next supplies a value.
+    it "S5: an empty CSV cell takes the default while presumption is soft" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyEmpty, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"])
+        , (Just (Bool False), presumedOf [])
+        ]
+
+    -- R5: a refusal stays loud, and names the input; it must not come back as
+    -- a quiet FALSE, which is the defect W1 fixed.
+    it "S5: with --presumption hard the same empty cell is an error naming the input" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTySection, "--inputs", batchTyEmpty
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success")]
+      sout `shouldSatisfy` ("Missing required field 'has capacity'" `isInfixOf`)
+      sout `shouldSatisfy` ("presumption is hard" `isInfixOf`)
+
+    it "with --presumption hard --validate-only reports the left-out input" $ do
+      env <- jsonEnvelope bin [ "batch", batchTyRule, "--inputs", batchTyOmitted
+                              , "--validate-only", "--presumption", "hard" ]
+      objField env "status" `shouldBe` Just (String "invalid")
+      objField env "errors" `shouldBe` Just (Array (pure (String "Missing required field: 'has capacity'")))
+
+    it "S6: null never takes the default, and the error names the field (T3)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Field 'has capacity' is null" `isInfixOf`)
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull, "--validate-only"]
+      vout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+    it "S7: --format csv carries a presumed column" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyOmitted, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      -- cassava ends each record with CRLF
+      case map (filter (/= '\r')) (lines sout) of
+        header : row : _ -> do
+          header `shouldBe` "input_is adult,output,status,presumed,diagnostics"
+          row `shouldSatisfy` (",success,has capacity," `isInfixOf`)
+        other -> expectationFailure ("expected a header and a row, got: " ++ show other)
+
+    -- T1b: the decoder fills a record field from its DECLARE, and an enum
+    -- default resolves on a field (p10, which used to fail to check) as it
+    -- does on a GIVEN. `presumed` names a field by its path, in force order.
+    it "fills record-field and enum defaults, and presumes only what was read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 32), presumedOf ["cfg.colour", "shade", "cfg.timeout"])
+        , (Just (Number 0), presumedOf [])
+        , (Just (Number 0), presumedOf ["cfg.colour"])
+        ]
+
+    -- The decoder knows the field defaults of an IMPORTed module's records too
+    -- (the evaluator is handed the importer's transitive imports).
+    it "fills a field default declared in an imported module" $ do
+      env <- jsonEnvelope bin ["batch", batchTyImported, "--inputs", batchTyImportedJson]
+      resultAndPresumed env `shouldBe` (Just (Number 32), presumedOf ["cfg.timeout"])
+
+    -- T3c's MAYBE paragraph: a left-out MAYBE input with no default is
+    -- NOTHING while soft, missing while hard. The fixture's MAYBE comes first,
+    -- which also pins the wrapper's InputArgs layout: a leading ", " after a
+    -- MAYBE field used to fail every row with "incorrect indentation".
+    it "an empty cell for a MAYBE input is NOTHING when soft and missing when hard" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyMaybe, "--inputs", batchTyMaybeCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 0), presumedOf []), (Just (Number 7), presumedOf []) ]
+      Output hcode hout _ <-
+        runL4 bin [ "batch", batchTyMaybe, "--inputs", batchTyMaybeCsv
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      hcode `shouldSatisfy` (/= ExitSuccess)
+      hrows <- decodeArray hout
+      map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
+      hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

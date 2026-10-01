@@ -54,6 +54,7 @@
 --   wrongly.
 module L4.Discharge
   ( dischargeModule
+  , dischargeModuleWith
   , sectionBinders
   , Binder (..)
   , readSets
@@ -240,7 +241,15 @@ subExprsOf = Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
 -- module's read-sets, which is §2.2's \"discharge happens at the module
 -- boundary\" and is not in this release.
 dischargeModule :: Module Resolved -> Module Resolved
-dischargeModule mod'
+dischargeModule = dischargeModuleWith True
+
+-- | 'dischargeModule', with T4's presumption switch
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5). With it off, no binder's @TYPICALLY@
+-- is filled in at the root ('fillInDefault' does not fire), so a binder that
+-- nothing supplies stays the assumed term it was before defaults existed:
+-- \"absent with no default\". Every other part of the pass is the same.
+dischargeModuleWith :: Bool -> Module Resolved -> Module Resolved
+dischargeModuleWith presume mod'
   | Map.null binders = mod'
   | Map.null rs      = mod'
   | otherwise        = rewriteExprs (rewriteSignatures mod')
@@ -289,7 +298,8 @@ dischargeModule mod'
   -- Nothing when the binder has no default, or when this declaration is not a
   -- section-binder elaboration at all (an ordinary ASSUME keeps its meaning).
   fillInDefault a (MkAssume asann tysig appform@(MkAppForm _ n [] _) mty (Just d))
-    | Map.member (getUnique n) binders =
+    | presume
+    , Map.member (getUnique n) binders =
         Just (Decide a (MkDecide asann (withGiveth mty tysig) appform d))
   fillInDefault _ _ = Nothing
 

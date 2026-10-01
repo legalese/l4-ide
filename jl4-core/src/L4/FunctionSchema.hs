@@ -22,7 +22,7 @@ import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (falseUnique, maybeUnique, trueUnique)
+import L4.TypeCheck.Environment (falseUnique, maybeUnique, nothingUnique, trueUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -216,10 +216,13 @@ typeToParameter declares visited ty =
                   | MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans <- fields
                   , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
                   ]
+              -- A field with a TYPICALLY may be left out: the JSON decoders
+              -- fill it from this DECLARE (T1b of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
               requiredFields =
                 [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy _ _ <- fields
+                | MkTypedName _ fieldName fieldTy mTypically _ <- fields
                 , not (isMaybeFieldType fieldTy)
+                , Maybe.isNothing mTypically
                 ]
              in
               (emptyParam "object")
@@ -333,19 +336,22 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       }
 
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
--- Only simple literals (numbers, strings) and the TRUE/FALSE constructors are
--- representable; anything else yields Nothing (no "default" key emitted).
+-- A default is a literal ('L4.TypeCheck.isTypicallyLiteral'): a number, a
+-- string, or a nullary constructor. TRUE and FALSE are JSON booleans, NOTHING
+-- is null, and any other nullary constructor is an enum value, which the wire
+-- spells as its name. Anything else yields Nothing (no "default" key emitted).
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
 typicallyToJson = \case
   Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
   Lit _ (StringLit _ t) -> Just (Aeson.String t)
-  App _ r [] -> nullaryToJson r
+  App _ r [] -> Just (nullaryToJson r)
   _ -> Nothing
  where
   nullaryToJson r
-    | getUnique r == trueUnique = Just (Aeson.Bool True)
-    | getUnique r == falseUnique = Just (Aeson.Bool False)
-    | otherwise = Nothing
+    | getUnique r == trueUnique = Aeson.Bool True
+    | getUnique r == falseUnique = Aeson.Bool False
+    | getUnique r == nothingUnique = Aeson.Null
+    | otherwise = Aeson.String (resolvedNameText r)
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool

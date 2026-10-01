@@ -230,6 +230,7 @@ svcQPNamed name cache bindings =
     , fnArguments = Map.fromList [(k, Just (FnLitBool v)) | (k, v) <- bindings]
     , startTime = Nothing
     , events = Nothing
+    , presumption = Nothing
     }
 
 -- | Run an LSP query plan.

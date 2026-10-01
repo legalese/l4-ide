@@ -22,6 +22,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import L4.Lexer (showStringLit)
+import L4.Print (prettyLayout)
 import L4.Syntax (Type'(..), Resolved, getUnique)
 import L4.TypeCheck.Environment (booleanUnique, dateUnique, timeUnique, datetimeUnique, maybeUnique, contractUnique)
 import Backend.Api (TraceLevel(..), TraceEvent(..), FnLiteral(..))
@@ -189,15 +190,23 @@ data GeneratedCode = GeneratedCode
 --
 -- ASSUME params are injected as LET bindings before the function call,
 -- shadowing any global ASSUME declarations with the provided values.
+--
+-- A GIVEN the request left out that takes its TYPICALLY default (@defaults@,
+-- the default as source text, by input name) is a field of its own declared
+-- type carrying that TYPICALLY, so the JSON decoder fills it and reports it
+-- when it is forced (W3 of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). The
+-- caller decides which inputs those are; a section GIVEN in the same position
+-- is simply not supplied, and discharge fills it at the root.
 generateEvalWrapper
   :: Text                         -- ^ Target function name
   -> [(Text, Type' Resolved)]     -- ^ GIVEN parameter names and types (passed as function args)
   -> [(Text, Type' Resolved)]     -- ^ section GIVEN names and types (supplied with WITH)
   -> [(Text, Type' Resolved)]     -- ^ ASSUME parameter names and types (injected as LET bindings)
+  -> Map Text Text                -- ^ GIVENs left out that take their default, with it
   -> Aeson.Value                  -- ^ Input arguments as JSON object
   -> TraceLevel                   -- ^ Whether to generate EVAL or EVALTRACE
   -> Either Text GeneratedCode
-generateEvalWrapper funName givenParams binderParams assumeParams inputJson traceLevel = do
+generateEvalWrapper funName givenParams binderParams assumeParams defaults inputJson traceLevel = do
   let allParams = givenParams <> binderParams <> assumeParams
   -- Handle zero-parameter functions: no wrapper needed, just eval directly
   if null allParams
@@ -218,7 +227,7 @@ generateEvalWrapper funName givenParams binderParams assumeParams inputJson trac
           isBooleanType (TyApp _ name []) = getUnique name == booleanUnique
           isBooleanType _ = False
           -- Annotate GIVEN params with (type info, isBoolean, isGiven, convFn, isMaybe)
-          givenParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, True, stringConversionFn ty, isMaybeType ty)) givenParams
+          givenParamInfo = map (givenInfo defaults isBooleanType) givenParams
           binderParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, False, stringConversionFn ty, isMaybeType ty)) binderParams
           -- Annotate ASSUME params with (type info, isBoolean, isGiven, convFn, isMaybe)
           assumeParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, False, stringConversionFn ty, isMaybeType ty)) assumeParams
@@ -230,7 +239,7 @@ generateEvalWrapper funName givenParams binderParams assumeParams inputJson trac
           ] ++
           placeholderAssumes allParamInfo ++
           [ ""
-          , generateInputRecordLifted allParams
+          , generateInputRecordLifted defaults allParams
           , ""
           , generateDecoder
           , ""
@@ -248,17 +257,36 @@ generateSimpleEval funName traceLevel =
     TraceNone -> "#EVAL " <> funName
     TraceFull -> "#EVALTRACE " <> funName
 
+-- | The parameter info of a GIVEN. One that takes its default ('defaults') is
+-- passed as its field's value directly: the field has the GIVEN's own type
+-- (see 'generateInputRecordLifted'), so there is nothing to unwrap and no
+-- placeholder to bind, which is the shape of an originally-MAYBE input.
+givenInfo
+  :: Map Text Text
+  -> (Type' Resolved -> Bool)
+  -> (Text, Type' Resolved)
+  -> ((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)
+givenInfo defaults isBooleanType (name, ty)
+  | Map.member name defaults = ((name, ty), False, True, Nothing, True)
+  | otherwise = ((name, ty), isBooleanType ty, True, stringConversionFn ty, isMaybeType ty)
+
 -- | Generate DECLARE for input record with ALL parameters lifted to MAYBE
 -- This enables uniform handling of null/missing JSON values
-generateInputRecordLifted :: [(Text, Type' Resolved)] -> Text
-generateInputRecordLifted params = Text.unlines $
+--
+-- Except an input that takes its default ('defaults'): its field keeps the
+-- input's own type and carries the TYPICALLY, which is what the JSON decoder
+-- fills an absent field from (T1b). Lifted, it would decode to NOTHING.
+generateInputRecordLifted :: Map Text Text -> [(Text, Type' Resolved)] -> Text
+generateInputRecordLifted defaults params = Text.unlines $
   ["DECLARE InputArgs HAS"] ++
   map formatField (zip [0::Int ..] params)
   where
     formatField (idx, (name, ty)) =
       let indent = if idx == 0 then "  " else ", "
-          -- Lift ALL types to MAYBE
-          tyText = liftTypeToMaybe ty
+          -- Lift ALL types to MAYBE, but for a default
+          tyText = case Map.lookup name defaults of
+            Just d  -> prettyLayout ty <> " TYPICALLY " <> d
+            Nothing -> liftTypeToMaybe ty
           -- Use prefixed field names to avoid collision with source identifiers
           quotedFieldName = quoteInputField name
       in indent <> quotedFieldName <> " IS A " <> tyText
@@ -552,6 +580,7 @@ generateDeonticEvalWrapper
   -> [(Text, Type' Resolved)]     -- ^ GIVEN parameter names and types
   -> [(Text, Type' Resolved)]     -- ^ section GIVEN names and types (supplied with WITH)
   -> [(Text, Type' Resolved)]     -- ^ ASSUME parameter names and types
+  -> Map Text Text                -- ^ GIVENs left out that take their default, with it
   -> Aeson.Value                  -- ^ Input arguments as JSON object
   -> Scientific.Scientific        -- ^ Start time
   -> [TraceEvent]                 -- ^ Events (may be empty for initial state)
@@ -559,7 +588,7 @@ generateDeonticEvalWrapper
   -> Maybe Text                   -- ^ Action type name (for formatting events)
   -> TraceLevel                   -- ^ Whether to generate EVAL or EVALTRACE
   -> Either Text GeneratedCode
-generateDeonticEvalWrapper funName givenParams binderParams assumeParams inputJson startTime events mPartyType mActionType traceLevel = do
+generateDeonticEvalWrapper funName givenParams binderParams assumeParams defaults inputJson startTime events mPartyType mActionType traceLevel = do
   let allParams = givenParams <> binderParams <> assumeParams
 
   -- Build event list expression with MEANS bindings for record-typed values
@@ -584,7 +613,7 @@ generateDeonticEvalWrapper funName givenParams binderParams assumeParams inputJs
       let isBooleanType :: Type' Resolved -> Bool
           isBooleanType (TyApp _ name []) = getUnique name == booleanUnique
           isBooleanType _ = False
-          givenParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, True, stringConversionFn ty, isMaybeType ty)) givenParams
+          givenParamInfo = map (givenInfo defaults isBooleanType) givenParams
           binderParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, False, stringConversionFn ty, isMaybeType ty)) binderParams
           assumeParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, False, stringConversionFn ty, isMaybeType ty)) assumeParams
           allParamInfo = givenParamInfo <> binderParamInfo <> assumeParamInfo
@@ -595,7 +624,7 @@ generateDeonticEvalWrapper funName givenParams binderParams assumeParams inputJs
           ] ++
           placeholderAssumes allParamInfo ++
           [ ""
-          , generateInputRecordLifted allParams
+          , generateInputRecordLifted defaults allParams
           , ""
           , generateDecoder
           , ""

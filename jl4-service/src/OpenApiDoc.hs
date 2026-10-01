@@ -322,13 +322,24 @@ buildComponents = Aeson.object
       ]
   ]
 
+-- | The optional @presumption@ field of an evaluation request (T4 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+presumptionSchema :: Aeson.Value
+presumptionSchema = Aeson.object
+  [ "type" .= ("string" :: Text)
+  , "enum" .= (["soft", "hard"] :: [Text])
+  , "description" .= ("soft (the default): an argument left out takes its default; hard: no defaults are used, so an argument left out is missing" :: Text)
+  ]
+
 -- | Build the request body schema for evaluation endpoints.
 -- Always wraps function parameters in an "arguments" key.
 -- Deontic functions additionally require "startTime" and "events".
 evalRequestSchema :: FunctionSummary -> Aeson.Value
 evalRequestSchema fn =
   let baseProps = Aeson.KeyMap.fromList
-        [ ("arguments", stripNonOpenApiFields $ Aeson.toJSON fn.fsParameters) ]
+        [ ("arguments", stripNonOpenApiFields $ Aeson.toJSON fn.fsParameters)
+        , ("presumption", presumptionSchema)
+        ]
       baseRequired = ["arguments" :: Text]
       (props, required)
         | fn.fsIsDeontic =
@@ -385,6 +396,7 @@ batchRequestSchema fn =
                 ]
             , "description" .= ("Input cases to evaluate" :: Text)
             ]
+        , "presumption" .= presumptionSchema
         ]
     , "required" .= (["outcomes", "cases"] :: [Text])
     ]

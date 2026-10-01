@@ -34,7 +34,7 @@ module Types (
   AppM,
 ) where
 
-import Backend.Api (EvalBackend, FnLiteral, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
+import Backend.Api (EvalBackend, FnLiteral, Presumption, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
 import Backend.DecisionQueryPlan (CachedDecisionQuery)
 import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
@@ -376,6 +376,8 @@ type Id = Int
 data BatchRequest = BatchRequest
   { outcomes :: [Outcomes]
   , cases :: [InputCase]
+  , presumption :: Maybe Presumption
+    -- ^ T4's switch, for every case; absent means @"soft"@
   }
   deriving stock (Show, Eq, Ord)
 
@@ -410,6 +412,8 @@ data OutputCase = OutputCase
   { id :: Id
   , attributes :: Map Text FnLiteral
   , graphviz :: Maybe GraphVizResponse
+  , presumed :: [Text]
+    -- ^ the case's @presumed@ list ('Backend.Api.ResponseWithReason'), as @\@presumed@
   }
   deriving stock (Show, Eq, Ord)
 
@@ -490,28 +494,34 @@ instance FromJSON BatchRequest where
     BatchRequest
       <$> o .: "outcomes"
       <*> o .: "cases"
+      <*> o .:? "presumption"
 
 instance ToJSON BatchRequest where
   toJSON br =
     Aeson.object
-      [ "outcomes" .= br.outcomes
-      , "cases" .= br.cases
-      ]
+      ( [ "outcomes" .= br.outcomes
+        , "cases" .= br.cases
+        ]
+        <> maybe [] (\p -> ["presumption" .= p]) br.presumption
+      )
 
 instance FromJSON OutputCase where
   parseJSON = Aeson.withObject "OutputCase" $ \o -> do
     caseId <- o .: "@id"
     graphvizVal <- o .:? "@graphviz"
+    presumedVal <- o .:? "@presumed" .!= []
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@presumed" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
     parsedAttrs <- traverse parseJSON attrs
-    pure $ OutputCase caseId parsedAttrs graphvizVal
+    pure $ OutputCase caseId parsedAttrs graphvizVal presumedVal
 
 instance ToJSON OutputCase where
   toJSON oc =
     Aeson.object $
       [ "@id" .= oc.id
+      , "@presumed" .= oc.presumed
       ] <> maybe [] (\gv -> ["@graphviz" .= gv]) oc.graphviz
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 

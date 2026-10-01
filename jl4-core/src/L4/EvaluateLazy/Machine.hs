@@ -45,6 +45,9 @@ module L4.EvaluateLazy.Machine
 , readEvalRef
 , Note (..)
 , tellNote
+, Presumed (..)
+, PresumedOrigin (..)
+, renderPresumedPath
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -315,7 +318,92 @@ data EvalState =
       -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
       -- no call site computes anything; 'L4.EvaluateLazy.captureDeonticSteps'
       -- installs one for the duration of a directive.
+    , presume :: !Bool
+      -- ^ T4's presumption switch (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5): when
+      -- False, a @TYPICALLY@ default is not used where a value can be
+      -- supplied, so an absent input is absent with no default. Read by the
+      -- JSON decoder; discharge reads the same flag from the 'EvalConfig'.
+    , presumableDefs :: !(Map Unique Presumed)
+      -- ^ The module-level 0-ary definitions that ARE a default: a section
+      -- binder's @TYPICALLY@, which 'L4.Discharge' turns into a definition,
+      -- and any default a caller filled at the root. Static for the run.
+      -- 'evalDecide' registers each one's reference in 'presumable'.
+    , presumable :: !(IORef (Map Address Presumed))
+      -- ^ References whose first force means a default took effect. Filled
+      -- by 'evalDecide' (from 'presumableDefs') and by the JSON decoder (a
+      -- field it filled from its @DECLARE@); drained by 'evalRef', which
+      -- reports each one once, in 'presumed', the first time it is forced.
+    , recordDefaults :: Map Unique (Map Text (Expr Resolved))
+      -- ^ Each record type's field defaults, keyed by the type's 'Unique' and
+      -- then by field name, from the @DECLARE@s of the evaluated module and of
+      -- whatever modules the caller passed beside it. The JSON decoder fills an
+      -- absent field from here (T1b). Static for the run, and deliberately
+      -- lazy: only a run that decodes JSON pays for walking the modules.
+    , presumed :: !(IORef (DList Presumed))
+      -- ^ The defaults that took effect during this directive, in the order
+      -- they were forced: W8's \"took its default\" event. Per directive,
+      -- like 'notes' (swapped fresh by 'L4.EvaluateLazy.withFreshLedger').
     }
+
+-- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
+-- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
+-- rests on it.
+--
+-- Recorded when the default is FORCED, not when it is filled in: an input the
+-- rule never reads did not shape the answer, and T6 lists only the defaults
+-- that did. That is why the event is raised by 'evalRef' rather than at the
+-- fill site, wherever the fill happened.
+data Presumed =
+  MkPresumed
+    { path       :: ![Text]
+      -- ^ Where the default landed: the input's name, then the field names
+      -- below it, with a list element written as its index.
+    , declaredAt :: !(Maybe SrcRange)
+      -- ^ The @TYPICALLY@ that supplied the value.
+    , origin     :: !PresumedOrigin
+    }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | Which fill site supplied a default. A consumer keeps only the events that
+-- belong to its request (T6b): an L4 program may decode JSON of its own.
+data PresumedOrigin
+  = FromSectionBinder
+    -- ^ A section @GIVEN@'s default, filled at the root by 'L4.Discharge'.
+  | FromRootFill
+    -- ^ A default the caller filled at the root ('presumableDefs').
+  | FromDecode !Text
+    -- ^ A record field the JSON decoder filled from its @DECLARE@; the text
+    -- is the type the decode started from.
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | Report a default that took effect ('EvalState.presumed'), once.
+tellPresumed :: Presumed -> Eval ()
+tellPresumed p = do
+  psRef <- asks (.presumed)
+  liftIO $ modifyIORef' psRef \ ps ->
+    if any (\ q -> q.path == p.path && q.origin == p.origin) (DList.toList ps)
+      then ps
+      else ps `DList.snoc` p
+
+-- | Mark a reference as a default, so that forcing it reports one.
+registerPresumable :: Reference -> Presumed -> Eval ()
+registerPresumable rf p = do
+  pRef <- asks (.presumable)
+  liftIO $ modifyIORef' pRef (Map.insert rf.address p)
+
+-- | Called on every force ('evalRef'): if the reference is a default nobody
+-- has forced yet, report it. The map is empty for almost every run, and the
+-- 'Map.null' test is all such a run pays.
+notePresumedForce :: Reference -> Eval ()
+notePresumedForce rf = do
+  pRef <- asks (.presumable)
+  m <- liftIO (readIORef pRef)
+  unless (Map.null m) $
+    for_ (Map.lookup rf.address m) \ p -> do
+      liftIO $ modifyIORef' pRef (Map.delete rf.address)
+      tellPresumed p
 
 -- | A note the run reports beside a directive's value ('EvalState.notes').
 -- Plain text: rendered where it is raised, from what the machine has in
@@ -4242,14 +4330,54 @@ decodeJsonToValueTyped jsonStr ty = do
       pure $ ValConstructor TypeCheck.leftRef [errorRef]
     Right jsonValue -> do
       -- Parse success: convert to L4 value using type information and wrap in RIGHT
-      l4Value <- jsonValueToWHNFTyped jsonValue ty
+      l4Value <- jsonValueToWHNFTyped (decodeRoot ty) jsonValue ty
       valueRef <- allocateValue l4Value
       pure $ ValConstructor TypeCheck.rightRef [valueRef]
 
+-- | Where in a JSON value the typed decoder is: the type the decode started
+-- from, and the path of field names (and list indices) down to here. The path
+-- names a field in an error, and is where a default that the decoder filled is
+-- reported ('Presumed').
+data DecodeAt = MkDecodeAt
+  { decodeFrom :: !Text
+  , fieldPath  :: ![Text]
+  }
+
+decodeRoot :: Type' Resolved -> DecodeAt
+decodeRoot ty = MkDecodeAt (prettyLayout ty) []
+
+-- | @ for field 'a.b'@, or nothing at the root of the decode.
+atField :: DecodeAt -> Text
+atField at
+  | null at.fieldPath = ""
+  | otherwise         = " for field '" <> renderPresumedPath at.fieldPath <> "'"
+
+-- | A decode path as one string: field names joined with dots, a list index
+-- written straight after its list (@people[0].age@).
+renderPresumedPath :: [Text] -> Text
+renderPresumedPath = Text.concat . go True
+  where
+    go _ [] = []
+    go atStart (s : ss)
+      | "[" `Text.isPrefixOf` s = s : go False ss
+      | atStart                 = s : go False ss
+      | otherwise               = "." : s : go False ss
+
+-- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
+-- a number, a string, or a nullary constructor. 'Nothing' for anything else,
+-- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
+-- will need an environment here.
+typicallyLiteralValue :: Expr Resolved -> Maybe WHNF
+typicallyLiteralValue = \ case
+  Lit _ (NumericLit _ r) -> Just (ValNumber r)
+  Lit _ (StringLit _ t)  -> Just (ValString t)
+  App _ r []             -> Just (ValConstructor r [])
+  _                      -> Nothing
+
 -- | Convert Aeson Value to L4 WHNF using type information
 -- This function recursively handles nested structures: lists of records, records containing records, etc.
-jsonValueToWHNFTyped :: Aeson.Value -> Type' Resolved -> Machine WHNF
-jsonValueToWHNFTyped jsonValue ty = do
+jsonValueToWHNFTyped :: DecodeAt -> Aeson.Value -> Type' Resolved -> Machine WHNF
+jsonValueToWHNFTyped at jsonValue ty = do
   case ty of
     -- Handle LIST OF α
     TyApp _anno listRef [elementType]
@@ -4258,10 +4386,10 @@ jsonValueToWHNFTyped jsonValue ty = do
           Aeson.Array vec -> do
             -- Recursively decode each element with the element type
             let values = Vector.toList vec
-            jsonListToWHNFTyped values elementType
+            jsonListToWHNFTyped at values elementType
           _ -> do
             userException $ UserError $
-              "Expected JSON array to decode to LIST type, but got: " <> Text.pack (show jsonValue)
+              "Expected JSON array to decode to LIST type" <> atField at <> ", but got: " <> Text.pack (show jsonValue)
 
     -- Handle MAYBE α
     TyApp _anno maybeRef [innerType]
@@ -4272,7 +4400,7 @@ jsonValueToWHNFTyped jsonValue ty = do
             pure $ ValConstructor TypeCheck.nothingRef []
           _ -> do
             -- Non-null value: decode and wrap in JUST
-            innerVal <- jsonValueToWHNFTyped jsonValue innerType
+            innerVal <- jsonValueToWHNFTyped at jsonValue innerType
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
@@ -4286,17 +4414,17 @@ jsonValueToWHNFTyped jsonValue ty = do
           case jsonValue of
             Aeson.String s -> pure $ ValString s
             _ -> userException $ UserError $
-                  "Expected JSON string but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "NUMBER" -> do
           case jsonValue of
             Aeson.Number n -> pure $ ValNumber (toRational n)
             _ -> userException $ UserError $
-                  "Expected JSON number but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON number" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "BOOLEAN" -> do
           case jsonValue of
             Aeson.Bool b -> pure $ if b then ValBool True else ValBool False
             _ -> userException $ UserError $
-                  "Expected JSON boolean but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON boolean" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "DATE" -> do
           -- DATE fields in JSON should be ISO-8601 strings (YYYY-MM-DD)
           case jsonValue of
@@ -4306,7 +4434,7 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> userException $ UserError $
                   "Could not parse date string '" <> s <> "'. Expected format: YYYY-MM-DD"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATE field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATE" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "TIME" -> do
           -- TIME fields in JSON should be strings (HH:MM:SS or HH:MM)
           case jsonValue of
@@ -4316,7 +4444,7 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> userException $ UserError $
                   "Could not parse time string '" <> s <> "'. Expected format: HH:MM:SS or HH:MM"
             _ -> userException $ UserError $
-                  "Expected JSON string for TIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for TIME" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "DATETIME" -> do
           -- DATETIME fields in JSON should be ISO-8601 strings with timezone
           case jsonValue of
@@ -4330,7 +4458,7 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> userException $ UserError $
                   "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATETIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATETIME" <> atField at <> " but got: " <> Text.pack (show jsonValue)
 
         -- Not a primitive, check if it's a custom record type
         _ -> do
@@ -4383,29 +4511,70 @@ jsonValueToWHNFTyped jsonValue ty = do
                     Aeson.Object obj -> do
                       -- Decode each field from the JSON object WITH TYPE INFORMATION
                       -- Note: We ignore extra fields in the JSON (Postel's Law)
+                      presumeOn <- asks (.presume)
+                      declared <- asks (.recordDefaults)
+                      let defaults = Map.findWithDefault Map.empty (getUnique tyRef) declared
                       fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType) -> do
+                        let fieldAt  = at { fieldPath = at.fieldPath <> [fieldName] }
+                            fieldTxt = renderPresumedPath fieldAt.fieldPath
+                            mDefault = Map.lookup fieldName defaults
                         case KeyMap.lookup (Key.fromText fieldName) obj of
                           Nothing
-                            | isMaybeFieldTy fieldType ->
+                            -- An ABSENT field takes the default its DECLARE
+                            -- gives it, and a declared default wins over the
+                            -- MAYBE fallback below (T1b). It is reported when
+                            -- it is forced, not here: a field the rule never
+                            -- reads did not shape the answer (T6).
+                            | presumeOn
+                            , Just d <- mDefault
+                            , Just v <- typicallyLiteralValue d -> do
+                              rf <- allocateValue v
+                              registerPresumable rf
+                                MkPresumed { path = fieldAt.fieldPath, declaredAt = rangeOf d, origin = FromDecode at.decodeFrom }
+                              pure rf
+                            | presumeOn, isMaybeFieldTy fieldType ->
                               -- MAYBE field missing in JSON: treat as NOTHING
+                              -- (D7.3). With presumption off this fallback does
+                              -- not fire, like any other default (T1b).
                               allocateValue $ ValConstructor TypeCheck.nothingRef []
                             | otherwise -> do
                               -- Required field missing in JSON: error
                               userException $ UserError $
-                                "Missing required field '" <> fieldName <> "' in JSON object"
+                                "Missing required field '" <> fieldTxt <> "' in JSON object"
+                                <> withheldDefault presumeOn (isJust mDefault) (isMaybeFieldTy fieldType)
+                          -- @null@ means "not known", and never takes a
+                          -- default (T3). Said here, naming the field, rather
+                          -- than left to the primitive decoder's "got: Null".
+                          Just Aeson.Null
+                            | Just _ <- mDefault
+                            , not (isMaybeFieldTy fieldType) ->
+                              userException $ UserError $
+                                "Field '" <> fieldTxt <> "' is null. null means the value is not known,"
+                                <> " and it never takes the TYPICALLY default: supply a value,"
+                                <> " or leave the field out to use the default"
                           Just fieldValue -> do
                             -- RECURSIVELY decode the field value WITH TYPE INFORMATION
-                            fieldWHNF <- jsonValueToWHNFTyped fieldValue fieldType
+                            fieldWHNF <- jsonValueToWHNFTyped fieldAt fieldValue fieldType
                             allocateValue fieldWHNF
                       -- Construct the record with the decoded fields
                       pure $ ValConstructor conRef fieldRefs
                     _ -> do
                       -- JSON value is not an object, can't decode to record
                       userException $ UserError $
-                        "Expected JSON object to decode to record type, but got: " <> Text.pack (show jsonValue)
+                        "Expected JSON object to decode to record type" <> atField at <> ", but got: " <> Text.pack (show jsonValue)
 
     -- For other types, fall back to generic decoding
     _ -> jsonValueToWHNF jsonValue
+
+-- | What a "missing field" error adds when presumption is off and the field
+-- would otherwise have been filled: by its own default, or, for a MAYBE, by
+-- NOTHING (T1b withdraws that fallback with the switch too).
+withheldDefault :: Bool -> Bool -> Bool -> Text
+withheldDefault presumeOn hasDefault isMaybe
+  | presumeOn  = ""
+  | hasDefault = " (it has a TYPICALLY default, but presumption is hard, so the default is not used)"
+  | isMaybe    = " (a MAYBE field left out is NOTHING only while presumption is soft)"
+  | otherwise  = ""
 
 -- | Check if a type is MAYBE α (used for optional record field handling)
 isMaybeFieldTy :: Type' Resolved -> Bool
@@ -4414,14 +4583,16 @@ isMaybeFieldTy _ = False
 
 -- | Convert list of JSON values to L4 list (ValCons/ValNil) with type information
 -- This recursively decodes each element using the provided element type
-jsonListToWHNFTyped :: [Aeson.Value] -> Type' Resolved -> Machine WHNF
-jsonListToWHNFTyped [] _elementType = pure ValNil
-jsonListToWHNFTyped (x:xs) elementType = do
-  headVal <- jsonValueToWHNFTyped x elementType
-  headRef <- allocateValue headVal
-  tailVal <- jsonListToWHNFTyped xs elementType
-  tailRef <- allocateValue tailVal
-  pure $ ValCons headRef tailRef
+jsonListToWHNFTyped :: DecodeAt -> [Aeson.Value] -> Type' Resolved -> Machine WHNF
+jsonListToWHNFTyped at = go (0 :: Int)
+  where
+    go _ [] _elementType = pure ValNil
+    go i (x:xs) elementType = do
+      headVal <- jsonValueToWHNFTyped at { fieldPath = at.fieldPath <> ["[" <> Text.pack (show i) <> "]"] } x elementType
+      headRef <- allocateValue headVal
+      tailVal <- go (i + 1) xs elementType
+      tailRef <- allocateValue tailVal
+      pure $ ValCons headRef tailRef
 
 decodeJsonToValue :: Text -> Machine WHNF
 decodeJsonToValue jsonStr = do
@@ -5374,6 +5545,9 @@ updateThunkToWHNFWhen rf fp v =
 -- well, which should be benign.
 evalRef :: Reference -> Machine Config
 evalRef rf = do
+  -- A default that took effect is reported where it is forced, whichever
+  -- fill site put it here ('notePresumedForce', 'Presumed').
+  notePresumedForce rf
   -- Fast path: plain-WHNF thunk updates are monotonic (Unevaluated ->
   -- Unevaluated with more blackhole marks, or Unevaluated -> WHNF, never
   -- back), so a thunk observed in WHNF is final and can be returned from a
@@ -5695,8 +5869,16 @@ updateTerm env n thunk = do
 
 -- We are assuming that the environment already contains an entry with an address for us.
 evalDecide :: Environment -> Decide Resolved -> Machine ()
-evalDecide env (MkDecide _ann _tysig (MkAppForm _ n []   _maka) expr) =
+evalDecide env (MkDecide _ann _tysig (MkAppForm _ n []   _maka) expr) = do
   updateTerm env n (Unevaluated Set.empty expr env)
+  -- A definition that IS a default ('presumableDefs') reports itself when it
+  -- is first forced. Registered per allocation, so each directive's fresh
+  -- heap ('L4.EvaluateLazy.forEachDirectiveFreshHeap') registers its own.
+  defs <- asks (.presumableDefs)
+  unless (Map.null defs) $
+    for_ (Map.lookup (getUnique n) defs) \ p -> do
+      rf <- expectTerm env n
+      registerPresumable rf p
 evalDecide env (MkDecide _ann _tysig (MkAppForm _ n args _maka) expr) = do
   let
     v = ValClosure (MkGivenSig emptyAnno ((\ r -> MkOptionallyTypedName emptyAnno r Nothing Nothing) <$> args)) expr env
@@ -6741,6 +6923,6 @@ writeJSONToReferences json env = case json of
               -- Convert JSON to WHNF and write into the existing Reference.
               -- NOTE (T6): deliberately a plain WHNF — externally injected
               -- batch input is a per-run constant, not a force result.
-              whnf <- jsonValueToWHNFTyped val ty
+              whnf <- jsonValueToWHNFTyped (MkDecodeAt key [key]) val ty
               updateThunkToWHNF existingRef whnf
   _ -> pure ()

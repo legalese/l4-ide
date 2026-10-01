@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -456,6 +456,116 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+  describe "TYPICALLY defaults (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC)" do
+    let uncertain = Aeson.object []
+        args kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs]
+        hard kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs, "presumption" Aeson..= ("hard" :: Text)]
+        expectAnswer resp v ps = assertSuccess resp \r ->
+          (Map.lookup "value" r.fnResult, r.presumed) `shouldBe` (Just v, ps)
+        expectError resp fragment =
+          case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+            Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf fragment
+            other -> expectationFailure ("Expected an error containing " <> show fragment <> ", got: " <> show other)
+
+    -- W2: the published schema is R8's surface: optional, with its default.
+    it "publishes a section GIVEN's default and leaves it out of required (W2)" do
+      withServiceFromSources "ty-schema" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema/functions/may%20contract")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            capacity = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object props) -> Aeson.KeyMap.lookup "has capacity" props
+              _ -> Nothing
+        required `shouldNotContain` ["has capacity"]
+        required `shouldContain` ["is adult"]
+        (capacity >>= \case Aeson.Object c -> Aeson.KeyMap.lookup "default" c; _ -> Nothing)
+          `shouldBe` Just (Aeson.Bool True)
+
+    it "fills a left-out section GIVEN on the direct path and lists it in presumed" do
+      withServiceFromSources "ty-sec-direct" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-direct" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    -- The positive control for presumed: a default the rule never forces is
+    -- not listed, although the request left it out just the same.
+    it "does not list a default the rule never read" do
+      withServiceFromSources "ty-sec-unread" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-unread" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    it "fills a left-out section GIVEN on the wrapper path too" do
+      withServiceFromSources "ty-sec-wrap" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    it "fills a left-out rule GIVEN on the direct and the wrapper path" do
+      withServiceFromSources "ty-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitBool True) ["has capacity"]
+        wrapped <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["has capacity"]
+
+    it "fills left-out record fields from their DECLARE, enum defaults included (T1b)" do
+      withServiceFromSources "ty-record" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-record" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
+        expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
+
+    it "lets a supplied value win, and presumes nothing" do
+      withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-supplied" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    -- T3: null is "I don't know", never an omission.
+    it "never takes a default for null" do
+      withServiceFromSources "ty-null" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-null" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= Aeson.Null])
+        expectError resp "never takes the TYPICALLY default"
+
+    -- T4: presumption hard withdraws the default; the refusal names the input
+    -- and stays loud, on both paths.
+    it "with presumption hard, refuses a left-out input on the direct path" do
+      withServiceFromSources "ty-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectError resp "'has capacity': missing required parameter"
+
+    it "with presumption hard, stops on a left-out input on the wrapper path" do
+      withServiceFromSources "ty-hard-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-wrap" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectError resp "has capacity (not supplied)"
+
+    it "carries presumed on each case of the batch endpoint" do
+      withServiceFromSources "ty-batch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+          Just batch -> map (\c -> c.presumed) batch.cases `shouldBe` [["has capacity"], []]
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
