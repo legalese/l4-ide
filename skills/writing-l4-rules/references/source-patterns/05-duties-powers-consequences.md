@@ -458,7 +458,7 @@ that shape, three rungs deep: pay, then pay with penalty, then pay everything ou
 > `"Any person who, without lawful authority, removes or attempts to remove from Singapore any portion of the property of which a receiver has been appointed under section 39, or destroys, conceals, or refuses to yield up the same to the receiver, shall be guilty of an offence and shall be liable on conviction by a Magistrates' Court to a fine not exceeding $1,000 or to imprisonment for a term not exceeding 6 months or to both."`
 >
 > — Probate and Administration Act 1934 s 42, at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/PAA1934.txt:842-853`, whose running
+> `PAA1934.txt:842-853` (the `pdftotext -layout` rendering legalese/canon's `subjects/sg/succession/encodings/cleanroom-2026-08/source/fetch-sso.py` re-creates byte for byte), whose running
 > header between `:845` and `:849` the quotation elides. **No offence in `jl4/examples/legal/` and `jl4/examples/canon/`
 > is encoded**. The word "offence" appears there in exactly three `.l4` files, and in each it
 > is a scope-out: that module lists "the s 42 offence" among the provisions it deliberately leaves
