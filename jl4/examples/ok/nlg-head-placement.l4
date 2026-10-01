@@ -27,11 +27,11 @@
 -- a named-argument call site, once as the heading and again as the input's
 -- gloss.
 --
--- Measured 2026-09-21, one rule per row. Every row carries BOTH a positional
--- and a `WITH` directive, because the loss used to be per CALL SITE -- a
--- positional call printed the bare name while a `WITH` call printed the
--- sentence as the input's gloss -- and the `.nlg.golden` beside this file is
--- what pins that the two columns now agree.
+-- Measured 2026-09-21 (rows 15 to 19: 2026-10-02, see (d)), one rule per row.
+-- Every row but 19 carries BOTH a positional and a `WITH` directive, because
+-- the loss used to be per CALL SITE -- a positional call printed the bare name
+-- while a `WITH` call printed the sentence as the input's gloss -- and the
+-- `.nlg.golden` beside this file is what pins that the two columns now agree.
 --
 --   #  head shape                      herald placement        nlg positional  nlg WITH   render
 --   1  DECIDE `r` IF ...               trailing the head       herald          herald     herald

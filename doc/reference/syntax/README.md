@@ -281,10 +281,12 @@ An annotation describes the thing it sits with, and there are two places to
 sit:
 
 ```l4
-GIVEN amount IS A NUMBER @nlg the claim amount   -- trailing: describes `amount`
+-- trailing: describes `amount`
+GIVEN amount IS A NUMBER @nlg the claim amount
 
 GIVETH A BOOLEAN
-@nlg the claim of %amount% is large              -- own line: describes the rule
+-- own line: describes the rule
+@nlg the claim of %amount% is large
 DECIDE `is large` IF amount GREATER THAN 100
 ```
 
@@ -299,13 +301,15 @@ It is read as the rule's sentence anyway: whichever of the four places an annota
 ```l4
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
-@nlg the claim of %amount% is large              -- above the head
+-- above the head
+@nlg the claim of %amount% is large
 `is large` amount MEANS amount GREATER THAN 100
 
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
 `is large` amount
-    @nlg the claim of %amount% is large          -- under the input: the same
+    -- under the input: the same
+    @nlg the claim of %amount% is large
     MEANS amount GREATER THAN 100
 ```
 
@@ -344,8 +348,9 @@ Each row is one rule; the two `l4 nlg` columns are a positional call and a `WITH
 Rows 5, 7, 8, 10, 11 and 12 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
 Row 13 heralds the rule twice, above the head and under its input, and the outer sentence wins; row 14 is an input gloss written in the `GIVEN`, which stays one.
 Rows 15 to 19 are the `GIVEN`-list rule described below.
-In rows 15, 16, 18 and 19 the annotation is indented past `GIVEN`, so it is the input's gloss: a positional call shows the rule's bare name and a `WITH` call labels the input with it.
-Row 19 has no positional call, because a section's input can only be supplied by name.
+In rows 15, 16, 18 and 19 the annotation is indented past `GIVEN`, so it is the input's gloss, and a `WITH` call labels the input with it.
+A positional call shows the rule's bare name in rows 15, 16 and 18; row 19 has none, because a section's input can only be supplied by name.
+These rows use heads that do not repeat their inputs: when the head does repeat them, the gloss in rows 15 and 16 is rendered nowhere, as the `GIVEN`-list paragraph below explains.
 Row 17 is the control, at `GIVEN`'s column, where it is still the rule's sentence.
 The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](../../../jl4/examples/ok/nlg-head-placement.l4), whose committed golden pins both `l4 nlg` columns, and a CLI test pins the `l4 render` one — so a change to any cell is a test failure rather than stale prose here.
 
@@ -374,7 +379,8 @@ Underneath a field, an annotation describes _that_ field — the one above it �
 ```l4
 DECLARE Employee
   HAS `full name`  IS A STRING
-      @nlg the employee's full name     -- describes `full name`
+      -- describes `full name`
+      @nlg the employee's full name
       `start date` IS A DATE
 ```
 
@@ -395,7 +401,8 @@ DECIDE `is large` IF amount GREATER THAN floor
 Here `the sum of money` is `amount`'s gloss and the second annotation is the rule's sentence.
 It is the `GIVEN` keyword's column that counts, not the left margin, so a `GIVEN` indented under a section heading or inside a `WHERE` reads the same way.
 The column is all it reads: a rule's sentence indented under the last input, by even one space, becomes that input's gloss, and nothing warns.
-When the head repeats the inputs, a gloss in the `GIVEN` reaches nothing, as explained above, so an annotation indented under the last input is lost without a warning; write the rule's sentence at `GIVEN`'s column there, or above the head.
+When the head repeats the inputs, a gloss in the `GIVEN` reaches nothing, as explained above, so an annotation indented under the last input is lost without a warning.
+There, write the rule's sentence at `GIVEN`'s column, or between `GIVETH` and the head at any indentation; above the head but indented past `GIVEN`, with no `GIVETH`, it is still the last input's.
 The exceptions are confined to those two lists: between `GIVETH` and `DECIDE`, an annotation on its own line describes the rule below it at any indentation.
 
 **The bare inline form cannot be tagged.** `[…]` has nowhere to put a subtag —

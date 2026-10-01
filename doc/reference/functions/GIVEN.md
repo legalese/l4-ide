@@ -77,7 +77,8 @@ getName p MEANS p's name
 
 ## Annotations
 
-An input can carry an `@nlg` annotation: the words that `l4 nlg` and the document renderer use for it in place of its name.
+An input can carry an `@nlg` annotation: the words that `l4 nlg` uses for it in place of its name.
+The document renderer, `l4 render`, does not use an input's annotation, except for an input declared in a section's `GIVEN`; the [placement table](../syntax/README.md#where-to-put-it) has the facts per projection.
 Write it at the end of the input's line, or on a line of its own under the input:
 
 ```l4
