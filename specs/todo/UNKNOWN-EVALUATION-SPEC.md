@@ -26,7 +26,7 @@ There, an unknown fact is an exception that aborts the directive, and whether yo
 
 ### 2.1 The connectives are not in the evaluator; `IF` is
 
-`forwardExpr` rewrites every Boolean connective into an `IfThenElse` before evaluating it (`jl4-core/src/L4/EvaluateLazy/Machine.hs:1198-1205`, read):
+The type checker turns every Boolean connective into a call to a built-in function (`desugarBinOpToFunction`, `jl4-core/src/L4/TypeCheck.hs:3743-3762`, read), and each built-in is a closure whose body is an `IfThenElse` (`boolBinOpClosure`, `andValClosure` and siblings, `jl4-core/src/L4/EvaluateLazy/Machine.hs:6636-6715`, allocated at `:5929-5932`, read):
 
 | source        | evaluated as                |
 | ------------- | --------------------------- |
@@ -35,6 +35,7 @@ There, an unknown fact is an exception that aborts the directive, and whether yo
 | `a IMPLIES b` | `IF a THEN b ELSE TRUE`     |
 | `NOT a`       | `IF a THEN FALSE ELSE TRUE` |
 
+`forwardExpr` also has a direct rewrite of the surface connectives into `IfThenElse` (`Machine.hs:1198-1205`), but type-checked code never reaches it: the surface `And` "does not survive type checking" (`Machine.hs:2990-2995`).
 `UNLESS` never reaches the evaluator as itself: the parser turns `l UNLESS r` into `l AND (NOT r)` (`Parser.hs:1885-1889`, read).
 `BRANCH` becomes a chain of `IfThenElse` too (`desugarMultiWayIf`, `Machine.hs:1323-1327`, read).
 The regulative `RAND` and `ROR` are the exception: they are their own value, `ValROp`, with their own frames (`Machine.hs:1196-1197`, `:2622-2753`, read), see §3.5.
@@ -43,7 +44,8 @@ The regulative `RAND` and `ROR` are the exception: they are their own value, `Va
 
 An input nobody supplied is the value `ValAssumed name` (`jl4-core/src/L4/Evaluate/ValueLazy.hs:98`).
 Every site that inspects one raises `Stuck name` (`stuckOnAssumed`, `Machine.hs:835-836`):
-`IF` (`:1634`), application of an assumed function (`:1593-1594`, carrying `-- TODO: we can do better here`), `expectNumber` / `expectString` / `expectDateValue` (`:4120`, `:4126`, `:4133`), every binary operator (`runBinOp`, `:5018-5019`), and equality (`runBinOpEquals`, `:5046`).
+`IF` (`:1634`), application of an assumed function (`:1593-1594`, carrying `-- TODO: we can do better here`), `expectNumber` / `expectString` / `expectDateValue` (`:4120`, `:4126`, `:4133`), every binary operator (`runBinOp`, `:5018-5019`), and equality (`runBinOpEquals`, `:5046`), for its left operand only.
+An unknown on the right of `EQUALS` is misdiagnosed: `3 EQUALS n` reports "Trying to check equality on types that do not support it", while `n EQUALS 3` names `n` (probe, `f9a504b77`).
 
 **No L4 construct can catch it.**
 `raiseException` unwinds every frame and rethrows to the host (`Machine.hs:699-704`), and the comment at `:724-728` states the invariant in terms: _"Today every `EvalException` aborts its whole directive."_
@@ -74,7 +76,7 @@ Section `GIVEN x IS A BOOLEAN` and `n IS A NUMBER`, both unsupplied (probe `q1-s
 | `and (LIST TRUE, x, FALSE)`  | **stuck**        | `FALSE`                       |
 | `and (LIST FALSE, x, TRUE)`  | `FALSE`          | `FALSE`                       |
 
-The six bold rows are the asymmetry.
+The five bold rows are the asymmetry.
 Each is a rule whose answer is fixed by what is known, and today's evaluator reports it as unanswerable because the unknown fact happens to be written first.
 For an encoder this is a hazard that no reading of the source reveals: reordering the conjuncts of an `AND` is an edit nobody expects to change what the rule can answer.
 
@@ -97,7 +99,9 @@ It is a defect in two-valued mode, independent of everything below: the pattern 
 
 **The `IF` rewrite leaks into user-visible traces.**
 `jl4/examples/ok/tests/lazytrace-exception.golden:15-16` shows the trace of `FALSE OR TRUE` as `IF a THEN TRUE ELSE b`, and `:56`, `:60`, `:65` and `:70` show `x AND (and OF xs)` as `IF a THEN b ELSE FALSE`.
-That is the only committed golden that carries one of the four rewrite shapes: `grep -rlF` over every `*.golden` in the tree, for each of the four, found one file and five lines.
+`a` and `b` are the built-ins' own parameter names.
+That is the only committed golden that carries one of the four shapes (`grep -rlF` over every `*.golden`), on about twenty lines once each `IF`'s child lines are counted.
+The service's reasoning tree (`traceToReasoning`, `jl4-service/src/Backend/Jl4.hs`) carries the same sub-tree, and jl4-mlir reproduces it on purpose for trace parity with the service (`jl4-mlir/runtime/jl4-runtime.mjs:3512-3521`, `:3718-3745`; parity harness `jl4-mlir/test/Main.hs:476-500`).
 A reader of that trace sees a conditional they never wrote, with variable names that are not theirs.
 
 ### 2.5 The service: one silent path, and it is the investigator's
@@ -124,10 +128,10 @@ Measured 2026-10-01 with a snapshot copy of the installed binary, `JL4_LIBRARY_P
 | ---------------------------------------------- | ----- |
 | files run (none failed to produce JSON)        | 514   |
 | directive results                              | 7,211 |
-| results that are a `Stuck` ("an assumed term") | 5     |
-| files with at least one                        | 3     |
+| results that are a `Stuck` ("an assumed term") | 9     |
+| files with at least one                        | 4     |
 
-The three are `ok/assumes.l4` (3), `ok/section-given-discharge.l4` (1) and `ok/lazytrace-exception.l4` (1), each a file that exists to show the stuck behaviour; that they were found is the census's positive control.
+The four are `ok/assumes.l4` (3), `ok/assert-raises.l4` (4), `ok/section-given-discharge.l4` (1) and `ok/lazytrace-exception.l4` (1), each a file that exists to show the stuck behaviour; that they were found is the census's positive control.
 
 **What this means.** The corpus's own directives almost always supply every input, because they are tests.
 So the lift would move almost nothing in the corpus, which is good news for §6 and bad news for §7: the corpus cannot be where its cost is measured.
@@ -268,10 +272,11 @@ Both are loud, and the first is no less true than before, but "needed to know `x
 
 ### 4.4 Step 0, in two-valued mode: connectives become frames
 
-Replace the four rewrites at `Machine.hs:1198-1205` with frames `AndFrame`, `OrFrame`, `ImpliesFrame`, `NotFrame`, built the way `RBinOp1`/`RBinOp2` are.
+Replace the `IfThenElse` bodies of the four built-ins (`Machine.hs:6636-6715`) with frames `AndFrame`, `OrFrame`, `ImpliesFrame`, `NotFrame`, built the way `RBinOp1`/`RBinOp2` are, and delete or replace the unreachable rewrite at `Machine.hs:1198-1205`.
+The lift of §4.2 lives in the same frames; a lift written at `:1198` would never fire.
 In two-valued mode they compute what the `IF` computed, in the same order.
 What changes is what the trace can say: `FALSE OR TRUE` instead of `IF a THEN TRUE ELSE b`.
-That moves `lazytrace-exception.golden`'s five lines (§2.4) and should move nothing else, which the step must measure rather than assume.
+That moves the `IF` sub-trees out of `lazytrace-exception.golden` (§2.4), changes the service's reasoning tree, and changes the trace shape jl4-mlir mirrors, so jl4-mlir's runtime and parity harness change in the same step; nothing else should move, which the step must measure rather than assume.
 
 This step is worth doing even if the lift is never switched on: the trace stops showing code the author never wrote, and it removes the `IMPLIES` flattening §3.7 objects to.
 `BRANCH` can stay as an `IF` chain, because its guards are a first-match ordering, which `IF` expresses exactly; §4.5 decides how an unknown guard behaves there.
@@ -293,13 +298,16 @@ The ladder's §23 already drew the line: the circuit is Boolean, typed data live
 The evaluator should draw it in the same place.
 
 - **Arithmetic or string operations on an unknown** (`n PLUS 1`, `CONCAT`) give an unknown of the result type, carrying the set of atoms it depends on; there is no residual arithmetic.
-- **A comparison** whose operands include an unknown (`n GREATER THAN 3`, `age AT LEAST 18`) gives a residual **atom**, and the atom is the comparison: its identity is the comparison's source position together with the atoms it depends on.
+- **A comparison** whose operands include an unknown (`n GREATER THAN 3`, `age AT LEAST 18`) gives a residual **atom**, and the atom is the comparison: its identity is the **evaluated term**: the operator, the normal forms of its known operands, and the unknown inputs it reads, never its source position.
+  One source position is evaluated many times (a helper called with different known arguments, an `IF` arm, a prelude recursion), and keying by position would make `older 18 AND NOT older 65`, with `older k MEANS age > k`, the contradiction `A AND NOT A`, decided `FALSE` though age 30 makes it `TRUE`.
+  An operand that is an arithmetic unknown carrying only its atom set (below) gets a fresh atom per evaluation.
   The planner can then ask "is `age AT LEAST 18`?" and the ladder can draw that atom with its value chip, as §23 describes.
 - **A call to an assumed function** (`Machine.hs:1593-1594`, the `TODO`) gives an unknown of its result type, or an atom if the result is Boolean.
 
 The consequence worth stating: the residual is propositional, so two atoms over the same number are independent to it.
 `n > 3 AND n < 2` is a residual, not `FALSE`.
-That is a loss of precision, not a wrong answer: it can say "undetermined" where the truth is "no", never the reverse.
+With atoms keyed by evaluated term, that is a loss of precision, not a wrong answer: it can say "undetermined" where the truth is "no", never the reverse.
+Keyed any coarser, the guarantee does not hold.
 Arithmetic reasoning over residuals belongs to an SMT backend (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md`), not to this evaluator.
 
 ### 4.7 Equality, lists and quantifiers
@@ -365,7 +373,7 @@ With the flag off, the only change any golden can see is Step 0's trace change (
 
 **What the service's `fromMaybe FALSE` becomes.**
 In explore mode a missing, `null` or `{}` boolean is an `RAtom`, of kind `Unsupplied` or `Declined` by the wire mapping of U9.
-In today's decide mode it should stop being `FALSE`: `{}` on a boolean should be refused the way `null` already is (§2.5), or take the input's `TYPICALLY` where it has one.
+In today's decide mode it should stop being `FALSE` everywhere on the wrapper path, which a single `{}` anywhere in a request reaches, making absent and `null` booleans `FALSE` too (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §3 S1); `{}` never takes a default.
 That second half is a defect fix in two-valued mode and belongs to the `TYPICALLY` work, not to this lift; it is listed here so the two specs do not each assume the other has it.
 
 ---
@@ -378,7 +386,7 @@ That is unbounded in principle, so it is measured, not guessed:
 
 1. **Baseline.** Today's census (§2.6) shows the corpus directives are almost all fully supplied (5 stuck in 7,211), so the workload has to be made: for every `@export` function in the corpus, take each directive that calls it and generate its partial-input variants, dropping each input in turn and then every pair, which is what a wizard does mid-interview.
 2. **Coverage.** On those variants, `--unknowns stuck` against `--unknowns residual`: how many end in a value, in a residual, in a different error, or time out.
-3. **Blow-up.** Per directive, the frames pushed (the machine already counts them against its budget, `StackOverflow`), the largest residual, and the number of conditionals evaluated on an unknown condition, each against the two-valued run of the same directive with every input supplied.
+3. **Blow-up.** Per directive, the total steps taken (the machine has no step counter today, only a stack-depth cap, `maximumFrameDepth`, `Exceptions.hs:159`, checked at `Machine.hs:857`, which cannot see a join's blow-up because the arms run one after the other; the counter is part of this measurement), the largest residual, the number of conditions whose residual is a tautology or contradiction, and the number of conditionals evaluated on an unknown condition, each against the two-valued run of the same directive with every input supplied.
 4. **Wall clock.** `jl4-test` and the §3.2.1 differential, flag off, must be unchanged within noise; that is the cost to everyone who does not use the lift.
 5. **Positive control.** One directive constructed to evaluate both arms of a nested conditional on one unknown, depth 10, whose frame count the measurement must show growing; a measurement that cannot see that cannot be trusted to have seen nothing elsewhere.
 
@@ -389,28 +397,31 @@ U4's budget is set from the distribution step 3 produces, not before.
 ## 8. Build sequence
 
 1. **Fix the `CONSIDER` misdiagnosis** (§2.4) in two-valued mode: a `ValAssumed` scrutinee raises `Stuck`, naming it. Independent; small.
-2. **Step 0** (§4.4): connectives as frames, flag off, one golden moved, measured.
-3. **K3 behind the flag**: `ValResidual` with atoms only, quotiented to `U` everywhere, so the six asymmetric rows of §2.3 answer correctly.
+2. **Step 0** (§4.4): the built-in connectives as frames, flag off, with the trace golden, the service reasoning tree and jl4-mlir's trace parity moved together, measured.
+3. **K3 behind the flag**: `ValResidual` with atoms only, quotiented to `U` everywhere, so the five asymmetric rows of §2.3 answer correctly.
 4. **Residuals**: the full `Residual`, printed as source, round-tripped through `prettyLayout`, covered by an extension of the §3.2.1 differential to explore mode.
 5. **Conditionals and the membrane** (§4.5, §4.6), after the measurement of §7.
 6. **Service explore mode**, then the planner reading residuals from evaluation instead of only from the static ladder tree.
-7. **Retire the duplicate**: the ladder's TypeScript evaluator (§3.4) pinned to the Haskell one by a shared truth-table fixture, then replaced by a call (U10).
+7. **Retire the duplicates**: once step 3 lands, shared L4 cases (a call with an unknown argument whose body decides anyway, `FALSE AND` a call that errors, `x OR NOT x`) run through both TypeScript evaluators, the ladder visualizer's (§3.4) and `ladder-core`'s `nodeValue` (`ts-shared/ladder-core/src/layout.ts:209`), and through the Haskell one, following `ladder-core/test/verdict.test.ts`; both TypeScript evaluators are replaced by a call after step 6 (U10).
 
 ---
 
 ## 9. Open rulings
 
+Each is a card on the bench "Unknowns and Defaults" (claude.ai artifact `XQk522h6PN2xv8YFPhogJc`, db collection `l4-unknowns-defaults-1001`), where an independent skeptic's objection and a revised recommendation sit beside it; U8 and U9 share cards with `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T4 and T3.
+A ruling is recorded here when it is made.
+
 ### U1 — Semantics: left-sequential strong Kleene with residual values
 
 **The question.** Which of §4.1's candidates is the evaluator's semantics of an unknown?
 **Recommendation.** (b)'s order with (c)'s values, §4.2: the K3 table on known values, errors and non-termination left-to-right as today, an undecided Boolean returned as a residual formula.
-**Cost of declining.** (a) alone answers the six rows of §2.3 but cannot decide `x OR NOT x` and gives the planner nothing to rank; a parallel evaluation order breaks §4.3's conservativity.
+**Cost of declining.** (a) alone answers the five rows of §2.3 but cannot decide `x OR NOT x` and gives the planner nothing to rank; a parallel evaluation order breaks §4.3's conservativity.
 
 ### U2 — Step 0 ships in two-valued mode
 
 **The question.** Replace the `IF` rewrite of `AND`/`OR`/`IMPLIES`/`NOT` with frames even if the lift is never switched on?
 **Recommendation.** Yes, §4.4: it is the change Meng asked for, it stops traces showing code the author did not write, and it keeps the `IMPLIES` seam.
-**Cost.** One golden, five lines (§2.4), if the measurement confirms that is all.
+**Cost.** The trace golden's `IF` sub-trees, the service's reasoning tree and jl4-mlir's mirrored trace shape (§2.4), if the measurement confirms that is all.
 
 ### U3 — Where the decision diagram lives
 
@@ -425,7 +436,7 @@ U4's budget is set from the distribution step 3 produces, not before.
 
 ### U5 — Comparisons become atoms (the membrane)
 
-**The question.** Is a comparison over an unknown a residual atom identified by its source position and atoms (§4.6)?
+**The question.** Is a comparison over an unknown a residual atom, identified by its evaluated term (§4.6)?
 **Recommendation.** Yes; it matches the ladder's §23 and the planner's existing treatment of a call as an atom.
 **Known loss.** `n > 3 AND n < 2` stays undetermined rather than `FALSE`; sound, imprecise.
 
@@ -470,7 +481,7 @@ U4's budget is set from the distribution step 3 produces, not before.
 ## 10. What this spec did not verify
 
 - The service behaviour in §2.5 was measured by the coordinating session, not here; the cause of the section-`GIVEN` prelude failure is unexplained.
-- §4.4's claim that Step 0 moves one golden and nothing else is a prediction from one `grep` over committed goldens; trace output from the CLI (`l4 trace`), the LSP and the service was not checked.
+- §4.4's claim that Step 0 moves only the trace golden, the service reasoning tree and jl4-mlir's trace parity is a prediction from `grep` and from reading the code; trace output from the LSP was not checked.
 - The `#EVALTRACE` probes printed "no trace captured" on the installed binary, so the trace shape in §2.4 is read from a committed golden, not reproduced.
 - §3.3's statement that two calls to one function share one planner atom follows from the atom being keyed by `nm.unique`; whether `nm` is the callee or the call was not checked, and it is outside this spec.
 - Nothing in §4–§7 has been built or timed.
