@@ -801,7 +801,7 @@ U4's step limit is set from the distribution step 3 produces, not before.
    The default report carries C5's scope-pending field from this step.
    Rows 1 to 6, 11 to 15, 23, 24, 35, 37, 52, 62 and 63 of §4.12 answer correctly.
    This is what U1b calls "true strong Kleene: atoms only".
-4. **The boundary decider and the residual report.** §4.7.2 by truth table over finite-domain atoms, the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results.
+4. **The boundary decider and the residual report.** §4.7.2 by truth table over the residual's atoms on every host (DU3b), the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results.
    Rows 7, 8, 10, 14, 25, 26, 36, 38, 41, 42, 61, 64, 65 and 66.
 5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b), after the measurement of §7.
    Rows 16, 19 to 22, 27 to 34, 59 and 60.
