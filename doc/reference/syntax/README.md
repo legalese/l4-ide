@@ -340,7 +340,9 @@ Each row is one rule; the two `l4 nlg` columns are a positional call and a `WITH
 | 19  | section `GIVEN`, then a rule   | under section input, indented         | bare name           | input's gloss   | gloss in the body |
 
 Rows 5, 7, 8, 10 and 11 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
-Rows 15 to 19 are the `GIVEN`-list rule described below: under an input and indented past `GIVEN`, an annotation is that input's gloss, so a positional call shows the rule's bare name and a `WITH` call labels the input with it.
+Rows 15 to 19 are the `GIVEN`-list rule described below.
+In rows 15, 16, 18 and 19 the annotation is indented past `GIVEN`, so it is the input's gloss: a positional call shows the rule's bare name and a `WITH` call labels the input with it.
+Row 17 is the control, at `GIVEN`'s column, where it is still the rule's sentence.
 The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](../../../jl4/examples/ok/nlg-head-placement.l4), whose committed golden pins both `l4 nlg` columns, and a CLI test pins the `l4 render` one — so a change to any cell is a test failure rather than stale prose here.
 
 **A head carrying an `AKA` reads the same way**, rows 10 and 11.

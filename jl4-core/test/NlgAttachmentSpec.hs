@@ -206,6 +206,17 @@ spec = describe "which node an @nlg attaches to" $ do
       attachments m `shouldBe` [("amount", "the sum of money")]
       [ () | NotAttached{} <- ws ] `shouldBe` []
 
+    it "leaves one at the GIVEN keyword's column unattached when a GIVETH follows, as before" $ do
+      -- The column test decides between the input and what follows; with a
+      -- GIVETH in between, what follows takes nothing, so it warns.
+      (m, ws) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \@nlg at the margin\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` IF amount GREATER THAN 100\n"
+      attachments m `shouldBe` []
+      [ () | NotAttached{} <- ws ] `shouldSatisfy` (not . null)
+
     it "attaches to the last input, not the rule, when no GIVETH follows" $ do
       (m, _) <- parsed
         "GIVEN amount IS A NUMBER\n\
@@ -277,6 +288,37 @@ spec = describe "which node an @nlg attaches to" $ do
         \@nlg the claim of %amount% is large\n\
         \DECIDE `is large` IF amount GREATER THAN 100\n"
       attachments m `shouldBe` [("is large", "the claim of `amount` is large")]
+
+    it "stops at a DECIDE, ASSUME, DECLARE or YIELD written on a line of its own" $ do
+      -- Those keywords are tokens of the declaration, not nodes with a span,
+      -- so they do not bound the last input by themselves. Past one of them,
+      -- an annotation is no longer inside the GIVEN list.
+      (decide, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \DECIDE\n\
+        \  @nlg after the DECIDE keyword\n\
+        \  `is large` IF amount GREATER THAN 100\n"
+      attachments decide `shouldBe` [("is large", "after the DECIDE keyword")]
+      (assume, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \ASSUME\n\
+        \  @nlg after the ASSUME keyword\n\
+        \  `is large` IS A BOOLEAN\n"
+      attachments assume `shouldBe` [("is large", "after the ASSUME keyword")]
+      (declare, _) <- parsed
+        "GIVEN a IS A TYPE\n\
+        \DECLARE\n\
+        \  @nlg after the DECLARE keyword\n\
+        \  Box HAS content IS AN a\n"
+      attachments declare `shouldBe` [("Box", "after the DECLARE keyword")]
+      (lambda, _) <- parsed
+        "DECIDE `doubled` IS\n\
+        \  map\n\
+        \    (GIVEN x YIELD\n\
+        \        @nlg after the YIELD keyword\n\
+        \        `twice` x)\n\
+        \    xs\n"
+      attachments lambda `shouldBe` [("twice", "after the YIELD keyword")]
 
     it "does not give the first input an annotation written ABOVE the GIVEN" $ do
       (m, ws) <- parsed

@@ -987,12 +987,19 @@ The keyword's column rather than column 1, so a `GIVEN` indented under a section
 | under the last input, indented, `GIVETH` next (row 15)         | dropped, "Not attached to any valid syntax node" | that input          |
 | under the last input, indented, no `GIVETH` (row 16)           | the rule's sentence, silently                    | that input          |
 | under the last input, at the `GIVEN` keyword's column (row 17) | the rule's sentence                              | the rule's sentence |
-| under an earlier input carrying a `TYPICALLY` default (row 18) | the NEXT input, silently                         | that input          |
+| under an earlier input carrying a `TYPICALLY` default (row 18) | the NEXT input, or a default that is a name      | that input          |
 | under a section `GIVEN`'s last input, indented (row 19)        | dropped, "Not attached to any valid syntax node" | that input          |
 
 The `TYPICALLY` row is the same rule rather than a second one: the input's name was cut off at the start of its default, so the line below fell to the input after it.
+(With a number or a string as the default. A default that is itself a name — `TRUE`, `FALSE`, or a name that parses but does not type-check — took the line below instead, silently.)
 `L4.Parser.ResolveAnnotation.addNlgInput` lets the name reach past the default, as a record field's name reaches past its type, and clamps the default to its own line so that a default naming something cannot take an annotation the last input declined.
 A record field carrying a `TYPICALLY` default has the same defect and keeps it; this ruling is about `GIVEN` lists, and the field case is not changed here.
+Nor is a gloss TRAILING a default on the input's own line, which is not an own-line annotation: it still misses the input, landing on the default itself when that is a name such as `FALSE`, and otherwise on the next input or, after the last one, on what follows the list.
+
+The rule applies to every `GIVEN` list the attachment pass reaches — a rule's, an `ASSUME`'s, a `DECLARE`'s type parameters, a section's and a lambda's — and the list ends at the declaration's own keyword.
+It does not reach the `GIVEN` of a rule written as several pattern-matching clauses: nothing in that list attaches, before or after this change, and each annotation there warns "Not attached".
+A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own is a token of the declaration rather than a node with a span, so `signatureBeforeKeyword` bounds the signature there; without it the last input would reach past such a keyword to an annotation written under it.
+The column is all the tie-break reads, so a rule whose `DECIDE` is indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last input; nothing in the corpus is laid out that way.
 
 Corpus exposure: one own-line annotation in the tree sits under a `GIVEN` list's last input, `doc/reference/syntax/directive-example.l4:7`, and it is at the margin, so it is unchanged.
 `NlgAttachmentSpec` pins each placement, including the section and `WHERE` columns, and a mutation that measures the column from 1 instead of from the keyword fails two of its cases.

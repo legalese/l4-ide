@@ -469,7 +469,10 @@ DECIDE `is large` IF amount GREATER THAN floor
 
 ``#EVAL `is large` WITH floor IS 100, amount IS 200`` prints ``the claim of `amount` is over `floor` where `floor` is 100 and the sum of money is 200``: the first annotation is `amount`'s, the second the rule's.
 The column is the `GIVEN` keyword's, not column 1, so a section `GIVEN` indented under its heading, or a `GIVEN` inside a `WHERE`, reads the same way.
-Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed and silently became the rule's sentence when none did, and one under any earlier parameter carrying a `TYPICALLY` default silently landed on the NEXT parameter.
+Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed and became the rule's sentence when none did (silently, unless the rule had a sentence of its own and the two collided), and one under an earlier parameter carrying a `TYPICALLY` default silently landed on the NEXT parameter, or on the default itself when that was a name such as `TRUE`.
+The column is all the rule reads: a `DECIDE` indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last parameter.
+A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own ends the list, so an annotation under one of those is not the parameter's.
+A herald TRAILING a `TYPICALLY` default on the parameter's own line still does not reach the parameter: it lands on the default itself when that is a name such as `FALSE`, and otherwise on the next parameter, or, after the last one, becomes the rule's sentence or is dropped with a warning; put it on the line below instead.
 
 **A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside
 a field list an annotation on its own line describes the field above it, an exception to

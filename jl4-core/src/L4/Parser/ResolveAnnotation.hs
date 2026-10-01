@@ -247,7 +247,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TopDecl n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
   addNlg a = extendNlgA a $ case a of
     MkDeclare ann tySig appFormAka tyDecl -> do
-      tySig' <- addNlg tySig
+      tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
       tyDecl' <- addNlg tyDecl
       pure $ MkDeclare ann tySig' appFormAka' tyDecl'
@@ -255,7 +255,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
   addNlg a = extendNlgA a $ case a of
     MkDecide ann tySig appFormAka expr -> do
-      tySig' <- addNlg tySig
+      tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
       expr' <- addNlg expr
       pure $ MkDecide ann tySig' appFormAka' expr'
@@ -263,10 +263,26 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
     MkAssume ann tySig appFormAka order mTypically -> do
-      tySig' <- addNlg tySig
+      tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
       mTypically' <- traverse addNlg mTypically
       pure $ MkAssume ann tySig' appFormAka' order mTypically'
+
+-- | Cut a declaration's signature off where the declaration's own keyword
+-- starts: the DECIDE of @GIVEN … DECIDE `r` IF …@, and likewise ASSUME,
+-- DECLARE and a lambda's YIELD. The keyword is a token of the declaration,
+-- not a node with a span, so nothing else stops a GIVEN list's last input —
+-- which reaches down to the next node ('addNlgInput') — from reaching past a
+-- keyword written on a line of its own to an annotation under it.
+--
+-- The signature is the declaration's first hole, so its keyword is the first
+-- token after it. In a @`r` MEANS …@ rule that token is MEANS, which comes
+-- after the head, so it bounds nothing the head does not already.
+signatureBeforeKeyword :: Anno -> NlgA a -> NlgA a
+signatureBeforeKeyword ann =
+  hoistNlgA (inLocRange (locRangeTo (listToMaybe keywords)))
+ where
+  keywords = [ r.start | AnnoCsn (Just r) _ <- drop 1 ann.payload ]
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
   addNlg a = extendNlgA a $ case a of
@@ -457,18 +473,20 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (GivenSig n) where
     -- @
     -- GIVEN floor  IS A NUMBER
     --       amount IS A NUMBER
-    --       \@nlg the sum of money          -- describes `amount`
-    -- \@nlg the claim of %amount% is large  -- describes the rule
+    --       \@nlg the sum of money
+    -- \@nlg the claim of %amount% is large
     -- DECIDE `is large` IF amount GREATER THAN floor
     -- @
     --
-    -- An input before the last gets that for free: the input after it bounds
-    -- its range. The last input is bounded only by whatever follows the list,
-    -- and with no GIVETH between them the slot under it is also the slot above
-    -- the rule — so it takes only an annotation indented further than the
-    -- GIVEN keyword, and one at the keyword's column or left of it describes
-    -- what follows, as it always did. The keyword's column, not column 1, so
-    -- a GIVEN indented under a section heading or a WHERE works the same way.
+    -- The first annotation describes `amount`, the second the rule. An input
+    -- before the last gets that for free: the input after it bounds its range.
+    -- The last input is bounded only by whatever follows the list — the next
+    -- node, or the declaration's own keyword ('signatureBeforeKeyword') — and
+    -- with no GIVETH between them the slot under it is also the slot above the
+    -- rule. So it takes only an annotation indented further than the GIVEN
+    -- keyword, and one at the keyword's column or left of it describes what
+    -- follows, as it always did. The keyword's column, not column 1, so a
+    -- GIVEN indented under a section heading or a WHERE works the same way.
     --
     -- The range still starts at the keyword: an annotation written ABOVE the
     -- GIVEN is not the first input's to take.
@@ -779,7 +797,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       v' <- addNlg v
       pure $ Var ann v'
     Lam ann sig body -> do
-      sig' <- addNlg sig
+      sig' <- signatureBeforeKeyword ann (addNlg sig)
       body' <- addNlg body
       pure $ Lam ann sig' body'
     App ann n ns -> do
