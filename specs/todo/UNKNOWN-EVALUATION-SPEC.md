@@ -2,11 +2,13 @@
 
 **Status:** proposed, not built (2026-10-01).
 Nothing in this document is in the tree.
+§4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day.
 Every statement about today's behaviour is a probe result or a `file:line` read on `unstable` at `f9a504b77`, and says which.
-Probes ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here).
+Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.11 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
 Probe files are in the session scratchpad, not in the tree.
 
 **Trigger:** SCHRODINGER, widened by Meng on 2026-10-01: _"continue your investigation of the evaluator lift with kand. It sounds like we'll need to redo the rewriting-to-IF in favour of something more algebraically principled."_
+§4 was added under REVERSEGEAR, fired by Meng the same day on the observation _"We seem to be backing our way into symbolic evaluation by fits and starts."_
 
 **Related:** `specs/done/NEGATION-AS-FAILURE-SPEC.md` (`DefBool`, `kand`/`kor`/`knot`), `specs/done/BOOLEAN-MINIMIZATION-SPEC.md` (whose Phase 1 proposed this and was never built, §3.2), `specs/todo/RUNTIME-INPUT-STATE-SPEC.md` (the four-cell input model), `specs/todo/ladder-diagrams-2026/DESIGN.md` §22, §23, §25f, `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.5 (R8, `TYPICALLY` at the root), `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`.
 
@@ -80,7 +82,7 @@ The five bold rows are the asymmetry.
 Each is a rule whose answer is fixed by what is known, and today's evaluator reports it as unanswerable because the unknown fact happens to be written first.
 For an encoder this is a hazard that no reading of the source reveals: reordering the conjuncts of an `AND` is an edit nobody expects to change what the rule can answer.
 
-### 2.4 Two defects the probes found on the way
+### 2.4 Defects the probes found on the way
 
 **`CONSIDER` on an unknown misreports it as a missing branch.**
 `CONSIDER m WHEN NOTHING THEN 1, WHEN JUST y THEN 2`, with `m IS A MAYBE NUMBER` an unsupplied section `GIVEN` (probe `q4.l4`), returns:
@@ -103,6 +105,15 @@ It is a defect in two-valued mode, independent of everything below: the pattern 
 That is the only committed golden that carries one of the four shapes (`grep -rlF` over every `*.golden`), on about twenty lines once each `IF`'s child lines are counted.
 The service's reasoning tree (`traceToReasoning`, `jl4-service/src/Backend/Jl4.hs`) carries the same sub-tree, and jl4-mlir reproduces it on purpose for trace parity with the service (`jl4-mlir/runtime/jl4-runtime.mjs:3512-3521`, `:3718-3745`; parity harness `jl4-mlir/test/Main.hs:476-500`).
 A reader of that trace sees a conditional they never wrote, with variable names that are not theirs.
+
+**A field read on an unknown record misreports the same way.**
+`d's age`, with `d IS A Person` an unsupplied section `GIVEN`, returns the same no-branch message (probe `p05-record.l4`, on the `f9a504b77` snapshot), because the generated selector is a closure whose body is a one-branch `CONSIDER` on its argument (`Machine.hs:5727-5743`).
+So every field path on an unknown record is misdiagnosed, not only a `CONSIDER` the author wrote, and `d's age AT LEAST 18` never reaches the comparison.
+
+**A bare unknown as the result of an `#EVAL` is reported as a value.**
+`#EVAL TRUE AND x`, `#EVAL TRUE IMPLIES x` and `#EVAL x` each print `x` as if it were a value, with JSON `"kind":"value"`, `"ok":true` and exit 0 (probes `p11-implies.l4`, `p17-bare.l4`).
+`#ASSERT` on the same expression is reported as `Stuck`, because only the assertion arm handles a `ValAssumed` result (`EvaluateLazy.hs:306`).
+This is the one path in two-valued mode where an unknown is silent, and it is the shape §2.5 finds again on the service.
 
 ### 2.5 The service: one silent path, and it is the investigator's
 
@@ -141,9 +152,9 @@ The unknowns this spec is about arrive at the boundary — the service, `l4 batc
 
 ## 3. Prior art already in the tree
 
-### 3.1 `DefBool` and the Kleene lift, user-level (`NEGATION-AS-FAILURE-SPEC.md`)
+### 3.1 `DefBool`: truth-functional strong Kleene, user-level (`NEGATION-AS-FAILURE-SPEC.md`)
 
-`DefBool` is `MAYBE BOOLEAN`, and `kand`, `kor`, `knot` are strong Kleene over it, written in L4 (`jl4/experiments/negation-as-failure-examples.l4:89-124`).
+`DefBool` is `MAYBE BOOLEAN`, and `kand`, `kor`, `knot` are truth-functional strong Kleene over it, reading (a) of §4.1, written in L4 (`jl4/experiments/negation-as-failure-examples.l4:89-124`); U12b asks that it be labelled so wherever the word "lift" referred to it.
 All 15 `#ASSERT`s in that file pass (probe on the installed binary, 15 of 15 `assertion satisfied`, each printed once as a message and once as a diagnostic).
 The shipped library carries only the three eliminators `holds`, `naf`, `presumed` (`jl4-core/libraries/negation-as-failure.l4`), each of which collapses `NOTHING` to a constant.
 The spec's open question 2, whether the lift ships, was never ruled.
@@ -173,7 +184,7 @@ Its input is the ladder's static tree, so it decides `x OR NOT x` correctly, whi
 `AND`/`OR` evaluate every child (`Promise.all`, `:165-167`, `:190-192`) and then apply strong Kleene (`evalAndChain` / `evalOrChain`, `:301-339`).
 `NOT` keeps unknown unknown (`:292-297`).
 A call with any unknown argument is unknown, with a console message saying that is a shortcut (`:220-224`).
-So the ladder already has the semantics this spec proposes, implemented a second time, in another language, over a different tree.
+So the ladder already has reading (a) of §4.1, implemented a second time, in another language, over a different tree; it evaluates every child before it consults the table, so it is not reading (b).
 
 ### 3.5 The regulative algebra is the precedent
 
@@ -200,209 +211,477 @@ Rewriting `IMPLIES` to `IF a THEN b ELSE TRUE`, as `Machine.hs:1203` does today,
 
 ---
 
-## 4. The design
+## 4. Symbolic evaluation, defined once
 
-### 4.1 Three candidates
+This section is the definition the rulings of §9 were converging on, clause by clause.
+It was written on 2026-10-01, after those rulings, and replaces the design section as it stood that morning.
+Where this section and a ruling's own words pull apart, §4.12 lists it with the evidence and does not resolve it.
+Nothing in it is built.
 
-**(a) Strong Kleene over a new `ValUnknown`.**
-A third Boolean value with the K3 tables, `U ∧ F = F`, `U ∧ T = U`, `U ∨ T = T`, `¬U = U`.
-The question it leaves open is _evaluation order_: the tables say what the answer is, not what gets evaluated, and an `AND` whose right operand errors or diverges needs an answer.
+### 4.1 Three readings of an unknown, and the one chosen
 
-**(b) Left-sequential strong Kleene.**
-Evaluate the left operand.
-If it is `FALSE` (for `AND`), stop with `FALSE`, exactly as today; if `TRUE`, the answer is the right operand, exactly as today.
-Only if it is **unknown** is the right operand evaluated, and then the K3 table applies: right `FALSE` gives `FALSE`, otherwise unknown.
-This is the K3 table on the three values, with the order in which a fourth outcome, an error or non-termination, can occur kept left-to-right, which is McCarthy's sequential reading.
-It does not need parallel evaluation: Plotkin's parallel-or, which would make `⊥ ∨ T = T`, is not proposed.
+Three readings have names here because the corpus, the rulings and the prior art each use one of them.
 
-**(c) Residualisation.**
-An undecided Boolean is not a bare `U` but a formula over the unknown atoms it depends on, an element of the free Boolean algebra on those atoms, with the `IMPLIES` seam kept as a node (§3.7).
-K3 is the quotient that forgets the formula: a residual maps to `U` unless it is a tautology or a contradiction.
-The residual carries strictly more: `x OR NOT x` is a residual the planner decides `TRUE` and K3 cannot; and it is exactly the shape the planner already consumes (§3.3) and the regulative side already returns (§3.5).
+**(a) Truth-functional strong Kleene.**
+A third Boolean value with the K3 tables, `U ∧ F = F`, `U ∧ T = U`, `U ∨ T = T`, `¬U = U`, applied after both operands are evaluated.
+This is what `kand`, `kor` and `knot` compute over `DefBool` (§3.1), what the ladder visualizer's `evalAndChain` computes over its children (`eval.ts:301-339`), and what `BOOLEAN-MINIMIZATION-SPEC.md`'s `evalTriBool` was (§4.10).
+It forgets which unknowns the answer depends on, so it cannot decide `x OR NOT x`, and it says nothing about an operand that errors.
 
-### 4.2 Recommendation: (b)'s evaluation order, (c)'s values
+**(b) Left-sequential evaluation.**
+Evaluate the left operand first.
+If it decides the connective (`FALSE` for `AND`, `TRUE` for `OR`, `FALSE` for `IMPLIES`), stop, as today.
+If it is known and does not decide, the answer is the right operand, as today.
+Only if it is unknown is the right operand evaluated and the K3 table applied.
+This is McCarthy's sequential reading of the connectives; Plotkin's parallel-or, which would make `⊥ ∨ T = T`, is not proposed.
 
-Evaluate connectives left-sequentially as (b) describes, and let an undecided Boolean be a residual as (c) describes.
-(a) is not a separate choice, it is what (b) and (c) look like through the K3 quotient, and is the reading every consumer that only wants "known or not" takes.
+**(c) Residuals.**
+An undecided result is not a bare `U` but the term it is waiting on: a formula over the atoms it depends on, with `IMPLIES` kept as its own node (§3.7).
+(a) is the quotient of (c) that forgets the formula.
 
-So the value domain gains one constructor, for Boolean results only:
+**Ruled (U1, U1b):** the evaluator uses (b)'s order and (c)'s values.
+(a) remains the right description of the user-level library (U12b) and of what the K3 report prints (§4.7).
 
-```haskell
--- proposed, not built
-| ValResidual Residual          -- an undecided BOOLEAN
+### 4.2 The term language
 
-data Residual
-  = RAtom   Atom                -- an unknown, with its provenance (§4.8)
-  | RNot    Residual
-  | RAnd    Residual Residual   -- operands already evaluated, at least one undecided
-  | ROr     Residual Residual
-  | RImplies Residual Residual  -- the seam, kept (§3.7)
-  | RLit    Bool                -- only inside a larger residual
+A value the evaluator cannot determine is a **term**.
+A determined value is a weak-head normal form exactly as today; nothing below changes any determined value.
+
+```
+term  t ::= ?i                 an unsupplied input i, with its declared type (U6b) and its provenance (§4.8)
+          | t 's f             a field of an unknown record: the selector f applied to t
+          | v                  a determined value
+          | g (a1, …, an)      an assumed function g applied to arguments, each a value or a term
+          | op (a1, …, an)     a built-in operation (arithmetic, string, date, list) with at least one term operand
+          | c ? t1 : t2        a join: a conditional whose condition c is a Boolean term and whose arms were both evaluated
+          | gave-up [c]        the evaluation under the pending condition c ran out of steps (§4.5)
+
+Boolean term (a residual)
+      b ::= TRUE | FALSE
+          | ?i                 an input atom, i a BOOLEAN input
+          | t1 cmp t2          a comparison atom, keyed by its evaluated term (§4.6)
+          | g (a1, …, an)      a Boolean call to an assumed function, keyed the same way
+          | fresh              an atom for an unknown that carries no key (§4.6)
+          | NOT b | b AND b | b OR b | b IMPLIES b
+          | c ? b1 : b2        a Boolean join, which is (c AND b1) OR (NOT c AND b2) once built
+          | error [c] e        a guarded error leaf: the error e, raised only if the path condition c is TRUE (U11, U11b)
+          | gave-up [c]        a guarded give-up leaf, carried like an error leaf (§4.5)
 ```
 
-The tables, for `AND` (`OR` dual, `IMPLIES` as its own row so the seam survives):
+Three choices in that grammar carry the design.
 
-| left         | right         | result             |
-| ------------ | ------------- | ------------------ |
-| `FALSE`      | not evaluated | `FALSE` (as today) |
-| `TRUE`       | `r`           | `r` (as today)     |
-| residual `p` | `FALSE`       | `FALSE`            |
-| residual `p` | `TRUE`        | `p`                |
-| residual `p` | residual `q`  | `RAnd p q`         |
-| residual `p` | error / ⊥     | error / ⊥ (U11)    |
+**A defined function never appears in a term.**
+A call to a function the module defines is unfolded as today, by binding its arguments and evaluating its body, so `older 18` with `older k MEANS age GREATER THAN k` leaves no trace of `older`: it becomes the atom `age GREATER THAN 18`.
+Only built-in operations and assumed functions appear applied, because only those have no body to unfold.
 
-`ValAssumed` stays the representation of an unsupplied input and becomes the source of an `RAtom` when it is inspected in a Boolean position, instead of `Stuck`.
+**A field read on an unknown record is a term, not an error.**
+`d's age` is desugared to the selector `age` applied to `d` (`Machine.hs:1236-1237`), and the selector is a closure whose body is a one-branch `CONSIDER` on its argument (`Machine.hs:5727-5743`).
+Applied to an unknown `d` today, that `CONSIDER` falls through to the no-branch message of §2.4 (probe `p05-record.l4`).
+Under this definition the selector applied to a term returns the term `d's age`, the input plus its field path, which the planner can ask for (U5b).
 
-### 4.3 Conservativity: what this cannot change
+**`IMPLIES` is a node, never `NOT a OR b`.**
+That is the ladder's finding at DESIGN §25f: a met requirement under an unknown scope is `TRUE` as a value and undetermined as a verdict, and only the unflattened node lets a consumer read both.
+So `b1 IMPLIES b2` is built whenever `b1` is a term, even when `b2` is a literal; the simplifications that apply to `AND` and `OR` in §4.3 do not apply to it.
 
-**Claim.** For every directive that does not end in `Stuck` today, the lifted evaluator returns the same value, raises the same error, or fails to terminate, exactly as today.
+### 4.3 The evaluation rule, and why it is conservative
 
-**Why.** The lift adds transitions only at the sites listed in §2.2, each of which today raises `Stuck`.
-`Stuck` cannot be caught in L4 and aborts the whole directive (§2.2).
-So a run that never reaches one of those sites takes exactly the same transitions under the lift, and a run that reaches one ended in `Stuck` today.
-The left-to-right order of (b) is what makes this hold for `AND` and `OR` themselves: when the left operand is known, the lifted frame does what the `IF` did, including not evaluating the right operand when the left decides.
+**The rule.**
+At every site that today raises `Stuck` (§2.2), and in the four built-in connectives, when every operand the site needs is determined, evaluate exactly as today.
+When an operand is a term, build the term node for that site instead of raising:
 
-**Where it changes a stuck directive for the worse.**
-A directive that today ends in `Stuck` on the left operand of an `AND` may, under the lift, go on to evaluate a right operand that errors or diverges.
-Today that directive reports "needed to know `x`"; lifted, it reports the right operand's error, or does not terminate.
-Both are loud, and the first is no less true than before, but "needed to know `x`" was more useful, which is what U11 asks.
+| site today (§2.2)                                                                           | with a term operand                                                                |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `AND`, `OR`, `IMPLIES`, `NOT` (`Machine.hs:6636-6715`)                                      | the connective table below                                                         |
+| `IF` (`:1634`), `BRANCH` (`:1323-1327`)                                                     | a join, §4.5                                                                       |
+| `CONSIDER` on a term scrutinee (`matchPattern`, `:4054`)                                    | a `fresh` unknown of the result type, naming the scrutinee (U4); never "no branch" |
+| a selector applied to a term (`:5727-5743`)                                                 | the field-path term                                                                |
+| an assumed function applied (`:1593-1594`)                                                  | the application term; an atom if its result type is `BOOLEAN`                      |
+| `expectNumber`, `expectString`, `expectDateValue` (`:4120-4133`), `runBinOp` (`:5018-5019`) | the operation term; a comparison atom if the operation is a comparison, §4.6       |
+| `runBinOpEquals` (`:5046`)                                                                  | the identity rule, then a comparison atom, §4.6                                    |
+| a term as the result of a directive (`EvaluateLazy.hs:306`)                                 | the report, §4.7                                                                   |
 
-**What the claim does not cover.** Anything that is not the evaluator: the printer, the traces, the exporters.
-§4.4 is a change to traces in two-valued mode and is not covered by this claim, which is why it is a separate step with a golden to move.
+The connective table, for `AND`; `OR` is dual, and `IMPLIES` and `NOT` build their node whenever the operand is a term:
 
-### 4.4 Step 0, in two-valued mode: connectives become frames
+| left     | right         | result                                                                 |
+| -------- | ------------- | ---------------------------------------------------------------------- |
+| `FALSE`  | not evaluated | `FALSE` (as today)                                                     |
+| `TRUE`   | `r`           | `r` (as today)                                                         |
+| term `p` | `FALSE`       | `FALSE`, unless `p` contains a guarded leaf: then `p AND FALSE` (U11b) |
+| term `p` | `TRUE`        | `p`                                                                    |
+| term `p` | term `q`      | `p AND q`                                                              |
+| term `p` | error `e`     | `p AND error [p] e`: the error becomes a leaf guarded by `p` (U11)     |
+| term `p` | ⊥             | the step counter, §4.5                                                 |
 
-Replace the `IfThenElse` bodies of the four built-ins (`Machine.hs:6636-6715`) with frames `AndFrame`, `OrFrame`, `ImpliesFrame`, `NotFrame`, built the way `RBinOp1`/`RBinOp2` are, and delete or replace the unreachable rewrite at `Machine.hs:1198-1205`.
-The lift of §4.2 lives in the same frames; a lift written at `:1198` would never fire.
+Nothing inside the evaluator decides a residual beyond these tables, the identity rule of §4.6 and the agreeing-arms rule of §4.5.
+In particular no tautology is recognised mid-evaluation (U3): `IF (x OR NOT x) THEN 1 ELSE 2` builds the join `(x OR NOT x) ? 1 : 2`.
+
+**Every evaluation is lifted (U7b).**
+There is no evaluation mode and no flag.
+`l4 run`, `#EVAL`, `#ASSERT`, `l4 batch`, the service, the language server and the golden harness all run this rule; what differs between them is only the report of §4.7.
+
+**Why it is conservative.**
+For every directive that does not end in `Stuck` today, the lifted evaluator returns the same value, raises the same error, or fails to terminate, exactly as today.
+The lift adds transitions only at the sites in the table above, each of which today raises `Stuck`, and `Stuck` cannot be caught in L4 and aborts the whole directive (`Machine.hs:699-704`, `:724-728`).
+So a run that never reaches one of those sites with a term takes the same transitions as today, and a run that does reach one ended in `Stuck` today.
+The left-to-right order is what makes this hold for the connectives themselves: when the left operand is known, the frame does what the `IF` did, including not evaluating the right operand when the left decides.
+That is also why the connectives do not commute in the presence of errors, which was the answer to Meng's note on U1: `FALSE AND (1 DIVIDED BY 0 GREATER THAN 0)` is `FALSE` and `(1 DIVIDED BY 0 GREATER THAN 0) AND FALSE` raises, today and after (probe `p03-commute.l4`), and the symmetric answer would change a fully supplied directive.
+The step counter of §4.5 starts at the first term built, which is the first point at which today's run would have ended, so no fully supplied directive can run out of steps.
+
+Where the lift changes a stuck directive for the worse, it is loud: a directive stuck on the left of an `AND` may now evaluate a right operand that errors, and U11 keeps that error as a guarded leaf next to the unknown rather than in place of it.
+
+What the claim does not cover is anything that is not the evaluator: the printer, the traces, the exporters.
+§4.4 changes traces in two-valued mode and is a separate step with a golden to move.
+
+### 4.4 Step 0, in two-valued mode: the connectives become frames (U2, U2b)
+
+Replace the `IfThenElse` bodies of the four built-ins (`Machine.hs:6636-6715`) with frames of their own, through a new lazy value form modelled on `ValROp` so that an indirect call through a variable gets them too, and delete or replace the unreachable rewrite at `Machine.hs:1198-1205` (U2b).
 In two-valued mode they compute what the `IF` computed, in the same order.
 What changes is what the trace can say: `FALSE OR TRUE` instead of `IF a THEN TRUE ELSE b`.
-That moves the `IF` sub-trees out of `lazytrace-exception.golden` (§2.4), changes the service's reasoning tree, and changes the trace shape jl4-mlir mirrors, so jl4-mlir's runtime and parity harness change in the same step; nothing else should move, which the step must measure rather than assume.
+That moves the `IF` sub-trees out of `lazytrace-exception.golden` (§2.4) and changes the service's reasoning tree.
+jl4-mlir's by-name mirror (`synthesizeBoolDesugar`, `synthesizeNotDesugar`) is deleted rather than updated, its eager codegen keeps its short-circuit filter, and the same change adds an `IMPLIES` fixture to the parity corpus whose trace cell must be byte-identical, with a recorded run in which the trace sub-matrix was read (U2b).
+No golden or trace output may name the built-ins' parameters `a` and `b`, and the indirect-call golden is read before it is blessed.
+The lift of §4.3 lives in these frames; a lift written at `:1198` would never fire.
+`BRANCH` stays an `IF` chain, because its guards are a first-match ordering, which `IF` expresses exactly.
 
-This step is worth doing even if the lift is never switched on: the trace stops showing code the author never wrote, and it removes the `IMPLIES` flattening §3.7 objects to.
-`BRANCH` can stay as an `IF` chain, because its guards are a first-match ordering, which `IF` expresses exactly; §4.5 decides how an unknown guard behaves there.
+### 4.5 Conditionals and the step counter (U4, U4b, U11)
 
-### 4.5 `IF`, `BRANCH` and `CONSIDER` on an unknown
+**A join.**
+`IF c THEN t ELSE e` with `c` a term evaluates both arms and builds the join `c ? t : e`.
+If both arms are the same determined value, by the equality `runBinOpEquals` already supports, the result is that value: `IF x THEN 1 ELSE 1` is `1`.
+If the arms are Boolean, the join is the residual `(c AND t) OR (NOT c AND e)`, so `IF x THEN TRUE ELSE TRUE` is `TRUE` and `IF x THEN y ELSE FALSE` is `x AND y`.
+Otherwise the join is kept as a term, and a strict built-in that returns a `BOOLEAN` applied to it is pushed into each arm (U4b): `(IF x THEN 1 ELSE 2) GREATER THAN 1` is `x ? FALSE : TRUE`, which is `NOT x`.
+At a result, in a field, or under any consumer that is not such an operation, the join is an opaque unknown whose atom set is the union of the condition's and both arms' (U3, U4b).
+`BRANCH` is a chain of `IF`s and inherits all of this: a guard after an unknown one is reached and evaluated.
+An error in one arm is an `error [c] e` leaf, one mechanism with the connective case (U4b, U11b): `IF x THEN 1 DIVIDED BY 0 ELSE 2` is `x ? error [x] : 2`, reported as "2 unless `x`; errors if `x`".
 
-**An unknown condition, Boolean-typed `IF`:** evaluate both arms; the result is `(c ∧ t) ∨ (¬c ∧ e)` as a residual, simplified when the arms agree (`IF x THEN TRUE ELSE TRUE` is `TRUE`).
-**An unknown condition, any other type:** evaluate both arms; if they are equal (normal-form equality on the values `runBinOpEquals` already supports) the result is that value, otherwise the result is an unknown of that type whose atom set is the union of the condition's and both arms' (§4.6).
-**`BRANCH`:** the chain of `IF`s inherits the above; a guard after an unknown one is reached and evaluated, which is the cost §6 measures.
-**`CONSIDER` on an unknown scrutinee:** for a Boolean-typed `CONSIDER`, the residual is the disjunction over arms of _scrutinee matches this arm_ and _arm_; this needs atoms of the form `s = C` for an enumeration, which a decision diagram handles only with a constraint that exactly one of them holds (U4).
-Until that is ruled, an unknown scrutinee gives an unknown result, with the scrutinee named, and **never** the "no branch" message §2.4 records.
+**`CONSIDER` on a term scrutinee stays unknown for now** (U4): the result is a `fresh` unknown of the result type, naming the scrutinee, and never the no-branch message of §2.4.
+The disjunction over arms that an earlier draft proposed needs atoms of the form `s = C` under an exactly-one constraint, and is not ruled.
 
-Evaluating both arms is the expensive half of the design and the half that can blow up: nested conditionals on the same unknown evaluate a tree of arms.
-U4 asks whether to bound it by a budget, and §6 says how to measure it before deciding.
+**The step counter.**
+Evaluating both arms is the half of this design that can blow up: nested conditionals on one unknown evaluate a tree of arms, and a recursion whose guard reads an unknown never reaches a base case.
+So every evaluation runs under a cumulative counter of machine steps, started when the first term is built (§4.3), with a limit set from the measurement of §7 step 3 (U4).
+It counts steps, not depth: the existing cap is on frame depth only (`maximumFrameDepth`, `Exceptions.hs:159`, checked in `pushFrame`, `Machine.hs:857`), and arms run one after another, so depth cannot see a join's blow-up.
+**Running out of steps returns `gave-up [c]`**, where `c` is the path condition the evaluator was working under: the conjunction of the term conditions whose unknownness caused the evaluation in progress, innermost last.
+It is reported as "gave up; needed _i_" for the inputs in `c` (U11), and it is never a `StackOverflow`.
+Recursion guarded by an `IF` over an unknown always runs out, and that is the ruled behaviour, not a defect: `countdown m` with `countdown n MEANS IF n GREATER THAN 0 THEN countdown (n MINUS 1) ELSE 0` gives up naming `m`.
+A `gave-up` leaf is carried exactly as an error leaf is: it is never absorbed by `AND FALSE` or `OR TRUE`, because the evaluation it stands for might not terminate once the inputs are supplied, and a definite answer would promise what the two-valued run cannot keep.
+That reading of U4's word "unknown" is listed in §4.12.
 
-### 4.6 Comparisons and arithmetic: the membrane
+### 4.6 The membrane: comparisons, arithmetic, equality, and what an atom is (U5, U5b, U6, U6b)
 
-The ladder's §23 already drew the line: the circuit is Boolean, typed data lives inside a leaf, and a predicate is the membrane between them.
-The evaluator should draw it in the same place.
+The ladder's §23 drew the line: the circuit is Boolean, typed data lives inside a leaf, and a predicate is the membrane between them.
+The evaluator draws it in the same place.
+A comparison or a Boolean call over a term is an **atom** of the residual; arithmetic, string and date operations over a term are terms that are not atoms.
 
-- **Arithmetic or string operations on an unknown** (`n PLUS 1`, `CONCAT`) give an unknown of the result type, carrying the set of atoms it depends on; there is no residual arithmetic.
-- **A comparison** whose operands include an unknown (`n GREATER THAN 3`, `age AT LEAST 18`) gives a residual **atom**, and the atom is the comparison: its identity is the **evaluated term**: the operator, the normal forms of its known operands, and the unknown inputs it reads, never its source position.
-  One source position is evaluated many times (a helper called with different known arguments, an `IF` arm, a prelude recursion), and keying by position would make `older 18 AND NOT older 65`, with `older k MEANS age > k`, the contradiction `A AND NOT A`, decided `FALSE` though age 30 makes it `TRUE`.
-  An operand that is an arithmetic unknown carrying only its atom set (below) gets a fresh atom per evaluation.
-  The planner can then ask "is `age AT LEAST 18`?" and the ladder can draw that atom with its value chip, as §23 describes.
-- **A call to an assumed function** (`Machine.hs:1593-1594`, the `TODO`) gives an unknown of its result type, or an atom if the result is Boolean.
+**An atom's key is its evaluated term**, never its source position: the operator, the normal forms of its determined operands, and its term operands as terms (U1, U5, U5b).
+One source position is evaluated many times, in a helper called with different arguments, in an `IF` arm, in a prelude recursion, and keying by position would make `older 18 AND NOT older 65` the contradiction `A AND NOT A`, decided `FALSE` though age 30 makes it `TRUE`.
+Keyed by term, `older 18 AND NOT older 65` is `age GREATER THAN 18 AND NOT age GREATER THAN 65`, two atoms, undetermined; and `older 18 AND NOT older 18` is one atom twice, `FALSE` at the boundary.
+The soundness claim of §4.7 is conditional on this key.
 
-The consequence worth stating: the residual is propositional, so two atoms over the same number are independent to it.
-`n > 3 AND n < 2` is a residual, not `FALSE`.
-With atoms keyed by evaluated term, that is a loss of precision, not a wrong answer: it can say "undetermined" where the truth is "no", never the reverse.
-Keyed any coarser, the guarantee does not hold.
-Arithmetic reasoning over residuals belongs to an SMT backend (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md`), not to this evaluator.
+**Which terms carry a key.**
+An input, an input's field path, a comparison over those, and a Boolean call to an assumed function over those are keyed, and the planner can ask for them: it matches an answer by the key (U5b).
+A term that contains an arithmetic result, a join, a non-Boolean assumed call, a `CONSIDER` on a term, a `gave-up`, or an excluded-type equality (below) is `fresh`: no two occurrences share an atom, and the planner never asks about it, only for the inputs it reads (U5, U5b).
+So `n PLUS 1 GREATER THAN 3 AND NOT (n PLUS 1 GREATER THAN 3)` is undetermined, and `n PLUS 1 EQUALS n PLUS 1` stays an atom (U6).
+This is a loss of precision, not a wrong answer, and §4.12 C1 says what it costs.
 
-### 4.7 Equality, lists and quantifiers
+**The residual is propositional**, so two atoms over one number are independent to it: `n GREATER THAN 3 AND n LESS THAN 2` is undetermined, not `FALSE`, and `age >= 18 OR age < 18` is undetermined, not `TRUE`.
+With atoms keyed by term, that can say "undetermined" where the truth is "no", never the reverse.
+Arithmetic reasoning over these atoms belongs to an SMT backend (§4.7, §4.10), which is why an atom keeps its term and not only its key.
 
-**Equality.** `x EQUALS x` is stuck today (§2.3).
-Over Booleans it becomes the residual `x ↔ x`, which the planner decides `TRUE`.
-Over other types, an atom compared with itself is equal, and any other comparison involving an unknown is an atom as in §4.6 (U6).
-**Lists of known spine.** `and`, `or`, `all`, `any` are prelude recursions over `CONSIDER` and `AND`/`OR` (`prelude.l4:223-257`), so they inherit the connectives' behaviour with no change: `and (LIST TRUE, x, FALSE)` becomes `FALSE`.
-**Lists of unknown spine** (the list itself unsupplied) meet `CONSIDER` on an unknown, §4.5.
-**Regulative `EVERY` / `EACH`** run over the regulative algebra, already three-valued (§3.5), and are out of scope.
+**Equality.**
+`runBinOpEquals` gains an identity rule before anything else (U6, U6b): the same unknown input on both sides is `TRUE` when the input's declared type has no function or `CONTRACT` component anywhere inside it; a type variable or an unsolved inference variable counts as excluded.
+The unknown carries its declared type for this (`ValAssumed` gains the type `evalAssume` already has).
+An excluded type stays unknown rather than becoming an error, except a bare function or `CONTRACT` type, which raises today's unsupported-equality error; so `elem g (LIST g)` with `g` an unknown function errors and never returns `TRUE`.
+`typeHasFunctionComponent` is lifted out of the DMN exporter's `where` clause for this.
+Over `BOOLEAN`, `b1 EQUALS b2` with a term operand is the biconditional `(b1 AND b2) OR (NOT b1 AND NOT b2)`, a connective rather than an atom, which is how `x EQUALS y AND x AND NOT y` reaches `FALSE` at the boundary.
+Every other equality with a term operand is a comparison atom.
+The right-operand misdiagnosis (`3 EQUALS n`, §2.2) is fixed in build step 1 (U6).
+
+**Lists** of known spine need nothing of their own: `and`, `or`, `all`, `any` and `elem` are prelude recursions over `CONSIDER` and the connectives (`prelude.l4:223-257`, `:465-468`), so `and (LIST TRUE, x, FALSE)` is `FALSE` and `elem n (LIST 1, 2)` is `n EQUALS 1 OR n EQUALS 2`.
+A list whose spine is itself a term meets `CONSIDER` on a term, above.
+Regulative `EVERY` and `EACH` run over the regulative algebra (§3.5) and are out of scope.
+
+### 4.7 What is decided where
+
+Three places decide something about a residual, and a fourth only reports it.
+
+**1. Inside the evaluator: the tables only.**
+§4.3's connective table, §4.5's agreeing arms and §4.6's identity rule.
+Nothing else; the decision diagram does not move into `jl4-core` (U3).
+
+**2. At the root: propositional supervaluation of a Boolean residual.**
+When a directive, a service call or a batch row ends in a Boolean residual, it is decided once: `TRUE` if it is `TRUE` under every assignment of its atoms, `FALSE` if `FALSE` under every assignment, otherwise undetermined.
+This is what the planner's `determinedFromRoot` already does over its diagram (`BooleanDecisionQuery.hs:183-186`): a root that reduces to a terminal is decided.
+The word is qualified on purpose.
+It is supervaluation over the **atoms as independent propositions**, not over the inputs: the completions it ranges over include ones no input value realises, so `age >= 18 OR age < 18` has a completion with both atoms `FALSE` and stays undetermined (U1b, the first gap).
+Because those extra completions can only prevent a decision and never force one, every value it does return holds under every real completion; that is the soundness this spec claims, and all it claims.
+**Non-Boolean results are not settled** (U1b, the second gap): a join at the root is reported undetermined even when its condition is a tautology, so `IF (x OR NOT x) THEN 1 ELSE 2` reports "I needed to know `x`" and counts toward the trigger below.
+**A guarded leaf is a hole, never a value**: a residual containing `error [c] e` or `gave-up [c]` is decided over the assignments in which no guard holds, and the report names the guards, as "FALSE unless `x`; errors if `x`" (U11b).
+That outcome is its own, on the wire, in the K3 report and in every consumer listed under 4 below.
+
+How it is computed: by truth table when every atom of the residual reads one finite-domain input (a `BOOLEAN` or an enumeration), and otherwise by the planner's diagram once it can be reached from the evaluator's side; until then only the finite-domain case is decided locally and the rest is reported undetermined (U3, U3b).
+Three counts are kept from the first build, because they are the triggers (U3b): conditions whose residual is a tautology or a contradiction, reported as a lower bound; conditions whose atoms all read one finite-domain input, the trigger for the local truth table; and the same over numeric inputs, the trigger for the SMT backend.
+
+**3. Later, an SMT backend for the arithmetic atoms.**
+`age >= 18 OR age < 18` and `n GREATER THAN 3 AND n LESS THAN 2` are decided by a solver over the atoms' terms, not by this evaluator.
+`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` has the shape: Z3 over SMT-LIB2 text by subprocess (R-V6, `:370`), exact encodings for rounding, modulo and dates (R-V7, `:393`), and three verdicts with every `unknown` naming its reason (R-V8, `:433`).
+The terms of §4.2 are what that lowering consumes.
+
+**4. The report, chosen at the root only (U7b).**
+The computation is the same for every caller; the caller chooses only how an undetermined result is shown:
+
+| report   | an undetermined result shows as                                                                                                                     | a decided residual shows as  |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| default  | today's "I could not continue evaluating, because I needed to know the value of …", naming **every** input in the residual's support, not the first | its value                    |
+| K3       | `unknown`; an error-leaf residual shows its own outcome, never `unknown` (U11b)                                                                     | see §4.12 C2                 |
+| residual | the residual, printed as L4 source (§4.9)                                                                                                           | its value, with the residual |
+
+A `gave-up` is reported as "gave up; needed _i_" under every report.
+The language server and the golden harness show the default report and have no setting (U7b).
+On the service the report is its own route or a rejected unknown key, never a silently dropped field, and every response states which report it carries; on MCP it is a separate tool or a listed capability (U7b).
+In `l4 batch` an undetermined row is a row status, not a failure, and never trips stop-on-error (`Batch.hs:247`, `:299`, `:319`) (U7b).
+Exit codes: an undetermined `#ASSERT` exits 1, as a stuck one does today (U1b); an undetermined `#EVAL` under the default report keeps today's exit 1 (`Run.hs:139-152` counts a `ReducedErrored` as a crash).
+Ranked against the 2026-08-01 ruling that a failed assertion exits 0, as U7b asks: a failed assertion is an answer the author did not want, and an undetermined directive is no answer at all, which is the distinction `l4 run` already draws between `Fails` and `Errored`.
+Every consumer of an evaluation outcome gets an explicit arm for the residual outcome, with no wildcard arm: the API, diagnostics, the `l4 run` exit code, the LSP inspector and rules, and Catala (U1b).
 
 ### 4.8 Provenance: what an unknown remembers
 
-An `RAtom` carries what `ValAssumed` carries, the input's `Resolved` name, plus why it is unknown:
+An input atom carries what `ValAssumed` carries, the input's `Resolved` name, plus its declared type (U6b) and why it is unknown:
 
-| kind         | origin                                                             | four-cell (§3.6) |
-| ------------ | ------------------------------------------------------------------ | ---------------- |
-| `Unsupplied` | an input nobody supplied, no default                               | `Left Nothing`   |
-| `Presumed v` | an input nobody supplied, whose `TYPICALLY v` was not applied (§5) | `Left (Just v)`  |
-| `Declined`   | an input the caller explicitly answered "don't know"               | `Right Nothing`  |
-| `Derived`    | a comparison or call over unknowns (§4.6)                          | —                |
+| kind         | origin                                                                                          | four-cell (§3.6) |
+| ------------ | ----------------------------------------------------------------------------------------------- | ---------------- |
+| `Unsupplied` | an input nobody supplied, no default; on the wire, absent with no `TYPICALLY` (T3)              | `Left Nothing`   |
+| `Presumed v` | an input nobody supplied, whose `TYPICALLY v` the presumption switch withheld (§5, T4)          | `Left (Just v)`  |
+| `Declined`   | an input the caller answered `null`, "don't know"; `{}` means the same until it is retired (T3) | `Right Nothing`  |
 
-This is what lets the result name what it is waiting for, the planner rank the questions, and the ladder draw a presumed atom differently from an unasked one.
+A term that is not an input, a field path, a comparison, a call, carries the provenance of the inputs it reads.
+This is what lets the default report name what it is waiting for, the planner rank the questions, and the ladder draw a presumed atom differently from an unasked one.
 
 ### 4.9 Printing
 
 `l4 batch` and the REPL evaluate the `prettyLayout` re-print of a module, not its source (`jl4/app/L4/Cli/Batch.hs:244`).
 On the main-line extension build, `(p OR q) AND r` used to print as `p OR q AND r` and `l4 batch` answered `TRUE` where `l4 run` answered `FALSE`, exit 0; `unstable` has bracketed nested connectives since `58f53e6b2` (2026-08-03).
-So any new connective form, and any printed residual, must round-trip through `prettyLayout` with its brackets intact, and the guard is the evaluation differential of `CLAUDE.md` §3.2.1, which today covers two-valued Booleans only.
-A residual is printed as L4 source over the input names (`x AND NOT y`), so it can be pasted back as a rule.
+So any new connective form, and any printed residual, must round-trip through `prettyLayout` with its brackets intact, and the guard is the evaluation differential of `CLAUDE.md` §3.2.1, extended to residual results.
+A residual is printed as L4 source over the input names, `x AND NOT y`, and a join as `IF c THEN t ELSE e`, so it can be pasted back as a rule; a guarded leaf is printed in the report's words, "errors if `x`", because L4 has no expression for it.
+
+### 4.10 Prior art, and the words used for it
+
+**In this tree.**
+
+- `specs/done/BOOLEAN-MINIMIZATION-SPEC.md` proposed this in January and did not build it.
+  Its "Approach 1: Symbolic Evaluation with Three-Valued Logic" (`:470-528`) is, despite the title, reading (a): `evalTriBool` evaluates both operands and then consults the table (`:496-510`).
+  Its "Recommended Approach: Hybrid" (`:598-604`) made that Phase 1 (`:625-633`), with the decision diagram as Phase 2; Phases 2 and 3 were built as `jl4-query-plan` over the ladder's static tree and Phase 1 was not (§3.2).
+  Its own edge case "3a: Tautology" (`:1000-1008`) expects `x OR NOT x` to answer `true`, which Phase 1's `TriBool` cannot give and only Phase 2's diagram can.
+  This section is that Hybrid with the two halves in the right order: the evaluator builds the residual, and the diagram decides it.
+- `specs/done/PARTIAL-EVAL-VISUALIZER-SPEC.md` is the argument for residuals over K3.
+  Its critique (`:19-30`) is that comparing three-valued results "can label variables as irrelevant when they actually influence whether the result becomes determined later" (`:29`), and that "once non-boolean predicates appear (`age >= 21`), the cofactor approach needs a consistent 'atomic predicate' layer anyway" (`:30`); its answer is to compile once to a reduced diagram and read determination and support off the restricted diagram (`:34-43`).
+  §4.6's atoms are that predicate layer, and §4.7.2 is that read-off.
+- `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` owns what this evaluator declines to do, arithmetic over the atoms (§4.7.3).
+- `specs/todo/ladder-diagrams-2026/DESIGN.md` §23 (`:927`) is the membrane and §25f (`:1489`) is the seam; `BooleanDecisionQuery.hs:27-43` and `layout.ts:209-266` are the two places that already keep `IMPLIES` as a node.
+- `Machine.hs:2749-2753` is the precedent inside the evaluator itself: `RBinOp2` returns the operator applied to its evaluated operands when neither table row applies (§3.5).
+
+**Names from the literature, used where they fit.**
+
+- _Strong Kleene_ (Kleene 1952) names the tables of reading (a) and the known-value rows of §4.3's table.
+- _McCarthy's sequential connectives_ name the left-to-right order of reading (b); the asymmetry under errors in §4.3 is theirs.
+- _Online partial evaluation_ (Jones, Gomard and Sestoft 1993) names what §4.3 does to a directive: specialise it on the inputs that are known, deciding during evaluation on the actual values, and leave a residual for the rest.
+  The residual here is an expression, not a program: there is no code generation and no specialisation of definitions, so the term is used for the shape of the computation and nothing more.
+- _Symbolic execution_ (King 1976) is where the path condition comes from: the guard on an error or give-up leaf is the condition under which the two-valued run reaches it.
+  Symbolic execution forks one path per branch; this evaluator joins the arms into one term (§4.5), so it borrows the guard and not the enumeration.
+- _Supervaluation_ (van Fraassen 1966) names §4.7.2 and nothing else: a residual is supertrue when every classical completion makes it true.
+  It is qualified as _propositional_ because the completions range over assignments to the atoms, not over values of the inputs, which is exactly the gap stated there.
+  The word was overclaimed once on 2026-10-01, for the whole design, and a skeptic caught it; it is applied here to the boundary decision only.
+- Not used: _abstract interpretation_, which this is not, since no abstract domain is joined at a fixpoint; and _three-valued logic_ as a description of the whole design, which describes only reading (a).
+
+### 4.11 Tests, from the rulings
+
+Each row names the ruling it comes from, gives the L4 input, says what the `unstable` binary at `f9a504b77` does today, and states the expected report under this section.
+Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `n` and `age` are `IS A NUMBER`, `d IS A Person` with `DECLARE Person HAS age IS A NUMBER`, and `g` is `ASSUME g IS A FUNCTION FROM NUMBER TO BOOLEAN`, all unsupplied.
+"Today" is a probe result where a probe file is named (`reversegear/p01` to `p21` in the session scratchpad, run 2026-10-01); a row with no probe name says where its "today" comes from.
+"Expected" is the default report unless the row names another; "undetermined naming _i_" means the default report's "I needed to know the value of _i_"; "unchanged" means §4.3's conservativity claim covers the row.
+
+| #   | from          | input                                                                                         | today                                                                                                                         | expected                                                                                                                           |
+| --- | ------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | U1, §2.3      | `x AND FALSE`                                                                                 | stuck on `x` (p01)                                                                                                            | `FALSE`                                                                                                                            |
+| 2   | U1            | `x OR TRUE`                                                                                   | stuck (p01)                                                                                                                   | `TRUE`                                                                                                                             |
+| 3   | U1            | `x UNLESS TRUE`                                                                               | stuck (p01)                                                                                                                   | `FALSE`                                                                                                                            |
+| 4   | U1, U10b      | `x IMPLIES TRUE`                                                                              | stuck (p01, p11)                                                                                                              | `TRUE`; the residual `x IMPLIES TRUE` keeps the seam, so a verdict read from it is `Undetermined` (§25f); see §4.12 C5             |
+| 5   | U1, §4.6      | `and (LIST TRUE, x, FALSE)`                                                                   | stuck (p01)                                                                                                                   | `FALSE`                                                                                                                            |
+| 6   | U1            | `NOT x`                                                                                       | stuck (p01)                                                                                                                   | undetermined naming `x`; residual `NOT x`                                                                                          |
+| 7   | U1b, U3, U12b | `x OR NOT x`                                                                                  | stuck (p01)                                                                                                                   | `TRUE`                                                                                                                             |
+| 8   | U1b, U3       | `x AND NOT x`                                                                                 | stuck (p01)                                                                                                                   | `FALSE`                                                                                                                            |
+| 9   | §4.5          | `IF x THEN 1 ELSE 1`                                                                          | stuck (p01)                                                                                                                   | `1`                                                                                                                                |
+| 10  | U6b           | `x EQUALS x`                                                                                  | stuck (p01)                                                                                                                   | `TRUE`                                                                                                                             |
+| 11  | U5            | `n EQUALS 3`                                                                                  | stuck on `n` (p01)                                                                                                            | undetermined naming `n`; atom `n EQUALS 3`                                                                                         |
+| 12  | U6            | `3 EQUALS n`                                                                                  | "equality on types that do not support it" (p01)                                                                              | as row 11                                                                                                                          |
+| 13  | U1, U5        | `older 18 AND NOT older 65`, with `older k MEANS age GREATER THAN k`                          | stuck on `age` (p02)                                                                                                          | undetermined naming `age`; residual `age GREATER THAN 18 AND NOT age GREATER THAN 65`; never `FALSE`                               |
+| 14  | U5            | `older 18 AND NOT older 18`                                                                   | stuck (p02)                                                                                                                   | `FALSE`                                                                                                                            |
+| 15  | U1b, U3b      | `age >= 18 OR age < 18`                                                                       | stuck (p02)                                                                                                                   | undetermined naming `age`; the numeric count of §4.7.2 rises by one                                                                |
+| 16  | U1b, U3       | `IF (x OR NOT x) THEN 1 ELSE 2`                                                               | stuck on `x` (p02)                                                                                                            | undetermined naming `x`; the tautology count of §4.7.2 rises by one                                                                |
+| 17  | U1b           | `FALSE AND (1 DIVIDED BY 0 GREATER THAN 0)`                                                   | `FALSE` (p03)                                                                                                                 | `FALSE`, unchanged                                                                                                                 |
+| 18  | U1b           | `(1 DIVIDED BY 0 GREATER THAN 0) AND FALSE`                                                   | division by zero (p03)                                                                                                        | division by zero, unchanged                                                                                                        |
+| 19  | U11, U11b     | `x AND (1 DIVIDED BY 0 GREATER THAN 0)`                                                       | stuck on `x` (p03)                                                                                                            | "FALSE unless `x`; errors (division by zero) if `x`", its own outcome                                                              |
+| 20  | U11b          | `f TRUE`, with `f b MEANS b AND (1 DIVIDED BY 0 GREATER THAN 0)`                              | division by zero (p03)                                                                                                        | division by zero, unchanged                                                                                                        |
+| 21  | U11b          | `(x AND (1 DIVIDED BY 0 GREATER THAN 0)) AND FALSE`                                           | stuck (p21)                                                                                                                   | as row 19; never absorbed to `FALSE`                                                                                               |
+| 22  | U11b          | `x OR (1 DIVIDED BY 0 GREATER THAN 0)`                                                        | stuck (p21)                                                                                                                   | "TRUE if `x`; errors if `NOT x`"                                                                                                   |
+| 23  | U1b           | `#ASSERT x AND y`                                                                             | "assertion could not be evaluated", naming only `x`, exit 1 (p04)                                                             | undetermined naming `x` and `y`, exit 1                                                                                            |
+| 24  | U1b           | `#ASSERT NOT (x AND y)`                                                                       | as row 23 (p04)                                                                                                               | as row 23                                                                                                                          |
+| 25  | U1b, U3       | `#ASSERT x OR NOT x`                                                                          | could not be evaluated (p21)                                                                                                  | satisfied                                                                                                                          |
+| 26  | U3            | `#ASSERT x AND NOT x`                                                                         | could not be evaluated (p21)                                                                                                  | failed, exit 0                                                                                                                     |
+| 27  | U4            | `IF x THEN 1 ELSE 2`                                                                          | stuck (p07)                                                                                                                   | undetermined naming `x`                                                                                                            |
+| 28  | U4b           | `(IF x THEN 1 ELSE 2) GREATER THAN 1`                                                         | stuck (p07)                                                                                                                   | residual `NOT x`; undetermined naming `x`                                                                                          |
+| 29  | U4b, U11b     | `IF x THEN 1 DIVIDED BY 0 ELSE 2`                                                             | stuck (p07)                                                                                                                   | "2 unless `x`; errors if `x`"                                                                                                      |
+| 30  | §4.3          | `IF TRUE THEN 1 ELSE 1 DIVIDED BY 0`                                                          | `1` (p07)                                                                                                                     | `1`, unchanged                                                                                                                     |
+| 31  | §4.5          | `IF x THEN TRUE ELSE TRUE`                                                                    | stuck (p07)                                                                                                                   | `TRUE`                                                                                                                             |
+| 32  | U4b, U5b      | `(IF x THEN 2 ELSE 3) PLUS 1 GREATER THAN 3`                                                  | stuck (p21)                                                                                                                   | undetermined naming `x`: `PLUS` is not pushed into the arms, so the comparison is over a `fresh` term; see §4.12 C1                |
+| 33  | U4, U11       | `countdown m`, with `countdown n MEANS IF n GREATER THAN 0 THEN countdown (n MINUS 1) ELSE 0` | stuck on `m` (p08)                                                                                                            | "gave up; needed `m`"; `countdown 3` stays `0`                                                                                     |
+| 34  | U4, §2.4      | `CONSIDER m WHEN NOTHING THEN 1 WHEN JUST y THEN 2`, with `m IS A MAYBE NUMBER`               | "reached a CONSIDER that has no branch for it" (p09)                                                                          | build step 1: stuck naming `m`; lifted: undetermined naming `m`                                                                    |
+| 35  | U5b           | `d's age`                                                                                     | the no-branch message (p05)                                                                                                   | undetermined naming `d's age`                                                                                                      |
+| 36  | U5b           | `d's age AT LEAST 18 AND NOT d's age AT LEAST 18`                                             | the no-branch message (p05)                                                                                                   | `FALSE`                                                                                                                            |
+| 37  | U5b           | `d's age AT LEAST 18`                                                                         | the no-branch message (p05)                                                                                                   | undetermined; atom `d's age AT LEAST 18`, askable                                                                                  |
+| 38  | U5b           | `g 3 AND NOT g 3`                                                                             | stuck on `g` (p12)                                                                                                            | `FALSE`                                                                                                                            |
+| 39  | U5b           | `g 3 AND NOT g 4`                                                                             | stuck (p12)                                                                                                                   | undetermined naming `g`; two atoms                                                                                                 |
+| 40  | §4.3          | `FALSE AND g 3`                                                                               | `FALSE` (p12)                                                                                                                 | `FALSE`, unchanged                                                                                                                 |
+| 41  | U5, U5b       | `n PLUS 1 GREATER THAN 3 AND NOT (n PLUS 1 GREATER THAN 3)`                                   | stuck (p15)                                                                                                                   | undetermined naming `n`, two `fresh` atoms; see §4.12 C1                                                                           |
+| 42  | U6            | `n PLUS 1 EQUALS n PLUS 1`                                                                    | stuck (p15)                                                                                                                   | undetermined naming `n`; see §4.12 C1                                                                                              |
+| 43  | §4.6          | `n GREATER THAN 3 AND n LESS THAN 2`                                                          | stuck (p15)                                                                                                                   | undetermined naming `n`; the numeric count rises by one                                                                            |
+| 44  | §4.7          | `n PLUS 1`                                                                                    | stuck (p15)                                                                                                                   | undetermined naming `n`                                                                                                            |
+| 45  | U6b           | `elem g (LIST g)`                                                                             | stuck on `g` (p06)                                                                                                            | "equality on types that do not support it", exit 1; never `TRUE`                                                                   |
+| 46  | §4.6          | `elem n (LIST 1, 2)`                                                                          | stuck (p06)                                                                                                                   | undetermined naming `n`; residual `n EQUALS 1 OR n EQUALS 2`                                                                       |
+| 47  | §4.3          | `elem 3 (LIST 3, n)`                                                                          | `TRUE` (p06)                                                                                                                  | `TRUE`, unchanged                                                                                                                  |
+| 48  | U6, §4.3      | `elem 3 (LIST n, 3)`                                                                          | "equality on types that do not support it" (p06)                                                                              | `TRUE`                                                                                                                             |
+| 49  | U10           | `f x`, with `f b MEANS TRUE OR b`                                                             | `TRUE` (p10)                                                                                                                  | `TRUE`; a shared case for `eval.ts` and `nodeValue`                                                                                |
+| 50  | U10           | `g x`, with `g b MEANS b OR TRUE`                                                             | stuck (p10)                                                                                                                   | `TRUE`                                                                                                                             |
+| 51  | U2, U2b       | the trace of `FALSE OR TRUE`                                                                  | `lazytrace-exception.golden:15-16` shows `IF a THEN TRUE ELSE b`; `#EVALTRACE` on the binary prints "no trace captured" (p16) | the trace shows `FALSE OR TRUE`; no golden names `a` or `b`                                                                        |
+| 52  | §2.4, U7b     | `#EVAL TRUE AND x`, `#EVAL TRUE IMPLIES x`, `#EVAL x`                                         | each prints `x` as a value, JSON `"kind":"value"`, `"ok":true`, exit 0 (p11, p17)                                             | undetermined naming `x`, exit 1                                                                                                    |
+| 53  | U8, T4, T6    | `` `has capacity` AND `is adult` ``, with `` `has capacity` IS A BOOLEAN TYPICALLY TRUE ``    | stuck on `` `has capacity` `` when a directive reads it (p14, p18); `` `is adult` `` printed as a value through a rule (p19)  | undetermined naming `is adult`, with `presumed` listing `has capacity`; presumption off: residual over both                        |
+| 54  | U9, T3        | service: `{}` for a boolean                                                                   | `{"result":{"value":false}}`, no diagnostic (§2.5, measured by the coordinating session)                                      | undetermined naming the input, the report stated; `null` the same; absent with `TYPICALLY` takes the default, listed in `presumed` |
+| 55  | U7b           | an `l4 batch` row with an unsupplied input                                                    | refused, "Missing required field" (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §2, p7)                                                  | row status undetermined; stop-on-error not tripped                                                                                 |
+| 56  | U12, U12b     | ``NOTHING `kor` (knot NOTHING)``                                                              | `NOTHING`; `#ASSERT … EQUALS NOTHING` satisfied (p13)                                                                         | unchanged: the library is reading (a), and row 7 is the contrast U12b asks the comment to draw                                     |
+| 57  | U11b, U7b     | row 19 under the K3 report                                                                    | not probed                                                                                                                    | "errors if `x`", never a bare `unknown`                                                                                            |
+| 58  | §2.6, §4.3    | every corpus directive not stuck today (7,202 of 7,211)                                       | §2.6's census                                                                                                                 | unchanged value, error or non-termination, measured by §7's differential                                                           |
+
+Of the 58 rows, 54 were probed today; rows 54, 55, 57 and 58 were not.
+
+### 4.12 Conflicts for Meng
+
+These are places where the definition above shows two recorded rulings pulling apart, or a ruling's word having lost its referent.
+None is resolved here; each says what the definition does in the meantime.
+
+**C1. Atom identity: by input, or by term.**
+U5 ("an arithmetic unknown operand gets a fresh atom per evaluation"), U5b ("only unknowns that carry no term (arithmetic results, `IF` joins, non-Boolean assumed calls) get fresh atoms") and U6 ("derived unknowns (`n PLUS 1 EQUALS n PLUS 1`) stay comparison atoms") make an arithmetic result keyless.
+§4.2 gives it a term anyway, because the SMT backend of §4.7.3 needs the term, and keying by that term would be sound for the same reason keying a comparison by term is: a built-in operation is a function of its operands, so two occurrences of one term denote one value.
+Under the rulings as recorded, rows 41, 42 and 32 are undetermined; keyed by term they would be `FALSE`, `TRUE` and `NOT x`.
+The same question reaches U6b's identity rule, which is stated for "the same unknown input on both sides": under it `d's age EQUALS d's age` is an atom, while row 36, `d's age AT LEAST 18 AND NOT d's age AT LEAST 18`, is `FALSE`, because the comparison is keyed by the field-path term and the equality is not.
+The definition follows the rulings.
+The recommendation is to key every atom by its full term, keep `fresh` for the genuinely keyless (a `CONSIDER` on a term, a `gave-up`, an excluded-type equality), and leave U5b's askability rule as it is, so the planner still asks only for inputs and field paths.
+
+**C2. Whether the K3 report sees the boundary decision.**
+U1b: "`--unknowns k3` is true strong Kleene: atoms only, no tautology settling, as #526 §8 step 3 already says."
+U7b: "What the caller chooses is the report, never the computation", and "the caller chooses only how an undetermined result is reported".
+The boundary decision of §4.7.2 is computation.
+If it runs before the report is chosen, the K3 report shows `x OR NOT x` as `TRUE` and U1b's sentence is false of it; if the K3 report skips it, the caller is choosing computation, which U7b retired.
+The definition leaves the K3 column of §4.7.4 open for a decided residual.
+The recommendation is to read U1b's sentence as describing build step 3 of §8, the stage before a boundary decider exists, and to let every report show a decided residual as its value; the K3 report then differs from the default only in printing `unknown` instead of naming the inputs.
+
+**C3. What running out of steps returns.**
+U4: "Running out returns an unknown naming the pending condition".
+U11: "Divergence on an unknown is caught by PETROL's step counter ('gave up; needed _x_')".
+U11b: "A residual that contains an error leaf is never absorbed", because a definite `FALSE` would promise what a supplied run that errors cannot keep.
+An ordinary unknown is absorbed by `AND FALSE`; so with `loop n MEANS IF n GREATER THAN 0 THEN loop n ELSE 0`, the lifted `(loop m GREATER THAN 0) AND FALSE` would be `FALSE` for unknown `m`, and the two-valued run with `m` set to 1 does not terminate.
+That is U11b's objection in a different coat.
+The definition treats `gave-up` as a guarded leaf, never absorbed (§4.5), and reads U4's "unknown" as that leaf.
+
+**C4. The step counter's scope.**
+U4: "a cumulative step counter, explore mode only".
+U7b: "Every evaluation is lifted; there is no evaluation mode."
+A counter that runs from the first step of every evaluation would turn a long but fully supplied computation into a `gave-up`, which breaks §4.3's conservativity.
+The definition starts the counter at the first term built, which is the only reading of "explore mode only" left once there is no mode (§4.5), and asks for that reading to be confirmed.
+
+**C5. A decided value with an undetermined verdict at the evaluator's root.**
+Row 4, `x IMPLIES TRUE`, is `TRUE` by §4.7.2, and U10b records the pair "value `TRUE`, verdict `Undetermined`" as the expected answer.
+The default report of §4.7.4 prints `TRUE` and names no input, because the result is decided; §25f's finding is that this is the one case where a met requirement must not end the interview.
+The residual report carries the seam intact, so a verdict-aware consumer can still ask for the scope; the default report cannot.
+Whether the default report should name the scope's inputs when the root is an `IMPLIES` with an undetermined scope is not ruled anywhere, and the definition does not do it.
 
 ---
 
 ## 5. `TYPICALLY`, R8, and the four cells
 
-R8 fills a defaulted section binder once at the root: discharge rewrites its elaboration from an `ASSUME` into a 0-ary definition whose body is the default (`jl4-core/src/L4/Discharge.hs:281-295`, `fillInDefault`).
-So by the time the evaluator runs, a defaulted binder is an ordinary value; the evaluator cannot tell it came from a default.
-The lift has to coexist with that in two modes, which U8 asks Meng to name:
+R8 fills a defaulted section `GIVEN` once at the root: discharge rewrites its elaboration from an `ASSUME` into a 0-ary definition whose body is the default (`jl4-core/src/L4/Discharge.hs:281-295`, `fillInDefault`).
+So by the time the evaluator runs, a defaulted input is an ordinary value; the evaluator cannot tell it came from a default.
 
-- **Presuming** (the default when the lift is on): defaults are applied as R8 says, but the root records which binders took one, and the result says so — "`TRUE`, presuming `has capacity`".
-  This is the ladder's `respectDefaults: true` (§3.6), and the verdict is the ladder's tentative box and streamer-weight current (DESIGN §22).
-- **Not presuming:** a defaulted binder nobody supplied is left as an `RAtom (Presumed v)` instead, and `v` becomes the planner's prior for it, which is what the planner already does with `TYPICALLY` (`VizExpr.hs`, `typicallyTrueWeight`).
-  This is the investigator's mode: a presumption is a question not yet asked, not an answer.
+**Ruled (U8, T4, T4b):** one presumption switch applies to every evaluation, on by default, landing with the `TYPICALLY` work's W3/W4 and not with this spec.
 
-R8's "filled in once at the root" is unchanged by either: both decide at the same root, which is the only place a binder can be absent.
-What R8 does not reach, and the parallel `TYPICALLY` work (branch `spec/typically-unify`) owns, is that the service's wrapper ignores `TYPICALLY` altogether (§2.5).
+- **On:** defaults apply as R8 says, and the response carries T6's `presumed` list of the defaults actually forced, with their declaration lines: "`TRUE`, presuming `has capacity`".
+  This is the ladder's `respectDefaults: true` (§3.6), and the verdict is DESIGN §22's tentative box.
+- **Off:** an absent input with a default is treated as absent with none, and becomes a `Presumed v` atom (§4.8) whose `v` is the planner's prior; only Boolean defaults become priors (T4).
+  The switch withdraws a default only where a request can supply the value; elsewhere the result says "rests on presumed _x_" and does not go stuck (T4b).
+  This is the investigator's reading: a presumption is a question not yet asked, not an answer.
+- `null` never takes a default, under either setting (T3).
+
+R8's "filled in once at the root" is unchanged by either setting: both decide at the same root, which is the only place an input can be absent.
+What R8 does not reach, and the parallel `TYPICALLY` work (branch `spec/typically-unify`) owns, is that the service's wrapper ignores `TYPICALLY` altogether (§2.5, T3).
+Two probe results from today that this spec does not explain are in §10.
 
 ---
 
-## 6. Switching it on, and what does not move
+## 6. Reports, and what does not move
 
-**Opt-in, per evaluation, never per module.**
-A module does not decide whether its readers have every fact; the caller does.
-So the switch is on the evaluation request, not in the source:
+**There is no switch (U7b).**
+Every evaluation is lifted; the module does not decide, and neither does the caller.
+The caller chooses the report of §4.7.4:
 
-- `l4 run --unknowns residual` (and `--unknowns k3` for the quotient), default `--unknowns stuck`, today's behaviour.
-- `l4 batch` the same flag.
-- The service: an evaluation mode on the request, say `"mode": "explore"`, whose response is `{"determined": null, "residual": "<L4 source>", "needs": [...], "verdict": "Undetermined"}`, the planner's own vocabulary (§3.3).
+- `l4 run` and `l4 batch`: the default report, unless a flag names the K3 or the residual report; the flag names a report, not a mode.
+- The service: the report is its own route, as `/query-plan` is, or an unknown key is rejected; every response states its report.
+  A residual response is `{"determined": null, "residual": "<L4 source>", "needs": [...], "verdict": "Undetermined"}`, the planner's own vocabulary (§3.3).
+- MCP: a separate tool or a listed capability, never a reserved argument.
 - No new directive.
-  A `#EXPLORE` would make the module decide, which is the thing the bullet above rules out, and it would be a directive every exporter has to learn to ignore.
+  A `#EXPLORE` would make the module decide, and it would be a directive every exporter has to learn to ignore.
 
-With the flag off, the only change any golden can see is Step 0's trace change (§4.4).
+**What does not move.**
+Every committed golden except the trace golden Step 0 names (§4.4): the corpus has nine stuck directives (§2.6), and under the default report a single-input residual prints the text today's `Stuck` prints, so those nine change only where the residual names more than one input or decides.
+Build step 1's bare-result fix (§8) also moves any golden that prints a bare assumed name as a value, which that step must count rather than assume.
+That is U7's scoping of "nothing changes" to committed goldens.
 
 **What the service's `fromMaybe FALSE` becomes.**
-In explore mode a missing, `null` or `{}` boolean is an `RAtom`, of kind `Unsupplied` or `Declined` by the wire mapping of U9.
-In today's decide mode it should stop being `FALSE` everywhere on the wrapper path, which a single `{}` anywhere in a request reaches, making absent and `null` booleans `FALSE` too (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §3 S1); `{}` never takes a default.
-That second half is a defect fix in two-valued mode and belongs to the `TYPICALLY` work, not to this lift; it is listed here so the two specs do not each assume the other has it.
+Removed at all three sites, `CodeGen.hs:239`, `:335`, `:603` (T3, T3b): an absent boolean on the wrapper path binds to a placeholder assumed term, lazy, stuck only if read and naming the input; `null` and `{}` bind the same way and never take a default; the direct path's eager refusal (`Jl4.hs:448`) stays, and its lazy binding is its own work item.
+That is the `TYPICALLY` work's W1 and W2, listed here so the two specs do not each assume the other has it.
 
 ---
 
 ## 7. Cost, and how to measure it before deciding
 
-The lift costs nothing on a directive that never meets an unknown: §4.3's transitions are the same ones.
-On a directive that does, it costs exactly the evaluation that today's `Stuck` skipped, which is the right operands of undecided connectives and both arms of undecided conditionals.
+The lift costs nothing on a directive that never meets an unknown: §4.3's transitions are the same ones, and the step counter has not started.
+On a directive that does, it costs exactly the evaluation today's `Stuck` skipped, which is the right operands of undecided connectives and both arms of undecided conditionals.
 That is unbounded in principle, so it is measured, not guessed:
 
-1. **Baseline.** Today's census (§2.6) shows the corpus directives are almost all fully supplied (5 stuck in 7,211), so the workload has to be made: for every `@export` function in the corpus, take each directive that calls it and generate its partial-input variants, dropping each input in turn and then every pair, which is what a wizard does mid-interview.
-2. **Coverage.** On those variants, `--unknowns stuck` against `--unknowns residual`: how many end in a value, in a residual, in a different error, or time out.
-3. **Blow-up.** Per directive, the total steps taken (the machine has no step counter today, only a stack-depth cap, `maximumFrameDepth`, `Exceptions.hs:159`, checked at `Machine.hs:857`, which cannot see a join's blow-up because the arms run one after the other; the counter is part of this measurement), the largest residual, the number of conditions whose residual is a tautology or contradiction, and the number of conditionals evaluated on an unknown condition, each against the two-valued run of the same directive with every input supplied.
-4. **Wall clock.** `jl4-test` and the §3.2.1 differential, flag off, must be unchanged within noise; that is the cost to everyone who does not use the lift.
-5. **Positive control.** One directive constructed to evaluate both arms of a nested conditional on one unknown, depth 10, whose frame count the measurement must show growing; a measurement that cannot see that cannot be trusted to have seen nothing elsewhere.
+1. **Baseline.** Today's census (§2.6) shows the corpus directives are almost all fully supplied (9 stuck in 7,211), so the workload has to be made: for every `@export` function in the corpus, take each directive that calls it and generate its partial-input variants, dropping each input in turn and then every pair, which is what a wizard does mid-interview.
+2. **Coverage.** On those variants, the `f9a504b77` binary against the lifted one: how many end in a value, a decided residual, an undetermined residual, a guarded leaf, a `gave-up`, a different error, or a timeout.
+3. **Blow-up.** Per directive, the total steps taken under §4.5's counter, the largest residual, the three counts of §4.7.2, and the number of conditionals evaluated on a term condition, each against the two-valued run of the same directive with every input supplied.
+   The machine has no step counter today, only the depth cap (`maximumFrameDepth`), so the counter is part of this measurement.
+4. **Wall clock.** `jl4-test` and the §3.2.1 differential must be unchanged within noise on fully supplied directives; that is the cost to everyone who never meets an unknown.
+5. **Positive controls.** One directive constructed to evaluate both arms of a nested conditional on one unknown, depth 10, whose step count the measurement must show growing; and rows 13, 14, 15, 16, 19, 20 and 36 of §4.11, which must come out as the table says.
+   A measurement that scores row 19 as a plain unknown has not seen the leaf, and one that scores row 13 as `FALSE` has keyed atoms by position.
 
-U4's budget is set from the distribution step 3 produces, not before.
+U4's step limit is set from the distribution step 3 produces, not before.
 
 ---
 
 ## 8. Build sequence
 
-1. **Fix the `CONSIDER` misdiagnosis** (§2.4) in two-valued mode: a `ValAssumed` scrutinee raises `Stuck`, naming it. Independent; small.
-2. **Step 0** (§4.4): the built-in connectives as frames, flag off, with the trace golden, the service reasoning tree and jl4-mlir's trace parity moved together, measured.
-3. **K3 behind the flag**: `ValResidual` with atoms only, quotiented to `U` everywhere, so the five asymmetric rows of §2.3 answer correctly.
-4. **Residuals**: the full `Residual`, printed as source, round-tripped through `prettyLayout`, covered by an extension of the §3.2.1 differential to explore mode.
-5. **Conditionals and the membrane** (§4.5, §4.6), after the measurement of §7.
-6. **Service explore mode**, then the planner reading residuals from evaluation instead of only from the static ladder tree.
-7. **Retire the duplicates**: once step 3 lands, shared L4 cases (a call with an unknown argument whose body decides anyway, `FALSE AND` a call that errors, `x OR NOT x`) run through both TypeScript evaluators, the ladder visualizer's (§3.4) and `ladder-core`'s `nodeValue` (`ts-shared/ladder-core/src/layout.ts:209`), and through the Haskell one, following `ladder-core/test/verdict.test.ts`; both TypeScript evaluators are replaced by a call after step 6 (U10).
+1. **Two-valued fixes, no lift.** A `ValAssumed` scrutinee of a `CONSIDER` raises `Stuck`, naming it (§2.4); the selector path raises the same (§2.4, probe `p05-record.l4`); the right-operand misdiagnosis of `runBinOpEquals` is fixed (U6); and a bare assumed term as the result of an `#EVAL` is reported as `Stuck`, as `#ASSERT` already does (`EvaluateLazy.hs:306`; §2.4, probe `p17-bare.l4`), which is proposed here and not yet ruled.
+   Independent; small.
+2. **Step 0** (§4.4, U2, U2b): the built-in connectives as frames, with the trace golden, the service reasoning tree and jl4-mlir's parity harness moved together, measured.
+3. **Atoms-only residuals, default report.** Input atoms, field paths, comparison atoms, Boolean assumed calls, the connective table of §4.3, the identity rule of §4.6, and the default report naming every input; no boundary decision yet.
+   Rows 1 to 6, 11 to 15, 23, 24, 35, 37 and 52 of §4.11 answer correctly.
+   This is what U1b calls "true strong Kleene: atoms only".
+4. **The boundary decider and the residual report.** §4.7.2 by truth table over finite-domain atoms, the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results.
+   Rows 7, 8, 10, 14, 25, 26, 36 and 38.
+5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b), after the measurement of §7.
+   Rows 16, 19 to 22 and 27 to 34.
+6. **Service and MCP report routes**, the batch row status, the planner reading residuals from evaluation instead of only from the static ladder tree, and the counts reported (U7b, U3b).
+7. **The two TypeScript evaluators** (U10, U10b): when step 3 lands, shared L4 cases (rows 4, 7, 19, 49, 50) run through the Haskell evaluator and the visualizer's `eval.ts`, which is replaced by a call after step 6.
+   `ladder-core`'s `nodeValue` (`layout.ts:209-266`) is kept permanently, held to the Haskell evaluator on the connective cases with each call's engine value fed in as a pin, with the tautology case (it stays `Undetermined`) and the error case (it has no error value) listed as known divergences; the `IMPLIES` case expects value `TRUE` and verdict `Undetermined` against `verdictFor` and both `verdictOf`s, extending `verdict.test.ts`.
 
 ---
 
@@ -495,6 +774,10 @@ Its condition is met: U1 and U7 are both accepted. The answer is recorded in `sp
 - §4.4's claim that Step 0 moves only the trace golden, the service reasoning tree and jl4-mlir's trace parity is a prediction from `grep` and from reading the code; trace output from the LSP was not checked.
 - The `#EVALTRACE` probes printed "no trace captured" on the installed binary, so the trace shape in §2.4 is read from a committed golden, not reproduced.
 - §3.3's statement that two calls to one function share one planner atom follows from the atom being keyed by `nm.unique`; whether `nm` is the callee or the call was not checked, and it is outside this spec.
-- Nothing in §4–§7 has been built or timed.
+- Nothing in §4–§8 has been built or timed.
+- `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, which U8 and U9 cite for their full text, is on branch `spec/typically-unify` (worktree `l4wt/typically-unify`, read at `b10f65203`) and not on this branch or on `unstable`; whichever of the two specs merges second must carry the cross-reference.
+- Two `TYPICALLY` probe results are recorded in §4.11 row 53 and not explained here: a section `GIVEN … TYPICALLY TRUE` read directly by a `#EVAL` in its own section is stuck on the input (probes `p14-typically.l4`, `p18-typ-single.l4`), while the same input read through a rule in the section takes its default (probe `p19-typ-rule.l4`); the census in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §2 records the second case as "honoured". The cause was not traced.
+- The literature attributions in §4.10 (Kleene 1952, McCarthy, King 1976, van Fraassen 1966, Jones, Gomard and Sestoft 1993) are from memory of the standard references and were not re-read today.
+- Whether `verdict.test.ts` already carries an `IMPLIES` case, which U10b extends, was not checked.
 - The guard-idiom count: one line-level `grep` over the 809 `.l4` files under `jl4/examples`, `jl4-core/libraries` and `doc` found no `isJust`/`isNothing` guard and no `AND … DIVIDED` on one line, and five lines with a non-zero guard before an `AND`; a guard split across lines is invisible to it.
   Left-sequential evaluation (U1) preserves every such guard whether or not it was found, which is why the count is not load-bearing.
