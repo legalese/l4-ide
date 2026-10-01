@@ -389,7 +389,12 @@ infoToHover nuri subst r i mNlg mDesc =
     x =
       case i of
         TypeInfo t _ ->
-          mdCodeBlock (prettyLayout (applyFinalSubstitution subst nuri t)) <>
+          -- Render the type via 'prettyTypeForDisplay' (not raw 'prettyLayout') so
+          -- residual inference variables — e.g. an un-annotated lambda parameter,
+          -- whose 'InfVar' prints @rawName <> uniq@ like @x10@ — are normalised to
+          -- stable names (@a@, @b@, …). This also makes hover consistent with the
+          -- deployed schema's @returnType@, which already uses this renderer. See #313.
+          mdCodeBlock (prettyTypeForDisplay (applyFinalSubstitution subst nuri t)) <>
             case mNlg of
               Nothing -> mempty
               Just nlg -> mdSeparator <> mdCodeBlock (simpleLinearizer nlg)

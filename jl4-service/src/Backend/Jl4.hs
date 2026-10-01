@@ -157,20 +157,26 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   -- Core libraries (prelude, …) to register as stable virtual files, unless the
   -- deployment ships its own copy of the same name (which then shadows the
   -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand `addVirtualFile` embedded
-  -- fallback (LSP.L4.Rules). That fallback mutates the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yields an unstable/duplicate
-  -- prelude module and spurious overload ambiguity (e.g. `count xs >= n` →
-  -- "ambiguous __GEQ__"). Verified: the same source is rejected via the embedded
-  -- fallback and accepted when the library is a real virtual file. The libraries
-  -- stay *dependencies* (NOT added to `allUris`), so they are never serialized or
-  -- surfaced as deployment files — only resolved when imported.
+  -- the VFS, instead of the resolver's on-demand embedded fallback
+  -- (LSP.L4.Rules). That fallback used to mutate the VFS mid-rule and — under
+  -- -O, in the multi-pass compileBundle/eval path — yielded an
+  -- unstable/duplicate prelude module and spurious overload ambiguity (e.g.
+  -- `count xs >= n` → "ambiguous __GEQ__"). Verified: the same source is
+  -- rejected via the embedded fallback and accepted when the library is a real
+  -- virtual file. The libraries stay *dependencies* (NOT added to `allUris`),
+  -- so they are never serialized or surfaced as deployment files — only
+  -- resolved when imported.
+  --
+  -- They are registered at `Shake.embeddedLibraryUri`, the one URI the resolver
+  -- hands back for an embedded winner. Registering them anywhere else would
+  -- give a bundle two `prelude` modules whenever some importer resolves via the
+  -- VFS tier and another falls through to the embedded tier — which is how the
+  -- duplicate-module ambiguity above arises.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
-        [ (libName, content)
+        [ (name, content)
         | (name, content) <- StrictMap.toList EmbeddedLibraries.embeddedLibraries
-        , let libName = Text.unpack name <.> "l4"
-        , not (libName `Set.member` bundleBasenames)
+        , not ((Text.unpack name <.> "l4") `Set.member` bundleBasenames)
         ]
 
   -- Use the first file's directory as the session root (arbitrary but required)
@@ -190,7 +196,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         -- Register embedded core libraries as stable virtual files (dependencies
         -- only — deliberately NOT added to allUris, see note above).
         forM_ embeddedLibFiles $ \(libName, content) ->
-          void $ Shake.addVirtualFile (toNormalizedFilePath ("./" <> libName)) content
+          void $ Shake.addVirtualFileUri (Shake.embeddedLibraryUri libName) content
 
         -- Typecheck ALL bundle files in one batch — Shake shares import resolution
         let allUris = [uri | (_, _, uri) <- fileNfps]

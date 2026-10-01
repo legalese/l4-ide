@@ -10,7 +10,7 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import Data.List (isInfixOf)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -20,14 +20,16 @@ import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
-  ( createDirectoryIfMissing
+  ( canonicalizePath
+  , createDirectoryIfMissing
+  , createFileLink
   , doesFileExist
   , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
   , removePathForcibly
   )
-import System.Environment (lookupEnv)
+import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
 import System.IO (hClose, hSetBinaryMode)
@@ -52,8 +54,15 @@ import Test.Hspec
 -- 1. @L4_BIN@ environment variable (useful in CI and for manual runs).
 -- 2. @cabal list-bin exe:l4@ output (when running under cabal).
 -- 3. Walk up from the test binary's path to @dist-newstyle/.../l4@.
+--
+-- The result is always absolute: some tests run the binary from a different
+-- working directory (to exercise the @l4 check main.l4@ invocation form), and a
+-- relative binary path would not survive that.
 locateL4Binary :: IO FilePath
-locateL4Binary = do
+locateL4Binary = makeAbsolute =<< locateL4Binary'
+
+locateL4Binary' :: IO FilePath
+locateL4Binary' = do
   fromEnv <- lookupEnv "L4_BIN"
   case fromEnv of
     Just p -> do
@@ -106,10 +115,27 @@ data Output = Output
 -- is the @hGetContents: cannot decode byte sequence starting from 194@
 -- failure we saw on the first Windows build.
 runL4 :: FilePath -> [String] -> IO Output
-runL4 = runL4In Nothing Nothing
+runL4 = runL4WithEnv Nothing
 
--- | Like 'runL4', but lets a test choose the child's working directory
--- and, with @Just env@, replace its environment wholesale.
+-- | Like 'runL4', but run the child process with an explicit environment.
+--
+-- @Nothing@ inherits the parent environment (the default). @Just env@ replaces
+-- it wholesale, which lets a test force a particular library-resolution regime
+-- (e.g. dropping @JL4_LIBRARY_PATH@ to exercise the embedded-library fallback)
+-- regardless of what CI happens to export into the parent process.
+runL4WithEnv :: Maybe [(String, String)] -> FilePath -> [String] -> IO Output
+runL4WithEnv = runL4In Nothing
+
+-- | Like 'runL4WithEnv', but also lets a test choose the child's working
+-- directory.
+--
+-- This matters for library resolution: the CLI derives its root directory from
+-- @takeDirectory@ of the entry path, so @l4 check main.l4@ run from inside the
+-- project (root directory @"."@) exercises a different resolution path than
+-- @l4 check some/dir/main.l4@ run from the package root. Every fixture path in
+-- this suite carries a directory component, so without this the @"."@ case is
+-- never covered — which is how the embedded stdlib came to outrank
+-- project-local libraries for a whole release without a red test.
 runL4In :: Maybe FilePath -> Maybe [(String, String)] -> FilePath -> [String] -> IO Output
 runL4In mCwd mEnv bin args = do
   let cp = (proc bin args)
@@ -131,6 +157,40 @@ runL4In mCwd mEnv bin args = do
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
+-- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports
+-- @hasExplicitPath = False@ and the resolver consults the embedded stdlib and
+-- the ambient tiers). This is the dev regime the library-shadow
+-- tests exercise — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
+runL4WithXdgHome :: FilePath -> FilePath -> [String] -> IO Output
+runL4WithXdgHome = runL4WithXdgHomeIn Nothing
+
+runL4WithXdgHomeIn :: Maybe FilePath -> FilePath -> FilePath -> [String] -> IO Output
+runL4WithXdgHomeIn mCwd xdgHome bin args = do
+  parentEnv <- getEnvironment
+  let childEnv =
+        ("XDG_DATA_HOME", xdgHome)
+          : filter (\(k, _) -> k /= "JL4_LIBRARY_PATH" && k /= "XDG_DATA_HOME")
+                   parentEnv
+  runL4In mCwd (Just childEnv) bin args
+
+-- | Run l4 with library resolution forced onto the embedded-library fallback:
+-- no @JL4_LIBRARY_PATH@, and an /empty/ XDG store (so no user-level
+-- @~/.local/share/jl4/libraries@ on the runner interferes). This is the exact
+-- regime issue #906 is about.
+runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
+runL4EmbeddedOnly = runL4EmbeddedOnlyIn Nothing
+
+-- | 'runL4EmbeddedOnly' from a caller-chosen working directory. Used to run the
+-- CLI the way a user does — @l4 check main.l4@ from inside the project — which
+-- makes the resolver's root directory @"."@.
+runL4EmbeddedOnlyIn :: Maybe FilePath -> FilePath -> [String] -> IO Output
+runL4EmbeddedOnlyIn mCwd bin args = do
+  tmp <- getTemporaryDirectory
+  let emptyXdg = tmp </> "l4-embedded-only-xdg"
+  createDirectoryIfMissing True emptyXdg
+  runL4WithXdgHomeIn mCwd emptyXdg bin args
 
 -- | Assert the CLI exited 0 with a given substring on stdout.
 expectOk :: FilePath -> [String] -> String -> IO ()
@@ -185,6 +245,32 @@ garbageFixture = fixtureDir </> "garbage.l4"
 
 evalTraceFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
+
+-- Diamond over the embedded-library fallback (issue #906): main imports two
+-- embedded siblings that share the embedded 'daydate' bottom.
+embeddedDiamondEntry :: FilePath
+embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
+
+-- Library-shadow fixtures (specs/as-built/import-resolution.md): a bare `IMPORT prelude` with no
+-- project-scoped copy (embedded must win over a poisoned XDG store), and a
+-- companion with a project-local prelude override (which must win over the
+-- embedded stdlib).
+shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
+shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
+shadowSiblingEntry  = fixtureDir </> "library-shadow" </> "sibling-wins"  </> "main.l4"
+shadowExtraEntry    = fixtureDir </> "library-shadow" </> "xdg-extra"     </> "main.l4"
+
+-- Directories of the shadow fixtures, for the tests that run the CLI from
+-- INSIDE the project (@l4 check main.l4@) rather than naming the fixture by a
+-- path with a directory component.
+shadowEmbeddedDir, shadowSiblingDir, shadowImporterDir :: FilePath
+shadowEmbeddedDir = fixtureDir </> "library-shadow" </> "embedded-wins"
+shadowSiblingDir  = fixtureDir </> "library-shadow" </> "sibling-wins"
+shadowImporterDir = fixtureDir </> "library-shadow" </> "embedded-importer"
+
+-- A project-local override of a module that an EMBEDDED library imports.
+shadowImporterEntry :: FilePath
+shadowImporterEntry = shadowImporterDir </> "main.l4"
 
 ----------------------------------------------------------------------------
 -- Tests
@@ -430,6 +516,150 @@ spec bin = do
     it "evaluates an exported division" $
       batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
         `shouldReturn` Number 2
+
+  -- Regression test for smucclaw/l4-ide#906: a diamond import over the
+  -- embedded-library fallback used to starve the second sibling of the shared
+  -- bottom's environment. `main.l4` imports two embedded siblings
+  -- (actus-daycount, actus-schedule) that both IMPORT the embedded `daydate`;
+  -- `actus-schedule` uses `Days in month`, defined in `daydate`. Run under the
+  -- embedded-only regime (no JL4_LIBRARY_PATH, empty XDG) so the whole closure
+  -- is served by the LSP/Shake embedded fallback — exactly the path CI's
+  -- JL4_LIBRARY_PATH normally hides. Before the fix this exited non-zero with
+  -- "I could not find a definition for the identifier `Days in month`".
+  describe "l4 embedded-library diamond imports (#906)" $ do
+    it "threads a transitive re-export into both diamond siblings" $ do
+      Output code sout serr <- runL4EmbeddedOnly bin ["check", embeddedDiamondEntry]
+      let combined = sout ++ "\n" ++ serr
+      -- The starvation surfaces as an out-of-scope error on daydate's exports.
+      when ("could not find a definition" `isInfixOf` combined) $
+        expectationFailure $
+          "Diamond sibling was starved of the embedded `daydate` environment:\n"
+          ++ "--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the embedded-fallback diamond to check clean, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+
+  -- Regression tests for specs/as-built/import-resolution.md (Option B′ ordering +
+  -- Option E shadow warning). All run in the dev regime: JL4_LIBRARY_PATH
+  -- unset, XDG_DATA_HOME pointed at a fabricated store. The incident being
+  -- guarded against (§3.1 there): a machine-global XDG symlink silently
+  -- shadowing the stdlib the binary was built with.
+  describe "l4 library resolution shadow (B′)" $ do
+    let mkXdgStore name libFileName mkLib = do
+          tmp <- getTemporaryDirectory
+          let xdgHome = tmp </> name
+              store = xdgHome </> "jl4" </> "libraries"
+          removePathForcibly xdgHome
+          createDirectoryIfMissing True store
+          _ <- mkLib (store </> libFileName)
+          pure xdgHome
+        poison = "this is not L4 at all ("
+
+    it "embedded stdlib outranks a poisoned machine-global XDG copy" $ do
+      xdgHome <- mkXdgStore "l4-shadow-xdg-poison" "prelude.l4" \p -> writeFile p poison
+      Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the embedded prelude to outrank the poisoned XDG copy, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+      -- Option E: two differing copies were visible; the warning names them
+      -- and the chosen one, at a priority the CLI actually prints.
+      serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
+      serr `shouldSatisfy` ("[chosen]" `isInfixOf`)
+      serr `shouldSatisfy` ("embedded stdlib" `isInfixOf`)
+      serr `shouldSatisfy` ("XDG data dir" `isInfixOf`)
+
+    it "dereferences symlinks when naming the shadowed copy" $ do
+      tmp <- getTemporaryDirectory
+      let target = tmp </> "l4-shadow-poison-target.l4"
+      writeFile target poison
+      realTarget <- canonicalizePath target
+      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> createFileLink target p
+      Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
+      code `shouldBe` ExitSuccess
+      -- The warning must print the symlink's real target, so a reader can see
+      -- WHICH checkout/file a machine-global entry actually points at.
+      serr `shouldSatisfy` (realTarget `isInfixOf`)
+
+    it "a project-local prelude override still outranks the embedded stdlib" $ do
+      xdgHome <- mkXdgStore "l4-shadow-xdg-empty" "unused.txt" \_ -> pure ()
+      Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowSiblingEntry]
+      -- main.l4 uses `shadow marker`, defined only in the fixture's local
+      -- prelude.l4 — this checks clean iff the project-scoped copy won.
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+
+    it "identical copies do not warn (content gate, non-embedded module)" $ do
+      -- `shadow-extra` is NOT an embedded module; it exists beside the
+      -- importing file AND in the XDG store, byte-identical. Two sources, one
+      -- content: the Option E warning must stay silent.
+      localCopy <- readFile (fixtureDir </> "library-shadow" </> "xdg-extra" </> "shadow-extra.l4")
+      xdgHome <- mkXdgStore "l4-shadow-xdg-identical" "shadow-extra.l4" \p -> writeFile p localCopy
+      Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("Multiple differing copies" `isInfixOf`))
+
+    it "differing copies of the same non-embedded module do warn" $ do
+      xdgHome <- mkXdgStore "l4-shadow-xdg-differing" "shadow-extra.l4" \p ->
+        writeFile p "`something else entirely` MEANS TRUE\n"
+      Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
+      -- The project-scoped copy wins either way; the differing ambient copy
+      -- must be called out.
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("Multiple differing copies of module `shadow-extra`" `isInfixOf`)
+
+  -- Precedence has to survive HOW THE ENTRY FILE IS SPELLED, and it has to
+  -- reach embedded importers, not just the top-level module. Neither property
+  -- was covered: every fixture path above carries a directory component, so
+  -- @rootDirectory@ was never "."; and no fixture put a project copy of a module
+  -- that an EMBEDDED library imports. Both gaps hid live precedence inversions.
+  describe "l4 library resolution: entry-path spelling and embedded importers" $ do
+    -- `l4 check main.l4`, run from inside the project — the ordinary way a user
+    -- invokes the CLI, and the one that makes the resolver's root directory ".".
+    let checkFrom dir = do
+          absDir <- makeAbsolute dir
+          runL4EmbeddedOnlyIn (Just absDir) bin ["check", "main.l4"]
+
+    it "a project-local prelude override wins when the entry file is named bare" $ do
+      -- Byte-for-byte the sibling-wins fixture the test above already uses, run
+      -- as `l4 check main.l4` instead of `l4 check <dir>/main.l4`. The verdict
+      -- must not depend on the spelling: main.l4 uses `shadow marker`, which
+      -- only the fixture's own prelude.l4 defines.
+      --
+      -- It used to. With rootDirectory ".", the root candidate URI for `prelude`
+      -- normalised to exactly the key the embedded stdlib was registered under,
+      -- and the VFS tier hit it before library resolution ran — so this exited 1
+      -- with "I could not find a definition for the identifier `shadow marker`".
+      Output code sout serr <- checkFrom shadowSiblingDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win for a bare entry\
+          \ path too, but l4 exited " ++ show n
+          ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+
+    it "the embedded stdlib still wins with a bare entry path when nothing shadows it" $ do
+      -- The other direction, so the fix above cannot be "never consult the
+      -- embedded stdlib": embedded-wins/main.l4 has no project-local prelude, so
+      -- the embedded copy must serve it.
+      Output code sout serr <- checkFrom shadowEmbeddedDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the embedded prelude to serve a bare entry path, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
 
 -- | Run one row through @l4 batch@ and return its result, failing the test
 -- unless the row's status is @success@.
