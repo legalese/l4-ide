@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -550,6 +550,19 @@ spec = describe "integration" do
         resp <- evalFunction baseUrl mgr "ty-hard-wrap" "may contract"
           (hard ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
         expectError resp "has capacity (not supplied)"
+
+    -- T1b: presumption hard withdraws D7.3's MAYBE fallback too, the same way
+    -- on both paths.
+    it "with presumption hard, refuses a left-out MAYBE input on both paths" do
+      withServiceFromSources "ty-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        soft <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False])
+        expectAnswer soft (FnLitInt 0) []
+        softWrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= uncertain])
+        expectAnswer softWrapped (FnLitInt 0) []
+        direct <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= False])
+        expectError direct "a MAYBE input left out is NOTHING only while presumption is soft"
+        wrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= uncertain])
+        expectError wrapped "Missing required field 'premium (input)'"
 
     it "carries presumed on each case of the batch endpoint" do
       withServiceFromSources "ty-batch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do

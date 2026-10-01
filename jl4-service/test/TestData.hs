@@ -28,6 +28,7 @@ module TestData (
   timeInputsJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
+  maybeHardJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -562,4 +563,21 @@ budget MEANS
   IF cfg's colour EQUALS Red AND shade EQUALS Green
   THEN cfg's timeout PLUS cfg's retries
   ELSE 0
+|]
+
+-- | A MAYBE input with no default (T1b, T3c's MAYBE paragraph): left out, it
+-- is NOTHING while presumption is soft, and missing while it is hard. The
+-- unread BOOLEAN comes first so a @{}@ on it reaches the wrapper path, whose
+-- record cannot yet carry a MAYBE input followed by another (README limit).
+maybeHardJL4 :: Text
+maybeHardJL4 =
+  [i|
+@export default premium due
+GIVEN `unused flag` IS A BOOLEAN
+      premium       IS A MAYBE NUMBER
+GIVETH A NUMBER
+`premium due` MEANS
+  CONSIDER premium
+    WHEN JUST p THEN p
+    WHEN NOTHING THEN 0
 |]

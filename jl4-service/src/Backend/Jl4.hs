@@ -755,13 +755,24 @@ wrapperDefaults presumption defaults params
 -- where the decoder no longer turns an ABSENT MAYBE field into NOTHING (T1b):
 -- that withdrawal is about a MAYBE the author declared, and these MAYBEs are
 -- the wrapper's own.
+--
+-- So an input the AUTHOR declared MAYBE is left absent when presumption is
+-- hard: T1b withdraws its NOTHING, and the decoder refuses it, naming it, as
+-- the direct path does ('rootInputExpr').
 wrapperArguments
-  :: [Text]                       -- ^ every input the function takes
+  :: Presumption
+  -> [(Text, Type' Resolved)]     -- ^ every input the function takes
   -> Map Text (Expr Resolved)     -- ^ those taking their default ('wrapperDefaults')
   -> [(Text, Maybe FnLiteral)]
   -> [(Text, Maybe FnLiteral)]
-wrapperArguments inputs filled params =
-  params <> [ (n, Nothing) | n <- inputs, n `notElem` map fst params, not (Map.member n filled) ]
+wrapperArguments presumption inputs filled params =
+  params <>
+    [ (n, Nothing)
+    | (n, ty) <- inputs
+    , n `notElem` map fst params
+    , not (Map.member n filled)
+    , presumption == PresumeSoft || isNothing (stripMaybe ty)
+    ]
 
 -- | Evaluate a deontic function with startTime and events via EVALTRACE wrapper.
 -- Always uses the wrapper path since events need to go through L4 typechecking.
@@ -786,10 +797,10 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
       filled = wrapperDefaults presumption (inputDefaults compiled.compiledModule compiled.compiledDecide) params
       binderParamTypes = filter (\ (n, _) -> not (Map.member n filled)) binderParamTypes0
       givenDefaults = Map.map prettyLayout (Map.filterWithKey (\ n _ -> n `elem` map fst givenParamTypes) filled)
-      inputNames = map fst (givenParamTypes <> binderParamTypes0 <> assumeParamTypes)
+      inputTypes = givenParamTypes <> binderParamTypes0 <> assumeParamTypes
 
   -- Convert input parameters to JSON
-  inputJson <- paramsToJson (wrapperArguments inputNames filled params)
+  inputJson <- paramsToJson (wrapperArguments presumption inputTypes filled params)
 
   -- Generate deontic wrapper code with EVALTRACE
   genCode <- case generateDeonticEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson startTime traceEvents mPartyType mActionType traceLevel of
@@ -991,10 +1002,10 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
       -- a section GIVEN that takes its default is not supplied: discharge fills it
       binderParamTypes = filter (\ (n, _) -> not (Map.member n filled)) binderParamTypes0
       givenDefaults = Map.map prettyLayout (Map.filterWithKey (\ n _ -> n `elem` map fst givenParamTypes) filled)
-      inputNames = map fst (givenParamTypes <> binderParamTypes0 <> assumeParamTypes)
+      inputTypes = givenParamTypes <> binderParamTypes0 <> assumeParamTypes
 
   -- Convert input parameters to JSON
-  inputJson <- paramsToJson (wrapperArguments inputNames filled params)
+  inputJson <- paramsToJson (wrapperArguments presumption inputTypes filled params)
 
   -- Generate wrapper code using existing code generation
   genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson traceLevel of
@@ -1205,14 +1216,15 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                     filled = wrapperDefaults presumption (inputDefaults tcRes.module' funDecide) params'
                     binderParamTypes = filter (\ (n, _) -> not (Map.member n filled)) binderParamTypes0
                     givenDefaults = Map.map prettyLayout (Map.filterWithKey (\ n _ -> n `elem` map fst givenParamTypes) filled)
-                    inputs = Set.fromList (map fst givenParamTypes <> map fst binderParamTypes0 <> map fst assumeParamTypes)
+                    inputTypes = givenParamTypes <> binderParamTypes0 <> assumeParamTypes
+                    inputs = Set.fromList (map fst inputTypes)
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting
                 let filteredSource = filterIdeDirectivesText fnImpl
 
                 -- 4. Convert input parameters to JSON
-                inputJson <- paramsToJson (wrapperArguments (Set.toList inputs) filled params')
+                inputJson <- paramsToJson (wrapperArguments presumption inputTypes filled params')
 
                 -- 5. Generate wrapper code
                 genCode <- case generateEvalWrapper fnDecl.name givenParamTypes binderParamTypes assumeParamTypes givenDefaults inputJson traceLevel of
