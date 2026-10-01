@@ -186,7 +186,6 @@ Limits, measured 2026-10-01:
 
 - On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE` fails the whole request with `Evaluation produced unknown value`, which does not name the input, even when the rule would never have read it.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
-- On the wrapper path, a `MAYBE` input followed by another input fails the request with a parser error (`incorrect indentation`), because the generated record prints its type as `MAYBE OF …`.
 - Neither path fills in a `TYPICALLY` default for a missing input yet; that is W3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`.
 
 #### Trace Output

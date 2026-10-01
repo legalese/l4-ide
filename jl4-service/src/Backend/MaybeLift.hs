@@ -31,19 +31,48 @@ isPrimitiveType name = name `elem` ["BOOLEAN", "NUMBER", "STRING"]
 isDateType :: Text -> Bool
 isDateType name = Text.toUpper (Text.strip name) == "DATE"
 
--- | Check if a type is already a MAYBE type
-isAlreadyMaybe :: Text -> Bool
-isAlreadyMaybe tyText = "MAYBE " `Text.isPrefixOf` Text.toUpper (Text.strip tyText)
+-- | The inner type of a MAYBE type, in either spelling: @MAYBE BOOLEAN@, or
+-- @MAYBE OF BOOLEAN@, which is how 'prettyLayout' prints every type application
+-- (@T OF p1, p2@). Reading only the first spelling let @MAYBE OF NUMBER@ through
+-- unlifted, and in the wrapper's record its @OF@ swallowed the next field's line.
+maybeInner :: Text -> Maybe Text
+maybeInner tyText
+  | "MAYBE OF " `Text.isPrefixOf` upper = Just (Text.strip (Text.drop 9 tyText))
+  | "MAYBE " `Text.isPrefixOf` upper    = Just (Text.strip (Text.drop 6 tyText))
+  | otherwise                           = Nothing
+  where
+    upper = Text.toUpper tyText
 
--- | Extract the inner type from a MAYBE type
--- e.g., "MAYBE BOOLEAN" -> "BOOLEAN"
-extractMaybeInner :: Text -> Text
-extractMaybeInner tyText =
-  let stripped = Text.strip tyText
-      upper = Text.toUpper stripped
-  in if "MAYBE " `Text.isPrefixOf` upper
-     then Text.strip $ Text.drop 6 stripped  -- drop "MAYBE "
-     else stripped
+-- | Whether the whole text is one bracketed group, as in @(LIST OF NUMBER)@.
+-- Brackets inside a backticked name do not count.
+isBracketed :: Text -> Bool
+isBracketed t = case Text.uncons t of
+  Just ('(', rest) -> go (1 :: Int) False rest
+  _ -> False
+  where
+    go depth inTick s = case Text.uncons s of
+      Nothing -> False
+      Just (c, rest)
+        | c == '`' -> go depth (not inTick) rest
+        | inTick -> go depth inTick rest
+        | c == '(' -> go (depth + 1) inTick rest
+        | c == ')' -> if depth == 1 then Text.null rest else go (depth - 1) inTick rest
+        | otherwise -> go depth inTick rest
+
+-- | Bracket a type that would otherwise read as more than one argument of
+-- @MAYBE@: anything with a space outside a backticked name, unless it is
+-- already one bracketed group.
+bracketIfNeeded :: Text -> Text
+bracketIfNeeded t
+  | isBracketed t = t
+  | hasBareSpace False (Text.unpack t) = "(" <> t <> ")"
+  | otherwise = t
+  where
+    hasBareSpace _ [] = False
+    hasBareSpace inTick (c : cs)
+      | c == '`' = hasBareSpace (not inTick) cs
+      | c == ' ' && not inTick = True
+      | otherwise = hasBareSpace inTick cs
 
 -- | Lift a type to MAYBE, handling primitives and complex types
 --
@@ -56,18 +85,20 @@ extractMaybeInner tyText =
 -- For lists:
 --   LIST OF a becomes MAYBE (LIST OF (lift a))
 --
--- For already-MAYBE types:
+-- For already-MAYBE types, in either spelling:
 --   Don't double-wrap, but DO recurse into the inner type if complex
---   MAYBE BOOLEAN stays as MAYBE BOOLEAN (primitive, already done)
---   MAYBE (LIST OF BOOLEAN) becomes MAYBE (LIST OF (MAYBE BOOLEAN)) (recurse)
+--   MAYBE OF BOOLEAN becomes MAYBE BOOLEAN (primitive, already done)
+--   MAYBE (LIST OF BOOLEAN) stays MAYBE (LIST OF BOOLEAN) (bracketed: not recursed into)
+--
+-- The result never contains @MAYBE OF@: it is a record field's type in the
+-- generated wrapper, and an @OF@ there would read the next field as another argument.
 liftTypeText :: Text -> Text
-liftTypeText tyText
+liftTypeText tyText0
   -- Already wrapped in MAYBE
-  | isAlreadyMaybe tyText =
-      let inner = extractMaybeInner tyText
-          innerUpper = Text.toUpper $ Text.strip inner
+  | Just inner <- maybeInner tyText =
+      let innerUpper = Text.toUpper inner
       in if isPrimitiveType innerUpper
-         then tyText  -- MAYBE primitive - already fully lifted
+         then "MAYBE " <> inner  -- MAYBE primitive - already fully lifted
          else if isDateType inner
               -- MAYBE DATE -> MAYBE STRING (JSON doesn't have date type)
               -- CodeGen handles the string→date conversion with TODATE
@@ -77,13 +108,13 @@ liftTypeText tyText
               then let elemType = Text.strip $ Text.drop 8 inner
                    in "MAYBE (LIST OF (" <> liftTypeText elemType <> "))"
               -- MAYBE complex - keep as is (record fields handled by JSON decoder)
-              else tyText
+              else "MAYBE " <> bracketIfNeeded inner
   -- DATE type - convert to STRING for JSON compatibility
   -- The CodeGen module will add TODATE conversion when unwrapping
   | isDateType tyText =
       "MAYBE STRING"
   -- Primitive types - wrap in MAYBE
-  | isPrimitiveType (Text.toUpper $ Text.strip tyText) =
+  | isPrimitiveType (Text.toUpper tyText) =
       "MAYBE " <> tyText
   -- LIST OF - wrap list and lift element type
   | "LIST OF " `Text.isPrefixOf` Text.toUpper tyText =
@@ -92,7 +123,14 @@ liftTypeText tyText
   -- Other types (records, enums, custom types) - just wrap in MAYBE
   -- The JSON decoder will handle field-level nulls
   | otherwise =
-      "MAYBE " <> tyText
+      "MAYBE " <> bracketIfNeeded tyText
+  where
+    -- A bracketed element type, such as the @(MAYBE OF NUMBER)@ of
+    -- @LIST OF (MAYBE OF NUMBER)@, is read without its brackets.
+    tyText = unbracket (Text.strip tyText0)
+    unbracket t
+      | isBracketed t = unbracket (Text.strip (Text.drop 1 (Text.dropEnd 1 t)))
+      | otherwise = t
 
 -- | Lift a resolved type to MAYBE
 -- This version works with the AST representation
