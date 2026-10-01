@@ -134,7 +134,8 @@ An `App` leaf's `unique` is its **node id** (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs`,
 Measured: in the different-actuals caller, `b` (resolver `Unique` 6) carried the `atomId` of `App#6`, `limb OF c, d`.
 Positive control: adding one unused leading parameter shifts the resolver numbering by one, and the collision moved to `a` (now `Unique` 6) while `b` became distinct.
 This failure is **silent**: anything that addresses that leaf by `atomId` addresses the call instead, with no diagnostic.
-It sits inside the reconciliation `45ea9f94a` added for smucclaw/l4-ide#935, and is not filed as of this writing.
+It sits inside the reconciliation `45ea9f94a` added for smucclaw/l4-ide#935, and is filed as smucclaw/l4-ide#991.
+Re-measured 2026-10-01 on `unstable` @ `f9a504b77`, with the probe and the control both reproducing exactly; no commit in between touched either cited file.
 
 **What this does to O2.**
 With resolved names, avoiding capture is mostly bookkeeping, not the hard part.
