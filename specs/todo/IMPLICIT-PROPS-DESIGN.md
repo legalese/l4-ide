@@ -1105,6 +1105,16 @@ reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to
 (`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
 gate it.
 
+**EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
+T1: any field declared `TYPICALLY`, not only a `MAYBE … TYPICALLY NOTHING` field, may be omitted at construction and may be absent in JSON, taking its default.
+T2: a module-level `ASSUME … TYPICALLY` takes its default at the root.
+T3: on the wire, absent means not asked and takes the default, `null` means "don't know" and never does, and `fromMaybe FALSE` leaves the service.
+T4: one switch turns presumption off for every evaluation.
+T5: exporters map a default or report dropping it.
+T6: responses list the defaults actually forced.
+The rulings, with their conditions, are recorded there; this section remains the ruling they extend.
+Each was amended the same day by its bench amendment card (T1b, T2b, T5b, T6b, TU-wire-b, TU-presume-b), recorded under the ruling it amends.
+
 ### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
 
 **Ruling (Meng, 2026-09-04: "next-line-after-section, indented, to be the convention; having a
