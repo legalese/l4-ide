@@ -165,17 +165,21 @@ Each event carries the path it landed at, the `SrcRange` of the `TYPICALLY` that
 - The service's direct path fills a rule `GIVEN` and a record field by root fill, and leaves a section `GIVEN` absent so that discharge fills it (T6b).
 - The service's wrapper path declares a defaulted rule `GIVEN` as an `InputArgs` field of its own type carrying the `TYPICALLY` (not lifted to `MAYBE`), and leaves a defaulted section `GIVEN` out of its `WITH`, for discharge.
   It also sends `null` for every input the request left out that is not being defaulted, because on that path absent and `null` were always the same (W1) and the hard switch below would otherwise refuse the wrapper's own lifted `MAYBE`s.
-  The exception is an input the author declared `MAYBE`, under hard: it stays absent, so T1b refuses it, as the direct path does.
+  The exception is an input the author declared `MAYBE`: it stays absent, so that the decoder fills its `NOTHING` and reports it under soft, and refuses it under hard (T1b), as the direct path does.
 
 **T1b's decoder half.** All three decoders read a field's default from its `DECLARE`: the `Machine.hs` decoder from the evaluated module's records and, through `GetLazyEvaluationDependencies`, its transitive imports' (`execEvalModuleWithEnvAndImports`); the service's direct path from `compiledAllDeclares`; the wrapper through the first.
 A declared default wins over D7.3's `MAYBE` fallback, and with presumption off neither fires.
+A field left out that nothing fills is refused with every such field of the object named in one message ("Missing required fields 'a', 'b' in JSON object"; one field keeps the old wording); the direct path names every failing input, one per line.
 `FunctionSchema.hs` and `JsonSchema.hs` drop a field with a `TYPICALLY` from `required`.
 Not covered: a field of an enum constructor that carries data (`JsonSchema.hs:333` still lists it as required, and no decoder fills it, because none decodes such a constructor from JSON); a record built inside L4 (W4/W5).
 
-**T3.** `null` on an input or field with a default is refused, naming it ("null means the value is not known, and it never takes the TYPICALLY default"); `{}` likewise, being `null` (T3).
+**T3, and null kept apart from absent from the wire inward.** On the service, `"x": null` arrives as a key present with no value and an absent key as no key (`Backend/Api.hs` `FnArguments`); the direct path reads the three cells from the request map before anything collapses them (`Backend/Jl4.hs` `suppliedIn`, `Supplied`), and the wrapper path fills only keys that are absent (`wrapperDefaults`). Tests send `null` and absent on both paths ("keeps null apart from absent on the wrapper path", "never takes a default for null").
+`null` on an input or field with a default is refused, naming it ("null means the value is not known, and it never takes the TYPICALLY default"); `{}` likewise, being `null` (T3).
 The decoder now names the field in every primitive mismatch (`Expected JSON boolean for field 'x' but got: Null`), where it used to name only the JSON kind.
 
 **T3c.** An empty CSV cell is dropped from the row (`Batch.hs` `parseBatchInput`), so it is absent exactly as a missing column is.
+Batch reads CSV with its own row loop over cassava's `header` and `record` parsers (`csvRows`), because `Csv.decodeByName` drops every record that parses to one empty field, and a line holding only `""` parses to that as a blank line does: a one-column file lost that row, two rows in and one out, exit 0.
+Assumed, not ruled: a cell of spaces is empty, so absent; a quoted `""` in a one-column file is a row whose cell is absent; an unquoted blank line is not a row.
 Its `MAYBE` paragraph measured both ways: an empty cell for `GIVEN premium IS A MAYBE NUMBER` gives `NOTHING` under soft and "Missing required field 'premium'" under hard.
 
 **T4, and the names chosen for it** (assumptions, not rulings; Meng's soft and hard of T3c):
@@ -189,10 +193,17 @@ Its `MAYBE` paragraph measured both ways: an empty cell for `GIVEN premium IS A 
 **T6, and the shape chosen for `presumed`** (assumptions):
 
 - A list of strings: an input's name, or the path to a field below it, dot-joined, with a list element as its index (`people[0].age`).
-- `l4 batch`: a top-level `presumed` array on every evaluated row, in every format; with `--format csv` a `presumed` column, the names joined with `; `, empty when none. A `--validate-only` row evaluates nothing and has none.
-- The service: `presumed` beside `result` on every response, always present; `@presumed` on each case of the batch endpoint.
+- `l4 batch`: a top-level `presumed` array on every evaluated row, in every format, an error row included (whatever was forced before it stopped, so the envelope keeps one shape). With `--format csv` a `presumed` column holding the same list as compact JSON, `[]` when empty: a name may contain `,` or `;` (`` `of sound mind; sober` `` checks), so no separator could be read back. A `--validate-only` row evaluates nothing and has none. Assumed, not ruled.
+- The service: `presumed` beside `result` on every answer, always present; `@presumed` on each case of the batch endpoint. An error body has none, since nothing was answered. The MCP tools take no `presumption` and evaluate soft; their result is the same JSON, `presumed` included. Assumed, not ruled.
 - Only events belonging to the request count (T6b): a section binder's, a root fill's, or one from the wrapper's own `InputArgs` decode, and only for an input the function takes. A `JSONDECODE` the rules make of their own is not the request's.
-- D7.3's `MAYBE` → `NOTHING` is not listed: it is not a `TYPICALLY`. Whether T4b's "every default that took effect" should include it is open.
+- **D7.3's `NOTHING` for a left-out `MAYBE` with no `TYPICALLY` is listed**, like a default. T1b puts that fallback under the presumption switch, so it is a presumption, and leaving it out would let a soft run and a hard run differ with `presumed` saying nothing. _Decided by Claude overnight 2026-10-02, pending Meng's review._ Its event carries no declaration range, since no `TYPICALLY` supplied it. A `null` on a `MAYBE` is a value and is not listed.
+- **A section default counts as forced on the first READ of its value, not when discharge binds it at the root.** A default that is declared, left out and never read does not appear. _Decided by Claude overnight 2026-10-02, pending Meng's review._ This is the likeliest silent over-report, so it is tested as `FALSE AND <defaulted input>` on batch and on both service paths ("lists only a default the evaluation actually read", "lists a section default only when the rule reads it, on both paths").
+
+**Other open shapes, assumed, not ruled:**
+
+- `{}` given as a field's value in batch acts as `null` and never takes a default, unless the field is a record, where `{}` is a record that supplies nothing; a whole row `{}` supplies nothing, so every default applies. (On the service `{}` already decodes as `null`.)
+- Presumption off makes a defaulted input behave exactly like an absent input with no default in the same tool: batch refuses it naming it, the direct path refuses it naming it, the wrapper path treats it as not supplied, exactly as W1 left that path. Never a third behaviour; the messages only add why the default was not used.
+- `ASSUME … TYPICALLY` stays in `required` until W6, and is neither published nor filled.
 
 **W2.** `isRequiredInput` (`L4.Export`): with presumption on, an input is required unless it is a `MAYBE` or has a default a request may omit.
 `honouredDefault` withholds a written `ASSUME`'s `TYPICALLY`: `#EVAL` does not honour it (W6), so neither the schema nor either tool does yet, which keeps R1's parity for it.
@@ -204,6 +215,13 @@ Omitting a defaulted field at a construction (L3) is still W5.
 
 **R1, parity with `#EVAL`.** Holds for section `GIVEN` defaults: batch, the service and `#EVAL` give the same answer with the binder omitted (`jl4/tests-cli/fixtures/batch-typically-section.l4`: ``#EVAL `can contract` TRUE`` is `TRUE`, and so is the batch row `{"is adult": true}`).
 It cannot yet hold for a rule `GIVEN` or a record field, because `#EVAL` refuses those omissions (p2, p4) until W4/W5; batch and the service fill them at the root, as W3 rules.
+**That gap is accepted, and stated on the batch documentation page** (`doc/tutorials/getting-started/l4-cli.md`). _Decided by Claude overnight 2026-10-02, pending Meng's review._
+
+**Not fixed, and outside W3: a section input overridden by an inner `WITH` does not run under `l4 batch`.**
+`outer MEANS inner PLUS (inner WITH r IS 100)`, with `r` a section `GIVEN`, gives `206` and, `WITH r IS 5`, `210` under `#EVAL`, and under `l4 batch` fails to type-check with every input supplied: "You are giving named inputs to inner … but it is not a function, so it takes none."
+Batch drops each read binder's `ASSUME` and redefines it as a plain value bound from the row (`Batch.hs` `unbindRead`, `rewriteModuleAssumes`), so the binder a `WITH` names no longer exists.
+It fails the same way on the 2026-09-28 `l4`, so it predates this branch.
+The likely fix is the service wrapper's: keep the binder and supply it at the root with `WITH`, leaving a defaulted one to discharge as T6b says. For batch that would probably also mean renaming the `InputArgs` fields, which share the inputs' names (the service suffixes them ` (input)`), and so changing the "Missing required field" messages batch prints. It is not done here, and the batch page states the limit.
 
 **Also fixed on the way.** Batch's `InputArgs` printed one field per line with a leading `, `, and a field after one whose type is an application (`MAYBE NUMBER`) failed to parse ("incorrect indentation"), so an export with a `MAYBE` input before another input failed every row; it now prints the fields without separators.
 The service wrapper has the same layout and the same limit, listed in `jl4-service/README.md`; it is not changed here.

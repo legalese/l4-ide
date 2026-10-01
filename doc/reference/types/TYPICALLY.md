@@ -104,7 +104,8 @@ as `config.timeout`) — but only if the answer actually used it. Three rules
 govern what counts as leaving a fact out:
 
 - **Leaving the name out** is leaving it out. So is an empty cell in a CSV file
-  given to `l4 batch`.
+  given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
+  and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
   takes its default: the case is refused, naming the fact.
 - **The presumption can be switched off.** `l4 batch --presumption hard`, or

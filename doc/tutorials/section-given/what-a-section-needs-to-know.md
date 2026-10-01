@@ -397,13 +397,13 @@ Two boxes on one, six on the other, and no box on both. Nobody drew either form 
 
 ### Checking the list before you publish
 
-Seeing that published list set out as a list, and turning it into a form, are both part of publishing the rules; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) shows you how. Before you get that far there is a rough check you can make from the command line. Give `l4 batch` a case with nothing in it at all — a file holding `[{}]` — and it names a fact the question requires:
+Seeing that published list set out as a list, and turning it into a form, are both part of publishing the rules; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) shows you how. Before you get that far there is a rough check you can make from the command line. Give `l4 batch` a case with nothing in it at all — a file holding `[{}]` — and it names every fact the question requires:
 
 ```
-{"diagnostics":["Missing required field 'annual income' in JSON object"],"input":{},"output":[{"result":{"error":"Missing required field 'annual income' in JSON object\n"},"trace":null}],"presumed":[],"status":"error"}
+{"diagnostics":["Missing required fields 'annual income', 'net worth' in JSON object"],"input":{},"output":[{"result":{"error":"Missing required fields 'annual income', 'net worth' in JSON object\n"},"trace":null}],"presumed":[],"status":"error"}
 ```
 
-It names one fact, not the whole list, so it confirms rather than enumerates: fill that one in, run it again, and it names the next. For a section with two facts that is a quick way to satisfy yourself both came out right. For a section with twenty, it is the published list you want.
+For a section with two facts that is a quick way to satisfy yourself both came out right. It leaves out any fact with a usual value written with `TYPICALLY`, because an empty case takes those; for the whole list, including those, it is the published list you want.
 
 ---
 

@@ -339,14 +339,17 @@ The first case took the usual value, and the answer rests on it. The second supp
 What counts as leaving a fact out:
 
 - **The usual value works the same wherever the `TYPICALLY` is written**: on a section `GIVEN` as above, on a rule's own `GIVEN`, or on a field of a record the rule takes as an input. A field is listed by its path, such as `config.timeout`.
-- **Leaving the name out of the case is leaving the fact out.** In a CSV file, an empty cell means the same, so one file can let one row take the usual value while the next row supplies its own.
-- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact.
-- **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before.
-- **A `TYPICALLY` on an `ASSUME` is not used**, here or by `l4 run`; move the fact under its section's heading to make it count.
+- **Leaving the name out of the case is leaving the fact out.** In a CSV file, an empty cell means the same, and so does a cell holding only spaces or a quoted `""`, so one file can let one row take the usual value while the next row supplies its own. A blank line is not a case.
+- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact. `{}` given as a fact's value means the same as `null`; a whole case `{}` supplies nothing, so every usual value applies.
+- **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before, and that is listed under `presumed` too: it is a presumption that the case is silent because there is nothing to say.
+- **A `TYPICALLY` on an `ASSUME` is not used**, here or by `l4 run`, and the fact stays required; move it under its section's heading to make it count.
+- **A rule's own `GIVEN` is the one place the boundary is ahead of the file.** `l4 batch` fills a rule's own defaulted input that a case leaves out, but inside the file ``#EVAL `the rule` WITH …`` still refuses to leave one out, and names it as missing; that half is not built yet. A section `GIVEN` behaves the same in both.
 
-To see what the rules establish without any usual values, pass `--presumption hard`. Every fact must then be in the case; one that is left out makes the line an error that names it, and `--validate-only` reports it the same way. The default is `--presumption soft`.
+To see what the rules establish without any usual values, pass `--presumption hard`. Every fact must then be in the case. A line that leaves facts out is an error naming every one of them, exactly as for a fact with no usual value, and `--validate-only` reports them the same way. The default is `--presumption soft`.
 
-`presumed` appears in every output format. With `--format csv` it is a column holding the names joined with `; `, empty when nothing was presumed. `--validate-only` evaluates nothing, so its lines have no `presumed`.
+`presumed` appears in every output format, on every line that was evaluated, including one that ended in an error. With `--format csv` it is a column holding the same list as compact JSON, `[]` when nothing was presumed; a list rather than names joined by a separator, because a name may itself contain a comma or a semicolon. `--validate-only` evaluates nothing, so its lines have no `presumed`.
+
+One limit, measured 2026-10-02: a rule that overrides a section `GIVEN` for part of a calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, does not run under `l4 batch`, although `#EVAL` answers it. The line is an error that says _You are giving named inputs to `inner` … but it is not a function, so it takes none._, because `l4 batch` supplies a section `GIVEN` by replacing it with a plain value, which a `WITH` can no longer reach. This was so before `TYPICALLY` defaults reached `l4 batch`, and is not changed by them.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
