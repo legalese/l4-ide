@@ -1363,6 +1363,14 @@ spec bin = do
 
     -- With presumption hard every defaulted input left out is named in one
     -- run, as --validate-only names them, and as one with no default is.
+    -- Hard refuses a left-out defaulted input before anything runs, even one
+    -- the rule would not have read: the same eager refusal as for an input
+    -- with no default. The batch page says so.
+    it "with --presumption hard refuses a left-out default the rule would not read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUnread, "--presumption", "hard"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required field 'has capacity'" `isInfixOf`)
+
     it "with --presumption hard names every defaulted input left out" $ do
       Output code sout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--presumption", "hard"]
       code `shouldSatisfy` (/= ExitSuccess)

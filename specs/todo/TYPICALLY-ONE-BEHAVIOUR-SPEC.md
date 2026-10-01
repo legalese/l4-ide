@@ -203,6 +203,7 @@ Its `MAYBE` paragraph measured both ways: an empty cell for `GIVEN premium IS A 
 
 - `{}` given as a field's value in batch acts as `null` and never takes a default, unless the field is a record, where `{}` is a record that supplies nothing; a whole row `{}` supplies nothing, so every default applies. (On the service `{}` already decodes as `null`.)
 - Presumption off makes a defaulted input behave exactly like an absent input with no default in the same tool: batch refuses it naming it, the direct path refuses it naming it, the wrapper path treats it as not supplied, exactly as W1 left that path. Never a third behaviour; the messages only add why the default was not used.
+  So in batch and on the direct path the refusal is eager: a left-out defaulted input the rule would never have read is refused too (`{"is adult": false}` under hard names `has capacity`), as an input with no default always was. The batch page says so.
 - `ASSUME … TYPICALLY` stays in `required` until W6, and is neither published nor filled.
 
 **W2.** `isRequiredInput` (`L4.Export`): with presumption on, an input is required unless it is a `MAYBE` or has a default a request may omit.
