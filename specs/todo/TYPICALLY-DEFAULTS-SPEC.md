@@ -1,15 +1,13 @@
 # Specification: TYPICALLY Keyword for Default Values
 
-**Status:** PARTIALLY LANDED (audited 2026-08-16) — `TYPICALLY` is back in the language as
-**metadata-only** default values: lexed, parsed, and type-checked (literal constants only, explicit
-type required, rejected on `TYPICALLY`-on-TYPE binders), but **not operational** — no presumptive
-evaluation, no PEVAL/PASSERT. Reintroduced by commit `27cd4770`
-(`feat(l4): reintroduce TYPICALLY as metadata-only default values`), hardened by `d6aca898`; see
-`jl4-core/src/L4/TypeCheck.hs:1268-1306` and `jl4/examples/ok/typically-basic.l4`. The presumptive
-evaluation this spec proposes below remains **not implemented**; the December 2025 revert history
-is retained beneath for the record. `CATALA-EXPORT-SPEC.md` R10 proposes operationalising the
-metadata externally (as Catala `context` variables).
-**Related:** `doc/default-values.md` (conceptual background), `BOOLEAN-MINIMIZATION-SPEC.md`
+**Status:** PARTIALLY LANDED (re-audited 2026-10-01 on `unstable` at `f9a504b77`).
+`TYPICALLY` is lexed, parsed and type-checked: literal values only, an explicit type required, rejected on a `TYPE` binder (`jl4-core/src/L4/TypeCheck.hs:1724-1767`, `jl4/examples/ok/typically-basic.l4`).
+**On a section `GIVEN` it is operational:** an unsupplied section binder takes its default, once per evaluation at the root, and an explicit `WITH` wins (`6c25d5771`, 2026-09-05; `jl4-core/src/L4/Discharge.hs:281-294`, `fillInDefault`; `doc/reference/types/TYPICALLY.md`).
+**Everywhere else it is metadata only:** a rule's own `GIVEN`, a `DECLARE` field and an `ASSUME` keep their default without using it, and the PEVAL/PASSERT presumptive evaluation this spec proposes below is not implemented.
+Reintroduced by `27cd4770` (`feat(l4): reintroduce TYPICALLY as metadata-only default values`), hardened by `d6aca898`; the December 2025 revert history is retained beneath for the record.
+Ruling R8 (`IMPLICIT-PROPS-DESIGN.md` §11.5, 2026-09-04) gives `TYPICALLY` one behaviour everywhere; what remains to build is `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (PR #525).
+`CATALA-EXPORT-SPEC.md` R10 operationalises the metadata externally, as Catala `context` variables.
+**Related:** `BOOLEAN-MINIMIZATION-SPEC.md`
 
 > **⚠️ HISTORY: FIRST IMPLEMENTATION REVERTED (December 2025)**
 >
