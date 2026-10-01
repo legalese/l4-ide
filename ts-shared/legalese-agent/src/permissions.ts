@@ -1,4 +1,4 @@
-import * as vscode from 'vscode'
+import type { PermissionPolicy } from './ports.js'
 
 /**
  * Per-category permission gate for client-side tools.
@@ -9,9 +9,11 @@ import * as vscode from 'vscode'
  * operations with serious blast radius default to Ask — today that's
  * `fs.delete` and any newly-added third-party MCP server.
  *
- * Permission values are persisted in VSCode settings under
- * `legaleseAi.permissions.*` so they survive reloads and flow through
- * settings-sync.
+ * Where values are stored is the host's business (the
+ * {@link PermissionPolicy} port): the VS Code adapter persists them in
+ * settings under `legaleseAi.permissions.*`, the cloud runner uses a
+ * fixed policy. This module holds the categories, their defaults and
+ * the tool → category mapping.
  */
 export type PermissionValue = 'never' | 'ask' | 'always'
 
@@ -27,20 +29,23 @@ export type PermissionCategory =
   | 'meta.askUser'
   | 'meta.statusUpdate'
 
-const CATEGORY_SETTING: Record<PermissionCategory, string> = {
-  'fs.read': 'legaleseAi.permissions.readFiles',
-  'fs.create': 'legaleseAi.permissions.createFiles',
-  'fs.edit': 'legaleseAi.permissions.editFiles',
-  'fs.delete': 'legaleseAi.permissions.deleteFiles',
-  'l4.evaluate': 'legaleseAi.permissions.evaluateL4',
-  'l4.refactor': 'legaleseAi.permissions.refactorL4',
-  'mcp.l4Rules': 'legaleseAi.permissions.runDeployedRules',
-  'mcp.vscode': 'legaleseAi.permissions.vscodeMcp',
-  'meta.askUser': 'legaleseAi.permissions.askUser',
-  'meta.statusUpdate': 'legaleseAi.permissions.statusUpdate',
-}
+/** Every category, in settings-UI order. */
+export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
+  'fs.read',
+  'fs.create',
+  'fs.edit',
+  'fs.delete',
+  'l4.evaluate',
+  'l4.refactor',
+  'mcp.l4Rules',
+  'mcp.vscode',
+  'meta.askUser',
+  'meta.statusUpdate',
+]
 
-const DEFAULTS: Record<PermissionCategory, PermissionValue> = {
+export const DEFAULT_PERMISSIONS: Readonly<
+  Record<PermissionCategory, PermissionValue>
+> = {
   'fs.read': 'always',
   'fs.create': 'always',
   'fs.edit': 'always',
@@ -67,24 +72,11 @@ const DEFAULTS: Record<PermissionCategory, PermissionValue> = {
   'meta.statusUpdate': 'always',
 }
 
-export function getPermission(category: PermissionCategory): PermissionValue {
-  const setting = CATEGORY_SETTING[category]
-  const raw = vscode.workspace
-    .getConfiguration()
-    .get<string>(setting)
-    ?.toLowerCase()
-  if (raw === 'never' || raw === 'ask' || raw === 'always') return raw
-  return DEFAULTS[category]
-}
-
-export async function setPermission(
-  category: PermissionCategory,
-  value: PermissionValue
-): Promise<void> {
-  const setting = CATEGORY_SETTING[category]
-  await vscode.workspace
-    .getConfiguration()
-    .update(setting, value, vscode.ConfigurationTarget.Global)
+/** Parse a stored permission value; `null` when it isn't one. */
+export function parsePermissionValue(raw: unknown): PermissionValue | null {
+  if (typeof raw !== 'string') return null
+  const v = raw.toLowerCase()
+  return v === 'never' || v === 'ask' || v === 'always' ? v : null
 }
 
 /**
@@ -104,4 +96,15 @@ export function categoryForTool(toolName: string): PermissionCategory | null {
   if (toolName.startsWith('l4-rules__')) return 'mcp.l4Rules'
   if (toolName.startsWith('vsmcp__')) return 'mcp.vscode'
   return null
+}
+
+/** A policy with fixed values, falling back to the defaults. The cloud
+ *  runner uses one; tests use it with overrides. */
+export function fixedPermissionPolicy(
+  overrides: Partial<Record<PermissionCategory, PermissionValue>> = {}
+): PermissionPolicy {
+  return {
+    getPermission: (category) =>
+      overrides[category] ?? DEFAULT_PERMISSIONS[category],
+  }
 }

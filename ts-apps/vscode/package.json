@@ -35,7 +35,7 @@
     ]
   },
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.106.0"
   },
   "repository": {
     "type": "git",
@@ -394,6 +394,7 @@
   },
   "prettier": "@repo/prettier-config",
   "dependencies": {
+    "@repo/legalese-agent": "*",
     "@repo/viz-expr": "*",
     "@repo/state-graph-render": "*",
     "@repo/webview": "*",
@@ -411,7 +412,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/minimatch": "^5.1.2",
     "@types/node": "^24.0.0",
-    "@types/vscode": "^1.95.0",
+    "@types/vscode": "^1.106.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "@vscode/test-cli": "^0.0.12",

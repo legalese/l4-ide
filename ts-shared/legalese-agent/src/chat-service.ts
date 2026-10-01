@@ -3,166 +3,49 @@ import type {
   AiChatInjectParams,
   AiChatMessage,
   AiChatStartParams,
-  AiConversation,
 } from 'jl4-client-rpc'
-import type { AuthManager } from '../auth.js'
-import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
-import { AiProxyClient, AiProxyError } from './ai-proxy-client.js'
-import type { ConversationStore } from './conversation-store.js'
-import type { AiLogger } from './logger.js'
+import { AiProxyError, type AiProxyClient } from './ai-proxy-client.js'
 import {
   buildEditorContextMessage,
   buildMentionContextMessage,
-  buildSessionContextMessage,
   buildMethodologyContextMessage,
-} from './editor-context.js'
-import { buildWorkspaceBootstrapMessage } from './workspace-bootstrap.js'
-import { BUILTIN_TOOLS } from './tool-registry.js'
+  buildSessionContextMessage,
+  buildWorkspaceBootstrapMessage,
+} from './context-messages.js'
+import type { ChatServiceEvent, PersistedBlock } from './events.js'
+import {
+  NO_EDITOR_CONTEXT,
+  type AuthProvider,
+  type ConversationStore,
+  type EditorContext,
+  type L4Language,
+  type Logger,
+  type UserInteraction,
+} from './ports.js'
 import type { ToolDispatcher } from './tool-dispatcher.js'
-import { categoryForTool, getPermission } from './permissions.js'
-import type { McpToolClient } from './mcp-client.js'
-import type { VsCodeMcpTools } from './vscode-mcp.js'
-
-/**
- * Events the chat service emits while running a turn. The sidebar
- * provider forwards each to the webview as the matching `AiChat*`
- * notification.
- */
-export type ChatServiceEvent =
-  | { kind: 'started'; conversationId: string; turnId: string; model: string }
-  | { kind: 'text-delta'; conversationId: string; text: string }
-  | { kind: 'thinking-delta'; conversationId: string; text: string }
-  | {
-      kind: 'tool-activity'
-      conversationId: string
-      tool: string
-      status: 'running' | 'done' | 'error'
-      /** Proxy-supplied bold action prefix (e.g. "L4 Deployments",
-       *  "Compacting...", "Legalesing..."). The webview renders it
-       *  verbatim — no per-tool name mapping on this side. */
-      label?: string
-      message: string
-      /** L4 Rule activities only. */
-      input?: unknown
-      output?: unknown
-      ruleId?: string
-      deploymentId?: string
-      error?: string
-      /** Synthetic `web_search` activities only — URL citations the
-       *  upstream model's provider-native web search produced. */
-      sources?: Array<{ url: string; title?: string }>
-    }
-  | {
-      kind: 'tool-call'
-      conversationId: string
-      callId: string
-      name: string
-      argsJson: string
-      status: 'pending-approval' | 'running' | 'done' | 'error'
-      result?: string
-      error?: string
-      /** For `l4-rules__<sanitised>` calls: original L4 function name
-       *  + deployment id parsed from the MCP description trailer.
-       *  Threaded through to the webview so the tool-call row shows
-       *  the unsanitised name (matching the server-side rule-activity
-       *  card) instead of the wire-level slug with dashes. */
-      ruleFnName?: string
-      deploymentId?: string
-    }
-  | {
-      kind: 'done'
-      conversationId: string
-      finishReason: string
-      usage?: { promptTokens: number; completionTokens: number }
-    }
-  | {
-      kind: 'error'
-      conversationId: string
-      message: string
-      code?: string
-    }
-  /** Fired when a queued user message (sent during an in-flight turn
-   *  via `AiChatInject`) triggers a brand-new sub-turn under the same
-   *  conversation. The webview mounts a fresh streaming assistant
-   *  bubble keyed off `subTurnId` so subsequent text-delta /
-   *  tool-call events route to it. */
-  | { kind: 'turn-spawn'; conversationId: string; subTurnId: string }
-  /** Fired each time the chat service drains queued user messages
-   *  into a fresh sub-turn. `injectionIds` lists the webview-minted
-   *  ids of the messages just consumed — the webview removes the
-   *  matching entries from its pending-queue array. An unack'd id
-   *  stays in the array so a dropped event surfaces as a stuck
-   *  pipeline rather than a silent miscount. */
-  | {
-      kind: 'queue-consumed'
-      conversationId: string
-      injectionIds: string[]
-    }
-
-export type ChatServiceEmitter = (event: ChatServiceEvent) => void
-
-/** Chronological record of what happened inside an assistant turn, saved
- *  as `_meta.blocks` on the assistant message so the webview can
- *  reconstruct the original text + tool-call row layout on reload. */
-export type PersistedBlock =
-  | { kind: 'text'; text: string }
-  | {
-      kind: 'tool-call'
-      callId: string
-      name: string
-      argsJson: string
-      status: 'running' | 'done' | 'error'
-      result?: string
-      error?: string
-      /** Original (unsanitised) L4 function name for `l4-rules__*`
-       *  rule calls — preserved so a reloaded transcript shows the
-       *  same row label the user saw live. */
-      ruleFnName?: string
-      /** Deployment id parsed from the MCP description trailer. */
-      deploymentId?: string
-    }
-  // Server activities worth preserving across a history reload. Two
-  // shapes share the variant:
-  //
-  //  - L4 Rule activities (the proxy ran a deployed rule): `ruleId` +
-  //    `ruleKey` are both set; `ruleKey` mirrors the webview store's
-  //    merge key so a `running → done` burst persists as ONE block.
-  //  - Synthetic `web_search` activities: `tool === 'web_search'`,
-  //    `sources` carries the URL citation list. No rule fields.
-  //
-  // Other plain status tickers (doc search, compaction, deployment
-  // browsing) are intentionally not recorded — they're ephemeral
-  // progress noise with nothing to reconstruct on reload.
-  | {
-      kind: 'tool-activity'
-      tool: string
-      ruleId?: string
-      ruleKey?: string
-      status: 'running' | 'done' | 'error'
-      message: string
-      input?: unknown
-      output?: unknown
-      deploymentId?: string
-      error?: string
-      sources?: Array<{ url: string; title?: string }>
-    }
 
 export interface ChatServiceOptions {
-  auth: AuthManager
-  client: VSCodeL4LanguageClient
+  auth: AuthProvider
   store: ConversationStore
   proxy: AiProxyClient
-  logger: AiLogger
+  logger: Logger
+  /** Runs tool calls and owns the advertised tool list (built-ins plus
+   *  every {@link ToolProvider}). */
   dispatcher: ToolDispatcher
-  mcp: McpToolClient
-  /** Tools from the user's VS Code-registered MCP servers (toggleable
-   *  per server in the sidebar settings). Advertised alongside the
-   *  built-ins and l4-rules tools; executed via vscode.lm.invokeTool. */
-  vsMcp: VsCodeMcpTools
-  /** Extension version string (e.g. "1.4.0"). Injected into the
+  /** Receives every {@link ChatServiceEvent}. */
+  interaction: UserInteraction
+  /** Language server: used for the first-turn `<workspace-exports>`. */
+  l4: L4Language
+  /** Active editor, for `<editor-context>` and `<workspace-exports>`.
+   *  Headless hosts omit it. */
+  editor?: EditorContext
+  /** The user's standing methodology preference, sent as a
+   *  `<methodology>` system message on the first turn. */
+  getMethodology?: () => string | undefined
+  /** Client version string (e.g. "1.4.0"). Injected into the
    *  first-turn `<session-context>` system message and stamped on
    *  locally-persisted conversations so support can correlate
-   *  transcripts with a specific extension build. */
+   *  transcripts with a specific build. */
   extensionVersion: string
 }
 
@@ -171,9 +54,9 @@ export interface ChatServiceOptions {
  * active stream per conversation id so abort requests can cancel the
  * right one.
  *
- * Emitter is set after construction (via `setEmitter`) because the
- * sidebar messenger — which defines where events are routed — is
- * usually initialized after the service itself.
+ * Events go to the {@link UserInteraction} port; tool calls go
+ * through the {@link ToolDispatcher} with their conversation and turn,
+ * so approvals and questions stay scoped to the turn that raised them.
  */
 /** A user message queued via `inject()` while a turn is still
  *  in-flight. Mirrors the shape of `AiChatStartParams` but only the
@@ -203,16 +86,14 @@ export class ChatService {
    *  assistant→tool→user sequence. Cleared on abort and on the
    *  turn's ultimate exit from `start()`. */
   private readonly injections = new Map<string, QueuedUserMessage[]>()
-  private emitter: ChatServiceEmitter = () => undefined
+  private readonly editor: EditorContext
 
-  constructor(private readonly opts: ChatServiceOptions) {}
-
-  setEmitter(emitter: ChatServiceEmitter): void {
-    this.emitter = emitter
+  constructor(private readonly opts: ChatServiceOptions) {
+    this.editor = opts.editor ?? NO_EDITOR_CONTEXT
   }
 
   private emit(event: ChatServiceEvent): void {
-    this.emitter(event)
+    this.opts.interaction.emit(event)
   }
 
   /** Webview → chat-service: append a user message to an in-flight
@@ -592,11 +473,14 @@ export class ChatService {
         // Execute each pending tool call.
         const toolMessages: AiChatMessage[] = []
         for (const call of pendingCalls) {
-          const result = await this.opts.dispatcher.run({
-            callId: call.callId,
-            name: call.name,
-            argsJson: call.argsJson,
-          })
+          const result = await this.opts.dispatcher.run(
+            {
+              callId: call.callId,
+              name: call.name,
+              argsJson: call.argsJson,
+            },
+            { conversationId: serverConversationId ?? turnId, turnId }
+          )
           const content = result.ok
             ? result.output
             : JSON.stringify({
@@ -790,21 +674,7 @@ export class ChatService {
     // client tools — shipping our local fs/lsp tools would let that
     // model try to read the operator's filesystem, which is both
     // wrong and confusing for a deployment-scoped chat.
-    const mcpTools = deploymentMode
-      ? []
-      : await this.opts.mcp.listTools().catch((err) => {
-          this.opts.logger.warn(
-            `chat-service: mcp tools/list failed: ${err instanceof Error ? err.message : String(err)}`
-          )
-          return []
-        })
-    // VS Code MCP servers the user enabled in the sidebar settings.
-    // Snapshot per iteration so a server started/stopped mid-turn is
-    // picked up on the next round.
-    const vsMcpTools = deploymentMode ? [] : this.opts.vsMcp.listTools()
-    const tools = deploymentMode
-      ? []
-      : [...BUILTIN_TOOLS, ...mcpTools, ...vsMcpTools]
+    const tools = deploymentMode ? [] : await this.opts.dispatcher.listTools()
 
     for await (const ev of this.opts.proxy.streamResilient(
       {
@@ -1033,7 +903,7 @@ export class ChatService {
         // For infra tools (list_files / read_file / etc.) and any
         // non-`l4-rules__` call this returns null and we leave the
         // fields undefined.
-        const ruleTarget = this.opts.mcp.getToolTarget(ev.name)
+        const ruleTarget = this.opts.dispatcher.getToolTarget(ev.name)
         const existingBlock = blocks.find(
           (b) => b.kind === 'tool-call' && b.callId === ev.callId
         )
@@ -1060,8 +930,7 @@ export class ChatService {
         // first frame (no merge race between the initial emit and the
         // dispatcher's later notifyStatus). `ask` → pending-approval so
         // the bottom Accept/Reject bar shows immediately.
-        const category = categoryForTool(ev.name)
-        const permission = category ? getPermission(category) : null
+        const permission = this.opts.dispatcher.permissionFor(ev.name)
         const initialStatus: 'pending-approval' | 'running' =
           permission === 'ask' ? 'pending-approval' : 'running'
         // Re-emit on every frame — the webview's onToolCall merges by
@@ -1137,7 +1006,9 @@ export class ChatService {
       // live activeTextEditor when the webview didn't send one
       // (older builds, or "include active file" toggled on without a
       // file open at the moment of the send).
-      const editorCtx = buildEditorContextMessage(params.activeFile)
+      const editorCtx = buildEditorContextMessage(
+        this.editor.describe(params.activeFile)
+      )
       if (editorCtx) messages.push(editorCtx)
     }
 
@@ -1155,16 +1026,21 @@ export class ChatService {
 
     if (isNew && !deploymentMode) {
       const session = buildSessionContextMessage(
-        this.opts.auth,
+        this.opts.auth.getEffectiveServiceUrl(),
         this.opts.extensionVersion
       )
       if (session) messages.push(session)
-      const bootstrap = await buildWorkspaceBootstrapMessage(this.opts.client)
+      const bootstrap = await buildWorkspaceBootstrapMessage(
+        this.editor.activeL4Document(),
+        this.opts.l4
+      )
       if (bootstrap) messages.push(bootstrap)
       // User's standing methodology, last so it sits closest to the
       // first user prompt it should shape. Gated on !deploymentMode
       // (this block) so attached deployments stay a plain passthrough.
-      const methodology = buildMethodologyContextMessage()
+      const methodology = buildMethodologyContextMessage(
+        this.opts.getMethodology?.()
+      )
       if (methodology) messages.push(methodology)
     }
 
@@ -1398,6 +1274,3 @@ function isTextLikeMediaType(mediaType: string): boolean {
     mediaType === 'application/yaml'
   )
 }
-
-// Re-export so register.ts can type-check emitted events.
-export type { AiConversation }

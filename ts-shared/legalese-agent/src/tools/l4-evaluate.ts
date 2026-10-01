@@ -1,12 +1,10 @@
-import * as vscode from 'vscode'
+import type { L4Language, Workspace } from '../ports.js'
 import { resolveFileUri } from './fs.js'
 import { fetchL4Diagnostics } from './lsp.js'
 import {
-  awaitDirectiveResults,
-  createDirectiveSnapshotStore,
-  getCachedDirectiveResults,
-  hasCachedDirectiveResults,
+  parseLineFromDirectiveId,
   renderDirectiveResults,
+  type DirectiveSnapshotStore,
 } from './directive-snapshot.js'
 
 /**
@@ -15,8 +13,8 @@ import {
  *
  * The jl4-lsp broadcasts every directive result via the
  * `l4/directiveResultsUpdated` notification after each compile.
- * `directive-snapshot.ts` owns the per-URI live cache and the shared
- * snapshot factory.
+ * The host's {@link L4Language} adapter keeps the per-URI live cache;
+ * `directive-snapshot.ts` owns the snapshot factory.
  *
  * Output modes:
  *   - `"full"` (default) — every directive verbose. Maximises utility
@@ -31,15 +29,15 @@ import {
  * `"changed"` queries always diff against the most recent baseline.
  */
 
-// Public re-exports so `extension.mts` and other consumers don't need
-// to know about the new file split.
-export type { DirectiveResultRow } from './directive-snapshot.js'
-export { recordDirectiveResults } from './directive-snapshot.js'
-
-// Private snapshot store for l4__evaluate. fs__edit_file uses its own
-// store instance (see fs.ts) so the two tools don't pollute each
-// other's "what did I last report" view.
-const evaluateStore = createDirectiveSnapshotStore()
+/** What `l4__evaluate` needs from the host. */
+export interface L4EvaluateContext {
+  workspace: Workspace
+  l4: L4Language
+  /** `l4__evaluate`'s private snapshot store. `fs__edit_file` uses its
+   *  own so the two tools don't pollute each other's "what did I last
+   *  report" view. Per conversation: see {@link BuiltinTools}. */
+  evaluateStore: DirectiveSnapshotStore
+}
 
 export type L4EvaluateMode = 'changed' | 'full'
 
@@ -51,21 +49,22 @@ export interface L4EvaluateArgs {
   mode?: L4EvaluateMode
 }
 
-export async function l4Evaluate(args: L4EvaluateArgs): Promise<string> {
+export async function l4Evaluate(
+  ctx: L4EvaluateContext,
+  args: L4EvaluateArgs
+): Promise<string> {
   if (!args.path) throw new Error('l4__evaluate: `path` is required')
-  const uri = resolveFileUri(args.path)
+  const uri = resolveFileUri(ctx.workspace, args.path)
   if (!uri) {
     throw new Error(
       `l4__evaluate: cannot resolve path ${args.path}. Only files inside a loaded workspace folder are supported.`
     )
   }
-  // Loading the doc triggers an LSP compile if cold; if already open
-  // it's a no-op. We hold a reference only to keep VSCode from
-  // garbage-collecting the in-memory TextDocument before the LSP
-  // settles.
-  let doc: vscode.TextDocument
+  // Opening the doc triggers an LSP compile if cold; if already open
+  // it's a no-op.
+  let doc: { lineCount: number }
   try {
-    doc = await vscode.workspace.openTextDocument(uri)
+    doc = await ctx.l4.openDocument(uri)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     throw new Error(`l4__evaluate: failed to open ${args.path}: ${msg}`)
@@ -79,18 +78,18 @@ export async function l4Evaluate(args: L4EvaluateArgs): Promise<string> {
   // diagnostic header. Info/hint diagnostics (jl4 emits one per
   // directive trace) and warnings don't suppress evaluation — the
   // model still wants the directive results in those cases.
-  const diagnostics = await fetchL4Diagnostics(uri).catch(() => null)
+  const diagnostics = await fetchL4Diagnostics(ctx.l4, uri).catch(() => null)
   if (diagnostics && /\b\d+ errors?\b/.test(diagnostics)) {
     return diagnostics
   }
 
-  const uriStr = uri.toString()
+  const uriStr = uri
   const timeoutMs = Math.min(args.timeoutMs ?? 6000, 15000)
-  if (!hasCachedDirectiveResults(uriStr)) {
-    await awaitDirectiveResults(uriStr, timeoutMs)
+  if (!ctx.l4.getDirectiveResults(uriStr)) {
+    await ctx.l4.awaitDirectiveResults(uriStr, timeoutMs)
   }
-  const results = getCachedDirectiveResults(uriStr) ?? []
-  const rel = vscode.workspace.asRelativePath(uri, false)
+  const results = ctx.l4.getDirectiveResults(uriStr) ?? []
+  const rel = ctx.workspace.relativePath(uri)
   const mode = args.mode ?? 'full'
 
   const directiveLines = results
@@ -99,7 +98,7 @@ export async function l4Evaluate(args: L4EvaluateArgs): Promise<string> {
   const header = buildHeader(rel, directiveLines, doc.lineCount)
   const block = renderDirectiveResults({
     results,
-    store: evaluateStore,
+    store: ctx.evaluateStore,
     uri: uriStr,
     mode,
   })
@@ -127,10 +126,4 @@ function buildHeader(
   const min = Math.min(...directiveLines)
   const max = Math.max(...directiveLines)
   return `[${rel} ${min}-${max}/${totalFileLines}]`
-}
-
-function parseLineFromDirectiveId(directiveId: string): number {
-  const head = directiveId.split(':', 1)[0]
-  const n = Number(head)
-  return Number.isFinite(n) ? n : 0
 }
