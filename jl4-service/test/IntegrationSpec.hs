@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -335,6 +335,82 @@ spec = describe "integration" do
                 reqList `shouldNotContain` ["extra"]
               [] -> expectationFailure "Could not find with_maybe function in deployment response"
           other -> expectationFailure ("Expected JSON array of deployments, got: " <> show other)
+
+  describe "missing BOOLEAN on the wrapper path (smucclaw/l4-ide#992)" do
+    -- A {} anywhere in a request sends it through the generated wrapper,
+    -- which read every missing BOOLEAN as FALSE.
+    let uncertain = Aeson.object []
+
+    it "stops and names a missing BOOLEAN that the rule reads" do
+      withServiceFromSources "w1-read" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-read" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertNotSupplied resp "has criminal record"
+
+    it "short-circuits past a missing BOOLEAN that the rule does not read" do
+      withServiceFromSources "w1-skip" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-skip" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    it "uses a BOOLEAN that is supplied" do
+      withServiceFromSources "w1-given" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-given" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "has criminal record" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "names a section GIVEN BOOLEAN sent as {}, and takes no default for it" do
+      withServiceFromSources "w1-section" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-section" "may contract"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "has capacity" Aeson..= uncertain
+                , "is adult" Aeson..= True
+                ]
+            ])
+        assertNotSupplied resp "has capacity"
+
+    it "stops a deontic rule instead of taking its ELSE branch" do
+      withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertNotSupplied resp "is motorway"
+
+    it "delivers a supplied section GIVEN, not its default" do
+      withServiceFromSources "w1-binder" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-binder" "may contract"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "has capacity" Aeson..= False
+                , "is adult" Aeson..= True
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
@@ -2294,6 +2370,15 @@ assertSuccess resp check = do
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r
     Just (SimpleError e) -> expectationFailure ("Evaluation error: " <> show e)
+
+-- | Assert an evaluation stopped on the placeholder for a missing BOOLEAN input.
+assertNotSupplied :: Response LBS.ByteString -> Text -> IO ()
+assertNotSupplied resp name =
+  case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+    Just (SimpleError (InterpreterError msg)) ->
+      msg `shouldSatisfy` Text.isInfixOf ("`" <> name <> " (not supplied)`")
+    other ->
+      expectationFailure ("Expected evaluation to stop on " <> show name <> ", got: " <> show other)
 
 -- | Poll a deployment until its status is "ready", with a timeout in seconds.
 pollUntilReady :: String -> Manager -> String -> Int -> IO ()
