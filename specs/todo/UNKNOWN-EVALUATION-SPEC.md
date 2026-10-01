@@ -2,9 +2,9 @@
 
 **Status:** proposed, not built (2026-10-01).
 Nothing in this document is in the tree.
-§4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day.
+§4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day, and §4.11 (the correspondence with the established designs) and D1 were added later that day.
 Every statement about today's behaviour is a probe result or a `file:line` read on `unstable` at `f9a504b77`, and says which.
-Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.11 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
+Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.12 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
 Probe files are in the session scratchpad, not in the tree.
 
 **Trigger:** SCHRODINGER, widened by Meng on 2026-10-01: _"continue your investigation of the evaluator lift with kand. It sounds like we'll need to redo the rewriting-to-IF in favour of something more algebraically principled."_
@@ -282,6 +282,25 @@ Under this definition the selector applied to a term returns the term `d's age`,
 That is the ladder's finding at DESIGN §25f: a met requirement under an unknown scope is `TRUE` as a value and undetermined as a verdict, and only the unflattened node lets a consumer read both.
 So `b1 IMPLIES b2` is built whenever `b1` is a term, even when `b2` is a literal; the simplifications that apply to `AND` and `OR` in §4.3 do not apply to it.
 
+**The term language is kept close to SMT-LIB2.**
+That is the hedge D1 (§9) makes part of its ruling: the solver is bought, and the lowering from this language to SMT-LIB2 is the one `l4 prove` already specified, so swapping z3 for cvc5 later, or adding a solver-aided tool, is a change to the lowering and not to the evaluator.
+The correspondence, with R-V7's encodings (`VERIFICATION-BACKEND-LOWERING-SPEC.md:393-432`):
+
+| term                                         | SMT-LIB2                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `?i` of `BOOLEAN`, `NUMBER`, `DATE`          | `declare-const` of `Bool`, `Real` (L4 numbers are exact rationals), `Int` (the day serial)             |
+| `?i` of a `STRING` or a bodiless `DECLARE T` | `declare-const` of an uninterpreted sort, equality only                                                |
+| `?i` of an enumeration, record or `MAYBE`    | `declare-const` of the SMT datatype R-V7 gives the type                                                |
+| `t 's f`                                     | the datatype selector applied to `t`                                                                   |
+| `g (a1, …, an)`                              | a `declare-fun` of `g`'s declared type, applied                                                        |
+| `op (a1, …, an)`                             | the theory operation, with R-V7's exact `ROUND` and `MODULO`; `LN`, `SQRT` and `^` are refused by name |
+| `c ? t1 : t2`                                | `ite`                                                                                                  |
+| `t1 cmp t2`, `b1 EQUALS b2`                  | the theory predicate                                                                                   |
+| `NOT`, `AND`, `OR`, `IMPLIES`                | `not`, `and`, `or`, `=>`; `IMPLIES` has its own symbol, so the seam survives the lowering              |
+| `fresh`                                      | a `declare-const` used once                                                                            |
+| `error [c] e`, `gave-up [c]`                 | not a term: the guard `c` is a side condition, carried next to the residual (§4.7.3)                   |
+| a `CONSIDER` on a term                       | no node yet (U4), so `unknown (out of fragment)` in R-V8's words                                       |
+
 ### 4.3 The evaluation rule, and why it is conservative
 
 **The rule.**
@@ -364,7 +383,7 @@ It counts steps, not depth: the existing cap is on frame depth only (`maximumFra
 It is reported as "gave up; needed _i_" for the inputs in `c` (U11), and it is never a `StackOverflow`.
 Recursion guarded by an `IF` over an unknown always runs out, and that is the ruled behaviour, not a defect: `countdown m` with `countdown n MEANS IF n GREATER THAN 0 THEN countdown (n MINUS 1) ELSE 0` gives up naming `m`.
 A `gave-up` leaf is carried exactly as an error leaf is: it is never absorbed by `AND FALSE` or `OR TRUE`, because the evaluation it stands for might not terminate once the inputs are supplied, and a definite answer would promise what the two-valued run cannot keep.
-That reading of U4's word "unknown" is listed in §4.12.
+That reading of U4's word "unknown" is listed in §4.13.
 
 ### 4.6 The membrane: comparisons, arithmetic, equality, and what an atom is (U5, U5b, U6, U6b)
 
@@ -381,7 +400,7 @@ The soundness claim of §4.7 is conditional on this key.
 An input, an input's field path, a comparison over those, and a Boolean call to an assumed function over those are keyed, and the planner can ask for them: it matches an answer by the key (U5b).
 A term that contains an arithmetic result, a join, a non-Boolean assumed call, a `CONSIDER` on a term, a `gave-up`, or an excluded-type equality (below) is `fresh`: no two occurrences share an atom, and the planner never asks about it, only for the inputs it reads (U5, U5b).
 So `n PLUS 1 GREATER THAN 3 AND NOT (n PLUS 1 GREATER THAN 3)` is undetermined, and `n PLUS 1 EQUALS n PLUS 1` stays an atom (U6).
-This is a loss of precision, not a wrong answer, and §4.12 C1 says what it costs.
+This is a loss of precision, not a wrong answer, and §4.13 C1 says what it costs.
 
 **The residual is propositional**, so two atoms over one number are independent to it: `n GREATER THAN 3 AND n LESS THAN 2` is undetermined, not `FALSE`, and `age >= 18 OR age < 18` is undetermined, not `TRUE`.
 With atoms keyed by term, that can say "undetermined" where the truth is "no", never the reverse.
@@ -418,13 +437,33 @@ Because those extra completions can only prevent a decision and never force one,
 **A guarded leaf is a hole, never a value**: a residual containing `error [c] e` or `gave-up [c]` is decided over the assignments in which no guard holds, and the report names the guards, as "FALSE unless `x`; errors if `x`" (U11b).
 That outcome is its own, on the wire, in the K3 report and in every consumer listed under 4 below.
 
-How it is computed: by truth table when every atom of the residual reads one finite-domain input (a `BOOLEAN` or an enumeration), and otherwise by the planner's diagram once it can be reached from the evaluator's side; until then only the finite-domain case is decided locally and the rest is reported undetermined (U3, U3b).
-Three counts are kept from the first build, because they are the triggers (U3b): conditions whose residual is a tautology or a contradiction, reported as a lower bound; conditions whose atoms all read one finite-domain input, the trigger for the local truth table; and the same over numeric inputs, the trigger for the SMT backend.
+How it is computed: by truth table when every atom of the residual reads one finite-domain input (a `BOOLEAN` or an enumeration), which needs no solver; otherwise by z3 through the lowering of §4.7.3 (D1); and when no solver is installed, the rest is reported undetermined, with that reason named (R-V6's degradation rule, R-V8's named `unknown`).
+With the solver the completions range over values of the inputs rather than over the atoms, so the first gap closes for everything in R-V7's fragment: `age >= 18 OR age < 18` is `TRUE`.
+Three counts are kept from the first build (U3b): conditions whose residual is a tautology or a contradiction, reported as a lower bound; conditions whose atoms all read one finite-domain input, which the truth table decides; and the same over numeric inputs, which measures how much the solver is asked.
+D1 settles that the solver is bought, so the numeric count is a measurement and no longer the trigger for that decision; §9 D1 records the change.
 
-**3. Later, an SMT backend for the arithmetic atoms.**
-`age >= 18 OR age < 18` and `n GREATER THAN 3 AND n LESS THAN 2` are decided by a solver over the atoms' terms, not by this evaluator.
-`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` has the shape: Z3 over SMT-LIB2 text by subprocess (R-V6, `:370`), exact encodings for rounding, modulo and dates (R-V7, `:393`), and three verdicts with every `unknown` naming its reason (R-V8, `:433`).
-The terms of §4.2 are what that lowering consumes.
+**3. The solver boundary (D1).**
+Build the evaluator, buy the solver: the symbolic evaluator is this section, native in `jl4-core`, and the solver is z3 as a subprocess driven by SMT-LIB2, as R-V6 already ruled for `l4 prove` (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:370`), with R-V7's encodings (`:393`) and R-V8's verdicts (`:433`).
+One lowering, from the term language of §4.2 to SMT-LIB2, serves two consumers: the query planner's arithmetic atoms, and `l4 prove` / `l4 verify`.
+
+_What lowers._
+The Boolean residual at the root, with every atom's term; a `declare-const` for each input it reads, of the sort §4.2's table gives its declared type; a `declare-fun` for each assumed function; and the guard of every `error` and `gave-up` leaf as a separate named condition.
+Nothing outside R-V7's fragment lowers; it is reported as `unknown (out of fragment)`.
+
+_What z3 is asked._
+Three questions, each a `check-sat` in its own `push`/`pop` scope: is `(not r)` unsatisfiable, in which case the residual is `TRUE`; is `r` unsatisfiable, in which case it is `FALSE`; and for each guard `c`, is `c` satisfiable, in which case the error or give-up behind it is reachable and the report must carry it.
+The first two are asked with every guard assumed false, which is U11b's "FALSE unless `x`" read as a query.
+A timeout or an `unknown` from the solver is reported as undetermined with its reason (R-V8), never as a value.
+
+_How the planner uses the answer._
+The planner plans over the residual an evaluation leaves, not over the ladder's static tree.
+Its support is the set of inputs the residual still reads; it ranks them as §25f measures, about the verdict; when the user answers one, the binding is added as an assertion and the three questions are asked again.
+Because the questions are put to the solver and not to a truth table over independent atoms, one answer for `age` settles both `age >= 18` and `age < 65`, which is the gap U1b and U3b record as a loss.
+The verdict is still read off the seam's two sides (§25f), each lowered as its own root.
+
+_What is not done._
+Rosette is not a backend; §4.11 says why.
+It is at most an optional cross-check oracle in testing, as `catala proof` is planned to be for `l4 prove`.
 
 **4. The report, chosen at the root only (U7b).**
 The computation is the same for every caller; the caller chooses only how an undetermined result is shown:
@@ -432,7 +471,7 @@ The computation is the same for every caller; the caller chooses only how an und
 | report   | an undetermined result shows as                                                                                                                     | a decided residual shows as  |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | default  | today's "I could not continue evaluating, because I needed to know the value of …", naming **every** input in the residual's support, not the first | its value                    |
-| K3       | `unknown`; an error-leaf residual shows its own outcome, never `unknown` (U11b)                                                                     | see §4.12 C2                 |
+| K3       | `unknown`; an error-leaf residual shows its own outcome, never `unknown` (U11b)                                                                     | see §4.13 C2                 |
 | residual | the residual, printed as L4 source (§4.9)                                                                                                           | its value, with the residual |
 
 A `gave-up` is reported as "gave up; needed _i_" under every report.
@@ -479,6 +518,17 @@ A residual is printed as L4 source over the input names, `x AND NOT y`, and a jo
 - `specs/todo/ladder-diagrams-2026/DESIGN.md` §23 (`:927`) is the membrane and §25f (`:1489`) is the seam; `BooleanDecisionQuery.hs:27-43` and `layout.ts:209-266` are the two places that already keep `IMPLIES` as a node.
 - `Machine.hs:2749-2753` is the precedent inside the evaluator itself: `RBinOp2` returns the operator applied to its evaluated operands when neither table row applies (§3.5).
 
+**Outside this tree.**
+Symbolic evaluation is a solved problem, and this section names the design it is closest to rather than inventing one.
+
+- **Rosette** (Torlak and Bodík, "Growing Solver-Aided Languages with Rosette", Onward! 2013; "A Lightweight Symbolic Virtual Machine for Solver-Aided Host Languages", PLDI 2014) is the closest: a host-language evaluator that runs every path, merges at control-flow joins, collects assertions against the path condition, and hands the result to a solver.
+  Three of its definitions were read today in the Rosette Guide and are quoted in §4.11: a symbolic term is "either a symbolic constant, created via `define-symbolic[*]`, or a symbolic expression, produced by a lifted operator", strongly typed and always of a solvable type, while "symbolic values of all other (unsolvable) types take the form of symbolic unions" (§7.1); "a symbolic union is a set of two or more guarded values", whose guards "are disjoint: only one of them can ever be true" (§7.1); and the verification condition "accumulates all the assertions and assumptions issued on these paths", with "failures due to exceptions … treated as assertion violations" (§7.2.1).
+  `define-symbolic` "binds the variable to the same (unique) constant every time it is evaluated", while `define-symbolic*` "creates a stream of (unique) constants" (Guide, Essentials).
+  Everything else said about Rosette here, its term hash-consing, its `ite` merging for solvable types, z3 as its default solver, is recalled from the papers and not re-read today; the PLDI 2014 PDF was not reachable at the address tried.
+- **Symbolic execution** (King, "Symbolic Execution and Program Testing", CACM 1976) is where the path condition comes from; **KLEE** (Cadar, Dunbar and Engler, OSDI 2008) is the path-per-path form with execution budgets, and **veritesting** (Avgerinos, Rebert, Cha and Brumley, ICSE 2014) is the finding that merging paths back together beats enumerating them; both recalled, neither re-read today.
+- **Online partial evaluation** (Jones, Gomard and Sestoft, _Partial Evaluation and Automatic Program Generation_, 1993) is the lift itself.
+- **Strong Kleene** (Kleene 1952) and **supervaluation** (van Fraassen 1966) name what the boundary decides and what it does not.
+
 **Names from the literature, used where they fit.**
 
 - _Strong Kleene_ (Kleene 1952) names the tables of reading (a) and the known-value rows of §4.3's table.
@@ -492,7 +542,27 @@ A residual is printed as L4 source over the input names, `x AND NOT y`, and a jo
   The word was overclaimed once on 2026-10-01, for the whole design, and a skeptic caught it; it is applied here to the boundary decision only.
 - Not used: _abstract interpretation_, which this is not, since no abstract domain is joined at a fixpoint; and _three-valued logic_ as a description of the whole design, which describes only reading (a).
 
-### 4.11 Tests, from the rulings
+### 4.11 Correspondence with the established designs
+
+Our construct, the established construct, and where we deliberately differ, with the reason.
+Rosette rows cite the Guide where a quotation in §4.10 covers them and say "recalled" otherwise.
+
+| ours                                                           | established                                                                                                                                                                                                        | same, or differs and why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| an input `?i`                                                  | Rosette `define-symbolic`: one constant per name, every evaluation (Guide)                                                                                                                                         | same                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `fresh`                                                        | Rosette `define-symbolic*`: a new constant each time the form is evaluated (Guide)                                                                                                                                 | same mechanism; we use it where Rosette would build a term (arithmetic results, joins, non-Boolean assumed calls), by U5 and U5b; §4.13 C1                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `op (…)`, `g (…)`, `t 's f`                                    | a Rosette symbolic expression "produced by a lifted operator", strongly typed, of a solvable type (Guide §7.1); hash-consed terms (recalled)                                                                       | same shape; differs in identity: Rosette shares equal terms by construction, U5b keys some and not others; §4.13 C1                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| a Boolean residual with `IMPLIES` as a node                    | a Rosette Boolean term; SMT-LIB `=>`                                                                                                                                                                               | same; the seam's two roots and the verdict are ours (§25f), and no established design has them                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| a join `c ? t : e` of a solvable type                          | Rosette: a term of that type, `ite` (recalled); SMT-LIB `ite`                                                                                                                                                      | same; differs at evaluation time: U4b pushes a comparison into the arms, Rosette leaves `(> (ite c 1 2) 1)` to the solver; under D1 the push is a free simplification, not the mechanism                                                                                                                                                                                                                                                                                                                                                                 |
+| a join of records, lists or enumerations; `CONSIDER` on a term | a Rosette symbolic union: guarded values with disjoint guards, split by `match` and accessors (Guide §7.1); SMT datatypes with testers (R-V7)                                                                      | differs: U4 keeps `CONSIDER` on a term unknown for now; the union is the known answer, and R-V7's datatypes carry it to the solver; recommended when U4's "for now" is reopened                                                                                                                                                                                                                                                                                                                                                                          |
+| `error [c] e` and `gave-up [c]` as leaves in the residual      | the Rosette verification condition: a store beside the value that "accumulates all the assertions and assumptions issued on these paths", with exception failures "treated as assertion violations" (Guide §7.2.1) | differs in placement: ours is a node in the value, Rosette's is a side store keyed by the path condition; the store gives U11b's "never absorbed" by construction, with no special row in §4.3's table; §4.13, Dissent U11                                                                                                                                                                                                                                                                                                                               |
+| left-to-right error order                                      | Rosette: on a symbolic left operand both sides run under their path conditions and a failure is recorded, never raised (Guide §7.2.1)                                                                              | differs on purpose: a known left operand behaves as in Rosette; an erroring left operand raises as today, because §4.3's conservativity is worth more than commutativity, which U1's note settled                                                                                                                                                                                                                                                                                                                                                        |
+| the step counter, started at the first term                    | Rosette: no budget, the programmer bounds recursion (recalled); KLEE: time, instruction and fork budgets (recalled); veritesting: merge paths statically                                                           | differs: ours merges at every join as Rosette does, and adds KLEE's kind of budget because L4 recursion is unbounded by the author; exhaustion as a store entry, §4.13 C3                                                                                                                                                                                                                                                                                                                                                                                |
+| propositional supervaluation at the root                       | Rosette: `solve` and `verify` always go to the solver (recalled)                                                                                                                                                   | differs today and converges under D1: the truth table stays for finite-domain atoms at no solver cost, z3 for the rest (§4.7.3)                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| the three reports                                              | Rosette: a model or `unsat`; no undetermined report, no residual printed back                                                                                                                                      | ours: the residual report prints the term as L4 (§4.9), because the reader is a caseworker and not a verifier                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Rosette as a backend                                           | lower L4 to Racket and run Rosette's symbolic VM                                                                                                                                                                   | not adopted (D1): it would re-implement laziness, left-to-right error order, the regulative and temporal machinery and `TYPICALLY` with its presumption switch in a second language, which is the drift this bench found between the ladder's evaluator and the Haskell one (§3.4), between `l4 batch` and `l4 run` (§4.9), and in OpenFisca's defaults (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §2); a Racket runtime on the service hosts; and Rosette's own split is a symbolic VM plus z3, where the VM is the half that must carry L4's semantics exactly |
+
+### 4.12 Tests, from the rulings
 
 Each row names the ruling it comes from, gives the L4 input, says what the `unstable` binary at `f9a504b77` does today, and states the expected report under this section.
 Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `n` and `age` are `IS A NUMBER`, `d IS A Person` with `DECLARE Person HAS age IS A NUMBER`, and `g` is `ASSUME g IS A FUNCTION FROM NUMBER TO BOOLEAN`, all unsupplied.
@@ -504,7 +574,7 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 | 1   | U1, §2.3      | `x AND FALSE`                                                                                 | stuck on `x` (p01)                                                                                                            | `FALSE`                                                                                                                            |
 | 2   | U1            | `x OR TRUE`                                                                                   | stuck (p01)                                                                                                                   | `TRUE`                                                                                                                             |
 | 3   | U1            | `x UNLESS TRUE`                                                                               | stuck (p01)                                                                                                                   | `FALSE`                                                                                                                            |
-| 4   | U1, U10b      | `x IMPLIES TRUE`                                                                              | stuck (p01, p11)                                                                                                              | `TRUE`; the residual `x IMPLIES TRUE` keeps the seam, so a verdict read from it is `Undetermined` (§25f); see §4.12 C5             |
+| 4   | U1, U10b      | `x IMPLIES TRUE`                                                                              | stuck (p01, p11)                                                                                                              | `TRUE`; the residual `x IMPLIES TRUE` keeps the seam, so a verdict read from it is `Undetermined` (§25f); see §4.13 C5             |
 | 5   | U1, §4.6      | `and (LIST TRUE, x, FALSE)`                                                                   | stuck (p01)                                                                                                                   | `FALSE`                                                                                                                            |
 | 6   | U1            | `NOT x`                                                                                       | stuck (p01)                                                                                                                   | undetermined naming `x`; residual `NOT x`                                                                                          |
 | 7   | U1b, U3, U12b | `x OR NOT x`                                                                                  | stuck (p01)                                                                                                                   | `TRUE`                                                                                                                             |
@@ -532,7 +602,7 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 | 29  | U4b, U11b     | `IF x THEN 1 DIVIDED BY 0 ELSE 2`                                                             | stuck (p07)                                                                                                                   | "2 unless `x`; errors if `x`"                                                                                                      |
 | 30  | §4.3          | `IF TRUE THEN 1 ELSE 1 DIVIDED BY 0`                                                          | `1` (p07)                                                                                                                     | `1`, unchanged                                                                                                                     |
 | 31  | §4.5          | `IF x THEN TRUE ELSE TRUE`                                                                    | stuck (p07)                                                                                                                   | `TRUE`                                                                                                                             |
-| 32  | U4b, U5b      | `(IF x THEN 2 ELSE 3) PLUS 1 GREATER THAN 3`                                                  | stuck (p21)                                                                                                                   | undetermined naming `x`: `PLUS` is not pushed into the arms, so the comparison is over a `fresh` term; see §4.12 C1                |
+| 32  | U4b, U5b      | `(IF x THEN 2 ELSE 3) PLUS 1 GREATER THAN 3`                                                  | stuck (p21)                                                                                                                   | undetermined naming `x`: `PLUS` is not pushed into the arms, so the comparison is over a `fresh` term; see §4.13 C1                |
 | 33  | U4, U11       | `countdown m`, with `countdown n MEANS IF n GREATER THAN 0 THEN countdown (n MINUS 1) ELSE 0` | stuck on `m` (p08)                                                                                                            | "gave up; needed `m`"; `countdown 3` stays `0`                                                                                     |
 | 34  | U4, §2.4      | `CONSIDER m WHEN NOTHING THEN 1 WHEN JUST y THEN 2`, with `m IS A MAYBE NUMBER`               | "reached a CONSIDER that has no branch for it" (p09)                                                                          | build step 1: stuck naming `m`; lifted: undetermined naming `m`                                                                    |
 | 35  | U5b           | `d's age`                                                                                     | the no-branch message (p05)                                                                                                   | undetermined naming `d's age`                                                                                                      |
@@ -541,8 +611,8 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 | 38  | U5b           | `g 3 AND NOT g 3`                                                                             | stuck on `g` (p12)                                                                                                            | `FALSE`                                                                                                                            |
 | 39  | U5b           | `g 3 AND NOT g 4`                                                                             | stuck (p12)                                                                                                                   | undetermined naming `g`; two atoms                                                                                                 |
 | 40  | §4.3          | `FALSE AND g 3`                                                                               | `FALSE` (p12)                                                                                                                 | `FALSE`, unchanged                                                                                                                 |
-| 41  | U5, U5b       | `n PLUS 1 GREATER THAN 3 AND NOT (n PLUS 1 GREATER THAN 3)`                                   | stuck (p15)                                                                                                                   | undetermined naming `n`, two `fresh` atoms; see §4.12 C1                                                                           |
-| 42  | U6            | `n PLUS 1 EQUALS n PLUS 1`                                                                    | stuck (p15)                                                                                                                   | undetermined naming `n`; see §4.12 C1                                                                                              |
+| 41  | U5, U5b       | `n PLUS 1 GREATER THAN 3 AND NOT (n PLUS 1 GREATER THAN 3)`                                   | stuck (p15)                                                                                                                   | undetermined naming `n`, two `fresh` atoms; see §4.13 C1                                                                           |
+| 42  | U6            | `n PLUS 1 EQUALS n PLUS 1`                                                                    | stuck (p15)                                                                                                                   | undetermined naming `n`; see §4.13 C1                                                                                              |
 | 43  | §4.6          | `n GREATER THAN 3 AND n LESS THAN 2`                                                          | stuck (p15)                                                                                                                   | undetermined naming `n`; the numeric count rises by one                                                                            |
 | 44  | §4.7          | `n PLUS 1`                                                                                    | stuck (p15)                                                                                                                   | undetermined naming `n`                                                                                                            |
 | 45  | U6b           | `elem g (LIST g)`                                                                             | stuck on `g` (p06)                                                                                                            | "equality on types that do not support it", exit 1; never `TRUE`                                                                   |
@@ -562,26 +632,32 @@ Unless a row says otherwise, `x` and `y` are section `GIVEN … IS A BOOLEAN`, `
 
 Of the 58 rows, 54 were probed today; rows 54, 55, 57 and 58 were not.
 
-### 4.12 Conflicts for Meng
+### 4.13 Conflicts for Meng
 
-These are places where the definition above shows two recorded rulings pulling apart, or a ruling's word having lost its referent.
-None is resolved here; each says what the definition does in the meantime.
+These are places where the definition shows two recorded rulings pulling apart, a ruling's word having lost its referent, or an established design answering a question better than the recorded ruling does.
+None is resolved here; each says what the definition does in the meantime, what the established design does where one speaks, and what is recommended.
+Items headed "Dissent" are places where this section thinks a ruling points the wrong way; the ruling stands as recorded, and the dissent sits beside it.
+The bench's own skeptics found four near-collisions and the amendments reconciled them: U3b's order clause against U4's join (dropped), U4b's `c ? t : e` against U3's boundary promise (kept inside the evaluator), U11b's leaf against U4b's guarded error (one mechanism), and U5b's field-path key against U4's `CONSIDER` (the selector returns a term).
+Reading the amendments together finds the five below and no sixth.
 
 **C1. Atom identity: by input, or by term.**
 U5 ("an arithmetic unknown operand gets a fresh atom per evaluation"), U5b ("only unknowns that carry no term (arithmetic results, `IF` joins, non-Boolean assumed calls) get fresh atoms") and U6 ("derived unknowns (`n PLUS 1 EQUALS n PLUS 1`) stay comparison atoms") make an arithmetic result keyless.
-§4.2 gives it a term anyway, because the SMT backend of §4.7.3 needs the term, and keying by that term would be sound for the same reason keying a comparison by term is: a built-in operation is a function of its operands, so two occurrences of one term denote one value.
+§4.2 gives it a term anyway, because the solver needs the term, and keying by that term would be sound for the same reason keying a comparison by term is: a built-in operation is a function of its operands, so two occurrences of one term denote one value.
 Under the rulings as recorded, rows 41, 42 and 32 are undetermined; keyed by term they would be `FALSE`, `TRUE` and `NOT x`.
-The same question reaches U6b's identity rule, which is stated for "the same unknown input on both sides": under it `d's age EQUALS d's age` is an atom, while row 36, `d's age AT LEAST 18 AND NOT d's age AT LEAST 18`, is `FALSE`, because the comparison is keyed by the field-path term and the equality is not.
+The same question reaches U6b's identity rule, stated for "the same unknown input on both sides": under it `d's age EQUALS d's age` is an atom, while row 36 is `FALSE`, because the comparison is keyed by the field-path term and the equality is not.
+Established answer: Rosette shares equal terms by construction (hash-consing, recalled), and a new constant per evaluation (`define-symbolic*`, Guide) is used only where the program itself asks for a new unknown; nothing in it corresponds to a fresh constant standing in for `n PLUS 1`.
+Under D1 the solver sees the term either way, so the only question left is whether the propositional decider may use it.
 The definition follows the rulings.
-The recommendation is to key every atom by its full term, keep `fresh` for the genuinely keyless (a `CONSIDER` on a term, a `gave-up`, an excluded-type equality), and leave U5b's askability rule as it is, so the planner still asks only for inputs and field paths.
+Recommendation: key every atom by its full term; keep `fresh` for the genuinely keyless (a `CONSIDER` on a term, a `gave-up`, an excluded-type equality); leave U5b's askability rule as it is, so the planner still asks only for inputs and field paths.
 
 **C2. Whether the K3 report sees the boundary decision.**
 U1b: "`--unknowns k3` is true strong Kleene: atoms only, no tautology settling, as #526 §8 step 3 already says."
 U7b: "What the caller chooses is the report, never the computation", and "the caller chooses only how an undetermined result is reported".
 The boundary decision of §4.7.2 is computation.
 If it runs before the report is chosen, the K3 report shows `x OR NOT x` as `TRUE` and U1b's sentence is false of it; if the K3 report skips it, the caller is choosing computation, which U7b retired.
+No established design has a K3 report; Rosette answers with a model or `unsat`.
 The definition leaves the K3 column of §4.7.4 open for a decided residual.
-The recommendation is to read U1b's sentence as describing build step 3 of §8, the stage before a boundary decider exists, and to let every report show a decided residual as its value; the K3 report then differs from the default only in printing `unknown` instead of naming the inputs.
+Recommendation: read U1b's sentence as describing build step 3 of §8, the stage before a boundary decider exists, and let every report show a decided residual as its value; the K3 report then differs from the default only in printing `unknown` instead of naming the inputs.
 
 **C3. What running out of steps returns.**
 U4: "Running out returns an unknown naming the pending condition".
@@ -589,19 +665,41 @@ U11: "Divergence on an unknown is caught by PETROL's step counter ('gave up; nee
 U11b: "A residual that contains an error leaf is never absorbed", because a definite `FALSE` would promise what a supplied run that errors cannot keep.
 An ordinary unknown is absorbed by `AND FALSE`; so with `loop n MEANS IF n GREATER THAN 0 THEN loop n ELSE 0`, the lifted `(loop m GREATER THAN 0) AND FALSE` would be `FALSE` for unknown `m`, and the two-valued run with `m` set to 1 does not terminate.
 That is U11b's objection in a different coat.
+Established answer: in Rosette a failure on a path is an entry in the verification condition and not a value (Guide §7.2.1), so nothing can absorb it; KLEE's budgets end a path and report it (recalled).
 The definition treats `gave-up` as a guarded leaf, never absorbed (§4.5), and reads U4's "unknown" as that leaf.
+Recommendation: a `gave-up` is an entry in the store that Dissent U11 below proposes, keyed by its path condition; if the leaf design stands instead, it is a guarded leaf and never absorbed.
 
 **C4. The step counter's scope.**
 U4: "a cumulative step counter, explore mode only".
 U7b: "Every evaluation is lifted; there is no evaluation mode."
 A counter that runs from the first step of every evaluation would turn a long but fully supplied computation into a `gave-up`, which breaks §4.3's conservativity.
+Rosette has no counter and KLEE's budgets are per run (both recalled), so neither answers the question of where ours starts.
 The definition starts the counter at the first term built, which is the only reading of "explore mode only" left once there is no mode (§4.5), and asks for that reading to be confirmed.
 
 **C5. A decided value with an undetermined verdict at the evaluator's root.**
 Row 4, `x IMPLIES TRUE`, is `TRUE` by §4.7.2, and U10b records the pair "value `TRUE`, verdict `Undetermined`" as the expected answer.
 The default report of §4.7.4 prints `TRUE` and names no input, because the result is decided; §25f's finding is that this is the one case where a met requirement must not end the interview.
 The residual report carries the seam intact, so a verdict-aware consumer can still ask for the scope; the default report cannot.
+No established design has the seam; the question is ours alone.
 Whether the default report should name the scope's inputs when the root is an `IMPLIES` with an undetermined scope is not ruled anywhere, and the definition does not do it.
+
+**Dissent: U11 and U11b, the error leaf's placement.**
+U11 ruled "add an error leaf to the residual", and U11b that a residual containing one is never absorbed, which §4.3's table implements with a special row and §4.7.2 with a hole rule.
+Rosette keeps the same information in a different place: the value merges freely, and the failure is recorded in a store beside it, keyed by the path condition (Guide §7.2.1: the verification condition "accumulates all the assertions and assumptions issued on these paths"; "failures due to exceptions are treated as assertion violations").
+With a store, `(x AND (1 DIVIDED BY 0 GREATER THAN 0)) AND FALSE` has value `FALSE` and store `{x: division by zero}`, and the report "FALSE unless `x`; errors if `x`" is read off the pair; absorption is impossible because there is nothing in the value to absorb.
+The same store carries U4b's arm errors and C3's give-ups, so one mechanism covers three rulings; §4.3's table loses its special row; a residual prints as plain L4 with no leaf that L4 cannot spell (§4.9); and the store lowers to SMT-LIB2 as the list of guards §4.7.3 asks z3 about anyway.
+The intent of U11 and U11b, loud and never absorbed, is kept exactly; only the data structure changes.
+Recommendation: implement the leaf as a store entry, and let U11's words "error leaf" name the entry.
+
+**Dissent: U3b's ordering, the truth table first and the solver on a trigger.**
+U3b made the count of numeric-input conditions "the trigger for the SMT backend", with the local truth table first.
+D1 bought the solver the same day, and R-V6 already specifies how a missing solver degrades.
+Two deciders in sequence are two behaviours for one residual depending on build stage, and the truth table's answer on `age >= 18 OR age < 18`, undetermined, is exactly the one the solver reverses.
+Recommendation: z3 is the boundary decider from build step 4; the truth table is the no-solver fallback for finite-domain atoms and nothing more; U3b's counts are measurements, not gates.
+The cost is a `z3` on the service hosts from step 4, which D1 accepts.
+
+**No dissent on D1.**
+Build the evaluator, buy the solver is the right split; the one consequence worth stating, the solver on every host that runs the planner, is in §9 D1.
 
 ---
 
@@ -660,7 +758,7 @@ That is unbounded in principle, so it is measured, not guessed:
 3. **Blow-up.** Per directive, the total steps taken under §4.5's counter, the largest residual, the three counts of §4.7.2, and the number of conditionals evaluated on a term condition, each against the two-valued run of the same directive with every input supplied.
    The machine has no step counter today, only the depth cap (`maximumFrameDepth`), so the counter is part of this measurement.
 4. **Wall clock.** `jl4-test` and the §3.2.1 differential must be unchanged within noise on fully supplied directives; that is the cost to everyone who never meets an unknown.
-5. **Positive controls.** One directive constructed to evaluate both arms of a nested conditional on one unknown, depth 10, whose step count the measurement must show growing; and rows 13, 14, 15, 16, 19, 20 and 36 of §4.11, which must come out as the table says.
+5. **Positive controls.** One directive constructed to evaluate both arms of a nested conditional on one unknown, depth 10, whose step count the measurement must show growing; and rows 13, 14, 15, 16, 19, 20 and 36 of §4.12, which must come out as the table says.
    A measurement that scores row 19 as a plain unknown has not seen the leaf, and one that scores row 13 as `FALSE` has keyed atoms by position.
 
 U4's step limit is set from the distribution step 3 produces, not before.
@@ -673,13 +771,15 @@ U4's step limit is set from the distribution step 3 produces, not before.
    Independent; small.
 2. **Step 0** (§4.4, U2, U2b): the built-in connectives as frames, with the trace golden, the service reasoning tree and jl4-mlir's parity harness moved together, measured.
 3. **Atoms-only residuals, default report.** Input atoms, field paths, comparison atoms, Boolean assumed calls, the connective table of §4.3, the identity rule of §4.6, and the default report naming every input; no boundary decision yet.
-   Rows 1 to 6, 11 to 15, 23, 24, 35, 37 and 52 of §4.11 answer correctly.
+   Rows 1 to 6, 11 to 15, 23, 24, 35, 37 and 52 of §4.12 answer correctly.
    This is what U1b calls "true strong Kleene: atoms only".
 4. **The boundary decider and the residual report.** §4.7.2 by truth table over finite-domain atoms, the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results.
-   Rows 7, 8, 10, 14, 25, 26, 36 and 38.
+   The lowering of §4.2 to SMT-LIB2 is shared with `l4 prove`, and z3 runs by subprocess (D1); without a solver the truth table decides finite-domain residuals and the rest is undetermined with the reason named.
+   Rows 7, 8, 10, 14, 15, 25, 26, 36, 38 and 43.
 5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b), after the measurement of §7.
    Rows 16, 19 to 22 and 27 to 34.
 6. **Service and MCP report routes**, the batch row status, the planner reading residuals from evaluation instead of only from the static ladder tree, and the counts reported (U7b, U3b).
+   The planner's questions go to the solver through the same lowering (§4.7.3, D1).
 7. **The two TypeScript evaluators** (U10, U10b): when step 3 lands, shared L4 cases (rows 4, 7, 19, 49, 50) run through the Haskell evaluator and the visualizer's `eval.ts`, which is replaced by a call after step 6.
    `ladder-core`'s `nodeValue` (`layout.ts:209-266`) is kept permanently, held to the Haskell evaluator on the connective cases with each call's engine value fed in as a pin, with the tautology case (it stays `Undetermined`) and the error case (it has no error value) listed as known divergences; the `IMPLIES` case expects value `TRUE` and verdict `Undetermined` against `verdictFor` and both `verdictOf`s, extending `verdict.test.ts`.
 
@@ -766,6 +866,21 @@ Amended the same day by bench card TU-wire-b, recorded in full in `TYPICALLY-ONE
 **RULED 2026-10-01.** Meng marked `accept` on bench card U12 at 10:16:54Z, with no note. The ruling, as printed on the card: Decline the library if LIMBO and CLICKER are accepted. Record in `NEGATION-AS-FAILURE-SPEC.md` that this reverses its leaning, and that a data-borne `NOTHING` still needs `CONSIDER` (the library can be revisited if that demand appears). Update `negation-as-failure.md:60-63` in the same change, and move the experiment under a checked glob so it cannot rot.
 Its condition is met: U1 and U7 are both accepted. The answer is recorded in `specs/done/NEGATION-AS-FAILURE-SPEC.md` as well. **AMENDED 2026-10-01**, by bench card U12b, which an independent skeptic reviewed before it was folded in. Meng ruled in chat at 10:20Z: _"These are my rulings prior to SEQUEL. Please fold in any additional recommendations due to SEQUEL."_ The amendment, as the card printed it: Label `jl4/experiments/negation-as-failure-examples.l4` and both doc pages as "truth-functional strong Kleene (#526 §4.1(a))", not as the lift, everywhere the word "lift" refers to it (file `:79-85`, NAF spec `:3`, `:5`, `:23`, #526 §3.1). Add `#ASSERT (NOTHING `kor` (knot NOTHING)) EQUALS NOTHING` with a comment that the residual evaluator decides `x OR NOT x` TRUE at the boundary. Move the file under a checked glob; turn both doc links into relative links to the new path, and update the citations (NAF spec `:5`, `:274`; #526 §3.1; the file's own line 2). The recorded condition now reads as met, U1 and U7 being accepted.
 
+### D1 — Build the evaluator, buy the solver
+
+**The question.** Meng had planned to call an external symbolic evaluator such as Rosette, as a backend under `l4 verify` or elsewhere, and expects the query planner to evolve on top of symbolic evaluation: buy or build?
+**RULED 2026-10-01 (HOMEBREW, in chat, 11:42Z).** The ruling, as stated when the word was fired:
+
+1. The symbolic evaluator is built natively in `jl4-core`; it is the lift §4 defines.
+2. The solver is bought: z3 as a subprocess, driven by SMT-LIB2, as R-V6 already decided for `l4 prove` (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:370`, "Emit SMT-LIB2 text; shell to a `z3` subprocess; no Haskell solver dependency").
+3. One lowering, from the residual term language (§4.2) to SMT-LIB2, serves two consumers: the query planner's arithmetic atoms, and `l4 prove` / `l4 verify`.
+4. Rosette is not a backend; it is at most an optional cross-check oracle in testing, as `catala proof` is planned to be for `l4 prove`.
+
+**The hedge, part of the ruling:** keep the residual term language close to SMT-LIB (§4.2's table), so that swapping z3 for cvc5, or adding Rosette later for synthesis, is a change to the lowering and not a redesign.
+**What decided it.** One semantics, not two: a Rosette backend lowers L4 into Racket, a second implementation of laziness, left-to-right error order, the regulative and temporal machinery, and `TYPICALLY` with its presumption switch, and this bench found that class of drift repeatedly, between the ladder's TypeScript evaluator and the Haskell one (§3.4), between `l4 batch` and `l4 run` (§4.9), in OpenFisca asserting a different default (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §2) and in FEEL's `if` taking the else arm on `null` (U1b); the native lift is conservative by construction (§4.3). Rosette's own architecture is a symbolic VM plus z3, and the VM is the half that must carry L4's semantics exactly, so the solver is the semantics-neutral half worth buying. The consumers run in-process, per request in `jl4-service`: the planner, the wizard, the ladder, traces that cite source lines, residuals printed as L4; a Racket runtime would be a new dependency for the service and the NixOS hosts. The lowering shrinks from all of L4 to the term language of §4.2. The planner evolves from a diagram over the ladder's static tree to planning over what is still unknown after each answer, with the solver settling `age >= 18` and `age < 65` from one answer, which closes the independence gap U1b and U3b record. Rosette would win only for solver-aided programming beyond checking, synthesis of holes or angelic execution, none of which is on the roadmap. The Rosette claims in this entry are recalled; the three Guide quotations in §4.10 are the only ones verified today.
+**What it changes.** U3b's numeric count stops being the trigger for whether an SMT backend exists and remains the measurement of how much it is asked (§4.7.2); the §8 build order carries the lowering from step 4; `VERIFICATION-BACKEND-LOWERING-SPEC.md` R-V6 gains a paragraph saying its input now includes the residual term language.
+**What it costs.** A `z3` binary on every host that runs `jl4-service` with the planner, discovered as R-V6 says (`Z3_EXE`, then `PATH`), and a named degradation when it is absent.
+
 ---
 
 ## 10. What this spec did not verify
@@ -776,8 +891,9 @@ Its condition is met: U1 and U7 are both accepted. The answer is recorded in `sp
 - §3.3's statement that two calls to one function share one planner atom follows from the atom being keyed by `nm.unique`; whether `nm` is the callee or the call was not checked, and it is outside this spec.
 - Nothing in §4–§8 has been built or timed.
 - `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, which U8 and U9 cite for their full text, is on branch `spec/typically-unify` (worktree `l4wt/typically-unify`, read at `b10f65203`) and not on this branch or on `unstable`; whichever of the two specs merges second must carry the cross-reference.
-- Two `TYPICALLY` probe results are recorded in §4.11 row 53 and not explained here: a section `GIVEN … TYPICALLY TRUE` read directly by a `#EVAL` in its own section is stuck on the input (probes `p14-typically.l4`, `p18-typ-single.l4`), while the same input read through a rule in the section takes its default (probe `p19-typ-rule.l4`); the census in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §2 records the second case as "honoured". The cause was not traced.
+- Two `TYPICALLY` probe results are recorded in §4.12 row 53 and not explained here: a section `GIVEN … TYPICALLY TRUE` read directly by a `#EVAL` in its own section is stuck on the input (probes `p14-typically.l4`, `p18-typ-single.l4`), while the same input read through a rule in the section takes its default (probe `p19-typ-rule.l4`); the census in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §2 records the second case as "honoured". The cause was not traced.
 - The literature attributions in §4.10 (Kleene 1952, McCarthy, King 1976, van Fraassen 1966, Jones, Gomard and Sestoft 1993) are from memory of the standard references and were not re-read today.
 - Whether `verdict.test.ts` already carries an `IMPLIES` case, which U10b extends, was not checked.
+- Of the Rosette claims in §4.10, §4.11 and D1, only the passages quoted from the Rosette Guide (§7.1, §7.2.1 and the Essentials chapter, read 2026-10-01) are verified; term hash-consing, `ite` merging for solvable types and z3 as the default solver are recalled. The PLDI 2014 PDF returned 404 at `homes.cs.washington.edu/~emina/pubs/rosette.pldi14.pdf`, and `klee-se.org/docs/options/` did not show KLEE's budget options, so those are recalled too.
 - The guard-idiom count: one line-level `grep` over the 809 `.l4` files under `jl4/examples`, `jl4-core/libraries` and `doc` found no `isJust`/`isNothing` guard and no `AND … DIVIDED` on one line, and five lines with a non-zero guard before an `AND`; a guard split across lines is invisible to it.
   Left-sequential evaluation (U1) preserves every such guard whether or not it was found, which is why the count is not load-bearing.

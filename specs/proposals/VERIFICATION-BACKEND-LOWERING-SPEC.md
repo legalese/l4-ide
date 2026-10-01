@@ -390,6 +390,11 @@ emitter sits behind an interface narrow enough that an `sbv` implementation is a
 pivot is a swap of one module, not a rewrite — and the emitter must not leak subprocess assumptions
 into the lowering. See §"Deferred obligations" D3.
 
+**Input widened 2026-10-01 (D1, HOMEBREW; `specs/todo/UNKNOWN-EVALUATION-SPEC.md` §9 D1, §4.2, §4.7.3).**
+The lowering's input now includes the evaluator's residual term language (#526 §4.2): the Boolean residual a lifted evaluation leaves at its root, each atom's term, and the guards of its error and give-up leaves as named side conditions.
+One lowering from that language to SMT-LIB2 serves both `l4 prove` and the query planner's arithmetic atoms, and the term language is kept close to SMT-LIB2 so that swapping z3 for cvc5 stays a change to this emitter.
+Nothing else in this ruling changes.
+
 ### R-V7 — Encode rounding, modulo and dates exactly; reject transcendentals by name. ANSWERED 2026-09-07.
 
 `BOOLEAN` → `Bool`; `NUMBER` → `Real`, which is **faithful** rather than approximate because L4
