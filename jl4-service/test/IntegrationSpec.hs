@@ -751,6 +751,41 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
 
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input or a field left out takes its default, a name that matches
+    -- nothing is refused, naming the nearest; elsewhere it is ignored.
+    it "refuses an unknown argument where a default is taken, and ignores it elsewhere" do
+      withServiceFromSources "ty-typo" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        typo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capasity" Aeson..= False])
+        expectError typo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        wrappedTypo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capasity" Aeson..= False])
+        expectError wrappedTypo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        nothingTaken <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False, "has capasity" Aeson..= True])
+        expectAnswer nothingTaken (FnLitBool False) []
+      withServiceFromSources "ty-typo-rec" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "shade" Aeson..= ("Green" :: Text)])
+        expectError direct "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+        full <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args [ "cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= (5 :: Int), "colour" Aeson..= ("Red" :: Text), "timout" Aeson..= (1 :: Int)]
+                , "shade" Aeson..= ("Green" :: Text) ])
+        expectAnswer full (FnLitInt 7) []
+      withServiceFromSources "ty-typo-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        wrapped <- evalFunction baseUrl mgr "ty-typo-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "unused flag" Aeson..= uncertain])
+        expectError wrapped "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on
+    -- a record input is null, so it is refused by name, as in l4 batch.
+    it "refuses {} on a record input by name" do
+      withServiceFromSources "ty-rec-empty" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rec-empty" "budget"
+          (args ["cfg" Aeson..= Aeson.object [], "unused flag" Aeson..= False])
+        expectError resp "Field 'cfg' is {}, which means the value is not known: supply a value"
+
     -- Review code #3: the "took its default" registry is per evaluation, so
     -- concurrent requests on one cached deployment cannot see each other's.
     it "keeps presumed apart across concurrent requests" do

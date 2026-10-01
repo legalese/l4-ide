@@ -15,11 +15,15 @@ module L4.Presumption
   , fillDecision
   , withheldText
   , nullRefusalText
+  , unrecognisedMessage
+  , nearestName
   , requestRecordName
   ) where
 
-import Data.Maybe (isJust)
+import Data.List (sortOn)
+import Data.Maybe (isJust, listToMaybe)
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 -- | What a request said about an input or a field: nothing (the key is
 -- absent), "not known" (@null@, or @{}@, which T3 reads as @null@), or a
@@ -85,6 +89,42 @@ nullRefusalText spelling hasDefault =
     <> (if hasDefault
           then ", and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"
           else ": supply a value")
+
+-- | The refusal of names that match nothing a request may supply, in an
+-- object where something left out took its default (review M1, decided
+-- overnight 2026-10-02, pending Meng's review: spec §4.1). A misspelled key
+-- used to be loud, because the input it misspelled was then missing; once
+-- that input has a default, ignoring the key makes the misspelling take the
+-- default with status success. So where a default is filled, a name that
+-- matches nothing is refused, naming it and the nearest declared name; where
+-- none is, an unknown name is ignored as before (Postel).
+--
+-- Each name comes with the nearest declared one ('nearestName'), both as the
+-- message should show them (a path, for a field).
+unrecognisedMessage :: Text -> [(Text, Maybe Text)] -> Text
+unrecognisedMessage noun names =
+  "Unknown " <> noun <> (case names of [_] -> ""; _ -> "s") <> " "
+    <> Text.intercalate ", " (map one names)
+    <> ". Something left out beside it takes its TYPICALLY default, so a name"
+    <> " that matches nothing is refused rather than ignored, in case it misspells"
+    <> " the one left out"
+  where
+    one (k, near) = "'" <> k <> "'" <> maybe "" (\ n -> " (did you mean '" <> n <> "'?)") near
+
+-- | The declared name nearest to an unknown one, by edit distance ignoring
+-- case; the earlier-declared on a tie. 'Nothing' only when nothing is declared.
+nearestName :: Text -> [Text] -> Maybe Text
+nearestName k candidates =
+  fst <$> listToMaybe (sortOn snd [ (c, editDistance (Text.toLower k) (Text.toLower c)) | c <- candidates ])
+
+editDistance :: Text -> Text -> Int
+editDistance a b = last (foldl' step [0 .. length bs] (Text.unpack a))
+  where
+    bs = Text.unpack b
+    step prev x = case prev of
+      p : ps -> scanl (cell x) (p + 1) (zip3 bs prev ps)
+      []     -> []
+    cell x left (y, diag, up) = minimum [left + 1, up + 1, diag + (if x == y then 0 else 1)]
 
 -- | The record the request's own arguments are decoded into, by every
 -- wrapper that decodes them (@l4 batch@'s and the service's). The decoder

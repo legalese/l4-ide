@@ -646,12 +646,25 @@ nonMaybeValue mi ctx path ty = \case
         -- left out takes its TYPICALLY, or a MAYBE NOTHING, while presumption
         -- is soft (T1b); one that nothing fills is refused, by its path.
         let fieldMap = Map.fromList fields
-        argExprs <- forM decl $ \(fname, fty0, mDefault) -> do
-          let fieldPath = path <> [fname]
-              fieldTxt  = "field '" <> Eval.renderPresumedPath fieldPath <> "'"
-              fty       = expandSyn mi fty0
-              given     = maybe Absent suppliedValue (Map.lookup fname fieldMap)
-          case fillDecision ctx.fcSoft (isJust (stripMaybe fty)) mDefault given of
+            decided =
+              [ (fname, fty, fieldPath, fillDecision ctx.fcSoft (isJust (stripMaybe fty)) mDefault given)
+              | (fname, fty0, mDefault) <- decl
+              , let fieldPath = path <> [fname]
+                    fty       = expandSyn mi fty0
+                    given     = maybe Absent suppliedValue (Map.lookup fname fieldMap)
+              ]
+            -- where a field left out takes its default, a key that matches no
+            -- field is refused, as the JSON decoder refuses it (review M1;
+            -- decided overnight 2026-10-02, pending Meng's review)
+            declNames = [ f | (f, _, _) <- decl ]
+            unknown   = [ k | (k, _) <- fields, k `notElem` declNames ]
+            pathTo k  = Eval.renderPresumedPath (path <> [k])
+            tookDefault = or [ True | (_, _, _, UseDefault _) <- decided ]
+        when (tookDefault && not (null unknown)) $
+          fillError (unrecognisedMessage "field" [ (pathTo k, pathTo <$> nearestName k declNames) | k <- unknown ])
+        argExprs <- forM decided $ \(fname, fty, fieldPath, decision) -> do
+          let fieldTxt  = "field '" <> Eval.renderPresumedPath fieldPath <> "'"
+          case decision of
             UseDefault d                   -> rootFill ctx fieldPath d
             UseNothing                     -> rootFill ctx fieldPath nothingExpr
             NullIsNothing                  -> pure nothingExpr
@@ -711,6 +724,36 @@ inputDefaults m decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ _) =
     binders = sectionBinders m
     nameText r = rawNameToText (rawName (getActual r))
 
+-- | Where an input left out of the request takes its default (presumption
+-- soft), an argument that names no input is refused, naming it and the
+-- nearest input, rather than ignored: it may misspell the input left out,
+-- which would otherwise take its default with no error (review M1; decided
+-- overnight 2026-10-02, pending Meng's review, spec §4.1). Where no default is
+-- taken, an unknown argument is ignored as before. Checked once for the
+-- request's top level on every path; the decoders check the records inside.
+refuseUnknownArguments
+  :: Monad m
+  => Presumption
+  -> Map Text (Expr Resolved)   -- ^ the defaults a request may leave an input out for
+  -> [Text]                     -- ^ the inputs, in declaration order
+  -> [(Text, Maybe FnLiteral)]
+  -> ExceptT EvaluatorError m ()
+refuseUnknownArguments presumption defaults inputs params =
+  when (tookDefault && not (null unknown)) $
+    throwError $ InterpreterError $
+      unrecognisedMessage "parameter" [ (k, nearestName k inputs) | k <- unknown ]
+  where
+    given       = map fst params
+    tookDefault = presumption == PresumeSoft && any (`notElem` given) (Map.keys defaults)
+    unknown     = [ k | k <- given, k `notElem` inputs ]
+
+-- | A function's inputs in declaration order: its GIVENs, then the ASSUMEs
+-- (section GIVENs included) it reads.
+inputNames :: Module Resolved -> Decide Resolved -> [Text]
+inputNames m decide =
+  map fst (extractParamTypes decide)
+    <> [ rawNameToText (rawName (getActual r)) | (r, _) <- extractAssumeParamResolveds m decide ]
+
 -- | Every input name a function takes: its GIVENs and the ASSUMEs (section
 -- GIVENs included) it reads.
 functionInputs :: CompiledModule -> Set.Set Text
@@ -760,6 +803,10 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
       assumeRefs = extractAssumeParamResolveds compiled.compiledModule compiled.compiledDecide
       assumeNameOf r = rawNameToText (rawName (getActual r))
       assumeValues = [(assumeNameOf r, join $ Map.lookup (assumeNameOf r) inputMap) | (r, _) <- assumeRefs]
+
+  refuseUnknownArguments presumption
+    (inputDefaults compiled.compiledModule compiled.compiledDecide)
+    (inputNames compiled.compiledModule compiled.compiledDecide) params
 
   -- Fall back to the wrapper path only for values the direct path can't express
   -- as AST (FnObject / FnUncertain / FnUnknown / missing non-MAYBE). ASSUMEs
@@ -882,6 +929,10 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
       (binderParamTypes0, assumeParamTypes) = splitAssumeParams compiled.compiledModule compiled.compiledDecide
       plan = wrapperPlan presumption compiled.compiledModule compiled.compiledDecide params
                (givenParamTypes, binderParamTypes0, assumeParamTypes)
+
+  refuseUnknownArguments presumption
+    (inputDefaults compiled.compiledModule compiled.compiledDecide)
+    (inputNames compiled.compiledModule compiled.compiledDecide) params
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson plan.wpArguments
@@ -1206,7 +1257,9 @@ fnLiteralToJson = \case
   FnLitString s -> Aeson.String s
   FnArray arr -> Aeson.Array (Vector.fromList (map fnLiteralToJson arr))
   FnObject fields -> Aeson.object [(Aeson.fromText k, fnLiteralToJson v) | (k, v) <- fields]
-  FnUncertain -> Aeson.Null
+  -- {} means "not known" as null does (T3), records included (review M2),
+  -- and is sent as itself so that a refusal says what the request sent
+  FnUncertain -> Aeson.object []
   FnUnknown -> Aeson.Null
 
 -- | Handle evaluation result, checking for decode failure sentinel
@@ -1304,6 +1357,8 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                     (binderParamTypes0, assumeParamTypes) = splitAssumeParams tcRes.module' funDecide
                     plan = wrapperPlan presumption tcRes.module' funDecide params'
                              (givenParamTypes, binderParamTypes0, assumeParamTypes)
+                refuseUnknownArguments presumption (inputDefaults tcRes.module' funDecide)
+                  (inputNames tcRes.module' funDecide) params'
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting

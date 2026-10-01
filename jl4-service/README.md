@@ -165,7 +165,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 
 #### Missing and uncertain inputs
 
-An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`.
+An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`, whatever its type, a record's included.
 The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an absent input can take a default, and a `null` one never does.
 
 **Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
@@ -175,6 +175,7 @@ A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same 
 A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
+**A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
 `null` is "not known" on every input that is not a `MAYBE`, whatever its type, so it is refused by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`.
 For this rule:
 

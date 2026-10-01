@@ -4578,8 +4578,9 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                   fieldNamesAndTypes <- extractFieldNamesAndTypes conType
                   case jsonValue of
                     Aeson.Object obj -> do
-                      -- Decode each field from the JSON object WITH TYPE INFORMATION
-                      -- Note: We ignore extra fields in the JSON (Postel's Law)
+                      -- Decode each field from the JSON object WITH TYPE INFORMATION.
+                      -- Extra fields are ignored (Postel's Law), except in an
+                      -- object where a field took its default (below).
                       -- The presumption switch reaches the request's own
                       -- decode only; a decode the rules make always fills its
                       -- defaults, because no request can supply them (T4b).
@@ -4591,11 +4592,24 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                       fields <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
                         -- a synonym for MAYBE is a MAYBE: expand before deciding
                         fieldType <- expandTypeSynonyms fieldType0
-                        given <- suppliedField fieldType (KeyMap.lookup (Key.fromText fieldName) obj)
-                        let fieldAt  = at { fieldPath = at.fieldPath <> [fieldName] }
+                        let given = suppliedField (KeyMap.lookup (Key.fromText fieldName) obj)
+                            fieldAt  = at { fieldPath = at.fieldPath <> [fieldName] }
                             mDefault = Map.lookup fieldName defaults >>= \ d -> (d,) <$> typicallyLiteralValue d
                             decision = fillDecision presumeOn (isMaybeFieldTy fieldType) mDefault given
                         pure (fieldType, fieldAt, given, decision)
+                      -- Where a field left out takes its default, a key that
+                      -- matches no field is refused, naming it and the nearest
+                      -- field, rather than ignored: it may misspell the one left
+                      -- out, which would otherwise take the default with no
+                      -- error (review M1; decided overnight 2026-10-02, pending
+                      -- Meng's review, spec §4.1).
+                      let fieldNames = map fst fieldNamesAndTypes
+                          tookDefault = or [ True | (_, _, _, UseDefault _) <- fields ]
+                          unknown = [ Key.toText k | k <- KeyMap.keys obj, Key.toText k `notElem` fieldNames ]
+                          pathTo k = renderPresumedPath (at.fieldPath <> [k])
+                      when (tookDefault && not (null unknown)) $
+                        userException $ UserError $ unrecognisedMessage "field"
+                          [ (pathTo k, pathTo <$> nearestName k fieldNames) | k <- unknown ]
                       -- Every field that is absent and that nothing fills,
                       -- named together, so that one run names them all (as
                       -- @l4 batch --validate-only@ does), rather than the
@@ -4658,40 +4672,19 @@ missingFieldsMessage = \ case
   fs -> "Missing required fields " <> Text.intercalate ", " [ "'" <> f <> "'" <> why | (f, why) <- fs ]
           <> " in JSON object"
 
--- | Whether the decoder builds this type, under any MAYBEs, from a JSON
--- object: a type whose constructor bears its name and takes fields.
-isRecordType :: Type' Resolved -> Machine Bool
-isRecordType = \ case
-  TyApp _ maybeRef [inner]
-    | nameToText (TypeCheck.getName maybeRef) == "MAYBE" -> isRecordType inner
-  TyApp _ tyRef [] -> do
-    entityInfo <- getEntityInfo
-    pure $ case Map.lookup (getUnique tyRef) entityInfo of
-      Nothing -> False
-      Just (typeNameRef, _) ->
-        or [ True
-           | (_, (name, TypeCheck.KnownTerm conType Constructor)) <- Map.toList entityInfo
-           , nameToText (TypeCheck.getName name) == nameToText (TypeCheck.getName typeNameRef)
-           , takesFields conType
-           ]
-  _ -> pure False
-  where
-    takesFields = \ case
-      Forall _ _ t -> takesFields t
-      Fun {}       -> True
-      _            -> False
-
--- | What an object says about one field ('L4.Presumption.Supplied'). @{}@ on
--- a field that is not a record means "not known", exactly like @null@ (T3);
--- on a record field it is a record that supplies nothing.
-suppliedField :: Type' Resolved -> Maybe Aeson.Value -> Machine (Supplied Aeson.Value)
-suppliedField fieldType = \ case
-  Nothing          -> pure Absent
-  Just Aeson.Null  -> pure (SuppliedNull "null")
-  Just v@(Aeson.Object o) | KeyMap.null o -> do
-    isRecord <- isRecordType fieldType
-    pure (if isRecord then Supplied v else SuppliedNull "{}")
-  Just v           -> pure (Supplied v)
+-- | What a JSON value says about a field or a list element
+-- ('L4.Presumption.Supplied'). @{}@ means "not known", exactly like @null@
+-- (T3), whatever the type, a record's included: so it never takes a default,
+-- and on a record that is not a MAYBE it is refused, naming the field (review
+-- M2; decided overnight 2026-10-02, pending Meng's review, spec §4.1). Only a
+-- whole object decoded at the root, such as a batch row @{}@, is a record
+-- that supplies nothing.
+suppliedField :: Maybe Aeson.Value -> Supplied Aeson.Value
+suppliedField = \ case
+  Nothing                                -> Absent
+  Just Aeson.Null                        -> SuppliedNull "null"
+  Just (Aeson.Object o) | KeyMap.null o  -> SuppliedNull "{}"
+  Just v                                 -> Supplied v
 
 -- | A type with its synonyms expanded at the head, as far as they go. The
 -- checker records a synonym's body on its 'TypeCheck.KnownType'; a
@@ -4732,8 +4725,17 @@ jsonListToWHNFTyped :: DecodeAt -> [Aeson.Value] -> Type' Resolved -> Machine WH
 jsonListToWHNFTyped at = go (0 :: Int)
   where
     go _ [] _elementType = pure ValNil
-    go i (x:xs) elementType = do
-      headVal <- jsonValueToWHNFTyped at { fieldPath = at.fieldPath <> ["[" <> Text.pack (show i) <> "]"] } x elementType
+    go i (x:xs) elementType0 = do
+      let elementAt = at { fieldPath = at.fieldPath <> ["[" <> Text.pack (show i) <> "]"] }
+      -- An element is a value, so @null@ and @{}@ are "not known" there too
+      -- (T3): NOTHING in a list of MAYBEs, refused by its path otherwise.
+      elementType <- expandTypeSynonyms elementType0
+      headVal <- case suppliedField (Just x) of
+        SuppliedNull spelling
+          | isMaybeFieldTy elementType -> pure (ValConstructor TypeCheck.nothingRef [])
+          | otherwise -> userException $ UserError $
+              "Field '" <> renderPresumedPath elementAt.fieldPath <> "' " <> nullRefusalText spelling False
+        _ -> jsonValueToWHNFTyped elementAt x elementType
       headRef <- allocateValue headVal
       tailVal <- go (i + 1) xs elementType
       tailRef <- allocateValue tailVal

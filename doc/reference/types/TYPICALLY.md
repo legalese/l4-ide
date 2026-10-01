@@ -100,14 +100,19 @@ out any fact that has a default, whether the `TYPICALLY` is on a section
 `GIVEN`, on the exported rule's own `GIVEN`, or on a field of a record the rule
 takes as an input. The default is filled in where the case arrives, and the
 answer lists it under **`presumed`**, by name (or, for a field, by its path, such
-as `config.timeout`) — but only if the answer actually used it. Three rules
+as `config.timeout`) — but only if the answer actually used it. These rules
 govern what counts as leaving a fact out:
 
 - **Leaving the name out** is leaving it out. So is an empty cell in a CSV file
   given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
   and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
-  takes its default: the case is refused, naming the fact.
+  takes its default: the case is refused, naming the fact. `{}` means the same,
+  for a record too.
+- **A name that matches nothing is refused where a default is taken.** In a
+  case that leaves out a fact with a default, a name that is not a fact is
+  refused, naming the nearest one, since it may misspell the fact left out.
+  Where no default is taken, it is ignored.
 - **The presumption can be switched off.** `l4 batch --presumption hard`, or
   `"presumption": "hard"` in a service request, uses no defaults: a fact left
   out is missing, and the case is refused, naming it. The default is `soft`.

@@ -143,7 +143,8 @@ batchTyExact         = fixtureDir </> "batch-typically-exact.l4"
 batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson
   , batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
-  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson :: FilePath
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
+  , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson :: FilePath
 batchTyOmitted    = fixtureDir </> "batch-typically-omitted.json"
 batchTySupplied   = fixtureDir </> "batch-typically-supplied.json"
 batchTyNull       = fixtureDir </> "batch-typically-null.json"
@@ -163,6 +164,11 @@ batchTyStringCsv     = fixtureDir </> "batch-typically-string.csv"
 batchTyOwnDecodeJson = fixtureDir </> "batch-typically-own-decode.json"
 batchTyEnumJson      = fixtureDir </> "batch-typically-enum.json"
 batchTyExactJson     = fixtureDir </> "batch-typically-exact.json"
+batchTyRaggedCsv     = fixtureDir </> "batch-typically-ragged.csv"
+batchTyTypoCsv       = fixtureDir </> "batch-typically-typo.csv"
+batchTyTypoJson      = fixtureDir </> "batch-typically-typo.json"
+batchTyRecordTypoJson  = fixtureDir </> "batch-typically-record-typo.json"
+batchTyRecordEmptyJson = fixtureDir </> "batch-typically-record-empty.json"
 
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
@@ -326,6 +332,7 @@ coreFixtures =
   , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
   , batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact
   , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
+  , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
@@ -1354,7 +1361,10 @@ spec bin = do
 
     -- T3c: a quoted "" is a row whose one cell is empty, so absent; cassava's
     -- own decoder drops it as if it were a blank line (two rows in, one out,
-    -- exit 0). A blank line is still not a row, and a cell of spaces is empty.
+    -- exit 0). A quoted "   " is a row too, its cell of spaces empty. A blank
+    -- line is not a row, and neither is an unquoted line of spaces, in a
+    -- one-column file too (review M4, decided overnight 2026-10-02, pending
+    -- Meng's review): the fixture's `   ` line is skipped.
     it "evaluates a one-column CSV row whose only cell is \"\"" $ do
       Output code sout _ <- runL4 bin ["batch", batchTyOneCol, "--inputs", batchTyOneColCsv, "--format", "json"]
       code `shouldBe` ExitSuccess
@@ -1364,6 +1374,53 @@ spec bin = do
         , (Just (Bool False), presumedOf [])
         , (Just (Bool True), presumedOf ["has capacity"])
         ]
+
+    -- Review M4 (decided overnight 2026-10-02, pending Meng's review): a short
+    -- row used to take the defaults of its missing cells, and a long one lost
+    -- its extra cells, both with status success. A line of a tab and a space
+    -- is blank, so it is skipped and still counted.
+    it "refuses a CSV record whose cell count is not the header's, naming its line" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyRaggedCsv, "--format", "json", "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "success"), Just (String "error"), Just (String "error")]
+      sout `shouldSatisfy` ("Line 3 has 1 cell, but the header has 2" `isInfixOf`)
+      sout `shouldSatisfy` ("Line 5 has 3 cells, but the header has 2" `isInfixOf`)
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyRaggedCsv, "--validate-only", "--continue-on-error"]
+      vout `shouldSatisfy` ("Line 3 has 1 cell" `isInfixOf`)
+
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input left out takes its default, a key that matches no input is
+    -- refused, naming it and the nearest input, in a CSV header, a JSON row
+    -- and a nested record, and --validate-only agrees. Where nothing took a
+    -- default, an unknown key is still ignored (row 2 of the JSON fixture).
+    it "refuses an unknown key where a default is filled, and ignores it elsewhere" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoCsv]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Unknown field 'has capasity' (did you mean 'has capacity'?)" `isInfixOf`)
+      Output _ jout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoJson, "--format", "json", "--continue-on-error"]
+      jrows <- decodeArray jout
+      map (`objField` "status") jrows `shouldBe` [Just (String "error"), Just (String "success"), Just (String "success")]
+      map resultAndPresumed (drop 1 jrows) `shouldBe` [ (Just (Bool False), presumedOf []), (Just (Bool True), presumedOf ["has capacity"]) ]
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoJson, "--validate-only", "--format", "json", "--continue-on-error"]
+      vrows <- decodeArray vout
+      map (`objField` "status") vrows `shouldBe` [Just (String "invalid"), Just (String "valid"), Just (String "valid")]
+      Output _ rout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordTypoJson, "--format", "json", "--continue-on-error"]
+      rrows <- decodeArray rout
+      map (`objField` "status") rrows `shouldBe` [Just (String "error"), Just (String "success")]
+      rout `shouldSatisfy` ("Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)" `isInfixOf`)
+      Output _ rvout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordTypoJson, "--validate-only", "--format", "json", "--continue-on-error"]
+      rvrows <- decodeArray rvout
+      map (`objField` "status") rvrows `shouldBe` [Just (String "invalid"), Just (String "valid")]
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on a
+    -- record input is null too, so it is refused by name; it used to be a
+    -- record that supplied nothing in batch and null on the service.
+    it "reads {} on a record input as null, and refuses it by name" $ do
+      Output _ sout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordEmptyJson, "--format", "json", "--continue-on-error"]
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success")]
+      sout `shouldSatisfy` ("Field 'cfg' is {}, which means the value is not known: supply a value" `isInfixOf`)
 
     it "takes every default for a JSON row {} that supplies nothing" $ do
       env <- jsonEnvelope bin ["batch", batchTyOneCol, "--inputs", batchTyEmptyRow]
