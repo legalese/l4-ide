@@ -6,7 +6,7 @@ Differences from the source spec: the CLI is `l4 batch FILE --inputs PATH`, not 
 The work came from `unstable`; this page describes only what `main` has.
 Line numbers are in this PR's tree, on `main` at `00298eb60`.
 
-Source: PR #47 (`tier2/batch-processing`; branch commits `582b956c6`, `291cd0051`; batch merge `eeb432e7d`, landed on unstable through #77), for the third commit of this PR, #625 (`0af1211a7` on unstable), which makes `l4 batch` read each value by the type its input declares, and for the tests, fixtures and `doc/` text of the fourth, #632 (merge `3fa87dee6` on unstable), with the blank-cell reading of the ruling T3c adapted to `main` (see below), and, for the fourth commit's CSV reader, unstable's `csvRows` (a ruling, below), and #635 (`af06ea470` on unstable) for a CSV cell for a choice or a date, and #646 (`78f1268af` on unstable) for the line named in a CSV error, the unclosed quote, and the synonym inputs.
+Source: PR #47 (`tier2/batch-processing`; branch commits `582b956c6`, `291cd0051`; batch merge `eeb432e7d`, landed on unstable through #77), for the third commit of this PR, #625 (`0af1211a7` on unstable), which makes `l4 batch` read each value by the type its input declares, and for the tests, fixtures and `doc/` text of the fourth, #632 (merge `3fa87dee6` on unstable), with the blank-cell reading of the ruling T3c adapted to `main` (see below), and, for the fourth commit's CSV reader, unstable's `csvRows` (a ruling, below), and #635 (`af06ea470` on unstable) for a CSV cell for a choice or a date, and #646 (`78f1268af` on unstable) for the line named in a CSV error, the unclosed quote, and the synonym inputs, and, for the exact quoting of a row in the wrapper, #51 and #632 (`cli-quoting.md`).
 The `batch` verb existed before #47 (`74efdc5d7`, 2026-04-12), and `main` already had it; #47 completed it: output formats, `--output`, `--continue-on-error`, `--validate-only`, CSV type inference, and runtime exceptions counted as row failures.
 Spec history: `BATCH-PROCESSING-SPEC.md` was added as `doc/todo/…` by `18215e82d` (2025-12-12), moved to `specs/todo/` by `09fbfd41f` (smucclaw/l4-ide#730), and on unstable moved to `specs/done/` by `b4469830a` (PR #85), whose status line names PR #47.
 `specs/todo/batch-json-output.md` (moved to `done/` on unstable by `ba95f0cdc`, "#46") specifies the JSON encoding of result values, which predates #47; it is not this PR's spec.
@@ -20,13 +20,13 @@ Each row yields a result envelope; by default the envelopes stream out as NDJSON
 ## Where it lives
 
 - `jl4/app/L4/Cli/Batch.hs` (878 lines); wired as the `batch` command at `jl4/app/Main.hs:72-78` and dispatched at `:125`.
-- Options: `BatchOptions` and `batchOptionsParser` (`Batch.hs:100-168`); `OutputFormat` = `FmtNdjson | FmtJson | FmtCsv | FmtYaml` (`:92-98`).
-- Driver: `batchCmd` (`:174-245`); row loops `streamRows` (`:260-280`) and `bufferRows` (`:282-300`); per-row `processRow` (`:302-373`), whose first clause answers a refused CSV record (`:316`).
-- Input: `BatchRow` and `RowSource` (`:462-475`), `parseBatchInput` (`:477-514`), `declareInputs` with `declaredInputs`, `expandSynonyms`, `throughMaybe`, `typeSynonyms`, `moduleDeclares`, `allDependencies`, `jsonNumber` and `jsonBool` (`:516-627`), the CSV reader `CsvRow` and `csvRows` (`:629-721`) with `unclosedQuote` (`:723-760`), and `inferCsvCell` (`:762-785`).
+- Options: `BatchOptions` and `batchOptionsParser` (`Batch.hs:101-169`); `OutputFormat` = `FmtNdjson | FmtJson | FmtCsv | FmtYaml` (`:93-99`).
+- Driver: `batchCmd` (`:175-246`); row loops `streamRows` (`:261-281`) and `bufferRows` (`:283-301`); per-row `processRow` (`:303-374`), whose first clause answers a refused CSV record (`:317`).
+- Input: `BatchRow` and `RowSource` (`:463-476`), `parseBatchInput` (`:478-515`), `declareInputs` with `declaredInputs`, `expandSynonyms`, `throughMaybe`, `typeSynonyms`, `moduleDeclares`, `allDependencies`, `jsonNumber` and `jsonBool` (`:517-628`), the CSV reader `CsvRow` and `csvRows` (`:630-722`) with `unclosedQuote` (`:724-761`), and `inferCsvCell` (`:763-786`).
 - `jl4-core/src/L4/EvaluateLazy/Machine.hs:1540-1569`: `expandTypeSynonyms` and `substituteTypeParams`, which `jsonValueToWHNFTyped` (`:1376-1538`) calls for a type and for each record field, so that a synonym decodes as what it stands for (#646).
-- Validation: `validateRow`, `primKind`, `unwrapMaybe` (`:386-441`).
-- Output: `writeBuffered`, `encodeJsonArray`, `encodeCsv`, `orderedEnvCols`, `flattenEnvelope` (`:791-852`).
-- Wrapper generation: `generateBatchWrapper` and helpers (`:868-943`); entrypoint choice `findExportFunction` (`:949-962`).
+- Validation: `validateRow`, `primKind`, `unwrapMaybe` (`:387-442`).
+- Output: `writeBuffered`, `encodeJsonArray`, `encodeCsv`, `orderedEnvCols`, `flattenEnvelope` (`:792-853`).
+- Wrapper generation: `generateBatchWrapper` and helpers (`:869-959`); the row's JSON is quoted into the wrapper by `escapeAsL4String` (`:917-936`), which `cli-quoting.md` describes; entrypoint choice `findExportFunction` (`:965-978`).
 
 ## Behaviour and rules
 
@@ -51,15 +51,15 @@ A STRING input keeps a non-blank CSV cell as the text written, so `123456`, `018
 Every other declared input keeps a non-blank CSV cell as the text written (#635): a choice named `True` receives the name and not a boolean, and a `DATE` receives `20261013` as text, so the decoder reports it as a bad date.
 Only a column that no input declares, and an input whose type the export does not give, is typed by content (`inferCsvCell`): `true`/`false` in any case become booleans, a cell containing `e` or `E` stays a string, and otherwise aeson's JSON number grammar decides, so `42` and `3.5` become numbers while `007`, `1,000` and `+5` stay strings.
 A JSON or YAML value for an input of another type is left alone.
-The typed case is what validation, the generated wrapper and the echoed `input` all see (`:373`).
+The typed case is what validation, the generated wrapper and the echoed `input` all see (`:374`).
 Entrypoint: `--entrypoint` names the export exactly; else the `@export default` function; else the first export; else the error `no @export functions found in module`.
 Parameters: the export's GIVENs become call arguments.
-Evaluation pipeline, read in code: the checked module goes through `filterIdeDirectives` (dropping every `#EVAL`/`#ASSERT`) and is re-emitted as source by `prettyLayout` (`:217-218`).
+Evaluation pipeline, read in code: the checked module goes through `filterIdeDirectives` (dropping every `#EVAL`/`#ASSERT`) and is re-emitted as source by `prettyLayout` (`:218-219`).
 A string literal in that printed source has its line breaks, tabs and carriage returns written as escapes (`escapeSourceStringLiteral`, `jl4-core/src/L4/Print.hs:896-901`, used at `:580`), because a raw newline would become a layout line break that takes the body's indentation (smucclaw/l4-ide#1028, from #595).
 Per row, a generated wrapper is appended to that text: `DECLARE InputArgs HAS …`, a `decodeArgs` function using `JSONDECODE`, `DECIDE inputJson IS "<row JSON>"`, and one `#EVAL` of `CONSIDER decodeArgs inputJson` applying the export.
-The combined text is registered as the virtual file `<FILE>.batch<N>.l4`, next to FILE, and evaluated with `Rules.EvaluateLazy` in a fresh one-shot build (`:344-350`).
+The combined text is registered as the virtual file `<FILE>.batch<N>.l4`, next to FILE, and evaluated with `Rules.EvaluateLazy` in a fresh one-shot build (`:345-351`).
 Envelope (evaluate mode): `{input, output, status, diagnostics}`; `output` is the array of directive results, e.g. `[{"result":20,"trace":null}]`.
-The status is `error` if the wrapper failed to check (then `output` is `null`) or any directive raised an evaluation exception, else `success` (`:351-369`).
+The status is `error` if the wrapper failed to check (then `output` is `null`) or any directive raised an evaluation exception, else `success` (`:352-370`).
 Envelope (`--validate-only`, no evaluation): `{input, status: valid|invalid, errors}`.
 Validation checks, on the typed case, that each required (non-`MAYBE`) parameter is present and non-null, and that NUMBER, BOOLEAN and STRING values (after unwrapping `MAYBE`) have the right JSON kind; compound types are not judged.
 Failure and exit: a row with status `error` or `invalid` is a failure, and so is a refused CSV record (below); without `-c` the run stops after emitting that row; with `-c` every row is processed; the exit code is 1 if any row failed, else 0.
@@ -69,34 +69,34 @@ Output: NDJSON is written and flushed row by row without keeping the list of env
 
 Fatal errors, printed to stdout (not stderr) before any row, with exit code 1: `Error: --input-format is required when the extension can't be inferred (e.g. reading from stdin)`, `Error: failed to parse inputs: <parser message>`, `Error: type checking failed` (after the check diagnostics), `Error: no @export function named '<n>' found`, `Error: no @export functions found in module`.
 An unknown `--format` is rejected by the option parser: `Invalid output format: <x> (expected ndjson|json|csv|yaml)`; an unknown `--input-format` surfaces as `Error: failed to parse inputs: Unsupported format: <x>`.
-Validation messages (`:386-414`): `Missing required field: '<p>'`, `Field '<p>' is null but required`, `Type mismatch for field '<p>': expected <KIND>, got <KIND>`, each followed by ` (<@desc text>)` when the parameter has one; and `Input record is not a JSON object: <kind>`.
+Validation messages (`:387-415`): `Missing required field: '<p>'`, `Field '<p>' is null but required`, `Type mismatch for field '<p>': expected <KIND>, got <KIND>`, each followed by ` (<@desc text>)` when the parameter has one; and `Input record is not a JSON object: <kind>`.
 
 ## Tests and fixtures that pin it
 
-- From #47: `jl4/tests-cli/Main.hs:423-511` (NDJSON default, CSV cells typed by declared type, `--format json`, `--format csv`, `--output`, stop-on-error, `--continue-on-error`, `--validate-only`, an exponent cell kept as a string, `MAYBE` validation at `:708`); the case at `:697`, a line break and a tab inside a string literal, is #595's, and the nested `describe "reads a value by the type its input declares"` at `:724-874` is #625's, with #635's, #632's and #646's cases added to it.
-- From #625 (`:724-780`): text for a NUMBER or BOOLEAN input is read as a number or boolean in JSON and in YAML and passes `--validate-only`; a CSV cell for a STRING input keeps the text written (`123456`, `018956`, `1.50`, `1e3`); a JSON number for a STRING input is still an error; text that is not a number is left alone, so the error names it.
-- From #635 (`:782-813`): a CSV cell for a choice input is the name written (`True`), also for a `MAYBE` choice with a blank cell left out; a cell for a `DATE` input is text, so `20261013` is reported as a bad date; a synonym of NUMBER or BOOLEAN is still read as one (a pin, not a regression test) (fixtures `batch-declared-text.l4`, `batch-declared-text-answers.csv`, `-optional.csv`, `-dates.csv`, `-synonyms.csv`).
+- From #47: `jl4/tests-cli/Main.hs:430-518` (NDJSON default, CSV cells typed by declared type, `--format json`, `--format csv`, `--output`, stop-on-error, `--continue-on-error`, `--validate-only`, an exponent cell kept as a string, `MAYBE` validation at `:721`); the case at `:710`, a line break and a tab inside a string literal, is #595's, and the nested `describe "reads a value by the type its input declares"` at `:808-958` is #625's, with #635's, #632's and #646's cases added to it.
+- From #625 (`:808-864`): text for a NUMBER or BOOLEAN input is read as a number or boolean in JSON and in YAML and passes `--validate-only`; a CSV cell for a STRING input keeps the text written (`123456`, `018956`, `1.50`, `1e3`); a JSON number for a STRING input is still an error; text that is not a number is left alone, so the error names it.
+- From #635 (`:866-897`): a CSV cell for a choice input is the name written (`True`), also for a `MAYBE` choice with a blank cell left out; a cell for a `DATE` input is text, so `20261013` is reported as a bad date; a synonym of NUMBER or BOOLEAN is still read as one (a pin, not a regression test) (fixtures `batch-declared-text.l4`, `batch-declared-text-answers.csv`, `-optional.csv`, `-dates.csv`, `-synonyms.csv`).
 - From #632, as adapted to `main`:
-  - `:815-827` a `MAYBE` NUMBER input given as text is read as the number it spells, and text that is not one is an error that names it (fixture `batch-maybe-text.json`);
-  - `:513-527` a CSV cell in a column no input declares is typed by how it looks, and `1E5` stays text (fixture `batch-undeclared-column.csv`; this is the one test that reaches `inferCsvCell`, so the two tests before it, `:430` and `:502`, are renamed for what they do: they read by the declared type);
-  - `:876-894` the step `l4 trace` prints for a string literal holds a backslash and an `n`, where `main` broke it across lines (fixture `evaltrace-line-break.l4`);
+  - `:899-911` a `MAYBE` NUMBER input given as text is read as the number it spells, and text that is not one is an error that names it (fixture `batch-maybe-text.json`);
+  - `:520-534` a CSV cell in a column no input declares is typed by how it looks, and `1E5` stays text (fixture `batch-undeclared-column.csv`; this is the one test that reaches `inferCsvCell`, so the two tests before it, `:437` and `:509`, are renamed for what they do: they read by the declared type);
+  - `:960-978` the step `l4 trace` prints for a string literal holds a backslash and an `n`, where `main` broke it across lines (fixture `evaltrace-line-break.l4`);
   - `jl4-service/test/IntegrationSpec.hs:691-712` the same for the `exampleCode` of the reasoning tree, and that `explanation` keeps the line break (`lineBreakJL4` in `jl4-service/test/TestData.hs`).
-- Written for this PR's reading of T3c: `:529-572` a blank CSV cell is absent, for a required STRING input (`Missing required field 'code'`), a `MAYBE` STRING input (`NOTHING`) and a required NUMBER input, and `--validate-only` says `Missing required field: 'income'` (fixtures `batch-blank.l4`, `batch-blank.csv`, `batch-blank-income.csv`); and `:444-450` a cases file holding one object is one case (`batch-single-object.json`).
-- Written for the ruled CSV reader, `describe "the CSV reader"` at `:574-651`: a one-column file with `alice`, `""`, `bob` is three cases and the `""` case is missing its input (`batch-onecol.l4`, `batch-onecol.csv`); a line of spaces, and a blank line, is not a case (`batch-onecol-spaces.csv`); a byte-order mark is not part of the first column's name (`batch-bom.csv`); a record with too few or too many cells is refused naming its line, with the sentence that says what would otherwise have happened, in `--validate-only` too (`batch-ragged.csv`); and CRLF line ends with a quoted cell holding a line break are read as before (`batch-crlf.csv`, a no-change pin).
-- From #646 (port): `:829-874` an input declared through a synonym (`DECLARE Year IS A NUMBER`, a BOOLEAN, a `MAYBE`) is refused or accepted exactly as the plain type is, in JSON and in CSV, under `--validate-only` and in a run, and a case is `valid` exactly when it is accepted (fixture `batch-synonym.l4` with plain controls, `batch-synonym-year.{json,csv}`, `batch-synonym-flag.{json,csv}`); `:653-695` a CSV file that cannot be read names its line, an empty file says it is empty, and a quote that opens a cell and is never closed is refused at its line in five shapes, with the control of a cell that closes at the end of the file (fixtures `batch-csv-bad-quote.csv`, `batch-csv-empty.csv`, `batch-csv-open-quote-{eof,mid,crlf,doubled,header}.csv`, `batch-csv-quote-closes-at-eof.csv`).
+- Written for this PR's reading of T3c: `:536-579` a blank CSV cell is absent, for a required STRING input (`Missing required field 'code'`), a `MAYBE` STRING input (`NOTHING`) and a required NUMBER input, and `--validate-only` says `Missing required field: 'income'` (fixtures `batch-blank.l4`, `batch-blank.csv`, `batch-blank-income.csv`); and `:451-457` a cases file holding one object is one case (`batch-single-object.json`).
+- Written for the ruled CSV reader, `describe "the CSV reader"` at `:581-659`: a one-column file with `alice`, `""`, `bob` is three cases and the `""` case is missing its input (`batch-onecol.l4`, `batch-onecol.csv`); a line of spaces, and a blank line, is not a case (`batch-onecol-spaces.csv`); a byte-order mark is not part of the first column's name (`batch-bom.csv`); a record with too few or too many cells is refused naming its line, with the sentence that says what would otherwise have happened, in `--validate-only` too (`batch-ragged.csv`); and CRLF line ends with a quoted cell holding a line break are read as before (`batch-crlf.csv`, a no-change pin).
+- From #646 (port): `:913-958` an input declared through a synonym (`DECLARE Year IS A NUMBER`, a BOOLEAN, a `MAYBE`) is refused or accepted exactly as the plain type is, in JSON and in CSV, under `--validate-only` and in a run, and a case is `valid` exactly when it is accepted (fixture `batch-synonym.l4` with plain controls, `batch-synonym-year.{json,csv}`, `batch-synonym-flag.{json,csv}`); `:666-708` a CSV file that cannot be read names its line, an empty file says it is empty, and a quote that opens a cell and is never closed is refused at its line in five shapes, with the control of a cell that closes at the end of the file (fixtures `batch-csv-bad-quote.csv`, `batch-csv-empty.csv`, `batch-csv-open-quote-{eof,mid,crlf,doubled,header}.csv`, `batch-csv-quote-closes-at-eof.csv`).
 - From #595: `jl4-core/test/PrintRoundtripSpec.hs:27` (a string with a line break and a tab prints with its escapes and re-parses) and the fixtures `jl4/tests-cli/fixtures/batch-string-line-break.l4` and `.json`.
 - Fixtures (#47): `jl4/tests-cli/fixtures/batch-elig.l4`, `batch-data.json`, `batch-data.csv`, `batch-mixed.json`, `batch-code.l4`, `batch-exponent.csv`, `batch-maybe.l4`, `batch-maybe-bad.json`.
 - Fixtures (#625): `jl4/tests-cli/fixtures/batch-declared-strings.json`, `batch-declared-strings.yaml`, `batch-declared-string-cells.csv`, `batch-declared-bad-number.json`, `batch-declared-number-for-string.json`.
-- Other `l4 batch` tests on `main` are not part of this change: the printer-bracket and grouping cases `describe "l4 batch keeps the grouping the rule wrote"` and `describe "l4 batch agrees with l4 run"` (`jl4/tests-cli/Main.hs:982` and `:1001`).
+- Other `l4 batch` tests on `main` are not part of this change: the printer-bracket and grouping cases `describe "l4 batch keeps the grouping the rule wrote"` and `describe "l4 batch agrees with l4 run"` (`jl4/tests-cli/Main.hs:1066` and `:1085`).
 - Run against `main`'s own `l4` (`L4_BIN`), 41 of the 78 tests in that file fail.
   Most of them fail because `main` has no `--format`, `--output`, `--continue-on-error` or `--validate-only`, and the new cases pass `--continue-on-error`; that says nothing about the behaviour.
-  The ones that fail for the behaviour itself, with only options `main` has, are the single-object case (`:444-450`), the string-literal step in `l4 trace` (`:876-894`), the line-break case (`:697`), and the unreadable-file and unclosed-quote cases (`:653-695`), which use no option `main` lacks.
+  The ones that fail for the behaviour itself, with only options `main` has, are the single-object case (`:451-457`), the string-literal step in `l4 trace` (`:960-978`), the line-break case (`:710`), and the unreadable-file and unclosed-quote cases (`:666-708`), which use no option `main` lacks.
   The other behaviours were each measured by hand with `main`'s own options, as listed under "What changes against `main`".
 - Run against the `l4` built from this branch before #646, 11 of the 78 fail: the two cases of an unreadable CSV file, the five shapes of an unclosed quote, and four of the synonym cases (the control of a cell that closes at the end of the file passes there, as its comment says).
 
 ## Limits and known defects
 
-- A CSV cell in a column that no input declares, or for an input whose type the export does not give, is typed by its content (`inferCsvCell`); the undeclared-column case is pinned by `:513-527`.
+- A CSV cell in a column that no input declares, or for an input whose type the export does not give, is typed by its content (`inferCsvCell`); the undeclared-column case is pinned by `:520-534`.
 - A CSV file cannot carry empty text, or text of only spaces, as a value, because a blank cell is absent (ruled 2026-10-12); to give an input that value, use a JSON or YAML file.
 - A CSV file must be UTF-8: a Latin-1 file stops the command with a backtrace and no `Error:` line (`main` too).
 - A line of empty cells, such as `,,`, is a case with nothing given: if any input has to be given it is an `error` row, and without `--continue-on-error` the run stops there.
@@ -113,7 +113,6 @@ Validation messages (`:386-414`): `Missing required field: '<p>'`, `Field '<p>' 
 - Correctness rests on `prettyLayout` reproducing the module's meaning; the printed text is the program that runs.
 - Fatal errors go to stdout, not stderr, as one line starting `Error:` (a cases file or rules file that does not exist is the exception: the operating system's message goes to stderr).
 - The wrapper adds the top-level names `InputArgs`, `decodeArgs` and `inputJson`; a module that already defines one was not probed.
-- The row JSON is put into the wrapper by `escapeAsL4String` (`:916-920`), which escapes only the double quote; a separate change replaces it.
 
 ## What changes against `main`
 
@@ -192,13 +191,15 @@ With `batch-declared-text.l4`: the cells `True` and `False` for a choice input a
     A synonym for a `MAYBE NUMBER` given 25 is accepted; `main` refused it (`The value 25 reached a CONSIDER that has no branch for it`).
     This changes the JSON decoder in `jl4-core` (`Machine.hs`), which `main` shares with the service and with a program's own `JSONDECODE`: a type is expanded at its head, and so is a record field's before it is judged a `MAYBE`.
     `batch-synonym.l4` with plain controls, in JSON and in CSV, run and validated.
+13. **A row is quoted exactly when it is put into the generated wrapper (#51, #632).**
+    `main` escaped only the double quote, so a value with a backslash, a tab, a line break or a carriage return came back as `null`, or as a different string, under `success`, and a value with a double quote failed to lex.
+    Now the rule is handed the text that was sent, for JSON, YAML and CSV alike: `cli-quoting.md` has the measurements, and the tests are listed there.
 
 The command, the options it had, the output keys and `main`'s backtick-quoting of natural-language export and parameter names (`quoteIdent`, also from `f6ebc282e`) are otherwise as on `main`.
 `doc/tutorials/getting-started/l4-cli.md` (under `l4 batch`) is rewritten to describe reading by declared type, blank cells, `--format` and `--output`, what each line says, stop-at-first-failure with `--continue-on-error`, `--validate-only` and its limits, and where fatal errors go.
 
 ## Later changes on unstable that `main` does not have
 
-- #51: the row JSON is quoted with the lexer's `showStringLit` instead of the hand-rolled escape.
 - #214: `prettyLayout` made to re-emit parseable, re-checkable source. (Its `batch` help text, which says input is json|yaml|csv, is written here independently.)
 - #595: its change to the `Inert` arm of the printer is not here; `main` prints an inert string as `"..." <+> dquotes (pretty txt)` (`Print.hs:440-441`), which needs its own change first.
 - #328: read ASSUMEs are bound by name via `rewriteModuleAssumes`, not passed as positional arguments.
