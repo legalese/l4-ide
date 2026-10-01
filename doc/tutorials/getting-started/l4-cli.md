@@ -293,7 +293,7 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
-Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
+Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, each cell is typed by its content: an empty cell becomes `null`, `true` or `false` (any case) a boolean, and a plain number such as `100` or `3.5` a number (a cell containing `e` or `E` stays text); anything else arrives as a string. So a digits-only cell without a leading zero (`123456`) arrives as a number, and a row that sends it to a `STRING` parameter fails, while `018956` stays text. `--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 

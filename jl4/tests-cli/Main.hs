@@ -25,6 +25,7 @@ import System.Directory
   , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
+  , removeFile
   , removePathForcibly
   )
 import System.Environment (lookupEnv)
@@ -186,6 +187,34 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalTraceFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 
+batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
+batchEligFixture = fixtureDir </> "batch-elig.l4"
+batchDataJson    = fixtureDir </> "batch-data.json"
+batchDataCsv     = fixtureDir </> "batch-data.csv"
+batchMixedJson   = fixtureDir </> "batch-mixed.json"
+
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+batchCodeFixture  = fixtureDir </> "batch-code.l4"
+batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
+batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
+batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
+-- | Decode stdout as a single JSON array (for @l4 batch --format json@).
+decodeArray :: String -> IO [Value]
+decodeArray sout =
+  case eitherDecode (BSL8.pack sout) of
+    Right (Array v)  -> pure (foldr (:) [] v)
+    Right other      -> do
+      expectationFailure ("Expected a JSON array, got: " ++ show other)
+      error "unreachable"
+    Left err         -> do
+      expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
+      error "unreachable"
+
+-- | Count non-blank lines (each NDJSON row is one line).
+nonBlankLines :: String -> Int
+nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -312,6 +341,97 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  describe "l4 batch" $ do
+    it "streams one NDJSON row per input (default format)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "infers CSV cell types so numeric params typecheck" $ do
+      -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
+      -- the rows would come back status=error; success proves inference works.
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+      let statuses = [ s | Object o <- rows
+                         , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
+      statuses `shouldBe` ["success", "success"]
+
+    it "emits a single JSON array with --format json" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+
+    it "emits a CSV table with flattened input_* columns via --format csv" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input_age" `isInfixOf`)
+      sout `shouldSatisfy` ("status" `isInfixOf`)
+
+    it "writes results to a file with --output" $ do
+      tmp <- getTemporaryDirectory
+      let outFile = tmp </> "l4-batch-out.json"
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchDataJson
+                  , "--format", "json", "--output", outFile ]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` null                    -- nothing on stdout
+      exists <- doesFileExist outFile
+      exists `shouldBe` True
+      contents <- readFile outFile
+      rows <- decodeArray contents
+      length rows `shouldBe` 2
+      removeFile outFile
+
+    it "stops at the first failing row by default (and exits non-zero)" $ do
+      -- Row 2 has a non-numeric income; row 3 must NOT be processed.
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+
+    it "processes every row with --continue-on-error (still exits non-zero)" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 3
+
+    it "validate-only reports schema mismatches without evaluating" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchMixedJson
+                  , "--validate-only", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
+
+    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+      -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
+      -- but must survive as the string "1E5" against a STRING param rather
+      -- than being coerced to 100000.
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "validate-only type-checks MAYBE primitive params" $ do
+      -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
+      -- as a type mismatch. Before unwrapping MAYBE on the AST this silently
+      -- passed as valid.
+      Output code sout _ <-
+        runL4 bin [ "batch", batchMaybeFixture, "--inputs", batchMaybeBadJson
+                  , "--validate-only" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
+      sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do
