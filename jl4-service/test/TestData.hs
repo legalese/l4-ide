@@ -576,9 +576,8 @@ budget MEANS
 |]
 
 -- | A MAYBE input with no default (T1b, T3c's MAYBE paragraph): left out, it
--- is NOTHING while presumption is soft, and missing while it is hard. The
--- unread BOOLEAN comes first so a @{}@ on it reaches the wrapper path, whose
--- record cannot yet carry a MAYBE input followed by another (README limit).
+-- is NOTHING while presumption is soft, and missing while it is hard. A @{}@
+-- on the unread BOOLEAN sends a request to the wrapper path.
 maybeHardJL4 :: Text
 maybeHardJL4 =
   [i|

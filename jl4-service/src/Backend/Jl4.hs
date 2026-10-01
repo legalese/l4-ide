@@ -854,9 +854,11 @@ unInputField :: Text -> Text
 unInputField n = fromMaybe n (Text.stripSuffix " (input)" n)
 
 -- | A decode error from the wrapper, with the wrapper's field names put back
--- to the inputs' (review m6): @'cfg (input).timeout'@ is @'cfg.timeout'@.
+-- to the inputs' (review m6): @'cfg (input).timeout'@ is @'cfg.timeout'@, and
+-- @'people (input)[0]'@ is @'people[0]'@.
 unInputFieldsIn :: Text -> Text
-unInputFieldsIn = Text.replace " (input)." "." . Text.replace " (input)'" "'"
+unInputFieldsIn =
+  Text.replace " (input)." "." . Text.replace " (input)[" "[" . Text.replace " (input)'" "'"
 
 -- | Evaluate a deontic function with startTime and events via EVALTRACE wrapper.
 -- Always uses the wrapper path since events need to go through L4 typechecking.
