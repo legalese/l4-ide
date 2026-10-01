@@ -6,6 +6,7 @@ Nothing in this document is in the tree.
 Every statement about today's behaviour is a probe result or a `file:line` read on `unstable` at `f9a504b77`, and says which.
 Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.12 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
 Probe files are in the session scratchpad, not in the tree.
+On 2026-10-02 the Track B audit's one open question, M1, was ruled as U13 under RAINCHECK (§9); probes added that day (`t07` to `t10`) ran on a snapshot of the installed `l4`, a store build of 2026-09-28.
 
 **Trigger:** SCHRODINGER, widened by Meng on 2026-10-01: _"continue your investigation of the evaluator lift with kand. It sounds like we'll need to redo the rewriting-to-IF in favour of something more algebraically principled."_
 §4 was added under REVERSEGEAR, fired by Meng the same day on the observation _"We seem to be backing our way into symbolic evaluation by fits and starts."_
@@ -907,6 +908,40 @@ Note (C4, 2026-10-01): "explore mode" here reads as the state in which the step 
 **RULED 2026-10-01.** Meng marked `accept` on bench card U12 at 10:16:54Z, with no note. The ruling, as printed on the card: Decline the library if LIMBO and CLICKER are accepted. Record in `NEGATION-AS-FAILURE-SPEC.md` that this reverses its leaning, and that a data-borne `NOTHING` still needs `CONSIDER` (the library can be revisited if that demand appears). Update `negation-as-failure.md:60-63` in the same change, and move the experiment under a checked glob so it cannot rot.
 Its condition is met: U1 and U7 are both accepted. The answer is recorded in `specs/done/NEGATION-AS-FAILURE-SPEC.md` as well. **AMENDED 2026-10-01**, by bench card U12b, which an independent skeptic reviewed before it was folded in. Meng ruled in chat at 10:20Z: _"These are my rulings prior to SEQUEL. Please fold in any additional recommendations due to SEQUEL."_ The amendment, as the card printed it: Label `jl4/experiments/negation-as-failure-examples.l4` and both doc pages as "truth-functional strong Kleene (#526 §4.1(a))", not as the lift, everywhere the word "lift" refers to it (file `:79-85`, NAF spec `:3`, `:5`, `:23`, #526 §3.1). Add `#ASSERT (NOTHING `kor` (knot NOTHING)) EQUALS NOTHING` with a comment that the residual evaluator decides `x OR NOT x` TRUE at the boundary. Move the file under a checked glob; turn both doc links into relative links to the new path, and update the citations (NAF spec `:5`, `:274`; #526 §3.1; the file's own line 2). The recorded condition now reads as met, U1 and U7 being accepted.
 
+### U13 — A refusal reached only under an undetermined guard
+
+**The question.** What does a `REFUSE`, the prelude's `TBD` included, report when it is reached only under an undetermined guard: the right operand of a connective whose left operand is a term, as in `x AND TBD`, or an arm of a join, as when `daydate`'s `YMD` is called with an unknown year?
+**RULED 2026-10-02 (RAINCHECK, in chat).** Meng fired RAINCHECK on the Track B audit's item M1, choosing its option A.
+The ruling, as stated when the word was fired:
+
+1. A `REFUSE` (`TBD` included) reached only under an undetermined guard becomes a guarded refusal leaf, distinct from U11's error leaf and never absorbed, printed `"FALSE unless x; refuses (<reason>) if x"`.
+2. The directive is undetermined (exit 1; batch status undetermined; the reason listed).
+3. Never a determinate refusal with exit 0 (option B).
+4. Interim (C), `Stuck` naming the guard's inputs, until step 5 builds the leaf.
+5. Restate the `Machine.hs:840-849` invariant as "a refusal is never turned into a value".
+
+**What raised it.** The Track B audit of 2026-10-02 found that neither this spec nor any ruling said what a refusal does under an unknown guard.
+Its evidence, each item re-read on `6ed297629` when this was recorded:
+
+- Before this ruling the spec never addressed `REFUSE`: it contained neither "REFUSE" nor "TBD", and "refus" occurred only for the wire's refusal of a missing parameter and the lowering's refusal of `LN`, `SQRT` and `^`; U11 rules an error leaf only.
+- A refusal is not an error: "A REFUSAL is not a crash … (Errors keep exit 1; the two must not be conflated, which is the whole point of REFUSE.)" (`jl4/app/L4/Cli/Run.hs:143-146`).
+  A refusing `#EVAL` exits 0 with a JSON kind of its own (`:191-195`), and `l4 batch` gives a refused row a status of its own and does not stop (`jl4/app/L4/Cli/Batch.hs:364-370`).
+- The invariant at `jl4-core/src/L4/EvaluateLazy/Machine.hs:840-849`: `tryEval` is the only `try` over an `EvalException`, so "nothing between a 'Refuse' and the directive that demanded it can observe the refusal or turn it into a value: not a CONSIDER arm, not a boolean connective", and "THIS IS AN INVARIANT, not an accident of the current code: a static refusal analysis is only sound while it holds".
+- Beside the invariant, the docstring of `unwindFrame` that it says a second `try` "would also have to reckon with" (`:849`): its `RestoreCurrentParty` clause calls the unwind's restoring of the acting party "defense in depth" today, which "becomes load-bearing the moment anything catches an 'EvalException' and resumes evaluation mid-directive" (`:720-728`).
+- R7 (`specs/todo/PROPS-REDTEAM-2026-09-03.md:492-502`) specifies a refusal as "a throw at force, never a value", and records that "Refusal is order-dependent under lazy `AND`/`OR`" and "well-defined only if the verifier models left-to-right demand".
+- `TBD MEANS REFUSE "TBD: this rule has not been written yet"` (`jl4-core/libraries/prelude.l4:767`).
+- `YMD` (`jl4-core/libraries/daydate.l4:135-142`) refuses in its else arm (`:140`), which a join evaluates whenever the year is unknown.
+  The corpus calls it with a function's own input, `y` at `jl4/examples/ok/closing-the-loop/feiertage.l4:133`, whose `GIVEN` is at `:130`, so the year is whatever that function's caller supplies, and an unknown one reaches the refusing arm of a shipped library.
+- Today both cases are `Stuck` on the guard: `x AND TBD` and `IF x THEN TBD ELSE FALSE` name `x`, while `TBD AND x` refuses and `FALSE AND TBD` is `FALSE` (rows 73 to 76, probes `t07` to `t10`).
+
+**Options declined.** Option B, a determinate refusal with exit 0, answers "refuses" where the answer is `FALSE` whenever `x` is `FALSE`, and nothing would mark it as wrong.
+Option C, undetermined naming the guard's inputs, is declined as the answer and kept as the interim until build step 5 builds the leaf; the audit's case against keeping it was that a deliberate `TBD` under an unknown condition would then report less than a division by zero does.
+Option C is close to today's output but not the same: today's `Stuck` names only the first input it reaches (row 23, "naming only `x`"), and naming every input of the guard is U7b's default report.
+
+**What it changes.** §4.2's grammar gains the leaf `refuses [c] r`, §4.3's connective table gains its row with the interim beside it, §4.5 covers the join case, §4.7.2's hole rule and §4.7.4's reports carry it, rows 73 to 76 of §4.12 test it, §8 step 3 carries the interim and step 5 builds the leaf.
+The restatement of the invariant is a ruling about the comment at `Machine.hs:840-849`, to be made in the change that builds the leaf, build step 5; recording it here edits no code.
+On its wording, the restated invariant lets a frame between a `Refuse` and its directive observe the refusal, which the leaf and the interim both need, and forbids only turning it into a value; whether the static refusal analysis that the comment names stays sound under it is for step 5 to check (§10).
+
 ### D1 — Build the evaluator, buy the solver
 
 **The question.** Meng had planned to call an external symbolic evaluator such as Rosette, as a backend under `l4 verify` or elsewhere, and expects the query planner to evolve on top of symbolic evaluation: buy or build?
@@ -939,3 +974,4 @@ DU3b (recorded in full under U3b, 14:09:03Z) confirms the scope: z3 decides for 
 - Of the Rosette claims in §4.10, §4.11 and D1, only the passages quoted from the Rosette Guide (§7.1, §7.2.1 and the Essentials chapter, read 2026-10-01) are verified; term hash-consing, `ite` merging for solvable types and z3 as the default solver are recalled. The PLDI 2014 PDF returned 404 at `homes.cs.washington.edu/~emina/pubs/rosette.pldi14.pdf`, and `klee-se.org/docs/options/` did not show KLEE's budget options, so those are recalled too.
 - The guard-idiom count: one line-level `grep` over the 809 `.l4` files under `jl4/examples`, `jl4-core/libraries` and `doc` found no `isJust`/`isNothing` guard and no `AND … DIVIDED` on one line, and five lines with a non-zero guard before an `AND`; a guard split across lines is invisible to it.
   Left-sequential evaluation (U1) preserves every such guard whether or not it was found, which is why the count is not load-bearing.
+- Whether the static refusal analysis named by the comment at `Machine.hs:840-849` stays sound once a frame may observe a refusal, under U13's interim or its leaf, was not checked; it is for step 5, which restates that comment.
