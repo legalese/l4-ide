@@ -65,7 +65,7 @@ And independently of the row:
 - **Only literals are accepted** (p5): `TYPICALLY phi` is "must be a literal". R8 rule 3 is not built.
 - **An enum constructor is refused on a `DECLARE` field and accepted on a `GIVEN`.** `colour IS A Colour TYPICALLY Red` checks on a rule `GIVEN` (p12) and a section `GIVEN` (p13), and on a record field fails twice: "must be a literal" and "I could not find a definition for the identifier Red" (p10). The second error is the real one: the field's default is checked where the enum's constructors are not in scope. The first is misleading, because `isTypicallyLiteral` (`TypeCheck.hs:1737`) accepts a nullary constructor and the message itself names nullary constructors as allowed.
 - **The service's published schema carries no default.** It lists both probes' defaulted inputs under `required` with no `default` key (p14, p15). `L4.FunctionSchema` does attach one (`FunctionSchema.hs:255`, `:280`, `:291`), but the service builds its schema through `paramToParameter` (`jl4-service/src/Compiler.hs:509-518`), which ignores the `paramDefault` its `ExportedParam` carries (`Export.hs:72`). So `TYPICALLY.md`'s statement that the published list of facts carries the JSON Schema `default` keyword holds in `jl4-core` and not over the wire.
-- **Exporters disagree.** Catala lowers a default to a caller-overridable `context` variable (`Catala/Lower.hs`, R10 of `CATALA-EXPORT-SPEC.md`). Docassemble pre-fills the question with it (`Docassemble/IR.hs:130`, `default:`), so the user still answers. A grep of `jl4-core/src/L4/{Dmn,OpenFisca,Blawx}` for `TYPICALLY`, `typically` and `paramDefault` finds no handling, and I did not check whether those exporters emit a fidelity note when they drop it.
+- **Exporters disagree.** Catala lowers a default to a caller-overridable `context` variable (`Catala/Lower.hs:1295-1296`, R10 of `CATALA-EXPORT-SPEC.md`). Docassemble pre-fills the question with it (`Docassemble/IR.hs:130`, `default:`), so the user still answers. OpenFisca replaces the default with its own: `GIVEN status IS A Status TYPICALLY married` exports as `default_value = Status.single`, the first enum member, exit 0, no note (`OpenFisca/Emit.hs:95`, `OpenFisca/Lower.hs:735`). Blawx lowers through `Relational/Lower.hs`, whose `R-TYPICALLY` fidelity note (`:2843-2855`) covers `ASSUME` only, and `BLAWX-EXPORT-SPEC.md` §5.1 rules Blawx's default "dropped, disclosed". For `GIVEN rate … TYPICALLY 3`, the DMN fidelity report, OpenFisca (which has no fidelity report) and Blawx all drop the default without a word. dmn-md, bpmn and yscript were not surveyed.
 - **The ladder presumes a rule default the evaluator will not use.** `ladder-core` lifts each atom's wire `typically` into `ViewSpec.defaults` (`ts-shared/ladder-core/src/viz-adapter.ts:212-222`) and lays it under the user's answers, with `respectDefaults` true unless the caller says otherwise (`layout.ts:412`). For a rule `GIVEN` that is an answer `#EVAL` cannot produce.
 
 ### 2.1 How much source this touches
@@ -91,8 +91,8 @@ Readers ration attention, so the silent failures come first (user `CLAUDE.md` ru
 
 **Silent — a wrong answer with exit 0:**
 
-- **S1. The service turns "uncertain" into FALSE.** `{}` is the wire format's uncertain value (`FnUncertain`, `Backend/Api.hs:74`). It forces the wrapper path (`Backend/Jl4.hs:527-535`, `:564`), whose code generator binds every boolean as `fromMaybe FALSE` (`Backend/CodeGen.hs:239`, `:335`, `:603`). On p14, `has capacity: {}` returns `{"result":{"value":false}}` with no diagnostic, although the input is declared `TYPICALLY TRUE`; `is adult: {}` does the same. This is the case an investigating officer hits when a fact is unsettled: "uncertain" comes back as "no".
-- **S2. Following the `ASSUME` deprecation advice changes the answer.** The warning on p6 says "Nothing is broken: the file still checks, runs and exports as before" and recommends a section `GIVEN`. On an `ASSUME` with a `TYPICALLY`, that move switches the default on: p6 evaluates to the bare name, and the same declaration as a section `GIVEN` (p7) evaluates to `TRUE`.
+- **S1. The service turns "uncertain", and with it every missing boolean, into FALSE.** `{}` is the wire format's uncertain value (`FnUncertain`, `Backend/Api.hs:74`). One `{}` on any input forces the whole request onto the wrapper path (`Backend/Jl4.hs:527-535`, `:564`), whose code generator binds every boolean as `fromMaybe FALSE` (`Backend/CodeGen.hs:239`, `:335`, `:603`), so on that path an absent or `null` boolean is FALSE as well. Probe p31: `` eligible MEANS `is resident` AND NOT `has criminal record` ``, with `has criminal record` absent and an unused input sent as `{}`, returns `true` with no diagnostic: a missing criminal record reads as none. Deontic functions always take the wrapper path. On p14, `has capacity: {}` returns `{"result":{"value":false}}` with no diagnostic, although the input is declared `TYPICALLY TRUE`; `is adult: {}` does the same. This is the case an investigating officer hits when a fact is unsettled: "uncertain" comes back as "no".
+- **S2. The `ASSUME` deprecation advice changes the answer, and says it does not.** The warning on p6 says "Nothing is broken: the file still checks, runs and exports as before" and recommends a section `GIVEN`, and `doc/reference/errors/README.md:571` calls that rewrite "safe to take". `doc/reference/types/TYPICALLY.md:150-155` says the opposite, correctly. On an `ASSUME` with a `TYPICALLY`, that move switches the default on: p6 evaluates to the bare name, and the same declaration as a section `GIVEN` (p7) evaluates to `TRUE`.
 - **S3. Canon keeps each default twice, and nothing checks the two agree.** Because a field default does nothing, encoders restate it as a named constant that call sites pass. In `legalese/canon`, `subjects/sg/succession/encodings/legalese/sg-succession-domain.l4:188-200` declares `TYPICALLY TRUE` on two `Interpretation` fields and then builds `the orthodox reading` with both set by hand. `subjects/sg/child-support/encodings/legalese/sg-child-support-domain.l4:91-106` does the same with `the live reading`, and says why: _"It restates the TYPICALLY defaults so that call sites and #ASSERTs have a value to pass; the defaults above remain the normative statement of the readings."_ Edit one and the encoding silently runs on the other. `subjects/us/regcf/encodings/cleanroom-2026-08/regcf-denovo.l4:134-140` gave up on the field default altogether, because of the enum defect in §2.
 - **S4. The ladder shows an answer the evaluator cannot give** (§2, last bullet). It is drawn as tentative, which is honest about provenance, but no evaluator path reproduces it.
 
@@ -151,6 +151,7 @@ That prior orders questions and never answers one, which is already the one beha
 
 R8 does not reach these.
 Each has a recommendation.
+Each is also a card on the bench "Unknowns and Defaults" (claude.ai artifact `XQk522h6PN2xv8YFPhogJc`, db collection `l4-unknowns-defaults-1001`), where an independent skeptic's objection revised it; where the card and this text differ, the card is current until the ruling is recorded here. T3 and T4 share cards with `UNKNOWN-EVALUATION-SPEC.md` U9 and U8.
 
 **T1. Every defaulted record field may be omitted, not only `MAYBE … TYPICALLY NOTHING`.**
 D7.3 ruled the `MAYBE` case and was silent on `timeout IS A NUMBER TYPICALLY 30`.
@@ -159,9 +160,9 @@ _Recommend: yes._ It is additive (p4: every such omission is a check error today
 
 **T2. `ASSUME … TYPICALLY` is honoured.**
 The alternative is to leave it ignored and make the deprecation warning say that moving the declaration switches its default on.
-_Recommend: honour it._ It is one behaviour, `ASSUME` is being retired anyway, and three sites change answer (§2.1).
+_Recommend: honour it,_ at the root, without rewriting the `ASSUME` into a definition the ladder or schema can see. It is one behaviour, and `ASSUME` is being retired anyway. No golden answer moves: no directive in the three sites' files reads them (§2.1).
 It also makes the warning's "nothing is broken" true of the migration it recommends.
-`ok/typically-basic.l4` is a fixture that asserts the metadata-only reading in its own header, so its goldens move deliberately.
+`ok/typically-basic.l4` stays on `ASSUME` because `jl4-service/test/QueryPlanSpec.hs:878-891` and a TypeScript fixture pin its ladder atomIds; those must not move. Its header, which asserts the metadata-only reading, changes.
 
 **T3. Absent, `null` and `{}` on the wire are three different things.**
 They are the four-cell model of `RUNTIME-INPUT-STATE-SPEC.md` ("The Four-State Model"):
@@ -192,8 +193,8 @@ OpenFisca's `Variable` has a `default_value`; that is recalled, not checked here
 DMN, OpenFisca and Blawx are the three to survey (§2).
 
 **T6. Where the "took its default" event shows.**
-R8 asks for it in the trace.
-_Recommend:_ also in the service response's reasoning and in `l4 batch`'s NDJSON, since T4's question — "which answers rested on a presumption?" — is asked at the service far more often than in a trace.
+R8 asks for it in every directive and trace output (`PROPS-REDTEAM-2026-09-03.md:367`).
+_Recommend:_ also as a top-level `presumed` field in the service response and in `l4 batch`'s NDJSON, listing only the defaults actually forced, built from W8's event (the response's `reasoning` is sent only when a trace is requested, `Backend/Api.hs:210-214`), since T4's question, "which answers rested on a presumption?", is one that service and batch callers ask without wanting a whole trace.
 
 ---
 
