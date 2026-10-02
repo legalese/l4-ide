@@ -24,6 +24,8 @@ module TestData (
   missingBooleanJL4,
   sectionBooleanJL4,
   deonticBooleanJL4,
+  maybeInputsJL4,
+  timeInputsJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -488,4 +490,37 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A MAYBE DATE and a MAYBE NUMBER input, each followed by another input. On
+-- the wrapper path the generated record printed their types as `MAYBE OF …`,
+-- whose OF read the next field's line as another argument.
+maybeInputsJL4 :: Text
+maybeInputsJL4 =
+  [i|
+@export default dated
+GIVEN `start date` IS A MAYBE DATE
+      count        IS A MAYBE NUMBER
+      flag         IS A BOOLEAN
+      unused       IS A BOOLEAN
+GIVETH A BOOLEAN
+dated MEANS
+      flag
+  AND NOT `start date` EQUALS NOTHING
+  AND NOT count EQUALS NOTHING
+|]
+
+-- | A TIME and a DATETIME input. The wrapper decodes each from a JSON string and
+-- parses it with TOTIME or TODATETIME; it used to declare the record field as
+-- TIME or DATETIME, so the parse was applied to a value that was not a string.
+timeInputsJL4 :: Text
+timeInputsJL4 =
+  [i|
+@export default timed
+GIVEN flag   IS A BOOLEAN
+      unused IS A BOOLEAN
+      t      IS A TIME
+      dt     IS A DATETIME
+GIVETH A BOOLEAN
+timed MEANS flag
 |]
