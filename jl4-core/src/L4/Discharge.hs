@@ -35,9 +35,10 @@
 -- @R(caller) ⊇ R(callee)@, the caller is guaranteed to have the very key its
 -- call site needs to pass on.
 --
--- The pass mints a 'Unique' in exactly one place: the parameters of the
--- eta-expansion that lets a reader with parameters of its own be passed as a
--- value. See 'dischargeModule'.
+-- The pass mints a 'Unique' in two places: the parameters of the eta-expansion
+-- that lets a reader with parameters of its own be passed as a value (see
+-- 'dischargeModule'), and the function that stands for a binder's default at a
+-- root when that default reads other binders ('defaultThunkUnique').
 --
 -- == What this pass deliberately does not do
 --
