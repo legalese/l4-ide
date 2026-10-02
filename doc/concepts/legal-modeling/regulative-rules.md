@@ -93,7 +93,7 @@ If an event sits beyond the deadline, the contract takes its failure branch (or,
 
 If the event's action holds a fact the case has not supplied, at a place where the action written in the `MUST`, `MAY` or `SHANT` line names one particular kind of thing — a delivery of goods of a kind nobody has stated, against `MUST Deliver Retail` — the contract cannot tell whether it matches, so the run stops and names the missing fact rather than skipping the event. An event that plainly cannot match, whatever that fact turns out to be, is still skipped: a different action, or a quantity written out as a number that differs from the number the obligation writes, as long as everything between the missing fact and that number is written out too. Where the run would have to work something out first to see the mismatch, it stops instead.
 
-One limit remains, and it is being worked on. When the missing fact is checked by a rule that uses `CONSIDER` with an `OTHERWISE` line, whether in the action or in a `PROVIDED` condition, that rule answers as if the fact were whatever `OTHERWISE` covers, and the run does not stop. So the event can be passed over as though the party had done something else, or taken as the act when it may not have been; under a `SHANT`, that can put the party in breach.
+The same holds when the missing fact is checked by a rule that uses `CONSIDER`, whether in the action or in a `PROVIDED` condition: the run stops and names it, even where the `CONSIDER` has an `OTHERWISE` line.
 
 The timeline is purely numeric. It can stand for days, seconds, business hours, or any other unit — L4 doesn't care, as long as deadlines and event timestamps use the same units.
 

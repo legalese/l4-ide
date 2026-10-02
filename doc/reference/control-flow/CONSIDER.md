@@ -92,6 +92,22 @@ describe n MEANS
   OTHERWISE "many"
 ```
 
+**`OTHERWISE` does not catch an input nobody supplied.**
+If the value being considered is an input that this run was not given — a section `GIVEN` the directive left out, say — `CONSIDER` cannot tell which branch it belongs to.
+Evaluation stops and names the input, exactly as `IF` does:
+
+```
+I could not continue evaluating, because I needed to know the value of
+  n
+but it is an assumed term.
+```
+
+Taking the `OTHERWISE` branch would give an answer the facts do not support, since the input could turn out to be `0`.
+The same holds for a field read on a record nobody supplied, such as `d's age`: it stops on `d`.
+A branch that another part of the same value rules out for certain is still skipped as usual.
+In `CONSIDER Claim k 5 WHEN Claim Retail 0 THEN "first", WHEN Claim kk a THEN "second"`, the `5` rules out `0`, so the answer is `"second"` whatever `k` is.
+L4 looks only at parts written as a literal or already worked out; it works nothing new out to decide.
+
 ## Exhaustiveness Checking
 
 The typechecker analyzes every CONSIDER expression and emits **warnings** (not errors) for two situations:

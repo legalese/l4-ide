@@ -364,20 +364,18 @@ replaces all 26.
 
 **Keep writing the named readings** (`` `the staff reading` ``, `` `the text alone` ``) as values.
 Until supply lands they are how a file demonstrates both poles: a `#EVAL` that reads an unsupplied
-section `GIVEN` stops, and makes `l4 run` exit non-zero. What it prints depends on where the missing
-value is first needed. Reached by the `CONSIDER` above, as here:
+section `GIVEN` stops, names the input, and makes `l4 run` exit non-zero. Reached by the `CONSIDER`
+above, as here:
 
 ```
-The value
+I could not continue evaluating, because I needed to know the value of
   `the reading`
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
-The typechecker's exhaustiveness warning lists all missing branches.
+but it is an assumed term.
 ```
 
-**That message is not about `CONSIDER`, and hunting for one will waste your time.** A plain genitive
-field access on an unsupplied record produces it word for word, with no `CONSIDER` anywhere in the
-file — field access is itself a match. Measured on the section-`GIVEN` binary, whole file, exit 1:
+A plain genitive field access on an unsupplied record produces it word for word, with no `CONSIDER`
+anywhere in the file. Measured on the build-step-1 binary (`UNKNOWN-EVALUATION-SPEC.md` §8), whole
+file, exit 1:
 
 ```l4
 DECLARE Applicant HAS
@@ -394,17 +392,17 @@ GIVETH A BOOLEAN
 ```
 
 ```
-The value
+I could not continue evaluating, because I needed to know the value of
   `the applicant`
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
-The typechecker's exhaustiveness warning lists all missing branches.
+but it is an assumed term.
 ```
 
-Read it as **"you did not supply this input"**, whatever construct it names.
+An `l4` built before that fix prints `reached a CONSIDER that has no branch for it` for both of
+these instead. **That message is not about `CONSIDER` there**: read it as "you did not supply this
+input", whatever construct it names.
 
-Reached by arithmetic instead — a section `GIVEN` `` `the rate` `` read by
-`` `tax on` amount MEANS amount TIMES `the rate` `` — it is the assumed-term message:
+Reached by arithmetic — a section `GIVEN` `` `the rate` `` read by
+`` `tax on` amount MEANS amount TIMES `the rate` `` — it is the same assumed-term message:
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -1095,18 +1093,17 @@ to, and a reader scanning `§` headings still sees one entry per clause.
 
 **Not** an `#ASSERT` on the rule that reads the section `GIVEN`. The fixture exists and there is
 still no way to hand it over — nothing inside the file supplies a section `GIVEN` in this release —
-so the assertion stops, and `l4 run` exits 1 (probe `r11b-assert-on-the-reader.l4`):
+so the assertion stops, and `l4 run` exits 1 (probe `r11b-assert-on-the-reader.l4`, its message
+re-measured on the build-step-1 binary):
 
 ```
 assertion could not be evaluated:
-The value
+I could not continue evaluating, because I needed to know the value of
   `the month`
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+but it is an assumed term.
 ```
 
-Read that as "you did not supply this input", whatever construct it names — entry [1.5](#e1-5) has
-the other wording it comes in. The recipe that keeps the file green is
+Entry [1.5](#e1-5) has the wording an older `l4` gives it. The recipe that keeps the file green is
 [11.9](11-when-the-encoding-cannot-answer.md#e11-9): assert on the rule `GIVEN`, `#CHECK` the reader.
 
 **Not** the fixtures at the end of the file, in one block, away from the rules. It reads well until

@@ -1929,11 +1929,22 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       _ -> internalException $ RuntimeTypeError $
         "expected an environment but found: " <> prettyLayout val <> " when matching constructor"
   Just (PatLit0 env lit) -> do
-    pushFrame (PatLit1 val)
-    continueExpr env lit
+    let compareExpr = pushFrame (PatLit1 val) >> continueExpr env lit
+    case val of
+      -- An unknown scrutinee: the comparison raises 'Stuck', unless a
+      -- sub-pattern still to be matched already clashes ('metUnknown').
+      ValAssumed _ -> metUnknown >>= \ case
+        BranchClashes -> patternMatchFailure
+        _          -> compareExpr
+      _ -> compareExpr
   Just (PatLit1 lit) -> do
-    pushFrame PatLit2
-    runBinOpEquals lit val
+    let compareLit = pushFrame PatLit2 >> runBinOpEquals lit val
+    case val of
+      -- Likewise: 'runBinOpEquals' names an unknown on its right (U6).
+      ValAssumed _ -> metUnknown >>= \ case
+        BranchClashes -> patternMatchFailure
+        _          -> compareLit
+      _ -> compareLit
   Just PatLit2 ->
     case val of
       -- NOTE: in future, we may give the pattern that was matched a name, potentially
@@ -4341,25 +4352,44 @@ patternMatchFailure = withPoppedFrame $ \ case
 -- Under the regulative action matcher this is Stuck, naming the unknown
 -- (smucclaw/l4-ide#999): failing the match would move on to the next
 -- event, which asserts that the act was not this one, and nothing says so.
+-- Under a @CONSIDER@ (and so a record selector, a one-branch @CONSIDER@) it
+-- is Stuck too: failing the match would hand the unknown to the next branch,
+-- where a catch-all takes it silently, or would report an exhaustive
+-- @CONSIDER@ as having no branch for it (UNKNOWN-EVALUATION-SPEC §8 step 1).
 -- The exception is a sub-pattern still to be matched that is already KNOWN
 -- to clash, with every sub-pattern the match would reach before it already
--- known to match; then the act cannot be this one whatever the unknown is,
--- and the matcher moves on exactly as for any mismatch. Those sub-patterns
--- sit in the 'PatApp1' and 'PatCons1' frames between here and the handler,
--- innermost first, which is the order the match would take them.
---
--- Under a @CONSIDER@ (and so a record selector) the match still fails, as it
--- always has: 'metUnknownHandled' says which handlers raise, and the
--- refinement ('anyKnownClash') does not depend on which handler it is.
+-- known to match; then the branch cannot match whatever the unknown is, and
+-- the match fails exactly as for any mismatch ('metUnknown').
 patternMetUnknown :: Resolved -> Machine Config
-patternMetUnknown r = do
+patternMetUnknown r = metUnknown >>= \ case
+  BranchMayMatch -> stuckOnAssumed r
+  BranchClashes  -> patternMatchFailure
+
+-- | What a pattern that met an unknown is to do. The literal patterns
+-- ('PatLit1') ask too, and on 'BranchMayMatch' leave the raising to their
+-- comparison, which names an unknown on either side.
+data MetUnknown
+  = BranchClashes
+    -- ^ a sub-pattern still to be matched already clashes: fail the match
+  | BranchMayMatch
+    -- ^ the branch may match, depending on the unknown: it is Stuck
+
+-- | Decide 'MetUnknown' by reading the stack, without popping it, down to the
+-- frame 'patternMatchFailure' would unwind to. The sub-patterns still to be
+-- matched sit in the 'PatApp1' and 'PatCons1' frames between here and that
+-- handler, innermost first, which is the order the match would take them, and
+-- the refinement ('anyKnownClash') does not depend on which handler it is.
+metUnknown :: Machine MetUnknown
+metUnknown = do
   stack <- liftIO . readIORef =<< asks (.stack)
   -- the handler is the frame 'patternMatchFailure' would unwind to
   case break isMatchHandler stack.frames of
     (pending, handler : _) | metUnknownHandled handler -> do
       clash <- anyKnownClash (concatMap pendingPositions pending)
-      if clash then patternMatchFailure else stuckOnAssumed r
-    _ -> patternMatchFailure
+      pure (if clash then BranchClashes else BranchMayMatch)
+    -- No handler: every pattern match is rooted at one, so this cannot
+    -- happen, and failing the match reports 'UnhandledPatternMatch'.
+    _ -> pure BranchClashes
   where
     isMatchHandler = \ case
       ConsiderWhen1{}              -> True
@@ -4371,11 +4401,12 @@ patternMetUnknown r = do
       _               -> []
 
 -- | The handlers under which an unknown met by a pattern is Stuck rather than
--- a failed match: the regulative action matcher only, today.
--- UNKNOWN-EVALUATION-SPEC §8 step 1 widens this to 'ConsiderWhen1'.
+-- a failed match: the regulative action matcher, and a @CONSIDER@ (by
+-- UNKNOWN-EVALUATION-SPEC §8 step 1).
 metUnknownHandled :: Frame -> Bool
 metUnknownHandled = \ case
   ContractFrame (Contract11 _) -> True
+  ConsiderWhen1{}              -> True
   _                            -> False
 
 -- | What reading a pending position tells us, without forcing anything.
