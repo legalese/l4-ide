@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -927,6 +927,39 @@ spec = describe "integration" do
             batch.summary.casesRead `shouldBe` 10
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
+
+    -- TRAFFICJAM (2026-10-02). A case's time limit is wall-clock, and the batch
+    -- used to start every case at once. On one core each case's timer then
+    -- counted its siblings' work as well as its own, so forty cases that each
+    -- take about a fifth of a second failed the whole batch with a 500 under a
+    -- three-second limit, and one slow case took thirty-nine answers with it.
+    it "answers 10 fast cases under a 3-second limit" do
+      withServiceFromSourcesOpts spinOptions "spin-10" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        resp <- postSpinBatch baseUrl mgr "spin-10" (replicate 10 spinFast)
+        expectBatchOutcomes resp (replicate 10 CaseAnswered)
+
+    it "answers 40 fast cases under a 3-second limit that no one case comes near" do
+      withServiceFromSourcesOpts spinOptions "spin-40" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        resp <- postSpinBatch baseUrl mgr "spin-40" (replicate 40 spinFast)
+        expectBatchOutcomes resp (replicate 40 CaseAnswered)
+
+    it "answers 39 fast cases and errs on 1 slow one, without failing the batch" do
+      -- The slow case comes first, so the others wait behind it: a case's
+      -- clock starts when the case starts running, not when the batch arrives.
+      withServiceFromSourcesOpts spinOptions "spin-39-1" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        resp <- postSpinBatch baseUrl mgr "spin-39-1" (spinSlow : replicate 39 spinFast)
+        expectBatchOutcomes resp
+          ( CaseErrored "Evaluation resource limit exceeded: this case ran past the time limit of 3 s (--eval-timeout)"
+              : replicate 39 CaseAnswered )
+
+    it "errs on the case that allocates too much, and answers the cases after it" do
+      let stingy = testOptions { maxEvalMemoryMb = 64 }
+      withServiceFromSourcesOpts stingy "spin-alloc" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        resp <- postSpinBatch baseUrl mgr "spin-alloc" [1_000, spinFast, 1_000]
+        expectBatchOutcomes resp
+          [ CaseAnswered
+          , CaseErrored "Evaluation resource limit exceeded: this case allocated more than the limit of 64 MB (--max-eval-memory-mb)"
+          , CaseAnswered ]
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -2417,6 +2450,44 @@ mkBatchCase n = Aeson.object
   , "eats" Aeson..= True
   , "drinks" Aeson..= True
   ]
+
+-- | Steps of 'spinJL4' that take about a fifth of a second (0.19 s on an
+-- M-series Mac, 2026-10-02) and allocate about 1 GB.
+spinFast :: Int
+spinFast = 150_000
+
+-- | Steps that would take some twenty minutes.
+spinSlow :: Int
+spinSlow = 1_000_000_000
+
+-- | A 3-second time limit, and an allocation limit (100 GB) that a spinning
+-- case cannot reach in three seconds, so the time limit is the one it meets.
+spinOptions :: Options
+spinOptions = testOptions { evalTimeout = 3, maxEvalMemoryMb = 100_000 }
+
+-- | Post one batch of 'spinJL4' cases, the i-th spinning for the i-th count.
+postSpinBatch :: String -> Manager -> String -> [Int] -> IO (Response LBS.ByteString)
+postSpinBatch baseUrl mgr deployId steps = do
+  let body = Aeson.object
+        [ "outcomes" Aeson..= ([] :: [Text])
+        , "cases" Aeson..=
+            [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n] | (i, n) <- zip [1 :: Int ..] steps ]
+        ]
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/spin/evaluation/batch") body
+  httpLbs req mgr
+
+-- | The batch was a 200, its cases came back with these outcomes in order, and
+-- the summary counts the answered ones as processed and the rest as ignored.
+expectBatchOutcomes :: Response LBS.ByteString -> [CaseOutcome] -> Expectation
+expectBatchOutcomes resp expected = do
+  unless (statusCode' resp == 200) $
+    expectationFailure ("Expected a 200, got " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
+  case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+    Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+    Just batch -> do
+      map (.outcome) batch.cases `shouldBe` expected
+      batch.summary.casesProcessed `shouldBe` length (filter (== CaseAnswered) expected)
+      batch.summary.casesIgnored `shouldBe` length (filter (/= CaseAnswered) expected)
 
 -- | Save sources to the BundleStore and register as DeploymentPending,
 -- simulating a lazy-load restart. The sources exist on disk but are not compiled.

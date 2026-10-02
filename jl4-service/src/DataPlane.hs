@@ -32,11 +32,14 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
+import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Async (forConcurrently)
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch, evaluate)
+import Control.Exception (bracket_, catch, evaluate, finally)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
+import Data.Functor ((<&>))
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
 import Data.List (find)
 import Data.Map.Strict (Map)
@@ -46,7 +49,7 @@ import Data.Scientific (Scientific)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
+import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit, disableAllocationLimit)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Servant
 import System.FilePath ((<.>))
@@ -297,14 +300,31 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
 
-  -- Evaluate all cases in parallel, collecting alloc bytes per case
-  evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase -> do
-    let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-    r <- runAppM env (runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz
-                        (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
-    pure (inputCase.id, r)
+  -- Evaluate the cases concurrently, but no more of them at once than there
+  -- are capabilities, collecting alloc bytes per case.
+  --
+  -- A case's time limit is wall-clock, so it counts whatever shares the core
+  -- while the case runs. With every case started at once, each case's timer
+  -- counted its siblings' work as well as its own: on one core, forty cases of
+  -- a fifth of a second each failed the batch under a three-second limit that
+  -- no case came near (TRAFFICJAM, 2026-10-02). A case acquires its slot
+  -- before 'withEvalLimits' starts its clock, so waiting for a slot is not
+  -- counted either.
+  --
+  -- A case that hits a limit is an errored case, like any other (below): it
+  -- does not take the other cases' answers down with it.
+  let limitHitCase (hit, allocBytes) =
+        (SimpleError (InterpreterError (limitHitMessage env.options hit)), allocBytes)
+  slots <- liftIO $ newQSem =<< getNumCapabilities
+  evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase ->
+    bracket_ (waitQSem slots) (signalQSem slots) do
+      let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
+      r <- runAppM env (runEvaluatorForDirectLimited vf Nothing args outputFilter traceLevel includeGraphViz
+                          (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
+      pure (inputCase.id, either limitHitCase id <$> r)
 
-  -- Check for fatal errors and propagate
+  -- Check for fatal errors and propagate. None is a case's own: the one left
+  -- is a function with no evaluator for its backend, which fails every case.
   case [err | (_, Left err) <- evalResults] of
     (err:_) -> throwError err
     [] -> pure ()
@@ -609,13 +629,29 @@ runEvaluatorForDirect
   -> Bool
   -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption = do
+runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption =
+  runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption
+    >>= either (const resourceLimitExceeded) pure
+
+-- | 'runEvaluatorForDirect', returning a limit hit (and the bytes allocated up
+-- to it) instead of failing the request, so that the batch endpoint can report
+-- it on the one case that hit it.
+runEvaluatorForDirectLimited
+  :: ValidatedFunction
+  -> Maybe EvalBackend
+  -> [(Text, Maybe FnLiteral)]
+  -> Maybe (Set.Set Text)
+  -> TraceLevel
+  -> Bool
+  -> Presumption
+  -> AppM (Either (LimitHit, Int64) (SimpleResponse, Int64))
+runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption = do
   let evalBackend = Maybe.fromMaybe JL4 engine
   case Map.lookup evalBackend vf.fnEvaluator of
     Nothing -> throwError err500 { errBody = jsonError "No evaluator available for backend" }
     Just runFn -> do
-      (evaluationResult, allocBytes) <-
-        timeoutAction $
+      limited <-
+        withEvalLimits $
           runExceptT
             ( runFn.runFunction
                 args
@@ -624,9 +660,9 @@ runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz pre
                 includeGraphViz
                 presumption
             )
-      case evaluationResult of
-        Left err -> pure (SimpleError err, allocBytes)
-        Right r -> pure (SimpleResponse r, allocBytes)
+      pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
+        Left err -> (SimpleError err, allocBytes)
+        Right r -> (SimpleResponse r, allocBytes)
 
 -- | Run deontic evaluation with EVALTRACE.
 runDeonticEvaluatorFor
@@ -683,23 +719,55 @@ runAppM env action = runHandler $ runReaderT action env
 -- | Timeout and memory-limited evaluation action.
 -- Uses configurable eval timeout and per-evaluation allocation limits.
 -- Returns the result and the number of GHC allocation bytes consumed.
+-- Hitting either limit fails the request with a 500.
 timeoutAction :: IO b -> AppM (b, Int64)
-timeoutAction act = do
+timeoutAction act = withEvalLimits act >>= either (const resourceLimitExceeded) pure
+
+resourceLimitExceeded :: AppM a
+resourceLimitExceeded = throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+
+-- | Which of an evaluation's two limits stopped it.
+data LimitHit = TimeLimitHit | AllocationLimitHit
+
+-- | The message on a batch case that hit a limit. It keeps the prefix of the
+-- 500 a single evaluation gets, and names the limit and the option that sets it.
+limitHitMessage :: Options -> LimitHit -> Text
+limitHitMessage cfg = \case
+  TimeLimitHit ->
+    "Evaluation resource limit exceeded: this case ran past the time limit of "
+      <> Text.pack (show cfg.evalTimeout) <> " s (--eval-timeout)"
+  AllocationLimitHit ->
+    "Evaluation resource limit exceeded: this case allocated more than the limit of "
+      <> Text.pack (show cfg.maxEvalMemoryMb) <> " MB (--max-eval-memory-mb)"
+
+-- | Run an evaluation under the configured time and allocation limits.
+--
+-- Returns the result and the GHC allocation bytes it consumed, or which limit
+-- stopped it and the bytes allocated up to then (for the allocation limit, the
+-- limit itself). The allocation counter belongs to the calling thread, so it
+-- counts only this evaluation; the time limit is wall-clock, so it counts
+-- whatever else shares the core meanwhile. That is why the batch endpoint
+-- bounds how many of its cases run at once.
+--
+-- The allocation limit is switched off again on the way out. Left on, it goes
+-- on counting down whatever the thread does next, such as encoding a single
+-- evaluation's response, and can raise 'AllocationLimitExceeded' there,
+-- outside this handler; once it has been hit, the RTS re-arms it with a grace
+-- allowance of only 100K (@+RTS -xq@) before raising it again.
+withEvalLimits :: IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
+withEvalLimits act = do
   cfg <- asks (.options)
   let timeoutMicros = cfg.evalTimeout * 1_000_000
       memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
-  result <- liftIO $
-    (timeout timeoutMicros $ do
-      setAllocationCounter memLimitBytes
-      enableAllocationLimit
-      r <- act
-      remaining <- getAllocationCounter
-      pure (r, memLimitBytes - remaining)
-    ) `catch` \AllocationLimitExceeded ->
-      pure Nothing
-  case result of
-    Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
-    Just x -> pure x
+  liftIO $
+    ( do
+        setAllocationCounter memLimitBytes
+        enableAllocationLimit
+        result <- timeout timeoutMicros act
+        allocBytes <- (memLimitBytes -) <$> getAllocationCounter
+        pure $ maybe (Left (TimeLimitHit, allocBytes)) (\r -> Right (r, allocBytes)) result
+    ) `catch` (\AllocationLimitExceeded -> pure (Left (AllocationLimitHit, memLimitBytes)))
+      `finally` disableAllocationLimit
 
 -- ----------------------------------------------------------------------------
 -- Helpers

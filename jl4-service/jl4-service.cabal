@@ -116,6 +116,11 @@ executable jl4-service
   import: defaults
   main-is: Main.hs
   hs-source-dirs: app
+  -- The threaded RTS on every core. A batch runs as many of its cases at once
+  -- as there are capabilities (DataPlane.batchFunctionHandler), so this is what
+  -- lets a batch use more than one core; -rtsopts lets an operator say
+  -- +RTS -N2 -RTS (or GHCRTS=-N2) to use fewer.
+  ghc-options: -threaded -rtsopts "-with-rtsopts=-N"
   build-depends:
     jl4-service
 
@@ -142,6 +147,12 @@ test-suite jl4-service-test
 
   hs-source-dirs:
     test
+
+  -- The threaded RTS, as the executable runs, so that System.Timeout takes the
+  -- timer-manager path it takes in production. But ONE capability (no -N), so
+  -- that a batch test's forty cases share one core on any machine, and the
+  -- test still fails if a batch starts more cases at once than it has cores.
+  ghc-options: -threaded
 
   build-tool-depends:
     hspec-discover:hspec-discover

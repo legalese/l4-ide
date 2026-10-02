@@ -39,6 +39,7 @@ module TestData (
   recordWrapJL4,
   ownDecodeJL4,
   deonticDefaultJL4,
+  spinJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -775,4 +776,23 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A rule whose cost is set by its input: it counts @n@ down to zero, so one
+-- batch can hold fast cases and a slow one without a second deployment. Each
+-- step allocates about 6.6 KB and the live heap stays constant (measured with
+-- @l4 run +RTS -s@ on 2026-10-02: 1,000,000 steps allocate 6.6 GB in 1.2 s,
+-- with 6 MiB in use).
+spinJL4 :: Text
+spinJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count down` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE `count down` (n - 1)
+
+@export default spins for n steps and then answers TRUE
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE spin IF `count down` n EQUALS 0
 |]
