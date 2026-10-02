@@ -41,6 +41,7 @@ module TestData (
   recordWrapJL4,
   ownDecodeJL4,
   deonticDefaultJL4,
+  deonticFieldDefaultJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -852,4 +853,30 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A deontic rule whose party record has a field with a @TYPICALLY@. The
+-- generated wrapper builds each event's party as SOURCE, which since W5 would
+-- fill an omitted field from its default (review silent F2, 2026-10-03).
+deonticFieldDefaultJL4 :: Text
+deonticFieldDefaultJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
 |]

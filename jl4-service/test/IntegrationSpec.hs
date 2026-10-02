@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -800,6 +800,46 @@ spec = describe "integration" do
             , "events" Aeson..= ([] :: [Aeson.Value])
             ])
         assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
+
+    -- Review F2, 2026-10-03: the wrapper turns an event's party record into
+    -- SOURCE, which since W5 filled a field it left out from its TYPICALLY, under
+    -- "presumption": "hard" as well, and listed it as a default no request could
+    -- supply. The event no longer matched the party it named. An event's record
+    -- is part of the request, so it keeps what it had: every field is written.
+    -- (Decided by Claude overnight 2026-10-03, pending Meng's review.)
+    it "refuses an event whose record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event" [("seatbelt.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+        let driver = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("drive" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= driver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            nameOnly = Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+            whole    = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            message = "Missing required field 'events[0].party.licence' (Driver)"
+        softGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" nameOnly)
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "hard" nameOnly)
+        expectError hardGap message
+        -- the positive control: the same request with the field written is answered,
+        -- and nothing is presumed
+        written <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" whole)
+        assertSuccess written \r -> r.presumed `shouldBe` []
+        -- the argument's own record is decoded from JSON, where the switch applies:
+        -- soft takes the default, hard refuses it. (Whether `presumed` lists the
+        -- default is not asserted: the deontic machinery reads a party without
+        -- forcing it, the known gap of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md 4.2.)
+        let argRequest presumption = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= nameOnly]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= ([] :: [Aeson.Value])
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+        argSoft <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "soft")
+        assertSuccess argSoft \_ -> pure ()
+        argHard <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "hard")
+        expectError argHard "Missing required field 'driver.licence'"
 
     -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
     -- an input or a field left out takes its default, a name that matches

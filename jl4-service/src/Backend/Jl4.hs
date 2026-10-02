@@ -934,6 +934,8 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     (inputDefaults compiled.compiledModule compiled.compiledDecide)
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
+  refuseEventRecordGaps (buildModuleInfo compiled.compiledAllDeclares) mPartyType mActionType traceEvents
+
   -- Convert input parameters to JSON
   inputJson <- paramsToJson plan.wpArguments
 
@@ -953,6 +955,61 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
         (wrapperPresumed presumption plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
+
+-- | Refuse an event whose party or action record leaves out a field that has a
+-- @TYPICALLY@ default (W5, T4b; review silent F2, 2026-10-03).
+--
+-- The wrapper turns each event's record into SOURCE
+-- (@`event party 0` MEANS Driver WITH name IS "Alice"@, 'Backend.CodeGen.prepareEvents'),
+-- and since W5 the checker fills a field a construction leaves out from its
+-- @TYPICALLY@. That would make a request's own record take a default the request
+-- could have supplied, under @"presumption": "hard"@ as well, and list it as a
+-- default "no request could supply": the answer changes (the event no longer
+-- matches the party it names) and the switch that exists to withdraw such
+-- defaults does nothing. Before W5 the omission failed to check, loudly.
+--
+-- So an event's record keeps what it always had: every field is written. The
+-- request's arguments are not affected, because their records are decoded from
+-- JSON, where the switch applies. _Decided by Claude overnight 2026-10-03,
+-- pending Meng's review._ Alternative: decode the event records as the
+-- arguments are, so that soft takes a default and lists it as
+-- @events[0].party.licence@, and hard refuses it.
+refuseEventRecordGaps
+  :: Monad m
+  => ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
+refuseEventRecordGaps mi mParty mAction events =
+  unless (null gaps) $
+    throwError $ InterpreterError $ Text.intercalate "\n"
+      [ "Missing required field '" <> role <> "." <> field <> "' (" <> con <> "): "
+          <> "an event's record is part of the request, so it never takes the field's TYPICALLY default. "
+          <> "Give every field of it."
+      | (role, con, field) <- gaps
+      ]
+  where
+    -- constructor name -> its fields that have a TYPICALLY
+    defaultedFields :: Map Text [Text]
+    defaultedFields = Map.fromList
+      [ (rawNameToText (rawName (getActual ctor)), [ f | (f, _, Just _) <- fields ])
+      | (ctor, fields) <- Map.elems mi.miRecords
+      ]
+
+    gaps =
+      [ ("events[" <> Text.textShow i <> "]." <> label, con, field)
+      | (i, ev) <- zip [0 :: Int ..] events
+      , (label, mType, lit) <- [("party", mParty, ev.party), ("action", mAction, ev.action)]
+      , Just (con, given) <- [recordShape mType lit]
+      , field <- Map.findWithDefault [] con defaultedFields
+      , field `notElem` given
+      ]
+
+    -- The shapes 'Backend.CodeGen.fnLiteralToL4ExprWithType' and
+    -- 'Backend.CodeGen.fnLiteralToL4Expr' turn into @Con WITH field IS value, ...@:
+    -- with the type name known, any object is a record of that type; without it,
+    -- a one-key object whose value is an object names the constructor itself.
+    recordShape :: Maybe Text -> FnLiteral -> Maybe (Text, [Text])
+    recordShape (Just t) (FnObject fs@(_ : _))    = Just (t, map fst fs)
+    recordShape Nothing  (FnObject [(c, FnObject fs)]) = Just (c, map fst fs)
+    recordShape _ _                               = Nothing
 
 -- | Direct AST evaluation (fast path) - for simple types without FnObject.
 -- Each supplied ASSUME is bound by installing a nullary DECIDE at the
