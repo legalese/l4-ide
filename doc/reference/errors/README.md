@@ -659,6 +659,8 @@ but it is an assumed term.
 
 **What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
 
+Evaluation stops wherever it needs the blank's value: to test it with `IF`, to compare it with `EQUALS` on either side, to calculate with it, to turn it into text with `AS STRING`, `TOSTRING` or `JSONENCODE`, or as the answer, day by day, of `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST` or `WHEN NEXT`. An `#EVAL` whose answer _is_ the blank, such as `#EVAL rate`, or `#EVAL TRUE AND eligible` with `eligible` a blank, stops the same way rather than print the name as though it were the answer. A rule that only carries the blank along gives its answer with the name in it: `#EVAL LIST rate, 6` prints `LIST rate, 6`.
+
 **How to fix it:** Decide which of three things you meant.
 
 - _The fact genuinely varies from case to case._ Supply it from outside the file. `l4 batch rules.l4 --inputs cases.json` fills each blank from the case it is given, as do `jl4-service` and the web form generated from an `@export`ed rule; the published list of facts asks for exactly the blanks that rule reads, directly or through any rule it relies on, and requires every one of them.
