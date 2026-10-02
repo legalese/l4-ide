@@ -1,28 +1,28 @@
 fidelity report — DMN 1.3 (XML), camunda flavor
-  [D-TYPICALLY] lossy — Config.timeout  (main.l4:18:5-37)
-      the field `timeout` of `Config` carries TYPICALLY 30, and DMN has no default for an itemComponent: an evaluation that leaves `timeout` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 30
+  [D-TYPICALLY] lossy — Config.timeout  (main.l4:20:5-37)
+      the field `timeout` of `Config` carries TYPICALLY 30, and DMN has no default for an itemComponent: an evaluation that leaves `timeout` out of the record gets `null` for it on Camunda 8 and on KIE alike, and neither reports an error, not 30
       lost: the presumption: the source says an omitted component is 30, and the model says it is nothing
-  [D-TYPICALLY] lossy — input_has_capacity  (main.l4:22:11-53)
+  [D-TYPICALLY] lossy — input_has_capacity  (main.l4:24:11-53)
       the section GIVEN `has capacity` carries TYPICALLY TRUE, and DMN has no default for an inputData: an evaluation that leaves `has capacity` out gets no value for it (`null` on Camunda 8, a model error on KIE), not TRUE
       lost: the presumption: the source says an omitted input is TRUE, and the model says it is nothing
-  [D-TYPICALLY] lossy — input_rate  (main.l4:30:7-35)
-      the GIVEN `rate` of `the fee` carries TYPICALLY 3, and DMN has no default for an inputData or a BKM parameter: an evaluation that leaves `rate` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 3
+  [D-TYPICALLY] lossy — input_rate  (main.l4:32:7-35)
+      the GIVEN `rate` of `the fee` carries TYPICALLY 3, and DMN has no default for an inputData: an evaluation that leaves `rate` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 3
       lost: the presumption: the source says an omitted input is 3, and the model says it is nothing
-  [D-TYPICALLY] lossy — input_income  (main.l4:41:7-41)
-      the GIVEN `income` of `the band` carries TYPICALLY 50000, and DMN has no default for an inputData or a BKM parameter: an evaluation that leaves `income` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 50000
+  [D-TYPICALLY] lossy — input_income  (main.l4:43:7-41)
+      the GIVEN `income` of `the band` carries TYPICALLY 50000, and DMN has no default for an inputData: an evaluation that leaves `income` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 50000
       lost: the presumption: the source says an omitted input is 50000, and the model says it is nothing
-  [D-LITERALEXPR] advisory — decision_may_contract  (main.l4:27:22-51)
+  [D-LITERALEXPR] advisory — decision_may_contract  (main.l4:29:22-51)
       `may contract` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_fee  (main.l4:33:27-42)
+  [D-LITERALEXPR] advisory — decision_the_fee  (main.l4:35:27-42)
       `the fee` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
-  [D-LITERALEXPR] advisory — decision_the_budget  (main.l4:38:22-55)
+  [D-LITERALEXPR] advisory — decision_the_budget  (main.l4:40:22-55)
       `the budget` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-SVCEMPTY] advisory — Capacity
       the section `Capacity` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 4 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
       lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
-  [D-ORDERDEPENDENT] advisory — decision_the_band  (main.l4:45:10-32)
+  [D-ORDERDEPENDENT] advisory — decision_the_band  (main.l4:47:10-32)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it

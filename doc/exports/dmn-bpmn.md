@@ -100,8 +100,12 @@ carry, at lossy severity, instead of dropping it without a word.
 
 **DMN** (`D-TYPICALLY`, also in the `dmn-md` report). A DMN `inputData`, a business knowledge model
 parameter and a record's `itemComponent` have no default. What an evaluation that leaves one out gets
-is up to the engine, and the two the export is checked against disagree: **Camunda 8 reads `null`, and
-KIE reports a model error and skips every decision that needed it.** Neither reads the default. Worse,
+is up to the engine. For a top-level input the two the export is checked against disagree: **Camunda 8
+reads `null`, and KIE reports a model error and skips every decision that needed it.** For a component
+of a record they agree, in the quieter direction: **both read `null`, and neither says a word**. A
+decision that multiplies the missing component answers `null`, and KIE reports that decision as
+succeeded (measured on the `defaults.l4` exhibit with the record's `timeout` left out, Camunda 8.7.6 and
+KIE 8.44.0.Final). Neither reads the default. Worse,
 a decision table over a missing input does not fail on Camunda: `null` matches no condition, so the
 table falls through to its `OTHERWISE` row, and answers confidently with a number the source never
 gave (measured on the `defaults.l4` exhibit: with `income` left out, Camunda answers band 1, where the

@@ -1,0 +1,31 @@
+{
+  "note": [
+    "One case over defaults.dmn: the record `c` arrives WITHOUT its `timeout` component, which the source",
+    "says is TYPICALLY 30. The expectation is the answer the source gives (30 TIMES 2 = 60), so the harness",
+    "reports a mismatch on both engines, and the tests in jl4/tests-cli/CliTest/DmnBpmn.hs read what each",
+    "engine printed instead of the verdict.",
+    "",
+    "Measured 2026-10-03 (Camunda 8.7.6, KIE 8.44.0.Final): BOTH read the missing component as null and",
+    "BOTH are silent about it. KIE does not treat a missing record component like a missing top-level",
+    "input (null-absent.dmn: a model error, the decision SKIPPED); it evaluates the decision and answers",
+    "null. A D-TYPICALLY note on a record field says exactly that."
+  ],
+  "cases": [
+    {
+      "name": "c.timeout left out of the record",
+      "context": {
+        "has_capacity": true,
+        "is_adult": true,
+        "rate": 3,
+        "base": 10,
+        "income": 60000,
+        "c": {
+          "retries": 2
+        }
+      },
+      "expect": {
+        "the_budget": 60
+      }
+    }
+  ]
+}
