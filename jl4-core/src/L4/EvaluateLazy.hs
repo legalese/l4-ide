@@ -996,6 +996,13 @@ recordFieldDefaults decls = Map.fromList
 -- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
 -- naming the type the rules decoded.
 --
+-- A default a named application of the rules took (W4, W5) is listed in BOTH
+-- modes, as @WITH rule: input@. T4b says the mark covers "every default that
+-- took effect, wherever filled", and a default taken inside the rules is one
+-- the switch cannot withdraw in either mode. Decided by Claude overnight
+-- 2026-10-03, pending Meng's review; T6b's filter ("only those whose binder or
+-- JSON path is part of the request") can be read the other way.
+--
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
 requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
@@ -1006,11 +1013,14 @@ requestPresumed presume fieldName inputs events =
     (FromDecode root, path)
       | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
       | otherwise   -> Nothing
-    -- A default a named application of the RULES took. Its binder is the
-    -- callee's, not an input of the request, so it must not fall through to
-    -- the case below, where a binder that shares an input's spelling would be
-    -- listed as that input.
-    (FromNamedApp _, _) -> Nothing
+    -- A default a named application of the RULES took (W4, W5): the answer
+    -- rests on it, in both modes, because no request could supply it. Its
+    -- binder is the callee's, not an input of the request, so it is listed
+    -- under the application and must not fall through to the case below,
+    -- where a binder that shares an input's spelling would be listed as that
+    -- input. Written @WITH scaled: rate@ (the application, then the input), as
+    -- a rules' own decode is written @JSONDECODE T: path@.
+    (FromNamedApp callee, path) -> Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
     _ -> Nothing
