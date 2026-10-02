@@ -234,9 +234,14 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
 
 A `TYPICALLY` default that took effect is a node of the `reasoning` tree, and of the `graphviz` graph, at the place the rule first read it (W8 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 In `reasoning` it is `{"exampleCode": ["has capacity"], "explanation": ["has capacity took its default (declared at capacity.l4:3:49-53)", "Result: TRUE"], "children": []}`.
+`exampleCode` is the string the `presumed` list uses for the same default: the input's name, a JSON path such as `cfg.timeout` for a field below it, and `JSONDECODE Settings: limit` for a field a rule's own `JSONDECODE` filled.
+So a client can mark the nodes that `presumed` lists by comparing strings, without reading the sentence.
 The tree has such a node for each default `presumed` lists, in the order they were read, and none for a default the rule never read.
 It also has one for a default a rule's own `JSONDECODE` filled, which `presumed` leaves out unless the request asked for `"presumption": "hard"`.
-A default read only when the answer is written out (a defaulted field of a record the function hands back) has its node under the expression that built the result.
+A second reader of the same default has no node of its own, so a client that collapses subtrees should rely on `presumed` for the defaults of the whole answer.
+The place named by `declared at` is the author's file and line on every path, the wrapper's and a deontic function's included.
+A default no step of the tree can show, such as a defaulted field of a record the function hands back that nothing computed with, has its node under the last step of the whole expression.
+A rule that runs while the answer is written out (the wrapper path, and every deontic function) has it under the step that read it, inside that run.
 
 #### Deontic (Contract) Evaluation
 

@@ -274,7 +274,8 @@ Measured on the branch's own `l4` and `jl4-service`; the tests named below pin i
 **The mechanism.**
 A default first forced during a traced evaluation emits a `TookDefault` trace action immediately before the `SetRef` of that force (`L4.EvaluateLazy.Machine.traceDefaultForce`, called from `runConfig`), so the event lands in the trace of whatever needed the value, beside the expression that needed it.
 The trace post-processing turns it into a `PreDefault` placeholder for the default's own address and then a `TraceDefault` node, whose steps are the default's own evaluation (empty for a literal, which until W7 is every default) and whose value is the default's.
-The trace emits an event for each default the directive's `presumed` log lists, bar the dropped cases below: both ask the same registry and the same log, so a default is shown once per directive, and only if it was read.
+The trace emits an event for each default the directive's `presumed` log lists: both ask the same registry and the same log, so a default is shown once per directive, and only if it was read, and an event the trace has no step to show it under is hung on the main expression (below), not dropped.
+The cases with no event are the ones `presumed` does not list either: a reader that peeks without forcing, and a section default of an imported module (both under "Not built").
 `FALSE AND <defaulted input>` leaves no event (test: "shows nothing for a default the rule never read", and the `never reads it` directive of `ok/typically-trace.l4`).
 A value supplied with `WITH` takes no default and shows as the argument it is (`doubled OF 5`, same fixture), which is R8's "an inner `WITH` override shows as the argument it is, at its site".
 `Presumed`, `PresumedOrigin` and `renderPresumedPath` moved from `Machine` to `Trace`, which `Machine` imports and still exports, so that the trace can name them without an import cycle.
@@ -282,9 +283,11 @@ A value supplied with `WITH` takes no default and shows as the argument it is (`
 **Where the event hangs.**
 On the last expression entered in the nearest frame that has entered one.
 A builtin operator's frame (`TIMES`, `>=`, `EQUALS`) is pushed to wait for its operands and enters no expression of its own, so it is passed over, and the event is a child of the application that needed the value: `` `the rate` TIMES 2 `` shows the event below it.
-A default first read while the result is being written out (a defaulted field of a record the function hands back, which nothing computed with) has no frame open; `hoistLateDefaults` moves its event to just before the result of the main expression.
-Neither step can fail the trace: with no frame to hang from, or a main expression that does not end in the usual `Exit` and `Pop`, the event is dropped, and it is still in `presumed`.
-Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", eight cases, three of which fail when the climbing and the hoist are removed), and the service's "keeps the trace when a default is read on the other paths" (a trace that failed to post-process is replaced by a single node saying so, which no other assertion would notice).
+The event stays where the default was read also when the rule that read it ran late, while the result is written out after the main expression has finished (`JUST rule`, a `LIST` of rule results, `map`, every service request through the wrapper, every `DEONTIC` function): that run is a placeholder in the main trace, and the event is in it, under the step that needed the value.
+An event that no step of the finished trace can show it under is hung by `hangUnplacedDefaults` on the last step of the main expression, in the order the defaults were read.
+Two shapes need it: a default first read while the result is written out with no run of a rule to hang from (a defaulted field of a record the function hands back, which nothing computed with), and a read inside a definition with no inputs, whose evaluation the trace does not unfold (a module-level definition that decodes JSON and leaves a field out).
+Nothing is dropped: the walk finds every event the main trace does not reach, following each placeholder once.
+Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", ten cases); the service's "a TYPICALLY default in the reasoning tree" (eleven cases, among them the wrapper and deontic placement and the quoted range); the corpus files `ok/typically-trace.l4` and `ok/typically-trace-where.l4`.
 
 **How each surface says it.**
 Decided by Claude overnight 2026-10-03, pending Meng's review: a reader of the output sees these words and R8 does not give them, and there is no conservative option to prefer, since keeping today's behaviour would be not building W8.
@@ -312,15 +315,17 @@ Commits `3fcf9c4fe` (text) and `47922a4c6` (service); each alternative is stated
 
 - **The graph draws the event as a node (pale yellow)** (commit `54824bf91`, which can be reverted alone).
   R8 says every trace output names each parameter that took its default; a graph that omitted it would be silent about a value the answer rests on, which is the shape of failure this spec ranks first.
-  _Alternative:_ leave the graph as it was, which `GraphViz2`'s own header argues for ("a map, not territory").
+  _Alternative:_ leave the graph as it was.
+  `GraphViz2`'s sentence "a map (high-level flow), not territory (implementation details)" is a comment on `enhanceLabelWithDesc` (`GraphViz2.hs:485`), which argues for replacing an expression's line with its `@desc`; it is not about leaving out a fact the answer rests on, and a presumption is the one fact a reader of a high-level map most needs.
   That is the behaviour of the first W8 commit (`3fcf9c4fe`: `withoutDefaultEvents`, since removed, kept the event out of the graph and the reasoning tree), and it is restored by removing the `TraceDefault` clause of `buildGraph` and filtering the events at `traceToGraphViz`.
   An IF labels its condition, and a CONSIDER its branches, by the position of the subtrace, so the event is left out of that counting (`edgeConfigsFor`); the CLI test holds the IF's single labelled edge to its condition.
 
 - **The place of the event: where the default is first read, not where it was filled in at the root.**
   Filling in is not an event (T6: only defaults actually forced), and the position says which expression needed it.
   _Alternative:_ all events first, at the top of the trace.
-- **A default first read while the result is written out hangs on the expression that built the result** (`hoistLateDefaults`, commit `ae593d742`).
+- **A default that no step of the trace can show it under hangs on the main expression's last step** (`hangUnplacedDefaults`; commit `ae593d742` built it as `hoistLateDefaults`, which moved every event read after the main expression finished and is replaced, see "What review changed").
   _Alternative:_ drop it from the trace, where it is still in `presumed`, which is what the first version of the branch did.
+  Chosen over dropping because T6b says the trace shows every event, and a trace that says nothing about a default the answer rests on is the silent shape this spec ranks first.
 
 **Assumed, not ruled (nobody outside the code is likely to notice):**
 
@@ -329,6 +334,37 @@ Commits `3fcf9c4fe` (text) and `47922a4c6` (service); each alternative is stated
   The MLIR backend does not consume `EvalTrace`.
 - With tracing off, the cost is one read of the trace switch per reference forced.
   Measured on `fib 30` with one section default never read, medians of seven interleaved runs of `l4 run`: 3.30 s on the base `l4`, 3.29 s with this change (a loaded machine, noise about 0.3 s).
+
+**What review changed (2026-10-03).**
+Two adversarial passes over the first build found six defects, all silent.
+Five are repaired and one is deferred; each repair has a test that fails without it, so that a later editor does not silently un-change it.
+
+- **F1 (major): the late hoist moved events out of the step that read them.**
+  `hoistLateDefaults` took every `TookDefault` after the main expression finished, including those inside a thunk that runs late and whose trace is shown, so a rule run while the result is written out showed a bare value and the event as a sibling after the call.
+  Measured with a rule `doubled MEANS IF has capacity THEN the rate TIMES 2 ELSE 0` read through `JUST doubled`, `LIST doubled, tripled` and `map`: each lost the event from `IF has capacity` and `the rate TIMES 2`, and on the service every wrapper-path request and every deontic function put it under the outer `JUST OF`.
+  Replaced by `hangUnplacedDefaults`, which hangs only the events the main trace does not reach (commit `ac9f5fb63`).
+  Test: `TracePostprocessSpec` "keeps an event in the trace of the run that read it, when that run came late"; the service's "hangs the event under the step that read the default on the wrapper path, not under its JUST".
+  Both fail with the old hoist put back.
+- **F2 (major): "declared at" pointed into generated code on the service's wrapper paths.**
+  A rule `GIVEN` default said `rule.l4:26` for a default written at `rule.l4:9` (the generated `InputArgs` record copies the `TYPICALLY`); a deontic function said `seatbelt%20requirement.l4`, a file named for the function; and a section default under two `#EVAL`s said line 5 for line 9, because the filtered directives were deleted and not blanked.
+  `wrapperTrace` puts each range where the author wrote it, and `filterIdeDirectivesText` leaves an empty line for each line it removes (commit `f75ac1bf0`).
+  Test: "says where the default was declared, in the author's file and line, on every path" quotes the whole range for five shapes; it fails with the relocation off, and, at the directives-above shape only, with the filter deleting lines again.
+- **F3 (minor): a default read inside a definition with no inputs was in `presumed` and not in the trace.**
+  The trace does not unfold such a definition (the base binary's trace of `budget PLUS n` has nothing under `budget`), so the event was in an address list that nothing shows.
+  Fixed by the same sweep as F1: the event now hangs on the main expression's last step.
+  Test: the `total budget` directive of `ok/typically-trace-where.l4`, and `TracePostprocessSpec` "hangs on the main expression an event whose run the trace does not show".
+- **F4 (minor): two sections' same-named defaults were one event.**
+  The once-per-default key was `(path, origin)`; it now includes the line the default came from, in the log and in the trace together (`presumedKey`, commit `ac9f5fb63`).
+  `presumed` is unchanged for every export, where names are unique and `requestPresumed` collapses same names anyway.
+  Test: the `both spans` directive of `ok/typically-trace-where.l4` shows both events, at their own lines.
+- **F5 (minor): a section default declared in an imported module has no event. Deferred, not repaired.**
+  `binderDefaults` registers the section inputs of the module being evaluated, and an imported module is evaluated by a run of its own, whose registry is discarded; a rule that reads such a default through an `IMPORT` takes it with no line in the trace and none in `presumed` (measured on the base binary and on `unstable` at `7768812fa` with `IMPORT ratelib` and `#EVALTRACE doubled`: the same, a result of 6 with no line).
+  The trace and `presumed` still agree, which is the invariant this slice owns (T6b), and an `@export` that reaches such an input is refused at check time (`ImplicitCrossesImport`), so it arises in the editor and in `l4 trace` only.
+  The repair is W3's registry, not W8's rendering: it needs the imported modules' section inputs threaded to `withDefaultsKnown`, in a corner where `quadrupled MEANS doubled TIMES 2`, with `doubled` an imported rule that reads a section input, already stops with an internal error on both binaries.
+  The limit is stated on the reference page (`doc/reference/types/TYPICALLY.md`, "In a trace").
+- **F6 (minor): the node and the `presumed` entry named a rule's own `JSONDECODE` default differently.**
+  The node said `limit` and the list `JSONDECODE Settings: limit`; both now come from `presumedName` (commit `f75ac1bf0`).
+  Test: "names a node as presumed does, for a default the rule's own decode filled".
 
 **Not built, and why.**
 
