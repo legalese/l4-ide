@@ -294,3 +294,37 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer as much as batch. Each expected value is what `l4 run`
+  -- gives on the fixture's own #EVAL. On build 90 the first three returned the
+  -- opposite answer with "status":"success", and the division failed to
+  -- re-parse (`a DIVIDED b`).
+  describe "l4 batch agrees with l4 run" $ do
+    let grouping = fixtureDir </> "batch-grouping.l4"
+        rows f   = fixtureDir </> ("batch-grouping-" ++ f ++ ".json")
+    it "keeps the brackets on an OR inside an AND" $
+      batchResult bin grouping (rows "tff") "or under and" `shouldReturn` Bool False
+    it "keeps the brackets on a NOT inside an OR" $
+      batchResult bin grouping (rows "ttf") "not under or" `shouldReturn` Bool True
+    it "keeps the brackets on an IMPLIES inside an AND" $
+      batchResult bin grouping (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "evaluates an exported division" $
+      batchResult bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
+        `shouldReturn` Number 2
+
+-- | Run one row through @l4 batch@ and return its result, failing the test
+-- unless the row's status is @success@.
+batchResult :: FilePath -> FilePath -> FilePath -> String -> IO Value
+batchResult bin file inputs entry = do
+  Output code sout serr <- runL4 bin ["batch", file, "-i", inputs, "-e", entry]
+  unless (code == ExitSuccess) $
+    expectationFailure ("l4 batch exited " ++ show code ++ "\nstdout:\n" ++ sout ++ "\nstderr:\n" ++ serr)
+  row <- case lines sout of
+    (l : _) -> either (\err -> expectationFailure ("NDJSON parse failed: " ++ err ++ "\n" ++ l) >> error "unreachable")
+                      pure (eitherDecode (BSL8.pack l))
+    []      -> expectationFailure "l4 batch printed no rows" >> error "unreachable"
+  objField row "status" `shouldBe` Just (String "success")
+  case objField row "output" of
+    Just (Array outs) | (o : _) <- foldr (:) [] outs, Just r <- objField o "result" -> pure r
+    other -> expectationFailure ("no result in batch output: " ++ show other) >> error "unreachable"

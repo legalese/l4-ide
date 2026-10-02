@@ -203,12 +203,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (GivethSig a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
   printWithLayout = \ case
     MkDeclare _ tySig appForm tyDecl  ->
-      fillCat
-        [ printWithLayout tySig
-        ]
-      <>
+      -- `vcat` (not `fillCat`): under the Unbounded layout `fillCat`'s
+      -- separators render empty, jamming a non-empty GIVEN signature straight
+      -- onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not re-parse.
+      -- Mirrors the Decide instance below.
       vcat
-        [ "DECLARE" <+> printWithLayout appForm
+        [ printWithLayout tySig
+        , "DECLARE" <+> printWithLayout appForm
         , indent 2 (printWithLayout tyDecl)
         ]
 
@@ -255,7 +256,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
   printWithLayout = \ case
     MkAssume _ tySig appForm ty ->
-      fillCat
+      -- `vcat` (not `fillCat`): see the Declare note above — `fillCat` jams a
+      -- non-empty GIVEN signature onto `ASSUME` under the Unbounded layout.
+      vcat
         [ printWithLayout tySig
         , "ASSUME" <+> printWithLayout appForm <> case ty of
             Nothing -> mempty
@@ -319,7 +322,7 @@ instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, TopDecl a) wher
     (_, Directive _ t) -> printWithLayout t
     (_, Import    _ t) -> printWithLayout t
     (i, Section   _ t) -> printWithLayout (i, t)
-    (_, Timezone  _ _) -> mempty  -- TIMEZONE IS declarations are not pretty-printed
+    (_, Timezone  _ e) -> "TIMEZONE IS" <+> printWithLayout e
 
 instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
   printWithLayout :: LayoutPrinter a => Expr a -> Doc ann
@@ -328,22 +331,22 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       let
         conjunction = scanAnd e
       in
-        prettyConj "AND" (fmap printWithLayout conjunction)
+        prettyConj "AND" (fmap parensIfConnective conjunction)
     e@Or{} ->
       let
         disjunction = scanOr e
       in
-        prettyConj "OR" (fmap printWithLayout disjunction)
+        prettyConj "OR" (fmap parensIfConnective disjunction)
     e@RAnd{} ->
       let
         conjunction = scanRAnd e
       in
-        prettyConj "RAND" (fmap printWithLayout conjunction)
+        prettyConj "RAND" (fmap parensIfConnective conjunction)
     e@ROr{} ->
       let
         disjunction = scanROr e
       in
-        prettyConj "ROR" (fmap printWithLayout disjunction)
+        prettyConj "ROR" (fmap parensIfConnective disjunction)
     Implies    _ e1 e2 ->
       parensIfNeeded e1 <+> "IMPLIES" <+> parensIfNeeded e2
     Equals     _ e1 e2 ->
@@ -357,11 +360,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Times      _ e1 e2 ->
       parensIfNeeded e1 <+> "TIMES" <+> parensIfNeeded e2
     DividedBy  _ e1 e2 ->
-      parensIfNeeded e1 <+> "DIVIDED" <+> parensIfNeeded e2
+      parensIfNeeded e1 <+> "DIVIDED BY" <+> parensIfNeeded e2
     Modulo     _ e1 e2 ->
       parensIfNeeded e1 <+> "MODULO" <+> parensIfNeeded e2
+    -- Power has no infix surface syntax; it is the prefix builtin
+    -- `EXPONENT base exp` (`^` is copy/ditto, not power). Printing the old
+    -- `<e1> TO THE POWER OF <e2>` produced unparseable output.
     Exponent   _ e1 e2 ->
-      parensIfNeeded e1 <+> "TO THE POWER OF" <+> parensIfNeeded e2
+      "EXPONENT" <+> parensIfNeeded e1 <+> parensIfNeeded e2
     Cons       _ e1 e2 ->
       parensIfNeeded e1 <+> "FOLLOWED BY" <+> parensIfNeeded e2
     Leq        _ e1 e2 ->
@@ -656,7 +662,7 @@ instance LayoutPrinter BinOp where
     BinOpPlus -> "PLUS"
     BinOpMinus -> "MINUS"
     BinOpTimes -> "TIMES"
-    BinOpDividedBy -> "DIVIDED"
+    BinOpDividedBy -> "DIVIDED BY"
     BinOpModulo -> "MODULO"
     BinOpExponent -> "TO THE POWER OF"
     BinOpTrunc -> "TRUNC"
@@ -750,25 +756,56 @@ quoteIfNeeded n = case Text.uncons n of
 quote :: Text.Text -> Text.Text
 quote n = "`" <> n <> "`"
 
-scanOp :: (forall r. Expr a -> (r, Expr a -> Expr a -> r) -> r) -> Expr a -> [Expr a]
-scanOp match e = match e ([e], \e1 e2 -> scanOp match e1 <> scanOp match e2)
+-- | Print one operand of an AND\/OR\/RAND\/ROR chain, bracketing it when it is
+-- itself a logical connective.
+--
+-- 'scanAnd' and friends flatten only their OWN operator, so a connective
+-- reaching here is nested inside a different one. Printing it bare hands the
+-- grouping back to the parser's precedence table, which does not agree with the
+-- tree, and @l4 batch@ (which re-parses this output and evaluates it) then
+-- returns a different answer with no diagnostic. Measured on build 90:
+--
+--   * @(p OR q) AND r@ printed as @p OR q AND r@, read back as @p OR (q AND r)@;
+--   * @(NOT p) OR q@ printed as @NOT p OR q@, read back as @NOT (p OR q)@;
+--   * @(p IMPLIES q) AND r@ likewise lost its grouping.
+--
+-- Comparisons and arithmetic bracket their own operands already, so only the
+-- six connectives need it. This is the operand rule of unstable's 58f53e6b2.
+parensIfConnective :: LayoutPrinterWithName a => Expr a -> Doc ann
+parensIfConnective e = case carameliseNode e of
+  And{}     -> bracketed
+  Or{}      -> bracketed
+  RAnd{}    -> bracketed
+  ROr{}     -> bracketed
+  Implies{} -> bracketed
+  Not{}     -> bracketed
+  _         -> printWithLayout e
+  where
+    bracketed = surround (printWithLayout e) "(" ")"
 
-scanOr :: Expr a -> [Expr a]
+-- | Caramelise as we descend, so a chain stored as a builtin @App@ (rather than
+-- an 'And'\/'Or' node) is flattened all the way down instead of peeling one
+-- level and leaving 'parensIfConnective' to bracket an associative nest that
+-- needs none.
+scanOp :: HasName a => (forall r. Expr a -> (r, Expr a -> Expr a -> r) -> r) -> Expr a -> [Expr a]
+scanOp match e = match (carameliseNode e) ([e], \e1 e2 -> scanOp match e1 <> scanOp match e2)
+
+scanOr :: HasName a => Expr a -> [Expr a]
 scanOr = scanOp \case
   Or _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
 
-scanAnd :: Expr a -> [Expr a]
+scanAnd :: HasName a => Expr a -> [Expr a]
 scanAnd = scanOp \case
   And _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
 
-scanROr :: Expr a -> [Expr a]
+scanROr :: HasName a => Expr a -> [Expr a]
 scanROr = scanOp \case
   ROr _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
 
-scanRAnd :: Expr a -> [Expr a]
+scanRAnd :: HasName a => Expr a -> [Expr a]
 scanRAnd = scanOp \case
   RAnd _ e1 e2 -> \t -> snd t e1 e2
   _ -> fst
