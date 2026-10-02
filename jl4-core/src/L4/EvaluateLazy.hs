@@ -415,9 +415,9 @@ data EvalDirectiveResult =
     , presumed :: ![Presumed]
       -- ^ The @TYPICALLY@ defaults the run actually forced while producing
       -- the value, in the order forced: W8's \"took its default\" event
-      -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). Not rendered by the
-      -- printers here; @l4 batch@ and @jl4-service@ turn it into their
-      -- @presumed@ list.
+      -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). The trace shows the
+      -- same events ('TraceDefault'); the list itself is not printed here, and
+      -- @l4 batch@ and @jl4-service@ turn it into their @presumed@ list.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData

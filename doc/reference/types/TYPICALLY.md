@@ -134,6 +134,58 @@ optional, which the boundary then honours. The other two have not. A rule's own
 `GIVEN` still cannot be left out at a call inside a file. The default still must
 be a fixed value written out, so it cannot name another `GIVEN`._
 
+## In a trace
+
+A trace shows how an answer was worked out: `#EVALTRACE` in the editor, `l4 trace`, and `trace=full` on the decision service.
+When a rule reads a name that took its default, the trace says so, at the place the rule needed it, with where the default was written and the value it gave:
+
+```l4
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+#EVALTRACE doubled
+#EVALTRACE doubled WITH `the rate` IS 5
+```
+
+```text
+6
+─────
+┌ doubled OF `the rate`
+│┌ doubled
+│└ <function>
+├ `the rate` TIMES 2
+│┌ the rate took its default (declared at rates.l4:2:44-45)
+│└ 3
+└ 6
+
+10
+─────
+┌ doubled OF 5
+│┌ doubled
+│└ <function>
+├ `the rate` TIMES 2
+└ 10
+```
+
+The second trace has no such line, because nothing was presumed: the value was given.
+It shows as the argument it is, `doubled OF 5`.
+
+- **A default that nothing read is not shown.**
+  The rule `FALSE AND` _the defaulted name_ is settled before the name is read, so its trace says nothing about it.
+  This is the same test `presumed` applies at the boundary, and a trace has a line for each default that `presumed` lists.
+- **A default is shown once**, where it was first read, however many rules read it after.
+- **The place is a line and a column.**
+  `rates.l4:2:44-45` is the `3`, on line 2.
+  A `MAYBE` field left out of a record takes `NOTHING` with no `TYPICALLY` behind it, and its line says so: `premium took its default (a MAYBE left out is NOTHING)`.
+- **On the decision service**, the `reasoning` of a `trace=full` answer has a node for it, with the name as its `exampleCode` and the same sentence, then the value, as its `explanation`.
+  The graph from `l4 trace`, and the service's `graphviz` output, draws it as a pale yellow node.
+- **A default that is read only when the answer is written out** appears under the expression that built the answer.
+  A function that hands back a record with a defaulted field it never looked at is the usual case.
+- **A default filled in by a rule's own `JSONDECODE`** is shown too, though `presumed` leaves it out unless the case was run under `hard` presumption: it is a default the case could not have supplied.
+
 ## Examples
 
 **Example file:** [typically-example.l4](typically-example.l4)

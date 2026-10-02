@@ -522,6 +522,7 @@ Evaluate an expression and display the result. Used for testing functions and in
 ### #EVALTRACE
 
 Evaluate an expression and display the full execution trace, showing each step of the evaluation.
+A name that took its [`TYPICALLY`](../types/TYPICALLY.md#in-a-trace) default is shown, where it was read, with the line the default was written on.
 
 **Syntax:**
 

@@ -232,6 +232,12 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+A `TYPICALLY` default that took effect is a node of the `reasoning` tree, and of the `graphviz` graph, at the place the rule first read it (W8 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
+In `reasoning` it is `{"exampleCode": ["has capacity"], "explanation": ["has capacity took its default (declared at capacity.l4:3:49-53)", "Result: TRUE"], "children": []}`.
+The tree has such a node for each default `presumed` lists, in the order they were read, and none for a default the rule never read.
+It also has one for a default a rule's own `JSONDECODE` filled, which `presumed` leaves out unless the request asked for `"presumption": "hard"`.
+A default read only when the answer is written out (a defaulted field of a record the function hands back) has its node under the expression that built the result.
+
 #### Deontic (Contract) Evaluation
 
 Functions returning `DEONTIC` model contract obligations and require additional parameters for simulation:
