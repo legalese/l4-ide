@@ -24,6 +24,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
   - [Wrong number of inputs](#wrong-number-of-inputs)
+  - [Defaults that depend on one another](#defaults-that-depend-on-one-another)
   - [APPEND vs append](#append-vs-append)
   - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
 - [Compiler Warnings](#compiler-warnings)
@@ -403,6 +404,18 @@ result MEANS
 **What went wrong:** The rule was defined with a certain number of `GIVEN` inputs, and a different number was supplied where it was used.
 
 **How to fix it:** Check the rule's definition to see how many inputs it expects, and supply exactly that many. If you meant to supply fewer (partial application), make sure the context supports it.
+
+---
+
+### Defaults that depend on one another
+
+**Error message:** `These inputs' TYPICALLY defaults depend on one another in a circle:` followed by the inputs, or, for one that reads itself, `The TYPICALLY default of … reads … itself`.
+
+**What you wrote:** A [section `GIVEN`](../syntax/section-given.md) whose `TYPICALLY` default is an expression that reads the input it stands in for, directly (`a TYPICALLY (a PLUS 1)`), through a definition it calls, or through another input's default (`b TYPICALLY (c PLUS 1)` with `c TYPICALLY (b PLUS 1)`).
+
+**What went wrong:** A default is worked out from the other inputs it reads, so none in a circle can be worked out first.
+
+**How to fix it:** Make one default in the circle a plain value, or have it supply the input it would read (``(`double it` WITH base IS 10)`` reads nothing of `base`). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
 
 ---
 

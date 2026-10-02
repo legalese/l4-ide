@@ -19,8 +19,13 @@ Each is described below, with what a default does _not_ excuse.
 ## Syntax
 
 ```l4
-name IS A Type TYPICALLY literal
+name IS A Type TYPICALLY default
 ```
+
+The **`default`** is a number, a piece of text, a bare name (`TRUE`, `NOTHING`, a
+constructor of an enumeration, or the name of a definition), or any other
+expression in parentheses: `TYPICALLY (list price DIVIDED BY 10)`. See
+[A default that is worked out](#a-default-that-is-worked-out).
 
 A rule is told some facts about the case in front of it (its **"inputs"**, the
 names listed after `GIVEN`). `TYPICALLY` may appear on:
@@ -150,23 +155,85 @@ quiet choice:
   at all: its value always comes from the `MEANS`, so a default could never be
   used. That is a check error.
 
+## A default that is worked out
+
+A default does not have to be a fixed value. It can be any expression over what
+the file declares: a definition, a constructor, or another section `GIVEN`.
+
+```l4
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
+
+#EVAL `final price`                                          -- 90
+#EVAL `final price` WITH `list price` IS 200                 -- 180
+#EVAL `final price` WITH `list price` IS 200, discount IS 5  -- 195
+```
+
+A compound expression is written in parentheses, which is how every operand
+after `TYPICALLY` is written; a literal or a bare name needs none.
+
+**On a section `GIVEN`**, the default is worked out when something reads the
+input, from the values the evaluation was started with, and once, like any other
+default. In the second line above, `WITH `list price` IS 200` reaches
+`discount` as well: the discount is a tenth of the 200 the call gave, so the
+price is 180. A rule that reads `discount` only through another rule is still
+told which inputs it needs, so a `WITH` that names `list price` for it is
+accepted. Because the answer needs `list price` whenever it needs the
+`discount`, a published rule asks for `list price` too (see below).
+
+**A default may not depend on itself.** `a TYPICALLY (b PLUS 1)` with
+`b TYPICALLY (a PLUS 1)` cannot be worked out, and neither can a default that
+reads its own input directly, or through a definition it calls. That is a check
+error that names the inputs on the circle. A default that _supplies_ the input
+it would otherwise read, such as `` `base doubled` TYPICALLY (`double it` WITH
+base IS 10) ``, reads nothing of it and is no circle.
+
+**On a rule's own `GIVEN` and on a record field**, the default is worked out
+where it is taken, as if it were written there. With
+`rate TYPICALLY (phi PLUS 1)`, the call `scaled WITH base IS 10` means
+`scaled WITH base IS 10, rate IS (phi PLUS 1)`. Three things follow:
+
+- **It sees what that call sees.** A section `GIVEN` it names is the value the
+  rule that makes the call reads. A `WITH` on the rule being called does not
+  reach it: `scaled WITH base IS 10, alpha IS 5` is refused when `scaled` does not
+  itself read `alpha`, because the `5` would go nowhere.
+- **It can name the file's definitions, constructors and section `GIVEN`s, not
+  the rule's other inputs.** `rate TYPICALLY (base PLUS 1)` is reported as
+  naming something that does not exist, since a default is worked out where the
+  rule's inputs are not yet known.
+- **A default that calls the rule it belongs to** is not checked. If the call
+  forces the default again, it runs out of stack ("Recursion depth of 1000000
+  exceeded"), as any rule that calls itself without an end does.
+
+Two places never work a default out, and keep asking for a fixed value: an
+`ASSUME` (deprecated; its default is not used) and a lambda's own `GIVEN`.
+
 ## What the default must be
 
-A default is checked when it is written, and has to be a fixed value:
+A default is checked when it is written:
 
 - It is type-checked against the annotated type
   (`x IS A BOOLEAN TYPICALLY 42` is a type error).
-- It must be a fixed value written out: a number, a piece of text, or a bare
-  name such as `TRUE`, `FALSE`, `NOTHING` or a constructor of an enumeration
-  (`colour IS A Colour TYPICALLY Red`). `x IS A BOOLEAN TYPICALLY (a AND b)` is
-  an error. A default that names something that does not exist is reported once,
-  as that.
+- It is a number, a piece of text, a bare name such as `TRUE`, `FALSE`,
+  `NOTHING`, a constructor of an enumeration
+  (`colour IS A Colour TYPICALLY Red`) or a definition, or an expression in
+  parentheses (`x IS A BOOLEAN TYPICALLY (a AND b)`), on a section `GIVEN`, a
+  rule's `GIVEN` or a record field. A default that names something that does not
+  exist is reported once, as that.
 - It requires an explicit type: the name must carry an `IS A Type` annotation so
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
-- **On an `ASSUME` it is still not used** ([`ASSUME`](ASSUME.md) is deprecated);
-  move the declaration under its section's heading to make the default count.
+- **On an `ASSUME` it is still not used** ([`ASSUME`](ASSUME.md) is deprecated),
+  and must stay a fixed value; move the declaration under its section's heading
+  to make the default count, and to be allowed an expression.
 
 ## At the boundary: `l4 batch` and the decision service
 
@@ -214,13 +281,24 @@ JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
 
+**A default that is an expression is published as its source text**, a JSON
+string, whatever the fact's type: `"default": "`list price` DIVIDED BY 10"` for a
+number. It is there to be read, not to be sent. A client that fills a missing
+fact from the `default` it finds in a schema must not do that for one of these,
+and for a fact of type text cannot tell it from a fixed value, so a client that
+needs the value should leave the fact out and read the answer's `presumed`. The
+service works the expression out itself, from the other facts in the same
+request. A section `GIVEN` that a default reads is a fact of the published rule
+too, and is listed under `required` unless it has a default of its own, because
+the service cannot know that a request will not need it.
+
 _Landed in stages (2026-10-02 and 2026-10-03). A **section** `GIVEN` may be left
 out, and a rule that reads it then uses the default; the published list of facts
 asks for a defaulted fact as optional, which the boundary then honours; a
 **rule's own** `GIVEN` and a **record field** may be left out at a call that
-names its inputs and at a construction. Still to come: a default may not yet
-name another `GIVEN` (it must be a fixed value written out), and nothing yet
-says how to write a construction that leaves out every field._
+names its inputs and at a construction; and a default may be an expression.
+Still to come: nothing yet says how to write a construction that leaves out
+every field._
 
 ## Examples
 
@@ -283,12 +361,13 @@ The companion file no longer carries this spelling.
 - A default is used where the name is left out, and nowhere else: a value
   supplied always wins, and `null` (not known) is never an omission.
 - The default must match the annotated type, or type checking fails.
-- The default must be a fixed value written out, like `18` or `"yes"`.
+- The default is a fixed value like `18` or `"yes"`, or an expression over what
+  the file declares, which is worked out when something reads it.
 - A call that gives its inputs by position, and a construction that gives its
   fields by position, give all of them: only `WITH` may leave one out.
 - On a computed field (one with a MEANS clause) a TYPICALLY is an error.
-- For anything a fixed value cannot express, write an ordinary definition
-  instead.
+- A default that reads the input it stands in for, directly or through another
+  default or a definition, is a check error.
 
 ## See Also
 

@@ -132,7 +132,9 @@ bump n MEANS n TIMES `the rate`
   that names its inputs may leave out one that carries a
   [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out
   a field that does; the default is taken. A call that gives its inputs by
-  position still gives them all. An input with no default is still asked for.
+  position still gives them all. An input with no default is still asked for. A
+  default may be an expression, worked out where the call is, as if written
+  there.
 
 ## Example
 

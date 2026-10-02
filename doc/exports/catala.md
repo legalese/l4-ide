@@ -60,7 +60,8 @@ Catala module name rather than writing a file the toolchain would refuse.
 
 The **constitutive subset** — the definitional layer of L4. `WHERE` bindings become `let … in`,
 `CONSIDER` over an enumeration becomes a `match`, `UNLESS` provisos become exception ladders, and
-`TYPICALLY` becomes a Catala `context` variable carrying an in-scope default.
+`TYPICALLY` becomes a Catala `context` variable carrying an in-scope default, and a default that is an
+expression (`rate TYPICALLY (phi PLUS 1)`) is carried the same way, with the definitions it names.
 
 A pleasant consequence of both backends taking the same subset: the OpenFisca examples compile to
 Catala **unchanged**. The same L4 file feeds both bridges with no edits.
