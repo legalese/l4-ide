@@ -277,6 +277,7 @@ test-suite jl4-core-test
     BlawxLiftSpec
     BlawxParseSpec
     ApiStateGraphLensSpec
+    TypicallyExportSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
