@@ -287,7 +287,7 @@ A builtin operator's frame (`TIMES`, `>=`, `EQUALS`) is pushed to wait for its o
 The event stays where the default was read also when the rule that read it ran late, while the result is written out after the main expression has finished (`JUST rule`, a `LIST` of rule results, `map`, every service request through the wrapper, every `DEONTIC` function): that run is a placeholder in the main trace, and the event is in it, under the step that needed the value.
 An event that no step of the finished trace can show it under is hung by `hangUnplacedDefaults` on the last step of the main expression, in the order the defaults were read.
 Two shapes need it: a default first read while the result is written out with no run of a rule to hang from (a defaulted field of a record the function hands back, which nothing computed with), and a read inside a definition with no inputs, whose evaluation the trace does not unfold (a module-level definition that decodes JSON and leaves a field out).
-Nothing is dropped: the walk finds every event the main trace does not reach, following each placeholder once.
+The post-processing drops no event: the walk finds every event the main trace does not reach, following each placeholder once; a trace cut off at its display limit (`maxTraceNodes`) carries its own marker.
 Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", ten cases, and one more for W11, §4.3); the service's "a TYPICALLY default in the reasoning tree" (eleven cases, among them the wrapper and deontic placement and the quoted range); the corpus files `ok/typically-trace.l4` and `ok/typically-trace-where.l4`.
 
 **How each surface says it.**
