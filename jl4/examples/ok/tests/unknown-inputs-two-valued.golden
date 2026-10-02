@@ -1,0 +1,72 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+unknown-inputs-two-valued.l4:35:1-17:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:36:1-17:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:37:1-55:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:39:1-22:
+  Trying to check equality on types that do not support it
+  These were the values you tried to compare:
+    <function>
+    f
+unknown-inputs-two-valued.l4:42:1-18:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:43:1-17:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:44:1-19:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:45:1-29:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:46:1-36:
+  I could not continue evaluating, because I needed to know the value of
+    xs
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:49:1-64:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:50:1-66:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:51:1-45:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:52:1-45:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:55:1-8:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:56:1-17:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:57:1-21:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-two-valued.l4:60:1-18:
+  assertion failed: expected a refusal, but the expression produced a value
+unknown-inputs-two-valued.l4:63:1-20:
+  LIST n, 6
