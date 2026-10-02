@@ -85,6 +85,9 @@ import L4.Export
   )
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), emptyReport)
+import L4.Interchange.Typically
+  ( DefaultKind (..), DefaultSite (..), classifyDefault, describeDefault, describeSite
+  , moduleDefaultSites )
 import L4.Nlg (simpleLinearizer)
 import qualified L4.Nlg as Nlg
 import L4.Parser.SrcSpan (SrcRange)
@@ -2668,7 +2671,8 @@ assemble ctx opts m = do
     , rpgQueries  = queries
     , rpgDeps     = deps
     , rpgStrata   = strata
-    , rpgFidelity = (emptyReport "relational") { notes = notes <> assumedNotes ctx assumed }
+    , rpgFidelity = (emptyReport "relational")
+        { notes = notes <> assumedNotes assumed <> typicallyNotes m ctx computed assumed }
     }
 
 -- | The module's records in source declaration order ('ctxRecOrder').
@@ -2824,9 +2828,9 @@ assumedInputPreds ctx preds =
 
 -- | The fidelity notes an admitted @ASSUME@ owes: one for a sort the fragment
 -- cannot name (mirroring 'lowerSpec' \'s @R-SORT@, since an input predicate does
--- not go through it) and one for a @TYPICALLY@ default that was dropped.
-assumedNotes :: Ctx -> [RPred] -> [FidelityNote]
-assumedNotes ctx assumed =
+-- not go through it). Its @TYPICALLY@ is reported by 'typicallyNotes'.
+assumedNotes :: [RPred] -> [FidelityNote]
+assumedNotes assumed =
      [ MkFidelityNote
          { code     = "R-SORT"
          , severity = Lossy
@@ -2839,20 +2843,68 @@ assumedNotes ctx assumed =
      | p <- assumed
      , RSOpaque _ <- p.rpParams <> maybeToList p.rpResult
      ]
-  <> [ MkFidelityNote
-         { code     = "R-TYPICALLY"
-         , severity = Lossy
-         , element  = p.rpName.rnText
-         , range    = p.rpProv.rpvRange
-         , message  = "a TYPICALLY default on an ASSUME is dropped: the name becomes an input\
-                      \ predicate, and seeding it would answer the question the target's\
-                      \ interview exists to ask"
-         , lost     = "the default value"
-         }
-     | p <- assumed
-     , Just ad <- [Map.lookup p.rpName.rnUnique ctx.ctxAssumeDefs]
-     , ad.adTypically
-     ]
+
+-- | One @R-TYPICALLY@ note for every @TYPICALLY@ the lowering reached and did
+-- not carry. The middle end carries none of them: its output is a logic
+-- program, and a Horn clause has no default for an argument nobody supplied.
+-- Saying so here, once, in the shared shape, is what lets the Blawx leg (which
+-- prints this note) and any other consumer of 'RelProgram' agree on what was
+-- dropped (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5b).
+--
+-- /Reached/ is each site's own reading of the word:
+--
+-- * a rule's @GIVEN@: the rule was lowered, as an export or a helper it reaches;
+-- * a section @GIVEN@ or an @ASSUME@: some clause called it and it was admitted
+--   as an input predicate (a name nothing reads carries nothing, so loses
+--   nothing);
+-- * a record field: its record is one of the program's records.
+--
+-- Four kinds, because the words differ: where a rule's input goes (an argument
+-- of its predicate), what a section input becomes (an input predicate the
+-- interview asks about), and what a field becomes (an attribute, which is a
+-- fact or the absence of one) are three different reasons a default has
+-- nowhere to live.
+typicallyNotes :: Module Resolved -> Ctx -> [RPred] -> [RPred] -> [FidelityNote]
+typicallyNotes m ctx computed assumed =
+  [ MkFidelityNote
+      { code     = "R-TYPICALLY"
+      , severity = Lossy
+      , element  = s.name
+      , range    = s.range
+      , message  = what s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
+                     <> ", which is dropped: " <> why s.kind
+      , lost     = lostOf s.kind
+      }
+  | s <- moduleDefaultSites m
+  , reached s
+  ]
+ where
+  decided   = Set.fromList [ p.rpProv.rpvUnique | p <- computed ]
+  assumedUs = Set.fromList [ p.rpName.rnUnique | p <- assumed ]
+  records   = Set.fromList ctx.ctxRecOrder
+
+  reached s = case s.kind of
+    DefaultOnRuleGiven    -> maybe False (`Set.member` decided) s.ownerUnique
+    DefaultOnSectionGiven -> Set.member s.unique assumedUs
+    DefaultOnAssume       -> Set.member s.unique assumedUs
+    DefaultOnRecordField  -> maybe False (`Set.member` records) s.ownerUnique
+
+  what = describeSite
+
+  why = \case
+    DefaultOnRuleGiven ->
+      "a rule's inputs are arguments of its predicate, which the caller always supplies,\
+      \ so nothing applies the default"
+    DefaultOnRecordField ->
+      "a Blawx attribute is a fact asserted about an object, or left out; it has no default"
+    _ ->
+      "the name becomes an input predicate, and seeding it would answer the question the\
+      \ target's interview exists to ask"
+
+  lostOf = \case
+    DefaultOnRuleGiven   -> "the default value: a query that leaves this argument out gets none"
+    DefaultOnRecordField -> "the default value: an object with no such fact has none"
+    _                    -> "the default value"
 
 -- | The @ASSUME@d types some emitted predicate's signature mentions, in source
 -- declaration order.

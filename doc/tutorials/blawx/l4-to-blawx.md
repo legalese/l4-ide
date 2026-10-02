@@ -268,9 +268,10 @@ non-structural recursion are all named-fragment exclusions: the exporter
 accumulates diagnostics and refuses, rather than emitting something
 approximate. `TYPICALLY` defaults are the one deliberate loss that does
 _not_ refuse: Blawx has no caller-overridable default machinery, so a
-`TYPICALLY` on an input is dropped and a lossy `R-TYPICALLY` note is
-emitted — check the notes before shipping a module that relies on its
-defaults. As an example of a refusal: at total arity 2 or below, an input
+`TYPICALLY` on a rule's input, a record field or an assumed input is dropped,
+and a lossy `R-TYPICALLY` note is printed on standard error and written into
+the header of the `.pl` dump — check the notes before shipping a module that
+relies on its defaults. As an example of a refusal: at total arity 2 or below, an input
 must be attribute-shaped — exactly one category-sorted parameter plus at
 most a result — while relationship blocks only start at total arity 3, so
 a two-parameter, no-result input falls between the two shapes and is
