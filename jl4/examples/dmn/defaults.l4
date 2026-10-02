@@ -6,7 +6,7 @@
 -- null-absent.dmn measured both); one that leaves a record's component out gets
 -- `null` on both, and neither says a word (defaults-omit-component.cases.json).
 -- Rewriting every read as `if x = null then d else x` would
--- change what each decision says and would not help KIE at all, so the exporter
+-- change what each decision says (and, for a top-level input, would not help KIE: it skips the decision first), so the exporter
 -- does not map a default; it reports each one as a D-TYPICALLY note
 -- (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5). One of each place a TYPICALLY can
 -- sit: a section GIVEN, a rule's own GIVEN, and a record field; plus a rule's
