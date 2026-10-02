@@ -120,9 +120,12 @@ every input a DMN model depends on; do not rely on its omission to mean the defa
 **BPMN** (`P-TYPICALLY`). A process draws no data: a `PROVIDED` condition becomes an opaque
 `conditionExpression` (`F4`), which reads whatever the process instance holds, so an instance that never
 set the variable does not get the default. The note is raised for the rule being drawn, for any rule it
-reaches through `HENCE`, and for the section `GIVEN`s and `ASSUME`s they read (an `ASSUME` imported from
-another file included, with its module named), and for nothing else; a default on an input of an
-unrelated rule is not this process's loss.
+reaches through `HENCE`, and for the section `GIVEN`s, `ASSUME`s and record fields they read (one imported
+from another file included, with its module named), and for nothing else; a default on an input of an
+unrelated rule is not this process's loss, and neither is a default on a field of a record the rule is
+given when nothing the process says names that field. The process draws no record, but a condition such
+as `PROVIDED s's \`in good standing\``names the field, so the instance that holds an`s` without it does
+not get the default.
 
 Neither note is `blocking` (the notations are not at fault for lacking a default), so
 `--fail-on=lossy` is the setting that makes a default you meant to carry stop a pipeline.

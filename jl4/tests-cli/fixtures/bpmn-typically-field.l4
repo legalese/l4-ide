@@ -1,0 +1,18 @@
+-- The same rule, with the default on a record's field that its PROVIDED reads.
+-- The process draws no record, but the condition names the field, so an
+-- instance that holds a Standing without it does not get TRUE. A second
+-- defaulted field that no condition reads must not be reported.
+DECLARE Actor IS ONE OF Member
+DECLARE Action IS ONE OF pay
+
+DECLARE Standing HAS
+    `in good standing` IS A BOOLEAN TYPICALLY TRUE
+    `years a member`   IS A NUMBER  TYPICALLY 0
+
+GIVEN s IS A Standing
+GIVETH A DEONTIC Actor Action
+`the duty` s MEANS
+    PARTY Member
+    MUST pay
+    PROVIDED s's `in good standing`
+    WITHIN 14

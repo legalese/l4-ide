@@ -85,15 +85,15 @@ supplies one. A default is a statement about what to presume, so an export eithe
 mechanism of the target that means the same thing, or says that it could not. **None of them drops
 it quietly, and none of them replaces it with a default of the target's own.**
 
-| Export                            | A rule's own `GIVEN`                                              | A section `GIVEN` or `ASSUME`                | A record field                                   |
-| --------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------ |
-| **[docassemble](docassemble.md)** | pre-fills the question (`default:`), and says so (`DA-TYPICALLY`) | the same                                     | the same                                         |
-| **[OpenFisca](openfisca.md)**     | the variable's `default_value`                                    | refused (the export reads no section inputs) | the variable's `default_value`                   |
-| **[Catala](catala.md)**           | a `context` variable with an in-scope default                     | the same                                     | dropped; the notes block says so                 |
-| **[Blawx](blawx.md)**             | dropped; `R-TYPICALLY` on stderr and in the `.pl` header          | dropped, the same way                        | dropped, the same way                            |
-| **[DMN](dmn-bpmn.md)**            | dropped; `D-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | dropped, the same way                            |
-| **[BPMN](dmn-bpmn.md)**           | dropped; `P-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | not carried (the process draws no record fields) |
-| **[yscript](yscript.md)**         | not exportable (a rule with `GIVEN`s is refused already)          | **refused**, naming the fact and its default | not exportable                                   |
+| Export                            | A rule's own `GIVEN`                                              | A section `GIVEN` or `ASSUME`                | A record field                                                  |
+| --------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| **[docassemble](docassemble.md)** | pre-fills the question (`default:`), and says so (`DA-TYPICALLY`) | the same                                     | the same                                                        |
+| **[OpenFisca](openfisca.md)**     | the variable's `default_value`                                    | refused (the export reads no section inputs) | the variable's `default_value`                                  |
+| **[Catala](catala.md)**           | a `context` variable with an in-scope default                     | the same                                     | dropped; the notes block says so                                |
+| **[Blawx](blawx.md)**             | dropped; `R-TYPICALLY` on stderr and in the `.pl` header          | dropped, the same way                        | dropped, the same way                                           |
+| **[DMN](dmn-bpmn.md)**            | dropped; `D-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | dropped, the same way                                           |
+| **[BPMN](dmn-bpmn.md)**           | dropped; `P-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | dropped, the same way, when the drawn rule's condition reads it |
+| **[yscript](yscript.md)**         | not exportable (a rule with `GIVEN`s is refused already)          | **refused**, naming the fact and its default | not exportable                                                  |
 
 Three things the table cannot show:
 

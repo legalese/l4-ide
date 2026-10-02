@@ -225,7 +225,23 @@ nothingDefaultSrc = Text.unlines
   ]
 
 -- | A regulative rule with its default on its own GIVEN.
-bpmnGivenSrc, bpmnSectionSrc, bpmnAssumeSrc, bpmnHenceSrc, bpmnPlainSrc :: Text
+bpmnGivenSrc, bpmnSectionSrc, bpmnAssumeSrc, bpmnHenceSrc, bpmnPlainSrc, bpmnFieldSrc :: Text
+bpmnFieldSrc = Text.unlines
+  [ "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "DECLARE Standing HAS"
+  , "    `in good standing` IS A BOOLEAN TYPICALLY TRUE"
+  , "    `years a member`   IS A NUMBER  TYPICALLY 0"
+  , ""
+  , "GIVEN s IS A Standing"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` s MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    PROVIDED s's `in good standing`"
+  , "    WITHIN 14"
+  ]
 bpmnGivenSrc = Text.unlines
   [ "DECLARE Actor IS ONE OF Member"
   , "DECLARE Action IS ONE OF pay"
@@ -338,6 +354,7 @@ importedLib = Text.unlines
   [ "DECLARE Config HAS"
   , "    timeout IS A NUMBER TYPICALLY 30"
   , "    retries IS A NUMBER"
+  , "    grace   IS A NUMBER TYPICALLY 5"
   , ""
   , "ASSUME allowance IS A NUMBER TYPICALLY 100"
   , ""
@@ -350,7 +367,21 @@ importedLib = Text.unlines
   , "`library rule` k MEANS k"
   ]
 
-importedDmnMain, importedBpmnMain :: Text
+importedDmnMain, importedBpmnMain, importedBpmnFieldMain :: Text
+importedBpmnFieldMain = Text.unlines
+  [ "IMPORT ratelib"
+  , ""
+  , "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "GIVEN c IS A Config"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` c MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    PROVIDED c's timeout AT LEAST 10"
+  , "    WITHIN 14"
+  ]
 importedDmnMain = Text.unlines
   [ "IMPORT ratelib"
   , ""
@@ -623,6 +654,8 @@ spec = do
       map (.message) ns `shouldSatisfy` (not . mentions "an unrelated fact")
       -- a rule's own GIVEN default in the library is not this model's loss
       map (.message) ns `shouldSatisfy` (not . mentions "library rule")
+      -- nor a defaulted field of the imported record that no decision reads
+      map (.message) ns `shouldSatisfy` (not . mentions "`grace`")
       -- the dmnmd report carries them too
       length [ () | n <- (markdownReport (dmnDrg tcI.tcdModule tcI)).notes, n.code == "D-TYPICALLY" ] `shouldBe` 2
 
@@ -648,6 +681,15 @@ spec = do
       map (.message) ns `shouldSatisfy`
         mentions "the GIVEN `is complete` of `the acknowledgement` carries TYPICALLY TRUE"
 
+    it "reports a default on a record field the rule's condition names, and not on the field it does not" $ do
+      let ns = bpmnNotes (moduleOf bpmnFieldSrc) "the duty"
+      map (.code) ns `shouldBe` ["P-TYPICALLY"]
+      map (.element) ns `shouldBe` ["in good standing"]
+      map (.message) ns `shouldSatisfy`
+        mentions "the field `in good standing` of `Standing` carries TYPICALLY TRUE"
+      map (.message) ns `shouldSatisfy` mentions "an instance that holds a `Standing` without it does not get TRUE"
+      map (.message) ns `shouldSatisfy` (not . mentions "years a member")
+
     it "reports nothing when the module writes no TYPICALLY" $
       bpmnNotes (moduleOf bpmnPlainSrc) "the duty" `shouldBe` []
 
@@ -657,6 +699,13 @@ spec = do
       map (.code) ns `shouldBe` ["P-TYPICALLY"]
       map (.message) ns `shouldSatisfy`
         mentions "the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE"
+
+    it "reports a record field read through an IMPORT, and not the imported field nothing reads" $ do
+      let tcI = checkedIn [("ratelib", importedLib)] importedBpmnFieldMain
+          ns  = bpmnNotesWith (importsOf tcI) tcI.tcdModule "the duty"
+      map (.element) ns `shouldBe` ["timeout"]
+      map (.message) ns `shouldSatisfy`
+        mentions "the field `timeout` of `Config` (in the imported module `ratelib`) carries TYPICALLY 30"
 
     it "says nothing of that default when it is not handed the imports (the control)" $ do
       let tcI = checkedIn [("ratelib", importedLib)] importedBpmnMain
