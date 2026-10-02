@@ -1146,8 +1146,8 @@ data ActionPatternPos
 -- 'RawName' and unioning it across modules could conflate same-named
 -- record types; the cost is error-message quality only (see the notes in
 -- the exhaustiveness design doc).
-unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> CheckEnv
-unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders =
+unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> InputDefaults -> CheckEnv
+unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders depInputDefaults =
   MkCheckEnv
     { moduleUri = accEnv.moduleUri
     , environment = Map.unionWith List.union accEnv.environment depEnvironment
@@ -1161,7 +1161,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , cyclicSynonyms = mempty
     , sectionBinderNames = mempty
     , sectionBinderDecls = mempty
-    , visibleInputDefaults = accEnv.visibleInputDefaults
+    , visibleInputDefaults = Map.union accEnv.visibleInputDefaults depInputDefaults
     , importedImplicitReaders =
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
@@ -1226,6 +1226,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , inputDefaults  :: !InputDefaults
+    -- ^ The @TYPICALLY@ defaults of every rule input and record field this
+    -- module declares, plus those it inherited from its dependencies, so a chain
+    -- of imports carries them all the way out. An importer merges this into
+    -- 'CheckEnv.visibleInputDefaults', which is what lets a named application of an
+    -- imported rule, or a construction of an imported record, leave a defaulted
+    -- input or field out (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5).
     , implicitReaders :: !(Set Unique)
     -- ^ Definitions with a non-empty read-set: this module's own, plus those
     -- it inherited from its dependencies, so a chain of imports carries them

@@ -327,6 +327,8 @@ doCheckProgramWithDependencies checkState checkEnv program =
               { program = rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
+              , inputDefaults =
+                  Map.union (moduleInputDefaults rprog) checkEnv.visibleInputDefaults
               , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
               , substitution = s'.substitution
               , environment = env.environment
@@ -739,6 +741,37 @@ withCheckedFieldDefaults m act = do
     Declare _ d -> [d]
     Section _ s -> fromSection s
     _           -> []
+
+-- | The @TYPICALLY@ defaults a checked module declares, for the modules that
+-- import it ('CheckResult.inputDefaults'): those of its rules' inputs, found on
+-- each rule's own signature, and those of its records' fields.
+--
+-- The recorded type of each default is dropped. It was inferred in THIS
+-- module's substitution, and an importer would otherwise be handed inference
+-- variables it has no substitution for (see 'unionImportedCheckEnv', which
+-- takes only zonked input). Nothing reads a default's type: it is the declared
+-- type of the input, and the application that takes it is checked against that.
+moduleInputDefaults :: Module Resolved -> InputDefaults
+moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection sect)
+ where
+  fromSection (MkSection _ _ _ _ decls) = Map.unions (map fromDecl decls)
+  fromDecl = \ case
+    Decide _ (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n _ _) _)
+      | not (Map.null ds) -> Map.singleton (getUnique n) ds
+      where
+        ds = Map.fromList
+          [ (getUnique bn, MkInputDefault { binder = getOriginal bn, declaredAt = rangeOf d, value = d })
+          | MkOptionallyTypedName _ bn _ (Just d) <- otns
+          ]
+    Declare _ d -> recordInputDefaults d
+    Section _ s -> fromSection s
+    _           -> Map.empty
+  untyped d =
+    MkInputDefault
+      { binder = d.binder
+      , declaredAt = d.declaredAt
+      , value = d.value & annoOf %~ \ a -> a { extra = a.extra { resolvedInfo = Nothing } }
+      }
 
 -- | The defaults of a record's fields, keyed by the record's constructor.
 --
