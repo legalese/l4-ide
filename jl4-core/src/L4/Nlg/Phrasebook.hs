@@ -85,6 +85,7 @@ hebrew = Map.fromList [ (Text.words en, he) | (en, he) <- entries ]
     -- calls
     , ("with",               "עם")
     , ("where",              "כאשר")
+    , ("by default",         "כברירת מחדל")
     , ("given",              "בהינתן")
     -- arithmetic
     , ("the sum of",         "הסכום של")
