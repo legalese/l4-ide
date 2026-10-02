@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -547,6 +547,33 @@ spec = describe "integration" do
         skipped <- evalFunction baseUrl mgr "ty-named" "combine"
           (args ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
         expectAnswer skipped (FnLitInt 0) []
+
+    -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+    -- listed whenever the same constructor was evaluated later in the run. Each
+    -- case is a default that is NOT read (or a pair of which only one is), with a
+    -- later use of the same constructor to trip it, on both paths.
+    it "lists a constructor default a named site took only if the answer read it, on both paths" do
+      withServiceFromSources "ty-ctor" [("ctor.l4", constructorNamedDefaultJL4)] \baseUrl mgr -> do
+        let flag = "unused flag" Aeson..= False
+            run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (args (extra <> [flag]))
+            runWrapped fn extra = evalFunction baseUrl mgr "ty-ctor" fn
+              (args (extra <> ["unused flag" Aeson..= uncertain]))
+        -- x FALSE: the AND stops at `a`; x TRUE: `b` is read
+        stops <- run "short circuits" ["x" Aeson..= False]
+        expectAnswer stops (FnLitInt 0) []
+        reads' <- run "short circuits" ["x" Aeson..= True]
+        expectAnswer reads' (FnLitInt 0) ["WITH both: b"]
+        stopsWrapped <- runWrapped "short circuits" ["x" Aeson..= False]
+        expectAnswer stopsWrapped (FnLitInt 0) []
+        readsWrapped <- runWrapped "short circuits" ["x" Aeson..= True]
+        expectAnswer readsWrapped (FnLitInt 0) ["WITH both: b"]
+        -- two defaults that are the same constructor: `ignoreD`'s `d` is never
+        -- read, `both`'s `b` is, and only `b` is listed
+        pair <- run "two of one constructor" ["x" Aeson..= True]
+        expectAnswer pair (FnLitBool False) ["WITH both: b"]
+        -- an enum default the rule never mentions, then that enum's constructor
+        enumNever <- run "enum never mentioned" ["x" Aeson..= True]
+        expectAnswer enumNever (FnLitString "Red") []
 
     it "lets a supplied value win, and presumes nothing" do
       withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do

@@ -176,6 +176,13 @@ batchTyNamed, batchTyNamedJson :: FilePath
 batchTyNamed     = fixtureDir </> "batch-typically-named.l4"
 batchTyNamedJson = fixtureDir </> "batch-typically-named.json"
 
+-- | The same, for defaults whose value is a bare constructor (TRUE, FALSE, an
+-- enum value), which share a cell with every other use of it unless the checker's
+-- added argument is given a cell of its own.
+batchTyCtors, batchTyCtorsJson :: FilePath
+batchTyCtors     = fixtureDir </> "batch-typically-named-constructors.l4"
+batchTyCtorsJson = fixtureDir </> "batch-typically-named-constructors.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -341,7 +348,7 @@ coreFixtures =
   , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
-  , batchTyNamed, batchTyNamedJson
+  , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
@@ -1570,6 +1577,47 @@ spec bin = do
       map resultAndPresumed rows `shouldBe`
         [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
         , (Just (Number 0), presumedOf [])
+        ]
+
+  -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+  -- listed whenever the same constructor was evaluated anywhere later in the
+  -- run, and two such defaults shared one registry slot. Each case below is a
+  -- default that is NOT read, or a pair of which only one is, with a later use
+  -- of the same constructor to trip it. The numeric defaults above never could.
+  describe "l4 batch: a constructor default at a named site is listed only if the answer read it" $ do
+    let rowsFor entry = do
+          Output code sout _ <-
+            runL4 bin [ "batch", batchTyCtors, "--inputs", batchTyCtorsJson
+                      , "--entrypoint", entry, "--format", "json" ]
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+
+    it "lists nothing while an AND stops before the default, and the default once it is read" $ do
+      rows <- rowsFor "short circuits"
+      rows `shouldBe`
+        [ (Just (Number 0), presumedOf [])
+        , (Just (Number 0), presumedOf ["WITH both: b"])
+        ]
+
+    it "lists nothing for an enum default the rule never mentions, though the rule evaluates that constructor" $ do
+      rows <- rowsFor "never mentioned"
+      rows `shouldBe`
+        [ (Just (String "Red"), presumedOf [])
+        , (Just (String "Red"), presumedOf [])
+        ]
+
+    it "lists the one of two defaults of the same constructor that was read, and not the other" $ do
+      rows <- rowsFor "two of one constructor"
+      rows `shouldBe`
+        [ (Just (Bool False), presumedOf ["WITH readsB: b"])
+        , (Just (Bool False), presumedOf ["WITH readsB: b"])
+        ]
+
+    it "lists nothing for a record's boolean field that the construction left out and nothing read" $ do
+      rows <- rowsFor "unread field"
+      rows `shouldBe`
+        [ (Just (Bool True), presumedOf [])
+        , (Just (Bool True), presumedOf [])
         ]
 
   describe "l4 trace (output path safety)" $ do
