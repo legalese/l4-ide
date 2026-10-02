@@ -175,18 +175,30 @@ doubled MEANS `the rate` TIMES 2
 The second trace has no such line, because nothing was presumed: the value was given.
 It shows as the argument it is, `doubled OF 5`.
 
+The two lines have the shape of any step the rule took, what was worked out over the value it gave, and the words `took its default` are what tell them apart.
+
 - **A default that nothing read is not shown.**
   The rule `FALSE AND` _the defaulted name_ is settled before the name is read, so its trace says nothing about it.
   This is the same test `presumed` applies at the boundary, and a trace has a line for each default that `presumed` lists.
-- **A default is shown once**, where it was first read, however many rules read it after.
+- **A default is shown once**, where it was first read.
+  A rule that reads the same name afterwards shows only its value, with no line of its own.
+  To see every default an answer rests on, take the first line of each, or on the decision service read the answer's `presumed` list.
 - **The place is a line and a column.**
-  `rates.l4:2:44-45` is the `3`, on line 2.
+  `rates.l4:2:44-45` is where the value `3` is written, on line 2, columns 44 to 45: the value itself, which is narrower than the whole line.
   A `MAYBE` field left out of a record takes `NOTHING` with no `TYPICALLY` behind it, and its line says so: `premium took its default (a MAYBE left out is NOTHING)`.
-- **On the decision service**, the `reasoning` of a `trace=full` answer has a node for it, with the name as its `exampleCode` and the same sentence, then the value, as its `explanation`.
+- **On the decision service**, the `reasoning` of a `trace=full` answer has a node for it, with the same sentence, then the value, as its `explanation`, and the name as its `exampleCode`.
+  The name is the string the answer's `presumed` list uses for the same default, so the nodes can be matched to the list.
+  The place is the author's own file and line, also when the request went through the service's wrapper.
   The graph from `l4 trace`, and the service's `graphviz` output, draws it as a pale yellow node.
-- **A default that is read only when the answer is written out** appears under the expression that built the answer.
-  A function that hands back a record with a defaulted field it never looked at is the usual case.
+- **A rule that runs only when the answer is written out** shows the default under the step that read it, as any rule does.
+  Handing back `JUST` the rule, a list of what rules gave, or a deontic function's answer are the usual cases.
+- **A default that no step of the trace can show** hangs under the last step of the whole expression.
+  A function that hands back a record with a defaulted field it never looked at is one: nothing computed with the field, so there is no step to put the line under.
+  A rule with no inputs of its own, which the trace does not open up, that decodes JSON and leaves a field out is the other.
 - **A default filled in by a rule's own `JSONDECODE`** is shown too, though `presumed` leaves it out unless the case was run under `hard` presumption: it is a default the case could not have supplied.
+- **A default written in a section of an imported file is not shown**, and `presumed` does not list it either.
+  A rule that reads one through an `IMPORT` takes the default with no line in the trace.
+  An `@export` that reaches a section input of an imported file is refused when the file is checked, so this arises in the editor and in `l4 trace` only.
 
 ## Examples
 
