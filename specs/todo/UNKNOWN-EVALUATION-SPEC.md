@@ -991,6 +991,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    Row 51.
    "Measured" means three things: `jl4-test` shows exactly one moved golden plus the new indirect-call goldens; its wall clock is within noise of the base (§7 item 4); and U2b's parity run, before and after, has its trace sub-matrix read by hand, since nothing gates on it (`parity-harness.mjs:556-571`; the full-parity CI job is `continue-on-error`, `pr-checks.yml:1980`).
    _Assumed, not ruled:_
+
    - The new value form forces every operand through `autoApplyDischargedImport` (`Machine.hs:3959`), never through a bare `continueRef`.
      Today's closure bodies reach their operands through `forwardExpr`'s `Var` arm, which applies a discharged imported reader, and a bare `continueRef` would hand back the reader's closure, so `#ASSERT TRUE AND <imported reader>` would report "assertion failed" with exit 0.
      Probe `s2skeptic/flagmain.l4`, which imports a module whose section `GIVEN` has a `TYPICALLY`, shows both sides today: `TRUE AND` the imported Boolean reader is `TRUE`, while the imported numeric reader `PLUS 1` is an internal error, because a binary built-in forces both operands by `continueRef` (`Machine.hs:1572-1573`, `:1515-1517`).
@@ -1006,6 +1007,10 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - The `IMPLIES` parity fixture, `jl4-mlir/test/fixtures/implies-probe.l4`, has two functions with one body: one takes its operands as the rule's own inputs, and its trace cell is byte-identical; one reads them as section `GIVEN`s, and its trace cell cannot be, because jl4-service reports a rule that reads only section `GIVEN`s as one node with no children, whatever its body (measured 2026-10-03, on an arithmetic body too). It joins all three corpus lists: the always-enforced fixture loop (`pr-checks.yml:1928`), the harness invocation (`:2083-2092`) and the harness's own default list.
    - jl4-mlir's schema force-traces a connective's operands as jl4-core shows them, the left one when it is a variable (a `TRUE` or `FALSE` constructor is pruned there as trivial) and the right one always, since jl4-core evaluates it as a step of its own; without this a variable operand has no wasm frame, and the cell differs.
    - The indirect-call golden is a new `ok/connectives-indirect.l4`, the four connectives passed through a function parameter, with a short circuit over a division by zero as its control, and a test that no trace names `a` or `b`.
+
+   **Built** 2026-10-03: row 51; `ValConnective` and its `ConnectiveLeft` frame, the indirect-call and two-file import controls, the GraphViz stub, and jl4-mlir's mirror and `IMPLIES` lowering.
+   Measured: `jl4-test` moved one golden, `lazytrace-exception`, beside the new files' goldens; its wall clock was 963 s for 3,784 examples against 1,009 s for 3,764 on the step-1 tree, run back to back on a shared machine; parity before and after, its trace sub-matrix read cell by cell, changed no existing cell and adds four byte-identical `IMPLIES` cells.
+
 3. **Atoms-only residuals, default report.** Input atoms, field paths, comparison atoms, Boolean assumed calls, operation terms over the total built-ins, the connective table of §4.3, the identity rule of §4.6, and the default report naming every input; no boundary decision yet.
    This is what U1b calls "true strong Kleene: atoms only".
    Rows 1, 2, 3, 5, 6, 10, 11, 12, 13, 15 (without its count clause), 17, 18, 23, 24, 35, 37, 39, 40, 42, 44, 45, 46, 47, 48, 49, 50, 66, 69, 75, 76, 77 and 85 of §4.12; the "from step 3" halves of rows 34, 70, 83 and 84; and rows 60 and 67, which hold at every step from this one.
@@ -1370,7 +1375,7 @@ Blocks: build step 5 (§4.5, §8 step 5).
 ## 10. What this spec did not verify
 
 - The service behaviour in §2.5 was measured by the coordinating session, not here; the cause of the section-`GIVEN` prelude failure is the `TYPICALLY` work's trace, read from its record, merged with #530, and not reproduced here.
-- §4.4's claim that Step 0 moves only the trace golden, the service reasoning tree and jl4-mlir's trace parity is a prediction from `grep` and from reading the code; trace output from the LSP was not checked.
+- Trace output from the LSP was not checked when step 2 was built, beyond `jl4-lsp-test`.
 - The `#EVALTRACE` probes printed "no trace captured" on the installed binary, so the trace shape in §2.4 is read from a committed golden, not reproduced.
 - Nothing in §4–§8 has been built or timed.
 - `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, which U8 and U9 cite for their full text, is on `unstable` since #525 (present at `6ed297629`) and not on this branch; whichever of the two specs merges second must carry the cross-reference.
@@ -1383,6 +1388,5 @@ Blocks: build step 5 (§4.5, §8 step 5).
 - What the Track B audit contributed and was not re-derived here: the hand trace by which C3 (2), read literally, leaves row 59 a bare "gave up" (§4.5), which the review of 2026-10-02 re-traced and confirmed; the reading of `UpdateThunk` behind §4.5's rule that a value carrying a `gave-up` is never written back; and that the batch request's `knownOutcomeStyle` and `unknownOutcomeStyle` follow Oracle Intelligent Advisor's Batch Assess shape (§8 step 6), which is the audit's reading of Oracle's documentation.
 - Predictions about lifted behaviour that no probe can check before the lift exists: that a residual reaching `EqConstructor3` or a temporal iterator would raise an internal or misleading error (§4.3), that a right operand diverging under a term would hang without step 3's interim counter, that the wrapper's `JUST` keeps the boundary decision and C5 from firing (§6), and that `Batch.hs:388` and `:396`'s wildcards would score an undetermined row "success".
   The iterators' misreport of a bare unknown is not a prediction: it is probed today (`c01`, `c02`).
-- What jl4-mlir does today with `__IMPLIES__`, which has no lowering, a compile failure or a refusal, was not measured (§8 step 2).
 - Whether the static refusal analysis named by the comment at `Machine.hs:838-849` stays sound once a frame may observe a refusal, under U13's interim or its leaf, was not checked, nor whether that analysis is the DMN exporter's `D-REFUSE`; it is for step 3, which restates that comment.
 - Whether §2's probes of 2026-10-01 ran on the store build `jl4-0.1-b69f17a4`, as the probes of 2026-10-02 did, was not recorded; `~/.cabal/bin/l4` points at that build, and was relinked to it on 2026-10-02.
