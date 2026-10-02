@@ -1119,6 +1119,10 @@ reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to
 (`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
 gate it.
 
+**Rule 3 built 2026-10-03 (W7 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.3; `feat/typically-w7`, on top of `feat/typically-w4w5`, not yet merged).**
+A default is a module-scope expression on a section `GIVEN`, a rule's `GIVEN` and a record field; it is worked out lazily, from the root's values for a section binder; a cycle `b ∈ R*(default(b))` among section binders is a check error; the default's read-set joins the requirement of every root that may use it; and the JSON schema gives an expression default as source text.
+Two places the ruling does not name keep a literal: a written `ASSUME` and a lambda's `GIVEN`.
+
 **EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
 T1: any field declared `TYPICALLY`, not only a `MAYBE … TYPICALLY NOTHING` field, may be omitted at construction and may be absent in JSON, taking its default.
 T2: a module-level `ASSUME … TYPICALLY` takes its default at the root.
@@ -2181,8 +2185,9 @@ body is `d`. Every reader takes the binder as a parameter and every call passes
 it on, so the only site that can reach that definition is a root that supplied
 nothing — and a 0-ary definition is a shared thunk, so `d` is forced at most
 once per evaluation and every reader sees the same value. `WITH` still wins,
-being an argument. The default's own read-set joins the call graph, so R8 rule 3
-("Closure") holds by construction. `doc/reference/types/TYPICALLY.md` now says
+being an argument. The default's own read-set joins the call graph (R8 rule 3,
+"Closure"; built with W7, see the note on the call-graph edge below, which says how
+and why it was not so before). `doc/reference/types/TYPICALLY.md` now says
 this is a change of meaning and says where it stops, which is Meng's own note in
 §11.5.
 
@@ -2343,14 +2348,25 @@ the corpus it was taken on is not a figure.** Two true measurements disagreed fo
 a week's worth of confusion in one evening because neither said which corpus it
 ran on.
 
-**The `TYPICALLY` call-graph edge is gone.** `readSets` used to add each binder's
-default as an edge keyed by the binder's own `Unique`. A default is literal-only
-so the edge is always empty, but if that restriction is ever lifted the edge
-makes `rewriteCall` rewrite every reference to that binder — including the
-value-bound parameter references inside readers — into an application. **R8 rule
-3 ("Closure") is therefore DEFERRED, not implemented**, with the literal
-restriction as its guard. The earlier wording here, that it "holds by
-construction", was a sharpening past the evidence actually gathered.
+**The `TYPICALLY` call-graph edge is back, as R8 rule 3 (W7, built 2026-10-03).**
+`readSets` used to add each binder's default as an edge keyed by the binder's own
+`Unique`, and was changed to add none: the edge made `rewriteCall` rewrite every
+reference to that binder — including the value-bound parameter references inside
+readers — into an application, and with literal-only defaults it was always empty.
+Rule 3 ("Closure") was DEFERRED, with the literal restriction as its guard. W7 lifts
+the restriction, so the edge returns, with the hazard answered: a defaulted binder is a
+pseudo-definition in the call graph (`decideBodiesFromModule`), so whatever reads
+the binder is charged with what its default reads, and `readSets` then leaves the
+binder itself out of its result, so a reference to it is still a reader's own
+parameter and is never turned into an application. The cycle check is the same table
+read the other way: `b ∈ R*(default(b))` is `L4.Discharge.defaultCycles`, a check error.
+A root is where the default's reads are supplied: at a directive (which is also how
+`l4 batch` and the service evaluate a request), the binder reaches a call as a
+function of its default, applied to the root's values for what it reads
+(`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3), so that a `WITH` on an input a default reads
+reaches the default. The earlier wording here, that closure "holds by construction",
+was a sharpening past the evidence actually gathered, and it was true only of
+literals.
 
 **Crossing an `IMPORT` was reachable and crashed; it is now handled in the
 evaluator.** Measured on the sweep tree (`a1525a89`): exactly one module declares

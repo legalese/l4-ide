@@ -53,7 +53,9 @@ most needed. If you add an entry to an area file, add its line here in the same 
 - **`TYPICALLY` is a default.** A section `GIVEN` that carries one needs no value from the caller. A
   `WITH` call that names a rule's inputs may leave out an input that carries one, and a `WITH`
   construction may leave out a record field that carries one; the call or the construction takes the
-  default. A call or construction by **position** still gives every input and field.
+  default. A call or construction by **position** still gives every input and field. A default may be
+  a literal, a name or an expression in parentheses over what the file declares (a definition, a
+  section `GIVEN`); one that reads its own input is a check error.
   [Entry 7.4](source-patterns/07-presumptions-and-defaults.md#e7-4) says what to write.
 
 **Proposed, not landed (2026-09-04). Do not write these.**

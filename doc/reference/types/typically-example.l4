@@ -36,3 +36,18 @@ DECIDE `contract is binding` IF
   AND `governing law` EQUALS "Singapore"
 
 #CHECK `contract is binding`
+
+-- A default may be worked out. It can name a definition or another section GIVEN,
+-- and a compound expression is written in parentheses.
+§ `Part 4 -- Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
+
+-- 90: the default for `discount` is a tenth of the 100 ...
+#EVAL `final price`
+
+-- ... and 180 here, because it is a tenth of the 200 the call gives.
+#EVAL `final price` WITH `list price` IS 200
