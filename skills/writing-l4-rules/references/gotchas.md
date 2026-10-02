@@ -473,12 +473,12 @@ The column is all it reads, and three consequences are silent:
 
 - A rule's sentence indented even one space past `GIVEN`, under the last parameter, becomes that parameter's gloss, and every projection changes with it: `l4 nlg`, `l4 render` and the Blawx export.
 - A `DECIDE` indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last parameter.
-- When the head repeats the inputs (`` `is large` amount MEANS … ``), the head is where the input is bound and a gloss on the `GIVEN` name is rendered nowhere, so an annotation indented under the last parameter vanishes.
+- When the head repeats the inputs (`` `is large` amount MEANS … ``), the head is where the input is bound and a gloss on the `GIVEN` name is rendered nowhere, so an annotation indented under the last parameter vanishes (smucclaw/l4-ide#995).
   Write the rule's sentence at the `GIVEN` keyword's column, or between `GIVETH` and the head at any indentation; above the head but indented past `GIVEN`, with no `GIVETH`, it is still the last parameter's.
 
 A trailing gloss and an own-line one on the same parameter, in the same language, collide: L4 warns and drops both.
-A gloss trailing a `TYPICALLY` default reaches the parameter when the default is a number or a string; when the default is a name such as `FALSE`, `EMPTY` or `NOTHING`, that name takes it, silently, so put it on the line below.
-In a rule whose head has a pattern argument (`DECIDE fib 0 IS 0` — one clause is enough), no `@nlg` attaches anywhere, in the `GIVEN`, on the head or above it; each one warns "Not attached".
+A gloss trailing a `TYPICALLY` default reaches the parameter when the default is a number or a string; when the default is a name such as `FALSE`, `EMPTY` or `NOTHING`, that name takes it, silently (smucclaw/l4-ide#994), so put it on the line below.
+In a rule whose head has a pattern argument (`DECIDE fib 0 IS 0` — one clause is enough), no `@nlg` attaches anywhere, in the `GIVEN`, on the head or above it; each one warns "Not attached" (smucclaw/l4-ide#996).
 
 Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed, and became the rule's sentence when none did (colliding, with a warning, if the rule had a sentence of its own).
 One under an earlier parameter with a `TYPICALLY` default landed on the next parameter, or on the default when that was a name such as `TRUE`, and a gloss trailing a number or a string default went past its parameter too.
@@ -497,8 +497,8 @@ DECLARE Payslip
 Never end an `@nlg` line with a `--` comment: the annotation runs to the end of the line, and the comment becomes part of the prose.
 
 Field lists have no column test, which leaves two silent traps.
-An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`, as in the `Teacher` example above.
-And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it.
+An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`, as in the `Teacher` example above, which is smucclaw/l4-ide#976.
+And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
 
 > **A corpus written before 2026-09-19 will not reflect any of this.** Until `#433` merged, an
 > own-line herald under a `GIVEN` was captured by the signature and the rule rendered as a bare

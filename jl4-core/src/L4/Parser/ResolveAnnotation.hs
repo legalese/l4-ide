@@ -384,7 +384,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
     --
     -- @
     -- HAS `full name`  IS A STRING
-    --     \@nlg the employee's full name      -- describes `full name`
+    --     -- describes `full name`
+    --     \@nlg the employee's full name
     --     `start date` IS A DATE
     -- @
     --
@@ -433,10 +434,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 -- actually write:
 --
 -- @
--- GIVEN a IS A STRING \@nlg the amount    -- trailing: describes `a`
+-- -- trailing: describes `a`
+-- GIVEN a IS A STRING \@nlg the amount
 --
 -- GIVETH A BOOLEAN
--- \@nlg 5% with %amount%                  -- own line: describes the rule below
+-- -- own line: describes the rule below
+-- \@nlg 5% with %amount%
 -- DECIDE `over threshold` IF …
 -- @
 --

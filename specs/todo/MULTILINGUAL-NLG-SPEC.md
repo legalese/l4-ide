@@ -991,15 +991,15 @@ The `TYPICALLY` row is the same rule rather than a second one: the input's name 
 It fell to the next input when the default was a number or a string, and to the default itself when that was a name such as `FALSE`, `EMPTY` or `NOTHING`, silently either way.
 `L4.Parser.ResolveAnnotation.addNlgInput` lets the name reach past the default, as a record field's name reaches past its type, and clamps the default to its own line, so that a default that is a name cannot take an annotation the last input declined.
 The same cut sent a gloss TRAILING a number or string default past its input, and that is fixed with it: a literal claims nothing, so the name now takes the rest of its own line.
-A gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, still lands on that name, silently; that is unchanged, and to be filed.
+A gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, still lands on that name, silently; that is unchanged, and filed as smucclaw/l4-ide#994.
 
-Field lists have no column test, and two field-list defects are unchanged here and to be filed.
-An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`.
-And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it.
+Field lists have no column test, and two field-list defects are unchanged here.
+An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`; that is a case of smucclaw/l4-ide#976.
+And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
 
 The rule applies to every `GIVEN` list the attachment pass reaches — a rule's, an `ASSUME`'s, a `DECLARE`'s type parameters, a section's and a lambda's — and the list ends at the declaration's own keyword.
 A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own is a token of the declaration rather than a node with a span, so `signatureBeforeKeyword` bounds the signature there; without it the last input would reach past such a keyword to an annotation written under it.
-It does not reach a rule whose head has a pattern argument (`DECIDE fib 0 IS 0`; one clause is enough): no `@nlg` attaches anywhere on such a rule — in its `GIVEN`, on its head or above it — before or after this change, and each one warns "Not attached". To be filed.
+It does not reach a rule whose head has a pattern argument (`DECIDE fib 0 IS 0`; one clause is enough): no `@nlg` attaches anywhere on such a rule — in its `GIVEN`, on its head or above it — before or after this change, and each one warns "Not attached" (smucclaw/l4-ide#996).
 
 The column is all the tie-break reads, which has three silent consequences.
 A rule's sentence indented even one space past `GIVEN`, under the last input, becomes that input's gloss, and every projection changes with it: `l4 nlg`, `l4 render`, and the Blawx export, where the review measured `#pred bearded(X) :: '@(X) is bearded'` becoming `'@(X) bearded'` once the first herald of `jl4/examples/blawx/beard.l4` was moved there.
@@ -1007,7 +1007,7 @@ A rule whose `DECIDE` is indented past its own `GIVEN`, with its herald lined up
 And when the head repeats its inputs, a gloss on the `GIVEN` name is rendered nowhere (the syntax reference says so under "Where the sentence goes when you write it in the `GIVEN` instead").
 That was already true of a trailing gloss and of a gloss under an earlier input; this change extends it to an annotation indented under the last input, which before warned "Not attached" (`GIVETH` next) or became the rule's sentence (no `GIVETH`), and now attaches and is lost.
 So rows 15 and 16 of the table hold for a head that does not repeat its inputs; for one that does, the "after" is "lost, silently".
-That is a limit of the gloss lookup rather than of this ruling, and is to be filed.
+That is a limit of the gloss lookup rather than of this ruling, filed as smucclaw/l4-ide#995.
 None of the three layouts occurs in this repository, and the attachment differential below covers canon and pc-encode as well.
 
 **Corpus exposure.**
