@@ -29,7 +29,7 @@ import L4.Export (ExportedFunction (..), getExportedFunctions)
 import L4.Interchange.Typically (DefaultValue (..), classifyDefault, describeDefault)
 import L4.OpenFisca.IR
 import L4.Syntax
-import L4.TypeCheck.Environment (nothingUnique)
+import L4.TypeCheck.Environment (emptyUnique, nothingUnique)
 
 -- | A reason a decision could not be compiled to OpenFisca.
 data LowerError = LowerError
@@ -148,14 +148,8 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
         let ty0 = fi0.fiType
         (ty, dflt, formula) <- case fi0.fiDefault of
           Nothing -> Right (ty0, Nothing, Nothing)
-          Just e
-            | isJust fi0.fiListElem ->
-                Left (LowerError fnName
-                  ("the field `" <> fi0.fiL4 <> "` is a LIST OF records and carries a TYPICALLY; "
-                   <> "OpenFisca turns it into a role, which has no default"))
-            | otherwise ->
-                mapLeft (LowerError fnName . (("the field `" <> fi0.fiL4 <> "`: ") <>))
-                        (lowerDefault env ty0 e)
+          Just e  -> mapLeft (LowerError fnName . (("the field `" <> fi0.fiL4 <> "`: ") <>))
+                             (lowerDefault env ty0 e)
         pure OFVariable
             { varName    = fi0.fiName
             , varL4      = fi0.fiL4
@@ -168,7 +162,19 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
             , varDated   = []
             , varDefault = dflt
             }
-      inputsFor e ri =
+      inputsFor e ri = do
+        -- A @LIST OF R@ field is a role, not an input variable, so 'mkInput' never
+        -- sees it and cannot refuse its default: this is where that is decided.
+        -- A role has no default list. @EMPTY@ says what a role nobody fills
+        -- already is, so it is accepted; anything else would be lost, so it is
+        -- refused.
+        forM_ [ (fi, d) | fi <- ri.riFields, isJust fi.fiListElem
+                        , Just d <- [fi.fiDefault], not (isEmptyList d) ] \(fi, d) ->
+          Left (LowerError fnName
+            ("the field `" <> fi.fiL4 <> "` is a LIST OF records and carries TYPICALLY "
+             <> describeDefault (classifyDefault d) <> ", and OpenFisca turns it into a role, "
+             <> "which has no default list (only EMPTY, which is what a role nobody fills already "
+             <> "is, can be written there)"))
         traverse (mkInput e) [ fi | fi <- ri.riFields, fi.fiStored, isNothing fi.fiListElem ]
   subjectInputs <- maybe (Right []) (inputsFor ent) mSubjRi
   memberInputs  <- concat <$> sequence (zipWith inputsFor memberEntities memberRecords)
@@ -832,6 +838,12 @@ lowerDefault env ty e = case (classified, ty) of
     OFBool   -> "boolean"
     OFStr    -> "string"
     OFEnum{} -> "member of an enum"
+
+-- | @EMPTY@, the one nullary list constructor.
+isEmptyList :: Expr Resolved -> Bool
+isEmptyList = \case
+  App _ r [] -> getUnique r == emptyUnique
+  _          -> False
 
 -- ---------------------------------------------------------------------------
 -- Types
