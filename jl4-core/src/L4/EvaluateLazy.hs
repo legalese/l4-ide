@@ -856,11 +856,9 @@ recordFieldDefaults decls = Map.fromList
 -- only those whose binder or JSON path is part of the request"), and the binder
 -- of an input a rule leaves out at its own call is part of no request. Under
 -- hard T4b's "rests on presumed x" applies, as it does to a rule's own
--- @JSONDECODE@. The first W4/W5 build listed it in both modes; that was
--- reversed to this reading on 2026-10-03 on the advisor's advice (decided by
--- Claude overnight 2026-10-03, pending Meng's review; the alternative, listing
--- it in both modes, is the one-line change of dropping the guard below). The
--- trace still carries every event.
+-- @JSONDECODE@. (Decided by Claude overnight 2026-10-03, pending Meng's
+-- review: listing it in both modes is a one-line change, dropping the guard on
+-- the 'FromNamedApp' case below.) The trace still carries every event.
 --
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
