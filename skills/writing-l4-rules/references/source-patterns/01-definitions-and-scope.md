@@ -363,9 +363,15 @@ This is the largest measured win in the corpus: `GIVEN interp IS AN Interpretati
 replaces all 26.
 
 **Keep writing the named readings** (`` `the staff reading` ``, `` `the text alone` ``) as values.
-Until supply lands they are how a file demonstrates both poles: a `#EVAL` that reads an unsupplied
-section `GIVEN` stops, names the input, and makes `l4 run` exit non-zero. Reached by the `CONSIDER`
-above, as here:
+They are what a directive hands the section `GIVEN`, by name, beside the rule's own inputs; this
+answers `10`:
+
+```
+#EVAL `the day the twelve month window opens on` WITH `the closing date` IS 10, `the offer date` IS 20, `the reading` IS `the staff reading`
+```
+
+Without the `WITH`, a `#EVAL` that reads the unsupplied section `GIVEN` stops, names the input, and
+makes `l4 run` exit non-zero. Reached by the `CONSIDER` above, as here:
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -416,9 +422,9 @@ evaluating, so an unsupplied section `GIVEN` costs it nothing. That is what lets
 the house style still run green; [entry 11.9](11-when-the-encoding-cannot-answer.md#e11-9) is the whole recipe.
 
 **Not** ``#EVAL `the day the twelve month window opens on` WITH `the reading` IS `the staff
-reading` `` — `WITH` names a rule's own inputs, and `` `the reading` `` is not one of them, so
-that line is a check error: the rule's two real inputs are reported unsupplied and
-`` `the reading` `` is reported undefined. **Not** a `TYPICALLY` default to make one reading win: a
+reading` `` on its own — a `WITH` that names any input must name the rule's own inputs too, so that
+line is a check error reporting `` `the closing date` `` and `` `the offer date` `` unsupplied.
+Name every input, as above. **Not** a `TYPICALLY` default to make one reading win: a
 `TYPICALLY` value must be a literal, and `` `the staff reading` `` is a defined name of record type,
 so the typechecker rejects it — _"The TYPICALLY value for `the reading` must be a literal: a number,
 a string, or a nullary constructor such as TRUE, FALSE or NOTHING."_ A constructor of your own
@@ -1091,9 +1097,9 @@ printing `NUMBER ` at Information severity.)_ The illustrations heading is a **c
 section, not a sibling: nesting it under `§ 4. Fees` keeps the fixtures with the rules they belong
 to, and a reader scanning `§` headings still sees one entry per clause.
 
-**Not** an `#ASSERT` on the rule that reads the section `GIVEN`. The fixture exists and there is
-still no way to hand it over — nothing inside the file supplies a section `GIVEN` in this release —
-so the assertion stops, and `l4 run` exits 1 (probe `r11b-assert-on-the-reader.l4`, its message
+**Not** an `#ASSERT` on the rule that reads the section `GIVEN` without a `WITH`. A fixture under
+the heading does not hand itself over, so the assertion stops, and `l4 run` exits 1 (probe
+`r11b-assert-on-the-reader.l4`, its message
 re-measured on the build-step-1 binary):
 
 ```
@@ -1103,7 +1109,9 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-Entry [1.5](#e1-5) has the wording an older `l4` gives it. The recipe that keeps the file green is
+Entry [1.5](#e1-5) has the wording an older `l4` gives it. Hand the fixture over by name instead:
+``#ASSERT (`the fee for this month` WITH `the month` IS `a 50 hour month`) EQUALS 6300``, under the
+illustrations heading, is satisfied. Or keep to the recipe in
 [11.9](11-when-the-encoding-cannot-answer.md#e11-9): assert on the rule `GIVEN`, `#CHECK` the reader.
 
 **Not** the fixtures at the end of the file, in one block, away from the rules. It reads well until

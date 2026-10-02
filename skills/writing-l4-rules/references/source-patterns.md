@@ -52,15 +52,13 @@ most needed. If you add an entry to an area file, add its line here in the same 
 
 **Proposed, not landed (2026-09-04). Do not write these.**
 
-- Supplying a **section `GIVEN`** or an `ASSUME`d name from inside the file, at a directive or at
-  a call in a body: `` #EVAL f WITH `the reading` IS `the strict reading` ``.
-  What `WITH` can name today is a rule's **own** inputs, so `#EVAL f WITH x IS 25` works where
-  `f` is `GIVEN x …`; naming anything that is not one of the rule's own inputs is a check error,
-  not a parse error (the rule's real inputs are reported unsupplied, and the name you wrote is
-  reported undefined). A parse error, `unexpected WITH`, is what you get only when a positional
-  value precedes the `WITH`, as in ``#EVAL `tax on` 100 WITH rate IS 0.2``. Section-`GIVEN`
-  values are supplied from outside: a web form, `l4 batch FILE --inputs cases.json`, or the
-  service request.
+- Supplying an `ASSUME`d name from inside the file, at a directive or at a call in a body.
+  `WITH` names a rule's own inputs and the section `GIVEN`s it reaches, but not an `ASSUME`:
+  `#EVAL f WITH rate IS 3`, where `rate` is an `ASSUME`, is a check error:
+  `You are giving named inputs to f … but it is not a function, so it takes none.`
+  Declare the input as a section `GIVEN` and supply it by name. A parse error, `unexpected WITH`,
+  is what you get when a positional value precedes the `WITH`, as in
+  ``#EVAL `tax on` 100 WITH rate IS 0.2``: name every input, or none.
 - Discharge — the compiler working out which inputs an entry point actually reads and asking for
   exactly those.
 - `TYPICALLY` as a default the caller may omit. Today it is metadata: the input is still required.
