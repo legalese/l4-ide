@@ -98,6 +98,7 @@ test-suite jl4-test
     silently,
     transformers,
     lsp-types,
+    text,
 
 test-suite l4-cli-test
   import: defaults
