@@ -133,6 +133,7 @@ mkInitialCheckState substitution =
     , constBodies  = Map.empty
     , sectionPaths = Map.empty
     , deferredChoices = 0
+    , overloadedCallees = Set.empty
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -4462,7 +4463,17 @@ supplyAppNamed  r onts [] = do
   -- rule's inputs, W5 for a record's fields). Only a NAMED site gets here, so
   -- R8 rule 1 holds without being checked: a positional site never reaches
   -- this function and keeps its arity error.
-  defaults <- asks (Map.findWithDefault Map.empty (getUnique r) . (.visibleInputDefaults))
+  --
+  -- Except at an overload. R8 does not rule on them, and taking a default there
+  -- would turn a site that was ambiguous (neither candidate has every input it
+  -- needs) into one that quietly chooses the candidate whose default fills the
+  -- gap and runs it on a presumed value, with nothing said. Such a site stays
+  -- as it was before W4: it needs every input written out.
+  overloaded <- use #overloadedCallees
+  defaults <-
+    if getUnique r `Set.member` overloaded
+      then pure Map.empty
+      else asks (Map.findWithDefault Map.empty (getUnique r) . (.visibleInputDefaults))
   let
     fillFor (i, MkOptionallyNamedType _ (Just n') _)
       | Just d <- Map.lookup (getUnique n') defaults = Right (i, defaultNamedExpr n' d)
