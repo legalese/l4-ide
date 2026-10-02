@@ -111,15 +111,38 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
               [ TookDefault theRate r, Enter (number 2), Exit (Right (ValNumber 2)), Pop ]
     eventsOf t `shouldBe` []
 
-  it "drops a default first used while the result is being normalised, and still answers" $ do
-    -- after the main expression has finished, with nothing open to hang it from
+  it "hangs a default first used while the result is written out on the expression that built it" $ do
+    -- after the main expression has finished, with no frame open: the usual
+    -- shape is a defaulted field of the returned record that nothing else read
     r <- numberRef 1 3
     let main = [ Enter (number 2), Exit (Right (ValNumber 2)), Pop ]
         late = [ TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
     t <- safePostprocessTrace (main <> late)
-    eventsOf t `shouldBe` []
-    -- and the trace is the one the main expression gave, not the fallback
-    prettyLayout t `shouldBe` prettyLayout (postprocessTrace main)
+    eventsOf t `shouldBe` [(["the rate"], 0)]
+    -- it is the trace of the main expression and not the fallback, and the
+    -- value is the default's
+    case t of
+      Trace _ [(_, [TraceDefault _ [] (Right (MkNF (ValNumber 3)))])] (Right (MkNF (ValNumber 2))) -> pure ()
+      other -> expectationFailure ("unexpected trace: " <> show other)
+
+  it "hangs two such defaults in the order they were read" $ do
+    r1 <- numberRef 1 3
+    r2 <- numberRef 2 4
+    let other = theRate { path = ["the limit"] }
+        main = [ Enter (number 2), Exit (Right (ValNumber 2)), Pop ]
+        late = [ TookDefault theRate r1, SetRef r1, Exit (Right (ValNumber 3)), Pop
+               , TookDefault other r2, SetRef r2, Exit (Right (ValNumber 4)), Pop ]
+    t <- safePostprocessTrace (main <> late)
+    map fst (eventsOf t) `shouldBe` [["the rate"], ["the limit"]]
+
+  it "leaves the actions alone when there is nothing late, or the main expression ends another way" $ do
+    r <- numberRef 1 3
+    let usual = [ Enter (number 2), TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
+        oddMain = [ Enter (number 2), Push, Exit (Right (ValNumber 3)), Pop, Pop
+                  , TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
+        same xs = debugEvalTraceActions (hoistLateDefaults xs) `shouldBe` debugEvalTraceActions xs
+    same usual
+    same oddMain
 
   it "keeps what a computed default did, and drops the steps of a plain value" $ do
     r <- numberRef 1 8

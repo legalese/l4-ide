@@ -38,6 +38,13 @@ GIVETH A NUMBER
 GIVETH A NUMBER
 `scaled by` n MEANS doubled TIMES n
 
+-- read only when the answer is written out: nothing computes with the rate,
+-- it is a field of the record returned
+DECLARE Quote HAS rate IS A NUMBER
+
+GIVETH A Quote
+`quote at the rate` MEANS Quote `the rate`
+
 #EVALTRACE doubled
 #EVALTRACE doubled WITH `the rate` IS 5
 #EVALTRACE `both readers`
@@ -46,6 +53,7 @@ GIVETH A NUMBER
 #EVALTRACE `where it is held`
 #EVALTRACE `rate if able`
 #EVALTRACE `scaled by` 10
+#EVALTRACE `quote at the rate`
 
 -- a directive that is not a trace answers as before
 #EVAL doubled

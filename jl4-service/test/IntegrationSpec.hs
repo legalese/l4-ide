@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, echoRecordJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1972,6 +1972,57 @@ spec = describe "integration" do
         supplied <- traced "w8-none" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]) baseUrl mgr
         whenTraced (\r -> events r `shouldBe` []) supplied
+
+    -- Read only when the answer is written out, a default has no frame open
+    -- to hang from; it hangs on the expression that built the result.
+    it "shows a default that is read only when the result is written out" do
+      withServiceFromSources "w8-late" [("config.l4", echoRecordJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-late" "same config" (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]]) baseUrl mgr
+        whenTraced
+          (\r -> [code | (code, _, _) <- events r] `shouldBe` ["cfg.timeout"])
+          resp
+
+    -- The trace must survive a default wherever the default is read: a trace
+    -- that fails to post-process is replaced by one node saying so, which no
+    -- other assertion here would notice for these shapes.
+    it "keeps the trace when a default is read on the other paths, and shows it" do
+      let intact r = [n | n <- nodes r.reasoning, any (Text.isInfixOf "trace unavailable") n.explanation] `shouldBe` []
+          codes r = [code | (code, _, _) <- events r]
+      withServiceFromSources "w8-rec-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)], "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> intact r >> (codes r `shouldBe` ["cfg.timeout"])) resp
+      -- T6b: the trace shows every event, a rule's own decode included, where
+      -- presumed names only those of the request
+      withServiceFromSources "w8-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-own" "within limit" (args ["amount" Aeson..= (5 :: Int)]) baseUrl mgr
+        assertSuccess resp \r -> do
+          intact r
+          codes r `shouldBe` ["limit"]
+          r.presumed `shouldBe` []
+      -- D7.3's NOTHING for a MAYBE left out has no TYPICALLY behind it, and says so
+      withServiceFromSources "w8-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-maybe" "premium due" (args ["unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced
+          (\r -> do
+              intact r
+              [said | (_, said, _) <- events r] `shouldBe` ["premium took its default (a MAYBE left out is NOTHING)"])
+          resp
+      withServiceFromSources "w8-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-two" "may contract" (args ["is adult" Aeson..= True]) baseUrl mgr
+        -- in the order they were read
+        whenTraced (\r -> intact r >> (codes r `shouldBe` ["has capacity", "of sound mind"])) resp
+      withServiceFromSources "w8-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ]) baseUrl mgr
+        assertSuccess resp \r -> do
+          intact r
+          r.presumed `shouldBe` ["is motorway"]
+          codes r `shouldBe` ["is motorway"]
 
     it "leaves the reasoning empty when no trace was asked for, and says presumed all the same" do
       withServiceFromSources "w8-quiet" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do

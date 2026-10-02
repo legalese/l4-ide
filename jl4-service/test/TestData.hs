@@ -45,6 +45,7 @@ module TestData (
   enumNullJL4,
   recordWrapJL4,
   ownDecodeJL4,
+  echoRecordJL4,
   deonticDefaultJL4,
   spinJL4,
   spinOrRefuseJL4,
@@ -934,6 +935,22 @@ GIVEN cfg IS A Config
       `unused flag` IS A BOOLEAN
 GIVETH A NUMBER
 budget MEANS cfg's timeout PLUS cfg's retries
+|]
+
+-- | A function that hands its record input back, so that a field the request
+-- left out is read only when the answer is written out (W8: the event of a
+-- default read that late hangs on the expression that built the result).
+echoRecordJL4 :: Text
+echoRecordJL4 =
+  [i|
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+
+@export default `same config`
+GIVEN cfg IS A Config
+GIVETH A Config
+`same config` MEANS cfg
 |]
 
 -- | A rule that decodes JSON of its own (review M3): the switch must not
