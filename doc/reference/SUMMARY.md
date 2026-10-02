@@ -18,6 +18,7 @@
 - [Functions](functions/README.md)
   - [AKA](functions/AKA.md)
   - [DECIDE](functions/DECIDE.md)
+  - [Multi-clause DECIDE](functions/multi-clause-DECIDE.md)
   - [GIVEN](functions/GIVEN.md)
   - [GIVETH](functions/GIVETH.md)
   - [LET](functions/LET.md)

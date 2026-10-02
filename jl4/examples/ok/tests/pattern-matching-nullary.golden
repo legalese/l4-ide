@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-nullary.l4:20:1-20:
+  1
+pattern-matching-nullary.l4:21:1-21:
+  0
+pattern-matching-nullary.l4:32:1-20:
+  TRUE
+pattern-matching-nullary.l4:33:1-19:
+  TRUE
+pattern-matching-nullary.l4:34:1-23:
+  FALSE
+pattern-matching-nullary.l4:43:1-20:
+  100
+pattern-matching-nullary.l4:44:1-19:
+  200
+pattern-matching-nullary.l4:45:1-23:
+  0

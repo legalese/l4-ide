@@ -1173,13 +1173,22 @@ checkConsider ec ann e branches t = do
   -- We need to apply the current substitution to resolve any inference variables.
   resolvedTe <- applySubst te
   let isPrimitiveScrutinee = isPrimitiveType resolvedTe
+  -- A CONSIDER in a multi-clause DECIDE's fall-through local is partial by construction
+  -- ('L4.Parser.fallthroughName'); a user's CONSIDER in clauses 2..n is silenced with it.
+  inFallthrough <- asks (inPatternFallthrough . (.errorContext))
 
-  unless (null missing || isPrimitiveScrutinee) do
+  unless (null missing || isPrimitiveScrutinee || inFallthrough) do
     addWarning $ PatternMatchesMissing missing
   unless (null redundant || isPrimitiveScrutinee) do
     addWarning $ PatternMatchRedundant redundant
 
   pure (Consider ann re rbranches)
+
+inPatternFallthrough :: CheckErrorContext -> Bool
+inPatternFallthrough = \case
+  WhileCheckingDecide (MkName _ (NormalName t)) _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
+  WhileCheckingExpression _ c -> inPatternFallthrough c
+  _ -> False
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do

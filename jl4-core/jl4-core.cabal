@@ -163,6 +163,7 @@ test-suite jl4-core-test
     ImportResolutionSpec
     TemporalContextSpec
     MixfixParserSpec
+    PatternMatchParserSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
