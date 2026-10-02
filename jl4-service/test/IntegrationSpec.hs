@@ -965,6 +965,15 @@ spec = describe "integration" do
             , CaseErrored "Evaluation resource limit exceeded: this case allocated more than the limit of 64 MB (--max-eval-memory-mb)"
             , CaseAnswered ]
 
+      it "answers 10 batches sent at once, which share the core's one slot" do
+        -- The slots are the process's, not each request's. With a set per
+        -- request, ten one-case batches ran ten cases at once on the core, and
+        -- a case taking a fifth of the limit alone ran past it.
+        withServiceFromSourcesOpts spinOptions "spin-shared" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resps <- forConcurrently [1 .. 10 :: Int] \_ ->
+            postSpinBatch baseUrl mgr "spin-shared" [spinFifth]
+          mapM_ (\resp -> expectBatchOutcomes resp [CaseAnswered]) resps
+
     -- Production runs one capability per core (-N), so a batch runs that many
     -- cases at once. At two, the forty cases still each meet the limit alone.
     describe "at two capabilities" $ around_ (withCapabilities 2) do
@@ -2473,6 +2482,10 @@ withCapabilities n act =
 spinFast :: Int
 spinFast = 150_000
 
+-- | Steps that take about a fifth of 'spinOptions'' 3-second limit (about 0.65 s).
+spinFifth :: Int
+spinFifth = 500_000
+
 -- | Steps that would take some twenty minutes.
 spinSlow :: Int
 spinSlow = 1_000_000_000
@@ -2543,7 +2556,8 @@ withPendingService' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentPending Nothing)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2588,7 +2602,8 @@ withFailedService' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentFailed "Test: simulated compilation failure")
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2629,7 +2644,8 @@ withServiceFromSources' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2673,7 +2689,8 @@ withServiceFromSourcesOpts' opts deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2726,7 +2743,8 @@ withServiceFromSourcesTVar' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2812,7 +2830,8 @@ withServiceRestartedFromCbor' deployId sources act = do
 
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2843,7 +2862,8 @@ withEmptyService' act = do
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do

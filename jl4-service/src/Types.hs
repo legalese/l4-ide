@@ -32,6 +32,7 @@ module Types (
   TaskState (..),
   -- * Environment
   AppEnv (..),
+  newBatchSlots,
   AppM,
 ) where
 
@@ -41,7 +42,9 @@ import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
 import BundleStore (BundleStore)
 import Control.Applicative ((<|>))
+import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Async (Async)
+import Control.Concurrent.QSem (QSem, newQSem)
 import Control.Concurrent.STM (TVar)
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Aeson as Aeson
@@ -648,7 +651,19 @@ data AppEnv = MkAppEnv
   -- naturally pin to whichever instance has that deployment loaded
   -- because the auth proxy already routes deployment-scoped MCP traffic
   -- with affinity.
+  , batchSlots         :: QSem
+  -- ^ How many batch cases may run at once, across every batch in flight:
+  -- one per capability ('newBatchSlots'). A case holds a slot while it
+  -- runs, and its clock starts once it has one. Shared by the whole
+  -- process, not made per request: with one set per request, four batches
+  -- of two cases on two cores ran eight cases at once, and every case ran
+  -- past a limit it met alone (2026-10-02). Single evaluations and MCP
+  -- calls do not take a slot, so they never queue behind a batch.
   }
+
+-- | One batch slot per capability.
+newBatchSlots :: IO QSem
+newBatchSlots = newQSem =<< getNumCapabilities
 
 -- | The handler monad for all Servant routes.
 type AppM = ReaderT AppEnv Handler

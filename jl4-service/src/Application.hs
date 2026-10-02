@@ -112,10 +112,11 @@ defaultMain = do
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
+  slots <- newBatchSlots
   let effectiveServerName = case options.serverName of
         Just s  -> Just s
         Nothing -> Just ("http://localhost:" <> Text.pack (show options.port))
-      env = MkAppEnv registry pendingUpd store effectiveServerName logger options tasksReg
+      env = MkAppEnv registry pendingUpd store effectiveServerName logger options tasksReg slots
 
   -- Fork a background sweeper that drops MCP tasks past their TTL.
   -- 30s tick is fine: tasks are 1h TTL by default.
@@ -233,7 +234,7 @@ app env req sendResp = do
       -- Override serverName with X-L4-Origin header if present (set by auth proxy).
       -- This allows the OpenAPI spec to reflect the org's external URL.
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
-        Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks
+        Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks env.batchSlots
         Nothing     -> env
   serve (Proxy @ServiceApi) (serverT reqEnv vis) req sendResp
 

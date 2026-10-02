@@ -117,10 +117,10 @@ executable jl4-service
   import: defaults
   main-is: Main.hs
   hs-source-dirs: app
-  -- The threaded RTS on every core. A batch runs as many of its cases at once
-  -- as there are capabilities (DataPlane.batchFunctionHandler), so this is what
-  -- lets a batch use more than one core; -rtsopts lets an operator say
-  -- +RTS -N2 -RTS (or GHCRTS=-N2) to use fewer.
+  -- The threaded RTS on every core. The service runs as many batch cases at
+  -- once, across all batches, as there are capabilities (Types.batchSlots),
+  -- so this is what lets batches use more than one core; -rtsopts lets an
+  -- operator say +RTS -N2 -RTS (or GHCRTS=-N2) to use fewer.
   ghc-options: -threaded -rtsopts "-with-rtsopts=-N"
   build-depends:
     jl4-service

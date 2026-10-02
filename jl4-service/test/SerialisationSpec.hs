@@ -249,7 +249,8 @@ spec = describe "CBOR serialisation" do
                     registry <- newTVarIO $ Map.singleton (DeploymentId deployId') (DeploymentReady fns rebuildMeta)
                     pendingUpd <- newTVarIO Map.empty
                     tasksReg <- newTVarIO Map.empty
-                    let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg
+                    slots <- newBatchSlots
+                    let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg slots
                     mgrLocal <- newManager defaultManagerSettings
                     testWithApplication (pure $ app env) $ \port' -> do
                       let baseUrl = "http://localhost:" <> show port'
@@ -367,7 +368,8 @@ withCborRebuiltService deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady rebuiltFns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg slots
 
   mgrLocal <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) $ \port' -> do
@@ -386,7 +388,8 @@ withEmptyService act = do
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg slots
 
   mgrLocal <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) $ \port' -> do

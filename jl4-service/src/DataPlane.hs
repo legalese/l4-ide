@@ -34,9 +34,8 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
-import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Async (forConcurrently)
-import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.Concurrent.QSem (signalQSem, waitQSem)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (bracket_, evaluate)
 import Control.Monad.IO.Class (liftIO)
@@ -300,8 +299,9 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
 
-  -- Evaluate the cases concurrently, but no more of them at once than there
-  -- are capabilities, collecting alloc bytes per case.
+  -- Evaluate the cases concurrently, but each case only once it holds one of
+  -- the process's batch slots ('batchSlots', one per capability, shared with
+  -- every other batch in flight), collecting alloc bytes per case.
   --
   -- A case's time limit is wall-clock, so it counts whatever shares the core
   -- while the case runs. With every case started at once, each case's timer
@@ -315,9 +315,8 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- does not take the other cases' answers down with it.
   let limitHitCase (hit, allocBytes) =
         (SimpleError (InterpreterError (limitHitMessage env.options hit)), allocBytes)
-  slots <- liftIO $ newQSem =<< getNumCapabilities
   evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase ->
-    bracket_ (waitQSem slots) (signalQSem slots) do
+    bracket_ (waitQSem env.batchSlots) (signalQSem env.batchSlots) do
       let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
       r <- runAppM env (runEvaluatorForDirectLimited vf Nothing args outputFilter traceLevel includeGraphViz
                           (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
