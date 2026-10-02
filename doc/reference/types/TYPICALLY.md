@@ -22,8 +22,6 @@ Each is described below, with what a default does _not_ excuse.
 name IS A Type TYPICALLY literal
 ```
 
-TYPICALLY may appear on:
-
 A rule is told some facts about the case in front of it (its **"inputs"**, the
 names listed after `GIVEN`). `TYPICALLY` may appear on:
 
@@ -101,7 +99,15 @@ scaled MEANS rate TIMES base
   input never forces its default, which is also what `presumed` (below) counts.
 
 This works for a rule in the same file, a rule declared in a `WHERE`, and a rule
-in a file you `IMPORT`.
+in a file you `IMPORT`. Two things it does not do:
+
+- **It does not choose between rules of the same name.** When two rules share a
+  name, a call that leaves out an input with a default is still ambiguous, as it
+  was before, and has to name every input of the one it means. A default is not
+  allowed to decide which rule the author meant.
+- **It does not reach an `ASSUME`.** An `ASSUME` that takes inputs (`ASSUME` is
+  deprecated) keeps its inputs' `TYPICALLY` as a note only, in the file that
+  declares it and in a file that imports it alike.
 
 ## On a record field: leaving a field out of a construction
 
@@ -186,10 +192,17 @@ govern what counts as leaving a fact out:
   under `hard` the answer lists them under `presumed` as
   `JSONDECODE <type>: <field>`, because nothing the case says could replace
   them. The same is true of a default a `WITH` call or a construction _inside_
-  the rules takes (see above): `hard` does not withdraw it, in either mode the
-  answer lists it under `presumed` as `WITH <rule>: <input>` (for example
-  `WITH scaled: rate`, or `WITH Config: timeout` for a field), and it is listed
-  only if the answer actually used it.
+  the rules takes (see above): neither mode withdraws it, because no case could
+  have supplied it. Under `hard` the answer lists it under `presumed` as
+  `WITH <rule>: <input>` (for example `WITH scaled: rate`, or
+  `WITH Config: timeout` for a field), naming the rule or record as its
+  declaration writes it, and only if the answer actually used it. Under `soft`
+  `presumed` lists the facts a case could have left out, and none of these.
+- **An event's record in the decision service is not a place a default can
+  be left out.** When a request for a rule that describes obligations replays
+  events, each event's party or action record has to give every field, whether
+  or not a field has a default: the record is part of the request, and the
+  service refuses one that leaves a field out.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
@@ -255,10 +268,10 @@ ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
 ```
 
 `ASSUME` is deprecated (ruled 2026-09-04) and still works. On an `ASSUME` the
-default stays metadata, as everywhere outside a section `GIVEN`; moving the
-declaration under its section's heading, as the previous example does, is what
-makes the default take effect for a rule given no value. The companion file no
-longer carries this spelling.
+default stays metadata, as does the default of an input of an `ASSUME` that takes
+inputs; moving the declaration under its section's heading, as the previous
+example does, is what makes the default take effect for a rule given no value.
+The companion file no longer carries this spelling.
 
 ## Behavior
 
@@ -276,7 +289,7 @@ longer carries this spelling.
 
 - [ASSUME](ASSUME.md) — declaring assumed values (deprecated, still works)
 - [The section `GIVEN`](../syntax/section-given.md) — declaring a name once for a
-  whole section, and the one place a default changes what a rule works out
+  whole section
 - [WITH](../functions/WITH.md) — supplying, and overriding, an input by name
 - [DECLARE](DECLARE.md) — declaring record types
 - [GIVEN](../functions/GIVEN.md) — the inputs of one rule
