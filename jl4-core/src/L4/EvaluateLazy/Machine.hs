@@ -2414,13 +2414,17 @@ backwardContractFrame val = \ case
       _ -> internalException $ RuntimeTypeError $
         "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
   -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the
-  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll.
+  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll. An
+  -- unknown entry may or may not be a @Tenant@, so the cast neither admits
+  -- nor drops it: it is Stuck, naming it (smucclaw/l4-ide#998). Dropping it
+  -- was the bug: the join then released without that member's obligation.
   QuantCast QuantCastFrame {..} -> do
-    let admitted = case ctx.cast of
-          Nothing -> True
-          Just c  -> case val of
-            ValConstructor n _ -> n `sameResolved` c
-            _                  -> False
+    admitted <- case ctx.cast of
+      Nothing -> pure True
+      Just c  -> case val of
+        ValConstructor n _ -> pure (n `sameResolved` c)
+        ValAssumed r       -> stuckOnAssumed r
+        _                  -> pure False
     if not admitted
       then quantNext QuantRollFrame {..} rest
       else case ctx.filt of
