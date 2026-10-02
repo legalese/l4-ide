@@ -27,6 +27,7 @@ module TestData (
   maybeInputsJL4,
   timeInputsJL4,
   ruleDefaultJL4,
+  namedSiteDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
   sectionSecondJL4,
@@ -550,6 +551,34 @@ GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
       `unused flag`  IS A BOOLEAN
 GIVETH A BOOLEAN
 `may contract` MEANS `is adult` AND `has capacity`
+|]
+
+-- | A rule that takes a @TYPICALLY@ default at a NAMED site of its own, for a
+-- rule's input and for a record's field (W4, W5). The exported rule has an input
+-- called @rate@, the spelling of the input @scaled@ leaves out: @presumed@ must
+-- name the default @scaled@ took, under @scaled@, and not the request's @rate@.
+namedSiteDefaultJL4 :: Text
+namedSiteDefaultJL4 =
+  [i|
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default combine
+GIVEN n IS A NUMBER
+      rate IS A NUMBER
+      use IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+combine MEANS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS rate)'s timeout
+  ELSE 0
 |]
 
 -- | Record-field defaults, one of them an enum constructor, and an enum

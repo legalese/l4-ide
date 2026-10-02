@@ -170,6 +170,12 @@ batchTyTypoJson      = fixtureDir </> "batch-typically-typo.json"
 batchTyRecordTypoJson  = fixtureDir </> "batch-typically-record-typo.json"
 batchTyRecordEmptyJson = fixtureDir </> "batch-typically-record-empty.json"
 
+-- | @TYPICALLY@ taken at a NAMED site inside the rules (W4, W5): the exported
+-- rule's own input has the spelling of the one the inner rule leaves out.
+batchTyNamed, batchTyNamedJson :: FilePath
+batchTyNamed     = fixtureDir </> "batch-typically-named.l4"
+batchTyNamedJson = fixtureDir </> "batch-typically-named.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -335,6 +341,7 @@ coreFixtures =
   , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
+  , batchTyNamed, batchTyNamedJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
@@ -1534,6 +1541,36 @@ spec bin = do
       hrows <- decodeArray hout
       map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
       hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
+
+  -- W4 and W5: a rule's own defaulted input, and a record's defaulted field,
+  -- may be left out at a NAMED site. The default is taken inside the rules, so
+  -- no request could have supplied it: presumption does not withdraw it, soft or
+  -- hard, and the answer lists it under the application that took it.
+  describe "l4 batch: TYPICALLY at a named site (W4, W5)" $ do
+    -- Before: the module did not check ("you have not supplied these inputs:
+    -- rate", and `timeout`), so there was no row to run. The request's own
+    -- `rate` is 7 and is NOT what `scaled` takes: it takes its default 3.
+    it "takes the default, and lists it under the application, not as the request's input" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyNamed, "--inputs", batchTyNamedJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0), presumedOf [])
+        ]
+
+    -- The positive control is the second row: `use` FALSE never reaches either
+    -- site, so nothing is listed. The report counts what the answer rests on.
+    it "takes the same defaults with --presumption hard, and lists them the same" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyNamed, "--inputs", batchTyNamedJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0), presumedOf [])
+        ]
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do
