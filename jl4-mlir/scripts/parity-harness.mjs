@@ -68,6 +68,7 @@ if (files.length === 0) {
   // jl4-mlir/test/fixtures/test.l4, so we point there.
   files.push(
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "test.l4"),
+    path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "implies-probe.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-sale.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-seatbelt.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-breach.l4"),

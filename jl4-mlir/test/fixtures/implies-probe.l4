@@ -1,0 +1,29 @@
+IMPORT prelude
+
+-- Parity fixture for the built-in IMPLIES (UNKNOWN-EVALUATION-SPEC §8 step 2):
+-- jl4-mlir lowers it with a short circuit, as it does AND and OR, and its
+-- trace shows the implication with a child for each operand it evaluated.
+-- Each function's four cases are the truth table; the two with a FALSE left
+-- operand never need the right one.
+--
+-- `member implies paid` takes the facts as its own inputs, and its trace is
+-- byte-identical to jl4-service's. `membership implies payment` reads them as
+-- section GIVENs: its result matches, but its trace does not, because the
+-- service reports a rule that reads only section GIVENs as one node, with no
+-- children, whatever its body is.
+
+§ `Membership dues`
+    GIVEN `is a member` IS A BOOLEAN
+          `has paid` IS A BOOLEAN
+
+@export Whether being a member implies having paid
+GIVETH A BOOLEAN
+DECIDE `membership implies payment` IS
+    `is a member` IMPLIES `has paid`
+
+@export The same implication, with the facts as the rule's own inputs
+GIVEN member IS A BOOLEAN
+      paid IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `member implies paid` IS
+    member IMPLIES paid
