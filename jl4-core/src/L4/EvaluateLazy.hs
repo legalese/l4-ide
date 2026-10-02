@@ -1006,6 +1006,11 @@ requestPresumed presume fieldName inputs events =
     (FromDecode root, path)
       | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
       | otherwise   -> Nothing
+    -- A default a named application of the RULES took. Its binder is the
+    -- callee's, not an input of the request, so it must not fall through to
+    -- the case below, where a binder that shares an input's spelling would be
+    -- listed as that input.
+    (FromNamedApp _, _) -> Nothing
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
     _ -> Nothing

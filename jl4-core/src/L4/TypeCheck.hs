@@ -114,7 +114,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.))
+import Optics ((%~), (^.), (?~))
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -151,6 +151,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , cyclicSynonyms = Set.empty
     , sectionBinderNames = Set.empty
     , sectionBinderDecls = Map.empty
+    , visibleInputDefaults = Map.empty
     , importedImplicitReaders = Set.empty
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
@@ -409,9 +410,31 @@ withDecides rdecides =
   extendKnownGlobalMany topDecides . local \s -> s
     { functionTypeSigs = Map.fromList $ mapMaybe (\d -> (,d) <$> rangeOf d.anno) rdecides
     , mixfixRegistry = unionMixfixRegistry (buildMixfixRegistry rdecides) s.mixfixRegistry
+    , visibleInputDefaults = Map.union (functionInputDefaults rdecides) s.visibleInputDefaults
     }
   where
     topDecides = fmap (.name) rdecides
+
+-- | The @TYPICALLY@ defaults of the rule inputs these signatures declare, for
+-- the named applications that leave one out (W4). The default is the checked
+-- one the signature already carries: 'checkTypicallyOpt' ran on it when the
+-- signature was scanned, so it is a literal or a nullary constructor of the
+-- declared type, and one rule's default cannot depend on another's.
+--
+-- Keyed by every name the rule is known by, because they share one 'Unique'
+-- ('withQualified', the mixfix canonical alias).
+functionInputDefaults :: [FunTypeSig] -> InputDefaults
+functionInputDefaults sigs = Map.fromList
+  [ (getUnique r, defaults)
+  | sig <- sigs
+  , let MkTypeSig _ (MkGivenSig _ otns) _ = sig.rtysig
+        defaults = Map.fromList
+          [ (getUnique n, MkInputDefault { binder = getOriginal n, declaredAt = rangeOf d, value = d })
+          | MkOptionallyTypedName _ n _ (Just d) <- otns
+          ]
+  , not (Map.null defaults)
+  , r <- sig.name.names
+  ]
 
 withExtraMixfix :: MixfixRegistry -> Check a -> Check a
 withExtraMixfix mixfixAdds =
@@ -420,8 +443,15 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne eo h i lb apos) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne eo h i lb apos
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd idf ir ne eo h i lb apos) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd idf ir ne eo h i lb apos
+
+-- | Make the input defaults of a @WHERE@ or @LET@'s own rules visible to the
+-- expression the bindings scope over, which is checked after the bindings'
+-- own scope has closed ('withDecides' only holds for the bindings themselves).
+withExtraInputDefaults :: InputDefaults -> Check a -> Check a
+withExtraInputDefaults adds =
+  local \ s -> s { visibleInputDefaults = Map.union adds s.visibleInputDefaults }
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -2029,8 +2059,10 @@ typedNameOptionallyNamedType :: TypedName n -> OptionallyNamedType n
 typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emptyAnno (Just n) t
 
 -- | Type-check a TYPICALLY default value against the declared type of its binder.
--- TYPICALLY is metadata only: we resolve and type-check the stored default,
--- but nothing consumes it at runtime.
+--
+-- The checked default is kept where a site that leaves the binder out reads it
+-- ('functionInputDefaults', 'recordInputDefaults') and where discharge and the
+-- JSON decoders do (TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
 checkTypically :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
 checkTypically n ty = traverse $ \ e -> do
   re <- checkExpr (ExpectTypicallyValueContext n) e ty
@@ -2302,10 +2334,10 @@ checkExpr ec (Where ann e ds) t = softprune $ do
     scanDecl = mapMaybeM inferTyDeclLocalDecl
     scanFuns = mapMaybeM scanFunSigLocalDecl
 
-  (rds, extends, mixfixAdds) <- withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \rdecides -> do
+  (rds, extends, mixfixAdds, defaultsAdds) <- withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \rdecides -> do
     (rds, extends) <- unzip <$> traverse (firstM nlgLocalDecl <=< inferLocalDecl) ds
-    pure (rds, extends, buildMixfixRegistry rdecides)
-  re <- withExtraMixfix mixfixAdds do
+    pure (rds, extends, buildMixfixRegistry rdecides, functionInputDefaults rdecides)
+  re <- withExtraInputDefaults defaultsAdds $ withExtraMixfix mixfixAdds do
     let knownExtends = dedupCheckInfos (concat extends)
     re <- extendKnownMany knownExtends do
       re <- checkExpr ec e t
@@ -2322,10 +2354,10 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
     scanDecl = mapMaybeM inferTyDeclLocalDecl
     scanFuns = mapMaybeM scanFunSigLocalDecl
 
-  (rds, extends, mixfixAdds) <- withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \rdecides -> do
+  (rds, extends, mixfixAdds, defaultsAdds) <- withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \rdecides -> do
     (rds, extends) <- unzip <$> traverse (firstM nlgLocalDecl <=< inferLocalDecl) ds
-    pure (rds, extends, buildMixfixRegistry rdecides)
-  re <- withExtraMixfix mixfixAdds $
+    pure (rds, extends, buildMixfixRegistry rdecides, functionInputDefaults rdecides)
+  re <- withExtraInputDefaults defaultsAdds $ withExtraMixfix mixfixAdds $
     extendKnownMany (dedupCheckInfos (concat extends)) do
       re <- checkExpr ec e t
       nlgExpr re
@@ -4611,8 +4643,20 @@ sectionBinderFor n = do
 supplyAppNamed :: Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
 supplyAppNamed _r []   [] = pure []
 supplyAppNamed  r onts [] = do
-  addError (IncompleteAppNamed r (snd <$> onts))
-  pure []
+  -- What the site left out. An input or field that declares a TYPICALLY is not
+  -- missing: it takes its default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 for a
+  -- rule's inputs, W5 for a record's fields). Only a NAMED site gets here, so
+  -- R8 rule 1 holds without being checked: a positional site never reaches
+  -- this function and keeps its arity error.
+  defaults <- asks (Map.findWithDefault Map.empty (getUnique r) . (.visibleInputDefaults))
+  let
+    fillFor (i, MkOptionallyNamedType _ (Just n') _)
+      | Just d <- Map.lookup (getUnique n') defaults = Right (i, defaultNamedExpr r n' d)
+    fillFor (_, ont) = Left ont
+    (missing, fills) = partitionEithers (map fillFor onts)
+  unless (null missing) $
+    addError (IncompleteAppNamed r missing)
+  pure fills
 supplyAppNamed  r onts (ne@(MkNamedExpr ann n e) : nes) =
   case lookupOptionallyNamedType n onts of
     Just (i, n', t, onts') -> do
@@ -4670,6 +4714,57 @@ findOptionallyNamedType n ((i, MkOptionallyNamedType _ (Just n') t) : onts)
 findOptionallyNamedType n (ont : onts) = do
     (i, rn, t, onts') <- findOptionallyNamedType n onts
     pure (i, rn, t, ont : onts')
+
+-- | The argument a named application is given for an input or field it left
+-- out, from that input's @TYPICALLY@ default.
+--
+-- It is built from nothing the author wrote: every annotation is empty, so no
+-- token of the declaration the default was written in is re-read at the call
+-- site, and the node has the shape the generic exactprint and semantic-token
+-- traversals expect (a 'NamedExpr' holds two holes, one for the name and one
+-- for the value). 'DefaultFill', on the value, is what says it was added.
+defaultNamedExpr :: Resolved -> Resolved -> InputDefault -> NamedExpr Resolved
+defaultNamedExpr callee binderRef d =
+  MkNamedExpr
+    (mkAnno [mkHoleWithSrcRangeHint Nothing, mkHoleWithSrcRangeHint Nothing])
+    (Ref (MkName emptyAnno (rawName binderName)) (getUnique binderRef) binderName)
+    (defaultValueAt fill d.value)
+ where
+  binderName = getOriginal binderRef
+  fill = MkDefaultFill
+    { owner      = rawName (getOriginal callee)
+    , binder     = rawName binderName
+    , declaredAt = d.declaredAt
+    }
+
+-- | A checked default re-made as a value of its own, marked with the 'DefaultFill'
+-- that says where it came from. A default is a literal or a nullary constructor
+-- ('isTypicallyLiteral'), so those are the two shapes handled; anything else
+-- would be a default the checker should already have refused, and is returned
+-- as it is.
+--
+-- The resolved type the checker recorded on the node is kept: a consumer that
+-- asks a field's value for its type should get one.
+defaultValueAt :: DefaultFill -> Expr Resolved -> Expr Resolved
+defaultValueAt fill = \ case
+  Lit ann lit ->
+    Lit (marked 1 ann) case lit of
+      NumericLit _ r -> NumericLit emptyAnno r
+      StringLit  _ t -> StringLit  emptyAnno t
+  App ann n [] ->
+    App (marked 2 ann) (bare n) []
+  other -> other
+ where
+  marked :: Int -> Anno -> Anno
+  marked holes ann =
+    ann { range = Nothing, payload = replicate holes (mkHoleWithSrcRangeHint Nothing) }
+      & annDefaultFill ?~ fill
+
+  bare = \ case
+    Def u n        -> Def u (blank n)
+    Ref n u o      -> Ref (blank n) u o
+    OutOfScope u n -> OutOfScope u (blank n)
+  blank (MkName _ raw) = MkName emptyAnno raw
 
 -- | The second 'ExpectationContext' is the one a WHEN pattern is checked in
 -- against the scrutinee's type (see 'checkConsider').
