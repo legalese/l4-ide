@@ -33,6 +33,7 @@ module L4.EvaluateLazy
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
 , prettyNotes
+, defaultNotes
 , prettyAssertionOutcome
 , prettyReductionOutcome
 , prettyUndetermined
@@ -661,9 +662,10 @@ renderProvenance prov =
 -- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns presumed) =
    prettyEvalDirectiveValue res
    <> prettyNotes ns
+   <> prettyNotes (defaultNotes mtrace presumed)
    <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
@@ -672,9 +674,10 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presu
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns presumed) =
    prettyEvalDirectiveValueWithFields fields res
    <> prettyNotes ns
+   <> prettyNotes (defaultNotes mtrace presumed)
    <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
@@ -684,6 +687,29 @@ prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtr
 -- there are none (the usual case), so no older output moves.
 prettyNotes :: [Text] -> Text
 prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
+
+-- | W11 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3): a directive that took a
+-- @TYPICALLY@ default says so beside its value, one line for each default that
+-- took effect, in the words of the trace's event ('defaultEventText'):
+--
+-- > 6
+-- > NOTE: the rate took its default (declared at rates.l4:2:44-45)
+--
+-- R8: "Every directive and trace output names each parameter that took its
+-- default". A traced directive has the event in its trace already, so it is
+-- not said twice; a default its trace does not show (a truncated trace, or one
+-- that failed to post-process) is still said here.
+defaultNotes :: Maybe EvalTrace -> [Presumed] -> [Text]
+defaultNotes mtrace presumed =
+  [ defaultEventText p | p <- presumed, p `notElem` traced ]
+  where
+    traced = maybe [] tracedDefaults mtrace
+
+-- | The defaults a trace shows.
+tracedDefaults :: EvalTrace -> [Presumed]
+tracedDefaults = \ case
+  Trace _ steps _        -> foldMap (foldMap tracedDefaults . snd) steps
+  TraceDefault p steps _ -> p : foldMap (foldMap tracedDefaults . snd) steps
 
 -- ----------------------------------------------------------------------------
 -- ToJSON instances for batch --json output

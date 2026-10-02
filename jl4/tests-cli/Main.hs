@@ -249,11 +249,12 @@ arrayField v k = case objField v k of
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
-batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture :: FilePath
+batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture, runDefaultFixture :: FilePath
 batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
 traceDefaultFixture = fixtureDir </> "trace-default.l4"
+runDefaultFixture = fixtureDir </> "run-default.l4"
 
 -- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
 descAttachmentFixture :: FilePath
@@ -407,7 +408,7 @@ coreFixtures =
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
-  , batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture
+  , batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture, runDefaultFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
   , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
@@ -500,6 +501,25 @@ spec bin = do
       case objField env "results" of
         Just (Array v) -> length v `shouldBe` 2
         other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- W11 (R8: "every directive ... names each parameter that took its
+    -- default"): a plain #EVAL says which default it took, beside its value,
+    -- on both surfaces, and a directive that supplied the value says nothing.
+    it "says which TYPICALLY default a directive took, and not when the value was supplied" $ do
+      Output code sout _ <- runL4 bin ["run", runDefaultFixture]
+      code `shouldBe` ExitSuccess
+      countInfix "the rate took its default (declared at run-default.l4:" sout `shouldBe` 1
+      countInfix "Notes:" sout `shouldBe` 1
+      env <- jsonEnvelope bin ["run", runDefaultFixture, "--json"]
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [first, second] -> do
+            objField first "notes" `shouldSatisfy` (\ n -> case n of
+              Just (Array ns) -> length ns == 1
+              _               -> False)
+            objField second "notes" `shouldBe` Nothing
+          other -> expectationFailure ("Expected two results, got " ++ show other)
+        other -> expectationFailure ("Expected results array, got " ++ show other)
 
     -- The R-X6 note must reach the machine-readable surface too: a consumer
     -- reading only "value" would be handed the silent nullity the ruling

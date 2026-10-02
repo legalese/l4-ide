@@ -3,5 +3,7 @@ Typechecking successful
 Evaluation successful
 section-given-import-connective-def.l4:18:1-21:
   TRUE
+  NOTE: the rate took its default (declared at section-given-import-connective-def.l4:10:44-45)
 section-given-import-connective-def.l4:19:1-20:
   FALSE
+  NOTE: the rate took its default (declared at section-given-import-connective-def.l4:10:44-45)

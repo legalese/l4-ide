@@ -15,7 +15,7 @@ import Data.IORef (newIORef)
 import qualified Data.Text as Text
 import Test.Hspec
 
-import L4.EvaluateLazy (postprocessTrace, safePostprocessTrace)
+import L4.EvaluateLazy (defaultNotes, postprocessTrace, safePostprocessTrace, tracePostprocessFailed)
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy (Address (..), NF(..), Reference (..), Thunk (..), Value(..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
@@ -191,3 +191,16 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
     -- the 'Push' to 'Pop' in the middle is the default's own evaluation, in the
     -- list of its address, which the event takes the steps of
     eventsOf t `shouldBe` [(["the rate"], 1)]
+
+  -- W11: the line beside a directive's answer says what the trace would say, and
+  -- is not said twice
+  it "says a default beside the answer when there is no trace, and not again when the trace shows it" $ do
+    r <- numberRef 1 3
+    let said = "the rate took its default (declared at rates.l4:4:30-31)"
+        shown = postprocessTrace
+          [ Enter (number 2), TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
+    defaultNotes Nothing [theRate] `shouldBe` [said]
+    defaultNotes (Just shown) [theRate] `shouldBe` []
+    -- a trace that does not show it (post-processing failed) leaves the line
+    defaultNotes (Just tracePostprocessFailed) [theRate] `shouldBe` [said]
+    defaultNotes Nothing [] `shouldBe` []

@@ -110,7 +110,10 @@ typically-trace.l4:56:1-31:
   │┌ the rate took its default (declared at typically-trace.l4:9:49-50)
   │└ 3
   └ Quote OF 3
-typically-trace.l4:59:1-14:
+typically-trace.l4:60:1-14:
   6
-typically-trace.l4:60:1-32:
+  NOTE: the rate took its default (declared at typically-trace.l4:9:49-50)
+typically-trace.l4:61:1-32:
   assertion satisfied
+  NOTE: has capacity took its default (declared at typically-trace.l4:10:49-53)
+  NOTE: the rate took its default (declared at typically-trace.l4:9:49-50)

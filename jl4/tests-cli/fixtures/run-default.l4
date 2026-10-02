@@ -1,0 +1,13 @@
+§ `Run default fixture`
+
+-- W11: a plain #EVAL says which TYPICALLY default it took, in the Notes of
+-- `l4 run` and in the "notes" of its JSON, and says nothing when the value
+-- was supplied.
+
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+#EVAL doubled
+#EVAL doubled WITH `the rate` IS 5

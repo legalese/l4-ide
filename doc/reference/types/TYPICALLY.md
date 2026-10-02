@@ -200,6 +200,22 @@ The two lines have the shape of any step the rule took, what was worked out over
   A rule that reads one through an `IMPORT` takes the default with no line in the trace.
   An `@export` that reaches a section input of an imported file is refused when the file is checked, so this arises in the editor and in `l4 trace` only.
 
+## Beside an answer
+
+A plain `#EVAL` or `#ASSERT` has no trace, so it says which defaults it took in a line after its answer, one line for each:
+
+```text
+6
+NOTE: the rate took its default (declared at rates.l4:2:44-45)
+```
+
+The line says what the trace says, in the same words: the name, and where its default was written.
+The value is the one written there.
+A directive that supplies the value, such as `#EVAL doubled WITH `the rate` IS 5`, has no such line, and neither has one that never read the default.
+A `#EVALTRACE` shows the default in its trace and does not say it twice.
+`l4 run` prints the lines in its `Notes:` block, and in the `notes` of `l4 run --json`.
+`l4 batch` and the decision service say it in the answer's `presumed` list instead.
+
 ## Examples
 
 **Example file:** [typically-example.l4](typically-example.l4)
