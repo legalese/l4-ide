@@ -949,7 +949,19 @@ jl4Rules evalConfig rootDirectory recorder = do
     -- put the diagnostic on that IMPORT
     deps    <- fmap catMaybes $ uses (AttachCallStack (f : cs) GetLazyEvaluationDependencies) $ map (.moduleUri) imports
     let environment = mconcat (fst <$> deps)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnv evalConfig tcRes.entityInfo environment tcRes.module')
+        -- the modules this one imports, transitively and once each (a diamond of
+        -- imports would otherwise list a module once per path): the JSON decoder
+        -- fills an absent field of a record declared in any of them from its
+        -- DECLARE (T1b)
+        importedModules = go Map.empty tcRes.dependencies
+          where
+            go seen [] = Map.elems seen
+            go seen (d : ds) =
+              let MkModule _ depUri _ = d.module'
+              in if Map.member depUri seen
+                   then go seen ds
+                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
     pure ([], Just (ownEnv <> environment, ownDirectives))
 
   define shakeRecorder $ \EvaluateLazy uri -> do
@@ -1109,7 +1121,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         }
 
     evalLazyResultToDiagnostic :: EvaluateLazy.EvalDirectiveResult -> Diagnostic
-    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes) = do
+    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes _) = do
       Diagnostic
         { _range = srcRangeToLspRange range
         , _severity =

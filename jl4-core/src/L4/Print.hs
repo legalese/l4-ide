@@ -24,7 +24,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Prettyprinter
 import Prettyprinter.Render.Text
 import qualified Data.List.NonEmpty as NE
-import L4.Utils.Ratio (prettyRatio)
+import L4.Utils.Ratio (prettyRatio, prettyRatioExact)
 import L4.Evaluate.Operators
 import L4.Names
 import L4.Desugar
@@ -1304,7 +1304,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where
 
 instance LayoutPrinter Lit where
   printWithLayout = \ case
-    NumericLit _ t -> pretty (prettyRatio t)
+    -- exact, not through Double: a re-printed module must be the same program
+    NumericLit _ t -> pretty (prettyRatioExact t)
     StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where

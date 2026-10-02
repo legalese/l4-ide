@@ -301,14 +301,56 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 ```
 
 ```
-{"diagnostics":[],"input":{"amount":1000,"days_overdue":12},"output":[{"result":20,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"amount":1000,"days_overdue":45},"output":[{"result":50,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"amount":2500,"days_overdue":0},"output":[{"result":0,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{"amount":1000,"days_overdue":12},"output":[{"result":20,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"amount":1000,"days_overdue":45},"output":[{"result":50,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"amount":2500,"days_overdue":0},"output":[{"result":0,"trace":null}],"presumed":[],"status":"success"}
 ```
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
+
+#### Facts a case leaves out
+
+A fact can carry a usual value, written with [`TYPICALLY`](../../reference/types/TYPICALLY.md): a rebuttable presumption that holds unless the case says otherwise. When a case leaves such a fact out, `l4 batch` uses the usual value, and the line says so under `presumed`:
+
+```l4
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Can contract
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`can contract` MEANS `is adult` AND `has capacity`
+```
+
+```
+$ cat cases.json
+[ {"is adult": true}, {"is adult": true, "has capacity": false}, {"is adult": false} ]
+
+$ l4 batch capacity.l4 --inputs cases.json
+{"diagnostics":[],"input":{"is adult":true},"output":[{"result":true,"trace":null}],"presumed":["has capacity"],"status":"success"}
+{"diagnostics":[],"input":{"has capacity":false,"is adult":true},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"is adult":false},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+```
+
+The first case took the usual value, and the answer rests on it. The second supplied the fact, so nothing was presumed. The third left the fact out too, but `presumed` is empty: someone who is not an adult cannot contract whatever their capacity, so the answer never needed it. `presumed` lists only what the answer actually used.
+
+What counts as leaving a fact out:
+
+- **The usual value works the same wherever the `TYPICALLY` is written**: on a section `GIVEN` as above, on a rule's own `GIVEN`, or on a field of a record the rule takes as an input. A field is listed by its path, such as `config.timeout`.
+- **Leaving the name out of the case is leaving the fact out.** In a CSV file, an empty cell means the same, and so does a cell holding only spaces or a quoted `""`, so one file can let one row take the usual value while the next row supplies its own. A blank line is not a case, and neither is a line holding only spaces or tabs; a quoted `"   "` is a case whose one cell is empty. A line with more or fewer cells than the header is an error that names its line number, because a cell missing from a short line would otherwise take its usual value without anyone having said so. A file saved as Excel's "CSV UTF-8", which starts with an invisible byte-order mark, reads the same as one without, and so does a file with Windows line ends.
+- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact. That holds for every fact that is not a `MAYBE`, whether or not it has a usual value. `{}` given as a fact's value means the same as `null`, a fact that is a record included, and so does `{}` as an item of a list; a whole case `{}` supplies nothing, so every usual value applies. There is not yet a way to say "this record, with every field at its usual value"; leave out each field you mean to leave to its usual value.
+- **A misspelled name is an error where a usual value is taken.** In a case that leaves out a fact with a usual value, a name that matches no fact (a JSON key, or a CSV column) is an error that names it and the nearest fact, `Unknown field 'has capasity' (did you mean 'has capacity'?)`, because it may be the fact that was left out. The same holds inside a record. In a case where nothing takes a usual value, an extra name is ignored, as it always was. `--validate-only` reports it the same way.
+- **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before, and that is listed under `presumed` too: it is a presumption that the case is silent because there is nothing to say.
+- **A `TYPICALLY` on an `ASSUME` is not used**, here or by `l4 run`, and the fact stays required; move it under its section's heading to make it count.
+- **A rule's own `GIVEN` is the one place the boundary is ahead of the file.** `l4 batch` fills a rule's own defaulted input that a case leaves out, but inside the file ``#EVAL `the rule` WITH …`` still refuses to leave one out, and names it as missing; that half is not built yet. A section `GIVEN` behaves the same in both.
+
+To see what the rules establish without any usual values, pass `--presumption hard`. Every fact must then be in the case. A line that leaves facts out is an error naming every one of them, exactly as for a fact with no usual value, and `--validate-only` reports them the same way. That includes a fact the rules would never have read for that case: `l4 batch` checks that every fact is there before it runs the rules, so with `--presumption hard`, `{"is adult": false}` is an error naming `has capacity`, although someone who is not an adult cannot contract whatever their capacity. The switch reaches only what a case can supply: a record the rules decode from JSON of their own still takes its usual values, and with `--presumption hard` the line lists them under `presumed` as `JSONDECODE <type>: <field>`. The default is `--presumption soft`.
+
+`presumed` appears in every output format, on every line that was evaluated, including one that ended in an error. With `--format csv` it is a column holding the same list as compact JSON, `[]` when nothing was presumed; a list rather than names joined by a separator, because a name may itself contain a comma or a semicolon. `--validate-only` evaluates nothing, so its lines have no `presumed`.
+
+One limit, measured 2026-10-02: a rule that overrides a section `GIVEN` for part of a calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, does not run under `l4 batch`, although `#EVAL` answers it. The line is an error that says _You are giving named inputs to `inner` … but it is not a function, so it takes none._, because `l4 batch` supplies a section `GIVEN` by replacing it with a plain value, which a `WITH` can no longer reach. This was so before `TYPICALLY` defaults reached `l4 batch`, and is not changed by them.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 

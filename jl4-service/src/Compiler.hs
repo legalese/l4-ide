@@ -11,7 +11,7 @@ import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
+import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule, typicallyToJson)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import BundleStore (SerializedBundle (..), StoredMetadata (..))
@@ -32,7 +32,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
-import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
+import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams, honouredDefault, isRequiredInput)
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
 import Logging (Logger, logInfo, logWarn)
@@ -498,11 +498,17 @@ exportToFunction declares implicitParams export =
     }
 
 -- | Build Parameters from ExportedParam list.
+--
+-- An input with a default a request may leave out is not @required@, and the
+-- default is published as the JSON Schema @default@ keyword (W2 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md; R8's schema surface). The
+-- schema describes presumption soft, the default; a @"presumption": "hard"@
+-- request must supply every input.
 parametersFromExport :: Map Text (Declare Resolved) -> [ExportedParam] -> Parameters
 parametersFromExport declares params =
   MkParameters
     { parameterMap = Map.fromList [(param.paramName, paramToParameter declares param) | param <- params]
-    , required = [param.paramName | param <- params, param.paramRequired]
+    , required = [param.paramName | param <- params, isRequiredInput param]
     }
 
 -- | Convert an ExportedParam to a Parameter.
@@ -515,6 +521,7 @@ paramToParameter declares param =
   in p0
     { parameterAlias = Nothing
     , parameterDescription = Text.strip $ maybe "" id param.paramDescription
+    , parameterDefault = typicallyToJson =<< honouredDefault param
     }
 
 -- | Convert a Function to a FunctionDeclaration for the Backend.

@@ -26,6 +26,19 @@ module TestData (
   deonticBooleanJL4,
   maybeInputsJL4,
   timeInputsJL4,
+  ruleDefaultJL4,
+  recordDefaultJL4,
+  maybeHardJL4,
+  sectionSecondJL4,
+  twoDefaultsJL4,
+  refuseDefaultJL4,
+  exactDecimalJL4,
+  enumSchemaJL4,
+  wrapperNullJL4,
+  enumNullJL4,
+  recordWrapJL4,
+  ownDecodeJL4,
+  deonticDefaultJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -523,4 +536,243 @@ GIVEN flag   IS A BOOLEAN
       dt     IS A DATETIME
 GIVETH A BOOLEAN
 timed MEANS flag
+|]
+
+-- | A rule GIVEN with a TYPICALLY default, beside an unread input that lets a
+-- test send the request down the wrapper path with a @{}@ (W3 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+ruleDefaultJL4 :: Text
+ruleDefaultJL4 =
+  [i|
+@export default may contract
+GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+      `is adult`     IS A BOOLEAN
+      `unused flag`  IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity`
+|]
+
+-- | Record-field defaults, one of them an enum constructor, and an enum
+-- default on a rule GIVEN (W3, T1b). A request that leaves @timeout@ out of
+-- @cfg@ gets 30, and @presumed@ names it @cfg.timeout@.
+recordDefaultJL4 :: Text
+recordDefaultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+  colour  IS A Colour TYPICALLY Red
+
+@export default budget
+GIVEN cfg   IS A Config
+      shade IS A Colour TYPICALLY Green
+GIVETH A NUMBER
+budget MEANS
+  IF cfg's colour EQUALS Red AND shade EQUALS Green
+  THEN cfg's timeout PLUS cfg's retries
+  ELSE 0
+|]
+
+-- | A MAYBE input with no default (T1b, T3c's MAYBE paragraph): left out, it
+-- is NOTHING while presumption is soft, and missing while it is hard. A @{}@
+-- on the unread BOOLEAN sends a request to the wrapper path.
+maybeHardJL4 :: Text
+maybeHardJL4 =
+  [i|
+@export default premium due
+GIVEN `unused flag` IS A BOOLEAN
+      premium       IS A MAYBE NUMBER
+GIVETH A NUMBER
+`premium due` MEANS
+  CONSIDER premium
+    WHEN JUST p THEN p
+    WHEN NOTHING THEN 0
+|]
+
+-- | A section GIVEN with a default that the rule reads SECOND, so that
+-- @is adult@ FALSE never forces it: the test that @presumed@ lists a default
+-- only when it is read, not when discharge binds it at the root (T6).
+sectionSecondJL4 :: Text
+sectionSecondJL4 =
+  [i|
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export default may contract
+GIVEN `is adult`    IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity`
+|]
+
+-- | Two defaulted inputs, a section GIVEN and a rule GIVEN, for the test that
+-- presumption hard names every one a request leaves out.
+twoDefaultsJL4 :: Text
+twoDefaultsJL4 =
+  [i|
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export default may contract
+GIVEN `is adult`     IS A BOOLEAN
+      `of sound mind` IS A BOOLEAN TYPICALLY TRUE
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity` AND `of sound mind`
+|]
+
+-- | A refusal that rests on a default: @is resident@ left out is FALSE, and
+-- FALSE refuses (review M5). The refusal must say it rests on the default.
+refuseDefaultJL4 :: Text
+refuseDefaultJL4 =
+  [i|
+@export default eligible
+GIVEN `is resident` IS A BOOLEAN TYPICALLY FALSE
+      age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE eligible IF
+  IF `is resident` THEN age >= 18
+  ELSE REFUSE "cannot decide for a non-resident"
+|]
+
+-- | A decimal default that a Double cannot hold (review m1).
+exactDecimalJL4 :: Text
+exactDecimalJL4 =
+  [i|
+§ `R`
+    GIVEN r IS A NUMBER TYPICALLY 0.10000000000000000001
+
+@export default is exact
+GIVEN u IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `is exact` IF r EQUALS 0.10000000000000000001
+|]
+
+-- | Defaults as the schema publishes them: an enum constructor named through
+-- its section (review m2), NOTHING on a MAYBE, and a number on a rule GIVEN.
+enumSchemaJL4 :: Text
+enumSchemaJL4 =
+  [i|
+§ `Light`
+DECLARE Signal IS ONE OF Red, Amber
+
+§ `Main`
+@export default which
+GIVEN s IS A `Light`.Signal TYPICALLY `Light`.Red
+      m IS A MAYBE NUMBER TYPICALLY NOTHING
+      k IS A NUMBER TYPICALLY 5
+GIVETH A NUMBER
+DECIDE which s m k IS
+  CONSIDER s
+    WHEN `Light`.Red THEN k
+    WHEN Amber THEN 2
+|]
+
+-- | Defaulted inputs of several kinds beside an unread MAYBE BOOLEAN that lets
+-- a test reach the wrapper path (review m4, m8).
+wrapperNullJL4 :: Text
+wrapperNullJL4 =
+  [i|
+GIVEN m IS A MAYBE NUMBER
+GIVETH A NUMBER
+orZero m MEANS
+  CONSIDER m
+    WHEN JUST x THEN x
+    WHEN NOTHING THEN 0
+
+@export default wrapper probe
+GIVEN
+  m    IS A MAYBE NUMBER TYPICALLY NOTHING
+  k    IS A NUMBER TYPICALLY 5
+  flag IS A BOOLEAN TYPICALLY TRUE
+  u    IS A MAYBE BOOLEAN
+GIVETH A NUMBER
+DECIDE wp m k flag u IS
+  orZero m
+  + k * 10
+  + (IF flag THEN 1000 ELSE 0)
+|]
+
+-- | An enum input with no default (T3, report item 5), and one typed by a
+-- synonym for MAYBE.
+enumNullJL4 :: Text
+enumNullJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green
+DECLARE `optional colour` IS MAYBE Colour
+
+@export default is red
+GIVEN shade IS A Colour
+      second IS AN `optional colour`
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`is red` MEANS
+      (shade EQUALS Red)
+  AND (CONSIDER second
+         WHEN JUST Green THEN FALSE
+         OTHERWISE TRUE)
+|]
+
+-- | A record field default on the wrapper path, reached with a @{}@ on the
+-- unread flag: the only place a nested path passes through the wrapper's own
+-- field names.
+recordWrapJL4 :: Text
+recordWrapJL4 =
+  [i|
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+
+@export default budget
+GIVEN cfg IS A Config
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+budget MEANS cfg's timeout PLUS cfg's retries
+|]
+
+-- | A rule that decodes JSON of its own (review M3): the switch must not
+-- reach it, and under hard the answer says it rests on its default.
+ownDecodeJL4 :: Text
+ownDecodeJL4 =
+  [i|
+DECLARE Settings HAS
+  limit IS A NUMBER TYPICALLY 10
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseSettings s MEANS JSONDECODE s
+
+@export default within limit
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `within limit` amount IF
+  CONSIDER parseSettings "{}"
+    WHEN RIGHT st THEN amount <= st's limit
+    WHEN LEFT e THEN FALSE
+|]
+
+-- | A deontic rule with a defaulted BOOLEAN input, which takes the deontic
+-- wrapper path.
+deonticDefaultJL4 :: Text
+deonticDefaultJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver        IS A Driver
+      `is motorway` IS A BOOLEAN TYPICALLY FALSE
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    IF      `is motorway`
+    THEN    PARTY driver
+            MUST `wear seatbelt`
+            WITHIN 1
+    ELSE    PARTY driver
+            MAY `drive`
 |]
