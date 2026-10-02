@@ -4153,6 +4153,12 @@ metUnknownHandled = \ case
 -- not raise or diverge where the match itself would not have. A cell not yet
 -- evaluated counts only when it holds a literal, and a context-dependent
 -- cache ('WHNFWhen') not at all, since it may not hold for this context.
+--
+-- So the refinement is conservative. A later argument that has to be
+-- computed (@2 PLUS 3@), or a list longer than the pattern whose tail is not
+-- yet evaluated, is Stuck rather than skipped, and whether a later cell
+-- counts can depend on whether something else has already forced it. Both
+-- outcomes are safe: a clash is only ever claimed where there is one.
 anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
 anyKnownClash = \ case
   [] -> pure False

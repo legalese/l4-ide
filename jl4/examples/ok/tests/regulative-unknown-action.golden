@@ -1,25 +1,39 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-regulative-unknown-action.l4:39:1-40:34:
+regulative-unknown-action.l4:54:1-55:34:
   I could not continue evaluating, because I needed to know the value of
     k
   but it is an assumed term.
-regulative-unknown-action.l4:43:1-44:39:
+regulative-unknown-action.l4:58:1-59:39:
   FULFILLED
-regulative-unknown-action.l4:48:1-49:31:
+regulative-unknown-action.l4:63:1-64:31:
   PARTY Seller OF "Alice" MUST Deliver Retail WITHIN 13 HENCE FULFILLED LEST BREACH
-regulative-unknown-action.l4:61:1-62:33:
+regulative-unknown-action.l4:76:1-77:33:
   PARTY Seller OF "Alice" MUST Send Retail 0 WITHIN 13 HENCE FULFILLED LEST BREACH
-regulative-unknown-action.l4:65:1-66:33:
+regulative-unknown-action.l4:80:1-81:33:
   I could not continue evaluating, because I needed to know the value of
     k
   but it is an assumed term.
-regulative-unknown-action.l4:77:1-78:34:
+regulative-unknown-action.l4:92:1-93:34:
   I could not continue evaluating, because I needed to know the value of
     k
   but it is an assumed term.
-regulative-unknown-action.l4:89:1-90:34:
+regulative-unknown-action.l4:104:1-105:34:
   I could not continue evaluating, because I needed to know the value of
     k
   but it is an assumed term.
+regulative-unknown-action.l4:108:1-109:28:
+  I could not continue evaluating, because I needed to know the value of
+    act
+  but it is an assumed term.
+regulative-unknown-action.l4:121:1-122:42:
+  PARTY Seller OF "Alice" MUST Send2 Retail Retail WITHIN 13 HENCE FULFILLED LEST BREACH
+regulative-unknown-action.l4:133:1-134:45:
+  PARTY Seller OF "Alice" MUST Wrap (P Retail Retail) WITHIN 13 HENCE FULFILLED LEST BREACH
+regulative-unknown-action.l4:145:1-146:33:
+  I could not continue evaluating, because I needed to know the value of
+    ks
+  but it is an assumed term.
+regulative-unknown-action.l4:152:1-153:41:
+  PARTY Seller OF "Alice" MUST Deliver Retail WITHIN 13 HENCE FULFILLED LEST BREACH

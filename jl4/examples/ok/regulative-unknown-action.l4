@@ -16,15 +16,30 @@ DECLARE Actor IS ONE OF
     Seller HAS name IS A STRING
 DECLARE Kind IS ONE OF Retail, Wholesale
 
+DECLARE Pair IS ONE OF
+    P HAS first IS A Kind, second IS A Kind
+
 DECLARE Action IS ONE OF
     Deliver HAS item IS A Kind
     Ship    HAS item IS A Kind
     Send    HAS item IS A Kind, qty IS A NUMBER
+    Send2   HAS one IS A Kind, other IS A Kind
+    Wrap    HAS inner IS A Pair
+    Order   HAS items IS A LIST OF Kind
 
 alice       MEANS Seller OF "Alice"
 
+GIVEN x IS A Kind
+GIVETH A Kind
+pick x MEANS
+    CONSIDER x
+    WHEN Retail THEN Retail
+    OTHERWISE Wholesale
+
 § `Facts`
-    GIVEN k IS A Kind
+    GIVEN k   IS A Kind
+          ks  IS A LIST OF Kind
+          act IS AN Action
 
 GIVETH A DEONTIC Actor Action
 `must deliver` MEANS
@@ -88,3 +103,51 @@ GIVETH A DEONTIC Actor Action
 -- 7. A permission: if `k` is `Retail` Alice has used it. Stuck on `k`.
 #TRACE `may deliver` AT 0 WITH
   PARTY alice DOES Deliver k AT 1
+
+-- 8. The whole act is not known. Stuck on `act`.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES act AT 1
+
+GIVETH A DEONTIC Actor Action
+`must send two retail` MEANS
+    PARTY alice
+    MUST   Send2 Retail Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 9. Control: the first kind is unknown, but the second is `Wholesale` where
+--    `Retail` is required, so this cannot be the act. Still pending.
+#TRACE `must send two retail` AT 0 WITH
+  PARTY alice DOES Send2 k Wholesale AT 1
+
+GIVETH A DEONTIC Actor Action
+`must wrap two retail` MEANS
+    PARTY alice
+    MUST   Wrap (P Retail Retail)
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 10. Control: the same, one level further in. Still pending.
+#TRACE `must wrap two retail` AT 0 WITH
+  PARTY alice DOES Wrap (P k Wholesale) AT 1
+
+GIVETH A DEONTIC Actor Action
+`must order nothing` MEANS
+    PARTY alice
+    MUST   Order EMPTY
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 11. A list nobody has supplied: it may be empty. Stuck on `ks`.
+#TRACE `must order nothing` AT 0 WITH
+  PARTY alice DOES Order ks AT 1
+
+-- 12. Not yet fixed: the unknown is read by a rule that uses CONSIDER, here
+--     `pick`, before the act is matched. That rule still treats `k` as "not
+--     Retail", so the event is passed over and the obligation stays pending.
+--     This is being worked on, and this answer will change to Stuck on `k`.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Deliver (pick k) AT 1
