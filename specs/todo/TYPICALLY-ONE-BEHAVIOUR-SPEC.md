@@ -233,6 +233,8 @@ The likely fix is the service wrapper's: keep the binder and supply it at the ro
 
 **Also fixed on the way.** Batch's `InputArgs` printed one field per line with a leading `, `, and a field after one whose type is an application (`MAYBE NUMBER`) failed to parse ("incorrect indentation"), so an export with a `MAYBE` input before another input failed every row; it now prints the fields without separators.
 The service wrapper had the same layout, and under hard it failed to compile a module soft ran (review m4, code #13); `generateInputRecordLifted` now prints the same way.
+legalese/l4-ide#531 cured the same symptom from the other end, by lifting the printer's `MAYBE OF X` to `MAYBE X`; the two fixes are independent, and both are in.
+On the wrapper path a missing `DATE`, `TIME` or `DATETIME` with no default still fails as "Evaluation produced unknown value", naming nothing: `wrapperPlan` keeps W1's lifting for them, because the wrapper converts them from strings (since #532 all three, as `MAYBE STRING`). Measured on the rebased service, 2026-10-02; the README lists it.
 
 **Review fixes (2026-10-02).** After the code-quality and silent-failure reviews, beyond those recorded above:
 
