@@ -918,20 +918,20 @@ atomIdentityShapeTests = do
   -- `ts-shared/ladder-core/test/fixtures/may-purchase-alcohol.viz.json`, a viz
   -- payload captured from a live jl4-lsp. They are the ANNOTATED ids, and a TS
   -- consumer in another repo pins the same ones, so a change that moves them
-  -- moves them for that consumer too. They have moved twice, each time
+  -- moves them for that consumer too. They have moved three times, each time
   -- deliberately, and the fixture was restamped in the same change: when an
   -- atomId became the hash of the leaf's term rather than its label (R3,
-  -- smucclaw/l4-ide#1013), and when `Extension` gained the `@nonassertable`
-  -- fields (the key is `show` of the AST with its annotations emptied, and
-  -- `show` of an `Extension` lists every field it has, so a new field moves
-  -- every id).
+  -- smucclaw/l4-ide#1013), when `Extension` gained the `@nonassertable`
+  -- fields, and when it gained `defaultFill` (the key is `show` of the AST
+  -- with its annotations emptied, and `show` of an `Extension` lists every
+  -- field it has, so a new field moves every id).
   it "the atomIds committed in the ladder-core TS fixture are unmoved" do
     src <- Text.pack <$> readFile "../jl4/examples/ok/typically-basic.l4"
     (info, vizState, _params) <- lspCache "may purchase alcohol" src
     let annotated = List.sort (List.nub (ladderAtomIdsOf (LspQP.annotateLadderWithAtomIds info vizState)))
     annotated
-      `shouldBe` [ "1e91cf87-7f70-5d77-bb64-c7fc5812072d"
-                 , "4dc37cfa-2efe-563b-a9f2-957c2285b149"
-                 , "53fd1fd0-6832-52fb-b9ab-3d5e073c71e3"
-                 , "6ed1531c-0dbc-53e2-ab1b-253baf8d2543"
+      `shouldBe` [ "4e21d8da-0dd1-5c51-802b-877dd18a8798"
+                 , "95d643e5-de0a-5075-a79a-69d04471211d"
+                 , "ce8300e9-504b-51b7-93e6-ee3f98da1779"
+                 , "d1aa4f28-2eb5-58d8-90ec-aaf890fbf67a"
                  ]
