@@ -78,6 +78,11 @@ That is precisely the kind of silent-degradation failure the `doc/exports/README
 
 Reuse Catala's error-accumulating pattern (`L4.Catala.Lower`'s `newtype V a = V (Either [LowerError] a)` Applicative) so a single run reports **every** offending Decide, not just the first — cheaper for a drafter to fix in one pass than to discover one refusal at a time.
 
+**Added 2026-10-02** (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T5b, W9, branch `feat/typically-w9`, not merged): a `TYPICALLY` on a fact the exported rule reads is an offender under this rule.
+A consultation asks the user for every fact, so the default would be dropped and the user asked a question the source had already answered; that is a silent change of meaning, and R5 refuses it instead of reporting it.
+A section `GIVEN` is the same kind of fact as a nullary `ASSUME`, because the checker elaborates it into one.
+A default on a fact the exported rule never reads is not refused.
+
 `LowerError` for this backend needs only a name and a reason string; no `FidelityReport` (`L4.Interchange.Fidelity`) — that type exists for backends that emit a _degraded but present_ artifact, which this backend, by R5, never does.
 
 ## R6 — The command

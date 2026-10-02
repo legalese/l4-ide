@@ -75,6 +75,11 @@ Refused outright, by construction:
 
 - **Any parameterised `Decide`/`ASSUME` in the closure.**
   yscript has no functional/predicate layer to receive arguments.
+- **A `TYPICALLY` on a fact the exported rule reads** — a nullary `ASSUME`, or a section `GIVEN`, which the checker turns into the same kind of fact.
+  A consultation asks the user for every fact, so the default would be dropped and the user asked a question the source had already answered.
+  Remove the `TYPICALLY` to export the rule, and let the consultation ask.
+  A default on a fact the exported rule never reads is not refused; it carries nothing into the consultation.
+  This backend has no note channel, so it refuses rather than say it dropped something.
 - **`NOT`.**
   yscript's own negation keyword could not be confirmed against a primary source (both manuals this project could reach 403'd, and the worked examples available contain no negation), so this is refused rather than guessed — a wrong keyword in generated yscript would be a silent miscompile, not a loud one.
 - **`IMPLIES` / `EQUALS`.**

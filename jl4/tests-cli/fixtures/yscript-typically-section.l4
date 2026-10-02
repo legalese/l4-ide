@@ -1,0 +1,8 @@
+-- The same module with the default on a section GIVEN, which the checker
+-- elaborates into the same kind of fact.
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+          `is adult` IS A BOOLEAN
+
+@export May contract
+`may contract` MEANS `has capacity` AND `is adult`
