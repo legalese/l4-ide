@@ -1646,6 +1646,8 @@ backward val = withPoppedFrame $ \ case
     case val of
       ValNil ->
         continueBackward (ValEnvironment Map.empty)
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatCons0 p1 env p2) -> do
@@ -1653,6 +1655,8 @@ backward val = withPoppedFrame $ \ case
       ValCons rf1 rf2 -> do
         pushFrame (PatCons1 rf2 env p2)
         continuePattern rf1 env p1
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatCons1 rf2 env p2) -> do
@@ -1685,6 +1689,8 @@ backward val = withPoppedFrame $ \ case
                     continuePattern r env p
             else internalException $ RuntimeTypeError
               "pattern for constructor has the wrong number of arguments"
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatApp1 ambient envs rps) ->
@@ -4098,6 +4104,84 @@ patternMatchFailure = withPoppedFrame $ \ case
     continueRef events
   Just _ ->
     patternMatchFailure
+
+-- | A pattern frame met an unknown where it needed a constructor or a list.
+--
+-- Under the regulative action matcher this is Stuck, naming the unknown
+-- (smucclaw/l4-ide#999): failing the match would move on to the next
+-- event, which asserts that the act was not this one, and nothing says so.
+-- The exception is a sub-pattern still to be matched that is already KNOWN
+-- to clash; then the act cannot be this one whatever the unknown is, and
+-- the matcher moves on exactly as for any mismatch. Those sub-patterns sit
+-- in the 'PatApp1' and 'PatCons1' frames between here and the handler.
+--
+-- Under a @CONSIDER@ (and so a record selector) the match still fails, as it
+-- always has; UNKNOWN-EVALUATION-SPEC §8 step 1 widens 'unknownIsStuck' to
+-- that handler too.
+patternMetUnknown :: Resolved -> Machine Config
+patternMetUnknown r = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  -- the handler is the frame 'patternMatchFailure' would unwind to
+  let (pending, handler) = break isMatchHandler stack.frames
+  if unknownIsStuck handler
+    then do
+      clash <- anyKnownClash (concatMap pendingPositions pending)
+      if clash then patternMatchFailure else stuckOnAssumed r
+    else patternMatchFailure
+  where
+    isMatchHandler = \ case
+      ConsiderWhen1{}              -> True
+      ContractFrame (Contract11 _) -> True
+      _                            -> False
+    unknownIsStuck = \ case
+      ContractFrame (Contract11 _) : _ -> True
+      _                                -> False
+    pendingPositions = \ case
+      PatApp1 _ _ rps -> rps
+      PatCons1 rf _ p -> [(rf, p)]
+      _               -> []
+
+-- | Whether some cell is already KNOWN to fail its pattern. Cells are read,
+-- never forced: a check made only so that a mismatch stays a mismatch must
+-- not raise or diverge where the match itself would not have. A cell not yet
+-- evaluated counts only when it holds a literal, and a context-dependent
+-- cache ('WHNFWhen') not at all, since it may not hold for this context.
+anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
+anyKnownClash = \ case
+  [] -> pure False
+  ((rf, p) : rest) -> do
+    clash <- knownClash rf p
+    if clash then pure True else anyKnownClash rest
+
+knownClash :: Reference -> Pattern Resolved -> Machine Bool
+knownClash rf pat = readThunk rf >>= \ case
+  WHNF v                      -> clashes v
+  Unevaluated _ (Lit _ lit) _ -> clashes =<< runLit lit
+  Unevaluated{}               -> pure False
+  WHNFWhen{}                  -> pure False
+  where
+    clashes v = case pat of
+      PatVar{} -> pure False
+      PatApp _ n []
+        | getUnique n == TypeCheck.emptyUnique -> pure case v of
+            ValCons{} -> True
+            _         -> False
+      PatApp _ n ps -> case v of
+        ValConstructor n' rfs
+          | sameResolved n n' -> anyKnownClash (zip rfs ps)
+          | otherwise         -> pure True
+        _ -> pure False
+      PatCons _ p1 p2 -> case v of
+        ValNil        -> pure True
+        ValCons r1 r2 -> anyKnownClash [(r1, p1), (r2, p2)]
+        _             -> pure False
+      PatLit _ lit          -> pure (literalClash lit v)
+      PatExpr _ (Lit _ lit) -> pure (literalClash lit v)
+      PatExpr{}             -> pure False
+    literalClash lit v = case (lit, v) of
+      (NumericLit _ n, ValNumber m) -> n /= m
+      (StringLit _ s, ValString t)  -> s /= t
+      _                             -> False
 
 runLit :: Lit -> Machine WHNF
 runLit (NumericLit _ann num) = pure (ValNumber num)

@@ -1,0 +1,78 @@
+IMPORT prelude
+-- AN EVENT WHOSE ACTION HOLDS AN UNKNOWN (smucclaw/l4-ide#999).
+--
+-- An event is matched against the obligation's action pattern. When the
+-- event's action holds an input whose value is not known, at a place where
+-- the pattern needs a particular constructor, the match cannot be decided:
+-- moving on to the next event would assert that the party did something
+-- else, which is how this used to leave the obligation pending. Now it is
+-- Stuck, naming the unknown.
+--
+-- An action that is KNOWN not to match still moves on, as before. "Known"
+-- here means a clash in a part of the event that is already a value or is
+-- written as a literal; nothing else is evaluated to find one.
+
+DECLARE Actor IS ONE OF
+    Seller HAS name IS A STRING
+DECLARE Kind IS ONE OF Retail, Wholesale
+
+DECLARE Action IS ONE OF
+    Deliver HAS item IS A Kind
+    Ship    HAS item IS A Kind
+    Send    HAS item IS A Kind, qty IS A NUMBER
+
+alice       MEANS Seller OF "Alice"
+
+§ `Facts`
+    GIVEN k IS A Kind
+
+GIVETH A DEONTIC Actor Action
+`must deliver` MEANS
+    PARTY alice
+    MUST   Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 1. Alice delivers something of unknown kind. If `k` is `Retail` this is
+--    FULFILLED; otherwise it is still pending. Stuck on `k`.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
+
+-- 2. Control: the kind is known, and it matches.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Deliver Retail AT 1
+
+-- 3. Control: a different action. Whatever `k` is, shipping is not
+--    delivering, so the obligation is still pending.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Ship k AT 1
+
+GIVETH A DEONTIC Actor Action
+`must send none` MEANS
+    PARTY alice
+    MUST   Send Retail 0
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 4. Control: the kind is unknown, but the quantity is the literal 5 where 0
+--    is required, so this cannot be the act. The obligation is still pending.
+#TRACE `must send none` AT 0 WITH
+  PARTY alice DOES Send k 5 AT 1
+
+-- 5. The quantity agrees, so the kind decides it. Stuck on `k`.
+#TRACE `must send none` AT 0 WITH
+  PARTY alice DOES Send k 0 AT 1
+
+GIVETH A DEONTIC Actor Action
+`must not deliver` MEANS
+    PARTY alice
+    SHANT  Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 6. A prohibition: if `k` is `Retail` this is a breach. Stuck on `k`.
+#TRACE `must not deliver` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1

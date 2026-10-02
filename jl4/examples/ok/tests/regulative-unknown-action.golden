@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-unknown-action.l4:39:1-40:34:
+  I could not continue evaluating, because I needed to know the value of
+    k
+  but it is an assumed term.
+regulative-unknown-action.l4:43:1-44:39:
+  FULFILLED
+regulative-unknown-action.l4:48:1-49:31:
+  PARTY Seller OF "Alice" MUST Deliver Retail WITHIN 13 HENCE FULFILLED LEST BREACH
+regulative-unknown-action.l4:61:1-62:33:
+  PARTY Seller OF "Alice" MUST Send Retail 0 WITHIN 13 HENCE FULFILLED LEST BREACH
+regulative-unknown-action.l4:65:1-66:33:
+  I could not continue evaluating, because I needed to know the value of
+    k
+  but it is an assumed term.
+regulative-unknown-action.l4:77:1-78:34:
+  I could not continue evaluating, because I needed to know the value of
+    k
+  but it is an assumed term.
