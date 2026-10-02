@@ -1831,12 +1831,24 @@ mkNormalName = NormalName
 
 buildReasoningTree :: Maybe EvalTrace -> Reasoning
 buildReasoningTree Nothing  = emptyReasoning
-buildReasoningTree (Just t) = traceToReasoning (withoutDefaultEvents t)
+buildReasoningTree (Just t) = traceToReasoning t
 
 traceToReasoning :: EvalTrace -> Reasoning
--- 'buildReasoningTree' has removed the events of defaults (W8), so none is met
--- here; one that is stands for the steps of the default it records.
-traceToReasoning (TraceDefault _ steps val) = traceToReasoning (Trace Nothing steps val)
+-- A @TYPICALLY@ default that took effect (W8) is a node of its own: the input's
+-- name as its code, the same sentence the text trace says as its explanation,
+-- and the value. A computed default shows what it did below it. The wrapper's
+-- own name for a field (@x (input)@) is put back to the input's.
+traceToReasoning (TraceDefault p steps val) =
+  Reasoning
+    { exampleCode = [renderPresumedPath path]
+    , explanation = [defaultEventText named, resultLine val]
+    , children = [traceToReasoning (Trace Nothing steps val) | not (null steps)]
+    }
+  where
+    path = case p.path of
+      n : rest -> unInputField n : rest
+      []       -> []
+    named = MkPresumed { path, declaredAt = p.declaredAt, origin = p.origin }
 traceToReasoning (Trace lbl [] val) =
   Reasoning
     { exampleCode = labelExample lbl

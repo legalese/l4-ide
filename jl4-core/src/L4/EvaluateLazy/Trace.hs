@@ -400,12 +400,17 @@ printDefaultEvent lvl p steps v =
 -- | What the event says, without its value: @the rate took its default
 -- (declared at f.l4:4:30-31)@. A default that no @TYPICALLY@ supplied is
 -- D7.3's @NOTHING@ for a @MAYBE@ left out of a JSON record.
-defaultEventHeader :: Presumed -> Doc ann
-defaultEventHeader p =
-  pretty (renderPresumedPath p.path) <+> "took its default" <+>
+--
+-- Every surface that shows the event says it in these words.
+defaultEventText :: Presumed -> Text
+defaultEventText p =
+  renderPresumedPath p.path <> " took its default " <>
     case p.declaredAt of
-      Just r  -> "(declared at" <+> pretty (prettySrcRange r) <> ")"
+      Just r  -> "(declared at " <> prettySrcRange r <> ")"
       Nothing -> "(a MAYBE left out is NOTHING)"
+
+defaultEventHeader :: Presumed -> Doc ann
+defaultEventHeader = pretty . defaultEventText
 
 -- | The trace as it was before defaults were events: every 'TraceDefault'
 -- removed, with whatever it showed of the default's own evaluation.
