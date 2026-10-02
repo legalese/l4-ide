@@ -84,7 +84,7 @@ lowerModule mod' =
           (errs, ok) = partitionEithers results
       in if not (null errs)
            then Left errs
-           else case checkCollisions (concatMap snd ok) of
+           else case checkCollisions enumDefs (concatMap snd ok) of
              Left e     -> Left [e]
              Right vars ->
                Right OFPackage
@@ -939,17 +939,26 @@ dedupOn key = go Set.empty
 -- sanitise to the same Python identifier would silently conflate (or, worse,
 -- drop a formula). Reject that. Exact duplicates — the same field read by
 -- several decisions — are collapsed to one.
-checkCollisions :: [OFVariable] -> Either LowerError [OFVariable]
-checkCollisions vs =
-  case [ (nm, grp) | (nm, grp) <- Map.toList byName, length (nub grp) > 1 ] of
+checkCollisions :: Map Text OFEnumDef -> [OFVariable] -> Either LowerError [OFVariable]
+checkCollisions enums vs =
+  case [ (nm, grp) | (nm, grp) <- Map.toList byName, length (nub (map effective grp)) > 1 ] of
     ((nm, grp0) : _)
       -- The same input read by several exported decisions is one variable; if
-      -- they disagree only about its TYPICALLY, there is no single default to
-      -- write, and picking one would silently make the others wrong.
-      | (g0 : gs) <- nub (reverse grp0), all (sameApartFromDefault g0) gs ->
+      -- they disagree only about its default, there is no single default to
+      -- write, and picking one would silently make the others wrong. "Disagree"
+      -- means the variable would DIFFER in OpenFisca: a decision that writes no
+      -- TYPICALLY gets OpenFisca's own default for the type, so @TYPICALLY 0@
+      -- against none is not a disagreement and @TYPICALLY 3@ against none is.
+      | (g0 : gs) <- nubBy (\a b -> effective a == effective b) (reverse grp0)
+      , all (sameApartFromDefault g0) gs ->
           Left $ LowerError ""
             ( "`" <> nm <> "` is an input of more than one exported decision, and they give it "
             <> "different TYPICALLY defaults (" <> Text.intercalate " and " (map defaultText (g0 : gs))
+            <> (if any ((== "none") . defaultText) (g0 : gs)
+                  then ", where none means that decision writes no TYPICALLY, and OpenFisca then "
+                       <> "gives the input its own default for its type: 0.0, False, '' or the first "
+                       <> "member of the enum"
+                  else "")
             <> "). OpenFisca has one variable of that name, and so one default for it: "
             <> "make the decisions agree, or rename one." )
       | otherwise ->
@@ -959,9 +968,29 @@ checkCollisions vs =
         <> ") both compile to the OpenFisca variable `" <> nm
         <> "`. A decision, field, or parameter that shares a (sanitised) name "
         <> "with another is unsafe in OpenFisca — rename one." )
-    [] -> Right (dedupOn (.varName) vs)
+    [] -> Right (dedupOn (.varName) (map prefer vs))
  where
   byName = Map.fromListWith (<>) [ (v.varName, [v]) | v <- vs ]
+
+  -- Variables that agree once each is given the default OpenFisca would give it
+  -- are one variable. Of such a group the artifact carries the one that WROTE a
+  -- default, so the generated class says what the source said.
+  best = Map.mapMaybe (\grp -> find (isJust . (.varDefault)) (reverse grp) <|> listToMaybe (reverse grp)) byName
+  prefer v = fromMaybe v (Map.lookup v.varName best)
+
+  -- The default a variable has in OpenFisca: what was written, else its own.
+  -- (An enum's is carried in its type, which already holds the member.)
+  effective v = v { varDefault = effectiveDefault v }
+  effectiveDefault v = case v.varDefault of
+    Just d -> Just d
+    Nothing
+      | isJust v.varFormula -> Nothing
+      | otherwise -> case v.varType of
+          OFFloat  -> Just (OFDefNum 0)
+          OFInt    -> Just (OFDefNum 0)
+          OFBool   -> Just (OFDefBool False)
+          OFStr    -> Just (OFDefStr "")
+          OFEnum{} -> Nothing
 
   -- Two variables that are the same input apart from the default each carries.
   sameApartFromDefault a b = bare a == bare b
@@ -973,5 +1002,13 @@ checkCollisions vs =
     (Just (OFDefBool b), _, _) -> if b then "TRUE" else "FALSE"
     (Just (OFDefStr t), _, _)  -> "\"" <> t <> "\""
     (_, Just _, _)             -> "a computed default"
-    (_, _, OFEnum cls m)       -> cls <> "." <> m
+    -- An enum's default is its member, written or not: the first declared
+    -- member is also what a decision that writes nothing gets, so it is said so.
+    (_, _, OFEnum cls m)
+      | isFirstMember cls m    -> cls <> "." <> m <> " (the first member, which is also what no TYPICALLY gives)"
+      | otherwise              -> cls <> "." <> m
     _                          -> "none"
+
+  isFirstMember cls m = case Map.lookup cls enums of
+    Just ed | ((m0, _) : _) <- ed.enMembers -> m0 == m
+    _                                       -> False

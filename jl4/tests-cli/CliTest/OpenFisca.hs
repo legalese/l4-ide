@@ -95,6 +95,12 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("different TYPICALLY defaults (3 and 5)" `isInfixOf`)
 
+    it "refuses a default against none, and says what none means" $ do
+      Output code _ serr <- runL4 bin ["export", "openfisca", "examples/openfisca/not-ok/defaults-vs-none.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("different TYPICALLY defaults (3 and none" `isInfixOf`)
+      serr `shouldSatisfy` ("OpenFisca then gives the input its own default for its type" `isInfixOf`)
+
     it "rejects a name collision (distinct L4 names → same Python identifier)" $
       expectFail bin ["export", "openfisca", "examples/openfisca/not-ok/name-collision.l4"]
 
