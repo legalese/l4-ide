@@ -288,7 +288,7 @@ The event stays where the default was read also when the rule that read it ran l
 An event that no step of the finished trace can show it under is hung by `hangUnplacedDefaults` on the last step of the main expression, in the order the defaults were read.
 Two shapes need it: a default first read while the result is written out with no run of a rule to hang from (a defaulted field of a record the function hands back, which nothing computed with), and a read inside a definition with no inputs, whose evaluation the trace does not unfold (a module-level definition that decodes JSON and leaves a field out).
 Nothing is dropped: the walk finds every event the main trace does not reach, following each placeholder once.
-Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", ten cases); the service's "a TYPICALLY default in the reasoning tree" (eleven cases, among them the wrapper and deontic placement and the quoted range); the corpus files `ok/typically-trace.l4` and `ok/typically-trace-where.l4`.
+Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", ten cases, and one more for W11, §4.3); the service's "a TYPICALLY default in the reasoning tree" (eleven cases, among them the wrapper and deontic placement and the quoted range); the corpus files `ok/typically-trace.l4` and `ok/typically-trace-where.l4`.
 
 **How each surface says it.**
 Decided by Claude overnight 2026-10-03, pending Meng's review: a reader of the output sees these words and R8 does not give them, and there is no conservative option to prefer, since keeping today's behaviour would be not building W8.
@@ -307,7 +307,7 @@ Commits `f8a37d8bf` (text) and `127d890ad` (service); each alternative is stated
   Alternative: one line, `• the rate took its default 3 (declared at …)`.
   Chosen for the layout because it matches a `LET` binding's, and carries a multi-line value and a computed default's steps with no new rule.
 - _Service reasoning tree_ (`trace=full`).
-  A node with `exampleCode: ["the rate"]` (the path, with the wrapper's own ` (input)` suffix put back to the input's, as `presumed` does) and `explanation: ["the rate took its default (declared at rates.l4:2:44-45)", "Result: 3"]`; a computed default's own steps are its child.
+  A node with `exampleCode: ["the rate"]` (the string `presumed` uses for the same default, `presumedName`: the path, with the wrapper's own ` (input)` suffix put back to the input's, and `JSONDECODE Settings: limit` for a field of a decode the rules made, review F6) and `explanation: ["the rate took its default (declared at rates.l4:2:44-45)", "Result: 3"]`; a computed default's own steps are its child.
   Alternative: no `exampleCode`, the sentence alone.
   A client that reads `explanation[0]` as the node's title still reads sensibly either way.
 - _Graph_ (`l4 trace`, and `graphviz` in a service response): see the decision below.
