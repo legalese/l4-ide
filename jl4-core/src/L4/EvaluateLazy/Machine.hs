@@ -1775,7 +1775,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (EverBetweenFrame originalCtx predicate endDay nextDay step)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "EVER BETWEEN expects predicate returning BOOLEAN"
+        iteratorNotBoolean "EVER BETWEEN" val
   Just (AlwaysBetweenFrame originalCtx predicate endDay currentDay step) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1790,7 +1790,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (AlwaysBetweenFrame originalCtx predicate endDay nextDay step)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "ALWAYS BETWEEN expects predicate returning BOOLEAN"
+        iteratorNotBoolean "ALWAYS BETWEEN" val
   Just (WhenLastFrame originalCtx predicate currentDay) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1807,7 +1807,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (WhenLastFrame originalCtx predicate nextDay)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "WHEN LAST expects predicate returning BOOLEAN"
+        iteratorNotBoolean "WHEN LAST" val
   Just (WhenNextFrame originalCtx predicate currentDay limitDay) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1824,7 +1824,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (WhenNextFrame originalCtx predicate nextDay limitDay)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "WHEN NEXT expects predicate returning BOOLEAN"
+        iteratorNotBoolean "WHEN NEXT" val
   -- VALUE AT is the one interval builtin whose result is not forced to a
   -- BOOLEAN/DATE by its own frame, so it needs the same deep pin as the four
   -- EVAL clause builtins (#934). EVER/ALWAYS BETWEEN and WHEN LAST/NEXT demand
@@ -1865,6 +1865,9 @@ backward val = withPoppedFrame $ \ case
             -- More elements to process. Evaluate the head element first
             pushFrame (JsonEncodeListFrame acc nextTailRef False)
             continueRef headRef
+          -- a list whose rest is unknown
+          ValAssumed r ->
+            stuckOnAssumed r
           _ ->
             -- Should not happen - tail should be ValNil or ValCons
             internalException $ RuntimeTypeError "Expected list (ValNil or ValCons) for tail"
@@ -4353,6 +4356,8 @@ encodeValueToJson = \case
     internalException $ RuntimeTypeError $
       "Internal error: Constructor encoding should be handled in runBuiltin, not encodeValueToJson: " <>
       nameToText (TypeCheck.getName conRef)
+  -- an unknown cannot be encoded, and it is not an internal error either
+  ValAssumed r -> stuckOnAssumed r
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
     escapeJson :: Text -> Text
@@ -4682,6 +4687,9 @@ coerceToString val = case val of
             internalException $ RuntimeTypeError "DATE values must have three fields (day, month, year) for string conversion"
     | otherwise ->
         incompatible
+  -- an unknown is not of the wrong type: name it
+  ValAssumed r ->
+    stuckOnAssumed r
   _ ->
     incompatible
   where
@@ -5180,10 +5188,36 @@ runBinOpEquals (ValConstructor n1 rs1) (ValConstructor n2 rs2)
   | otherwise                                           = continueBackward $ ValBool False
 -- TODO: we probably also want to check ValObligations for equality
 runBinOpEquals (ValAssumed r)          _                = stuckOnAssumed r
+-- An unknown on the right is as unknown as one on the left (U6): name it,
+-- rather than blame its type. Only where the left operand is of a type that
+-- equality supports; a function, an obligation or an unapplied constructor on
+-- the left is still the unsupported-type error it always was.
+runBinOpEquals v1                      (ValAssumed r)
+  | supportsEquality v1                                 = stuckOnAssumed r
 runBinOpEquals v1                       v2              = userException (EqualityOnUnsupportedType v1 v2)
+
+-- | The value forms 'runBinOpEquals' compares, when both sides have one.
+supportsEquality :: WHNF -> Bool
+supportsEquality = \ case
+  ValNumber {}      -> True
+  ValString {}      -> True
+  ValDate {}        -> True
+  ValTime {}        -> True
+  ValDateTime {}    -> True
+  ValNil            -> True
+  ValCons {}        -> True
+  ValConstructor {} -> True
+  _                 -> False
 
 infinityDay :: Time.Day
 infinityDay = Time.fromGregorian 9999 12 31
+
+-- | A temporal iterator's predicate returned something other than a BOOLEAN.
+-- An unknown is not of the wrong type: name it.
+iteratorNotBoolean :: Text -> WHNF -> Machine a
+iteratorNotBoolean _    (ValAssumed r) = stuckOnAssumed r
+iteratorNotBoolean what _              =
+  userException $ UserError (what <> " expects predicate returning BOOLEAN")
 
 applyDatePredicate :: WHNF -> Time.Day -> Machine Config
 applyDatePredicate predicate day = do
