@@ -860,7 +860,7 @@ wrapperPlan presumption m decide params (givens, binders, assumes) =
   WrapperPlan
     { wpBinders   = filter (not . discharged) binders
     , wpFields    = Map.fromList
-        [ (n, prettyLayout <$> Map.lookup n defaults)
+        [ (n, Print.prettyTypicallyOperand <$> Map.lookup n defaults)
         | (n, ty) <- givens <> filter (not . discharged) binders <> assumes
         , ownType n ty
         ]

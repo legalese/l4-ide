@@ -161,3 +161,50 @@ spec = do
         Right ps -> do
           ps.required `shouldBe` ["x"]
           Map.keys ps.parameterMap `shouldBe` ["x"]
+
+  -- R8 rule 3 (W7): a default is an expression, and whatever reads the input
+  -- is charged with what the default reads, so a request can supply it.
+  describe "export read-set through a TYPICALLY default" $ do
+    let binderReadsBinder = Text.unlines
+          [ "§ `Pricing`"
+          , "    GIVEN `list price` IS A NUMBER"
+          , "          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)"
+          , ""
+          , "@export final"
+          , "GIVETH A NUMBER"
+          , "`final price` MEANS discount TIMES 2"
+          ]
+        suppliedDefault = Text.unlines
+          [ "§ `Supplied`"
+          , "    GIVEN base IS A NUMBER TYPICALLY 4"
+          , "          doubled IS A NUMBER TYPICALLY (`double it` WITH base IS 10)"
+          , ""
+          , "GIVETH A NUMBER"
+          , "`double it` MEANS base TIMES 2"
+          , ""
+          , "@export read"
+          , "GIVETH A NUMBER"
+          , "`read it` MEANS doubled"
+          ]
+
+    it "lists a section input that only another input's default reads" $ do
+      exportParamNames binderReadsBinder `shouldBe` Right ["list price", "discount"]
+
+    -- The export's closure follows references and does not subtract what a WITH
+    -- supplies, as it never has for a body: `base` is listed although the default
+    -- supplies it for itself. That over-asks and is loud, and is not W7's to
+    -- change; `ok/typically-expression.l4` pins that it is no cycle.
+    it "lists an input a default supplies for itself, as it does for a body" $ do
+      exportParamNames suppliedDefault `shouldBe` Right ["base", "doubled"]
+
+    it "reports a default that reads its own input as a check error" $ do
+      let src = Text.unlines
+            [ "§ `Loop`"
+            , "    GIVEN a IS A NUMBER TYPICALLY (b PLUS 1)"
+            , "          b IS A NUMBER TYPICALLY (a PLUS 1)"
+            ]
+      case checkWithImports emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right r ->
+          [ length bs | MkCheckErrorWithContext{kind = TypicallyCycle bs} <- r.tcdErrors ]
+            `shouldBe` [2]

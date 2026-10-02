@@ -320,8 +320,16 @@ data CheckError =
     -- record whose value is a constructor of @PartyT@. Arguments: the
     -- obligated/acting party, the action's own actor, the action name.
   | TypicallyValueNotALiteral Name
-    -- ^ The TYPICALLY default value must be a literal (a compile-time
-    -- constant): a number or string literal, or a nullary constructor.
+    -- ^ A TYPICALLY default that nothing evaluates, on a written @ASSUME@ or a
+    -- lambda's @GIVEN@, must be a literal: a number or string literal, or a
+    -- nullary constructor. Anywhere a default is evaluated it may be any
+    -- expression (R8 rule 3, W7).
+  | TypicallyCycle [Resolved]
+    -- ^ A section binder's @TYPICALLY@ default reads the binder itself, directly
+    -- or through another binder's default or a definition it calls (R8 rule 3,
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). Carries the binders on the cycle, in
+    -- declaration order, the first of which is where the error is reported.
+    -- See 'L4.Discharge.defaultCycles'.
   | TypicallyRequiresType Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
@@ -760,6 +768,7 @@ instance HasSrcRange CheckErrorContext where
 instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (TypicallyOnComputedField n)      = rangeOf n
+  rangeOf (TypicallyCycle (b : _))          = rangeOf b
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
@@ -870,6 +879,32 @@ data FunTypeSig = MkFunTypeSig
   -- Includes type variables.
   , mixfixInfo :: Maybe MixfixInfo
   -- ^ If this is a mixfix function, its pattern info. Nothing for prefix functions.
+  , pendingDefaults :: [PendingDefault]
+  -- ^ The @TYPICALLY@ defaults of this signature's inputs that could not be
+  -- checked while the signature was scanned, because the definitions they may
+  -- name are not in scope until every signature has been scanned. They are
+  -- checked once those are ('L4.TypeCheck.checkPendingDefaults'), and the
+  -- results put into 'rtysig'.
+  }
+  deriving (Show, Eq, Generic)
+  deriving anyclass (SOP.Generic, NFData)
+
+-- | A rule input's @TYPICALLY@ default whose check waits until the module's
+-- definitions are in scope (R8 rule 3: a default is a module-scope expression
+-- and may name a definition or a section binder). Only a plain literal is
+-- checked at once, which keeps every error a literal could raise where it was.
+data PendingDefault = MkPendingDefault
+  { input        :: Resolved
+    -- ^ The input, as the checked signature names it.
+  , inputName    :: Name
+    -- ^ The input, as written, for the checker's own messages.
+  , declaredType :: Type' Resolved
+    -- ^ The input's declared type, which the default is checked against.
+  , source       :: Expr Name
+    -- ^ The default, as written.
+  , sectionPath  :: [NonEmpty Text]
+    -- ^ The section stack where the rule is declared, so that a name in the
+    -- default resolves as it would at the declaration.
   }
   deriving (Show, Eq, Generic)
   deriving anyclass (SOP.Generic, NFData)

@@ -89,7 +89,8 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
+import L4.Presumption (requestRecordName)
+import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, prettyTypicallyOperand, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
 import L4.TypeCheck.Annotation
@@ -113,7 +114,8 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.), (?~))
+import Optics ((%~), (^.), (?~), gplate)
+import qualified Optics
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -301,6 +303,14 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (callee, binder) <- Discharge.unreadImplicitSupplies rprog
                   ]
                   ++
+                  -- R8 rule 3 (W7): a section binder's default that reads the
+                  -- binder itself, or reaches it through another default or a
+                  -- definition, cannot be worked out. A whole-module fact, like
+                  -- the read-set it is computed from.
+                  [ MkCheckErrorWithContext (TypicallyCycle bs) None
+                  | bs <- Discharge.defaultCycles rprog
+                  ]
+                  ++
                   [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
@@ -424,6 +434,15 @@ withDecides rdecides =
     }
   where
     topDecides = fmap (.name) rdecides
+
+-- | 'withDecides' again for the same signatures once their pending defaults
+-- have been checked ('checkPendingDefaults'): the tables that hold a signature
+-- are rebuilt from the checked ones. The names are already in scope.
+withCheckedSignatures :: [FunTypeSig] -> Check a -> Check a
+withCheckedSignatures rdecides = local \ s -> s
+  { functionTypeSigs = Map.fromList $ mapMaybe (\ d -> (,d) <$> rangeOf d.anno) rdecides
+  , visibleInputDefaults = Map.union (functionInputDefaults rdecides) s.visibleInputDefaults
+  }
 
 -- | The @TYPICALLY@ defaults of the rule inputs these signatures declare, for
 -- the named applications that leave one out (W4). The default is the checked
@@ -791,8 +810,14 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
       { owner = d.owner
       , binder = d.binder
       , declaredAt = d.declaredAt
-      , value = d.value & annoOf %~ \ a -> a { extra = a.extra { resolvedInfo = Nothing } }
+      , value = Optics.over (gplate @Anno) forget d.value
       }
+  -- Every node's recorded type goes, but the fact that a name is a constructor
+  -- stays: that is closed (a constructor's declared type has no inference
+  -- variables), and what a consumer reads a name by (see 'defaultValueAt').
+  forget a = case a.extra.resolvedInfo of
+    Just (TypeInfo _ (Just Constructor)) -> a
+    _ -> a { extra = a.extra { resolvedInfo = Nothing } }
 
 -- | The defaults of a record's fields, keyed by the record's constructor.
 --
@@ -835,8 +860,11 @@ checkFieldDefaults t (MkDeclare dann dsig daf rt) =
  where
   conFields (MkConDecl _ _ tns) (MkConDecl cann cn rtns) = MkConDecl cann cn <$> fields tns rtns
   fields = zipWithM \ (MkTypedName _ n _ mTypically _) (MkTypedName fann fn fty _ fmeans) -> do
-    rTypically <- checkTypically n fty mTypically
+    rTypically <- checkTypicallyAt place n fty mTypically
     pure (MkTypedName fann fn fty rTypically fmeans)
+  place
+    | rawNameToText (rawName (getName daf)) == requestRecordName = RequestField
+    | otherwise                                                  = RecordField
 
 -- | Where an 'Assume' node came from. Only an author-written @ASSUME@ is the
 -- deprecated spelling; the 0-ary @ASSUME@ that 'desugarSectionGivens' prepends
@@ -897,7 +925,12 @@ inferAssume origin (MkAssume ann _tysig appForm mt mTypically) = do
               expect (ExpectAssumeSignatureContext (rangeOf dHead.resultType)) dHead.resultType rt'
               pure (Just rt')
 
-          rTypically <- checkTypically (getName appForm) dHead.resultType mTypically
+          -- Only a section binder's default is evaluated (R8 rule 3, W7), so
+          -- only it may be an expression; a written ASSUME's is ignored until
+          -- W6 and stays a literal.
+          rTypically <- case origin of
+            SectionGivenElaboration -> checkTypicallyAt SectionInput (getName appForm) dHead.resultType mTypically
+            _                       -> checkTypicallyLiteral (getName appForm) dHead.resultType mTypically
 
           -- The deprecation warning reads the declared type off @rmt@ where
           -- there is one: for a bare @ASSUME age IS A NUMBER@ the scanned
@@ -1058,7 +1091,7 @@ assumeReplacementLine dHead declaredType mTypically = \ case
     spellType t = case t of
       Forall {} -> prettyLayout t
       _         -> "A " <> prettyLayout t
-    typically = maybe "" (\ e -> " TYPICALLY " <> prettyLayout e) mTypically
+    typically = maybe "" (\ e -> " TYPICALLY " <> prettyTypicallyOperand e) mTypically
     fullType = case termInputTypesOf dHead of
       [] -> declaredType
       tys -> Fun emptyAnno [ MkOptionallyNamedType emptyAnno Nothing ty | ty <- tys ] declaredType
@@ -1769,8 +1802,75 @@ mkref :: Resolved -> OptionallyTypedName Name -> Check (OptionallyTypedName Reso
 mkref r (MkOptionallyTypedName ann n mt mTypically) = do
   rn <- ref n r
   rmt <- traverse inferType mt
-  rTypically <- checkTypicallyOpt n rmt mTypically
+  rTypically <- scanTypicallyOpt n rmt mTypically
   pure (MkOptionallyTypedName ann rn rmt rTypically)
+
+-- | 'checkTypicallyOpt' at the time a rule's signature is SCANNED.
+--
+-- A default is a module-scope expression and may name a definition
+-- (@rate TYPICALLY phi@), but while signatures are being scanned no definition
+-- is in scope yet: they are added once every signature has been scanned
+-- ('withScanTypeAndSigEnvironment'). So anything but a plain literal is left
+-- for 'checkPendingDefaults', which runs as soon as they are; a literal is
+-- checked here as it always was, which keeps every error a literal could raise
+-- exactly where it was.
+scanTypicallyOpt :: Name -> Maybe (Type' Resolved) -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
+scanTypicallyOpt n mty mTypically
+  | Just e <- mTypically, deferrableDefault e mty = pure Nothing
+  | otherwise = checkTypicallyOpt n mty mTypically
+
+-- | Whether a default's check waits for the module's definitions: it has a
+-- declared type to be checked against, and it is not a plain literal.
+deferrableDefault :: Expr Name -> Maybe (Type' Resolved) -> Bool
+deferrableDefault e = \ case
+  Just ty | allowsExpressionDefault RuleInput, not (isKindMarker ty) -> not (isLit e)
+  _                                                                  -> False
+ where
+  isLit = \ case
+    Lit {} -> True
+    _      -> False
+  isKindMarker = \ case
+    Type _ -> True
+    _      -> False
+
+-- | The defaults 'scanTypicallyOpt' left unchecked, read off a scanned
+-- signature: the source signature's inputs paired with the checked ones.
+pendingDefaultsOf :: TypeSig Name -> TypeSig Resolved -> Check [PendingDefault]
+pendingDefaultsOf (MkTypeSig _ (MkGivenSig _ srcs) _) (MkTypeSig _ (MkGivenSig _ ress) _) = do
+  sects <- asks (.sectionStack)
+  pure
+    [ MkPendingDefault { input = rn, inputName = n, declaredType = ty, source = d, sectionPath = sects }
+    | (MkOptionallyTypedName _ n _ (Just d), MkOptionallyTypedName _ rn (Just ty) _) <- zip srcs ress
+    , deferrableDefault d (Just ty)
+    ]
+
+-- | Check the defaults that waited for the module's definitions
+-- ('scanTypicallyOpt'), and put each into its signature. Run with the
+-- definitions in scope, before any body is checked, so that a site that leaves
+-- the input out finds the checked default ('functionInputDefaults').
+checkPendingDefaults :: [FunTypeSig] -> Check [FunTypeSig]
+checkPendingDefaults = traverse \ sig ->
+  if null sig.pendingDefaults
+    then pure sig
+    else do
+      checked <- for sig.pendingDefaults \ p ->
+        prune $ errorContext (contextOf sig) $
+          local (\ env -> env { sectionStack = p.sectionPath }) do
+            rd <- checkTypically p.inputName p.declaredType (Just p.source)
+            pure (getUnique p.input, rd)
+      let byInput = Map.fromList [ (u, d) | (u, Just d) <- checked ]
+          patch otn@(MkOptionallyTypedName a r t _)
+            | Just d <- Map.lookup (getUnique r) byInput = MkOptionallyTypedName a r t (Just d)
+            | otherwise                                  = otn
+          MkTypeSig tann (MkGivenSig gann otns) mgiveth = sig.rtysig
+      pure sig
+        { rtysig = MkTypeSig tann (MkGivenSig gann (map patch otns)) mgiveth
+        , pendingDefaults = []
+        }
+ where
+  contextOf sig = case sig.anno ^. annInfo of
+    Just (TypeInfo _ (Just Assumed)) -> WhileCheckingAssume (getName sig.rappForm)
+    _                                -> WhileCheckingDecide (getName sig.rappForm)
 
 appFormType :: AppForm Resolved -> Type' Resolved
 appFormType (MkAppForm _ann n args _maka) = app n (tyvar <$> args)
@@ -1893,15 +1993,31 @@ typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emp
 
 -- | Type-check a TYPICALLY default value against the declared type of its binder.
 --
+-- A default is a module-scope expression (R8 rule 3, TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- W7): a literal, a nullary constructor, or any expression over what the module
+-- declares, which may name a definition or a section binder. Whether a section
+-- binder's default reads the binder itself is a fact about the whole module, so
+-- it is checked once the module is: 'L4.Discharge.defaultCycles', reported as
+-- 'TypicallyCycle'.
+--
 -- The checked default is kept where a site that leaves the binder out reads it
 -- ('functionInputDefaults', 'recordInputDefaults') and where discharge and the
 -- JSON decoders do (TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
 --
--- A default naming something that is not in scope is reported once, as that:
--- 'OutOfScope' is no literal, and saying so as well was a second, misleading
--- error about a name the first one had already explained (p10 of the spec).
+-- A default naming something that is not in scope is reported once, as that
+-- (p10 of the spec): the reference is the 'OutOfScope' the resolution error
+-- already explained.
 checkTypically :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
-checkTypically n ty = traverse $ \ e -> do
+checkTypically n ty = traverse $ \ e ->
+  checkExpr (ExpectTypicallyValueContext n) e ty
+
+-- | 'checkTypically' for a default nothing evaluates: one a written @ASSUME@
+-- carries (its default is ignored until W6 lands) and one a lambda's @GIVEN@
+-- carries. There it stays a literal, as it was, because an expression that is
+-- never evaluated would be a default that quietly does nothing, and a literal
+-- already is that.
+checkTypicallyLiteral :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
+checkTypicallyLiteral n ty = traverse $ \ e -> do
   re <- checkExpr (ExpectTypicallyValueContext n) e ty
   literal <- isTypicallyLiteral re
   unless (literal || unresolved re) $ addError (TypicallyValueNotALiteral n)
@@ -1911,9 +2027,39 @@ checkTypically n ty = traverse $ \ e -> do
     App _ OutOfScope {} _ -> True
     _                     -> False
 
--- | TYPICALLY values must be literals (compile-time constants): number or
--- string literals, or nullary constructors (TRUE, FALSE, NOTHING, enum
--- constructors).
+-- | Where a @TYPICALLY@ default is written.
+data DefaultPlace
+  = SectionInput  -- ^ a section @GIVEN@
+  | RuleInput     -- ^ a rule's own @GIVEN@
+  | RecordField   -- ^ a @DECLARE@ field
+  | RequestField
+    -- ^ a field of the record @l4 batch@ and the service decode a request into
+    -- ('L4.Presumption.requestRecordName'). It is not the author's: it carries
+    -- each input of the exported rule, a section @GIVEN@'s among them, and the
+    -- decoder works its default out at the root, as a section's is.
+
+-- | Whether a default written in this place may be an expression (R8 rule 3,
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). A section @GIVEN@'s is worked out at the
+-- root, which is what the ruling describes. A rule's input and a record's field
+-- take their default where a call or a construction leaves them out, and
+-- whether that may be an expression is the one choice the ruling leaves
+-- (§4.3): this switch is the whole of it, so it can be turned back alone.
+allowsExpressionDefault :: DefaultPlace -> Bool
+allowsExpressionDefault = \ case
+  SectionInput -> True
+  RuleInput    -> False
+  RecordField  -> False
+  RequestField -> True
+
+-- | 'checkTypically' for a default written in a place, an expression only where
+-- the place allows one ('allowsExpressionDefault').
+checkTypicallyAt :: DefaultPlace -> Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
+checkTypicallyAt place
+  | allowsExpressionDefault place = checkTypically
+  | otherwise                     = checkTypicallyLiteral
+
+-- | A default that is a literal: a number or string literal, or a nullary
+-- constructor (TRUE, FALSE, NOTHING, an enum constructor).
 isTypicallyLiteral :: Expr Resolved -> Check Bool
 isTypicallyLiteral = \ case
   Lit {} -> pure True
@@ -1933,7 +2079,7 @@ checkTypicallyOpt :: Name -> Maybe (Type' Resolved) -> Maybe (Expr Name) -> Chec
 checkTypicallyOpt _ _ Nothing = pure Nothing
 checkTypicallyOpt n mty mTypically =
   case mty of
-    Just ty | not (isKindMarker ty) -> checkTypically n ty mTypically
+    Just ty | not (isKindMarker ty) -> checkTypicallyLiteral n ty mTypically
     _ -> Nothing <$ addError (TypicallyRequiresType n)
   where
     isKindMarker (Type _) = True
@@ -2088,13 +2234,13 @@ inferLamGivens (MkGivenSig ann otns) = do
     inferOptionallyTypedName (MkOptionallyTypedName ann' n Nothing mTypically) = do
       rn <- def n
       v <- fresh (rawName n)
-      rTypically <- checkTypically n v mTypically
+      rTypically <- checkTypicallyLiteral n v mTypically
       recordDescForParam ann' rn
       pure (MkOptionallyTypedName ann' rn (Just v) rTypically, v, [makeKnown rn (KnownTerm v Local)])
     inferOptionallyTypedName (MkOptionallyTypedName ann' n (Just t) mTypically) = do
       rn <- def n
       rt <- inferType t
-      rTypically <- checkTypically n rt mTypically
+      rTypically <- checkTypicallyLiteral n rt mTypically
       recordDescForParam ann' rn
       pure (MkOptionallyTypedName ann' rn (Just rt) rTypically, rt, [makeKnown rn (KnownTerm rt Local)])
 
@@ -4616,12 +4762,19 @@ defaultNamedExpr binderRef d =
     }
 
 -- | A checked default re-made as a value of its own, marked with the 'DefaultFill'
--- that says where it came from. A default is a literal or a nullary constructor
--- ('isTypicallyLiteral'), so those are the two shapes handled; anything else
--- would be a default the checker should already have refused, and is returned
--- as it is.
+-- that says where it came from.
 --
--- The resolved type the checker recorded on the node is kept: a consumer that
+-- A literal or a nullary constructor, the common cases, is re-made node for
+-- node with the shape the generic traversals expect (see 'defaultNamedExpr').
+-- Any other expression (R8 rule 3: a module-scope expression, which may name a
+-- definition or a section binder) is copied with every source annotation
+-- cleared, in every node of it: the checker's own bookkeeping stays, but no
+-- token or range of the declaration it was written in does, so the semantic-token,
+-- exact-print and find-references traversals see nothing at the site, and the
+-- copy is a value like any other to everything that reads the checked tree.
+-- Only the root carries 'DefaultFill'.
+--
+-- The resolved type the checker recorded on a node is kept: a consumer that
 -- asks a field's value for its type should get one.
 defaultValueAt :: DefaultFill -> Expr Resolved -> Expr Resolved
 defaultValueAt fill = \ case
@@ -4631,7 +4784,8 @@ defaultValueAt fill = \ case
       StringLit  _ t -> StringLit  emptyAnno t
   App ann n [] ->
     App (marked 2 ann) (bare n) []
-  other -> other
+  other ->
+    clearSources other & annoOf %~ \ a -> a & annDefaultFill ?~ fill
  where
   marked :: Int -> Anno -> Anno
   marked holes ann =
@@ -4649,6 +4803,12 @@ defaultValueAt fill = \ case
   -- not exist, so Camunda evaluated the field to null and reported success
   -- (review R-M1, 2026-10-03).
   blank (MkName a raw) = MkName (emptyAnno & annInfo %~ const (a ^. annInfo)) raw
+
+-- | Every source annotation in a tree, cleared: no range and no tokens, in the
+-- tree's nodes and in the names inside it. What the checker recorded about each
+-- node ('Extension') stays.
+clearSources :: Expr Resolved -> Expr Resolved
+clearSources = Optics.over (gplate @Anno) \ a -> a { range = Nothing, payload = [] }
 
 checkBranch :: ExpectationContext -> Expr Resolved -> Type' Resolved -> Type' Resolved -> Branch Name -> Check (Branch Resolved)
 checkBranch ec scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
@@ -5353,9 +5513,13 @@ withScanTypeAndSigEnvironment ::
 withScanTypeAndSigEnvironment preScanDecls scanDecl scanTySig a act = do
   rdeclares <- scanDeclares preScanDecls scanDecl a
   withDeclares rdeclares do
-    rdecides <- scanTySig a
-    withDecides rdecides $ do
-      act rdecides
+    rdecides0 <- scanTySig a
+    withDecides rdecides0 $ do
+      -- With every definition in scope, the defaults that waited for them
+      -- can be checked ('scanTypicallyOpt'). Only the signatures change; the
+      -- names are in scope already.
+      rdecides <- checkPendingDefaults rdecides0
+      withCheckedSignatures rdecides $ act rdecides
 
 -- | @'withQualified' rs ce@ takes a list of 'Resolved' names and creates
 -- a 'CheckInfo' of @rs@ pointing to the @ce@ 'CheckInfo'.
@@ -6428,6 +6592,7 @@ scanFunSigDecide :: Decide Name -> Check FunTypeSig
 scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
   errorContext (WhileCheckingDecide (getName appForm)) do
     (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig
+    pending <- pendingDefaultsOf tysig rtysig
     -- Determine if this DECIDE is a synthetic computed field function
     cfMap <- asks (.computedFields)
     let funcRawName = rawName (getName appForm)
@@ -6462,6 +6627,7 @@ scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
       , name = name'
       , arguments = extendsTySig <> extendsAppForm
       , mixfixInfo = mMixfix
+      , pendingDefaults = pending
       }
 
 scanFunSigAssume :: Assume Name -> Check (Maybe FunTypeSig)
@@ -6471,6 +6637,7 @@ scanFunSigAssume a@(MkAssume _ tysig appForm mt _mTypically) = do
   let tysig' = mergeResultTypeInto tysig mt
   errorContext (WhileCheckingAssume (getName appForm)) do
     (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig'
+    pending <- pendingDefaultsOf tysig' rtysig
     (ce, rt, result, extendsAppForm) <- inferTermAppForm rappForm rtysig
     aty <- setAnnResolvedType rt (Just Assumed) a
     name <- withQualified (appFormHeads rappForm) ce
@@ -6492,6 +6659,7 @@ scanFunSigAssume a@(MkAssume _ tysig appForm mt _mTypically) = do
       , name = name'
       , arguments = extendsTySig <> extendsAppForm
       , mixfixInfo = mMixfix
+      , pendingDefaults = pending
       }
   where
     -- In the specific case where we have no GIVETH, but a type for the ASSUME itself,
@@ -7195,6 +7363,24 @@ prettyCheckError (TypicallyValueNotALiteral n) =
   [ "The TYPICALLY value for " <> quotedName n <> " must be a literal:"
   , "a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING."
   ]
+prettyCheckError (TypicallyCycle bs) =
+  case bs of
+    [b] ->
+      [ "The TYPICALLY default of " <> quotedName (getName b) <> " reads " <> quotedName (getName b) <> " itself,"
+      , "directly or through a definition it calls. A default is worked out from"
+      , "the other inputs, so it cannot depend on the one it stands in for."
+      , ""
+      , "Remove the self-reference, or give the default a value that does not read it."
+      ]
+    _ ->
+      [ "These inputs' TYPICALLY defaults depend on one another in a circle:"
+      , ""
+      ] <>
+      [ "  " <> quotedName (getName b) | b <- bs ] <>
+      [ ""
+      , "Each default is worked out from the other inputs it reads, so none of them"
+      , "can be worked out first. Break the circle by making one default a plain value."
+      ]
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."
   , "Add a type annotation (for example IS A NUMBER) so the default can be type-checked."

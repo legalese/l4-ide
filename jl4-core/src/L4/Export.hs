@@ -428,13 +428,25 @@ collectReferencedUniques =
 -- | The body of every module-level DECIDE (in any section), keyed by the
 -- 'Unique' of the name it defines. This is the call graph's edge table:
 -- 'transitiveReferencedUniques' follows a reference into its body.
+--
+-- A section binder's @TYPICALLY@ default is in it too, under the binder's own
+-- 'Unique': a default is an expression and reads what it names (R8 rule 3,
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7), so whatever reads the binder is charged
+-- with the default's own reads, which is the default's read-set joining the
+-- requirement of every root that may use it. Only the elaboration the checker
+-- made of a section @GIVEN@ counts: a written @ASSUME@'s default is not used
+-- (W6 is deferred), so it reads nothing.
 decideBodiesFromModule :: Module Resolved -> Map.Map Unique (Expr Resolved)
 decideBodiesFromModule (MkModule _ _ section) =
   Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
+  goSection (MkSection _ _ _ mgiven decls) =
+    let binders = sectionGivenNames mgiven
+    in decls >>= goDecl binders
+  goDecl binders = \case
     Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) -> [(getUnique name, body)]
+    d@(Assume _ (MkAssume _ _ (MkAppForm _ name [] _) _ (Just dflt)))
+      | isSectionBinderElaboration binders d -> [(getUnique name, dflt)]
     Section _ sub -> goSection sub
     _ -> []
 
@@ -480,8 +492,14 @@ assumesReadBy
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [Assume Resolved]
-assumesReadBy mod' assumes (MkDecide _ _ _ body) =
-  let referencedUniques = transitiveReferencedUniques mod' body
+assumesReadBy mod' assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ body) =
+  -- The export's own inputs' defaults are read too, when a request leaves the
+  -- input out: a default that names a section binder makes it an input of the
+  -- export, so a request can supply it (R8 rule 3, W7).
+  let referencedUniques =
+        Set.unions
+          (map (transitiveReferencedUniques mod')
+             (body : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]))
   in [ assume
      | (uniq, assume) <- Map.toList assumes
      , Set.member uniq referencedUniques

@@ -103,7 +103,7 @@ import L4.EvaluateLazy
   )
 import L4.Lexer (showStringLit)
 import L4.Presumption (nearestName, requestRecordName, unrecognisedMessage)
-import L4.Print (prettyLayout, restoreMixfixPatterns)
+import L4.Print (prettyLayout, prettyTypicallyOperand, restoreMixfixPatterns)
 import L4.Syntax
   ( AppForm(..), Assume(..), Declare(..), Decide(..), Expr, GivenSig(..), Module(..), Resolved
   , Type'(..), TypeDecl(..), TypedName(..), TypeSig(..), Unique, getActual, getUnique, rawName
@@ -926,7 +926,7 @@ generateInputRecord defaults params = Text.unlines $
   where
     formatField (name, mty) =
       let tyText      = maybe "A NUMBER" prettyLayout mty
-          typically   = maybe "" ((" TYPICALLY " <>) . prettyLayout) (Map.lookup name defaults)
+          typically   = maybe "" ((" TYPICALLY " <>) . prettyTypicallyOperand) (Map.lookup name defaults)
       in "  " <> quoteIdent name <> " IS " <> tyText <> typically
 
 generateDecoder :: Text

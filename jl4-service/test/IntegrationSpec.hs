@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, expressionDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -552,6 +552,32 @@ spec = describe "integration" do
         skipped <- evalFunction baseUrl mgr "ty-named" "combine"
           (hard ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
         expectAnswer skipped (FnLitInt 0) []
+
+    -- W7 (R8 rule 3): a section input's default that is an expression is worked
+    -- out from the values the same request supplies, on both paths.
+    it "works a section input's expression default out from the request, on the direct and the wrapper path (W7)" do
+      withServiceFromSources "ty-expr-sec" [("price.l4", expressionDefaultJL4)] \baseUrl mgr -> do
+        let listPrice n = "list price" Aeson..= (n :: Int)
+        -- twice a tenth of the request's own `list price`, which only the
+        -- default reads
+        direct <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 200, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitInt 40) ["discount"]
+        -- the default follows the request
+        other <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 50, "unused flag" Aeson..= False])
+        expectAnswer other (FnLitInt 10) ["discount"]
+        wrapped <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 200, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitInt 40) ["discount"]
+        -- a value the request supplies wins, and nothing is presumed
+        supplied <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 200, "discount" Aeson..= (5 :: Int), "unused flag" Aeson..= False])
+        expectAnswer supplied (FnLitInt 10) []
+        -- hard uses no default, an expression among them
+        refused <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (hard [listPrice 200, "unused flag" Aeson..= False])
+        expectError refused "presumption is hard"
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each
