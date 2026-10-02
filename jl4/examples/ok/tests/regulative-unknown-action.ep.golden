@@ -18,6 +18,8 @@ DECLARE Kind IS ONE OF Retail, Wholesale
 
 DECLARE Pair IS ONE OF
     P HAS first IS A Kind, second IS A Kind
+DECLARE Unit IS ONE OF Only
+DECLARE Person HAS age IS A NUMBER
 
 DECLARE Action IS ONE OF
     Deliver HAS item IS A Kind
@@ -26,8 +28,14 @@ DECLARE Action IS ONE OF
     Send2   HAS one IS A Kind, other IS A Kind
     Wrap    HAS inner IS A Pair
     Order   HAS items IS A LIST OF Kind
+    Send3   HAS one IS A Kind, qty IS A NUMBER, other IS A Kind
+    SendU   HAS unit IS A Unit, qty IS A NUMBER, other IS A Kind
+    SendP   HAS person IS A Person, qty IS A NUMBER, other IS A Kind
 
 alice       MEANS Seller OF "Alice"
+
+GIVETH A NUMBER
+tbd MEANS REFUSE "not decided"
 
 GIVEN x IS A Kind
 GIVETH A Kind
@@ -40,6 +48,8 @@ pick x MEANS
     GIVEN k   IS A Kind
           ks  IS A LIST OF Kind
           act IS AN Action
+          u   IS A Unit
+          d   IS A Person
 
 GIVETH A DEONTIC Actor Action
 `must deliver` MEANS
@@ -151,3 +161,52 @@ GIVETH A DEONTIC Actor Action
 --     This is being worked on, and this answer will change to Stuck on `k`.
 #TRACE `must deliver` AT 0 WITH
   PARTY alice DOES Deliver (pick k) AT 1
+
+-- 13-16. A later clash counts only if everything the match would reach
+-- before it is already decided. The match takes the positions in order, and
+-- forcing one can refuse: `tbd` refuses whenever it is read.
+
+GIVETH A DEONTIC Actor Action
+`must send3` MEANS
+    PARTY alice
+    MUST   Send3 Retail 7 Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 13. If `k` is `Retail` the match reads `tbd` and the run refuses; if it is
+--     `Wholesale` the event is passed over. Which one depends on `k`, so this
+--     is Stuck on `k`, although the last kind clashes.
+#TRACE `must send3` AT 0 WITH
+  PARTY alice DOES Send3 k tbd Wholesale AT 1
+
+-- 14. Control: the quantity is the literal 7, which is decided and matches,
+--     so the clash after it is reached and the event is passed over.
+--     Still pending.
+#TRACE `must send3` AT 0 WITH
+  PARTY alice DOES Send3 k 7 Wholesale AT 1
+
+GIVETH A DEONTIC Actor Action
+`must sendU` MEANS
+    PARTY alice
+    MUST   SendU Only 7 Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 15. `Only` is the one value a `Unit` can have, so every value of `u` makes
+--     the match read `tbd`, and every one refuses. Stuck on `u`.
+#TRACE `must sendU` AT 0 WITH
+  PARTY alice DOES SendU u tbd Wholesale AT 1
+
+GIVETH A DEONTIC Actor Action
+`must sendP` MEANS
+    PARTY alice
+    MUST   SendP (Person a) 7 Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 16. The same with a record: every `Person` fits `Person a`. Stuck on `d`.
+#TRACE `must sendP` AT 0 WITH
+  PARTY alice DOES SendP d tbd Wholesale AT 1

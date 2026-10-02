@@ -10,3 +10,7 @@ executing contract `must send two retail` at 0 with the following events: party 
 executing contract `must wrap two retail` at 0 with the following events: party `alice` did `Wrap` with `P` with `k` and `Wholesale` at 1
 executing contract `must order nothing` at 0 with the following events: party `alice` did `Order` with `ks` at 1
 executing contract `must deliver` at 0 with the following events: party `alice` did `Deliver` with `pick` with `k` at 1
+executing contract `must send3` at 0 with the following events: party `alice` did `Send3` with `k`, `tbd` and `Wholesale` at 1
+executing contract `must send3` at 0 with the following events: party `alice` did `Send3` with `k`, 7 and `Wholesale` at 1
+executing contract `must sendU` at 0 with the following events: party `alice` did `SendU` with `u`, `tbd` and `Wholesale` at 1
+executing contract `must sendP` at 0 with the following events: party `alice` did `SendP` with `d`, `tbd` and `Wholesale` at 1

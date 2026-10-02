@@ -4114,9 +4114,11 @@ patternMatchFailure = withPoppedFrame $ \ case
 -- (smucclaw/l4-ide#999): failing the match would move on to the next
 -- event, which asserts that the act was not this one, and nothing says so.
 -- The exception is a sub-pattern still to be matched that is already KNOWN
--- to clash; then the act cannot be this one whatever the unknown is, and
--- the matcher moves on exactly as for any mismatch. Those sub-patterns sit
--- in the 'PatApp1' and 'PatCons1' frames between here and the handler.
+-- to clash, with every sub-pattern the match would reach before it already
+-- known to match; then the act cannot be this one whatever the unknown is,
+-- and the matcher moves on exactly as for any mismatch. Those sub-patterns
+-- sit in the 'PatApp1' and 'PatCons1' frames between here and the handler,
+-- innermost first, which is the order the match would take them.
 --
 -- Under a @CONSIDER@ (and so a record selector) the match still fails, as it
 -- always has: 'metUnknownHandled' says which handlers raise, and the
@@ -4148,53 +4150,86 @@ metUnknownHandled = \ case
   ContractFrame (Contract11 _) -> True
   _                            -> False
 
--- | Whether some cell is already KNOWN to fail its pattern. Cells are read,
--- never forced: a check made only so that a mismatch stays a mismatch must
--- not raise or diverge where the match itself would not have. A cell not yet
--- evaluated counts only when it holds a literal, and a context-dependent
--- cache ('WHNFWhen') not at all, since it may not hold for this context.
---
--- So the refinement is conservative. A later argument that has to be
--- computed (@2 PLUS 3@), or a list longer than the pattern whose tail is not
--- yet evaluated, is Stuck rather than skipped, and whether a later cell
--- counts can depend on whether something else has already forced it. Both
--- outcomes are safe: a clash is only ever claimed where there is one.
-anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
-anyKnownClash = \ case
-  [] -> pure False
-  ((rf, p) : rest) -> do
-    clash <- knownClash rf p
-    if clash then pure True else anyKnownClash rest
+-- | What reading a pending position tells us, without forcing anything.
+data PendingVerdict
+  = KnownClash  -- ^ the match would fail here, whatever any unknown is
+  | KnownMatch  -- ^ the match would succeed here, forcing nothing new
+  | Undecided   -- ^ the match would have to force something to say
 
-knownClash :: Reference -> Pattern Resolved -> Machine Bool
-knownClash rf pat = readThunk rf >>= \ case
-  WHNF v                      -> clashes v
-  Unevaluated _ (Lit _ lit) _ -> clashes =<< runLit lit
-  Unevaluated{}               -> pure False
-  WHNFWhen{}                  -> pure False
+-- | Whether the pending positions, taken in the order the match would take
+-- them, reach a KNOWN clash before anything the match would have to force.
+--
+-- Cells are read, never forced: a check made only so that a mismatch stays a
+-- mismatch must not raise or diverge where the match itself would not have.
+-- And the scan stops at the first position it cannot decide, rather than
+-- looking past it for a later clash, because the match would force that
+-- position first, and forcing it can refuse, raise or diverge. Skipping it
+-- would answer "no match" for every value of the unknown when some values
+-- would refuse: with @tbd MEANS REFUSE ...@, the event @Send3 k tbd Wholesale@
+-- against @MUST Send3 Retail 7 Retail@ refuses when @k@ is @Retail@, so it is
+-- Stuck, not passed over.
+--
+-- A position is decided when its cell is already a value, or an unevaluated
+-- literal; a variable pattern binds without looking, so it always matches.
+-- A context-dependent cache ('WHNFWhen') is not trusted, since it may not hold
+-- for this context, and a pattern expression other than a literal would be
+-- evaluated, so neither is decided.
+--
+-- So the refinement is conservative. A computed argument (@2 PLUS 3@), or a
+-- list longer than the pattern whose tail is not yet evaluated, is Stuck
+-- rather than skipped, and whether a position counts as decided can depend on
+-- whether something else has already forced its cell. Either way a clash is
+-- claimed only where the match, run in order, would reach one.
+anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
+anyKnownClash positions = pendingVerdict positions >>= \ case
+  KnownClash -> pure True
+  _          -> pure False
+
+-- | The positions in matching order: the first that is not 'KnownMatch' is
+-- the answer.
+pendingVerdict :: [(Reference, Pattern Resolved)] -> Machine PendingVerdict
+pendingVerdict = \ case
+  [] -> pure KnownMatch
+  ((rf, p) : rest) -> knownClash rf p >>= \ case
+    KnownMatch -> pendingVerdict rest
+    verdict    -> pure verdict
+
+knownClash :: Reference -> Pattern Resolved -> Machine PendingVerdict
+knownClash rf pat = case pat of
+  PatVar{} -> pure KnownMatch
+  PatExpr _ e | not (isLiteral e) -> pure Undecided
+  _ -> readThunk rf >>= \ case
+    WHNF v                      -> verdictOn v
+    Unevaluated _ (Lit _ lit) _ -> verdictOn =<< runLit lit
+    Unevaluated{}               -> pure Undecided
+    WHNFWhen{}                  -> pure Undecided
   where
-    clashes v = case pat of
-      PatVar{} -> pure False
+    isLiteral = \ case
+      Lit{} -> True
+      _     -> False
+    verdictOn v = case pat of
       PatApp _ n []
         | getUnique n == TypeCheck.emptyUnique -> pure case v of
-            ValCons{} -> True
-            _         -> False
+            ValNil    -> KnownMatch
+            ValCons{} -> KnownClash
+            _         -> Undecided
       PatApp _ n ps -> case v of
         ValConstructor n' rfs
-          | sameResolved n n' -> anyKnownClash (zip rfs ps)
-          | otherwise         -> pure True
-        _ -> pure False
+          | sameResolved n n' -> pendingVerdict (zip rfs ps)
+          | otherwise         -> pure KnownClash
+        _ -> pure Undecided
       PatCons _ p1 p2 -> case v of
-        ValNil        -> pure True
-        ValCons r1 r2 -> anyKnownClash [(r1, p1), (r2, p2)]
-        _             -> pure False
-      PatLit _ lit          -> pure (literalClash lit v)
-      PatExpr _ (Lit _ lit) -> pure (literalClash lit v)
-      PatExpr{}             -> pure False
-    literalClash lit v = case (lit, v) of
-      (NumericLit _ n, ValNumber m) -> n /= m
-      (StringLit _ s, ValString t)  -> s /= t
-      _                             -> False
+        ValNil        -> pure KnownClash
+        ValCons r1 r2 -> pendingVerdict [(r1, p1), (r2, p2)]
+        _             -> pure Undecided
+      PatLit _ lit          -> pure (literalVerdict lit v)
+      PatExpr _ (Lit _ lit) -> pure (literalVerdict lit v)
+      PatExpr{}             -> pure Undecided
+      PatVar{}              -> pure KnownMatch
+    literalVerdict lit v = case (lit, v) of
+      (NumericLit _ n, ValNumber m) -> if n == m then KnownMatch else KnownClash
+      (StringLit _ s, ValString t)  -> if s == t then KnownMatch else KnownClash
+      _                             -> Undecided
 
 runLit :: Lit -> Machine WHNF
 runLit (NumericLit _ann num) = pure (ValNumber num)
