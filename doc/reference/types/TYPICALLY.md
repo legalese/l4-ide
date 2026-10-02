@@ -1,14 +1,20 @@
 # TYPICALLY
 
 Attaches a default value to a name. The default is a _rebuttable presumption_:
-it records what should be presumed when nobody supplies a value.
+it records what should be presumed when nobody supplies a value, and a rule that
+is given no value uses it.
 
-**On a section `GIVEN` the default is used when nobody supplies a value.**
-**At the boundary — `l4 batch` and the decision service — it is also used for a
-rule's own `GIVEN` and for a record field, when a case leaves the fact out.**
-Inside a file, everywhere else, it records what should be presumed without
-changing what the rules work out. That split is new, and the parts are
-described separately below.
+It is used wherever the name is left out:
+
+- **on a section `GIVEN`**, by every rule that reads the name and is given no
+  value for it;
+- **on a rule's own `GIVEN`**, by a call that names its inputs with
+  [`WITH`](../functions/WITH.md) and leaves this one out;
+- **on a record field**, by a construction that leaves the field out; and
+- **at the boundary**, `l4 batch` and the decision service, by a case that
+  leaves the fact out.
+
+Each is described below, with what a default does _not_ excuse.
 
 ## Syntax
 
@@ -39,7 +45,7 @@ typically not under duress, a transaction is typically at arm's length.
 TYPICALLY makes these rebuttable presumptions explicit, machine-readable, and
 auditable.
 
-## On a section `GIVEN`: a value, not metadata
+## On a section `GIVEN`
 
 A [section `GIVEN`](../syntax/section-given.md) declares an input for a whole
 section, and every rule that reads it takes it as an input. If it carries a
@@ -69,29 +75,86 @@ Three things follow from where the default is applied:
 - **A name with no default that nobody supplies is still an assumed fact**, and
   a rule that reads it says so at the point where it is needed.
 
-This is a change in what `TYPICALLY` means, and it is confined to this one
-place: a `TYPICALLY` on a `DECLARE` field, on a rule's own `GIVEN`, or on an
-`ASSUME` behaves exactly as it did before, as the next section describes. A
-rule's own defaulted `GIVEN` still cannot be omitted at a call.
+## On a rule's own `GIVEN`: leaving an input out of a `WITH` call
 
-## Everywhere else: metadata only
+A call that names its inputs with `WITH` may leave out an input that has a
+default. The call takes the default:
 
-The default value is **metadata only**:
+```l4
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+#EVAL scaled WITH base IS 10                 -- 30: `rate` takes its default, 3
+#EVAL scaled WITH base IS 10, rate IS 2      -- 20: a value the call gives wins
+```
+
+- **Only a call that names its inputs.** `scaled 10`, which gives its inputs by
+  position, still has to give all of them: it is told it "expects 2 inputs, but
+  here it is given 1". A position says which input a value is for only if every
+  input before it has been given, so a gap cannot be left.
+- **An input with no default is still asked for.** `scaled WITH rate IS 1` is
+  told it has not supplied `base`, and a name the rule does not have is still an
+  error, so a misspelling of `rate` is never read as a default taken.
+- **The default is used only if the rule reads it.** A rule that never needs the
+  input never forces its default, which is also what `presumed` (below) counts.
+
+This works for a rule in the same file, a rule declared in a `WHERE`, and a rule
+in a file you `IMPORT`.
+
+## On a record field: leaving a field out of a construction
+
+A record is built with `WITH` too, and may leave out a field that has a default:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER
+      note   IS A MAYBE STRING TYPICALLY NOTHING
+
+GIVETH A Paint
+fresh MEANS Paint WITH coats IS 2
+
+#EVAL fresh's colour        -- Red
+#EVAL fresh's note          -- NOTHING
+```
+
+The same limits apply as for a rule's input: a field with no default must still
+be given, and `Paint OF 2` (by position) must give every field. The record may
+be declared after the rule that builds it, and in a file you `IMPORT`.
+
+Three things are not offered, and each is an error or unchanged rather than a
+quiet choice:
+
+- **A construction that leaves out _every_ field.** There is no way to write it
+  yet; how it should be spelled is an open question, so none is invented.
+- **A field of an enum constructor that carries data**, an alternative under
+  `ONE OF` such as `Circle HAS radius IS A NUMBER`, still has to be given, even
+  when it carries a `TYPICALLY`.
+- **A computed field**, one with a `MEANS` clause, cannot carry a `TYPICALLY`
+  at all: its value always comes from the `MEANS`, so a default could never be
+  used. That is a check error.
+
+## What the default must be
+
+A default is checked when it is written, and has to be a fixed value:
 
 - It is type-checked against the annotated type
   (`x IS A BOOLEAN TYPICALLY 42` is a type error).
 - It must be a fixed value written out: a number, a piece of text, or a bare
-  name such as `TRUE`, `FALSE` or `NOTHING` (`x IS A BOOLEAN TYPICALLY (a AND
-b)` is an error).
+  name such as `TRUE`, `FALSE`, `NOTHING` or a constructor of an enumeration
+  (`colour IS A Colour TYPICALLY Red`). `x IS A BOOLEAN TYPICALLY (a AND b)` is
+  an error. A default that names something that does not exist is reported once,
+  as that.
 - It requires an explicit type: the name must carry an `IS A Type` annotation so
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
-- **On a section `GIVEN` it changes what a rule works out**: a rule that reads
-  the name, and is given no value for it, uses the default. Inside a file,
-  everywhere else, it does not: a rule's own defaulted `GIVEN` still cannot be
-  left out at a call, and a record cannot be built with a defaulted field left
-  out.
+- **On an `ASSUME` it is still not used** ([`ASSUME`](ASSUME.md) is deprecated);
+  move the declaration under its section's heading to make the default count.
 
 ## At the boundary: `l4 batch` and the decision service
 
@@ -122,19 +185,24 @@ govern what counts as leaving a fact out:
   decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
   under `hard` the answer lists them under `presumed` as
   `JSONDECODE <type>: <field>`, because nothing the case says could replace
-  them.
+  them. The same is true of a default a `WITH` call or a construction _inside_
+  the rules takes (see above): `hard` does not withdraw it, in either mode the
+  answer lists it under `presumed` as `WITH <rule>: <input>` (for example
+  `WITH scaled: rate`, or `WITH Config: timeout` for a field), and it is listed
+  only if the answer actually used it.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
 
-_Partly landed (2026-10-02). Of the four things proposed on 2026-09-04, two have
-landed: a **section** `GIVEN` may be left out, and a rule that reads it then uses
-the default; and the published list of facts asks for a defaulted fact as
-optional, which the boundary then honours. The other two have not. A rule's own
-`GIVEN` still cannot be left out at a call inside a file. The default still must
-be a fixed value written out, so it cannot name another `GIVEN`._
+_Landed in stages (2026-10-02 and 2026-10-03). A **section** `GIVEN` may be left
+out, and a rule that reads it then uses the default; the published list of facts
+asks for a defaulted fact as optional, which the boundary then honours; a
+**rule's own** `GIVEN` and a **record field** may be left out at a call that
+names its inputs and at a construction. Still to come: a default may not yet
+name another `GIVEN` (it must be a fixed value written out), and nothing yet
+says how to write a construction that leaves out every field._
 
 ## Examples
 
@@ -159,6 +227,9 @@ GIVEN
 GIVETH A BOOLEAN
 DECIDE `may purchase alcohol` IF age >= 18
 ```
+
+A call by name may leave either of them out: `` `may purchase alcohol` WITH
+age IS 21 `` takes `married` as `FALSE`.
 
 ### In a section GIVEN (one name for every rule in the section)
 
@@ -191,13 +262,13 @@ longer carries this spelling.
 
 ## Behavior
 
-- TYPICALLY only adds, except on a section `GIVEN`, where it decides what a rule
-  that is given no value for the name works out, and at the boundary, where it
-  decides what a case that leaves the fact out works out.
+- A default is used where the name is left out, and nowhere else: a value
+  supplied always wins, and `null` (not known) is never an omission.
 - The default must match the annotated type, or type checking fails.
 - The default must be a fixed value written out, like `18` or `"yes"`.
-- On a computed field (one with a MEANS clause), the MEANS definition governs
-  and the TYPICALLY default does nothing.
+- A call that gives its inputs by position, and a construction that gives its
+  fields by position, give all of them: only `WITH` may leave one out.
+- On a computed field (one with a MEANS clause) a TYPICALLY is an error.
 - For anything a fixed value cannot express, write an ordinary definition
   instead.
 
