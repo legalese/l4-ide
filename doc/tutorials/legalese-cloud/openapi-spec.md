@@ -78,6 +78,37 @@ curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/<rule-operation> \
 
 The exact path and request shape for each rule come straight from the spec.
 
+## Evaluating many cases at once
+
+Sometimes you have a list of cases rather than one: every row of a spreadsheet of applicants, say, or every claim in last month's file.
+You can send them all in one request, to the rule's batch operation; the spec lists it beside the rule's ordinary operation, under a path that ends in `/evaluation/batch`.
+Give each case an `@id` of your own, such as its row number, so that you can match each answer to its row. For a rule that takes three yes-or-no facts:
+
+```json
+{
+  "outcomes": [],
+  "cases": [
+    { "@id": 1, "walks": true, "eats": true, "drinks": true },
+    { "@id": 2, "walks": false, "eats": true, "drinks": true }
+  ]
+}
+```
+
+Each case comes back with its own answer, under its `@id`, in the order you sent them:
+
+```json
+{ "@id": 1, "@presumed": [], "value": true }
+```
+
+What else a case can carry:
+
+- **`@error`**: the case failed, and the message says why, for example a fact the rule needs that the case left out. A case that fails does not spoil the others: they still get their answers.
+- **`@limit`**, beside `@error`: the service stopped the case because it took longer than the service allows (`"time"`) or used more memory than it allows (`"memory"`). A case like that may be worth sending again: a `"time"` case when the service is less busy, and either kind to a service with a higher limit. A case with `@error` and no `@limit` will fail the same way again, so change the case before you send it again.
+- **`@refused`**: the rule itself declined to answer this case, and says why.
+- **`@presumed`**: the facts the case left out for which the rule used its usual value instead, by name. An empty list means the answer rests only on what the case supplied.
+
+For every detail of the request and the response, see the [decision service's own documentation](https://github.com/legalese/l4-ide/blob/main/jl4-service/README.md#batch-evaluation).
+
 ## Notes
 
 - The spec regenerates on every redeploy, so generated clients stay in sync — re-run codegen after a schema-changing deploy.
