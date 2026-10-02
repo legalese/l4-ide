@@ -1,0 +1,111 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-trace.l4:41:1-19:
+  6
+  ─────
+  ┌ doubled OF `the rate`
+  │┌ doubled
+  │└ <function>
+  ├ `the rate` TIMES 2
+  │┌ the rate took its default (declared at typically-trace.l4:9:49-50)
+  │└ 3
+  └ 6
+typically-trace.l4:42:1-40:
+  10
+  ─────
+  ┌ doubled OF 5
+  │┌ doubled
+  │└ <function>
+  ├ `the rate` TIMES 2
+  └ 10
+typically-trace.l4:43:1-26:
+  15
+  ─────
+  ┌ `both readers` OF `the rate`
+  │┌ `both readers`
+  │└ <function>
+  ├ (doubled OF `the rate`) PLUS (tripled OF `the rate`)
+  │┌ doubled OF `the rate`
+  ││┌ doubled
+  ││└ <function>
+  │├ `the rate` TIMES 2
+  ││┌ the rate took its default (declared at typically-trace.l4:9:49-50)
+  ││└ 3
+  │└ 6
+  │┌ tripled OF `the rate`
+  ││┌ tripled
+  ││└ <function>
+  │├ `the rate` TIMES 3
+  │└ 9
+  └ 15
+typically-trace.l4:44:1-21:
+  TRUE
+  ─────
+  ┌ `can act` OF `has capacity`
+  │┌ `can act`
+  │└ <function>
+  ├ `has capacity` AND TRUE
+  ├ IF a THEN b ELSE FALSE
+  │┌ a
+  ││┌ has capacity took its default (declared at typically-trace.l4:10:49-53)
+  ││└ TRUE
+  │└ TRUE
+  ├ b
+  └ TRUE
+typically-trace.l4:45:1-28:
+  FALSE
+  ─────
+  ┌ `never reads it` OF `has capacity`
+  │┌ `never reads it`
+  │└ <function>
+  ├ FALSE AND `has capacity`
+  ├ IF a THEN b ELSE FALSE
+  │┌ a
+  │└ FALSE
+  ├ FALSE
+  └ FALSE
+typically-trace.l4:46:1-30:
+  "Singapore"
+  ─────
+  ┌ `where it is held` OF `the venue`
+  │┌ `where it is held`
+  │└ <function>
+  ├ `the venue`
+  │┌ the venue took its default (declared at typically-trace.l4:12:49-60)
+  │└ "Singapore"
+  └ "Singapore"
+typically-trace.l4:47:1-26:
+  3
+  ─────
+  ┌ `rate if able` OF `the rate`, `has capacity`
+  │┌ `rate if able`
+  │└ <function>
+  ├ IF `has capacity` THEN `the rate` ELSE 0
+  │┌ `has capacity`
+  ││┌ has capacity took its default (declared at typically-trace.l4:10:49-53)
+  ││└ TRUE
+  │└ TRUE
+  ├ `the rate`
+  │┌ the rate took its default (declared at typically-trace.l4:9:49-50)
+  │└ 3
+  └ 3
+typically-trace.l4:48:1-26:
+  60
+  ─────
+  ┌ `scaled by` OF 10, `the rate`
+  │┌ `scaled by`
+  │└ <function>
+  ├ (doubled OF `the rate`) TIMES n
+  │┌ doubled OF `the rate`
+  ││┌ doubled
+  ││└ <function>
+  │├ `the rate` TIMES 2
+  ││┌ the rate took its default (declared at typically-trace.l4:9:49-50)
+  ││└ 3
+  │└ 6
+  └ 60
+typically-trace.l4:51:1-14:
+  6
+typically-trace.l4:52:1-32:
+  assertion satisfied

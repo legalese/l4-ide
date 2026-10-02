@@ -17,7 +17,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import Control.Applicative ((<|>))
-import L4.EvaluateLazy.Trace (EvalTrace(..))
+import L4.EvaluateLazy.Trace (EvalTrace(..), withoutDefaultEvents)
 import L4.EvaluateLazy.Machine (boolView)
 import L4.EvaluateLazy.Exceptions (EvalException (..), Refusal (..))
 import L4.EvaluateLazy.GraphVizOptions (GraphVizOptions(..), defaultGraphVizOptions)
@@ -56,8 +56,10 @@ type EvalGraph = FGL.Gr NodeAttrs EdgeAttrs
 
 -- | Main entry point: convert trace to GraphViz DOT format
 traceToGraphViz :: GraphVizOptions -> Maybe (Module Resolved) -> EvalTrace -> Text
-traceToGraphViz opts mModule evalTrace =
-  let (nodes, edges, _) = buildGraph opts mModule 0 0 evalTrace
+traceToGraphViz opts mModule evalTrace0 =
+  let -- a default's event (W8) is not drawn: the graph is the same as it was
+      evalTrace = withoutDefaultEvents evalTrace0
+      (nodes, edges, _) = buildGraph opts mModule 0 0 evalTrace
       graph = FGL.mkGraph nodes edges
 
       -- Apply local optimizations (graph-to-graph transformations)
@@ -243,6 +245,10 @@ deduplicateBindingsPass graph =
 -- Returns (nodes, edges, next available node ID)
 buildGraph :: GraphVizOptions -> Maybe (Module Resolved) -> Int -> Node -> EvalTrace
            -> ([LNode NodeAttrs], [LEdge EdgeAttrs], Node)
+-- 'traceToGraphViz' has removed the events, so none is met here; one that is
+-- stands for the steps of the default it records.
+buildGraph opts mModule depth nodeId (TraceDefault _ steps result) =
+  buildGraph opts mModule depth nodeId (Trace Nothing steps result)
 buildGraph opts mModule depth nodeId (Trace mlabel steps result) =
   let -- Create node for this trace
       baseLabel = formatTraceLabel opts mlabel steps result
