@@ -55,6 +55,7 @@ GIVETH A Quote
 #EVALTRACE `scaled by` 10
 #EVALTRACE `quote at the rate`
 
--- a directive that is not a trace answers as before
+-- a directive that is not a trace says which defaults it took, in a NOTE line
+-- after its answer (W11)
 #EVAL doubled
 #ASSERT `rate if able` EQUALS 3

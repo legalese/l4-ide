@@ -23,7 +23,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), defaultNotes, prettyAssertionOutcome, prettyEvalException)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -160,7 +160,7 @@ evalDirectiveCrashed r = case r.result of
 ----------------------------------------------------------------------------
 
 evalResultToJson :: EvalDirectiveResult -> Aeson.Value
-evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes = ns} =
+evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = mTrace, notes = ns0, presumed} =
   Aeson.object $
     [ Key.fromString "range" Aeson..= fmap prettySrcRange mRange
     , Key.fromString "kind"  Aeson..= kindText
@@ -172,6 +172,9 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
     -- the silent nullity R-X6 forbids (adversarial pass of 2026-09-16, G1).
     <> [ Key.fromString "notes" Aeson..= ns | not (null ns) ]
   where
+    -- and each TYPICALLY default the run took (W11): a consumer that read only
+    -- "value" would be handed an answer that rests on a presumption, unsaid
+    ns = ns0 <> defaultNotes mTrace presumed
     (kindText, valueJson, errorField) = case result of
       Assertion Holds         -> ("assertion" :: Text, Aeson.Bool True, [])
       Assertion Fails         -> ("assertion", Aeson.Bool False, [])

@@ -5,7 +5,9 @@ section-given-computed-field.l4:23:1-55:
   7
 section-given-computed-field.l4:27:1-31:
   5
+  NOTE: the rate took its default (declared at section-given-computed-field.l4:13:44-48)
 section-given-computed-field.l4:34:1-68:
   assertion satisfied
 section-given-computed-field.l4:35:1-42:
   assertion satisfied
+  NOTE: the rate took its default (declared at section-given-computed-field.l4:13:44-48)

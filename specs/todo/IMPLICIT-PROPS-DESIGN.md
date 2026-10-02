@@ -2439,9 +2439,11 @@ which owns the defect; this section owns the ruling and the limit.
 - ~~**A defaulted binder gets no dedicated trace event.**~~ **Built 2026-10-03 in
   `feat/typically-w8`, not landed** (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2): a
   default that is read is an event in the text trace, the service's reasoning
-  tree and the graph, naming the binder, the declaration and the value. What is
-  still open of this bullet: the line is in traces only, not in the output of a
-  plain `#EVAL` (§4.2, "Not built").
+  tree and the graph, naming the binder, the declaration and the value. The
+  "alpha took its default" line of a plain `#EVAL` or `#ASSERT` is built beside
+  it as W11 (§4.3, same branch, not landed): a `NOTE:` line naming the binder and
+  the declaration. Still open: it does not carry the value, and a default read
+  through an `IMPORT` has no event at all (§4.2, F5).
 - ~~A rule that reads a binder cannot be passed as a first-class value.~~
   **Built after review.** The pass now eta-expands a bare reference to a reader
   with parameters of its own, minting `Unique`s with the sort char `'d'` (no

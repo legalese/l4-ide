@@ -1,6 +1,6 @@
 # `TYPICALLY`: one behaviour
 
-**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (PR #539), with the minimum of W8 they need and the checking half of W5 (§4.1); W8 built 2026-10-03 in `feat/typically-w8`, on top of that branch, not landed (§4.2); the rest not built.
+**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (PR #539), with the minimum of W8 they need and the checking half of W5 (§4.1); W8 built 2026-10-03 in `feat/typically-w8`, on top of that branch, not landed (§4.2), with W11, the directive half of R8's surface, beside it (§4.3); the rest not built.
 This spec is an implementation plan, not a new design.
 The design was ruled on 2026-09-04 as **R8** (`IMPLICIT-PROPS-DESIGN.md` §11.5) and extended on 2026-09-06 by **D7.3** (`SURFACE-SUGAR-CLUSTER-2026-09.md`).
 R8 is the owning ruling, and anything this spec settles is recorded back there (repo `CLAUDE.md` §4).
@@ -140,6 +140,7 @@ Each is independently landable unless it names a dependency.
 | W8  | The trace records "took its default", with the declaration line (R8 surface).                                                                                                                                                                                                                                                                                                                                                                            | —            | **Built in `feat/typically-w8`** (§4.2): the event (W2+W3) is rendered in the text trace, the service's reasoning tree and the graph. `L4.EvaluateLazy.Trace` |
 | W9  | Every exporter either maps the default to the target's own mechanism or emits a fidelity note (T5).                                                                                                                                                                                                                                                                                                                                                      | §2 exporters | `Dmn/`, `OpenFisca/`, `Blawx/` lowerings                                                                                                                      |
 | W10 | Documentation and stale records: `doc/reference/types/TYPICALLY.md` (one behaviour; delete the "everywhere else: metadata only" half), `typically-example.l4`, the header comment of `ok/typically-basic.l4`, the status headers of `TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`, the deferred list in `IMPLICIT-PROPS-DESIGN.md:2391`. Canon's restated constants (S3) can go once W5 lands; that is a canon change, not this repo's. | —            | —                                                                                                                                                             |
+| W11 | A plain `#EVAL` or `#ASSERT` names each default it took, in a `NOTE:` line after its answer (R8: "every directive and trace output names each parameter that took its default").                                                                                                                                                                                                                                                                         | R8 surface   | **Built in `feat/typically-w8`** (§4.3). `L4.EvaluateLazy.defaultNotes`; `l4 run`'s `Notes:` and JSON `notes`                                                 |
 
 ### 4.1 W2 and W3, as built (2026-10-02)
 
@@ -368,11 +369,7 @@ Five are repaired and one is deferred; each repair has a test that fails without
 
 **Not built, and why.**
 
-- **A line for the default in the output of a plain `#EVAL`.**
-  R8 §2.5 says "Every directive and trace output names each parameter that took its default", and `PROPS-REDTEAM-2026-09-03.md` §2.5 that the event is what "every directive's 'alpha took its default 10' line is rendered from".
-  The assignment for W8 was the trace, so a directive that is not traced prints as it did.
-  It is Meng's to rule, because it moves every `#EVAL` golden of a program that takes a default (the census, §2.1, counts 13 section defaults in 11 corpus files), and `EvalDirectiveResult.presumed` already carries what such a line would be rendered from.
-  Likeliest spelling: a `NOTE:` line, through `prettyNotes`, as R-X6's early act is reported.
+- **A line for the default in the output of a plain `#EVAL`** was left out of W8, which was assigned the trace, and is built as W11 (§4.3).
 - **`l4 run --trace full` prints no trace.**
   `makeTracePolicyForEval` collects none, whatever `--trace` says: "(no trace captured; add #EVALTRACE to the directive)" appears even under a `#EVALTRACE`.
   That predates W8 and is left as found (measured on the base binary, 2026-10-03).
@@ -380,6 +377,44 @@ Five are repaired and one is deferred; each repair has a test that fails without
 - **A default read by a reader that peeks without forcing** (the deontic machinery's reads of a party, `peekWHNF`) has no event, and is not in `presumed` either; W3 recorded the same gap.
   A default read by a deontic function's `IF` was measured and is shown (test: the deontic wrapper).
 - **A computed default** (W7) will carry its own steps under the event; the node and both renderers already have the room for them, and the one case that can exercise it today is the unit test that builds it by hand.
+
+### 4.3 W11, as built (2026-10-03)
+
+**Treated as ruled, not as an open question.**
+R8's surface has two halves, and the first W8 build did one.
+`PROPS-REDTEAM-2026-09-03.md` §2.5 says _"Every directive and trace output names each parameter that took its default"_, and, under "Two surfaces, confirmed with Meng on 2026-09-04", that the trace event _"is what every directive's 'alpha took its default 10' line is rendered from"_.
+The one-line summaries of that ruling (`IMPLICIT-PROPS-DESIGN.md` §11.5, this spec's §1.1) name only the trace and the schema, which is how the directive half fell out of the work table; it was not dropped by a decision.
+T4b adds that the mark covers every default that took effect, wherever filled.
+After W8, a plain `#EVAL` was the one evaluation surface that left no mark: `EvalDirectiveResult.presumed` carried the defaults and the printers discarded it, so `#EVAL doubled` printed `6` beneath a trace that said a default was taken, which is a wrong-by-omission answer with exit 0 in the surface a rule author uses most.
+Built as its own commit, so that it can be reverted alone; Meng can object to the noise on a program with many defaults, which is the only part of it that is his.
+
+**What it does.**
+A directive that took a default says so after its answer, one `NOTE:` line for each, in the words of the trace's event (`defaultEventText`):
+
+```
+6
+NOTE: the rate took its default (declared at typically-trace.l4:9:49-50)
+```
+
+- On `#EVAL` and `#ASSERT` alike, because both go through `prettyEvalDirectiveResult`.
+- Not on a directive that supplied the value (`doubled WITH the rate IS 5`), and not on one that never read the default (`FALSE AND` the defaulted name): the lines are the directive's `presumed` events, which are the defaults forced.
+- Not twice: `defaultNotes` leaves out an event that the directive's own trace shows, and says one the trace does not show (a truncated trace, or one that failed to post-process).
+  `l4 run` captures no trace for any directive (§4.2), so there it says all of them, in its `Notes:` block and in the `notes` of `l4 run --json`: a consumer that read only `value` would otherwise be handed an answer that rests on a presumption, unsaid (the argument of R-X6's notes, which share the channel).
+- Every event counts, a rule's own `JSONDECODE` default included, as the trace shows every event (T6b).
+  `l4 batch` and the decision service say the same facts in `presumed` and are unchanged.
+
+**Churn, measured.**
+Five goldens under `jl4/examples/ok/` moved, 14 directives, each by added `NOTE:` lines and nothing else: `section-given-typically` (4), `section-given-bridge` (4), `section-given-computed-field` (2), `section-given-import-def` (2) and `typically-trace` (2); `typically-trace.ep.golden` moved with the fixture's comment.
+No file under `legal/` or the canon mirror has a section `GIVEN … TYPICALLY`, and the two directives of `section-given-import-call` read a default through an `IMPORT`, which W8 does not record (§4.2, F5), so they print as before.
+The first estimate of 13 section defaults in 11 corpus files counted declarations; what moves an `#EVAL` golden is an untraced directive that reads one.
+
+**Not carried: the value.**
+R8's example has the value ("alpha took its default 10") and this line has the declaration, where the value is written, and not the value.
+`Presumed` does not hold it (a default is a thunk when it is registered), and carrying it needs the reference kept in the log and read when the directive ends; it is cheap for a literal and wants W7's computed defaults in view.
+Decided overnight, pending Meng's review; the alternative is `NOTE: the rate took its default 3 (declared at …)`.
+
+**Tests.**
+The six moved goldens, read before blessing (the diff of each is only the added lines); `TracePostprocessSpec` "says a default beside the answer when there is no trace, and not again when the trace shows it"; `l4-cli-test` "says which TYPICALLY default a directive took, and not when the value was supplied" (text and JSON, fails with `defaultNotes` switched off).
 
 ---
 
