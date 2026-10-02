@@ -1,0 +1,24 @@
+-- R8 does not rule on overloads, so a named site whose callee has more than one
+-- definition in scope takes no default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md section
+-- 4.2; review silent F3, 2026-10-03). Before W4 the first #EVAL below was
+-- ambiguous: neither `scaled` had every input it needs. It must stay so, and
+-- not quietly become the first `scaled`, run on a presumed rate, when what the
+-- author meant was the second and forgot `factor`.
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A NUMBER
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS base PLUS factor
+
+-- ambiguous, as before W4: a named site that leaves out a defaulted input does
+-- not choose the overload that has a default for it
+#EVAL scaled WITH base IS 10
+
+-- these two write every input one overload needs and are fine (11 and 20); the error above stops evaluation
+#EVAL scaled WITH base IS 10, factor IS 1
+#EVAL scaled WITH base IS 10, rate IS 2
