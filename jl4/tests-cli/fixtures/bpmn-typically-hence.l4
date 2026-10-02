@@ -1,0 +1,19 @@
+-- The default sits on a rule the drawn rule reaches through HENCE, not on the
+-- drawn rule itself: it is part of the same process, so it is reported with it.
+DECLARE Actor IS ONE OF Filer
+DECLARE Action IS ONE OF file, acknowledge
+
+GIVEN `is complete` IS A BOOLEAN TYPICALLY TRUE
+GIVETH A DEONTIC Actor Action
+`the acknowledgement` MEANS
+    PARTY Filer
+    MUST acknowledge
+    PROVIDED `is complete`
+    WITHIN 7
+
+GIVETH A DEONTIC Actor Action
+`the filing` MEANS
+    PARTY Filer
+    MUST file
+    WITHIN 30
+    HENCE `the acknowledgement` TRUE

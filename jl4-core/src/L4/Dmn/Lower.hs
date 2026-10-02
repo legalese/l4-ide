@@ -124,6 +124,9 @@ import L4.Syntax
 import qualified L4.TypeCheck as TC
 import L4.Viz.GuardedRows (GuardedRows (..), hasEffectfulNode, normaliseGuarded)
 import L4.Interchange.Fidelity
+import L4.Interchange.Typically
+  ( DefaultKind (..), DefaultSite (..), classifyDefault, describeDefault, describeSite
+  , moduleDefaultSites )
 
 import qualified L4.Dmn.Analysis as A
 import L4.Dmn.IR
@@ -3597,6 +3600,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , drgNotes     = sharedInputNotes <> renameNotes <> feelNameCollisionNotes
                        <> itemDefNotes <> componentMaybeNotes <> inputMaybeNotes
                        <> ruleDateNotes <> computedFieldNotes <> hydratorVerbatimNotes
+                       <> typicallyNotes
                        <> concatMap snd lowered
                        <> phase4Notes
                        <> serviceNotes
@@ -4297,6 +4301,66 @@ lowerModule opts modul@(MkModule _ uri _) =
              , getUnique n == getUnique cf.cfSel] of
       (ty : _) -> let (t, _, _) = classifyType typeEnv ty in t
       []       -> DmnAny
+
+  -- D-TYPICALLY: LOSSY, one per @TYPICALLY@ the model reaches. DMN carries
+  -- none of them.
+  --
+  -- __Why a note and not a mapping.__ DMN has no default on an @inputData@, a
+  -- BKM @formalParameter@ or a record's @itemComponent@: an evaluation context
+  -- that leaves the name out reads @null@. A default could be spelled as a
+  -- @if x = null then d else x@ at every read (and that would not even help on
+  -- KIE, where a missing required input is a model error and the decision is
+  -- skipped before any expression runs: jl4/tests-cli/fixtures/dmn-null-probe/
+  -- null-absent.dmn measured both engines, 2026-07-31), but that rewrites every decision
+  -- that reads the name and makes the model say something the source never did,
+  -- so the mapping is not one T5 admits ("only where the target's mechanism means
+  -- what T1-T4 rule TYPICALLY means", TYPICALLY-ONE-BEHAVIOUR-SPEC). What is
+  -- lost is the presumption itself: the source says an omitted input is @d@,
+  -- the model says it is nothing.
+  --
+  -- /Reached/ means the model has the element: the rule is one of the emitted
+  -- decisions (a rule the population filter dropped has no element), the
+  -- section @GIVEN@ or @ASSUME@ is one of the inputData terms, and a record
+  -- field is on an itemDefinition (every @DECLARE@d record gets one, read or
+  -- not). A default of any shape reaches the same note: the value is printed,
+  -- not interpreted, so an expression default (R8 rule 3, unbuilt) is reported
+  -- the same way instead of being missed.
+  typicallyNotes :: [FidelityNote]
+  typicallyNotes =
+    [ dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+        ( describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
+            <> ", and DMN has no default for " <> carrier s.kind <> ": an evaluation that leaves "
+            <> tick s.name <> " out gets no value for it (`null` on Camunda 8, a model error on KIE), not "
+            <> describeDefault (classifyDefault s.value) )
+        ( "the presumption: the source says an omitted " <> noun s.kind
+            <> " is " <> describeDefault (classifyDefault s.value)
+            <> ", and the model says it is nothing" )
+    | s <- moduleDefaultSites modul
+    , reached s
+    ]
+   where
+    emittedDecides = Set.fromList (map (getUnique . decideResolved) decides)
+    inputUniques   = Set.fromList (map fst freeTerms)
+    recordUniques  = Set.fromList (map (.itdUnique) itemDecls)
+
+    reached s = case s.kind of
+      DefaultOnRuleGiven    -> maybe False (`Set.member` emittedDecides) s.ownerUnique
+      DefaultOnSectionGiven -> Set.member s.unique inputUniques
+      DefaultOnAssume       -> Set.member s.unique inputUniques
+      DefaultOnRecordField  -> maybe False (`Set.member` recordUniques) s.ownerUnique
+
+    dmnElementOf s = case s.kind of
+      DefaultOnRecordField -> maybe s.name (\o -> o <> "." <> s.name) s.owner
+      _                    -> maybe s.name id (Map.lookup s.unique inputByUnique)
+
+    carrier = \case
+      DefaultOnRecordField -> "an itemComponent"
+      DefaultOnRuleGiven   -> "an inputData or a BKM parameter"
+      _                    -> "an inputData"
+
+    noun = \case
+      DefaultOnRecordField -> "component"
+      _                    -> "input"
 
   -- D-COMPUTEDFIELD: ADVISORY, one per hydrated TYPE, raised on the hydrated
   -- itemDefinition.
