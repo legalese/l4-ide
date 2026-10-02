@@ -446,9 +446,11 @@ withCheckedSignatures rdecides = local \ s -> s
 
 -- | The @TYPICALLY@ defaults of the rule inputs these signatures declare, for
 -- the named applications that leave one out (W4). The default is the checked
--- one the signature already carries: 'checkTypicallyOpt' ran on it when the
--- signature was scanned, so it is a literal or a nullary constructor of the
--- declared type, and one rule's default cannot depend on another's.
+-- one the signature already carries: a plain literal was checked when the
+-- signature was scanned ('checkTypicallyOpt'), and any other expression once
+-- every signature had been ('checkPendingDefaults'), against the declared type.
+-- It may name the module's definitions and section inputs, not the rule's other
+-- inputs, which are not in scope where it is checked.
 --
 -- Keyed by every name the rule is known by, because they share one 'Unique'
 -- ('withQualified', the mixfix canonical alias).
