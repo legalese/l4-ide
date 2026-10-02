@@ -283,6 +283,11 @@ So neither the size of a batch nor the number of batches sent at once decides wh
 Single evaluations and MCP calls do not wait for a batch slot, so the ones running at the same time as batch cases still share the cores with them.
 On one core the whole batch takes as long as its cases take together, and more cores shorten it: measured on 2026-10-02 on a machine busy with other work, 100 cases of 0.19 s each took 15.7 s on one core and 4.0 to 5.5 s on ten.
 
+**What a batch can cost.**
+A batch whose cases all run to the time limit takes about ⌈cases ÷ cores⌉ × `--eval-timeout`, and longer while other batches are in flight, since every batch case takes its slot from the same set.
+The service sets no limit on the number of cases in a batch.
+It also goes on working through a batch after the client has disconnected: measured on 2026-10-02 at `+RTS -N4`, 24 cases that each ran to a 2-second limit kept more than three cores busy for about 12 s, although the client gave up after 6 s.
+
 ### Query Planning
 
 Build interactive questionnaires by asking only the questions that still matter:
@@ -498,6 +503,11 @@ Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 
 The service runs GHC's threaded runtime on every core of the machine (`-N`), and runs as many batch cases at once, across all batches, as there are cores.
 To use fewer, pass runtime options on the command line, `jl4-service +RTS -N2 -RTS`, or in the environment, `GHCRTS=-N2`.
+
+In a container, `-N` may count the host's cores rather than the container's CPU quota (`docker run --cpus`, a Kubernetes CPU limit); this is reasoned, not measured.
+If it does, the service runs more batch cases at once than it has CPU for, and each case's clock counts the others' work again.
+In a container with a CPU quota, set `+RTS -N<cpus> -RTS` or `GHCRTS=-N<cpus>` to the quota.
+Each capability also costs memory: measured on 2026-10-02, the idle service used 106 MB at `-N10` and 59 MB at `-N1`, the same as on the non-threaded runtime the service used before.
 
 ## Logging
 
