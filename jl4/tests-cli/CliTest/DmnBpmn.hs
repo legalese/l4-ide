@@ -209,11 +209,15 @@ dmnXsdOrderDir = fixtureDir </> "dmn-xsd-order"
 -- reports each @TYPICALLY@ as D-TYPICALLY instead of dropping it without a word.
 -- `jl4/tests/DmnExport.hs` owns the goldens; `typicallyEngineCases` supplies every
 -- input, which is all a DMN model can honestly be asked.
-typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases :: FilePath
+typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases, typicallyOmitCases :: FilePath
 typicallySource         = "examples/dmn/defaults.l4"
 typicallyGolden         = "examples/dmn/expected/defaults.dmn"
 typicallyMarkdownGolden = "examples/dmn/expected/defaults.dmn.md"
 typicallyEngineCases    = "examples/dmn/defaults.cases.json"
+-- One case with a record's @timeout@ component left out. Its expectation is the
+-- answer the source gives, so each engine reports a mismatch, and the legs below
+-- read what each engine printed.
+typicallyOmitCases      = "examples/dmn/defaults-omit-component.cases.json"
 
 -- A default the export reads through an IMPORT. `ratelib.l4` writes the
 -- defaults; `dmn-main.l4` reads two of them (a record field and an ASSUME) and
@@ -457,7 +461,7 @@ fixtures =
   , hydrationGolden, hydrationEngineCases, sumtypeGolden
   , bkmSource, bkmDmnGolden, bkmEngineCases
   , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
-  , typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases
+  , typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases, typicallyOmitCases
   , bpmnTypicallyGiven, bpmnTypicallySection, bpmnTypicallyAssume, bpmnTypicallyHence
   , typicallyImportLib, typicallyImportDmn, typicallyImportBpmn
   ]
@@ -899,6 +903,10 @@ spec bin = do
       serr `shouldSatisfy` ("the GIVEN `rate` of `the fee` carries TYPICALLY 3" `isInfixOf`)
       serr `shouldSatisfy` ("the GIVEN `income` of `the band` carries TYPICALLY 50000" `isInfixOf`)
       serr `shouldSatisfy` ("`null` on Camunda 8, a model error on KIE" `isInfixOf`)
+      -- a record's component is not a top-level input: both engines read null
+      -- and neither complains, which is what the field's note says
+      serr `shouldSatisfy`
+        ("`null` for it on Camunda 8 and on KIE alike, and neither reports an error" `isInfixOf`)
 
     it "reports the same notes in the dmnmd report" $ do
       Output code _ serr <- runL4 bin ["export", "dmn-md", typicallySource, "--fidelity-report"]
@@ -981,6 +989,24 @@ spec bin = do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("8/8 value(s) as expected" `isInfixOf`)
+
+    -- What the D-TYPICALLY note on a record field says, pinned on both engines. A
+    -- record component left out is NOT treated like a top-level input left out:
+    -- the second pair of legs under "FEEL null semantics" shows KIE refusing the
+    -- decision for the latter, and here it answers (null) and calls it succeeded.
+    it "KIE reads a record component that was left out as null, and calls the decision succeeded" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        typicallyGolden [typicallyGolden, "--cases", typicallyOmitCases] \out -> do
+          out `shouldSatisfy` ("the_budget" `isInfixOf`)
+          out `shouldSatisfy` ("SUCCEEDED-BUT-NULL" `isInfixOf`)
+          -- the one decision that reads the component raised nothing
+          out `shouldSatisfy` (not . ("Required dependency" `isInfixOf`))
+
+    it "Camunda reads a record component that was left out as null" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        typicallyGolden [typicallyGolden, "--cases", typicallyOmitCases] \out -> do
+          out `shouldSatisfy` ("the_budget" `isInfixOf`)
+          out `shouldSatisfy` ("EVALUATED-TO-NULL" `isInfixOf`)
 
     it "KIE answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass

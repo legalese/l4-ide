@@ -30,7 +30,7 @@ module DmnExport (spec, drgAsCli) where
 import Base
 import qualified Base.Text as Text
 
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
+import L4.API.VirtualFS (ResolvedImport (..), TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
 import qualified Base.Set as Set
 import L4.Annotation (rangeOf)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
@@ -4145,9 +4145,9 @@ goldenSubjects =
     -- The TYPICALLY exhibit (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5/W9). DMN has
     -- no default on an inputData, a BKM parameter or an itemComponent, so the
     -- exporter does not map one and reports each as D-TYPICALLY: a section
-    -- GIVEN, a rule's own GIVEN and a record field, one of each. The golden pins
-    -- the three notes (and, in the markdown report, the same three); the engine
-    -- cases supply every input.
+    -- GIVEN, two rules' own GIVENs and a record field. The golden pins the four
+    -- notes (and, in the markdown report, the same four); the engine cases
+    -- supply every input.
   , ( "dmn" </> "defaults.l4"
     , "defaults"
     , "the TYPICALLY exhibit"

@@ -2,17 +2,17 @@ fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_capacity
       dmnmd is a table format, not a graph: the 6 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
-  [D-TYPICALLY] lossy — Config.timeout  (main.l4:18:5-37)
-      the field `timeout` of `Config` carries TYPICALLY 30, and DMN has no default for an itemComponent: an evaluation that leaves `timeout` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 30
+  [D-TYPICALLY] lossy — Config.timeout  (main.l4:20:5-37)
+      the field `timeout` of `Config` carries TYPICALLY 30, and DMN has no default for an itemComponent: an evaluation that leaves `timeout` out of the record gets `null` for it on Camunda 8 and on KIE alike, and neither reports an error, not 30
       lost: the presumption: the source says an omitted component is 30, and the model says it is nothing
-  [D-TYPICALLY] lossy — input_has_capacity  (main.l4:22:11-53)
+  [D-TYPICALLY] lossy — input_has_capacity  (main.l4:24:11-53)
       the section GIVEN `has capacity` carries TYPICALLY TRUE, and DMN has no default for an inputData: an evaluation that leaves `has capacity` out gets no value for it (`null` on Camunda 8, a model error on KIE), not TRUE
       lost: the presumption: the source says an omitted input is TRUE, and the model says it is nothing
-  [D-TYPICALLY] lossy — input_rate  (main.l4:30:7-35)
-      the GIVEN `rate` of `the fee` carries TYPICALLY 3, and DMN has no default for an inputData or a BKM parameter: an evaluation that leaves `rate` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 3
+  [D-TYPICALLY] lossy — input_rate  (main.l4:32:7-35)
+      the GIVEN `rate` of `the fee` carries TYPICALLY 3, and DMN has no default for an inputData: an evaluation that leaves `rate` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 3
       lost: the presumption: the source says an omitted input is 3, and the model says it is nothing
-  [D-TYPICALLY] lossy — input_income  (main.l4:41:7-41)
-      the GIVEN `income` of `the band` carries TYPICALLY 50000, and DMN has no default for an inputData or a BKM parameter: an evaluation that leaves `income` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 50000
+  [D-TYPICALLY] lossy — input_income  (main.l4:43:7-41)
+      the GIVEN `income` of `the band` carries TYPICALLY 50000, and DMN has no default for an inputData: an evaluation that leaves `income` out gets no value for it (`null` on Camunda 8, a model error on KIE), not 50000
       lost: the presumption: the source says an omitted input is 50000, and the model says it is nothing
   [D-MD-NOLITERAL] blocking — decision_may_contract
       `may contract` is a formula (has_capacity and is_adult), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

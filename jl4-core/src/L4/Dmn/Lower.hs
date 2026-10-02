@@ -4315,11 +4315,14 @@ lowerModule opts modul@(MkModule _ uri _) =
   --
   -- __Why a note and not a mapping.__ DMN has no default on an @inputData@, a
   -- BKM @formalParameter@ or a record's @itemComponent@: an evaluation context
-  -- that leaves the name out reads @null@. A default could be spelled as a
+  -- that leaves the name out reads @null@ (on KIE, for a top-level @inputData@,
+  -- a model error instead; see 'omission' for what was measured where). A
+  -- default could be spelled as a
   -- @if x = null then d else x@ at every read (and that would not even help on
-  -- KIE, where a missing required input is a model error and the decision is
-  -- skipped before any expression runs: jl4/tests-cli/fixtures/dmn-null-probe/
-  -- null-absent.dmn measured both engines, 2026-07-31), but that rewrites every decision
+  -- KIE for a top-level input, where a missing required input is a model error
+  -- and the decision is skipped before any expression runs:
+  -- jl4/tests-cli/fixtures/dmn-null-probe/null-absent.dmn measured both
+  -- engines, 2026-07-31), but that rewrites every decision
   -- that reads the name and makes the model say something the source never did,
   -- so the mapping is not one T5 admits ("only where the target's mechanism means
   -- what T1-T4 rule TYPICALLY means", TYPICALLY-ONE-BEHAVIOUR-SPEC). What is
@@ -4347,13 +4350,37 @@ lowerModule opts modul@(MkModule _ uri _) =
    where
     note s =
       dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
-        ( describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
-            <> ", and DMN has no default for " <> carrier s.kind <> ": an evaluation that leaves "
-            <> tick s.name <> " out gets no value for it (`null` on Camunda 8, a model error on KIE), not "
-            <> describeDefault (classifyDefault s.value) )
+        ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and DMN has no default for "
+            <> carrier s <> ": " <> omission s )
         ( "the presumption: the source says an omitted " <> noun s.kind
-            <> " is " <> describeDefault (classifyDefault s.value)
-            <> ", and the model says it is nothing" )
+            <> " is " <> dflt s <> ", and the model says it is nothing" )
+
+    dflt s = describeDefault (classifyDefault s.value)
+
+    -- What an engine does with a name the evaluation leaves out, said only where
+    -- it was measured (2026-10-03, Camunda 8.7.6 and KIE 8.44.0.Final):
+    --
+    -- * a top-level inputData: Camunda reads null, KIE reports a model error and
+    --   skips the decision (jl4/tests-cli/fixtures/dmn-null-probe/null-absent.dmn);
+    -- * a record's itemComponent: BOTH read null and neither reports anything.
+    --   KIE does not treat a missing component like a missing input, so a
+    --   reader who trusts KIE to catch the omission gets null downstream
+    --   (jl4/examples/dmn/defaults-omit-component.cases.json, pinned by the
+    --   opt-in engine legs in jl4/tests-cli/CliTest/DmnBpmn.hs);
+    -- * a BKM parameter: not measured, so nothing is claimed about an engine.
+    --   The note says only what is true of the model: it does not say that an
+    --   omitted parameter is @d@.
+    omission s = case s.kind of
+      DefaultOnRecordField ->
+        "an evaluation that leaves " <> tick s.name <> " out of the record gets `null` for it on "
+          <> "Camunda 8 and on KIE alike, and neither reports an error, not " <> dflt s
+      _ | isBkmParam s ->
+            "the model does not say that an omitted " <> tick s.name <> " is " <> dflt s
+        | otherwise ->
+            "an evaluation that leaves " <> tick s.name <> " out gets no value for it "
+              <> "(`null` on Camunda 8, a model error on KIE), not " <> dflt s
+
+    isBkmParam s = s.kind == DefaultOnRuleGiven && Set.member s.unique bkmParamSet
 
     readByEmitted = Set.unions
       [ transitiveReferencedUniques modul body | MkDecide _ _ _ body <- decides ]
@@ -4371,9 +4398,9 @@ lowerModule opts modul@(MkModule _ uri _) =
       DefaultOnRecordField -> maybe s.name (\o -> o <> "." <> s.name) s.owner
       _                    -> maybe s.name id (Map.lookup s.unique inputByUnique)
 
-    carrier = \case
+    carrier s = case s.kind of
       DefaultOnRecordField -> "an itemComponent"
-      DefaultOnRuleGiven   -> "an inputData or a BKM parameter"
+      DefaultOnRuleGiven | isBkmParam s -> "a BKM parameter"
       _                    -> "an inputData"
 
     noun = \case

@@ -40,7 +40,7 @@ import L4.Dmn.Lower
   ( DmnLowerOptions (..), lowerModule, resolveMaybePredicates )
 import L4.Dmn.Markdown (markdownReport)
 import qualified L4.Docassemble.Lower as Docassemble
-import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport (..))
+import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport (..), FidelitySeverity (..))
 import L4.Interchange.Typically
   ( DefaultKind (..), DefaultSite (..), classifyDefault
   , describeDefault, isLiteralDefault, moduleDefaultSites )
@@ -588,7 +588,20 @@ spec = do
     it "is Lossy and names what each engine does with an omitted input" $ do
       let ns = dmnTypicallyNotes drg
       map (.code) ns `shouldBe` replicate 4 "D-TYPICALLY"
-      all (Text.isInfixOf "`null` on Camunda 8, a model error on KIE" . (.message)) ns `shouldBe` True
+      map (.severity) ns `shouldBe` replicate 4 Lossy
+      -- a top-level input: Camunda reads null, KIE refuses the decision
+      let inputs = [ n | n <- ns, n.element /= "Config.timeout" ]
+      length inputs `shouldBe` 3
+      all (Text.isInfixOf "`null` on Camunda 8, a model error on KIE" . (.message)) inputs `shouldBe` True
+
+    it "says of a record field what was measured of one: both engines read null, and neither complains" $ do
+      -- A missing itemComponent is NOT a missing input on KIE. It is answered
+      -- (as null) and reported SUCCEEDED, so the note must not send a reader
+      -- to KIE for a loud failure it will not give.
+      -- (jl4/examples/dmn/defaults-omit-component.cases.json)
+      let field = [ n | n <- dmnTypicallyNotes drg, n.element == "Config.timeout" ]
+      map (.message) field `shouldSatisfy` all (Text.isInfixOf "`null` for it on Camunda 8 and on KIE alike, and neither reports an error")
+      map (.message) field `shouldSatisfy` all (not . Text.isInfixOf "a model error on KIE")
 
     it "carries the same four notes into the dmnmd report" $
       length [ () | n <- (markdownReport drg).notes, n.code == "D-TYPICALLY" ] `shouldBe` 4
