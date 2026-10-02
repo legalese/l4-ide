@@ -286,7 +286,10 @@ A default first read while the result is being written out (a defaulted field of
 Neither step can fail the trace: with no frame to hang from, or a main expression that does not end in the usual `Exit` and `Pop`, the event is dropped, and it is still in `presumed`.
 Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", eight cases, three of which fail when the climbing and the hoist are removed), and the service's "keeps the trace when a default is read on the other paths" (a trace that failed to post-process is replaced by a single node saying so, which no other assertion would notice).
 
-**How each surface says it** (all assumed, not ruled; the sentence is one function, `defaultEventText`, so that every surface says the same thing):
+**How each surface says it.**
+Decided by Claude overnight 2026-10-03, pending Meng's review: a reader of the output sees these words and R8 does not give them, and there is no conservative option to prefer, since keeping today's behaviour would be not building W8.
+The sentence is one function, `defaultEventText`, so that every surface says the same thing.
+Commits `3fcf9c4fe` (text) and `47922a4c6` (service); each alternative is stated beside it.
 
 - _Text trace_ (`#EVALTRACE` in the editor and the golden harness; `l4 trace`'s diagnostics; the LSP, which renders traces only as this text, in its diagnostics and in the inspector panel's `prettyText`; `jl4-lsp/test/InspectorTraceSpec.hs` holds that to what the inspector sends).
   Laid out like a binding, the sentence first and the value last:
@@ -306,19 +309,21 @@ Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", eight ca
 - _Graph_ (`l4 trace`, and `graphviz` in a service response): see the decision below.
 
 **Decided by Claude overnight 2026-10-03, pending Meng's review.**
-Commit `54824bf91`, which can be reverted alone.
 
-- **The graph draws the event as a node (pale yellow).**
+- **The graph draws the event as a node (pale yellow)** (commit `54824bf91`, which can be reverted alone).
   R8 says every trace output names each parameter that took its default; a graph that omitted it would be silent about a value the answer rests on, which is the shape of failure this spec ranks first.
   _Alternative:_ leave the graph as it was, which `GraphViz2`'s own header argues for ("a map, not territory").
-  That is the behaviour of the first two W8 commits (`withoutDefaultEvents` kept the event out of the graph and the reasoning tree), and it is restored by removing the `TraceDefault` clause of `buildGraph` and filtering the events at `traceToGraphViz`.
+  That is the behaviour of the first W8 commit (`3fcf9c4fe`: `withoutDefaultEvents`, since removed, kept the event out of the graph and the reasoning tree), and it is restored by removing the `TraceDefault` clause of `buildGraph` and filtering the events at `traceToGraphViz`.
   An IF labels its condition, and a CONSIDER its branches, by the position of the subtrace, so the event is left out of that counting (`edgeConfigsFor`); the CLI test holds the IF's single labelled edge to its condition.
 
-**Assumed, not ruled (nobody outside the code is likely to notice, or it is stated above):**
-
-- The place of the event: where the default is first read, not where it was filled in at the root.
+- **The place of the event: where the default is first read, not where it was filled in at the root.**
   Filling in is not an event (T6: only defaults actually forced), and the position says which expression needed it.
-  Alternative: all events first, at the top of the trace.
+  _Alternative:_ all events first, at the top of the trace.
+- **A default first read while the result is written out hangs on the expression that built the result** (`hoistLateDefaults`, commit `ae593d742`).
+  _Alternative:_ drop it from the trace, where it is still in `presumed`, which is what the first version of the branch did.
+
+**Assumed, not ruled (nobody outside the code is likely to notice):**
+
 - `TraceDefault` as a constructor of its own, rather than a `Trace` with a synthetic label, so that no consumer can mistake it for an evaluation.
   Every consumer of `EvalTrace` was visited: `printEvalTrace`, `simplifyEvalTrace`, `buildEvalTrace`, `GraphViz2`, the service's `traceToReasoning`.
   The MLIR backend does not consume `EvalTrace`.
