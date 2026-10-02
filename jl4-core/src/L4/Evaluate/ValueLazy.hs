@@ -90,6 +90,12 @@ data Value a =
   | ValNullaryBuiltinFun NullaryBuiltinFun
   | ValUnaryBuiltinFun UnaryBuiltinFun
   | ValBinaryBuiltinFun BinOp
+  | ValConnective Connective
+    -- ^ The built-in @AND@, @OR@, @IMPLIES@ or @NOT@ as a function value
+    -- (UNKNOWN-EVALUATION-SPEC §4.4, U2, U2b). Not a closure: applying one
+    -- evaluates its operands in the connective's own frames, the left first
+    -- and the right only if the left does not decide. Being a value of its
+    -- own, it keeps those frames when it is called through a variable.
   | ValTernaryBuiltinFun TernaryBuiltinFun
   | ValPartialTernary TernaryBuiltinFun a             -- Ternary with 1 arg applied
   | ValPartialTernary2 TernaryBuiltinFun a a          -- Ternary with 2 args applied
@@ -99,6 +105,13 @@ data Value a =
   | ValEnvironment Environment
   | ValBreached (ReasonForBreach a)
   deriving stock (Show, Functor, Foldable, Traversable)
+
+-- | Which built-in connective a 'ValConnective' is.
+data Connective = ConnAnd | ConnOr | ConnImplies | ConnNot
+  deriving stock (Eq, Show)
+
+instance NFData Connective where
+  rnf c = c `seq` ()
 
 data RBinOp = ValROr | ValRAnd
   deriving stock (Eq, Show)
@@ -283,6 +296,7 @@ instance NFData a => NFData (Value a) where
   rnf (ValNullaryBuiltinFun r)    = rnf r
   rnf (ValUnaryBuiltinFun r)      = rnf r
   rnf (ValBinaryBuiltinFun r)     = rnf r
+  rnf (ValConnective c)           = rnf c
   rnf (ValTernaryBuiltinFun r)    = rnf r
   rnf (ValPartialTernary r a)     = rnf r `seq` rnf a
   rnf (ValPartialTernary2 r a b)  = rnf r `seq` rnf a `seq` rnf b
