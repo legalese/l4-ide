@@ -721,7 +721,12 @@ accumulated, `Lower.hs:76-79` **[E]**):
   per version snapshot. OUT in v1.
 - **Effects/ledger.** `FETCH`/`POST`/`ENV`/`Record`/`ReadCell` — the target is pure. OUT.
 - **`TYPICALLY`.** Blawx has no caller-overridable default machinery (contrast Catala's
-  `context`, which operationalised it). Dropped with a lowering note in the emitted header.
+  `context`, which operationalised it). Dropped with an `R-TYPICALLY` lowering note, which
+  **since 2026-10-02 (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T5/T5b, W9, branch `feat/typically-w9`, not merged)**
+  is printed on stderr and written into the header of the `.pl` dump, for a rule's own `GIVEN`, a record
+  field and an assumed input alike. Before that this paragraph's "in the emitted header" was not true:
+  the middle end computed the note for an `ASSUME` and nothing printed it. The `.blawx` YAML is a
+  fixture stream with no header and is left unchanged.
 - **Strings-as-computation** (§4.7), **payload enums** (§4.1), **higher-order and
   non-structural recursion** (§4.8).
 
@@ -916,10 +921,10 @@ combinators; `STRING` literals in equality position; top-level `ASSUME`d inputs,
 arity/category condition of §6.1; `@export`/`@desc`/`@ref`/`@nlg` annotations; `#EVAL`/`#ASSERT`.
 
 Everything else — string computation, payload enums, non-structural recursion, function-typed
-parameters, `DEONTIC`/`PARTY`, `#TRACE`, ledger/effect keywords, temporal pins, `TYPICALLY`
-(dropped with a note, not an error) — is rejected with a `LowerError` naming the construct and
+parameters, `DEONTIC`/`PARTY`, `#TRACE`, ledger/effect keywords, temporal pins — is rejected with a `LowerError` naming the construct and
 its source range, all errors in one batch, following `Cli/OpenFisca.hs`'s "cannot compile these
 decisions" presentation **[E]**.
+`TYPICALLY` is the exception: it is dropped with an `R-TYPICALLY` note, not refused (§5.1).
 
 ### 6.1 `ASSUME`d inputs: which ones, and in which spelling
 

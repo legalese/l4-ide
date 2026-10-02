@@ -158,14 +158,45 @@ a fixture under `jl4/examples/blawx/not-ok/`:
   index (`4. 5. …`) is refused, because Blawx v1 has no sub-provision anchor.
 
 **Lossy — the compiler emits anyway and tells you what it dropped.** The one to know is
-`TYPICALLY` on an `ASSUME`. The name becomes an input predicate and the default is deliberately
-**not** seeded, because seeding it "would answer the question the target's interview exists to
-ask". That is a design decision rather than a limitation: Blawx's whole value is asking the user,
-so pre-filling their answer would defeat it.
+`TYPICALLY`. Blawx has no default machinery, so a default is **not carried**, and the export says so
+for every place one can be written:
+
+- on a rule's own `GIVEN`: a rule's inputs are arguments of its predicate, which the caller always
+  supplies, so nothing applies the default;
+- on a record field: a Blawx attribute is a fact asserted about an object, or left out, and has no
+  default;
+- on an assumed input (an older `ASSUME`, or a section `GIVEN` that reaches here as one): the name
+  becomes an input predicate, and the default is deliberately **not** seeded, because seeding it
+  "would answer the question the target's interview exists to ask". That is a design decision
+  rather than a limitation: Blawx's whole value is asking the user, so pre-filling their answer
+  would defeat it.
+
+Each dropped default is one `R-TYPICALLY` note, in two places: on **standard error** when you run the
+command, and as a `%` comment line in the **header of the `.pl` dump** (so a saved file carries it
+too; the `.blawx` YAML is a fixture stream and is left byte-for-byte as it was):
+
+```
+l4 export blawx: 2 TYPICALLY defaults not carried — Blawx has no default machinery
+fidelity report — Blawx
+  [R-TYPICALLY] lossy — timeout  (defaults.l4:18:5-37)
+      the field `timeout` of `Config` carries TYPICALLY 30, which is dropped: a Blawx attribute is a fact asserted about an object, or left out; it has no default
+      lost: the default value: an object with no such fact has none
+```
+
+```
+% lossy R-TYPICALLY — timeout: the field `timeout` of `Config` carries TYPICALLY 30, which is dropped: …
+```
+
+A module that writes no `TYPICALLY` prints nothing and its `.pl` header is unchanged. The note is the
+only kind of note this channel carries; the lowering keeps others (a sort it could not name, a
+disjunction it factored) that are not printed. A scalar section `GIVEN` with a default never gets as
+far as a note, because Blawx refuses a section input with no category to hang it on (an "input
+predicate with no category subject"); the older `ASSUME` spelling of a predicate over a category
+does, and says so.
 
 Worth setting beside [docassemble](docassemble.md), which consumes `TYPICALLY` as a `default:`
 prefill. The same L4 annotation is honoured by one interaction backend and deliberately dropped by
-the other, and both are right for what they are for.
+the other, and both are right for what they are for. What neither may do is lose it quietly.
 
 **A file that compiles here may still refuse to be published as a web API, and `l4 check` will say
 so.** An `ASSUME`d predicate — `GIVEN p IS A Person` above ``ASSUME `is authorised` p IS A

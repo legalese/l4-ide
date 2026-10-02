@@ -87,6 +87,36 @@ spec bin = do
       expectGolden bin ["export", "blawx", "examples/blawx/benefit.l4", "--scasp"]
                        "examples/blawx/expected/benefit.pl"
 
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC T5b: Blawx has no default machinery, so the
+    -- default is dropped, and BLAWX-EXPORT-SPEC §5.1's promise of a note holds for
+    -- a rule's own GIVEN and a record field, not only for an assumed input.
+    it "compiles the TYPICALLY seed to its golden .blawx stream" $
+      expectGolden bin ["export", "blawx", "examples/blawx/defaults.l4"]
+                       "examples/blawx/expected/defaults.blawx"
+
+    it "carries the dropped defaults in the header of the s(CASP) dump (golden .pl)" $
+      expectGolden bin ["export", "blawx", "examples/blawx/defaults.l4", "--scasp"]
+                       "examples/blawx/expected/defaults.pl"
+
+    it "says on stderr that a rule GIVEN's and a record field's TYPICALLY were dropped" $ do
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/defaults.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("2 TYPICALLY defaults not carried" `isInfixOf`)
+      serr `shouldSatisfy` ("the GIVEN `rate` of `budget` carries TYPICALLY 3, which is dropped" `isInfixOf`)
+      serr `shouldSatisfy` ("the field `timeout` of `Config` carries TYPICALLY 30, which is dropped" `isInfixOf`)
+
+    it "says the same of an ASSUMEd input, which it kept quiet about before" $ do
+      Output code _ serr <-
+        runL4 bin ["export", "blawx", "tests-cli/fixtures/blawx-assume-default.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("the ASSUME `is authorised` carries TYPICALLY TRUE, which is dropped" `isInfixOf`)
+
+    it "stays silent about TYPICALLY on a module that writes none" $ do
+      Output code sout serr <- runL4 bin ["export", "blawx", "examples/blawx/benefit.l4", "--scasp"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("TYPICALLY" `isInfixOf`))
+      sout `shouldSatisfy` (not . ("R-TYPICALLY" `isInfixOf`))
+
     it "compiles the minimal mortality example to its golden .blawx stream" $
       expectGolden bin ["export", "blawx", "examples/blawx/mortality.l4"]
                        "examples/blawx/expected/mortality.blawx"

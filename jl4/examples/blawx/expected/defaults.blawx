@@ -1,0 +1,276 @@
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Defaults
+    rule_text: "Defaults\n\n1. Budget for a configuration"
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000001" x="40" y="40"><statement name="statements"><block type="new_category_declaration" id="l4b000002"><field name="category_name">config</field><field name="prefix"></field><field name="first_element">object</field><field name="postfix">is a config</field><next><block type="new_attribute_declaration" id="l4b000003"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="config" attribute_type="number"></mutation><field name="category_name">config</field><field name="attribute_name">timeout</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has timeout of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="new_attribute_declaration" id="l4b000004"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="config" attribute_type="number"></mutation><field name="category_name">config</field><field name="attribute_name">retries</field><field name="attribute_type">number</field><field name="order">ov</field><field name="prefix"></field><field name="first_element">object</field><field name="infix">has retries of</field><field name="second_element">value</field><field name="postfix"></field><next><block type="relationship_declaration" id="l4b000005"><mutation xmlns="http://www.w3.org/1999/xhtml" prefix1="" type1="config" prefix2="and" type2="number" prefix3="and" type3="number"></mutation><field name="relationship_name">budget</field><field name="relationship_arity">3</field><field name="prefix1"></field><field name="type1">config</field><field name="prefix2">and</field><field name="type2">number</field><field name="prefix3">and</field><field name="type3">number</field><field name="postfix">are related as budget</field></block></next></block></next></block></next></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      blawx_category(config).
+      blawx_category_nlg(config,"","is a config").
+      :- dynamic config/1.
+      #pred config(X) :: '@(X) is a config'.
+      #pred holds(user,config,X) :: 'it is provided as a fact that @(X) is a config'.
+      #pred holds(user,-config,X) :: 'it is provided as a fact that it is not the case that @(X) is a config'.
+      #pred holds(Z,config,X) :: 'the conclusion in @(Z) that @(X) is a config holds'.
+      #pred holds(Z,-config,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a config holds'.
+      #pred according_to(Z,config,X) :: 'according to @(Z), @(X) is a config'.
+      #pred according_to(Z,-config,X) :: 'according to @(Z), it is not the case that @(X) is a config'.
+      #pred blawx_defeated(Z,config,X) :: 'the conclusion in @(Z) that @(X) is a config is defeated'.
+      #pred blawx_defeated(Z,-config,X) :: 'the conclusion in @(Z) that it is not the case that @(X) is a config is defeated'.
+      #pred blawx_initially(config(X)) :: 'that @(X) is a config holds initially'.
+      #pred blawx_initially(-config(X)) :: 'that it is not the case that @(X) is a config holds initially'.
+      #pred blawx_ultimately(config(X)) :: 'that @(X) is a config holds ultimately'.
+      #pred blawx_ultimately(-config(X)) :: 'that it is not the case that @(X) is a config holds ultimately'.
+      #pred blawx_as_of(config(X),T) :: 'that @(X) is a config holds at @(T)'.
+      #pred blawx_as_of(-config(X),T) :: 'that it is not the case that @(X) is a config holds at @(T)'.
+      #pred blawx_during(T1,config(X),T2) :: 'that @(X) is a config held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-config(X),T2) :: 'that it is not the case that @(X) is a config held between @(T1) and @(T2)'.
+      #pred blawx_becomes(config(X),T) :: 'that @(X) is a config became true at @(T)'.
+      #pred blawx_becomes(-config(X),T) :: 'that it is not the case that @(X) is a config became true at @(T)'.
+      #pred blawx_not_interrupted(Start,config(X),End) :: '@(X) is a config remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-config(X),End) :: 'it is not the case that @(X) is a config remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),config(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-config(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-config(X),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(config(X),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),config(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-config(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-config(X),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(config(X),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),config(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-config(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-config(X),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(config(X),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),config(X),datetime(eot)) :- blawx_initially(config(X)), blawx_ultimately(config(X)), findall(Time,blawx_becomes(-config(X),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-config(X),datetime(eot)) :- blawx_initially(-config(X)), blawx_ultimately(-config(X)), findall(Time,blawx_becomes(config(X),datetime(Time)),[]).
+      blawx_as_of(config(X),datetime(Time)) :- blawx_initially(config(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),config(X),datetime(BeforeT)).
+      blawx_as_of(config(X),datetime(Time)) :- blawx_becomes(config(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),config(X),datetime(Time)).
+      blawx_as_of(-config(X),datetime(Time)) :- blawx_initially(-config(X)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-config(X),datetime(BeforeT)).
+      blawx_as_of(-config(X),datetime(Time)) :- blawx_becomes(-config(X),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-config(X),datetime(Time)).
+      blawx_during(datetime(Start),config(X),datetime(End)) :- blawx_becomes(config(X),datetime(Start)), blawx_becomes(-config(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),config(X),datetime(End)).
+      blawx_during(datetime(bot),config(X),datetime(End)) :- blawx_initially(config(X)), blawx_becomes(-config(X),datetime(End)), blawx_not_interrupted(datetime(bot),config(X),datetime(End)).
+      blawx_during(datetime(Start),config(X),datetime(eot)) :- blawx_ultimately(config(X)), blawx_becomes(-config(X),datetime(Start)), blawx_not_interrupted(datetime(Start),config(X),datetime(eot)).
+      blawx_during(datetime(bot),config(X),datetime(eot)) :- blawx_initially(config(X)), blawx_ultimately(config(X)), blawx_becomes(-config(X),datetime(Start)), blawx_not_interrupted(datetime(bot),config(X),datetime(eot)).
+      blawx_during(datetime(Start),-config(X),datetime(End)) :- blawx_becomes(-config(X),datetime(Start)), blawx_becomes(config(X),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-config(X),datetime(End)).
+      blawx_during(datetime(bot),-config(X),datetime(End)) :- blawx_initially(-config(X)), blawx_becomes(config(X),datetime(End)), blawx_not_interrupted(datetime(bot),-config(X),datetime(End)).
+      blawx_during(datetime(Start),-config(X),datetime(eot)) :- blawx_ultimately(-config(X)), blawx_becomes(config(X),datetime(Start)), blawx_not_interrupted(datetime(Start),-config(X),datetime(eot)).
+      blawx_during(datetime(bot),-config(X),datetime(eot)) :- blawx_initially(-config(X)), blawx_ultimately(-config(X)), blawx_becomes(-config(X),datetime(Start)), blawx_not_interrupted(datetime(bot),-config(X),datetime(eot)).
+      blawx_attribute(config,timeout,number).
+      blawx_attribute_nlg(timeout,ov,"","has timeout of","").
+      :- dynamic timeout/2.
+      #pred timeout(X,Y) :: '@(X) has timeout of @(Y)'.
+      #pred holds(user,timeout,X,Y) :: 'it is provided as a fact that @(X) has timeout of @(Y)'.
+      #pred holds(user,-timeout,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has timeout of @(Y)'.
+      #pred holds(Z,timeout,X,Y) :: 'the conclusion in @(Z) that @(X) has timeout of @(Y) holds'.
+      #pred holds(Z,-timeout,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has timeout of @(Y) holds'.
+      #pred according_to(Z,timeout,X,Y) :: 'according to @(Z), @(X) has timeout of @(Y)'.
+      #pred according_to(Z,-timeout,X,Y) :: 'according to @(Z), it is not the case that @(X) has timeout of @(Y)'.
+      #pred blawx_defeated(Z,timeout,X,Y) :: 'the conclusion in @(Z) that @(X) has timeout of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-timeout,X,Y) :: 'the conclusion in @(Z) that @(X) has timeout of @(Y) is defeated'.
+      #pred blawx_initially(timeout(X,Y)) :: 'that @(X) has timeout of @(Y) holds initially'.
+      #pred blawx_initially(-timeout(X,Y)) :: 'that it is not the case that @(X) has timeout of @(Y) holds initially'.
+      #pred blawx_ultimately(timeout(X,Y)) :: 'that @(X) has timeout of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-timeout(X,Y)) :: 'that it is not the case that @(X) has timeout of @(Y) holds ultimately'.
+      #pred blawx_as_of(timeout(X,Y),T) :: 'that @(X) has timeout of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-timeout(X,Y),T) :: 'that it is not the case that @(X) has timeout of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,timeout(X,Y),T2) :: 'that @(X) has timeout of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-timeout(X,Y),T2) :: 'that it is not the case that @(X) has timeout of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(timeout(X,Y),T) :: 'that @(X) has timeout of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-timeout(X,Y),T) :: 'that it is not the case that @(X) has timeout of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,timeout(X,Y),End) :: '@(X) has timeout of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-timeout(X,Y),End) :: 'it is not the case that @(X) has timeout of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),timeout(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-timeout(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-timeout(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(timeout(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),timeout(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-timeout(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-timeout(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(timeout(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),timeout(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-timeout(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-timeout(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(timeout(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),timeout(X,Y),datetime(eot)) :- blawx_initially(timeout(X,Y)), blawx_ultimately(timeout(X,Y)), findall(Time,blawx_becomes(-timeout(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-timeout(X,Y),datetime(eot)) :- blawx_initially(-timeout(X,Y)), blawx_ultimately(-timeout(X,Y)), findall(Time,blawx_becomes(timeout(X,Y),datetime(Time)),[]).
+      blawx_as_of(timeout(X,Y),datetime(Time)) :- blawx_initially(timeout(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),timeout(X,Y),datetime(BeforeT)).
+      blawx_as_of(timeout(X,Y),datetime(Time)) :- blawx_becomes(timeout(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),timeout(X,Y),datetime(Time)).
+      blawx_as_of(-timeout(X,Y),datetime(Time)) :- blawx_initially(-timeout(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-timeout(X,Y),datetime(BeforeT)).
+      blawx_as_of(-timeout(X,Y),datetime(Time)) :- blawx_becomes(-timeout(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-timeout(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),timeout(X,Y),datetime(End)) :- blawx_becomes(timeout(X,Y),datetime(Start)), blawx_becomes(-timeout(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),timeout(X,Y),datetime(End)).
+      blawx_during(datetime(bot),timeout(X,Y),datetime(End)) :- blawx_initially(timeout(X,Y)), blawx_becomes(-timeout(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),timeout(X,Y),datetime(End)).
+      blawx_during(datetime(Start),timeout(X,Y),datetime(eot)) :- blawx_ultimately(timeout(X,Y)), blawx_becomes(-timeout(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),timeout(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),timeout(X,Y),datetime(eot)) :- blawx_initially(timeout(X,Y)), blawx_ultimately(timeout(X,Y)), blawx_becomes(-timeout(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),timeout(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-timeout(X,Y),datetime(End)) :- blawx_becomes(-timeout(X,Y),datetime(Start)), blawx_becomes(timeout(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-timeout(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-timeout(X,Y),datetime(End)) :- blawx_initially(-timeout(X,Y)), blawx_becomes(timeout(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-timeout(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-timeout(X,Y),datetime(eot)) :- blawx_ultimately(-timeout(X,Y)), blawx_becomes(timeout(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-timeout(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-timeout(X,Y),datetime(eot)) :- blawx_initially(-timeout(X,Y)), blawx_ultimately(-timeout(X,Y)), blawx_becomes(-timeout(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-timeout(X,Y),datetime(eot)).
+      blawx_attribute(config,retries,number).
+      blawx_attribute_nlg(retries,ov,"","has retries of","").
+      :- dynamic retries/2.
+      #pred retries(X,Y) :: '@(X) has retries of @(Y)'.
+      #pred holds(user,retries,X,Y) :: 'it is provided as a fact that @(X) has retries of @(Y)'.
+      #pred holds(user,-retries,X,Y) :: 'it is provided as a fact that it is not the case that @(X) has retries of @(Y)'.
+      #pred holds(Z,retries,X,Y) :: 'the conclusion in @(Z) that @(X) has retries of @(Y) holds'.
+      #pred holds(Z,-retries,X,Y) :: 'the conclusion in @(Z) that it is not the case that @(X) has retries of @(Y) holds'.
+      #pred according_to(Z,retries,X,Y) :: 'according to @(Z), @(X) has retries of @(Y)'.
+      #pred according_to(Z,-retries,X,Y) :: 'according to @(Z), it is not the case that @(X) has retries of @(Y)'.
+      #pred blawx_defeated(Z,retries,X,Y) :: 'the conclusion in @(Z) that @(X) has retries of @(Y) is defeated'.
+      #pred blawx_defeated(Z,-retries,X,Y) :: 'the conclusion in @(Z) that @(X) has retries of @(Y) is defeated'.
+      #pred blawx_initially(retries(X,Y)) :: 'that @(X) has retries of @(Y) holds initially'.
+      #pred blawx_initially(-retries(X,Y)) :: 'that it is not the case that @(X) has retries of @(Y) holds initially'.
+      #pred blawx_ultimately(retries(X,Y)) :: 'that @(X) has retries of @(Y) holds ultimately'.
+      #pred blawx_ultimately(-retries(X,Y)) :: 'that it is not the case that @(X) has retries of @(Y) holds ultimately'.
+      #pred blawx_as_of(retries(X,Y),T) :: 'that @(X) has retries of @(Y) holds at @(T)'.
+      #pred blawx_as_of(-retries(X,Y),T) :: 'that it is not the case that @(X) has retries of @(Y) holds at @(T)'.
+      #pred blawx_during(T1,retries(X,Y),T2) :: 'that @(X) has retries of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-retries(X,Y),T2) :: 'that it is not the case that @(X) has retries of @(Y) held between @(T1) and @(T2)'.
+      #pred blawx_becomes(retries(X,Y),T) :: 'that @(X) has retries of @(Y) became true at @(T)'.
+      #pred blawx_becomes(-retries(X,Y),T) :: 'that it is not the case that @(X) has retries of @(Y) became true at @(T)'.
+      #pred blawx_not_interrupted(Start,retries(X,Y),End) :: '@(X) has retries of @(Y) remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-retries(X,Y),End) :: 'it is not the case that @(X) has retries of @(Y) remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),retries(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-retries(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-retries(X,Y),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(retries(X,Y),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),retries(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-retries(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-retries(X,Y),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(retries(X,Y),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),retries(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-retries(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-retries(X,Y),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(retries(X,Y),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),retries(X,Y),datetime(eot)) :- blawx_initially(retries(X,Y)), blawx_ultimately(retries(X,Y)), findall(Time,blawx_becomes(-retries(X,Y),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-retries(X,Y),datetime(eot)) :- blawx_initially(-retries(X,Y)), blawx_ultimately(-retries(X,Y)), findall(Time,blawx_becomes(retries(X,Y),datetime(Time)),[]).
+      blawx_as_of(retries(X,Y),datetime(Time)) :- blawx_initially(retries(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),retries(X,Y),datetime(BeforeT)).
+      blawx_as_of(retries(X,Y),datetime(Time)) :- blawx_becomes(retries(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),retries(X,Y),datetime(Time)).
+      blawx_as_of(-retries(X,Y),datetime(Time)) :- blawx_initially(-retries(X,Y)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-retries(X,Y),datetime(BeforeT)).
+      blawx_as_of(-retries(X,Y),datetime(Time)) :- blawx_becomes(-retries(X,Y),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-retries(X,Y),datetime(Time)).
+      blawx_during(datetime(Start),retries(X,Y),datetime(End)) :- blawx_becomes(retries(X,Y),datetime(Start)), blawx_becomes(-retries(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),retries(X,Y),datetime(End)).
+      blawx_during(datetime(bot),retries(X,Y),datetime(End)) :- blawx_initially(retries(X,Y)), blawx_becomes(-retries(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),retries(X,Y),datetime(End)).
+      blawx_during(datetime(Start),retries(X,Y),datetime(eot)) :- blawx_ultimately(retries(X,Y)), blawx_becomes(-retries(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),retries(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),retries(X,Y),datetime(eot)) :- blawx_initially(retries(X,Y)), blawx_ultimately(retries(X,Y)), blawx_becomes(-retries(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),retries(X,Y),datetime(eot)).
+      blawx_during(datetime(Start),-retries(X,Y),datetime(End)) :- blawx_becomes(-retries(X,Y),datetime(Start)), blawx_becomes(retries(X,Y),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-retries(X,Y),datetime(End)).
+      blawx_during(datetime(bot),-retries(X,Y),datetime(End)) :- blawx_initially(-retries(X,Y)), blawx_becomes(retries(X,Y),datetime(End)), blawx_not_interrupted(datetime(bot),-retries(X,Y),datetime(End)).
+      blawx_during(datetime(Start),-retries(X,Y),datetime(eot)) :- blawx_ultimately(-retries(X,Y)), blawx_becomes(retries(X,Y),datetime(Start)), blawx_not_interrupted(datetime(Start),-retries(X,Y),datetime(eot)).
+      blawx_during(datetime(bot),-retries(X,Y),datetime(eot)) :- blawx_initially(-retries(X,Y)), blawx_ultimately(-retries(X,Y)), blawx_becomes(-retries(X,Y),datetime(Start)), blawx_not_interrupted(datetime(bot),-retries(X,Y),datetime(eot)).
+      blawx_relationship(budget,config,number,number).
+      blawx_relationship_nlg(budget,"","and","and","are related as budget").
+      :- dynamic budget/3.
+      #pred budget(A,B,C) :: '@(A) and @(B) and @(C) are related as budget'.
+      #pred holds(user,budget,A,B,C) :: 'it is provided as a fact that @(A) and @(B) and @(C) are related as budget'.
+      #pred holds(user,-budget,A,B,C) :: 'it is provided as a fact that it is not the case that @(A) and @(B) and @(C) are related as budget'.
+      #pred holds(Z,budget,A,B,C) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) are related as budget holds'.
+      #pred holds(Z,-budget,A,B,C) :: 'the conclusion in @(Z) that it is not the case that @(A) and @(B) and @(C) are related as budget holds'.
+      #pred according_to(Z,budget,A,B,C) :: 'according to @(Z), @(A) and @(B) and @(C) are related as budget'.
+      #pred according_to(Z,-budget,A,B,C) :: 'according to @(Z), it is not the case that @(A) and @(B) and @(C) are related as budget'.
+      #pred blawx_defeated(Z,budget,A,B,C) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) are related as budget is defeated'.
+      #pred blawx_defeated(Z,-budget,A,B,C) :: 'the conclusion in @(Z) that @(A) and @(B) and @(C) are related as budget is defeated'.
+      #pred blawx_initially(budget(A,B,C)) :: 'that @(A) and @(B) and @(C) are related as budget holds initially'.
+      #pred blawx_initially(-budget(A,B,C)) :: 'that it is not the case that @(A) and @(B) and @(C) are related as budget holds initially'.
+      #pred blawx_ultimately(budget(A,B,C)) :: 'that @(A) and @(B) and @(C) are related as budget holds ultimately'.
+      #pred blawx_ultimately(-budget(A,B,C)) :: 'that it is not the case that @(A) and @(B) and @(C) are related as budget holds ultimately'.
+      #pred blawx_as_of(budget(A,B,C),T) :: 'that @(A) and @(B) and @(C) are related as budget holds at @(T)'.
+      #pred blawx_as_of(-budget(A,B,C),T) :: 'that it is not the case that @(A) and @(B) and @(C) are related as budget holds at @(T)'.
+      #pred blawx_during(T1,budget(A,B,C),T2) :: 'that @(A) and @(B) and @(C) are related as budget held between @(T1) and @(T2)'.
+      #pred blawx_during(T1,-budget(A,B,C),T2) :: 'that it is not the case that @(A) and @(B) and @(C) are related as budget held between @(T1) and @(T2)'.
+      #pred blawx_becomes(budget(A,B,C),T) :: 'that @(A) and @(B) and @(C) are related as budget became true at @(T)'.
+      #pred blawx_becomes(-budget(A,B,C),T) :: 'that it is not the case that @(A) and @(B) and @(C) are related as budget became true at @(T)'.
+      #pred blawx_not_interrupted(Start,budget(A,B,C),End) :: '@(A) and @(B) and @(C) are related as budget remained the case between @(Start) and @(End)'.
+      #pred blawx_not_interrupted(Start,-budget(A,B,C),End) :: 'it is not the case that @(A) and @(B) and @(C) are related as budget remained the case between @(Start) and @(End)'.
+      blawx_not_interrupted(datetime(Start),budget(A,B,C),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(-budget(A,B,C),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(Start),-budget(A,B,C),datetime(End)) :- Start \= bot, End \= eot, findall(Time,blawx_becomes(budget(A,B,C),datetime(Time)),Times),blawx_list_not_between(Times,Start,End).
+      blawx_not_interrupted(datetime(bot),budget(A,B,C),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(-budget(A,B,C),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(bot),-budget(A,B,C),datetime(End)) :- End \= eot, findall(Time,blawx_becomes(budget(A,B,C),datetime(Time)),Times),blawx_list_not_before(Times,End).
+      blawx_not_interrupted(datetime(Start),budget(A,B,C),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(-budget(A,B,C),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(Start),-budget(A,B,C),datetime(eot)) :- Start \= bot, findall(Time,blawx_becomes(budget(A,B,C),datetime(Time)),Times),blawx_list_not_after(Times,Start).
+      blawx_not_interrupted(datetime(bot),budget(A,B,C),datetime(eot)) :- blawx_initially(budget(A,B,C)), blawx_ultimately(budget(A,B,C)), findall(Time,blawx_becomes(-budget(A,B,C),datetime(Time)),[]).
+      blawx_not_interrupted(datetime(bot),-budget(A,B,C),datetime(eot)) :- blawx_initially(-budget(A,B,C)), blawx_ultimately(-budget(A,B,C)), findall(Time,blawx_becomes(budget(A,B,C),datetime(Time)),[]).
+      blawx_as_of(budget(A,B,C),datetime(Time)) :- blawx_initially(budget(A,B,C)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),budget(A,B,C),datetime(BeforeT)).
+      blawx_as_of(budget(A,B,C),datetime(Time)) :- blawx_becomes(budget(A,B,C),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),budget(A,B,C),datetime(Time)).
+      blawx_as_of(-budget(A,B,C),datetime(Time)) :- blawx_initially(-budget(A,B,C)), BeforeT #< Time,blawx_not_interrupted(datetime(bot),-budget(A,B,C),datetime(BeforeT)).
+      blawx_as_of(-budget(A,B,C),datetime(Time)) :- blawx_becomes(-budget(A,B,C),datetime(BeforeT)),BeforeT #< Time,blawx_not_interrupted(datetime(BeforeT),-budget(A,B,C),datetime(Time)).
+      blawx_during(datetime(Start),budget(A,B,C),datetime(End)) :- blawx_becomes(budget(A,B,C),datetime(Start)), blawx_becomes(-budget(A,B,C),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),budget(A,B,C),datetime(End)).
+      blawx_during(datetime(bot),budget(A,B,C),datetime(End)) :- blawx_initially(budget(A,B,C)), blawx_becomes(-budget(A,B,C),datetime(End)), blawx_not_interrupted(datetime(bot),budget(A,B,C),datetime(End)).
+      blawx_during(datetime(Start),budget(A,B,C),datetime(eot)) :- blawx_ultimately(budget(A,B,C)), blawx_becomes(-budget(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(Start),budget(A,B,C),datetime(eot)).
+      blawx_during(datetime(bot),budget(A,B,C),datetime(eot)) :- blawx_initially(budget(A,B,C)), blawx_ultimately(budget(A,B,C)), blawx_becomes(-budget(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(bot),budget(A,B,C),datetime(eot)).
+      blawx_during(datetime(Start),-budget(A,B,C),datetime(End)) :- blawx_becomes(-budget(A,B,C),datetime(Start)), blawx_becomes(budget(A,B,C),datetime(End)), Start #< End, blawx_not_interrupted(datetime(Start),-budget(A,B,C),datetime(End)).
+      blawx_during(datetime(bot),-budget(A,B,C),datetime(End)) :- blawx_initially(-budget(A,B,C)), blawx_becomes(budget(A,B,C),datetime(End)), blawx_not_interrupted(datetime(bot),-budget(A,B,C),datetime(End)).
+      blawx_during(datetime(Start),-budget(A,B,C),datetime(eot)) :- blawx_ultimately(-budget(A,B,C)), blawx_becomes(budget(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(Start),-budget(A,B,C),datetime(eot)).
+      blawx_during(datetime(bot),-budget(A,B,C),datetime(eot)) :- blawx_initially(-budget(A,B,C)), blawx_ultimately(-budget(A,B,C)), blawx_becomes(-budget(A,B,C),datetime(Start)), blawx_not_interrupted(datetime(bot),-budget(A,B,C),datetime(eot)).
+- model: blawx.workspace
+  pk: 2
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="attributed_rule" id="l4b000006" x="40" y="40"><field name="defeasible">FALSE</field><field name="inapplicable">FALSE</field><statement name="conditions"><block type="object_category" id="l4b000007"><value name="object"><block type="variable" id="l4b000008"><field name="variable_name">C</field></block></value><value name="category"><block type="category_selector" id="l4b000009"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="config"></mutation><field name="category_name">config</field></block></value><next><block type="attribute_selector" id="l4b000010"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="timeout" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has timeout of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000011"><field name="variable_name">C</field></block></value><value name="second_element"><block type="variable" id="l4b000012"><field name="variable_name">Timeout</field></block></value><next><block type="attribute_selector" id="l4b000013"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="retries" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has retries of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000014"><field name="variable_name">C</field></block></value><value name="second_element"><block type="variable" id="l4b000015"><field name="variable_name">Retries</field></block></value><next><block type="calculation" id="l4b000016"><value name="variable"><block type="variable" id="l4b000017"><field name="variable_name">Tmp</field></block></value><value name="calculation"><block type="math_operation" id="l4b000018"><field name="operator">mul</field><value name="left_side"><block type="math_operation" id="l4b000019"><field name="operator">mul</field><value name="left_side"><block type="variable" id="l4b000020"><field name="variable_name">Timeout</field></block></value><value name="right_side"><block type="variable" id="l4b000021"><field name="variable_name">Retries</field></block></value></block></value><value name="right_side"><block type="variable" id="l4b000022"><field name="variable_name">Rate</field></block></value></block></value></block></next></block></next></block></next></block></statement><value name="source"><block type="doc_selector" id="l4b000023"><mutation xmlns="http://www.w3.org/1999/xhtml" section_reference="sec_1_section"></mutation><field name="doc_part_name">D 1</field></block></value><statement name="conclusion"><block type="relationship_selector3" id="l4b000024"><mutation xmlns="http://www.w3.org/1999/xhtml" arity="3" relationship_name="budget" type1="config" type2="number" type3="number"></mutation><field name="prefix1"></field><field name="prefix2">and</field><field name="prefix3">and</field><field name="postfix">are related as budget</field><value name="parameter1"><block type="variable" id="l4b000025"><field name="variable_name">C</field></block></value><value name="parameter2"><block type="variable" id="l4b000026"><field name="variable_name">Rate</field></block></value><value name="parameter3"><block type="variable" id="l4b000027"><field name="variable_name">Tmp</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      according_to(sec_1_section,budget,C,Rate,Tmp) :- config(C),
+      timeout(C,Timeout),
+      retries(C,Retries),
+      Tmp is ( ( Timeout * Retries ) * Rate ).
+
+      % BLAWX CHECK DUPLICATES
+      holds(sec_1_section,budget,C,Rate,Tmp) :- according_to(sec_1_section,budget,C,Rate,Tmp).
+
+      % BLAWX CHECK DUPLICATES
+        budget(C,Rate,Tmp) :- holds(sec_1_section,budget,C,Rate,Tmp).
+- model: blawx.blawxtest
+  pk: 1
+  fields:
+    ruledoc: 1
+    test_name: q1
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000028" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000029"><value name="object"><block type="object_selector" id="l4b000030"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="category"><block type="category_selector" id="l4b000031"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="config"></mutation><field name="category_name">config</field></block></value><next><block type="attribute_selector" id="l4b000032"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="timeout" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has timeout of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000033"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="second_element"><block type="number_value" id="l4b000034"><field name="value">30</field></block></value><next><block type="attribute_selector" id="l4b000035"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="retries" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has retries of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000036"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="second_element"><block type="number_value" id="l4b000037"><field name="value">2</field></block></value></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000038" x="40" y="388"><statement name="query"><block type="relationship_selector3" id="l4b000039"><mutation xmlns="http://www.w3.org/1999/xhtml" arity="3" relationship_name="budget" type1="config" type2="number" type3="number"></mutation><field name="prefix1"></field><field name="prefix2">and</field><field name="prefix3">and</field><field name="postfix">are related as budget</field><value name="parameter1"><block type="object_selector" id="l4b000040"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="parameter2"><block type="number_value" id="l4b000041"><field name="value">3</field></block></value><value name="parameter3"><block type="variable" id="l4b000042"><field name="variable_name">Budget</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      config(c1).
+      timeout(c1,30).
+      retries(c1,2).
+
+      ?- budget(c1,3,Budget).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 2
+  fields:
+    ruledoc: 1
+    test_name: q2
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="l4b000043" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000044"><value name="object"><block type="object_selector" id="l4b000045"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="category"><block type="category_selector" id="l4b000046"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="config"></mutation><field name="category_name">config</field></block></value><next><block type="attribute_selector" id="l4b000047"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="timeout" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has timeout of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000048"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="second_element"><block type="number_value" id="l4b000049"><field name="value">10</field></block></value><next><block type="attribute_selector" id="l4b000050"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="retries" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has retries of</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="l4b000051"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="second_element"><block type="number_value" id="l4b000052"><field name="value">2</field></block></value></block></next></block></next></block></statement></block>
+      <block type="query" id="l4b000053" x="40" y="388"><statement name="query"><block type="relationship_selector3" id="l4b000054"><mutation xmlns="http://www.w3.org/1999/xhtml" arity="3" relationship_name="budget" type1="config" type2="number" type3="number"></mutation><field name="prefix1"></field><field name="prefix2">and</field><field name="prefix3">and</field><field name="postfix">are related as budget</field><value name="parameter1"><block type="object_selector" id="l4b000055"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="c1"></mutation><field name="object_name">c1</field></block></value><value name="parameter2"><block type="number_value" id="l4b000056"><field name="value">5</field></block></value><value name="parameter3"><block type="variable" id="l4b000057"><field name="variable_name">Budget</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      config(c1).
+      timeout(c1,10).
+      retries(c1,2).
+
+      ?- budget(c1,5,Budget).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''
+- model: blawx.blawxtest
+  pk: 3
+  fields:
+    ruledoc: 1
+    test_name: interview
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="assume" id="l4b000058" x="40" y="40"><statement name="statements"><block type="object_category" id="l4b000059"><value name="object"><block type="variable" id="l4b000060"><field name="variable_name">X</field></block></value><value name="category"><block type="category_selector" id="l4b000061"><mutation xmlns="http://www.w3.org/1999/xhtml" category_name="config"></mutation><field name="category_name">config</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000062" x="40" y="208"><statement name="statements"><block type="attribute_selector" id="l4b000063"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="timeout" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has timeout of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000064"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000065"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="assume" id="l4b000066" x="40" y="376"><statement name="statements"><block type="attribute_selector" id="l4b000067"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="retries" attributetype="number" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">has retries of</field><field name="postfix"></field><value name="first_element"><block type="variable" id="l4b000068"><field name="variable_name">X</field></block></value><value name="second_element"><block type="variable" id="l4b000069"><field name="variable_name">Y</field></block></value></block></statement></block>
+      <block type="query" id="l4b000070" x="40" y="544"><statement name="query"><block type="relationship_selector3" id="l4b000071"><mutation xmlns="http://www.w3.org/1999/xhtml" arity="3" relationship_name="budget" type1="config" type2="number" type3="number"></mutation><field name="prefix1"></field><field name="prefix2">and</field><field name="prefix3">and</field><field name="postfix">are related as budget</field><value name="parameter1"><block type="variable" id="l4b000072"><field name="variable_name">A</field></block></value><value name="parameter2"><block type="variable" id="l4b000073"><field name="variable_name">B</field></block></value><value name="parameter3"><block type="variable" id="l4b000074"><field name="variable_name">C</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: |-
+      #abducible config(X).
+
+      #abducible timeout(X,Y).
+
+      #abducible retries(X,Y).
+
+      ?- budget(A,B,C).
+    tutorial: ''
+    view: ''
+    fact_scenario: ''

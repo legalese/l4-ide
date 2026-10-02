@@ -1,0 +1,31 @@
+-- TYPICALLY has no counterpart in Blawx, and this seed pins that the export
+-- says so.
+--
+-- Blawx has no default machinery: an attribute is a fact asserted about an
+-- object or left out, and a rule's inputs are arguments of its predicate that
+-- the caller always supplies. So `timeout` (a record field) and `rate` (a rule's
+-- own GIVEN) lose their defaults, and `l4 export blawx` reports each as an
+-- R-TYPICALLY note on stderr and in the header of the .pl dump
+-- (expected/defaults.pl), instead of dropping them without a word. BLAWX-EXPORT-SPEC
+-- §5.1 rules the default "dropped, disclosed"; this is the disclosure.
+--
+-- The directives supply every input, because that is all a Blawx query can do:
+-- the tier-1 harness runs them under s(CASP) against the L4 oracle on the line
+-- after each. An input left out would not get its default in Blawx; it would
+-- get no model (the epistemics line in the .pl header), which is loud.
+
+DECLARE Config HAS
+    timeout IS A NUMBER TYPICALLY 30
+    retries IS A NUMBER
+
+@export Budget for a configuration
+GIVEN c    IS A Config
+      rate IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+`budget` c rate MEANS (c's timeout) TIMES (c's retries) TIMES rate
+
+#EVAL `budget` (Config WITH timeout IS 30, retries IS 2) 3
+-- L4 oracle ==> 180
+
+#EVAL `budget` (Config WITH timeout IS 10, retries IS 2) 5
+-- L4 oracle ==> 100
