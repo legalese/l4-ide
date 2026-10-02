@@ -333,6 +333,11 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- the program broken.
           Left (RefusalException ref) -> ReducedRefused ref
           Left exc                    -> ReducedErrored exc
+          -- A result that is a bare assumed term is no value: report it as
+          -- the 'Stuck' that '#ASSERT' already reports for it, below, rather
+          -- than print the unknown as though it were the answer
+          -- (UNKNOWN-EVALUATION-SPEC §2.4, row 52).
+          Right (MkNF (ValAssumed a)) -> ReducedErrored (UserEvalException (Stuck a))
           Right nfv                   -> Reduced nfv
       AssertHolds -> Assertion
         case v of
