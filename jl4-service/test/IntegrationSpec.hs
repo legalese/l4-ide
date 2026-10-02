@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -676,6 +676,29 @@ spec = describe "integration" do
         resp <- evalFunction baseUrl mgr "ty-record" "budget"
           (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
         expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
+
+    -- W4, W5: a default the RULES take at a named site is not the request's to
+    -- supply, so it is taken in both presumption modes, and listed under the
+    -- application that took it, on both paths. The request's own `rate` is 7;
+    -- `scaled` still takes its 3.
+    it "lists a default a named site inside the rules took, on both paths and in both modes" do
+      withServiceFromSources "ty-named" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
+        let used = ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= True]
+            presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        soft <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= False : used))
+        expectAnswer soft (FnLitInt 60) presumedHere
+        hardRun <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= False : used))
+        expectAnswer hardRun (FnLitInt 60) presumedHere
+        -- a {} on the unread flag sends the request down the wrapper path
+        wrapped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrapped (FnLitInt 60) presumedHere
+        -- The positive control: `use` FALSE never reaches either site.
+        skipped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer skipped (FnLitInt 0) []
 
     it "lets a supplied value win, and presumes nothing" do
       withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
