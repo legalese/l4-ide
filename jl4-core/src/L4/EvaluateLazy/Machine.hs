@@ -1929,22 +1929,27 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       _ -> internalException $ RuntimeTypeError $
         "expected an environment but found: " <> prettyLayout val <> " when matching constructor"
   Just (PatLit0 env lit) -> do
-    let compareExpr = pushFrame (PatLit1 val) >> continueExpr env lit
-    case val of
-      -- An unknown scrutinee: the comparison raises 'Stuck', unless a
-      -- sub-pattern still to be matched already clashes ('metUnknown').
-      ValAssumed _ -> metUnknown >>= \ case
-        BranchClashes -> patternMatchFailure
-        _          -> compareExpr
-      _ -> compareExpr
+    -- The pattern's expression is evaluated whatever the scrutinee is, as
+    -- the match would: it can raise or refuse, and that must not turn into
+    -- a failed branch because a LATER position clashes. 'PatLit1' consults
+    -- the refinement, once both sides are in hand.
+    pushFrame (PatLit1 val)
+    continueExpr env lit
   Just (PatLit1 lit) -> do
+    -- For a literal pattern 'lit' is the literal and 'val' the scrutinee;
+    -- for an expression pattern 'lit' is the scrutinee and 'val' the
+    -- expression's value. Either can be an unknown. The comparison names it
+    -- ('runBinOpEquals' does on either side, U6), unless a sub-pattern still
+    -- to be matched already clashes ('metUnknown').
     let compareLit = pushFrame PatLit2 >> runBinOpEquals lit val
-    case val of
-      -- Likewise: 'runBinOpEquals' names an unknown on its right (U6).
-      ValAssumed _ -> metUnknown >>= \ case
-        BranchClashes -> patternMatchFailure
-        _          -> compareLit
-      _ -> compareLit
+        unknown = \ case
+          ValAssumed _ -> True
+          _            -> False
+    if unknown lit || unknown val
+      then metUnknown >>= \ case
+        BranchClashes  -> patternMatchFailure
+        BranchMayMatch -> compareLit
+      else compareLit
   Just PatLit2 ->
     case val of
       -- NOTE: in future, we may give the pattern that was matched a name, potentially

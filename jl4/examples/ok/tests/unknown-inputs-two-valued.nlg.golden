@@ -9,6 +9,11 @@ consider the case distinctions of `Claim` with `k` and 0 :  when `Claim` has `Re
 consider the case distinctions of `Pair` with `n` and x :  when `Pair` has 0 and y then first. when `Pair` has `a` and `b` then second
 consider the case distinctions of `Pair` with `n` and y :  when `Pair` has 0 and y then first. when `Pair` has `a` and `b` then second
 consider the case distinctions of `Triple` with `n`, `undecided` and 5 :  when `Triple` has 0, 7 and 0 then first. when `Triple` has `x`, `y` and `z` then second
+consider the case distinctions of `Pair` with `n` and x :  when `Pair` has is exactly `zero` and y then first. when `Pair` has `a` and `b` then second
+consider the case distinctions of `Pair` with `n` and x :  when `Pair` has is exactly the result of dividing 1 by 0 and y then first. when `Pair` has `a` and `b` then second
+consider the case distinctions of `Pair` with `n` and x :  when `Pair` has is exactly `undecided` and y then first. when `Pair` has `a` and `b` then second
+consider the case distinctions of `Pair` with `n` and x :  when `Pair` has is exactly the result of dividing 1 by 0 and y then first. when `Pair` has `a` and `b` then second
+executing contract `must pay rent` at 0 with the following events: party `alice` did `Pay` with `n` and deposit at 1
 3 is equal to `n`
 `n` is equal to 3
 consider the case distinctions of `n` :  when 0 then zero. in any other case other
