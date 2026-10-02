@@ -2410,13 +2410,16 @@ backwardContractFrame val = \ case
   -- environment the value happened to capture ('rebindLifecycle').
   Handoff lifecycle ->
     continueBackward (rebindLifecycle lifecycle val)
-  -- EVERY, the roll call. One cons cell of the roll per step.
+  -- EVERY, the roll call. One cons cell of the roll per step. A roll, or the
+  -- rest of one, that is not known is Stuck on it: nobody can say who the
+  -- group is.
   QuantRoll QuantRollFrame {..} ->
     case val of
       ValNil -> assembleQuantified ctx (reverse acc)
       ValCons hd tl -> do
         pushCFrame (QuantCast QuantCastFrame {candidate = hd, rest = tl, ..})
         continueRef hd
+      ValAssumed r -> stuckOnAssumed r
       _ -> internalException $ RuntimeTypeError $
         "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
   -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the

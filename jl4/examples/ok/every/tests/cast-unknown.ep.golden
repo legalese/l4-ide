@@ -20,7 +20,9 @@ alice       MEANS Tenant OF "Alice"
 bob         MEANS Tenant OF "Bob"
 
 § `Facts`
-    GIVEN u IS AN Actor
+    GIVEN u    IS AN Actor
+          roll IS A LIST OF Actor
+          rest IS A LIST OF Actor
 
 -- 1. The roll holds an unknown. Alice signs; whether `u` must sign too
 --    depends on what `u` is, so this is Stuck on `u`.
@@ -91,3 +93,30 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `landlords with unknown` AT 0 WITH
   PARTY theLandlord DOES Sign theLandlord AT 1
+
+-- 6. The roll itself is not known: nobody can say who the group is. Stuck on
+--    `roll`.
+GIVETH A DEONTIC Actor Action
+`unknown roll` MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `unknown roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 7. The roll starts with Alice and the rest is not known. Stuck on `rest`.
+GIVETH A DEONTIC Actor Action
+`unknown rest of roll` MEANS
+    EVERY Tenant t IN alice FOLLOWED BY rest
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `unknown rest of roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
