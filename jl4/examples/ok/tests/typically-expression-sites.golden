@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-expression-sites.l4:20:1-43:
+  assertion satisfied
+typically-expression-sites.l4:21:1-54:
+  assertion satisfied
+typically-expression-sites.l4:22:1-55:
+  assertion satisfied
+typically-expression-sites.l4:23:1-68:
+  assertion satisfied
+typically-expression-sites.l4:40:1-30:
+  assertion satisfied
+typically-expression-sites.l4:41:1-48:
+  assertion satisfied
+typically-expression-sites.l4:50:1-30:
+  assertion satisfied
+typically-expression-sites.l4:51:1-48:
+  assertion satisfied
+typically-expression-sites.l4:60:1-41:
+  assertion satisfied
+typically-expression-sites.l4:61:1-52:
+  assertion satisfied
+typically-expression-sites.l4:71:1-48:
+  assertion satisfied
+typically-expression-sites.l4:72:1-63:
+  assertion satisfied
+typically-expression-sites.l4:82:1-37:
+  assertion satisfied

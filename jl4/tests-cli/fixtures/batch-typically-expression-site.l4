@@ -1,0 +1,29 @@
+-- l4 batch over defaults that are EXPRESSIONS and are taken at a NAMED site
+-- inside the rules (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). Each default names a
+-- section input, `alpha`, which the request supplies, so the value the site takes
+-- is worked out from the request. Under hard each one is listed under the
+-- application that took it, and only if the answer read it.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Rates`
+    GIVEN alpha IS A NUMBER
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES alpha)
+  retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS alpha)
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default Combine
+GIVEN n IS A NUMBER
+      use IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS 1)'s timeout
+  ELSE 0

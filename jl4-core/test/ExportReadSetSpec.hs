@@ -227,3 +227,18 @@ spec = do
         Right r ->
           [ length bs | MkCheckErrorWithContext{kind = TypicallyCycle bs} <- r.tcdErrors ]
             `shouldBe` [2]
+
+    -- W7, decision 1 (§4.3 of the spec): a rule's own input takes an expression
+    -- too, and what it reads is an input of the export.
+    it "lists a section input that only the export's own input's default reads" $ do
+      let inputDefaultReadsBinder = Text.unlines
+            [ "§ `Rates`"
+            , "    GIVEN alpha IS A NUMBER"
+            , ""
+            , "@export scaled"
+            , "GIVEN base IS A NUMBER"
+            , "      rate IS A NUMBER TYPICALLY (alpha PLUS 1)"
+            , "GIVETH A NUMBER"
+            , "scaled MEANS base TIMES rate"
+            ]
+      exportParamNames inputDefaultReadsBinder `shouldBe` Right ["base", "rate", "alpha"]

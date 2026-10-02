@@ -1,0 +1,22 @@
+-- l4 batch over defaults that are EXPRESSIONS (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- W7, R8 rule 3): a rule's input, a section input and a record's field, together. A row
+-- that leaves them out takes the value the expression works out, from the
+-- values the same row supplies, and `presumed` lists each one by name, or by
+-- path for a field.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+  retries IS A NUMBER
+
+@export default Final price
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+      cfg IS A Config
+GIVETH A NUMBER
+`final price` MEANS ((`list price` MINUS discount) TIMES rate) PLUS cfg's timeout

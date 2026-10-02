@@ -1,0 +1,32 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-expression-places.l4
+  Hidden: no
+  Range: 8:35-8:39
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      base
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: typically-expression-places.l4
+  Hidden: no
+  Range: 14:34-14:44
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      nosuchname
+
+    which I have inferred to be of type: 
+
+      NUMBER

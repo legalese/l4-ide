@@ -1,0 +1,25 @@
+-- A named site and a construction that leave out a TYPICALLY default which is an
+-- EXPRESSION (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). The checker copies the
+-- expression to the site, with every token and range of the declaration it was
+-- written in cleared; the Check phase below must still have tokens for this
+-- file, and none at the site for what the default names.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+DECLARE Paint
+  HAS coats IS A NUMBER TYPICALLY (phi TIMES 2)
+      gloss IS A NUMBER
+
+GIVETH A NUMBER
+`one` MEANS scaled WITH base IS 1
+
+GIVETH A Paint
+`two` MEANS Paint WITH gloss IS 2
+
+#EVAL `one`

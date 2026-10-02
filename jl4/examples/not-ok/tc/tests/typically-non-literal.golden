@@ -3,10 +3,35 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: typically-non-literal.l4
   Hidden: no
-  Range: 4:9-4:14
+  Range: 7:8-7:12
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The TYPICALLY value for `x` must be a literal:
+    The TYPICALLY value for `flag` must be a literal:
     a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.
+
+File: typically-non-literal.l4
+  Hidden: no
+  Range: 7:8-7:12
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+
+      `flag`
+
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+
+      § <heading>
+          GIVEN flag IS A BOOLEAN TYPICALLY (TRUE AND FALSE)
+
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+
+    The manual explains the move: doc/reference/types/ASSUME.md.
