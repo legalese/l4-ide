@@ -13,6 +13,7 @@ module McpServer (
 
 import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
+import EvalLimits (withEvalLimits)
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
 import Shared (collectMetadataEntries, collectDeploymentMetadata, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
@@ -29,7 +30,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import Data.Char (isAlphaNum)
-import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import Data.Text (Text)
@@ -40,10 +40,7 @@ import qualified Data.Maybe as Maybe
 import Data.Time (UTCTime, getCurrentTime, diffUTCTime)
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
 import Control.Exception (SomeException, catch)
-import GHC.IO.Exception (AllocationLimitExceeded (..))
-import System.Timeout (timeout)
 
 import Backend.Api (EvalBackend (..), FnLiteral (..), Presumption (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
 import Options (Options (..))
@@ -567,25 +564,16 @@ runMcpEvaluation vf args = do
 
 runMcpEvaluationIO :: Options -> ValidatedFunction -> [(Text, Maybe FnLiteral)] -> IO (Either Text Text)
 runMcpEvaluationIO cfg vf args = do
-  let timeoutMicros = cfg.evalTimeout * 1_000_000
-      memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
   case Map.lookup JL4 vf.fnEvaluator of
     Nothing -> pure $ Left "No evaluator available"
     Just runFn -> do
-      mResult <- (timeout timeoutMicros $ do
-          setAllocationCounter memLimitBytes
-          enableAllocationLimit
-          r <- runExceptT (runFn.runFunction args Nothing TraceNone False PresumeSoft)
-          remaining <- getAllocationCounter
-          let _ = memLimitBytes - remaining
-          pure r
-        ) `catch` \AllocationLimitExceeded ->
-          pure Nothing
-      case mResult of
-        Nothing -> pure $ Left "Evaluation resource limit exceeded"
-        Just (Left err) ->
+      limited <- withEvalLimits cfg $
+        runExceptT (runFn.runFunction args Nothing TraceNone False PresumeSoft)
+      case limited of
+        Left _ -> pure $ Left "Evaluation resource limit exceeded"
+        Right (Left err, _) ->
           pure $ Left (prettyEvaluatorError err)
-        Just (Right rwr) ->
+        Right (Right rwr, _) ->
           let encoded = Aeson.encode (SimpleResponse rwr)
           in pure $ Right (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
 

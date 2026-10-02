@@ -23,6 +23,8 @@ import qualified L4.StateGraph as StateGraph
 import qualified L4.StateGraph.Dot as StateGraph
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 import Compiler (toDecl)
+import EvalLimits (LimitHit, limitHitMessage)
+import qualified EvalLimits
 import Logging (logInfo)
 import Options (Options (..))
 import Shared (jsonError)
@@ -36,7 +38,7 @@ import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (bracket_, catch, evaluate, finally)
+import Control.Exception (bracket_, evaluate)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Functor ((<&>))
@@ -49,8 +51,6 @@ import Data.Scientific (Scientific)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit, disableAllocationLimit)
-import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Servant
 import System.FilePath ((<.>))
 import System.Timeout (timeout)
@@ -726,48 +726,11 @@ timeoutAction act = withEvalLimits act >>= either (const resourceLimitExceeded) 
 resourceLimitExceeded :: AppM a
 resourceLimitExceeded = throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
 
--- | Which of an evaluation's two limits stopped it.
-data LimitHit = TimeLimitHit | AllocationLimitHit
-
--- | The message on a batch case that hit a limit. It keeps the prefix of the
--- 500 a single evaluation gets, and names the limit and the option that sets it.
-limitHitMessage :: Options -> LimitHit -> Text
-limitHitMessage cfg = \case
-  TimeLimitHit ->
-    "Evaluation resource limit exceeded: this case ran past the time limit of "
-      <> Text.pack (show cfg.evalTimeout) <> " s (--eval-timeout)"
-  AllocationLimitHit ->
-    "Evaluation resource limit exceeded: this case allocated more than the limit of "
-      <> Text.pack (show cfg.maxEvalMemoryMb) <> " MB (--max-eval-memory-mb)"
-
--- | Run an evaluation under the configured time and allocation limits.
---
--- Returns the result and the GHC allocation bytes it consumed, or which limit
--- stopped it and the bytes allocated up to then (for the allocation limit, the
--- limit itself). The allocation counter belongs to the calling thread, so it
--- counts only this evaluation; the time limit is wall-clock, so it counts
--- whatever else shares the core meanwhile. That is why the batch endpoint
--- bounds how many of its cases run at once.
---
--- The allocation limit is switched off again on the way out. Left on, it goes
--- on counting down whatever the thread does next, such as encoding a single
--- evaluation's response, and can raise 'AllocationLimitExceeded' there,
--- outside this handler; once it has been hit, the RTS re-arms it with a grace
--- allowance of only 100K (@+RTS -xq@) before raising it again.
+-- | 'EvalLimits.withEvalLimits' under the service's configured limits.
 withEvalLimits :: IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits act = do
   cfg <- asks (.options)
-  let timeoutMicros = cfg.evalTimeout * 1_000_000
-      memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
-  liftIO $
-    ( do
-        setAllocationCounter memLimitBytes
-        enableAllocationLimit
-        result <- timeout timeoutMicros act
-        allocBytes <- (memLimitBytes -) <$> getAllocationCounter
-        pure $ maybe (Left (TimeLimitHit, allocBytes)) (\r -> Right (r, allocBytes)) result
-    ) `catch` (\AllocationLimitExceeded -> pure (Left (AllocationLimitHit, memLimitBytes)))
-      `finally` disableAllocationLimit
+  liftIO (EvalLimits.withEvalLimits cfg act)
 
 -- ----------------------------------------------------------------------------
 -- Helpers
