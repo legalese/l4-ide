@@ -234,7 +234,7 @@ Engine evidence (nothing here is a golden alone):
 - Catala: `etc/validate-catala.mjs` typechecks and proves all thirteen goldens and `clerk test` passes 83 of 83. A hand-written test scope over the new `defaults` golden, run through `clerk run`: the `context` defaults give 280 when the caller omits them and 301 when it supplies `rate: 5.0`, `allowance: 1.0`. No generated test scope can exist for it (a test scope declares no inputs, so a decision that reads a section `GIVEN` or `ASSUME` is not tested), so that probe is not committed.
 - Blawx: see above. BPMN and docassemble emit byte-identical documents; only BPMN's report grew.
 
-**Choices W9 made where T5 leaves one** (assumed, not ruled; each was decided by Claude overnight 2026-10-03 and awaits Meng's review; each is also the subject line of its commit):
+**Choices W9 made where T5 leaves one** (assumed, not ruled; each was decided by Claude overnight 2026-10-03 and awaits Meng's review; the commits that make them say so in their subject lines, except the yscript commit, item 9, which is T5b's own scope):
 
 1. **Blawx prints only `R-TYPICALLY`.** The middle end's report also holds `R-SORT`, `R-DNF` and `R-DIRECTIVE` notes that nothing has ever printed. Alternative: print them all, which changes stderr for every Blawx export.
 2. **Blawx puts the note on stderr and in the `.pl` header, and leaves the `.blawx` YAML alone.** The YAML is an import-shaped fixture stream with no header, and byte-stable goldens depend on it. Alternative: stderr only.
