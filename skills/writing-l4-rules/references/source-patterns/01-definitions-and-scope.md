@@ -427,12 +427,10 @@ the house style still run green; [entry 11.9](11-when-the-encoding-cannot-answer
 reading` `` on its own — a `WITH` that names any input must name the rule's own inputs too, so that
 line is a check error reporting `` `the closing date` `` and `` `the offer date` `` unsupplied.
 Name every input, as above. **Not** a `TYPICALLY` default to make one reading win: a
-`TYPICALLY` value must be a literal, and `` `the staff reading` `` is a defined name of record type,
-so the typechecker rejects it — _"The TYPICALLY value for `the reading` must be a literal: a number,
-a string, or a nullary constructor such as TRUE, FALSE or NOTHING."_ A constructor of your own
-`ONE OF` type is a literal and is accepted, so a reading modelled as a bare enum could carry one —
-and a `WITH` call that left the input out would then take that reading without anyone having
-chosen it, which is the next **Not**. **Not**, above all, silently picking a reading and presenting it as the text.
+`TYPICALLY` may name a definition, so `` TYPICALLY `the staff reading` `` on `` `the reading` ``
+type-checks — and then every rule that reads `` `the reading` `` and is given no value takes the staff
+reading without anyone having chosen it, which is the next **Not**. **Not**, above all, silently
+picking a reading and presenting it as the text.
 
 **See** [entry 1.4](#e1-4) (the confinement), and [drafting-patterns.md](../drafting-patterns.md), "Provenance —
 pin every inert string".

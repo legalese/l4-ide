@@ -229,10 +229,31 @@ required at a `WITH` construction, and a misspelt name is still an error.
 **Not** a `TYPICALLY` on a field with a `MEANS` clause. A computed field's value always comes from
 its `MEANS`, so a default could never be used, and the checker says so.
 
-**Not** a default that is itself a calculation. A `TYPICALLY` value must be a fixed value written
-out (`28`, `"yes"`, `TRUE`, `NOTHING`, a constructor of your own `ONE OF` type); it cannot name another
-`GIVEN` or a definition. For a default that is worked out, or one a provision should be able to cite,
-write it as in [7.3](#e7-3): a named definition plus `fromMaybe`.
+**A default may be worked out.** After `TYPICALLY` write a literal, a bare name, or an expression in
+parentheses over what the file declares: a definition, a constructor, or a section `GIVEN`.
+
+```l4
+GIVETH A NUMBER
+`the standard notice` MEANS 28
+
+§ `Notice`
+    GIVEN `days of notice` IS A NUMBER TYPICALLY `the standard notice`
+          `days to respond` IS A NUMBER TYPICALLY (`days of notice` DIVIDED BY 2)
+
+GIVETH A NUMBER
+`the response deadline` MEANS `days to respond`
+```
+
+`` #EVAL `the response deadline` `` gives `14`, and with ``WITH `days of notice` IS 60`` it gives `30`: a
+section `GIVEN`'s default is worked out from the values the whole evaluation was started with, so a
+`WITH` on one input reaches the default that reads it. A rule's own input or a record field takes its
+default as if it were written at the call, and cannot name that rule's other inputs. A section
+`GIVEN`'s default that reads itself, directly or through other defaults, is a check error. A written
+`ASSUME` and a lambda's `GIVEN` still take only a literal.
+
+**Not** a way to state what an instrument supplies and a party may displace. That is a fallback the
+provision will cite, which the parties set in the record, so write it as in [7.3](#e7-3): a named
+definition plus `fromMaybe`. `TYPICALLY` records what a form presumes when a fact is not given.
 
 **Not** a way to show that an answer rests on a presumption inside the file. `#EVAL` does not list the
 defaults it took. `l4 batch` and the service list, under `presumed`, a default a case left out and the

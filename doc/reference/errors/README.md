@@ -26,6 +26,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Undefined field access](#undefined-field-access)
   - [Wrong number of inputs](#wrong-number-of-inputs)
   - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
+  - [Defaults that depend on one another](#defaults-that-depend-on-one-another)
   - [APPEND vs append](#append-vs-append)
   - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
   - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
@@ -503,6 +504,18 @@ or give every clause one pattern for each input the `GIVEN` names.
 A list of clauses with no `GIVEN` at all is allowed.
 L4 then works out the type of each input from the patterns and the clause bodies, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
 Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
+
+---
+
+### Defaults that depend on one another
+
+**Error message:** `These inputs' TYPICALLY defaults depend on one another in a circle:` followed by the inputs, or, for one that reads itself, `The TYPICALLY default of … reads … itself`.
+
+**What you wrote:** A [section `GIVEN`](../syntax/section-given.md) whose `TYPICALLY` default is an expression that reads the input it stands in for, directly (`a TYPICALLY (a PLUS 1)`), through a definition it calls, or through another input's default (`b TYPICALLY (c PLUS 1)` with `c TYPICALLY (b PLUS 1)`).
+
+**What went wrong:** A default is worked out from the other inputs it reads, so none in a circle can be worked out first.
+
+**How to fix it:** Make one default in the circle a plain value, or have it supply the input it would read (``(`double it` WITH base IS 10)`` reads nothing of `base`). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
 
 ---
 
