@@ -390,8 +390,15 @@ textShowInt = Text.pack . show
 markdownReport :: Drg -> FidelityReport
 markdownReport drg =
   foldl' (flip addNote) (emptyReport "dmnmd") $
-    drgNotes <> bkmNotes <> concatMap decisionNotes (drgDecisions drg)
+    drgNotes <> typicallyNotes <> bkmNotes <> concatMap decisionNotes (drgDecisions drg)
  where
+  -- The one note the XML backend's list contributes to this one. A default is
+  -- a property of the /source/, which the markdown is generated from just as the
+  -- XML is, so what DMN could not carry of it, dmnmd could not either: a table's
+  -- input column has no default and the cell for "left out" is blank. The rest of
+  -- the XML list describes XML constructs and is deliberately not repeated here.
+  typicallyNotes = [ n | n <- drg.drgNotes, n.code == "D-TYPICALLY" ]
+
   drgNotes =
     [ note "D-MD-NODRG" Blocking drg.drgId
         ("dmnmd is a table format, not a graph: the "

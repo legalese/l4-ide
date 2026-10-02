@@ -4142,6 +4142,16 @@ goldenSubjects =
     , "refuse"
     , "the refusal exhibit"
     )
+    -- The TYPICALLY exhibit (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5/W9). DMN has
+    -- no default on an inputData, a BKM parameter or an itemComponent, so the
+    -- exporter does not map one and reports each as D-TYPICALLY: a section
+    -- GIVEN, a rule's own GIVEN and a record field, one of each. The golden pins
+    -- the three notes (and, in the markdown report, the same three); the engine
+    -- cases supply every input.
+  , ( "dmn" </> "defaults.l4"
+    , "defaults"
+    , "the TYPICALLY exhibit"
+    )
   ]
 
 -- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually

@@ -92,6 +92,34 @@ describe the target notation's limits rather than a defect in your file — DMN 
 substantially less expressive than L4 — which is why `--fail-on` defaults to `none`. A clean exit
 means the export ran, not that everything made it across.
 
+### `TYPICALLY`: neither carries a default, and both say so
+
+[`TYPICALLY`](../reference/types/TYPICALLY.md) gives a name a default, the value to use when nothing
+supplies one. Neither notation has anywhere to put it, so each reports every default it could not
+carry, at lossy severity, instead of dropping it without a word.
+
+**DMN** (`D-TYPICALLY`, also in the `dmn-md` report). A DMN `inputData`, a business knowledge model
+parameter and a record's `itemComponent` have no default. What an evaluation that leaves one out gets
+is up to the engine, and the two the export is checked against disagree: **Camunda 8 reads `null`, and
+KIE reports a model error and skips every decision that needed it.** Neither reads the default. Worse,
+a decision table over a missing input does not fail on Camunda: `null` matches no condition, so the
+table falls through to its `OTHERWISE` row, and answers confidently with a number the source never
+gave (measured on the `defaults.l4` exhibit: with `income` left out, Camunda answers band 1, where the
+default `TYPICALLY 50000` gives band 2). The export does not rewrite every read as
+`if x = null then d else x`, which would change what each decision says and would not help KIE at all.
+It reports one note per default: a rule's own `GIVEN`, a section `GIVEN`, an `ASSUME`, and every record
+field of every `DECLARE` (the model carries all of them whether a decision reads them or not). Supply
+every input a DMN model depends on; do not rely on its omission to mean the default.
+
+**BPMN** (`P-TYPICALLY`). A process draws no data: a `PROVIDED` condition becomes an opaque
+`conditionExpression` (`F4`), which reads whatever the process instance holds, so an instance that never
+set the variable does not get the default. The note is raised for the rule being drawn, for any rule it
+reaches through `HENCE`, and for the section `GIVEN`s and `ASSUME`s they read, and for nothing else; a
+default on an input of an unrelated rule is not this process's loss.
+
+Neither note is `blocking` (the notations are not at fault for lacking a default), so
+`--fail-on=lossy` is the setting that makes a default you meant to carry stop a pipeline.
+
 The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with no unit, and BPMN
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`
 emits no timer and records that instead. Neither silently invents a unit.

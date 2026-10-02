@@ -1,0 +1,14 @@
+-- The same rule, with the default on a section GIVEN it reads instead of on its
+-- own GIVEN.
+DECLARE Actor IS ONE OF Member
+DECLARE Action IS ONE OF pay
+
+§ `Standing`
+    GIVEN `is in good standing` IS A BOOLEAN TYPICALLY TRUE
+
+GIVETH A DEONTIC Actor Action
+`the duty` MEANS
+    PARTY Member
+    MUST pay
+    PROVIDED `is in good standing`
+    WITHIN 14
