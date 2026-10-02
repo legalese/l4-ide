@@ -19,3 +19,7 @@ regulative-unknown-action.l4:77:1-78:34:
   I could not continue evaluating, because I needed to know the value of
     k
   but it is an assumed term.
+regulative-unknown-action.l4:89:1-90:34:
+  I could not continue evaluating, because I needed to know the value of
+    k
+  but it is an assumed term.

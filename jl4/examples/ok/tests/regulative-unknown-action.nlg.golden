@@ -4,3 +4,4 @@ executing contract `must deliver` at 0 with the following events: party `alice` 
 executing contract `must send none` at 0 with the following events: party `alice` did `Send` with `k` and 5 at 1
 executing contract `must send none` at 0 with the following events: party `alice` did `Send` with `k` and 0 at 1
 executing contract `must not deliver` at 0 with the following events: party `alice` did `Deliver` with `k` at 1
+executing contract `may deliver` at 0 with the following events: party `alice` did `Deliver` with `k` at 1

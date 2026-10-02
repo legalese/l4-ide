@@ -13,3 +13,7 @@ cast-unknown.l4:64:1-65:35:
   but it is an assumed term.
 cast-unknown.l4:78:1-79:35:
   FULFILLED
+cast-unknown.l4:92:1-93:47:
+  I could not continue evaluating, because I needed to know the value of
+    u
+  but it is an assumed term.

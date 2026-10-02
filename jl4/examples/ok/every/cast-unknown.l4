@@ -77,3 +77,17 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `roll with landlord` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
+
+-- 5. The unknown under another cast word. `u` may be a landlord, so the run
+--    is Stuck on `u` rather than released on the one landlord's signature.
+GIVETH A DEONTIC Actor Action
+`landlords with unknown` MEANS
+    EVERY Landlord l IN LIST theLandlord, u
+        MUST   Sign l
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `landlords with unknown` AT 0 WITH
+  PARTY theLandlord DOES Sign theLandlord AT 1

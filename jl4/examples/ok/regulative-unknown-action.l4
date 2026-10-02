@@ -76,3 +76,15 @@ GIVETH A DEONTIC Actor Action
 -- 6. A prohibition: if `k` is `Retail` this is a breach. Stuck on `k`.
 #TRACE `must not deliver` AT 0 WITH
   PARTY alice DOES Deliver k AT 1
+
+GIVETH A DEONTIC Actor Action
+`may deliver` MEANS
+    PARTY alice
+    MAY    Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 7. A permission: if `k` is `Retail` Alice has used it. Stuck on `k`.
+#TRACE `may deliver` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
