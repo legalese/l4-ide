@@ -246,6 +246,24 @@ listFieldSrc = Text.unlines
   , "`total` h period MEANS 1"
   ]
 
+-- | Two exported decisions that share an input called @x@: the first writes the
+-- given default, the second writes none. (Neither body reads it; an unread GIVEN
+-- is still an input variable.)
+defaultVsNoneSrc :: Text -> Text -> Text
+defaultVsNoneSrc ty dflt = Text.unlines
+  [ "DECLARE Status IS ONE OF single, married"
+  , ""
+  , "@export A"
+  , "GIVEN x IS A " <> ty <> " " <> dflt
+  , "GIVETH A NUMBER"
+  , "`the a` x MEANS 1"
+  , ""
+  , "@export B"
+  , "GIVEN x IS A " <> ty
+  , "GIVETH A NUMBER"
+  , "`the b` x MEANS 2"
+  ]
+
 nothingDefaultSrc :: Text
 nothingDefaultSrc = Text.unlines
   [ "@export the scaled amount"
@@ -606,6 +624,21 @@ spec = do
     it "refuses any other default on a LIST OF field, rather than dropping it" $
       refuses (openFiscaOut (withDefaultsAs (const (Lit emptyAnno (NumericLit emptyAnno 1))) (moduleOf listFieldSrc)))
         `shouldSatisfy` mentions "`members` is a LIST OF records and carries TYPICALLY 1"
+
+    it "treats a default equal to OpenFisca's own as no disagreement: 0, FALSE and the first member against none" $ do
+      succeeds (openFiscaOut (moduleOf (defaultVsNoneSrc "NUMBER" "TYPICALLY 0"))) `shouldSatisfy` Text.isInfixOf "class x(Variable):"
+      succeeds (openFiscaOut (moduleOf (defaultVsNoneSrc "BOOLEAN" "TYPICALLY FALSE"))) `shouldSatisfy` Text.isInfixOf "class x(Variable):"
+      succeeds (openFiscaOut (moduleOf (defaultVsNoneSrc "Status" "TYPICALLY single"))) `shouldSatisfy` Text.isInfixOf "class x(Variable):"
+
+    it "refuses a default that differs from OpenFisca's own against none, and says what none means" $ do
+      let msgs src = refuses (openFiscaOut (moduleOf src))
+      msgs (defaultVsNoneSrc "NUMBER" "TYPICALLY 3") `shouldSatisfy` mentions "different TYPICALLY defaults (3 and none"
+      msgs (defaultVsNoneSrc "BOOLEAN" "TYPICALLY TRUE") `shouldSatisfy` mentions "(TRUE and none"
+      -- an enum's undefaulted side is its first member, whether or not it was written
+      msgs (defaultVsNoneSrc "Status" "TYPICALLY married")
+        `shouldSatisfy` mentions "(Status.married and Status.single (the first member, which is also what no TYPICALLY gives)"
+      msgs (defaultVsNoneSrc "NUMBER" "TYPICALLY 3")
+        `shouldSatisfy` mentions "OpenFisca then gives the input its own default for its type"
 
   ------------------------------------------------------------------------
   describe "Blawx (relational middle end): says what it dropped" $ do

@@ -93,14 +93,20 @@ not the first one declared. A simulation that supplies the input overrides the d
 
 What it refuses, loudly, because OpenFisca has no value to give it:
 
-- **`NOTHING`.** Every OpenFisca variable has a value; there is no "no value".
+- **`NOTHING`.** Every OpenFisca variable has a value; there is no "no value". The export refuses
+  it even for a field that no decision reads, because every stored field of the subject becomes an
+  input variable whether or not a formula uses it.
 - **A default on the subject or on `period`.** Those come from the simulation, not from an input
   variable, so there is nothing for a default to attach to.
 - **A default on a `LIST OF` field, other than `EMPTY`.** A role has no default list, so any other
   default would be lost. `EMPTY` says what a role nobody fills already is, so it is accepted and
   changes nothing in the output.
 - **Two exported decisions that give one input different defaults.** OpenFisca has one variable of
-  that name and so one default; the export names both and stops rather than pick one.
+  that name and so one default; the export names both and stops rather than pick one. "Different"
+  means different in OpenFisca, where a decision that writes no `TYPICALLY` gets OpenFisca's own
+  default for the type: `TYPICALLY 3` against none is refused (taking it would change what the
+  undefaulted decision answers), while `TYPICALLY 0` against none, `FALSE` against none, or an
+  enum's first member against none is not, because the variable is the same either way.
 
 (An expression default is not accepted by the checker yet. When it is, the export turns it into a
 `formula` on the input variable, which OpenFisca computes only for a period left without an input
