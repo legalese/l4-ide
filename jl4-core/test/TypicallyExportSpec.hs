@@ -112,6 +112,24 @@ withDefaultsAs bump (MkModule ann uri section) = MkModule ann uri (goSection sec
     Section a s -> Section a (goSection s)
     other -> other
 
+-- | Replace every @TYPICALLY@ by a reference to the module's @GIVEN@ of that
+-- name: a nullary application whose head is a variable, which is the shape R8
+-- rule 3 (W7) admits as a default and which has exactly the shape of a nullary
+-- constructor. The AST alone does not tell the two apart.
+withDefaultsReferring :: Text -> Module Resolved -> Module Resolved
+withDefaultsReferring target m = withDefaultsAs (const ref) m
+ where
+  ref = case [ r | r <- binderNames m, rawNameToText (rawName (getActual r)) == target ] of
+    (r : _) -> let n = getOriginal r in App emptyAnno (Ref n (getUnique r) n) []
+    _       -> error ("no GIVEN named " <> Text.unpack target)
+  binderNames (MkModule _ _ section) = goSection section
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \case
+    Decide _ (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ _) ->
+      [ n | MkOptionallyTypedName _ n _ _ <- otns ]
+    Section _ s -> goSection s
+    _ -> []
+
 sitesOf :: Module Resolved -> [DefaultSite]
 sitesOf = moduleDefaultSites
 
@@ -554,6 +572,19 @@ spec = do
       -- a string concatenation has no OpenFisca form
       refuses (openFiscaOut (withDefaultsAs (const (Concat emptyAnno [])) (moduleOf ruleGivenSrc)))
         `shouldSatisfy` mentions "unsupported construct for OpenFisca"
+
+    it "maps a default that names another input to a formula, not to 'no way to say a variable has no value'" $ do
+      -- `TYPICALLY base` has the same shape as a nullary constructor. The
+      -- checker tells them apart, the AST does not, so the lowering must.
+      let referring = withDefaultsReferring "base" (moduleOf ruleGivenSrc)
+          o = succeeds (openFiscaOut referring)
+      o `shouldSatisfy` Text.isInfixOf "class rate(Variable):"
+      o `shouldSatisfy` Text.isInfixOf "def formula(person, period):"
+      o `shouldSatisfy` (not . Text.isInfixOf "default_value")
+
+    it "still refuses NOTHING as a default on a scalar GIVEN (the constructor arm, after that change)" $
+      refuses (openFiscaOut (moduleOf nothingDefaultSrc))
+        `shouldSatisfy` mentions "no way to say a variable has no value"
 
   ------------------------------------------------------------------------
   describe "Blawx (relational middle end): says what it dropped" $ do
