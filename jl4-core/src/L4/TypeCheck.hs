@@ -398,7 +398,7 @@ suppressResolutionCascade errs
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
 checkProgram module' = do
   withScanTypeAndSigEnvironment scanTyDeclModule inferTyDeclModule scanFunSigModule module' \rdecides -> do
-    (rprog, topEnv) <- inferProgram module'
+    (rprog, topEnv) <- withCheckedFieldDefaults module' (inferProgram module')
     -- Build the mixfix registry from THIS module's function signatures
     -- so it can be propagated to importing modules
     let localMixfixRegistry = buildMixfixRegistry rdecides
@@ -692,13 +692,71 @@ checkRegulativeBinOp ec opname op ctx ann e1 e2 t = do
   expect ec t contractT
   fst <$> regulativeBinOpAt contractT opname op ctx ann e1 e2
 
--- Phase 4.
+-- Phase 4. The fields' @TYPICALLY@ defaults were checked, with the rest of the
+-- module's, before the first body ('withCheckedFieldDefaults').
 inferDeclare :: Declare Name -> Check (Declare Resolved, [CheckInfo])
-inferDeclare (MkDeclare ann _tysig appForm t) =
+inferDeclare (MkDeclare ann _tysig appForm _t) =
   errorContext (WhileCheckingDeclare (getName appForm)) do
     d <- lookupDeclareCheckedByAnno ann
-    payload <- checkFieldDefaults t d.payload
-    pure (payload, d.publicNames)
+    pure (d.payload, d.publicNames)
+
+-- | Check the @TYPICALLY@ default of every record field in the module, once,
+-- before any body is checked, and keep the results where a construction can
+-- read them (W5).
+--
+-- A construction that leaves a defaulted field out takes the field's checked
+-- default ('supplyAppNamed'), so the default has to be there when a body BEFORE
+-- the @DECLARE@ in the file is checked, which in-order checking at the
+-- declaration would not give. That is the same reason a field's default is
+-- checked in phase 4 and not phase 1 ('checkFieldDefaults'): here every
+-- constructor is in scope.
+--
+-- Errors are reported here, under the record's own context, exactly as
+-- 'inferDeclare' did; 'inferDeclare' now only reads the result.
+withCheckedFieldDefaults :: Module Name -> Check a -> Check a
+withCheckedFieldDefaults m act = do
+  checked <- for (declaresOf m) \ (MkDeclare ann _ appForm t) -> do
+    dc <- lookupDeclareCheckedByAnno ann
+    payload <-
+      prune $ errorContext (WhileCheckingDeclare (getName appForm)) $
+        checkFieldDefaults t dc.payload
+    pure (ann, MkDeclChecked payload dc.publicNames)
+  local
+    (\ s -> s
+      { declareDeclarations =
+          Map.union
+            (Map.fromList [ (r, dc) | (ann, dc) <- checked, Just r <- [rangeOf ann] ])
+            s.declareDeclarations
+      , visibleInputDefaults =
+          Map.union (foldMap (recordInputDefaults . (.payload) . snd) checked) s.visibleInputDefaults
+      })
+    act
+ where
+  declaresOf (MkModule _ _ sect) = fromSection sect
+  fromSection (MkSection _ _ _ _ decls) = concatMap fromDecl decls
+  fromDecl = \ case
+    Declare _ d -> [d]
+    Section _ s -> fromSection s
+    _           -> []
+
+-- | The defaults of a record's fields, keyed by the record's constructor.
+--
+-- Only a record: the fields of an enum constructor that carries data are not
+-- offered, so omitting one stays an error, as it was. T1 rules on record
+-- fields ("any field declared TYPICALLY", under the heading of record
+-- construction); the payload of an enum constructor is the same mechanism and
+-- could be opened with it, but nobody has asked, and what is not ruled stays
+-- loud. Assumed, not ruled.
+recordInputDefaults :: Declare Resolved -> InputDefaults
+recordInputDefaults = \ case
+  MkDeclare _ _ _ (RecordDecl _ (Just con) tns)
+    | not (Map.null ds) -> Map.singleton (getUnique con) ds
+    where
+      ds = Map.fromList
+        [ (getUnique fn, MkInputDefault { binder = getOriginal fn, declaredAt = rangeOf d, value = d })
+        | MkTypedName _ fn _ (Just d) _ <- tns
+        ]
+  _ -> Map.empty
 
 -- | Check each field's @TYPICALLY@ default, now that every constructor is in
 -- scope.
