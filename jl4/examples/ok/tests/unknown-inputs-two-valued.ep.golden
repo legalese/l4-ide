@@ -23,6 +23,7 @@ DECLARE Kind IS ONE OF Retail, Wholesale
 DECLARE Claim HAS kind IS A Kind, amount IS A NUMBER
 DECLARE Person HAS age IS A NUMBER
 DECLARE Pair HAS num IS A NUMBER, tag IS A STRING
+DECLARE Triple HAS first IS A NUMBER, second IS A NUMBER, third IS A NUMBER
 DECLARE Box HAS kind IS A Kind
 
 DECLARE Actor IS ONE OF
@@ -31,6 +32,9 @@ DECLARE Action IS ONE OF
     Deliver HAS item IS A Kind
 
 alice MEANS Seller OF "Alice"
+
+GIVETH A NUMBER
+undecided MEANS REFUSE "not decided"
 
 GIVEN it IS A Kind
 GIVETH A BOOLEAN
@@ -109,6 +113,9 @@ GIVETH A BOOLEAN
 #EVAL CONSIDER Pair n "x" WHEN Pair 0 "y" THEN "first", WHEN Pair a b THEN "second"
 -- ... and here the first branch matches if `n` is `0`.
 #EVAL CONSIDER Pair n "y" WHEN Pair 0 "y" THEN "first", WHEN Pair a b THEN "second"
+-- A clash counts only if the match reaches it: here it would first read
+-- `undecided`, which refuses, so the branch could refuse and this is stuck.
+#EVAL CONSIDER Triple n undecided 5 WHEN Triple 0 7 0 THEN "first", WHEN Triple x y z THEN "second"
 
 -- EQUALS names an unknown on either side (row 12), and so does a literal
 -- pattern, which compares the literal with the value considered ...
