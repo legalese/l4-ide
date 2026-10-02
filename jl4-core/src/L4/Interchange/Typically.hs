@@ -35,6 +35,7 @@ module L4.Interchange.Typically
     DefaultKind (..)
   , DefaultSite (..)
   , moduleDefaultSites
+  , importedDefaultSites
   , decideDefaultSites
     -- * What the default is
   , DefaultValue (..)
@@ -49,6 +50,7 @@ import Base
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 import Data.Ratio (denominator, numerator)
+import System.FilePath (takeBaseName)
 
 import L4.Annotation (rangeOf)
 import L4.Export (transitiveReferencedUniques)
@@ -88,6 +90,10 @@ data DefaultSite = MkDefaultSite
     -- type's for a field
   , value   :: !(Expr Resolved)
   , range   :: !(Maybe SrcRange)
+  , origin  :: !(Maybe Text)
+    -- ^ the imported module the default is written in (its file name without
+    -- the extension), or 'Nothing' for the module being exported. A reader of a
+    -- note needs to know the line is not in the file they exported.
   }
   deriving stock (Eq, Show)
 
@@ -116,6 +122,7 @@ moduleDefaultSites (MkModule _ _ section) = goSection section
           , ownerUnique = Nothing
           , value  = dflt
           , range  = rangeOf a
+          , origin = Nothing
           }
       ]
     Declare _ (MkDeclare _ _ (MkAppForm _ rec _ _) (RecordDecl _ _ fields)) ->
@@ -127,6 +134,7 @@ moduleDefaultSites (MkModule _ _ section) = goSection section
           , ownerUnique = Just (getUnique rec)
           , value  = dflt
           , range  = rangeOf tn
+          , origin = Nothing
           }
       | tn@(MkTypedName _ fn _ (Just dflt) _) <- fields
       ]
@@ -144,9 +152,43 @@ ruleGivenSites (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ rul
       , ownerUnique = Just (getUnique rule)
       , value  = dflt
       , range  = rangeOf otn
+      , origin = Nothing
       }
   | otn@(MkOptionallyTypedName _ n _ (Just dflt)) <- names
   ]
+
+-- | The @TYPICALLY@s written in the modules a module imports, for a backend that
+-- has to report on a default it reads through an @IMPORT@.
+--
+-- A default written in an imported file is a default all the same: an export
+-- that names the imported @ASSUME@ or reads the imported record's field loses
+-- it exactly as it would lose a local one, and nothing in the exported file
+-- shows that it was ever there. 'moduleDefaultSites' sees only the module it is
+-- given, so a backend that collected sites from the root alone dropped these in
+-- silence (the canon encoding @sg-isa.l4@ reads an imported field that is
+-- @TYPICALLY TRUE@, and its DMN export said nothing).
+--
+-- Each site is tagged with the module it was written in ('origin'). A rule's own
+-- @GIVEN@ in an imported module is left out on purpose: the exported rule only
+-- reaches an imported rule by calling it, and a call supplies every argument, so
+-- there is nothing for the default to do and nothing lost. Whether an imported
+-- site is /read/ is the caller's question, because "read" means something
+-- different to a lowering that emits a model (every name its bodies name) and
+-- to one that draws a process.
+--
+-- Pass the closure of imports with each module once ('dedupModules' in the CLI).
+importedDefaultSites :: [Module Resolved] -> [DefaultSite]
+importedDefaultSites mods =
+  [ s { origin = Just (moduleLabel m) }
+  | m <- mods
+  , s <- moduleDefaultSites m
+  , s.kind /= DefaultOnRuleGiven
+  ]
+
+-- | A module's file name without its extension, which is what an @IMPORT@ names.
+moduleLabel :: Module Resolved -> Text
+moduleLabel (MkModule _ uri _) =
+  Text.pack (takeBaseName (Text.unpack (fromNormalizedUri uri).getUri))
 
 -- | The defaults a decision depends on: its own @GIVEN@s, the @GIVEN@s of every
 -- rule it reaches by name, and every section @GIVEN@ and @ASSUME@ that its body
@@ -154,8 +196,12 @@ ruleGivenSites (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ rul
 -- rule at a time (BPMN draws one process, and a @HENCE@ into another rule is
 -- part of that process) reports on this, and not on the whole module, so a
 -- default on an unrelated input does not appear in a note about this rule.
-decideDefaultSites :: Module Resolved -> Decide Resolved -> [DefaultSite]
-decideDefaultSites modul (MkDecide _ _ (MkAppForm _ self _ _) body) =
+--
+-- The first argument is the modules the checked one imports. An imported
+-- @ASSUME@ the rule's body names (directly, or through a rule of this module) is
+-- reported too; an imported rule's own @GIVEN@ is not (see 'importedDefaultSites').
+decideDefaultSites :: [Module Resolved] -> Module Resolved -> Decide Resolved -> [DefaultSite]
+decideDefaultSites imports modul (MkDecide _ _ (MkAppForm _ self _ _) body) =
   [ s
   | s <- moduleDefaultSites modul
   , case s.kind of
@@ -163,6 +209,12 @@ decideDefaultSites modul (MkDecide _ _ (MkAppForm _ self _ _) body) =
       DefaultOnSectionGiven -> Set.member s.unique readSet
       DefaultOnAssume       -> Set.member s.unique readSet
       DefaultOnRecordField  -> False
+  ]
+  <>
+  [ s
+  | s <- importedDefaultSites imports
+  , s.kind `elem` [DefaultOnSectionGiven, DefaultOnAssume]
+  , Set.member s.unique readSet
   ]
  where
   readSet = transitiveReferencedUniques modul body
@@ -197,15 +249,17 @@ isLiteralDefault = \case
 
 -- | "the GIVEN @rate@ of @scaled@", "the section GIVEN @rate@", "the ASSUME
 -- @rate@", "the field @timeout@ of @Config@": the site as a reader would
--- point at it.
+-- point at it, with the imported module's name when it is not in the file they
+-- exported.
 describeSite :: DefaultSite -> Text
 describeSite s = case s.kind of
-  DefaultOnRuleGiven    -> "the GIVEN `" <> s.name <> "`" <> ofOwner
-  DefaultOnSectionGiven -> "the section GIVEN `" <> s.name <> "`"
-  DefaultOnAssume       -> "the ASSUME `" <> s.name <> "`"
-  DefaultOnRecordField  -> "the field `" <> s.name <> "`" <> ofOwner
+  DefaultOnRuleGiven    -> "the GIVEN `" <> s.name <> "`" <> ofOwner <> inModule
+  DefaultOnSectionGiven -> "the section GIVEN `" <> s.name <> "`" <> inModule
+  DefaultOnAssume       -> "the ASSUME `" <> s.name <> "`" <> inModule
+  DefaultOnRecordField  -> "the field `" <> s.name <> "`" <> ofOwner <> inModule
  where
   ofOwner = maybe "" (\o -> " of `" <> o <> "`") s.owner
+  inModule = maybe "" (\m -> " (in the imported module `" <> m <> "`)") s.origin
 
 -- | The value as source would spell it; an expression is printed, not
 -- evaluated.

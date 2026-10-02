@@ -4333,6 +4333,9 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                     , Just r <- [rangeOf e]
                     ]
                 , dloExternalRefNames = Just Set.empty
+                -- The imports' modules, as the CLI passes them: D-TYPICALLY
+                -- reports a default an emitted decision reads through one.
+                , dloImports = [ ri.riTypeChecked.program | ri <- tc.tcdResolvedImports ]
                 }
           )
           tc.tcdModule

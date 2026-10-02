@@ -124,9 +124,10 @@ import L4.Syntax
 import qualified L4.TypeCheck as TC
 import L4.Viz.GuardedRows (GuardedRows (..), hasEffectfulNode, normaliseGuarded)
 import L4.Interchange.Fidelity
+import L4.Export (transitiveReferencedUniques)
 import L4.Interchange.Typically
   ( DefaultKind (..), DefaultSite (..), classifyDefault, describeDefault, describeSite
-  , moduleDefaultSites )
+  , importedDefaultSites, moduleDefaultSites )
 
 import qualified L4.Dmn.Analysis as A
 import L4.Dmn.IR
@@ -506,6 +507,12 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- filter then FAILS SAFE (drops nothing, reports what it would have
     -- dropped). The CLI supplies a sibling-directory scan; the golden harness
     -- supplies its VFS's contents.
+  , dloImports :: ![Module Resolved]
+    -- ^ the modules this one imports, each once, for 'typicallyNotes' alone. A
+    -- @TYPICALLY@ written in an imported file and read by an emitted decision is
+    -- as lost to the model as a local one, and the root module cannot see it.
+    -- Nothing else in the lowering reads this: a name from an imported module is
+    -- still emitted as the model emits it today.
   }
 
 defaultDmnLowerOptions :: DmnLowerOptions
@@ -518,6 +525,7 @@ defaultDmnLowerOptions = MkDmnLowerOptions
   , dloMissingMatchRanges = []
   , dloClauseMatrixRanges = []
   , dloExternalRefNames   = Nothing
+  , dloImports            = []
   }
 
 -- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
@@ -4326,8 +4334,19 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- not interpreted, so an expression default (R8 rule 3, unbuilt) is reported
   -- the same way instead of being missed.
   typicallyNotes :: [FidelityNote]
-  typicallyNotes =
-    [ dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+  typicallyNotes = map note
+    ( [ s | s <- moduleDefaultSites modul, reached s ]
+      -- A default written in an imported module is reported when an emitted
+      -- decision reads the name, which is the only way the model can have lost
+      -- it: the imported file's own elements are not in this model. "Reads" is
+      -- the bodies' own references, taken through this module's helpers
+      -- ('transitiveReferencedUniques'); a reference into an imported rule stops
+      -- there, because that rule's body is not emitted.
+      <> [ s | s <- importedDefaultSites opts.dloImports, Set.member s.unique readByEmitted ]
+    )
+   where
+    note s =
+      dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
         ( describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
             <> ", and DMN has no default for " <> carrier s.kind <> ": an evaluation that leaves "
             <> tick s.name <> " out gets no value for it (`null` on Camunda 8, a model error on KIE), not "
@@ -4335,10 +4354,9 @@ lowerModule opts modul@(MkModule _ uri _) =
         ( "the presumption: the source says an omitted " <> noun s.kind
             <> " is " <> describeDefault (classifyDefault s.value)
             <> ", and the model says it is nothing" )
-    | s <- moduleDefaultSites modul
-    , reached s
-    ]
-   where
+
+    readByEmitted = Set.unions
+      [ transitiveReferencedUniques modul body | MkDecide _ _ _ body <- decides ]
     emittedDecides = Set.fromList (map (getUnique . decideResolved) decides)
     inputUniques   = Set.fromList (map fst freeTerms)
     recordUniques  = Set.fromList (map (.itdUnique) itemDecls)

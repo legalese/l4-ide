@@ -108,14 +108,17 @@ gave (measured on the `defaults.l4` exhibit: with `income` left out, Camunda ans
 default `TYPICALLY 50000` gives band 2). The export does not rewrite every read as
 `if x = null then d else x`, which would change what each decision says and would not help KIE at all.
 It reports one note per default: a rule's own `GIVEN`, a section `GIVEN`, an `ASSUME`, and every record
-field of every `DECLARE` (the model carries all of them whether a decision reads them or not). Supply
+field of every `DECLARE` (the model carries all of them whether a decision reads them or not). A default
+written in a file the module imports is reported too, when an emitted decision reads the name (an
+imported `ASSUME`, or a field of an imported record), and the note says which module it is in. Supply
 every input a DMN model depends on; do not rely on its omission to mean the default.
 
 **BPMN** (`P-TYPICALLY`). A process draws no data: a `PROVIDED` condition becomes an opaque
 `conditionExpression` (`F4`), which reads whatever the process instance holds, so an instance that never
 set the variable does not get the default. The note is raised for the rule being drawn, for any rule it
-reaches through `HENCE`, and for the section `GIVEN`s and `ASSUME`s they read, and for nothing else; a
-default on an input of an unrelated rule is not this process's loss.
+reaches through `HENCE`, and for the section `GIVEN`s and `ASSUME`s they read (an `ASSUME` imported from
+another file included, with its module named), and for nothing else; a default on an input of an
+unrelated rule is not this process's loss.
 
 Neither note is `blocking` (the notations are not at fault for lacking a default), so
 `--fail-on=lossy` is the setting that makes a default you meant to carry stop a pipeline.

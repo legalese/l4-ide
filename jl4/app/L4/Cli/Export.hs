@@ -472,6 +472,9 @@ dmnDrgFor opts tcRes = do
                 , Just r <- [rangeOf e]
                 ]
             , dloExternalRefNames = externalRefs
+            -- Read by D-TYPICALLY alone: a default written in an imported file
+            -- and read by an emitted decision is lost to the model like a local one.
+            , dloImports = dedupModules (transitiveDeps tcRes)
             }
           tcRes.module'
   pure drg
@@ -513,7 +516,8 @@ exportBpmn opts tcRes = do
   emitArtifact opts (renderBpmn bx)
   -- The graph has forgotten the module, so the notes that need its binders
   -- (a TYPICALLY the process cannot carry) are added here, where both exist.
-  pure (foldl' (flip addNote) bx.bxFidelity (bpmnDefaultNotes tcRes.module' sg))
+  pure (foldl' (flip addNote) bx.bxFidelity
+    (bpmnDefaultNotes (dedupModules (transitiveDeps tcRes)) tcRes.module' sg))
 
 -- | Pick the one regulative rule to draw.
 --
