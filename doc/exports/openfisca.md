@@ -60,6 +60,53 @@ The **decision-rule subset**, mapped as follows:
 | a call to another `@export` decision         | `entity('other_var', period)`                          |
 | a record with `LIST OF Person` fields        | a group entity, each list field becoming a role        |
 
+## What `TYPICALLY` becomes
+
+OpenFisca gives every variable a default of its own when a simulation leaves it out: `0.0` for a
+number, `False` for a boolean, `''` for a string. An enum has none of its own, so the export has
+always written the first member. A rule that says an input is _typically_ 3 must not be turned into
+one that says it is 0, so **this export maps every default**: a `TYPICALLY` on a record field or on
+a rule's own `GIVEN` becomes that input variable's `default_value`.
+
+```l4
+DECLARE Claimant HAS
+    income        IS A NUMBER
+    `hours a week` IS A NUMBER TYPICALLY 40
+
+GIVEN c IS A Claimant
+      rate IS A NUMBER TYPICALLY 3
+```
+
+```python
+class hours_a_week(Variable):
+    value_type = float
+    default_value = 40.0
+    …
+class rate(Variable):
+    value_type = float
+    default_value = 3.0
+    …
+```
+
+An enum default is the member you wrote (`TYPICALLY married` gives `default_value = Status.married`),
+not the first one declared. A simulation that supplies the input overrides the default, as it should.
+
+What it refuses, loudly, because OpenFisca has no value to give it:
+
+- **`NOTHING`.** Every OpenFisca variable has a value; there is no "no value".
+- **A default on the subject or on `period`.** Those come from the simulation, not from an input
+  variable, so there is nothing for a default to attach to.
+- **A default on a `LIST OF` field**, which becomes a role.
+- **Two exported decisions that give one input different defaults.** OpenFisca has one variable of
+  that name and so one default; the export names both and stops rather than pick one.
+
+(An expression default is not accepted by the checker yet. When it is, the export turns it into a
+`formula` on the input variable, which OpenFisca computes only for a period left without an input
+value, and refuses one that the formula lowering cannot express.)
+
+A `TYPICALLY` on a section `GIVEN` or an `ASSUME` never reaches this point: the export reads neither,
+and refuses a rule that does (`unbound reference`).
+
 ## What doesn't survive
 
 OpenFisca does not emit a fidelity report; these are the caveats the bridge's own review recorded,
@@ -69,9 +116,10 @@ and they are worth reading before you trust a number.
   while L4 `NUMBER` is an exact rational. Results diverge past roughly seven significant digits —
   `16777217` comes back as `16777216.0` — and decimal round-off accumulates. For money in cents,
   large aggregates or high-precision rates, treat OpenFisca output as float32-approximate.
-- **An omitted enum input defaults to the first declared member.** OpenFisca answers with that
-  member when the input is absent, so order your `DECLARE … IS ONE OF` such that the first listed
-  value is the safe one. This is a convention the bridge relies on, not something it checks.
+- **An omitted enum input with no `TYPICALLY` defaults to the first declared member.** OpenFisca
+  answers with that member when the input is absent, so order your `DECLARE … IS ONE OF` such that
+  the first listed value is the safe one. This is a convention the bridge relies on, not something
+  it checks. An input that _does_ carry a `TYPICALLY` is different, and is covered next.
 
 ## Where to look
 

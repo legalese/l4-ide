@@ -199,9 +199,17 @@ For money in cents, large aggregates, or high-precision rates, treat the
 OpenFisca output as float32-approximate, not exact.
 
 ### Defaults and conventions (must hold, not checked)
-- **Enum `default_value` is the first declared member.** When an enum input is
-  omitted from a situation, OpenFisca answers with that member. Order your
+- **Enum `default_value` is the first declared member, unless the input says
+  `TYPICALLY`.** When an enum input with no `TYPICALLY` is omitted from a
+  situation, OpenFisca answers with the first member. Order your
   `DECLARE … IS ONE OF` so the first listed value is the safe/natural default.
+  An input that writes `TYPICALLY <member>` gets that member instead.
+- **`TYPICALLY` is the input's `default_value`.** OpenFisca has a default for
+  every variable (`0.0`, `False`, `''`), so a default left unwritten would be
+  replaced by it. Every `TYPICALLY` on a record field or a rule's own `GIVEN`
+  is written out (`defaults.l4`, `roundtrip_check.py defaults`); what has no
+  OpenFisca value (`NOTHING`) is refused, as is a default on the subject or on
+  `period`, and two decisions that disagree about one input's default.
 - **`members of` is recognised by name**, and is assumed to concatenate the
   subject's role lists (= all members). If you define it to mean something else,
   aggregations over it will silently disagree with L4.

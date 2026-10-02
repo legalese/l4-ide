@@ -1,0 +1,32 @@
+-- TYPICALLY on an input. OpenFisca gives every variable a default of its own
+-- (0.0, False, the first member of an enum); `l4 export openfisca` writes the
+-- default the L4 source states instead, as the variable's `default_value`, so a
+-- simulation that leaves an input out gets what the rule says it typically is.
+--
+-- Written on a record field (`hours a week`, `is resident`) or on a rule's own
+-- GIVEN (`status`, `rate`). Without the mapping, `rate` would be 0.0 and
+-- `status` would be `single`, the first member, whatever the source said.
+
+DECLARE Status IS ONE OF single, married
+
+DECLARE Claimant
+    HAS income         IS A NUMBER
+        `hours a week` IS A NUMBER  TYPICALLY 40
+        `is resident`  IS A BOOLEAN TYPICALLY TRUE
+
+@export Allowance for a claimant
+GIVEN c      IS A Claimant
+      period IS A STRING
+      status IS A Status TYPICALLY married
+      rate   IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+allowance c period status rate MEANS
+  IF c's `is resident` AND (c's `hours a week`) >= 20
+  THEN CONSIDER status
+         WHEN single THEN c's income
+         OTHERWISE (c's income) * rate
+  ELSE 0
+
+#EVAL allowance (Claimant WITH income IS 1000, `hours a week` IS 40, `is resident` IS TRUE) "2026-01" married 3  -- 3000
+#EVAL allowance (Claimant WITH income IS 1000, `hours a week` IS 40, `is resident` IS TRUE) "2026-01" single 3   -- 1000
+#EVAL allowance (Claimant WITH income IS 1000, `hours a week` IS 10, `is resident` IS TRUE) "2026-01" married 3  -- 0
