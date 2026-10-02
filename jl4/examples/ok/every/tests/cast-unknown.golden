@@ -1,0 +1,27 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+cast-unknown.l4:38:1-39:35:
+  I could not continue evaluating, because I needed to know the value of
+    u
+  but it is an assumed term.
+cast-unknown.l4:52:1-53:35:
+  PARTY Tenant OF "Bob" MUST Sign t WITHIN 13 HENCE `the join` LEST `the join fails`
+cast-unknown.l4:66:1-67:35:
+  I could not continue evaluating, because I needed to know the value of
+    u
+  but it is an assumed term.
+cast-unknown.l4:80:1-81:35:
+  FULFILLED
+cast-unknown.l4:94:1-95:47:
+  I could not continue evaluating, because I needed to know the value of
+    u
+  but it is an assumed term.
+cast-unknown.l4:108:1-109:35:
+  I could not continue evaluating, because I needed to know the value of
+    roll
+  but it is an assumed term.
+cast-unknown.l4:121:1-122:35:
+  I could not continue evaluating, because I needed to know the value of
+    rest
+  but it is an assumed term.

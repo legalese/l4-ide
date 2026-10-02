@@ -6,7 +6,11 @@
           applicantAge IS A NUMBER @nlg "the applicant's age"
           eligible IS A BOOLEAN @ref "Section 4(1)(a) of the Act"
 
-#EVAL age
+-- A section input is supplied where a rule that reads it is evaluated.
+GIVETH A NUMBER
+`age next year` MEANS age PLUS 1
+
+#EVAL `age next year` WITH age IS 41
 
 -- A literal percent sign or close bracket in an `@nlg` annotation is written
 -- with a backslash in front of it. Here the rate range `10%and%20` would

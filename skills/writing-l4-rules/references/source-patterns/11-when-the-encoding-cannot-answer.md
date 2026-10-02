@@ -666,7 +666,7 @@ a rule with an unsupplied section `GIVEN`**, and it is what keeps a file in the 
 
 The delegation is not scaffolding you delete later. It is the same split the statute makes: a test
 stated in general terms, and a Part that applies it to the person the Part is about. Both names are
-worth having, and when supply lands the second becomes callable as it stands.
+worth having, and the second is callable as it stands, by supplying the section `GIVEN` with `WITH`.
 
 **Not** a `#EVAL` or `#ASSERT` on the section-`GIVEN` rule **without a `WITH`**. Exit 1, and on a
 page under `doc/` it fails the docs harness.
