@@ -12,6 +12,7 @@ module ExportReadSetSpec (spec) where
 import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
@@ -196,6 +197,24 @@ spec = do
     -- change; `ok/typically-expression.l4` pins that it is no cycle.
     it "lists an input a default supplies for itself, as it does for a body" $ do
       exportParamNames suppliedDefault `shouldBe` Right ["base", "doubled"]
+
+    it "publishes an expression default as its source text, and a literal as its value" $ do
+      case exportSchema binderReadsBinder of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps -> do
+          fmap (.parameterDefault) (Map.lookup "discount" ps.parameterMap)
+            `shouldBe` Just (Just (Aeson.String "`list price` DIVIDED BY 10"))
+          ps.required `shouldBe` ["list price"]
+      case exportSchema (Text.unlines
+             [ "@export f"
+             , "GIVEN n IS A NUMBER TYPICALLY 3"
+             , "GIVETH A NUMBER"
+             , "f MEANS n"
+             ]) of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps ->
+          fmap (.parameterDefault) (Map.lookup "n" ps.parameterMap)
+            `shouldBe` Just (Just (Aeson.Number 3))
 
     it "reports a default that reads its own input as a check error" $ do
       let src = Text.unlines

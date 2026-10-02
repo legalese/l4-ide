@@ -731,6 +731,30 @@ spec = describe "integration" do
           (hard [listPrice 200, "unused flag" Aeson..= False])
         expectError refused "presumption is hard"
 
+    -- The published schema gives an expression default as source text
+    -- (IMPLICIT-PROPS-DESIGN §11.5), and still asks for the input it reads.
+    it "publishes a section input's expression default as its source text, and leaves it out of required (W7)" do
+      withServiceFromSources "ty-expr-schema" [("price.l4", expressionDefaultJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-expr-schema/functions/final%20price")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            props = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            defaultOf key = case Aeson.KeyMap.lookup key props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "discount" `shouldBe` Just (Aeson.String "`list price` DIVIDED BY 10")
+        required `shouldContain` ["list price"]
+        required `shouldNotContain` ["discount"]
+
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each
     -- case is a default that is NOT read (or a pair of which only one is), with a
