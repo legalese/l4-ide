@@ -103,7 +103,6 @@ import qualified Data.Time as Time
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
-import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
 import L4.Evaluate.Ledger
   ( EventRoute (..)
@@ -122,7 +121,7 @@ import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
-import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
+import L4.Print hiding (tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
@@ -7086,15 +7085,6 @@ parseDigits txt =
 ----------------------------------------------------------------------------
 -- Timezone utilities
 ----------------------------------------------------------------------------
-
--- | Try to load a TZ from the IANA database. Returns Nothing on failure.
-tryLoadTZ :: String -> IO (Maybe TZ.TZ)
-tryLoadTZ name =
-  (Just <$> TZ.loadTZFromDB name) `catch` \(_ :: SomeException) ->
-    -- Fall back to the embedded timezone database.  The system DB may be
-    -- unavailable when the LSP runs inside VS Code or other sandboxed
-    -- environments on macOS.
-    pure $ TZAll.tzByLabel <$> TZAll.fromTZName (TE.encodeUtf8 (Text.pack name))
 
 -- | Extract a timezone string from a TIMEZONE IS expression.
 -- Handles string literals directly and simple identifiers by peeking at thunks.

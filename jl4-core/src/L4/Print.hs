@@ -18,7 +18,7 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import qualified Data.Text.Encoding as TE
-import Control.Exception (SomeException, catch)
+import Control.Exception (IOException, catch)
 import qualified Optics
 import System.IO.Unsafe (unsafePerformIO)
 import Prettyprinter
@@ -1923,8 +1923,22 @@ tryLoadTZPure :: Text -> Maybe TZ.TZ
 tryLoadTZPure name = unsafePerformIO $ tryLoadTZ (Text.unpack name)
 {-# NOINLINE tryLoadTZPure #-}
 
+-- | Load a timezone by its IANA name; 'Nothing' if the name is unknown.
+--
+-- 'TZ.loadTZFromDB' reads the zone file from the data directory of the @tzdata@
+-- package: a path Cabal fixed when @tzdata@ was built (@tzdata_datadir@ overrides
+-- it), not the operating system's zoneinfo.
+-- When that directory is missing or unreadable, the open fails, and we use the
+-- copy of the same database compiled into the binary instead.
+--
+-- The handler catches 'IOException' and nothing wider, and that is load-bearing.
+-- The file is opened here and parsed later, when the zone is first used, so the
+-- open is the only thing in this scope that can fail.
+-- A 'SomeException' handler would also catch the asynchronous exception that
+-- 'System.Timeout.timeout' throws, once, to stop an evaluation (smucclaw/l4-ide#1001).
+-- That would be taken for a missing database and the evaluation would carry on
+-- with its timeout spent.
 tryLoadTZ :: String -> IO (Maybe TZ.TZ)
 tryLoadTZ name =
-  (Just <$> TZ.loadTZFromDB name) `catch` \(_ :: SomeException) ->
-    -- Fall back to the embedded timezone database when the system DB is unavailable.
+  (Just <$> TZ.loadTZFromDB name) `catch` \(_ :: IOException) ->
     pure $ TZAll.tzByLabel <$> TZAll.fromTZName (TE.encodeUtf8 (Text.pack name))
