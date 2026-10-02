@@ -94,6 +94,8 @@ Give each case an `@id` of your own, such as its row number, so that you can mat
 }
 ```
 
+The request must include `outcomes`; an empty list is fine, because every case comes back with the rule's whole answer.
+
 Each case comes back with its own answer, under its `@id`, in the order you sent them:
 
 ```json
