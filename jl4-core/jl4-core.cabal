@@ -276,6 +276,7 @@ test-suite jl4-core-test
     BlawxLiftSpec
     BlawxParseSpec
     ApiStateGraphLensSpec
+    TimezoneTimeoutSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
