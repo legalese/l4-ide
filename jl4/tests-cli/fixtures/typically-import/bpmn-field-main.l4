@@ -1,0 +1,12 @@
+IMPORT ratelib
+
+DECLARE Actor IS ONE OF Member
+DECLARE Action IS ONE OF pay
+
+GIVEN c IS A Config
+GIVETH A DEONTIC Actor Action
+`the duty` c MEANS
+    PARTY Member
+    MUST pay
+    PROVIDED c's timeout AT LEAST 10
+    WITHIN 14

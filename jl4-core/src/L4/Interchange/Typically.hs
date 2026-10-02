@@ -191,15 +191,21 @@ moduleLabel (MkModule _ uri _) =
   Text.pack (takeBaseName (Text.unpack (fromNormalizedUri uri).getUri))
 
 -- | The defaults a decision depends on: its own @GIVEN@s, the @GIVEN@s of every
--- rule it reaches by name, and every section @GIVEN@ and @ASSUME@ that its body
--- reads, directly or through anything it reaches. A backend that exports one
--- rule at a time (BPMN draws one process, and a @HENCE@ into another rule is
--- part of that process) reports on this, and not on the whole module, so a
--- default on an unrelated input does not appear in a note about this rule.
+-- rule it reaches by name, and every section @GIVEN@, @ASSUME@ and record field
+-- that its body reads, directly or through anything it reaches. A backend that
+-- exports one rule at a time (BPMN draws one process, and a @HENCE@ into another
+-- rule is part of that process) reports on this, and not on the whole module, so
+-- a default on an unrelated input does not appear in a note about this rule.
+--
+-- A record field counts when the body /names/ it (@s's field@, or @field OF s@,
+-- in this rule or any rule it reaches): that is the only way a condition can
+-- depend on it. The other fields of a record the rule is given are not reported,
+-- because nothing the process says reads them.
 --
 -- The first argument is the modules the checked one imports. An imported
--- @ASSUME@ the rule's body names (directly, or through a rule of this module) is
--- reported too; an imported rule's own @GIVEN@ is not (see 'importedDefaultSites').
+-- @ASSUME@ or record field the rule's body names (directly, or through a rule of
+-- this module) is reported too; an imported rule's own @GIVEN@ is not (see
+-- 'importedDefaultSites').
 decideDefaultSites :: [Module Resolved] -> Module Resolved -> Decide Resolved -> [DefaultSite]
 decideDefaultSites imports modul (MkDecide _ _ (MkAppForm _ self _ _) body) =
   [ s
@@ -208,12 +214,11 @@ decideDefaultSites imports modul (MkDecide _ _ (MkAppForm _ self _ _) body) =
       DefaultOnRuleGiven    -> maybe False (\o -> o == getUnique self || Set.member o readSet) s.ownerUnique
       DefaultOnSectionGiven -> Set.member s.unique readSet
       DefaultOnAssume       -> Set.member s.unique readSet
-      DefaultOnRecordField  -> False
+      DefaultOnRecordField  -> Set.member s.unique readSet
   ]
   <>
   [ s
   | s <- importedDefaultSites imports
-  , s.kind `elem` [DefaultOnSectionGiven, DefaultOnAssume]
   , Set.member s.unique readSet
   ]
  where

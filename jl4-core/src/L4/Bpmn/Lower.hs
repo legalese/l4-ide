@@ -74,7 +74,8 @@ import qualified Data.Set as Set
 import L4.Bpmn.IR
 import L4.Interchange.Fidelity
 import L4.Interchange.Typically
-  ( DefaultSite (..), classifyDefault, decideDefaultSites, describeDefault, describeSite )
+  ( DefaultKind (..), DefaultSite (..), classifyDefault, decideDefaultSites, describeDefault
+  , describeSite )
 import L4.StateGraph
 import L4.Syntax
   ( AppForm (..), Decide (..), DeonticModal (..), Module (..), Resolved, Section (..)
@@ -3605,7 +3606,7 @@ ncName raw =
 
 -- | The @P-TYPICALLY@ notes a process owes for the @TYPICALLY@ defaults its rule
 -- depends on: the rule's own @GIVEN@s, those of any rule it reaches, and the
--- section @GIVEN@s and @ASSUME@s it reads.
+-- section @GIVEN@s, @ASSUME@s and record fields it reads.
 --
 -- BPMN has no default for a process variable, and this exporter does not even
 -- carry the variable: a @PROVIDED@ condition becomes an opaque
@@ -3620,8 +3621,8 @@ ncName raw =
 -- binders that decide reads. A hand-built graph (no @sgDecide@) owes none.
 --
 -- The first argument is the modules the checked one imports: an imported
--- @ASSUME@ that the rule's condition names is read exactly as a local one is,
--- and its default is lost the same way.
+-- @ASSUME@ or record field that the rule's condition names is read exactly as a
+-- local one is, and its default is lost the same way.
 bpmnDefaultNotes :: [Module Resolved] -> Module Resolved -> StateGraph -> [FidelityNote]
 bpmnDefaultNotes imports modul sg = case sg.sgDecide of
   Nothing -> []
@@ -3633,8 +3634,11 @@ bpmnDefaultNotes imports modul sg = case sg.sgDecide of
         , range    = s.range
         , message  = describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
                        <> ", and BPMN has no default for a process variable: a condition that tests `"
-                       <> s.name <> "` reads whatever the process instance holds, so an instance that "
-                       <> "never set it does not get " <> describeDefault (classifyDefault s.value)
+                       <> s.name <> "` reads whatever the process instance holds, so an instance "
+                       <> (case (s.kind, s.owner) of
+                             (DefaultOnRecordField, Just r) -> "that holds a `" <> r <> "` without it"
+                             _                              -> "that never set it")
+                       <> " does not get " <> describeDefault (classifyDefault s.value)
         , lost     = "the presumption: the source says an unsupplied `" <> s.name
                        <> "` is " <> describeDefault (classifyDefault s.value)
                        <> ", and the process says nothing"
