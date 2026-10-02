@@ -1,0 +1,52 @@
+-- W8 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md): a default that took effect is an event
+-- in the trace, with the line it was declared at and the value it gave.
+--
+-- It is recorded where the default is first used, so a default nothing read
+-- leaves no event, and one that two rules read appears once, under the first.
+-- Supplying the value with WITH takes no default, so there is nothing to record.
+
+§ `Rates`
+    GIVEN `the rate`     IS A NUMBER  TYPICALLY 3
+          `has capacity` IS A BOOLEAN TYPICALLY TRUE
+          `the unused`   IS A NUMBER  TYPICALLY 7
+          `the venue`    IS A STRING  TYPICALLY "Singapore"
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+GIVETH A NUMBER
+tripled MEANS `the rate` TIMES 3
+
+GIVETH A NUMBER
+`both readers` MEANS doubled PLUS tripled
+
+GIVETH A BOOLEAN
+`can act` MEANS `has capacity` AND TRUE
+
+-- the default is never read: FALSE settles the AND without it
+GIVETH A BOOLEAN
+`never reads it` MEANS FALSE AND `has capacity`
+
+GIVETH A STRING
+`where it is held` MEANS `the venue`
+
+-- two defaults, read in this order
+GIVETH A NUMBER
+`rate if able` MEANS IF `has capacity` THEN `the rate` ELSE 0
+
+-- read below a function that is itself applied to an argument
+GIVETH A NUMBER
+`scaled by` n MEANS doubled TIMES n
+
+#EVALTRACE doubled
+#EVALTRACE doubled WITH `the rate` IS 5
+#EVALTRACE `both readers`
+#EVALTRACE `can act`
+#EVALTRACE `never reads it`
+#EVALTRACE `where it is held`
+#EVALTRACE `rate if able`
+#EVALTRACE `scaled by` 10
+
+-- a directive that is not a trace answers as before
+#EVAL doubled
+#ASSERT `rate if able` EQUALS 3

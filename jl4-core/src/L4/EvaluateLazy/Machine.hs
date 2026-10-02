@@ -14,6 +14,7 @@ module L4.EvaluateLazy.Machine
 , runEval
 , tryEval
 , traceEval
+, traceDefaultForce
 , raiseException
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
@@ -135,7 +136,7 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
-import L4.EvaluateLazy.Trace (EvalTraceAction (..))
+import L4.EvaluateLazy.Trace (EvalTraceAction (..), Presumed (..), PresumedOrigin (..), renderPresumedPath)
 import L4.Presumption
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
@@ -423,42 +424,6 @@ emptyPresumedLog = MkPresumedLog mempty Set.empty
 presumedEvents :: PresumedLog -> [Presumed]
 presumedEvents l = DList.toList l.events
 
--- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
--- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
--- rests on it.
---
--- Recorded when the default is FORCED, not when it is filled in: an input the
--- rule never reads did not shape the answer, and T6 lists only the defaults
--- that did. That is why the event is raised by 'evalRef' rather than at the
--- fill site, wherever the fill happened.
-data Presumed =
-  MkPresumed
-    { path       :: ![Text]
-      -- ^ Where the default landed: the input's name, then the field names
-      -- below it, with a list element written as its index.
-    , declaredAt :: !(Maybe SrcRange)
-      -- ^ The @TYPICALLY@ that supplied the value.
-    , origin     :: !PresumedOrigin
-    }
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass NFData
-
--- | Which fill site supplied a default. A consumer keeps only the events that
--- belong to its request (T6b): an L4 program may decode JSON of its own.
-data PresumedOrigin
-  = FromSectionBinder
-    -- ^ A section @GIVEN@'s default, filled at the root by 'L4.Discharge'.
-  | FromRootFill
-    -- ^ A default the caller filled at the root ('presumableDefs').
-  | FromRequest
-    -- ^ A field of the request's own decode ('EvalState.requestRecord'),
-    -- filled from its @DECLARE@, or a MAYBE there filled with NOTHING.
-  | FromDecode !Text
-    -- ^ A field of a decode the RULES made, filled the same way; the text is
-    -- the type that decode started from.
-  deriving stock (Eq, Ord, Show, Generic)
-  deriving anyclass NFData
-
 -- | Report a default that took effect ('EvalState.presumed'), once.
 tellPresumed :: Presumed -> Eval ()
 tellPresumed p = do
@@ -486,6 +451,26 @@ lookupPresumable rf = do
 
 addressNumber :: Address -> Int
 addressNumber (MkAddress _ i) = i
+
+-- | W8: if this reference is a default nobody has forced yet, record that in
+-- the trace, as the event 'TookDefault'. Called by the machine immediately
+-- before it records the force itself ('SetRef'), which is what puts the event
+-- in the trace of whatever needed the value (Note [Defaults in the trace]).
+--
+-- It only looks: the log ('notePresumedForce') is updated by 'evalRef' as
+-- the force happens, and both see the same registry and the same log, so the
+-- trace has an event for exactly the defaults the log lists. With tracing off
+-- this costs one read of the trace switch.
+traceDefaultForce :: Reference -> Eval ()
+traceDefaultForce rf = do
+  tracing <- isJust <$> asks (.evalTrace)
+  when tracing $
+    lookupPresumable rf >>= traverse_ \ p -> do
+      -- once per default, as in the log: a pinned copy of a default
+      -- ('snapshotRef') is another reference to the same one
+      l <- readEvalRef (.presumed)
+      unless ((p.path, p.origin) `Set.member` l.seen) $
+        traceEval (TookDefault p rf)
 
 -- | Called on every force ('evalRef'): if the reference is a default nobody
 -- has forced yet, report it. The map is empty for almost every run, and the
@@ -4896,17 +4881,6 @@ atField :: DecodeAt -> Text
 atField at
   | null at.fieldPath = ""
   | otherwise         = " for field '" <> renderPresumedPath at.fieldPath <> "'"
-
--- | A decode path as one string: field names joined with dots, a list index
--- written straight after its list (@people[0].age@).
-renderPresumedPath :: [Text] -> Text
-renderPresumedPath = Text.concat . go True
-  where
-    go _ [] = []
-    go atStart (s : ss)
-      | "[" `Text.isPrefixOf` s = s : go False ss
-      | atStart                 = s : go False ss
-      | otherwise               = "." : s : go False ss
 
 -- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
 -- a number, a string, or a nullary constructor. 'Nothing' for anything else,

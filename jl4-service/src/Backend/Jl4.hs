@@ -1940,9 +1940,12 @@ mkNormalName = NormalName
 
 buildReasoningTree :: Maybe EvalTrace -> Reasoning
 buildReasoningTree Nothing  = emptyReasoning
-buildReasoningTree (Just t) = traceToReasoning t
+buildReasoningTree (Just t) = traceToReasoning (withoutDefaultEvents t)
 
 traceToReasoning :: EvalTrace -> Reasoning
+-- 'buildReasoningTree' has removed the events of defaults (W8), so none is met
+-- here; one that is stands for the steps of the default it records.
+traceToReasoning (TraceDefault _ steps val) = traceToReasoning (Trace Nothing steps val)
 traceToReasoning (Trace lbl [] val) =
   Reasoning
     { exampleCode = labelExample lbl

@@ -278,6 +278,9 @@ runConfigStep = \ case
     next <- backward whnf
     runConfig next
   EvalRefMachine r -> do
+    -- W8: a default being forced for the first time is an event of its own,
+    -- and it comes before the force it belongs to, in the caller's trace
+    traceDefaultForce r
     traceEval (SetRef r)
     next <- evalRef r
     runConfig next
