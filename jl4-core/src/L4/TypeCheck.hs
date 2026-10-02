@@ -437,8 +437,9 @@ functionInputDefaults sigs = Map.fromList
   [ (getUnique r, defaults)
   | sig <- sigs
   , let MkTypeSig _ (MkGivenSig _ otns) _ = sig.rtysig
+        MkAppForm _ ownerRef _ _ = sig.rappForm
         defaults = Map.fromList
-          [ (getUnique n, MkInputDefault { binder = getOriginal n, declaredAt = rangeOf d, value = d })
+          [ (getUnique n, MkInputDefault { owner = getOriginal ownerRef, binder = getOriginal n, declaredAt = rangeOf d, value = d })
           | MkOptionallyTypedName _ n _ (Just d) <- otns
           ]
   , not (Map.null defaults)
@@ -767,7 +768,7 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
       | not (Map.null ds) -> Map.singleton (getUnique n) ds
       where
         ds = Map.fromList
-          [ (getUnique bn, MkInputDefault { binder = getOriginal bn, declaredAt = rangeOf d, value = d })
+          [ (getUnique bn, MkInputDefault { owner = getOriginal n, binder = getOriginal bn, declaredAt = rangeOf d, value = d })
           | MkOptionallyTypedName _ bn _ (Just d) <- otns
           ]
     Declare _ d -> recordInputDefaults d
@@ -775,7 +776,8 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
     _           -> Map.empty
   untyped d =
     MkInputDefault
-      { binder = d.binder
+      { owner = d.owner
+      , binder = d.binder
       , declaredAt = d.declaredAt
       , value = d.value & annoOf %~ \ a -> a { extra = a.extra { resolvedInfo = Nothing } }
       }
@@ -794,7 +796,7 @@ recordInputDefaults = \ case
     | not (Map.null ds) -> Map.singleton (getUnique con) ds
     where
       ds = Map.fromList
-        [ (getUnique fn, MkInputDefault { binder = getOriginal fn, declaredAt = rangeOf d, value = d })
+        [ (getUnique fn, MkInputDefault { owner = getOriginal con, binder = getOriginal fn, declaredAt = rangeOf d, value = d })
         | MkTypedName _ fn _ (Just d) _ <- tns
         ]
   _ -> Map.empty
@@ -4452,7 +4454,7 @@ supplyAppNamed  r onts [] = do
   defaults <- asks (Map.findWithDefault Map.empty (getUnique r) . (.visibleInputDefaults))
   let
     fillFor (i, MkOptionallyNamedType _ (Just n') _)
-      | Just d <- Map.lookup (getUnique n') defaults = Right (i, defaultNamedExpr r n' d)
+      | Just d <- Map.lookup (getUnique n') defaults = Right (i, defaultNamedExpr n' d)
     fillFor (_, ont) = Left ont
     (missing, fills) = partitionEithers (map fillFor onts)
   unless (null missing) $
@@ -4524,8 +4526,8 @@ findOptionallyNamedType n (ont : onts) = do
 -- site, and the node has the shape the generic exactprint and semantic-token
 -- traversals expect (a 'NamedExpr' holds two holes, one for the name and one
 -- for the value). 'DefaultFill', on the value, is what says it was added.
-defaultNamedExpr :: Resolved -> Resolved -> InputDefault -> NamedExpr Resolved
-defaultNamedExpr callee binderRef d =
+defaultNamedExpr :: Resolved -> InputDefault -> NamedExpr Resolved
+defaultNamedExpr binderRef d =
   MkNamedExpr
     (mkAnno [mkHoleWithSrcRangeHint Nothing, mkHoleWithSrcRangeHint Nothing])
     (Ref (MkName emptyAnno (rawName binderName)) (getUnique binderRef) binderName)
@@ -4533,7 +4535,7 @@ defaultNamedExpr callee binderRef d =
  where
   binderName = getOriginal binderRef
   fill = MkDefaultFill
-    { owner      = rawName (getOriginal callee)
+    { owner      = rawName d.owner
     , binder     = rawName binderName
     , declaredAt = d.declaredAt
     }

@@ -183,6 +183,12 @@ batchTyCtors, batchTyCtorsJson :: FilePath
 batchTyCtors     = fixtureDir </> "batch-typically-named-constructors.l4"
 batchTyCtorsJson = fixtureDir </> "batch-typically-named-constructors.json"
 
+-- | The name @presumed@ gives a default taken at a named site: the rule's own,
+-- as declared, whatever the site called it.
+batchTyLabels, batchTyLabelsJson :: FilePath
+batchTyLabels     = fixtureDir </> "batch-typically-named-labels.l4"
+batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -348,7 +354,7 @@ coreFixtures =
   , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
-  , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson
+  , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
@@ -1618,6 +1624,21 @@ spec bin = do
       rows `shouldBe`
         [ (Just (Bool True), presumedOf [])
         , (Just (Bool True), presumedOf [])
+        ]
+
+  -- Review m1, 2026-10-03: the entry named the rule by whatever the callee's
+  -- resolved name carried, so an AKA alias, the section a rule is declared in
+  -- and a mixfix rule's canonical pattern all leaked into it, and none of the
+  -- documentation's examples (`WITH scaled: rate`) matched a client's parse.
+  describe "l4 batch: a default taken at a named site is listed under the rule's own name" $ do
+    it "names the rule and the record as declared: not an alias, not a section path, not a mixfix pattern" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyLabels, "--inputs", batchTyLabelsJson, "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ ( Just (Number 140)
+          , presumedOf ["WITH scaled: rate", "WITH scaled by: factor", "WITH Config: timeout"] )
         ]
 
   describe "l4 trace (output path safety)" $ do

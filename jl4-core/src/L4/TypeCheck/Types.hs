@@ -934,7 +934,13 @@ lookupByCanonicalName cn reg = fromMaybe [] $ Map.lookup cn reg.byCanonicalName
 -- | The @TYPICALLY@ default of one rule input or record field, as the checker
 -- keeps it for the sites that leave it out.
 data InputDefault = MkInputDefault
-  { binder     :: !Name
+  { owner      :: !Name
+    -- ^ The rule or record constructor that declares the input or field, named
+    -- as its declaration writes it: not an @AKA@ alias, not section-qualified,
+    -- and a mixfix rule by the name it is declared with. This is the name the
+    -- evaluator's report gives for the default ('L4.Syntax.DefaultFill'), so it
+    -- must not depend on how a site spelled the callee.
+  , binder     :: !Name
     -- ^ The input or field, as declared.
   , declaredAt :: !(Maybe SrcRange)
     -- ^ The @TYPICALLY@ that gave the value.
