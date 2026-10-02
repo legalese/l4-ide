@@ -14,6 +14,7 @@ module L4.OpenFisca.IR
   , OFRole (..)
   , OFEntity (..)
   , OFVariable (..)
+  , OFDefault (..)
   , OFExpr (..)
   , OFBinOp (..)
   , OFCmpOp (..)
@@ -27,7 +28,8 @@ module L4.OpenFisca.IR
 import Base
 
 -- | OpenFisca @value_type@s. @OFEnum class default@ carries the Python enum
--- class name and its default member (for @default_value@).
+-- class name and its default member (for @default_value@): the first declared
+-- member, unless the source wrote @TYPICALLY <member>@ on the input.
 data OFType = OFFloat | OFInt | OFBool | OFStr | OFEnum Text Text
   deriving stock (Eq, Show, Generic)
 
@@ -76,7 +78,24 @@ data OFVariable = OFVariable
   , varLabel   :: !Text
   , varFormula :: !(Maybe OFExpr)        -- ^ the undated @formula@; Nothing = input variable
   , varDated   :: ![(Text, OFExpr)]      -- ^ dated @formula_YYYY_MM@ overrides (ISO date → body)
+  , varDefault :: !(Maybe OFDefault)
+    -- ^ the @default_value@ an input variable takes when a simulation leaves it
+    -- out, from the source's @TYPICALLY@. @Nothing@ means OpenFisca's own default
+    -- for the type (@0.0@, @False@, @''@), which is what an input with no
+    -- @TYPICALLY@ has always got. An enum's default is carried in 'OFEnum', not
+    -- here.
+    --
+    -- OpenFisca has a default for every variable, so this is not optional
+    -- politeness: leaving a @TYPICALLY 3@ out writes @0.0@, which asserts a
+    -- different presumption (TYPICALLY-ONE-BEHAVIOUR-SPEC T5).
   }
+  deriving stock (Eq, Show, Generic)
+
+-- | A literal @default_value@ for a scalar input variable.
+data OFDefault
+  = OFDefNum  Rational
+  | OFDefBool Bool
+  | OFDefStr  Text
   deriving stock (Eq, Show, Generic)
 
 data OFBinOp = OFAdd | OFSub | OFMul | OFDiv | OFMod

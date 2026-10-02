@@ -25,6 +25,9 @@ arithmetic, recursion, and general function application.
 - `flat-tax.l4` — the OpenFisca textbook example (`flat_tax_on_salary`).
 - `benefit.l4` — a means-tested benefit: comparisons, `IF/THEN/ELSE`, a boolean
   decision, and one decision calling another.
+- `defaults.l4` — `TYPICALLY` on record fields and a rule's `GIVEN`, written out as
+  each input variable's `default_value` (`roundtrip_check.py … defaults` shows an
+  omitted input taking the source's default, and a supplied one overriding it).
 - `expected/*.py` — committed golden output (pinned by the `l4 export openfisca`
   cases in `jl4/tests-cli/Main.hs`).
 - `roundtrip_check.py` — runs the generated module in real OpenFisca and asserts

@@ -1,0 +1,16 @@
+-- Two exported decisions read an input called `rate` and give it different
+-- TYPICALLY defaults. OpenFisca has one variable of that name and so one
+-- default for it, and picking either would make the other decision wrong, so
+-- the export refuses and names both.
+
+@export Scaled amount
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+scaled base rate MEANS base * rate
+
+@export Capped amount
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY 5
+GIVETH A NUMBER
+capped base rate MEANS (base * rate) - 1

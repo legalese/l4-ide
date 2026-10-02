@@ -82,6 +82,27 @@ def main():
             print(f"  {occ} sz={sz} {var} = {got}  (L4 expected {exp})  "
                   f"{'OK' if ok else '*** MISMATCH ***'}")
             assert ok, got
+    elif which == "defaults":
+        # TYPICALLY -> default_value. An input the simulation leaves out takes the
+        # default the L4 source states (rate 3, status married, 40 hours, resident),
+        # not OpenFisca's own (0.0, the first enum member, 0.0, False); a supplied
+        # input overrides it. The first case is the one that is wrong without the
+        # mapping: 0.0 * income would be 0, and `single` would give 1000.
+        def claimant(**given):
+            return {"claimant": {k: {"2026-01": v} for k, v in {"income": 1000, **given}.items()}}
+        for label, given, exp in [
+                ("all defaults",           {},                    3000.0),
+                ("status supplied",        {"status": "single"},  1000.0),
+                ("rate supplied",          {"rate": 2},           2000.0),
+                ("hours supplied (10)",    {"hours_a_week": 10},  0.0),
+                ("not resident",           {"is_resident": False}, 0.0)]:
+            sim = SimulationBuilder().build_from_entities(
+                tbs, {"claimants": claimant(**given)})
+            got = float(sim.calculate("allowance", "2026-01")[0])
+            ok = abs(got - exp) < 1e-6
+            print(f"  {label}: allowance = {got}  (L4 expected {exp})  "
+                  f"{'OK' if ok else '*** MISMATCH ***'}")
+            assert ok, (label, got)
     elif which == "agecheck":
         def hh(members):
             return {"persons": {p: {"birth_year": {"2026-01": by}} for p, by in members},
