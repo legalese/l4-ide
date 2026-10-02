@@ -1900,6 +1900,87 @@ spec = describe "integration" do
         statusCode' bound `shouldBe` 200
         lookupKey "determined" (decodeObject (responseBody bound)) `shouldBe` Just (Aeson.Bool False)
 
+  describe "a TYPICALLY default in the reasoning tree (W8 of TYPICALLY-ONE-BEHAVIOUR-SPEC)" do
+    let uncertain = Aeson.object []
+        args kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs]
+        traced deployId fnName body = \baseUrl mgr -> do
+          req <- buildJsonPost
+            (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/evaluation?trace=full")
+            body
+          httpLbs req mgr
+        -- every node of the tree
+        nodes :: Reasoning -> [Reasoning]
+        nodes r = r : concatMap nodes r.children
+        -- the nodes that say a default took effect, as (code, what it says, its value)
+        events :: ResponseWithReason -> [(Text, Text, Text)]
+        events r =
+          [ (code, said, result)
+          | n <- nodes r.reasoning
+          , said : result : _ <- [n.explanation]
+          , "took its default" `Text.isInfixOf` said
+          , code <- take 1 n.exampleCode
+          ]
+        -- what the tree and the presumed list each say, which must be the same
+        -- defaults: the trace has an event for exactly those the answer rests on
+        agrees r = List.sort [code | (code, _, _) <- events r] `shouldBe` List.sort r.presumed
+        whenTraced check resp = assertSuccess resp \r -> check r >> agrees r
+
+    it "shows a section default on the direct path, with its value and where it was declared" do
+      withServiceFromSources "w8-sec" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-sec" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced
+          (\r -> case events r of
+              [(code, said, result)] -> do
+                code `shouldBe` "has capacity"
+                said `shouldSatisfy` Text.isPrefixOf "has capacity took its default (declared at "
+                result `shouldBe` "Result: TRUE"
+              other -> expectationFailure ("expected one event, got " <> show other))
+          resp
+
+    it "shows it on the wrapper path too, under the input's own name" do
+      withServiceFromSources "w8-sec-wrap" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-sec-wrap" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced
+          (\r -> map (\(code, _, _) -> code) (events r) `shouldBe` ["has capacity"])
+          resp
+
+    it "shows a rule GIVEN's default, which the service filled at the root, on both paths" do
+      withServiceFromSources "w8-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- traced "w8-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> map (\(code, _, _) -> code) (events r) `shouldBe` ["has capacity"]) direct
+        wrapped <- traced "w8-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> map (\(code, _, _) -> code) (events r) `shouldBe` ["has capacity"]) wrapped
+
+    it "shows the fields of a record the request left out, by their path" do
+      withServiceFromSources "w8-record" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-record" "budget" (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]]) baseUrl mgr
+        whenTraced
+          (\r -> List.sort [code | (code, _, _) <- events r] `shouldBe` ["cfg.colour", "cfg.timeout", "shade"])
+          resp
+
+    -- the positive controls: no default taken, none read, none shown
+    it "shows nothing for a default the rule never read, or one the request supplied" do
+      -- `is adult AND has capacity`: FALSE settles it before the default is read
+      withServiceFromSources "w8-none" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        unread <- traced "w8-none" "may contract" (args ["is adult" Aeson..= False, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> events r `shouldBe` []) unread
+        unreadWrapped <- traced "w8-none" "may contract" (args ["is adult" Aeson..= False, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> events r `shouldBe` []) unreadWrapped
+        -- and the same rule does show it, when it is read
+        read' <- traced "w8-none" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> length (events r) `shouldBe` 1) read'
+        supplied <- traced "w8-none" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> events r `shouldBe` []) supplied
+
+    it "leaves the reasoning empty when no trace was asked for, and says presumed all the same" do
+      withServiceFromSources "w8-quiet" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w8-quiet" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        assertSuccess resp \r -> do
+          isEmptyReasoning r.reasoning `shouldBe` True
+          r.presumed `shouldBe` ["has capacity"]
+
   describe "evaluation with trace" do
     it "includes reasoning when trace=full" do
       withServiceFromSources "trace-full" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
