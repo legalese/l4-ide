@@ -4116,30 +4116,34 @@ patternMatchFailure = withPoppedFrame $ \ case
 -- in the 'PatApp1' and 'PatCons1' frames between here and the handler.
 --
 -- Under a @CONSIDER@ (and so a record selector) the match still fails, as it
--- always has; UNKNOWN-EVALUATION-SPEC §8 step 1 widens 'unknownIsStuck' to
--- that handler too.
+-- always has: 'metUnknownHandled' says which handlers raise, and the
+-- refinement ('anyKnownClash') does not depend on which handler it is.
 patternMetUnknown :: Resolved -> Machine Config
 patternMetUnknown r = do
   stack <- liftIO . readIORef =<< asks (.stack)
   -- the handler is the frame 'patternMatchFailure' would unwind to
-  let (pending, handler) = break isMatchHandler stack.frames
-  if unknownIsStuck handler
-    then do
+  case break isMatchHandler stack.frames of
+    (pending, handler : _) | metUnknownHandled handler -> do
       clash <- anyKnownClash (concatMap pendingPositions pending)
       if clash then patternMatchFailure else stuckOnAssumed r
-    else patternMatchFailure
+    _ -> patternMatchFailure
   where
     isMatchHandler = \ case
       ConsiderWhen1{}              -> True
       ContractFrame (Contract11 _) -> True
       _                            -> False
-    unknownIsStuck = \ case
-      ContractFrame (Contract11 _) : _ -> True
-      _                                -> False
     pendingPositions = \ case
       PatApp1 _ _ rps -> rps
       PatCons1 rf _ p -> [(rf, p)]
       _               -> []
+
+-- | The handlers under which an unknown met by a pattern is Stuck rather than
+-- a failed match: the regulative action matcher only, today.
+-- UNKNOWN-EVALUATION-SPEC §8 step 1 widens this to 'ConsiderWhen1'.
+metUnknownHandled :: Frame -> Bool
+metUnknownHandled = \ case
+  ContractFrame (Contract11 _) -> True
+  _                            -> False
 
 -- | Whether some cell is already KNOWN to fail its pattern. Cells are read,
 -- never forced: a check made only so that a mismatch stays a mismatch must
