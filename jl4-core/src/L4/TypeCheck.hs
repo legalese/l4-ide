@@ -4567,7 +4567,13 @@ defaultValueAt fill = \ case
     Def u n        -> Def u (blank n)
     Ref n u o      -> Ref (blank n) u o
     OutOfScope u n -> OutOfScope u (blank n)
-  blank (MkName _ raw) = MkName emptyAnno raw
+  -- No source range and no tokens, but the name's RESOLVED INFO stays: it is
+  -- what says the name is a constructor ('L4.Dmn.Lower.isConstructorKind'), and
+  -- a consumer that renders a name by that fact (DMN's rule rows quote a string
+  -- and leave a constructor bare) read an enum default as a variable that does
+  -- not exist, so Camunda evaluated the field to null and reported success
+  -- (review R-M1, 2026-10-03).
+  blank (MkName a raw) = MkName (emptyAnno & annInfo %~ const (a ^. annInfo)) raw
 
 checkBranch :: ExpectationContext -> Expr Resolved -> Type' Resolved -> Type' Resolved -> Branch Name -> Check (Branch Resolved)
 checkBranch ec scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
