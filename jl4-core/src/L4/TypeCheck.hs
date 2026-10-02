@@ -118,7 +118,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectTypicallyOnComputedFields, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -184,6 +184,14 @@ doCheckProgramWithDependencies checkState checkEnv program =
   let cycleErrors =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
+        ]
+        ++
+        -- T1 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md): a field with a MEANS clause is
+        -- derived, so a TYPICALLY on it is never used. It used to be accepted
+        -- as inert metadata; now that every other TYPICALLY is a default a
+        -- construction takes, the one that cannot be is an error.
+        [ MkCheckErrorWithContext (TypicallyOnComputedField fld) None
+        | fld <- detectTypicallyOnComputedFields program
         ]
         ++
         [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
@@ -1874,12 +1882,20 @@ typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emp
 -- The checked default is kept where a site that leaves the binder out reads it
 -- ('functionInputDefaults', 'recordInputDefaults') and where discharge and the
 -- JSON decoders do (TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+--
+-- A default naming something that is not in scope is reported once, as that:
+-- 'OutOfScope' is no literal, and saying so as well was a second, misleading
+-- error about a name the first one had already explained (p10 of the spec).
 checkTypically :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
 checkTypically n ty = traverse $ \ e -> do
   re <- checkExpr (ExpectTypicallyValueContext n) e ty
   literal <- isTypicallyLiteral re
-  unless literal $ addError (TypicallyValueNotALiteral n)
+  unless (literal || unresolved re) $ addError (TypicallyValueNotALiteral n)
   pure re
+ where
+  unresolved = \ case
+    App _ OutOfScope {} _ -> True
+    _                     -> False
 
 -- | TYPICALLY values must be literals (compile-time constants): number or
 -- string literals, or nullary constructors (TRUE, FALSE, NOTHING, enum
@@ -7099,6 +7115,11 @@ prettyCheckError (TypicallyValueNotALiteral n) =
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."
   , "Add a type annotation (for example IS A NUMBER) so the default can be type-checked."
+  ]
+prettyCheckError (TypicallyOnComputedField n) =
+  [ quotedName n <> " is a computed field (it has a MEANS clause), so its value always comes"
+  , "from the MEANS expression and a TYPICALLY default would never be used."
+  , "Remove the TYPICALLY, or make the field a stored one by removing the MEANS."
   ]
 prettyCheckError (TypicallyOnTypeVariable n) =
   [ quotedName n <> " is a type, which cannot carry a TYPICALLY default value."
