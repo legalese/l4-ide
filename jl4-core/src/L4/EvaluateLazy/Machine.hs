@@ -377,8 +377,17 @@ data EvalState =
 -- so that a repeat is dropped without rescanning the list.
 data PresumedLog = MkPresumedLog
   { events :: !(DList Presumed)
-  , seen   :: !(Set ([Text], PresumedOrigin))
+  , seen   :: !(Set PresumedKey)
   }
+
+-- | What makes two events the same default: where it landed, which fill site
+-- supplied it, and the @TYPICALLY@ it came from. The last matters when two
+-- sections each declare an input of one name with a default of their own: they
+-- are two defaults, each an event, though 'path' names them alike.
+type PresumedKey = ([Text], PresumedOrigin, Maybe SrcRange)
+
+presumedKey :: Presumed -> PresumedKey
+presumedKey p = (p.path, p.origin, p.declaredAt)
 
 emptyPresumedLog :: PresumedLog
 emptyPresumedLog = MkPresumedLog mempty Set.empty
@@ -391,7 +400,7 @@ tellPresumed :: Presumed -> Eval ()
 tellPresumed p = do
   psRef <- asks (.presumed)
   liftIO $ modifyIORef' psRef \ l ->
-    let key = (p.path, p.origin)
+    let key = presumedKey p
     in if key `Set.member` l.seen
          then l
          else MkPresumedLog (l.events `DList.snoc` p) (Set.insert key l.seen)
@@ -431,7 +440,7 @@ traceDefaultForce rf = do
       -- once per default, as in the log: a pinned copy of a default
       -- ('snapshotRef') is another reference to the same one
       l <- readEvalRef (.presumed)
-      unless ((p.path, p.origin) `Set.member` l.seen) $
+      unless (presumedKey p `Set.member` l.seen) $
         traceEval (TookDefault p rf)
 
 -- | Called on every force ('evalRef'): if the reference is a default nobody

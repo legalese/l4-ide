@@ -105,11 +105,11 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
               , Exit (Right (ValNumber 6)), Pop ]
     eventsOf t `shouldBe` [(["the rate"], 0)]
 
-  it "drops an event that is the first thing in a list, rather than fail" $ do
+  it "hangs an event that is the first thing in a list on the main expression, rather than drop it or fail" $ do
     r <- numberRef 1 3
     let t = postprocessTrace
               [ TookDefault theRate r, Enter (number 2), Exit (Right (ValNumber 2)), Pop ]
-    eventsOf t `shouldBe` []
+    eventsOf t `shouldBe` [(["the rate"], 0)]
 
   it "hangs a default first used while the result is written out on the expression that built it" $ do
     -- after the main expression has finished, with no frame open: the usual
@@ -135,14 +135,50 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
     t <- safePostprocessTrace (main <> late)
     map fst (eventsOf t) `shouldBe` [["the rate"], ["the limit"]]
 
-  it "leaves the actions alone when there is nothing late, or the main expression ends another way" $ do
-    r <- numberRef 1 3
-    let usual = [ Enter (number 2), TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
-        oddMain = [ Enter (number 2), Push, Exit (Right (ValNumber 3)), Pop, Pop
-                  , TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
-        same xs = debugEvalTraceActions (hoistLateDefaults xs) `shouldBe` debugEvalTraceActions xs
-    same usual
-    same oddMain
+  -- A rule that runs while the result is written out, as in @JUST (rule ...)@:
+  -- the thunk it is run from is a placeholder in the main trace, so the trace
+  -- of that run is shown, and the event belongs in it, under the step that
+  -- read the value. The actions are those of the machine: the thunk is forced
+  -- from an empty stack ('SetRef', its update frame's 'Push', the read, the
+  -- 'Pop' of that frame, then the 'Exit' and 'Pop' that end the force).
+  let lateThunk r d =
+        [ SetRef r, Push, Enter (number 6), TookDefault theRate d, SetRef d
+        , Exit (Right (ValNumber 3)), Pop, Exit (Right (ValNumber 3)), Pop ]
+
+  it "keeps an event in the trace of the run that read it, when that run came late (review F1)" $ do
+    thunk <- numberRef 1 6
+    dflt <- numberRef 2 3
+    let main = [ Enter (number 2), Alloc (number 6) thunk, Exit (Right (ValNumber 2)), Pop ]
+    t <- safePostprocessTrace (main <> lateThunk thunk dflt)
+    eventsOf t `shouldBe` [(["the rate"], 0)]
+    -- under the thunk's own step, not beside the main expression's
+    case t of
+      Trace _ [(_, [Trace _ [(_, [TraceDefault p [] _])] _])] _ -> p `shouldBe` theRate
+      other -> expectationFailure ("the event is not in the trace of the run: " <> show other)
+
+  it "hangs on the main expression an event whose run the trace does not show" $ do
+    -- the same late run, with nothing in the main trace that stands for it: a
+    -- read inside a definition with no inputs looks like this
+    thunk <- numberRef 1 6
+    dflt <- numberRef 2 3
+    let main = [ Enter (number 2), Exit (Right (ValNumber 2)), Pop ]
+    t <- safePostprocessTrace (main <> lateThunk thunk dflt)
+    case t of
+      Trace _ [(_, [TraceDefault p [] (Right (MkNF (ValNumber 3)))])] _ -> p `shouldBe` theRate
+      other -> expectationFailure ("unexpected trace: " <> show other)
+
+  it "shows the event at each place that shows the run, and hangs no further copy" $ do
+    -- one placeholder referenced from two places: zonking inlines the run at
+    -- both, as for any shared thunk, so the event is in both and none is
+    -- hung on the main expression as well
+    thunk <- numberRef 1 6
+    dflt <- numberRef 2 3
+    let main = [ Enter (number 2), Alloc (number 6) thunk, Alloc (number 6) thunk, Exit (Right (ValNumber 2)), Pop ]
+    t <- safePostprocessTrace (main <> lateThunk thunk dflt)
+    map fst (eventsOf t) `shouldBe` [["the rate"], ["the rate"]]
+    case t of
+      Trace _ [(_, [Trace _ [(_, [TraceDefault {}])] _, Trace _ [(_, [TraceDefault {}])] _])] _ -> pure ()
+      other -> expectationFailure ("unexpected trace: " <> show other)
 
   it "keeps what a computed default did, and drops the steps of a plain value" $ do
     r <- numberRef 1 8
