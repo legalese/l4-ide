@@ -444,8 +444,19 @@ functionInputDefaults sigs = Map.fromList
           | MkOptionallyTypedName _ n _ (Just d) <- otns
           ]
   , not (Map.null defaults)
+  , not (isAssumed sig)
   , r <- sig.name.names
   ]
+ where
+  -- A written ASSUME is not a rule with a body: its inputs' TYPICALLY stays
+  -- metadata until W6 (deferred, TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4), and
+  -- 'moduleInputDefaults', which carries a module's defaults to its importers,
+  -- reads Decides only. Reading them here made the same named site check in
+  -- the file that declares the ASSUME and fail across an IMPORT of it (review
+  -- silent M3, 2026-10-03). Both now leave it as it was before W4.
+  isAssumed sig = case sig.anno ^. annInfo of
+    Just (TypeInfo _ (Just Assumed)) -> True
+    _                                -> False
 
 withExtraMixfix :: MixfixRegistry -> Check a -> Check a
 withExtraMixfix mixfixAdds =
