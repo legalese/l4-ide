@@ -10,6 +10,7 @@ module Logging (
 ) where
 
 import Control.Concurrent.MVar (MVar, newMVar, withMVar)
+import Control.Exception (evaluate)
 import Data.Aeson (Value, encode, object, (.=))
 import qualified Data.Aeson.Key as Key
 import qualified Data.ByteString as BS
@@ -71,7 +72,10 @@ logMsg level logger msg fields
             , "level" .= levelText level
             , "msg" .= msg
             ] <> [(Key.fromText k, v) | (k, v) <- fields]
-          line = LBS.toStrict (encode entry <> "\n")
+      -- Encode before taking the lock, so that threads encode in parallel and
+      -- only the write is one at a time. A strict ByteString in WHNF is the
+      -- whole line.
+      line <- evaluate (LBS.toStrict (encode entry <> "\n"))
       -- One write per line, under the lock. A lazy 'LBS.hPut' writes each
       -- chunk separately, and the newline is a chunk of its own, so on more
       -- than one core two threads' lines came out joined as @}{@ (144 of the
