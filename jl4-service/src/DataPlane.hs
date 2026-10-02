@@ -35,7 +35,7 @@ import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
-import Control.Concurrent.QSem (signalQSem, waitQSem)
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (bracket_, evaluate)
 import Control.Monad.IO.Class (liftIO)
@@ -315,8 +315,21 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- limit it hit: it does not take the other cases' answers down with it.
   let limitHitCase (hit, allocBytes) =
         (SimpleError (EvaluatorLimited hit (limitHitMessage env.options hit)), allocBytes)
+
+  -- In front of the shared slots, each request has a bound of its own, as
+  -- many units as there are shared slots, so that a request never has more
+  -- than that many cases waiting for a shared slot. Without it, every case of
+  -- a big batch queued at once, and a one-case batch from another client sent
+  -- 0.5 s later waited for the whole big batch: 11.5 s, against 0.1 s before
+  -- the slots were shared (-N2, 12 slow cases, 2026-10-03). This depends on
+  -- base's QSem granting a released unit to the oldest waiter ("guaranteed
+  -- FIFO ordering for satisfying blocked waitQSem calls"): the small batch's
+  -- case is then next in line. Do not swap in an STM TSem, which wakes every
+  -- waiter and lets any of them take the unit, so a big batch can keep it.
+  local <- liftIO $ newQSem env.batchSlots.count
   evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase ->
-    bracket_ (waitQSem env.batchSlots) (signalQSem env.batchSlots) do
+    bracket_ (waitQSem local) (signalQSem local) $
+    bracket_ (waitQSem env.batchSlots.shared) (signalQSem env.batchSlots.shared) do
       let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
       r <- runAppM env (runEvaluatorForDirectLimited vf Nothing args outputFilter traceLevel includeGraphViz
                           (Maybe.fromMaybe PresumeSoft batchArgs.presumption))

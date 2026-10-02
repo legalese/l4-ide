@@ -325,12 +325,14 @@ A case with `@error` and no `@limit` will fail the same way again.
 The cases run concurrently, but no more batch cases run at once, counting every batch in flight, than the service has cores (its capabilities, `+RTS -N`; see [CLI Options](#cli-options)).
 A case's clock starts when the case starts running, not when its batch arrives, so waiting behind other cases, of its own batch or another, does not count against it.
 So neither the size of a batch nor the number of batches sent at once decides whether a case meets the time limit: each case has to meet it on its own.
+Each request has at most as many cases waiting for a slot as there are slots, and a freed slot goes to the case that has waited longest, so the requests take turns.
+A small batch sent behind a big one therefore waits about one case-time for each request ahead of it, not for the whole of the big batch, and `--max-concurrent-requests` bounds how many requests can be ahead: measured on 2026-10-03 at `+RTS -N2`, a one-case batch sent 0.5 s after a batch of twelve 2-second cases answered in 1.5 s.
 Single evaluations and MCP calls do not wait for a batch slot, so the ones running at the same time as batch cases still share the cores with them.
 On one core the whole batch takes as long as its cases take together, and more cores shorten it: measured on 2026-10-02 on a machine busy with other work, 100 cases of 0.19 s each took 15.7 s on one core and 4.0 to 5.5 s on ten.
 
 #### What a batch can cost
 
-A batch whose cases all run to the time limit takes about ⌈cases ÷ cores⌉ × `--eval-timeout`, and longer while other batches are in flight, since every batch case takes its slot from the same set.
+A batch whose cases all run to the time limit takes about ⌈cases ÷ cores⌉ × `--eval-timeout`, and longer while other batches are in flight, since the requests take turns at the same slots.
 The service sets no limit on the number of cases in a batch.
 It also goes on working through a batch after the client has disconnected: measured on 2026-10-02 at `+RTS -N4`, 24 cases that each ran to a 2-second limit kept more than three cores busy for about 12 s, although the client gave up after 6 s.
 

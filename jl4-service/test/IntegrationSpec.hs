@@ -17,7 +17,7 @@ import Logging (newLogger)
 import Options (Options (..))
 import Types
 
-import Control.Concurrent.Async (forConcurrently)
+import Control.Concurrent.Async (concurrently, forConcurrently)
 import Control.Monad (forM_, guard, unless)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
@@ -995,6 +995,29 @@ spec = describe "integration" do
           resps <- forConcurrently [1 .. 10 :: Int] \_ ->
             postSpinBatch baseUrl mgr "spin-shared" [spinFifth]
           mapM_ (\resp -> expectBatchOutcomes resp [CaseAnswered]) resps
+
+      it "runs a one-case batch sent just behind a big batch next, not after it" do
+        -- Each request queues at most as many cases for the shared slots as
+        -- there are slots (here one), and a freed slot goes to the oldest
+        -- waiter, so the small batch's case runs as soon as the big batch's
+        -- current case is done. With every case of the big batch queued at
+        -- once, the small batch waited behind most of them: 4 to 6 s here,
+        -- against about one case-time with the bound. The case-time is
+        -- measured, as the big batch's time over its eight cases, so that the
+        -- test does not depend on how fast the machine is.
+        withServiceFromSourcesOpts spinOptions "spin-hol" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          bigStarted <- getCurrentTime
+          (bigDone, (smallResp, smallSent, smallDone)) <- concurrently
+            (postSpinBatch baseUrl mgr "spin-hol" (replicate 8 spinFifth) >> getCurrentTime)
+            ( do
+                threadDelay 300_000
+                sent <- getCurrentTime
+                resp <- postSpinBatch baseUrl mgr "spin-hol" [1_000]
+                done <- getCurrentTime
+                pure (resp, sent, done) )
+          expectBatchOutcomes smallResp [CaseAnswered]
+          let caseTime = diffUTCTime bigDone bigStarted / 8
+          diffUTCTime smallDone smallSent `shouldSatisfy` (< 2 * caseTime)
 
     -- Production runs one capability per core (-N), so a batch runs that many
     -- cases at once. At two, the forty cases still each meet the limit alone.

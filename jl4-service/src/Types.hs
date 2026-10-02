@@ -32,6 +32,7 @@ module Types (
   TaskState (..),
   -- * Environment
   AppEnv (..),
+  BatchSlots (..),
   newBatchSlots,
   AppM,
 ) where
@@ -659,19 +660,29 @@ data AppEnv = MkAppEnv
   -- naturally pin to whichever instance has that deployment loaded
   -- because the auth proxy already routes deployment-scoped MCP traffic
   -- with affinity.
-  , batchSlots         :: QSem
-  -- ^ How many batch cases may run at once, across every batch in flight:
-  -- one per capability ('newBatchSlots'). A case holds a slot while it
-  -- runs, and its clock starts once it has one. Shared by the whole
-  -- process, not made per request: with one set per request, four batches
-  -- of two cases on two cores ran eight cases at once, and every case ran
-  -- past a limit it met alone (2026-10-02). Single evaluations and MCP
-  -- calls do not take a slot, so they never queue behind a batch.
+  , batchSlots         :: BatchSlots
+  -- ^ How many batch cases may run at once, across every batch in flight.
   }
 
--- | One batch slot per capability.
-newBatchSlots :: IO QSem
-newBatchSlots = newQSem =<< getNumCapabilities
+-- | The batch slots: one per capability ('newBatchSlots'), shared by every
+-- batch case of every request. A case holds a slot while it runs, and its
+-- clock starts once it has one. Shared by the whole process, not made per
+-- request: with one set per request, four batches of two cases on two cores
+-- ran eight cases at once, and every case ran past a limit it met alone
+-- (2026-10-02). Single evaluations and MCP calls do not take a slot, so they
+-- never queue behind a batch.
+data BatchSlots = BatchSlots
+  { shared :: QSem
+  , count  :: Int
+    -- ^ how many units 'shared' was made with. A QSem's count cannot be read
+    -- back, and the batch handler needs it to size each request's own bound.
+  }
+
+newBatchSlots :: IO BatchSlots
+newBatchSlots = do
+  n <- getNumCapabilities
+  sem <- newQSem n
+  pure BatchSlots { shared = sem, count = n }
 
 -- | The handler monad for all Servant routes.
 type AppM = ReaderT AppEnv Handler
