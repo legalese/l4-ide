@@ -107,6 +107,8 @@ The same holds for a field read on a record nobody supplied, such as `d's age`: 
 A branch that another part of the same value rules out for certain is still skipped as usual.
 In `CONSIDER Claim k 5 WHEN Claim Retail 0 THEN "first", WHEN Claim kk a THEN "second"`, the `5` rules out `0`, so the answer is `"second"` whatever `k` is.
 L4 looks only at parts written as a literal or already worked out; it works nothing new out to decide.
+Whether a part counts as already worked out can depend on what the rule has worked out elsewhere, so the same `CONSIDER` can stop in one rule and answer in another.
+Either way it never gives a wrong answer: when it stops, it is asking for the input.
 
 ## Exhaustiveness Checking
 
