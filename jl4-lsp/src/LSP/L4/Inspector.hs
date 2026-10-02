@@ -202,6 +202,7 @@ valueToJson = \case
   Val.ValNullaryBuiltinFun{} -> Aeson.String "<builtin>"
   Val.ValUnaryBuiltinFun{} -> Aeson.String "<builtin>"
   Val.ValBinaryBuiltinFun{} -> Aeson.String "<builtin>"
+  Val.ValConnective{} -> Aeson.String "<function>"
   Val.ValTernaryBuiltinFun{} -> Aeson.String "<builtin>"
   Val.ValPartialTernary{} -> Aeson.String "<partial>"
   Val.ValPartialTernary2{} -> Aeson.String "<partial>"

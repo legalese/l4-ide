@@ -1492,6 +1492,7 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValNil                    -> "EMPTY"
     Lazy.ValCons v1 v2             -> "(" <> printWithLayout v1 <> " FOLLOWED BY " <> printWithLayout v2 <> ")" -- TODO: parens
     Lazy.ValClosure{}              -> "<function>"
+    Lazy.ValConnective{}           -> "<function>"
     Lazy.ValNullaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValUnaryBuiltinFun{}      -> "<builtin-function>"
     Lazy.ValBinaryBuiltinFun{}     -> "<function>"
@@ -1529,6 +1530,7 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValDateTime{}             -> printWithLayout v
     Lazy.ValNil                    -> "EMPTY"
     Lazy.ValClosure{}              -> printWithLayout v
+    Lazy.ValConnective{}           -> printWithLayout v
     Lazy.ValUnappliedConstructor{} -> printWithLayout v
     Lazy.ValAssumed{}              -> printWithLayout v
     Lazy.ValConstructor r []       -> bareName r
@@ -1584,6 +1586,7 @@ prettyNFWithConstructorFields fields = goNF
       Lazy.ValDateTime{}             -> goVal v
       Lazy.ValNil                    -> "EMPTY"
       Lazy.ValClosure{}              -> goVal v
+      Lazy.ValConnective{}           -> goVal v
       Lazy.ValUnappliedConstructor{} -> goVal v
       Lazy.ValAssumed{}              -> goVal v
       Lazy.ValConstructor _ []       -> goVal v
@@ -1706,6 +1709,7 @@ instance LayoutPrinter Lazy.NF where
     MkNF (Lazy.ValString{})               -> printWithLayout v
     MkNF Lazy.ValNil                      -> printWithLayout v
     MkNF (Lazy.ValClosure{})              -> printWithLayout v
+    MkNF (Lazy.ValConnective{})           -> printWithLayout v
     MkNF (Lazy.ValUnappliedConstructor{}) -> printWithLayout v
     MkNF (Lazy.ValAssumed{})              -> printWithLayout v
     MkNF (Lazy.ValConstructor r [])       -> printWithLayout r
