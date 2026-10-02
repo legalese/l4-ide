@@ -110,7 +110,7 @@ a decision table over a missing input does not fail on Camunda: `null` matches n
 table falls through to its `OTHERWISE` row, and answers confidently with a number the source never
 gave (measured on the `defaults.l4` exhibit: with `income` left out, Camunda answers band 1, where the
 default `TYPICALLY 50000` gives band 2). The export does not rewrite every read as
-`if x = null then d else x`, which would change what each decision says and would not help KIE at all.
+`if x = null then d else x`, which would change what each decision says, and for a top-level input would not help KIE at all (it skips the decision before any expression runs).
 It reports one note per default: a rule's own `GIVEN`, a section `GIVEN`, an `ASSUME`, and every record
 field of every `DECLARE` (the model carries all of them whether a decision reads them or not). A default
 written in a file the module imports is reported too, when an emitted decision reads the name (an
