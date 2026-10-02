@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-typically-trace.l4:41:1-19:
+typically-trace.l4:48:1-19:
   6
   ─────
   ┌ doubled OF `the rate`
@@ -11,7 +11,7 @@ typically-trace.l4:41:1-19:
   │┌ the rate took its default (declared at typically-trace.l4:9:49-50)
   │└ 3
   └ 6
-typically-trace.l4:42:1-40:
+typically-trace.l4:49:1-40:
   10
   ─────
   ┌ doubled OF 5
@@ -19,7 +19,7 @@ typically-trace.l4:42:1-40:
   │└ <function>
   ├ `the rate` TIMES 2
   └ 10
-typically-trace.l4:43:1-26:
+typically-trace.l4:50:1-26:
   15
   ─────
   ┌ `both readers` OF `the rate`
@@ -39,7 +39,7 @@ typically-trace.l4:43:1-26:
   │├ `the rate` TIMES 3
   │└ 9
   └ 15
-typically-trace.l4:44:1-21:
+typically-trace.l4:51:1-21:
   TRUE
   ─────
   ┌ `can act` OF `has capacity`
@@ -53,7 +53,7 @@ typically-trace.l4:44:1-21:
   │└ TRUE
   ├ b
   └ TRUE
-typically-trace.l4:45:1-28:
+typically-trace.l4:52:1-28:
   FALSE
   ─────
   ┌ `never reads it` OF `has capacity`
@@ -65,7 +65,7 @@ typically-trace.l4:45:1-28:
   │└ FALSE
   ├ FALSE
   └ FALSE
-typically-trace.l4:46:1-30:
+typically-trace.l4:53:1-30:
   "Singapore"
   ─────
   ┌ `where it is held` OF `the venue`
@@ -75,7 +75,7 @@ typically-trace.l4:46:1-30:
   │┌ the venue took its default (declared at typically-trace.l4:12:49-60)
   │└ "Singapore"
   └ "Singapore"
-typically-trace.l4:47:1-26:
+typically-trace.l4:54:1-26:
   3
   ─────
   ┌ `rate if able` OF `the rate`, `has capacity`
@@ -90,7 +90,7 @@ typically-trace.l4:47:1-26:
   │┌ the rate took its default (declared at typically-trace.l4:9:49-50)
   │└ 3
   └ 3
-typically-trace.l4:48:1-26:
+typically-trace.l4:55:1-26:
   60
   ─────
   ┌ `scaled by` OF 10, `the rate`
@@ -105,7 +105,17 @@ typically-trace.l4:48:1-26:
   ││└ 3
   │└ 6
   └ 60
-typically-trace.l4:51:1-14:
+typically-trace.l4:56:1-31:
+  Quote OF 3
+  ─────
+  ┌ `quote at the rate` OF `the rate`
+  │┌ `quote at the rate`
+  │└ <function>
+  ├ Quote OF `the rate`
+  │┌ the rate took its default (declared at typically-trace.l4:9:49-50)
+  │└ 3
+  └ Quote OF 3
+typically-trace.l4:59:1-14:
   6
-typically-trace.l4:52:1-32:
+typically-trace.l4:60:1-32:
   assertion satisfied

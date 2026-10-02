@@ -131,15 +131,20 @@ instance LayoutPrinter EvalTraceAction where
 -- address with the event attached; zonking gives a 'TraceDefault' whose steps
 -- are the evaluation of the default, and whose value is the default's.
 --
--- Two things are deliberately not events:
+-- Where it hangs: on the last expression entered in the nearest frame that has
+-- entered one, so a builtin operator's frame (pushed to wait for its operands,
+-- with no expression of its own) is passed over to the application waiting on
+-- it, and the event is a child of that application.
 --
---   * a default first forced while the RESULT is being normalised, after the
---     main expression has finished: nothing in the trace tree is open to hang
---     it from, so 'splitEvalTraceActions' drops it (it is still in the
---     directive's @presumed@ list);
---   * a force with no expression to hang it from (a frame that has not entered
---     one yet): 'addDefaultToFrame' drops it rather than hide the frame, which
---     would also drop an exception the frame carries.
+-- A default first forced while the RESULT is being normalised, after the main
+-- expression has finished (a defaulted field of a returned record that nothing
+-- else read), has no frame open to hang from. 'hoistLateDefaults' moves such an
+-- event to just before the result of the main expression, so that it hangs on
+-- the expression that built the result. If the main expression did not end the
+-- usual way, it is dropped; it is still in the directive's @presumed@ list.
+--
+-- 'addDefaultToStack' never fails and never hides a frame: with no frame to
+-- hang from, or one that has its result already, the event is dropped.
 
 -- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
 -- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
@@ -217,7 +222,7 @@ pattern TraceValue v = Trace Nothing [] (Right v)
 
 -- | Implements step 2 of Note [Lazy evaluation tracing]
 splitEvalTraceActions :: [EvalTraceAction] -> Map (Maybe Address) (Either WHNF [EvalTraceAction])
-splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
+splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty . hoistLateDefaults
   where
     -- In order to split the trace actions into sublists, we need to keep track of
     -- a stack of addresses.
@@ -281,9 +286,10 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
       -- to pop the stack when it is empty.
       m
     go (-1) [] m (TookDefault _ _ : as) =
-      -- A default first forced while the result is being normalised (see Note
-      -- [Defaults in the trace]): nothing is open to hang it from. The 'SetRef'
-      -- that follows it is handled by the next equation.
+      -- A default first forced while the result is being normalised, which
+      -- 'hoistLateDefaults' could not move (see Note [Defaults in the trace]):
+      -- nothing is open to hang it from. The 'SetRef' that follows it is
+      -- handled by the next equation.
       go (-1) [] m as
     go (-1) [] m as@(SetRef _ : _) =
       -- This case occurs if after we're done with the main expression, we
@@ -311,6 +317,38 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
 
     insertIfMissing :: Ord k => k -> a -> Map k a -> Map k a
     insertIfMissing = Map.insertWith (\ _new old -> old)
+
+-- | Move each 'TookDefault' that comes after the main expression has finished
+-- to just before the result of the main expression. See Note [Defaults in the
+-- trace].
+--
+-- The main expression is over at the 'Pop' that closes depth 0, the one the
+-- splitter below ends on. What follows it is the result being normalised, one
+-- 'SetRef' at a time. The main list ends with that result, @Exit@, and the
+-- closing @Pop@; an event is put in front of the @Exit@. With nothing late, or
+-- a main list that ends any other way, the actions are returned as they were.
+hoistLateDefaults :: [EvalTraceAction] -> [EvalTraceAction]
+hoistLateDefaults actions
+  | not (any isDefaultEvent actions) = actions
+  | otherwise = case afterMain 0 [] actions of
+      Just (Pop : Exit r : mainRev, late)
+        | (events@(_ : _), rest) <- partition isDefaultEvent late ->
+            reverse mainRev <> events <> [Exit r, Pop] <> rest
+      _ -> actions
+  where
+    isDefaultEvent :: EvalTraceAction -> Bool
+    isDefaultEvent = \ case
+      TookDefault {} -> True
+      _              -> False
+
+    -- the main expression's actions, newest first, and everything after
+    afterMain :: Int -> [EvalTraceAction] -> [EvalTraceAction] -> Maybe ([EvalTraceAction], [EvalTraceAction])
+    afterMain _ _   []       = Nothing
+    afterMain d acc (a : as) = case a of
+      Push            -> afterMain (d + 1) (a : acc) as
+      Pop | d == 0    -> Just (a : acc, as)
+          | otherwise -> afterMain (d - 1) (a : acc) as
+      _               -> afterMain d (a : acc) as
 
 -- | Just used in error messages to produce a reasonably readable version
 -- of the split address action map maintained during 'splitEvalTraceActions'.
