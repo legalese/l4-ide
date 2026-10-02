@@ -322,7 +322,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - **A default taken at a named site or construction is listed in `presumed` under hard, and not under soft.** In its own commit, so that it can be reverted alone.
   T6b names these sites ("W4's named sites and constructions emit W8's event themselves. The trace shows every event; `presumed` keeps only those whose binder or JSON path is part of the request"), and the binder of `rate` in `scaled WITH base IS 10` is part of no request; T4b's "elsewhere the result says 'rests on presumed x'" is about the off switch.
   Read together: listed under hard, filtered under soft, which is how a rule's own `JSONDECODE` is treated (`JSONDECODE T: field`, under hard only).
-  Under soft every entry in `presumed` is then a name a client could have sent, and soft's output is what #539 gave.
+  Under soft every entry in `presumed` is then a name a client could have sent, as it was in #539.
   _Alternatives:_ (b) list it in both modes, which reads T4b's first sentence ("every default that took effect, wherever filled") alone, and is a one-line change (drop the guard on the `FromNamedApp` case of `requestPresumed`, `L4.EvaluateLazy`); (c) never list it, trace only, which reads T6b's filter alone and loses "rests on presumed x" under hard.
   The reconciliation of T4b and T6b is also noted under T6 in §5.
 
@@ -366,7 +366,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - A construction that leaves out every field: T1 leaves its spelling for a later card.
 - An enum constructor's payload fields: a field of `Rect HAS width IS A NUMBER, height IS A NUMBER TYPICALLY 1` still has to be given at `Rect WITH width IS 2`, and its `TYPICALLY` does nothing.
   T1 as printed ("any field declared `TYPICALLY` may be omitted at construction") does not say records only, so this is a ruling for Meng and not an assumption.
-  Recommended: open them, with the same table keyed by the constructor (`recordInputDefaults`); additive, since no file in `jl4/examples`, `doc/` or canon has a `TYPICALLY` on such a field and every such omission is an error today.
+  Recommended: open them, with the same table keyed by the constructor (`recordInputDefaults`); additive, since no `DECLARE … IS ONE OF` block in `jl4/examples`, `doc/`, `skills/`, `jl4-core/libraries` or `legalese/canon` (at `6b6476d`) has a `TYPICALLY` (scanned 2026-10-03, by block, not by grep for the keyword), and every such omission is an error today.
   If declined, make a `TYPICALLY` on such a field a check error, so that the annotation is never inert; that would also settle a `MEANS` there (above).
 - **T4b's check-time warning on a construction that restates a field's `TYPICALLY` literally.**
   Not built, so S3 is made avoidable and not closed (§3).
