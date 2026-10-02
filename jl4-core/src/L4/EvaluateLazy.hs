@@ -859,11 +859,11 @@ requestPresumed presume fieldName inputs events =
   nubOrd (mapMaybe entry events)
  where
   entry p = case (p.origin, p.path) of
-    (FromDecode root, path)
-      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+    (FromDecode _, _)
+      | not presume -> Just (presumedName fieldName p)
       | otherwise   -> Nothing
-    (_, n : rest)
-      | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
+    (_, n : _)
+      | fieldName n `Set.member` inputs -> Just (presumedName fieldName p)
     _ -> Nothing
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching

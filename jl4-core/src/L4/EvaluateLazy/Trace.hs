@@ -415,6 +415,27 @@ printDefaultEvent lvl p steps v =
       []     -> [pre <> "└"]
       l : ls -> (pre <> "└ " <> l) : [ pre <> "  " <> d | d <- ls ]
 
+-- | How a service names a default in its @presumed@ list, and as the code of the
+-- node that shows the event: the input's name, or the path to a field below it
+-- (@cfg.timeout@), and for a field of a decode the RULES made
+-- @JSONDECODE Settings: limit@, naming the type the rules decoded. @fieldName@
+-- maps a wrapper's own field name back to the input's. One function, so that a
+-- client can match a node to an entry of the list by comparing the two strings.
+presumedName :: (Text -> Text) -> Presumed -> Text
+presumedName fieldName p = case (p.origin, p.path) of
+  (FromDecode root, path) -> "JSONDECODE " <> root <> ": " <> renderPresumedPath path
+  (_, n : rest)           -> renderPresumedPath (fieldName n : rest)
+  (_, [])                 -> ""
+
+-- | Rewrite the default events of a trace, wherever they hang, and their steps.
+mapDefaultEvents :: (Presumed -> Presumed) -> EvalTrace -> EvalTrace
+mapDefaultEvents f = go
+  where
+    go = \ case
+      Trace l steps v        -> Trace l (goSteps steps) v
+      TraceDefault p steps v -> TraceDefault (f p) (goSteps steps) v
+    goSteps = fmap (second (fmap go))
+
 -- | What the event says, without its value: @the rate took its default
 -- (declared at f.l4:4:30-31)@. A default that no @TYPICALLY@ supplied is
 -- D7.3's @NOTHING@ for a @MAYBE@ left out of a JSON record.
