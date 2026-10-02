@@ -1692,6 +1692,52 @@ spec = describe "integration" do
         lookupKey "openapi" body `shouldBe` Just (Aeson.String "3.0.0")
         lookupKey "paths" body `shouldSatisfy` Maybe.isJust
 
+    -- The batch response schema names exactly the keys a batch response
+    -- carries: every case key the code emits for an answered, refused,
+    -- errored and limit-stopped case, plus @graphviz, which needs
+    -- ?trace=full&graphviz=true; and every summary key.
+    it "documents in OpenAPI exactly the keys a batch response carries" do
+      let stingy = testOptions { maxEvalMemoryMb = 64 }
+      withServiceFromSourcesOpts stingy "batch-doc" [("spin.l4", spinOrRefuseJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "n" Aeson..= (1_000 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "n" Aeson..= (-1 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (3 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (4 :: Int), "n" Aeson..= spinFast]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/batch-doc/functions/spin/evaluation/batch") body
+        resp <- httpLbs req mgr
+        docReq <- parseRequest (baseUrl <> "/deployments/batch-doc/openapi.json")
+        docResp <- httpLbs docReq mgr
+        let at k = \case
+              Aeson.Object o -> Aeson.KeyMap.lookup k o
+              _ -> Nothing
+            keysOf = \case
+              Just (Aeson.Object o) -> List.sort (Aeson.KeyMap.keys o)
+              _ -> []
+            emittedCases = rawBatchCases resp
+            emittedCaseKeys = List.sort (List.nub ("@graphviz" : concatMap Aeson.KeyMap.keys emittedCases))
+            emitted = Aeson.decode (responseBody resp) :: Maybe Aeson.Value
+            batchOps = case Aeson.decode (responseBody docResp) >>= at "paths" of
+              Just (Aeson.Object ps) ->
+                [ op | (k, op) <- Aeson.KeyMap.toList ps
+                     , "/evaluation/batch" `Text.isSuffixOf` Aeson.Key.toText k ]
+              _ -> []
+            schema = case batchOps of
+              [op] -> at "post" op >>= at "responses" >>= at "200" >>= at "content"
+                        >>= at "application/json" >>= at "schema"
+              _ -> Nothing
+        length batchOps `shouldBe` 1
+        map (\c -> Aeson.KeyMap.member "@limit" c) emittedCases `shouldBe` [False, False, False, True]
+        keysOf (schema >>= at "properties" >>= at "cases" >>= at "items" >>= at "properties")
+          `shouldBe` emittedCaseKeys
+        keysOf (schema >>= at "properties") `shouldBe` keysOf emitted
+        keysOf (schema >>= at "properties" >>= at "summary" >>= at "properties")
+          `shouldBe` keysOf (emitted >>= at "summary")
+
     it "returns OpenAPI 3.0 spec via org-wide /openapi.json" do
       withServiceFromSources "org-openapi" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/openapi.json")
