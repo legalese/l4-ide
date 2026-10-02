@@ -102,7 +102,8 @@ What it refuses, loudly, because OpenFisca has no value to give it:
 
 (An expression default is not accepted by the checker yet. When it is, the export turns it into a
 `formula` on the input variable, which OpenFisca computes only for a period left without an input
-value, and refuses one that the formula lowering cannot express.)
+value, and refuses one that the formula lowering cannot express. A default that names another input
+is an expression like any other, and becomes a formula too.)
 
 A `TYPICALLY` on a section `GIVEN` or an `ASSUME` never reaches this point: the export reads neither,
 and refuses a rule that does (`unbound reference`).

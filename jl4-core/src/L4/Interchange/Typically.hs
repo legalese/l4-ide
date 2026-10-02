@@ -230,7 +230,13 @@ data DefaultValue
   | DefString Text
   | DefBool Bool
   | DefConstructor Resolved
-    -- ^ @NOTHING@ or a constructor of a user's enum
+    -- ^ a nullary application: @NOTHING@ or a constructor of a user's enum, __by
+    -- shape only__. A reference to another binder or to a definition, which R8
+    -- rule 3 (W7) admits as a default, has exactly this shape, and nothing in the
+    -- AST tells the two apart (the checker does, through its entity map). A
+    -- backend whose behaviour depends on which one it has (OpenFisca maps an enum
+    -- member and must lower a reference as the expression it is) has to check the
+    -- constructor itself.
   | DefComputed (Expr Resolved)
     -- ^ anything else. The checker does not produce one today (R8 rule 3 is
     -- unbuilt), so a backend reaches this arm only on a module whose checker

@@ -29,6 +29,7 @@ import L4.Export (ExportedFunction (..), getExportedFunctions)
 import L4.Interchange.Typically (DefaultValue (..), classifyDefault, describeDefault)
 import L4.OpenFisca.IR
 import L4.Syntax
+import L4.TypeCheck.Environment (nothingUnique)
 
 -- | A reason a decision could not be compiled to OpenFisca.
 data LowerError = LowerError
@@ -794,7 +795,7 @@ typeRecordName _                = Nothing
 -- * Anything else — @NOTHING@, a literal whose type is not the variable's —
 --   is refused with the reason, because there is no OpenFisca value for it.
 lowerDefault :: LowerEnv -> OFType -> Expr Resolved -> Either Text (OFType, Maybe OFDefault, Maybe OFExpr)
-lowerDefault env ty e = case (classifyDefault e, ty) of
+lowerDefault env ty e = case (classified, ty) of
   (DefNumber r, OFFloat) -> Right (ty, Just (OFDefNum r), Nothing)
   (DefNumber r, OFInt)
     | denominator r == 1 -> Right (ty, Just (OFDefNum r), Nothing)
@@ -809,7 +810,19 @@ lowerDefault env ty e = case (classifyDefault e, ty) of
   (d, _) -> Left ("TYPICALLY " <> describeDefault d <> " has no OpenFisca value: "
                   <> reason d)
  where
-  described = describeDefault (classifyDefault e)
+  -- 'classifyDefault' calls every nullary application a constructor, because the
+  -- AST does not tell @NOTHING@ or an enum member from a reference to another
+  -- input, which has exactly that shape and which R8 rule 3 (W7) admits as a
+  -- default. The checker tells them apart through its entity map; here the
+  -- constructors this module knows are the enum members and @NOTHING@, and a
+  -- nullary application of anything else is the expression it is, which becomes
+  -- a formula like any other expression default.
+  classified = case classifyDefault e of
+    DefConstructor c
+      | getUnique c /= nothingUnique
+      , not (Map.member (getUnique c) env.envEnumCons) -> DefComputed e
+    d -> d
+  described = describeDefault classified
   reason = \case
     DefConstructor _ -> "OpenFisca has no way to say a variable has no value; every variable has one"
     _                -> "it is not a " <> typeName <> ", which is what this variable holds"
