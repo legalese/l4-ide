@@ -26,6 +26,9 @@ The brackets are doing real work there, and leaving them out changes the meaning
 
 In legal terms: "If A, then B" - the rule is violated only when A is true but B is false.
 
+IMPLIES evaluates lazily - if A is FALSE, the rule does not apply, the answer is TRUE, and B is not evaluated.
+In a trace (`#EVALTRACE`, or the reasoning a service returns), an IMPLIES appears as itself, with A and its value beneath it (unless A is written as plain `TRUE` or `FALSE`), followed by B when it was needed.
+
 ## Examples
 
 **Example file:** [implies-example.l4](implies-example.l4)

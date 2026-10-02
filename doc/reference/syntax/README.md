@@ -522,6 +522,7 @@ Evaluate an expression and display the result. Used for testing functions and in
 ### #EVALTRACE
 
 Evaluate an expression and display the full execution trace, showing each step of the evaluation.
+`AND`, `OR`, `IMPLIES` and `NOT` appear as written, each with the operands it evaluated beneath it; an operand that was not needed, such as the second operand of `FALSE AND …`, does not appear.
 
 **Syntax:**
 
