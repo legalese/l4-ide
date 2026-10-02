@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, echoRecordJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, echoRecordJL4, deonticSectionDefaultJL4, directivesAboveDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1924,6 +1924,27 @@ spec = describe "integration" do
         -- defaults: the trace has an event for exactly those the answer rests on
         agrees r = List.sort [code | (code, _, _) <- events r] `shouldBe` List.sort r.presumed
         whenTraced check resp = assertSuccess resp \r -> check r >> agrees r
+        -- every (parent, child) pair of the tree
+        edges :: Reasoning -> [(Reasoning, Reasoning)]
+        edges r = [(r, k) | k <- r.children] <> concatMap edges r.children
+        -- where the author wrote a default, as the response must say it:
+        -- @file:line:from-to@, the line of the fixture that holds the needle
+        -- and the columns of the value after its TYPICALLY (the end is the
+        -- column after the value)
+        declaredAt :: Text -> Text -> Text -> Text -> Text
+        declaredAt file source needle value =
+          case [ (n, l) | (n, l) <- zip [1 :: Int ..] (Text.lines source), needle `Text.isInfixOf` l ] of
+            (n, l) : _ ->
+              let start = Text.length (fst (Text.breakOn ("TYPICALLY " <> value) l)) + Text.length "TYPICALLY " + 1
+              in file <> ":" <> Text.pack (show n) <> ":" <> Text.pack (show start) <> "-" <> Text.pack (show (start + Text.length value))
+            [] -> error ("no line of the fixture has " <> Text.unpack needle)
+        saidBy r = [said | (_, said, _) <- events r]
+        -- a deontic function's request: a driver, from the start, no events
+        deonticBody = Aeson.object
+          [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+          , "startTime" Aeson..= (0 :: Int)
+          , "events" Aeson..= ([] :: [Aeson.Value])
+          ]
 
     it "shows a section default on the direct path, with its value and where it was declared" do
       withServiceFromSources "w8-sec" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
@@ -1998,7 +2019,8 @@ spec = describe "integration" do
         resp <- traced "w8-own" "within limit" (args ["amount" Aeson..= (5 :: Int)]) baseUrl mgr
         assertSuccess resp \r -> do
           intact r
-          codes r `shouldBe` ["limit"]
+          -- named as presumed names it under hard, with the type the rules decoded
+          codes r `shouldBe` ["JSONDECODE Settings: limit"]
           r.presumed `shouldBe` []
       -- D7.3's NOTHING for a MAYBE left out has no TYPICALLY behind it, and says so
       withServiceFromSources "w8-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
@@ -2023,6 +2045,77 @@ spec = describe "integration" do
           intact r
           r.presumed `shouldBe` ["is motorway"]
           codes r `shouldBe` ["is motorway"]
+
+    -- R8's "with the declaration line" must be the author's, on every path: the
+    -- wrapper is evaluated as the author's source followed by generated code,
+    -- and its range was the generated text's (review F2)
+    it "says where the default was declared, in the author's file and line, on every path" do
+      let capacity = declaredAt "capacity.l4" sectionBooleanJL4 "`has capacity`" "TRUE"
+          sentence what at = what <> " took its default (declared at " <> at <> ")"
+      withServiceFromSources "w8-at-sec" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        direct <- traced "w8-at-sec" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" capacity]) direct
+        wrapped <- traced "w8-at-sec" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" capacity]) wrapped
+      -- a rule GIVEN's default: the wrapper's InputArgs record copies it
+      let rule = declaredAt "capacity.l4" ruleDefaultJL4 "`has capacity`" "TRUE"
+      withServiceFromSources "w8-at-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- traced "w8-at-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" rule]) direct
+        wrapped <- traced "w8-at-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" rule]) wrapped
+      -- a deontic function always takes the wrapper path, and its evaluation
+      -- is named for the function, not the file
+      withServiceFromSources "w8-at-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-at-deontic" "seatbelt requirement" deonticBody baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "is motorway" (declaredAt "seatbelt.l4" deonticDefaultJL4 "`is motorway`" "FALSE")]) resp
+      withServiceFromSources "w8-at-deontic-sec" [("belt.l4", deonticSectionDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-at-deontic-sec" "belt rule" deonticBody baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "is motorway" (declaredAt "belt.l4" deonticSectionDefaultJL4 "`is motorway`" "FALSE")]) resp
+      -- directives above the default are not part of the wrapper's source, and
+      -- must not move the lines below them
+      withServiceFromSources "w8-at-lines" [("capacity.l4", directivesAboveDefaultJL4)] \baseUrl mgr -> do
+        wrapped <- traced "w8-at-lines" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" (declaredAt "capacity.l4" directivesAboveDefaultJL4 "`has capacity`" "TRUE")]) wrapped
+
+    -- Review F1: a rule that runs while the answer is written out (the wrapper
+    -- returns JUST of it, and so does every deontic function) shows the
+    -- default under the step that read it, in the trace of that run, and not
+    -- as a sibling of the call that follows it.
+    it "hangs the event under the step that read the default on the wrapper path, not under its JUST" do
+      withServiceFromSources "w8-place" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        wrapped <- traced "w8-place" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced
+          (\r -> do
+              [ (parent.exampleCode, kid.exampleCode)
+                | (parent, kid) <- edges r.reasoning, kid.exampleCode == ["has capacity"] ]
+                `shouldSatisfy` all (\(parentCode, _) -> not (any (Text.isPrefixOf "JUST OF") parentCode))
+              length (events r) `shouldBe` 1)
+          wrapped
+      withServiceFromSources "w8-place-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-place-deontic" "seatbelt requirement" deonticBody baseUrl mgr
+        whenTraced
+          (\r -> do
+              let parents = [parent.exampleCode | (parent, kid) <- edges r.reasoning, kid.exampleCode == ["is motorway"]]
+              length parents `shouldBe` 1
+              -- the step that read it is the field of the decoded input, which
+              -- is where the rule's own input is read
+              parents `shouldSatisfy` all (any (Text.isInfixOf "is motorway (input)"))
+              parents `shouldSatisfy` all (not . any (Text.isPrefixOf "JUST OF")))
+          resp
+
+    -- Review F6: a node and an entry of presumed name the same default by the
+    -- same string, also for a field a rule's own decode filled
+    it "names a node as presumed does, for a default the rule's own decode filled" do
+      withServiceFromSources "w8-own-hard" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-own-hard" "within limit"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
+          baseUrl mgr
+        whenTraced
+          (\r -> do
+              r.presumed `shouldBe` ["JSONDECODE Settings: limit"]
+              [code | (code, _, _) <- events r] `shouldBe` r.presumed)
+          resp
 
     it "leaves the reasoning empty when no trace was asked for, and says presumed all the same" do
       withServiceFromSources "w8-quiet" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
