@@ -96,7 +96,9 @@ What it refuses, loudly, because OpenFisca has no value to give it:
 - **`NOTHING`.** Every OpenFisca variable has a value; there is no "no value".
 - **A default on the subject or on `period`.** Those come from the simulation, not from an input
   variable, so there is nothing for a default to attach to.
-- **A default on a `LIST OF` field**, which becomes a role.
+- **A default on a `LIST OF` field, other than `EMPTY`.** A role has no default list, so any other
+  default would be lost. `EMPTY` says what a role nobody fills already is, so it is accepted and
+  changes nothing in the output.
 - **Two exported decisions that give one input different defaults.** OpenFisca has one variable of
   that name and so one default; the export names both and stops rather than pick one.
 

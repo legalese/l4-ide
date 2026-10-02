@@ -233,6 +233,19 @@ conflictSrc = Text.unlines
   , "capped base rate MEANS (base * rate) - 1"
   ]
 
+-- | A household whose members are a role, with a default written on the field.
+listFieldSrc :: Text
+listFieldSrc = Text.unlines
+  [ "DECLARE Person HAS salary IS A NUMBER"
+  , "DECLARE Household HAS members IS A LIST OF Person TYPICALLY EMPTY"
+  , ""
+  , "@export Total"
+  , "GIVEN h IS A Household"
+  , "      period IS A STRING"
+  , "GIVETH A NUMBER"
+  , "`total` h period MEANS 1"
+  ]
+
 nothingDefaultSrc :: Text
 nothingDefaultSrc = Text.unlines
   [ "@export the scaled amount"
@@ -585,6 +598,14 @@ spec = do
     it "still refuses NOTHING as a default on a scalar GIVEN (the constructor arm, after that change)" $
       refuses (openFiscaOut (moduleOf nothingDefaultSrc))
         `shouldSatisfy` mentions "no way to say a variable has no value"
+
+    it "accepts TYPICALLY EMPTY on a LIST OF field: a role nobody fills is already empty" $
+      succeeds (openFiscaOut (moduleOf listFieldSrc))
+        `shouldBe` succeeds (openFiscaOut (moduleOf (Text.replace " TYPICALLY EMPTY" "" listFieldSrc)))
+
+    it "refuses any other default on a LIST OF field, rather than dropping it" $
+      refuses (openFiscaOut (withDefaultsAs (const (Lit emptyAnno (NumericLit emptyAnno 1))) (moduleOf listFieldSrc)))
+        `shouldSatisfy` mentions "`members` is a LIST OF records and carries TYPICALLY 1"
 
   ------------------------------------------------------------------------
   describe "Blawx (relational middle end): says what it dropped" $ do
