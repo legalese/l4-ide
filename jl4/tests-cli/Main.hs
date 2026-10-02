@@ -237,9 +237,13 @@ batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 -- | @TYPICALLY@ that is an EXPRESSION (W7, R8 rule 3): on a rule's input, a
 -- section input and a record's field; taken from the case, and at a named site
 -- inside the rules; and a circle of defaults, which is no program.
-batchTyExpr, batchTyExprJson, batchTyCycle, batchTyCycleJson :: FilePath
+batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson :: FilePath
 batchTyExpr         = fixtureDir </> "batch-typically-expression.l4"
 batchTyExprJson     = fixtureDir </> "batch-typically-expression.json"
+batchTyExprAll      = fixtureDir </> "batch-typically-expression-all.l4"
+batchTyExprAllJson  = fixtureDir </> "batch-typically-expression-all.json"
+batchTyExprSite     = fixtureDir </> "batch-typically-expression-site.l4"
+batchTyExprSiteJson = fixtureDir </> "batch-typically-expression-site.json"
 batchTyCycle        = fixtureDir </> "batch-typically-cycle.l4"
 batchTyCycleJson    = fixtureDir </> "batch-typically-cycle.json"
 
@@ -435,7 +439,7 @@ coreFixtures =
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
-  , batchTyExpr, batchTyExprJson, batchTyCycle, batchTyCycleJson
+  , batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -1995,6 +1999,51 @@ spec bin = do
       Output code sout serr <- runL4 bin ["batch", batchTyCycle, "--inputs", batchTyCycleJson]
       code `shouldSatisfy` (/= ExitSuccess)
       (sout <> serr) `shouldSatisfy` ("depend on one another in a circle" `isInfixOf`)
+
+  -- W7, decision 1 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3): a rule's input and a
+  -- record's field take an expression too, worked out where the call or the
+  -- construction is.
+  describe "l4 batch: a rule's input and a record's field take an expression too (W7)" $ do
+    -- `discount` is a tenth of the case's own `list price`, `rate` is `phi` plus
+    -- one, `cfg.timeout` is twice `phi`: (200 - 20) * 9 + 16, then with the case's
+    -- own values (200 - 5) * 2 + 1, then (50 - 5) * 9 + 16.
+    it "works each default out from the case, and lists each by name" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExprAll, "--inputs", batchTyExprAllJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 1636), presumedOf ["discount", "rate", "cfg.timeout"])
+        , (Just (Number 391),  presumedOf [])
+        , (Just (Number 421),  presumedOf ["discount", "rate", "cfg.timeout"])
+        ]
+
+    it "uses none under --presumption hard, and names what the row left out" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyExprAll, "--inputs", batchTyExprAllJson
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required fields 'rate'" `isInfixOf`)
+
+    -- The default each site takes names `alpha`, which the case supplies. The
+    -- second row never reaches either site; the third shows the default follows
+    -- the case's `alpha`: (8 + 5) * 10 + 8 * 5.
+    it "takes an expression default at a named site from the case, and lists it under hard" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExprSite, "--inputs", batchTyExprSiteJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      map resultAndPresumed <$> decodeArray sout >>= (`shouldBe`
+        [ (Just (Number 116), presumedOf [])
+        , (Just (Number 0),   presumedOf [])
+        , (Just (Number 170), presumedOf [])
+        ])
+      Output hcode hout _ <-
+        runL4 bin [ "batch", batchTyExprSite, "--inputs", batchTyExprSiteJson
+                  , "--presumption", "hard", "--format", "json" ]
+      hcode `shouldBe` ExitSuccess
+      map resultAndPresumed <$> decodeArray hout >>= (`shouldBe`
+        [ (Just (Number 116), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0),   presumedOf [])
+        , (Just (Number 170), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        ])
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

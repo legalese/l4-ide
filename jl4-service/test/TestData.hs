@@ -36,6 +36,8 @@ module TestData (
   ruleDefaultJL4,
   namedSiteDefaultJL4,
   expressionDefaultJL4,
+  expressionAllDefaultJL4,
+  expressionSiteDefaultJL4,
   constructorNamedDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -806,6 +808,61 @@ expressionDefaultJL4 =
 GIVEN `unused flag` IS A BOOLEAN
 GIVETH A NUMBER
 `final price` MEANS discount TIMES 2
+|]
+
+-- | A @TYPICALLY@ that is an expression on a rule's input, on a section input
+-- that reads another and on a record's field, together.
+expressionAllDefaultJL4 :: Text
+expressionAllDefaultJL4 =
+  [i|
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+  retries IS A NUMBER
+
+@export default final price
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+      cfg IS A Config
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS ((`list price` MINUS discount) TIMES rate) PLUS cfg's timeout
+|]
+
+-- | Expression defaults taken at a NAMED site inside the rules, each naming a
+-- section input the request supplies.
+expressionSiteDefaultJL4 :: Text
+expressionSiteDefaultJL4 =
+  [i|
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Rates`
+    GIVEN alpha IS A NUMBER
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES alpha)
+  retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS alpha)
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default combine
+GIVEN n IS A NUMBER
+      use IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+combine MEANS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS 1)'s timeout
+  ELSE 0
 |]
 
 -- | Defaults whose value is a bare constructor (FALSE, an enum value), taken at

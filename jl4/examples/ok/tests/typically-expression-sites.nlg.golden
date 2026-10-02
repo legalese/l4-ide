@@ -1,0 +1,13 @@
+`scaled` where `base` is 10 and `rate` is the sum of `phi` and 1 by default is equal to 90
+`scaled` where `base` is 10 and `rate` is 2 is equal to 20
+`Config` where `retries` is 1 and `timeout` is the product of `phi` and 2 by default 's `timeout` is equal to 16
+`Config` where `retries` is 1 and `timeout` is 3 's `timeout` is equal to 3
+`one call` is equal to 100
+`one call` where `alpha` is 5 is equal to 130
+`the limit` is equal to 16
+`the limit` where `alpha` is 3 is equal to 24
+`countdown` where `n` is 5 and `step` is the result of dividing `phi` by 8 by default is equal to 5
+`countdown` where `n` is 6 and `step` is 2 is equal to 5
+`paint cost` where `coats` is 4 and `colour` is if `phi` is greater than 5 then `Green` else `Red` by default is equal to 8
+`paint cost` where `coats` is 4 and `colour` is `Red` is equal to 4
+`use the local one` is equal to 8

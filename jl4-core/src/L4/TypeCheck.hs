@@ -2327,8 +2327,8 @@ data DefaultPlace
 allowsExpressionDefault :: DefaultPlace -> Bool
 allowsExpressionDefault = \ case
   SectionInput -> True
-  RuleInput    -> False
-  RecordField  -> False
+  RuleInput    -> True
+  RecordField  -> True
   RequestField -> True
 
 -- | 'checkTypically' for a default written in a place, an expression only where
