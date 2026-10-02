@@ -104,6 +104,8 @@ double z MEANS z TIMES 2
           b IS A Box
           xs IS A LIST OF NUMBER
           f IS A FUNCTION FROM NUMBER TO NUMBER
+          s IS A STRING
+          dt IS A DATE
 
 GIVEN day IS A DATE
 GIVETH A BOOLEAN
@@ -148,6 +150,9 @@ GIVETH A BOOLEAN
 -- pattern, which compares the literal with the value considered ...
 #EVAL 3 EQUALS n
 #EVAL n EQUALS 3
+#EVAL "a" EQUALS s
+#EVAL (Date 1 1 2024) EQUALS dt
+#EVAL Person 3 EQUALS d
 #EVAL CONSIDER n WHEN 0 THEN "zero", OTHERWISE "other"
 -- ... while a function on the left is still an unsupported equality.
 #EVAL double EQUALS f
