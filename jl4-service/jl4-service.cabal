@@ -137,6 +137,7 @@ test-suite jl4-service-test
     DecisionQueryCacheKeySpec
     DeploymentIdSpec
     IntegrationSpec
+    LoggingSpec
     MaybeLiftSpec
     PutGuardSpec
     QueryPlanSpec

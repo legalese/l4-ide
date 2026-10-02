@@ -563,6 +563,7 @@ Test coverage:
 - **CodeGenSpec** -- Input field name collision avoidance
 - **DecisionQueryCacheKeySpec** -- Cache key determinism
 - **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping
+- **LoggingSpec** -- Log lines stay whole when many threads log at once
 - **SanitizationSpec** -- Property name sanitization, reverse mapping, collision detection
 - **SerialisationSpec** -- CBOR serialisation round-trips and cache rebuild
 - **SchemaSpec** -- QuickCheck property tests for API type serialization

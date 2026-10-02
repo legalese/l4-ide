@@ -2,38 +2,46 @@ module Logging (
   Logger,
   LogLevel (..),
   newLogger,
+  newLoggerTo,
   logDebug,
   logInfo,
   logWarn,
   logError,
 ) where
 
+import Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import Data.Aeson (Value, encode, object, (.=))
 import qualified Data.Aeson.Key as Key
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.IORef (IORef, newIORef, atomicModifyIORef')
 import Data.Text (Text)
 import Data.Time (getCurrentTime)
-import System.IO (hFlush, stdout)
+import System.IO (Handle, hFlush, stdout)
 
 -- | Log severity levels.
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError
   deriving stock (Eq, Ord, Show)
 
--- | Structured JSON logger.
--- Thread-safe via IORef serialization of writes.
+-- | Structured JSON logger, one object per line.
+-- Thread-safe: a line is written whole, under 'logLock'.
 data Logger = Logger
   { logMinLevel :: !LogLevel
-  , logLock     :: !(IORef ())
+  , logLock     :: !(MVar ())
+  , logHandle   :: !Handle
   }
 
--- | Create a logger. Debug mode enables DEBUG level; otherwise INFO and above.
+-- | Create a logger on stdout. Debug mode enables DEBUG level; otherwise INFO and above.
 newLogger :: Bool -> IO Logger
-newLogger debugMode = do
-  lock <- newIORef ()
+newLogger = newLoggerTo stdout
+
+-- | Create a logger writing to the given handle.
+newLoggerTo :: Handle -> Bool -> IO Logger
+newLoggerTo h debugMode = do
+  lock <- newMVar ()
   pure Logger
     { logMinLevel = if debugMode then LevelDebug else LevelInfo
     , logLock = lock
+    , logHandle = h
     }
 
 -- | Log at DEBUG level.
@@ -63,12 +71,15 @@ logMsg level logger msg fields
             , "level" .= levelText level
             , "msg" .= msg
             ] <> [(Key.fromText k, v) | (k, v) <- fields]
-          line = encode entry <> "\n"
-      -- Serialize writes to prevent interleaved output
-      atomicModifyIORef' logger.logLock $ \() ->
-        let !_ = () in ((), ())
-      LBS.hPut stdout line
-      hFlush stdout
+          line = LBS.toStrict (encode entry <> "\n")
+      -- One write per line, under the lock. A lazy 'LBS.hPut' writes each
+      -- chunk separately, and the newline is a chunk of its own, so on more
+      -- than one core two threads' lines came out joined as @}{@ (144 of the
+      -- 1,103 lines of one run on -N10, 2026-10-02). The lock used to be an
+      -- 'atomicModifyIORef'' on a unit, which serialised nothing.
+      withMVar logger.logLock $ \() -> do
+        BS.hPut logger.logHandle line
+        hFlush logger.logHandle
 
 -- | Convert log level to text label.
 levelText :: LogLevel -> Text
