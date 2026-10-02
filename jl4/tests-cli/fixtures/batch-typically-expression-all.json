@@ -1,0 +1,3 @@
+[{"list price": 200, "cfg": {"retries": 1}},
+ {"list price": 200, "discount": 5, "rate": 2, "cfg": {"retries": 1, "timeout": 1}},
+ {"list price": 50, "cfg": {"retries": 1}}]

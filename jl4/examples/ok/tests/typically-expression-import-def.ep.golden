@@ -1,0 +1,23 @@
+-- The defining half of ok/typically-expression-import-use.l4: a rule's input and
+-- a record's field whose TYPICALLY defaults are EXPRESSIONS over this module's own
+-- definitions, which a module that imports this one may leave out
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7 across an IMPORT).
+
+DECLARE Colour IS ONE OF Red, Green
+
+GIVETH A NUMBER
+`the usual rate` MEANS 3
+
+GIVETH A Colour
+`the usual colour` MEANS Green
+
+DECLARE Paint
+  HAS coats  IS A NUMBER TYPICALLY (`the usual rate` TIMES 2)
+      colour IS A Colour TYPICALLY `the usual colour`
+      layers IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY (`the usual rate` PLUS 1)
+      base IS A NUMBER
+      colour IS A Colour TYPICALLY (IF `the usual rate` GREATER THAN 100 THEN Red ELSE `the usual colour`)
+GIVETH A NUMBER
+`imported scaled` MEANS IF colour EQUALS Green THEN rate TIMES base ELSE 0

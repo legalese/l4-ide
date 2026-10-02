@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, expressionDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, expressionDefaultJL4, expressionAllDefaultJL4, expressionSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -602,6 +602,76 @@ spec = describe "integration" do
         defaultOf "discount" `shouldBe` Just (Aeson.String "`list price` DIVIDED BY 10")
         required `shouldContain` ["list price"]
         required `shouldNotContain` ["discount"]
+
+    -- W7, decision 1 (§4.3 of the spec): a rule's input and a record's field take
+    -- an expression too.
+    it "publishes a rule input's and a field's expression default as source text (W7)" do
+      withServiceFromSources "ty-expr-all-schema" [("price.l4", expressionAllDefaultJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-expr-all-schema/functions/final%20price")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            props = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            defaultOf key = case Aeson.KeyMap.lookup key props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+            fieldDefault = case Aeson.KeyMap.lookup "cfg" props of
+              Just (Aeson.Object p) | Just (Aeson.Object fs) <- Aeson.KeyMap.lookup "properties" p ->
+                case Aeson.KeyMap.lookup "timeout" fs of
+                  Just (Aeson.Object t) -> Aeson.KeyMap.lookup "default" t
+                  _ -> Nothing
+              _ -> Nothing
+        defaultOf "rate" `shouldBe` Just (Aeson.String "phi PLUS 1")
+        fieldDefault `shouldBe` Just (Aeson.String "phi TIMES 2")
+        required `shouldNotContain` ["rate", "discount"]
+
+    it "works a rule's, a section's and a field's expression default out from the request (W7)" do
+      withServiceFromSources "ty-expr" [("price.l4", expressionAllDefaultJL4)] \baseUrl mgr -> do
+        let cfg = "cfg" Aeson..= Aeson.object ["retries" Aeson..= (1 :: Int)]
+            listPrice n = "list price" Aeson..= (n :: Int)
+            everything = ["discount", "rate", "cfg.timeout"]
+        -- (200 - 20) * 9 + 16, from the request's own `list price`
+        direct <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [listPrice 200, cfg, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitInt 1636) everything
+        -- the default follows the request: (50 - 5) * 9 + 16
+        other <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [listPrice 50, cfg, "unused flag" Aeson..= False])
+        expectAnswer other (FnLitInt 421) everything
+        wrapped <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [listPrice 200, cfg, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitInt 1636) everything
+        -- a value the request supplies wins, and nothing is presumed
+        supplied <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [ listPrice 200, "discount" Aeson..= (5 :: Int), "rate" Aeson..= (2 :: Int)
+                , "cfg" Aeson..= Aeson.object ["retries" Aeson..= (1 :: Int), "timeout" Aeson..= (1 :: Int)]
+                , "unused flag" Aeson..= False ])
+        expectAnswer supplied (FnLitInt 391) []
+        refused <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (hard [listPrice 200, cfg, "unused flag" Aeson..= False])
+        expectError refused "presumption is hard"
+
+    it "takes an expression default at a named site from the request, and lists it under hard (W7)" do
+      withServiceFromSources "ty-expr-site" [("combine.l4", expressionSiteDefaultJL4)] \baseUrl mgr -> do
+        let used alpha = ["n" Aeson..= (10 :: Int), "use" Aeson..= True, "alpha" Aeson..= (alpha :: Int)]
+            presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        soft <- evalFunction baseUrl mgr "ty-expr-site" "combine"
+          (args ("unused flag" Aeson..= False : used 2))
+        expectAnswer soft (FnLitInt 116) []
+        hardRun <- evalFunction baseUrl mgr "ty-expr-site" "combine"
+          (hard ("unused flag" Aeson..= False : used 5))
+        expectAnswer hardRun (FnLitInt 170) presumedHere
+        wrapped <- evalFunction baseUrl mgr "ty-expr-site" "combine"
+          (hard ("unused flag" Aeson..= uncertain : used 2))
+        expectAnswer wrapped (FnLitInt 116) presumedHere
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each

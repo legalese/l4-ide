@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-expression-import-use.l4:8:1-54:
+  assertion satisfied
+typically-expression-import-use.l4:9:1-65:
+  assertion satisfied
+typically-expression-import-use.l4:10:1-68:
+  assertion satisfied
+typically-expression-import-use.l4:15:1-40:
+  assertion satisfied
+typically-expression-import-use.l4:16:1-45:
+  assertion satisfied
+typically-expression-import-use.l4:17:1-41:
+  assertion satisfied
+typically-expression-import-use.l4:18:1-19:
+  Paint OF 6, Green, 2

@@ -1,0 +1,82 @@
+-- A rule's own input and a record's field take a TYPICALLY default that is an
+-- EXPRESSION (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). It is worked out where it is
+-- taken, as if written at the call or the construction that leaves the input out,
+-- and it may name the file's definitions, constructors and section inputs. A
+-- default written in parentheses is how the grammar takes any compound operand
+-- after TYPICALLY; a bare name needs none.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+  retries IS A NUMBER
+
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (phi PLUS 1)
+GIVETH A NUMBER
+scaled MEANS base TIMES rate
+
+#ASSERT (scaled WITH base IS 10) EQUALS 90
+#ASSERT (scaled WITH base IS 10, rate IS 2) EQUALS 20
+#ASSERT (Config WITH retries IS 1)'s timeout EQUALS 16
+#ASSERT (Config WITH retries IS 1, timeout IS 3)'s timeout EQUALS 3
+
+-- A default may name a section input. It is worked out where the call is, so it
+-- reads what the rule that makes the call reads: the call below reads `alpha`
+-- (through the default it takes), which makes `alpha` an input of `one call`,
+-- and a WITH on it reaches the default.
+§ `Rates`
+    GIVEN alpha IS A NUMBER TYPICALLY 2
+
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS alpha)
+      base IS A NUMBER
+GIVETH A NUMBER
+`scaled by alpha` MEANS base TIMES rate
+
+GIVETH A NUMBER
+`one call` MEANS `scaled by alpha` WITH base IS 10
+
+#ASSERT `one call` EQUALS 100
+#ASSERT (`one call` WITH alpha IS 5) EQUALS 130
+
+DECLARE Budget HAS
+  limit IS A NUMBER TYPICALLY (phi TIMES alpha)
+  spent IS A NUMBER
+
+GIVETH A NUMBER
+`the limit` MEANS (Budget WITH spent IS 1)'s limit
+
+#ASSERT `the limit` EQUALS 16
+#ASSERT (`the limit` WITH alpha IS 3) EQUALS 24
+
+-- A rule that calls itself and takes its own default on every step. `step` is not
+-- passed on, so the second assertion is one step of 2 and then four of 1.
+GIVEN n IS A NUMBER
+      step IS A NUMBER TYPICALLY (phi DIVIDED BY 8)
+GIVETH A NUMBER
+countdown MEANS IF n AT MOST 0 THEN 0 ELSE 1 PLUS (countdown WITH n IS n MINUS step)
+
+#ASSERT (countdown WITH n IS 5) EQUALS 5
+#ASSERT (countdown WITH n IS 6, step IS 2) EQUALS 5
+
+-- An enum default that is an expression, and a rule declared in a WHERE.
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN colour IS A Colour TYPICALLY (IF phi GREATER THAN 5 THEN Green ELSE Red)
+      coats IS A NUMBER
+GIVETH A NUMBER
+`paint cost` MEANS IF colour EQUALS Green THEN coats TIMES 2 ELSE coats
+
+#ASSERT (`paint cost` WITH coats IS 4) EQUALS 8
+#ASSERT (`paint cost` WITH coats IS 4, colour IS Red) EQUALS 4
+
+GIVETH A NUMBER
+`use the local one` MEANS inner WITH x IS 4
+  WHERE
+    GIVEN k IS A NUMBER TYPICALLY (phi MINUS 6)
+          x IS A NUMBER
+    GIVETH A NUMBER
+    inner MEANS k TIMES x
+
+#ASSERT `use the local one` EQUALS 8
