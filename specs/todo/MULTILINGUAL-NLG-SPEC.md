@@ -1,14 +1,16 @@
 # Multilingual L4 — language-tagged `@nlg`, and the trilingual Penal Law
 
 _Status: **§§3–4 are IMPLEMENTED AND MERGED; §5 and the pilot are still proposals.**
-Updated 2026-09-19. §4 (the `%` and `]` escapes) merged as PR #415, §4.1(a)'s `\>` escape for
+Updated 2026-10-02. §4 (the `%` and `]` escapes) merged as PR #415, §4.1(a)'s `\>` escape for
 `@ref` as PR #418, this spec's own revisions as #416, the `#962` schema-golden fix as #419, and
 the language tag itself as **#423** — verified in `unstable` by feature presence
 (`MkLangTag`, `NlgLangTagSpec`), not by report. Multiplicity, selection and
 `prettyLayout`'s annotation loss are on `fix/prettylayout-nlg` and `lang/nlg-multiplicity`.
 **A bilingual document set is producible today**: two `@nlg:xx` renderings on one name, and
 `l4 nlg --lang he` / `--lang en` over one encoding. §8a records what was built, what was
-deliberately not, and the one live defect found on the way._ Every measurement in §2 was executed on 2026-09-17 against `unstable` @
+deliberately not, and the one live defect found on the way._
+§8a.1 also records a second placement ruling, for `GIVEN` lists (RULED 2026-10-02 (Meng), and implemented).
+Every measurement in §2 was executed on 2026-09-17 against `unstable` @
 `cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Eight measurement errors in earlier drafts
 of this file have been corrected in place, each re-measured rather than taken on report —
 §2.3's gap count (twice: 76 → 52 → 59, the last on 2026-09-21), §2.4's annotation census and its bare-inline count, a line citation, three
@@ -957,20 +959,66 @@ its annotations.** The file that exists to test `@nlg` renders none of its own. 
 sampled files, 11 of 116 annotations sit on a builtin type name; `prelude.l4` has 0 of 67, so
 the idiomatic style avoids it by habit rather than by construction.
 
-**RULED 2026-09-19 (Meng), and implemented.** Trailing a line, an annotation describes what is
-on that line; starting a line of its own, it describes what follows — with ONE exception, ruled
-separately the same day: inside a record-field list, an annotation on its own line describes the
-field ABOVE it. A field list is a column of things rather than a sequence of declarations, and
-the evidence is that authors write it that way: across three independently generated Hebrew
-encodings, field and parameter heralds are the largest single category — 100 of 334 — and every
-one is written below its field (measured by the `ofek` session; our own corpus contains
-essentially none of that shape, so no golden of ours would ever have raised the question).
+**RULED 2026-09-19 (Meng), and implemented.**
+Trailing a line, an annotation describes what is on that line; starting a line of its own, it describes what follows — with two exceptions, both lists that are columns: inside a record-field list (ruled separately the same day) and inside a `GIVEN` list (**RULED 2026-10-02 (Meng)**, below), an annotation on its own line describes the field or input ABOVE it.
+A field list is a column of things rather than a sequence of declarations, and the evidence is that authors write it that way: across three independently generated Hebrew encodings, field and parameter heralds are the largest single category — 100 of 334 — and every one is written below its field (measured by the `ofek` session; our own corpus contains essentially none of that shape, so no golden of ours would ever have raised the question).
 
 The field name therefore claims two disjoint regions: everything before its type, which is its
 own trailing gloss, and everything on a later line. What falls between — trailing the TYPE on
 the field's own line — stays with the type, which is what keeps `ok/nlg_declare1.l4`'s
 deliberate `head [Get First Element] IS AN a [Start Element]` working. Giving the name the whole
 line instead makes those two collide and loses both; that was measured before it was narrowed.
+
+**The `GIVEN` list — RULED 2026-10-02 (Meng), and implemented.**
+A `GIVEN` list is a column too, so the field-list rule extends to it: an annotation on its own line under an input describes that input, the LAST input included.
+The last input is where the two conventions meet, because with no `GIVETH` between the list and the rule the line under the last input is also the line above the rule.
+The tie-break is the annotation's starting column against the `GIVEN` keyword's: indented further than the keyword, it describes the last input; at the keyword's column or left of it, it describes what follows, exactly as before.
+The keyword's column rather than column 1, so a `GIVEN` indented under a section heading or inside a `WHERE` reads the same way.
+
+**Measured 2026-10-02**, before at `6ed297629` and after at `e0366fd7f`, the commit that completes this change's code.
+Rows two to six of the table are rows 15 to 19 of `ok/nlg-head-placement.l4`; the first row was probed separately and is pinned by `NlgAttachmentSpec`.
+
+| placement                                                      | before (`6ed297629`)                             | after (`e0366fd7f`) |
+| -------------------------------------------------------------- | ------------------------------------------------ | ------------------- |
+| under an input that has another after it                       | that input                                       | that input          |
+| under the last input, indented, `GIVETH` next (row 15)         | dropped, "Not attached to any valid syntax node" | that input          |
+| under the last input, indented, no `GIVETH` (row 16)           | the rule's sentence, silently                    | that input          |
+| under the last input, at the `GIVEN` keyword's column (row 17) | the rule's sentence                              | the rule's sentence |
+| under an earlier input carrying a `TYPICALLY` default (row 18) | the NEXT input, or a default that is a name      | that input          |
+| under a section `GIVEN`'s last input, indented (row 19)        | dropped, "Not attached to any valid syntax node" | that input          |
+
+The `TYPICALLY` row is the same rule rather than a second one: the input's name was cut off at the start of its default, so the line below fell past the input.
+It fell to the next input when the default was a number or a string, and to the default itself when that was a name such as `FALSE`, `EMPTY` or `NOTHING`, silently either way.
+`L4.Parser.ResolveAnnotation.addNlgInput` lets the name reach past the default, as a record field's name reaches past its type, and clamps the default to its own line, so that a default that is a name cannot take an annotation the last input declined.
+The same cut sent a gloss TRAILING a number or string default past its input, and that is fixed with it: a literal claims nothing, so the name now takes the rest of its own line.
+A gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, still lands on that name, silently; that is unchanged, and filed as smucclaw/l4-ide#994.
+
+Field lists have no column test, and two field-list defects are unchanged here.
+An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`; that is a case of smucclaw/l4-ide#976.
+And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
+
+The rule applies to every `GIVEN` list the attachment pass reaches — a rule's, an `ASSUME`'s, a `DECLARE`'s type parameters, a section's and a lambda's — and the list ends at the declaration's own keyword.
+A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own is a token of the declaration rather than a node with a span, so `signatureBeforeKeyword` bounds the signature there; without it the last input would reach past such a keyword to an annotation written under it.
+It does not reach a rule whose head has a pattern argument (`DECIDE fib 0 IS 0`; one clause is enough): no `@nlg` attaches anywhere on such a rule — in its `GIVEN`, on its head or above it — before or after this change, and each one warns "Not attached" (smucclaw/l4-ide#996).
+
+The column is all the tie-break reads, which has three silent consequences.
+A rule's sentence indented even one space past `GIVEN`, under the last input, becomes that input's gloss, and every projection changes with it: `l4 nlg`, `l4 render`, and the Blawx export, where the review measured `#pred bearded(X) :: '@(X) is bearded'` becoming `'@(X) bearded'` once the first herald of `jl4/examples/blawx/beard.l4` was moved there.
+A rule whose `DECIDE` is indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last input.
+And when the head repeats its inputs, a gloss on the `GIVEN` name is rendered nowhere (the syntax reference says so under "Where the sentence goes when you write it in the `GIVEN` instead").
+That was already true of a trailing gloss and of a gloss under an earlier input; this change extends it to an annotation indented under the last input, which before warned "Not attached" (`GIVETH` next) or became the rule's sentence (no `GIVETH`), and now attaches and is lost.
+So rows 15 and 16 of the table hold for a head that does not repeat its inputs; for one that does, the "after" is "lost, silently".
+That is a limit of the gloss lookup rather than of this ruling, filed as smucclaw/l4-ide#995.
+None of the three layouts occurs in this repository, and the attachment differential below covers canon and pc-encode as well.
+
+**Corpus exposure.**
+Three own-line annotations in this repository sit under a `GIVEN` list's last input, all at the margin and so all unchanged: `doc/reference/syntax/directive-example.l4:7`, and an `@nlg:he` / `@nlg:en` pair in a fenced example of `skills/writing-l4-rules/references/gotchas.md` (lines 487–488 at `6ed297629`).
+The owner of every `@nlg` across 214 files is the same at `6ed297629` and at `e0366fd7f`, except in the fixture.
+The 214 are the 31 tracked `.l4` files that carry `@nlg`, the 146 tracked `.l4` files without one that contain a `[` (a possible inline gloss), 33 files from a canon checkout and 4 from pc-encode.
+`NlgAttachmentSpec` pins each placement, and each of these mutations fails at least one of its cases: measuring the column from 1, or from the input's own column; no column test; the default unclamped; no lower clamp at the keyword; no bound at each of the four keywords; and a column test on inputs before the last.
+
+**What review changed.**
+Two adversarial reviews of this change found the keyword overreach, which `signatureBeforeKeyword` closes, the trailing-literal case, and the limits stated above.
+Do not drop the keyword bound as redundant: removing it from any one of the four declarations fails `NlgAttachmentSpec`'s "stops at a DECIDE, ASSUME, DECLARE or YIELD written on a line of its own".
 
 There is precedent for the fix inside the same pass: a **leading `@ref` already attaches
 FORWARD**, to the declaration that follows it, and `RefAnnotationSpec` pins that specifically

@@ -372,11 +372,10 @@ squared x MEANS x TIMES x
 
 ## Annotation fence
 
-All annotations begin with `@`. On its own line, an annotation applies to the **following**
-definition; trailing a line, it applies to what is on that line. `@nlg` follows that rule with
-two twists — a rule takes it only on the line above, and inside a field list an own-line
-annotation describes the field **above** it — which the next section measures. Read it before
-writing one:
+All annotations begin with `@`.
+On its own line, an annotation applies to the **following** definition; trailing a line, it applies to what is on that line.
+`@nlg` follows that rule with two twists — a rule takes it only on the line above, and inside a field list or a `GIVEN` list an own-line annotation describes the field or input **above** it — which the next section measures.
+Read it before writing one:
 
 | Annotation | Purpose                                                            |
 | ---------- | ------------------------------------------------------------------ |
@@ -397,6 +396,7 @@ implementation, and the three levers before you reach for one — is in
 This section is only about WHERE it goes and what it will not do. Every claim below was measured
 on 2026-09-21 on a build of `unstable` at `debf44d34`, which carries both `legalese/l4-ide#433`
 (attachment) and `#435` (field lists); the one-file probe is the measurement, not the merge log.
+The exception is the `GIVEN`-list paragraphs below, which were measured on 2026-10-02 at `e0366fd7f`.
 
 **A rule's herald goes on its own line, immediately above the definition.** That is the only
 placement that reaches a rule:
@@ -408,7 +408,7 @@ GIVETH A NUMBER
 DECIDE `כפול` n IS n TIMES 2
 ```
 
-`l4 nlg --lang he` prints `שורה משלה with 21`.
+`l4 nlg --lang he` prints `שורה משלה עם 21`.
 
 **Trailing the definition line does NOT reach the rule**, and this is the trap, because it looks
 like it should. `DECIDE f n IS n TIMES 2 @nlg …`, the same with `MEANS`, and the head-line form
@@ -430,22 +430,18 @@ It does not attach to the rule, and it usually does not warn either:
 DECLARE Teacher HAS
     name IS A STRING
 
-@nlg the only one          -- WRONG: above GIVEN, not above the definition
+-- WRONG: above GIVEN, not above the definition
+@nlg the only one
 GIVEN t IS A Teacher
 GIVETH A NUMBER
 `f of` t MEANS 1
 ```
 
-`l4 check` is clean here — no diagnostic at all. `l4 nlg` on a case exercising `` `f of` `` prints
-the bare fallback, `` `f of` with `Teacher` where `name` is Alice ``, not "the only one". The
-herald silently captured BACKWARD onto `DECLARE Teacher` instead (confirmed with `l4 ast`) —
-verified this reaches as far back as an `IMPORT` statement when nothing closer offers a slot. It
-only fails loudly (`Not attached to any valid syntax node`) in the rarer case where nothing at all
-precedes it to capture — which is why one real encoding shipped ~230 heralds with twelve of them
-silently dead and only found out via a `check`-clean corpus, because the loud case never fired for
-eleven of the twelve (smucclaw/l4-ide#976). Move the herald to after `GIVETH`, and it attaches
-correctly regardless of what precedes it — after a `DECLARE`, after another bare rule, or first in
-the file.
+`l4 check` is clean here — no diagnostic at all.
+`l4 nlg` on ``#EVAL `f of` (Teacher WITH name IS "Alice")`` prints `` `f of` with `Teacher` where the only one is Alice ``: the rule is its bare name, and "the only one" has been captured BACKWARD by the record's last field, `name`, which it now labels (confirmed with `l4 ast`).
+The capture reaches as far back as an `IMPORT` statement when nothing closer offers a slot.
+It only fails loudly (`Not attached to any valid syntax node`) in the rarer case where nothing at all precedes it to capture — which is why one real encoding shipped ~230 heralds with twelve of them silently dead and only found out via a `check`-clean corpus, because the loud case never fired for eleven of the twelve (smucclaw/l4-ide#976).
+Move the herald to after `GIVETH`, and it attaches correctly regardless of what precedes it — after a `DECLARE`, after another bare rule, or first in the file.
 
 **So do not trust `l4 check`'s silence as evidence a herald attached.** The only real check is `l4
 nlg` (or `l4 ast`) on a case that exercises the rule, confirming the herald's own text — not the
@@ -455,20 +451,54 @@ bare fallback — comes out the other end.
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
 herald is on a parameter line still renders as a bare name.
 
-**A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside
-a field list an annotation on its own line describes the field above it, the one exception to
-"own line describes what follows", because a field list is a column). Trailing the field's line
-reaches the TYPE, not the field, and that is deliberate — a field and its type can be glossed
-separately on one line, and letting the field claim the whole line makes the two collide:
+**Or it goes on its own line BELOW the parameter** (ruled 2026-10-02: a `GIVEN` list is a column, like a field list).
+Under a parameter that has another after it, any column works, because the next parameter bounds it.
+Under the LAST parameter, with no `GIVETH` before the rule, the same line is also the line above the rule, so the column decides.
+Indented further than the `GIVEN` keyword, it is the parameter's.
+At the keyword's column or left of it, it describes what follows: the rule's sentence, or, with a `GIVETH` next, nothing at all, with a "Not attached" warning.
+
+```l4
+GIVEN floor  IS A NUMBER
+      amount IS A NUMBER
+      @nlg the sum of money
+@nlg the claim of %amount% is over %floor%
+DECIDE `is large` IF amount GREATER THAN floor
+```
+
+`l4 nlg` writes ``#EVAL `is large` WITH floor IS 100, amount IS 200`` as ``the claim of `amount` is over `floor` where `floor` is 100 and the sum of money is 200``: the first annotation is `amount`'s, the second the rule's.
+The column is the `GIVEN` keyword's, not column 1, so a section `GIVEN` indented under its heading, or a `GIVEN` inside a `WHERE`, reads the same way.
+A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own ends the list, so an annotation under one of those is not the parameter's.
+
+The column is all it reads, and three consequences are silent:
+
+- A rule's sentence indented even one space past `GIVEN`, under the last parameter, becomes that parameter's gloss, and every projection changes with it: `l4 nlg`, `l4 render` and the Blawx export.
+- A `DECIDE` indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last parameter.
+- When the head repeats the inputs (`` `is large` amount MEANS … ``), the head is where the input is bound and a gloss on the `GIVEN` name is rendered nowhere, so an annotation indented under the last parameter vanishes (smucclaw/l4-ide#995).
+  Write the rule's sentence at the `GIVEN` keyword's column, or between `GIVETH` and the head at any indentation; above the head but indented past `GIVEN`, with no `GIVETH`, it is still the last parameter's.
+
+A trailing gloss and an own-line one on the same parameter, in the same language, collide: L4 warns and drops both.
+A gloss trailing a `TYPICALLY` default reaches the parameter when the default is a number or a string; when the default is a name such as `FALSE`, `EMPTY` or `NOTHING`, that name takes it, silently (smucclaw/l4-ide#994), so put it on the line below.
+In a rule whose head has a pattern argument (`DECIDE fib 0 IS 0` — one clause is enough), no `@nlg` attaches anywhere, in the `GIVEN`, on the head or above it; each one warns "Not attached" (smucclaw/l4-ide#996).
+
+Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed, and became the rule's sentence when none did (colliding, with a warning, if the rule had a sentence of its own).
+One under an earlier parameter with a `TYPICALLY` default landed on the next parameter, or on the default when that was a name such as `TRUE`, and a gloss trailing a number or a string default went past its parameter too.
+
+**A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside a field list an annotation on its own line describes the field above it, an exception to "own line describes what follows", because a field list is a column).
+Trailing the field's line reaches the TYPE, not the field, and that is deliberate — a field and its type can be glossed separately on one line, and letting the field claim the whole line makes the two collide:
 
 ```l4
 DECLARE Payslip
-    HAS base  IS A NUMBER   @nlg the basic salary     -- describes NUMBER; `base` renders bare
+    HAS base  IS A NUMBER   @nlg the basic salary
         bonus IS A NUMBER
-        @nlg the bonus                                -- describes `bonus`; renders
+        @nlg the bonus
 ```
 
-`l4 nlg` prints ``where `base` is 100 and the bonus is 5``.
+`l4 nlg` prints ``where `base` is 100 and the bonus is 5``: the first annotation describes `NUMBER`, so `base` renders bare, and the second describes `bonus`.
+Never end an `@nlg` line with a `--` comment: the annotation runs to the end of the line, and the comment becomes part of the prose.
+
+Field lists have no column test, which leaves two silent traps.
+An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`, as in the `Teacher` example above, which is smucclaw/l4-ide#976.
+And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
 
 > **A corpus written before 2026-09-19 will not reflect any of this.** Until `#433` merged, an
 > own-line herald under a `GIVEN` was captured by the signature and the rule rendered as a bare
@@ -489,17 +519,17 @@ GIVEN n IS A NUMBER
 DECIDE `כפול` n IS n TIMES 2
 ```
 
-- `l4 nlg FILE --lang he` → `שורה משלה with 21`
+- `l4 nlg FILE --lang he` → `שורה משלה עם 21`
 - `l4 nlg FILE --lang en` → `the doubling rule with 21`
 
 `l4 render` takes `--lang` too, which is the flag that produces a bilingual set of **documents**
 rather than linearized prose. `@lang he` at module level declares what an **untagged** `@nlg` in
 that module means, so an existing monolingual file gets labelled without touching every herald.
 
-**One thing a tag does not buy, and it surprises people.** Look again at the output above: `with`
-is the linearizer's own connective, not yours. A tag names the _rendering_; **it does not
-localise the sentence built around it**, and `@lang` does not either — that was measured, not
-assumed. A right-to-left document still has English scaffolding between its Hebrew renderings.
+**One thing a tag does not buy, and it surprises people.**
+A tag names the _rendering_; **it does not localise the words L4 puts around it**, and `@lang` does not either.
+Those words — `with`, "is equal to" — follow `l4 nlg --lang` instead: the module above prints `עם` with `--lang he`, and `שורה משלה with 21` with no `--lang` at all.
+`l4 render` does not localise them yet, so a right-to-left document still has English scaffolding (`means`) between its Hebrew renderings.
 
 **Non-Latin identifiers need no annotation at all.** L4 takes Hebrew — and by the same rule any
 `Lo`-category script — in every name position: bare and backticked names, types, constructors,
