@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -953,7 +953,7 @@ spec = describe "integration" do
         withServiceFromSourcesOpts spinOptions "spin-39-1" [("spin.l4", spinJL4)] \baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-39-1" (spinSlow : replicate 39 spinFast)
           expectBatchOutcomes resp
-            ( CaseErrored "Evaluation resource limit exceeded: this case ran past the time limit of 3 s (--eval-timeout)"
+            ( CaseLimited TimeLimitHit "Evaluation resource limit exceeded: this case did not finish within the time limit of 3 s (--eval-timeout)"
                 : replicate 39 CaseAnswered )
 
       it "errs on the case that allocates too much, and answers the cases after it" do
@@ -962,8 +962,30 @@ spec = describe "integration" do
           resp <- postSpinBatch baseUrl mgr "spin-alloc" [1_000, spinFast, 1_000]
           expectBatchOutcomes resp
             [ CaseAnswered
-            , CaseErrored "Evaluation resource limit exceeded: this case allocated more than the limit of 64 MB (--max-eval-memory-mb)"
+            , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
             , CaseAnswered ]
+          map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
+            `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
+
+      -- SPEEDTRAP (2026-10-03): only a case a limit stopped carries @limit.
+      it "puts @limit on the case a limit stopped, and on no other" do
+        withServiceFromSourcesOpts spinOptions "spin-limit-key" [("spin.l4", spinOrRefuseJL4)] \baseUrl mgr -> do
+          let body = Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object ["@id" Aeson..= (1 :: Int), "n" Aeson..= spinSlow]
+                    , Aeson.object ["@id" Aeson..= (2 :: Int)]
+                    , Aeson.object ["@id" Aeson..= (3 :: Int), "n" Aeson..= (-1 :: Int)]
+                    , Aeson.object ["@id" Aeson..= (4 :: Int), "n" Aeson..= (1_000 :: Int)]
+                    ]
+                ]
+          req <- buildJsonPost (baseUrl <> "/deployments/spin-limit-key/functions/spin/evaluation/batch") body
+          resp <- httpLbs req mgr
+          let raw = rawBatchCases resp
+          map (Aeson.KeyMap.lookup "@limit") raw
+            `shouldBe` [Just (Aeson.String "time"), Nothing, Nothing, Nothing]
+          map (Aeson.KeyMap.member "@error") raw `shouldBe` [True, True, False, False]
+          map (Aeson.KeyMap.member "@refused") raw `shouldBe` [False, False, True, False]
 
       it "answers 10 batches sent at once, which share the core's one slot" do
         -- The slots are the process's, not each request's. With a set per
@@ -2505,6 +2527,13 @@ postSpinBatch baseUrl mgr deployId steps = do
         ]
   req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/spin/evaluation/batch") body
   httpLbs req mgr
+
+-- | The case objects of a batch response, as the service wrote them.
+rawBatchCases :: Response LBS.ByteString -> [Aeson.Object]
+rawBatchCases resp = case Aeson.decode (responseBody resp) of
+  Just (Aeson.Object o) | Just (Aeson.Array cs) <- Aeson.KeyMap.lookup "cases" o ->
+    [c | Aeson.Object c <- toList cs]
+  _ -> error ("not a batch response: " <> show (responseBody resp))
 
 -- | The batch was a 200, its cases came back with these outcomes in order, and
 -- the summary counts the answered ones as processed and the rest as ignored.

@@ -120,7 +120,9 @@ instance Arbitrary ResponseWithReason where
   arbitrary = ResponseWithReason <$> arbitrary <*> pure emptyTree <*> pure Nothing <*> arbitrary
 
 instance Arbitrary EvaluatorError where
-  arbitrary = Q.oneof [InterpreterError <$> arbitrary]
+  arbitrary = Q.oneof
+    [ InterpreterError <$> arbitrary
+    , EvaluatorLimited <$> Q.arbitraryBoundedEnum <*> arbitrary ]
 
 instance Arbitrary SimpleResponse where
   arbitrary =
@@ -209,7 +211,9 @@ instance Arbitrary OutputCase where
       <*> arbitrary
       <*> pure Nothing  -- Exclude GraphViz from QuickCheck
       <*> arbitrary
-      <*> Q.oneof [pure CaseAnswered, CaseRefused <$> arbitrary, CaseErrored <$> arbitrary]
+      <*> Q.oneof
+            [ pure CaseAnswered, CaseRefused <$> arbitrary, CaseErrored <$> arbitrary
+            , CaseLimited <$> Q.arbitraryBoundedEnum <*> arbitrary ]
 
 instance Arbitrary OutputSummary where
   arbitrary =

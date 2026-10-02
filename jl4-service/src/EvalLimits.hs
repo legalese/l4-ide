@@ -7,6 +7,7 @@ module EvalLimits (
   limitHitMessage,
 ) where
 
+import Backend.Api (LimitHit (..))
 import Control.Exception (catch, finally)
 import Data.Int (Int64)
 import Data.Text (Text)
@@ -16,18 +17,17 @@ import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Options (Options (..))
 import System.Timeout (timeout)
 
--- | Which of an evaluation's two limits stopped it.
-data LimitHit = TimeLimitHit | AllocationLimitHit
-
 -- | The message on a batch case that hit a limit. It keeps the prefix of the
--- 500 a single evaluation gets, and names the limit and the option that sets it.
+-- 500 a single evaluation gets, and names the limit and the option that sets
+-- it. It does not say why the case took that long or that much: the case's
+-- own work and a busy service look the same from here.
 limitHitMessage :: Options -> LimitHit -> Text
 limitHitMessage cfg = \case
   TimeLimitHit ->
-    "Evaluation resource limit exceeded: this case ran past the time limit of "
+    "Evaluation resource limit exceeded: this case did not finish within the time limit of "
       <> Text.pack (show cfg.evalTimeout) <> " s (--eval-timeout)"
   AllocationLimitHit ->
-    "Evaluation resource limit exceeded: this case allocated more than the limit of "
+    "Evaluation resource limit exceeded: this case allocated more than the memory limit of "
       <> Text.pack (show cfg.maxEvalMemoryMb) <> " MB (--max-eval-memory-mb)"
 
 -- | Run an evaluation under the configured time and allocation limits.

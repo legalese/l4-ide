@@ -274,7 +274,7 @@ A case the rule refused carries `@refused` (the reason) and still counts as proc
 Neither has a result.
 
 Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is.
-A case that reaches one fails on its own: it carries `@error`, such as `Evaluation resource limit exceeded: this case ran past the time limit of 3 s (--eval-timeout)`, and the other cases keep their answers.
+A case that reaches one fails on its own: it carries `@error`, such as `Evaluation resource limit exceeded: this case did not finish within the time limit of 3 s (--eval-timeout)`, and `@limit`, which is `"time"` or `"memory"`; the other cases keep their answers.
 The batch is still a `200`.
 
 The cases run concurrently, but no more batch cases run at once, counting every batch in flight, than the service has cores (its capabilities, `+RTS -N`; see [CLI Options](#cli-options)).

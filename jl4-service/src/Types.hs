@@ -36,7 +36,7 @@ module Types (
   AppM,
 ) where
 
-import Backend.Api (EvalBackend, FnLiteral, Presumption, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
+import Backend.Api (EvalBackend, FnLiteral, LimitHit, Presumption, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
 import Backend.DecisionQueryPlan (CachedDecisionQuery)
 import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
@@ -419,7 +419,8 @@ data OutputCase = OutputCase
   , presumed :: [Text]
     -- ^ the case's @presumed@ list ('Backend.Api.ResponseWithReason'), as @\@presumed@
   , outcome :: CaseOutcome
-    -- ^ whether the case was answered; a refusal as @\@refused@, an error as @\@error@
+    -- ^ whether the case was answered; a refusal as @\@refused@, an error as
+    -- @\@error@, and an error that is a limit hit as @\@error@ and @\@limit@
   }
   deriving stock (Show, Eq, Ord)
 
@@ -429,6 +430,9 @@ data CaseOutcome
   = CaseAnswered
   | CaseRefused Text
   | CaseErrored Text
+  | CaseLimited LimitHit Text
+    -- ^ errored because a limit stopped it, which a retry with a higher
+    -- limit or on a less busy service might not repeat
   deriving stock (Show, Eq, Ord)
 
 data BatchResponse = BatchResponse
@@ -526,16 +530,19 @@ instance FromJSON OutputCase where
     presumedVal <- o .:? "@presumed" .!= []
     refusedVal <- o .:? "@refused"
     errorVal <- o .:? "@error"
+    limitVal <- o .:? "@limit"
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@limit" $
           Aeson.KeyMap.delete "@error" $
           Aeson.KeyMap.delete "@refused" $
           Aeson.KeyMap.delete "@presumed" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
-        outcomeVal = case (refusedVal, errorVal) of
-          (Just r, _)       -> CaseRefused r
-          (Nothing, Just e) -> CaseErrored e
-          _                 -> CaseAnswered
+        outcomeVal = case (refusedVal, errorVal, limitVal) of
+          (Just r, _, _)             -> CaseRefused r
+          (Nothing, Just e, Just l)  -> CaseLimited l e
+          (Nothing, Just e, Nothing) -> CaseErrored e
+          _                          -> CaseAnswered
     parsedAttrs <- traverse parseJSON attrs
     pure $ OutputCase caseId parsedAttrs graphvizVal presumedVal outcomeVal
 
@@ -549,6 +556,7 @@ instance ToJSON OutputCase where
              CaseAnswered  -> []
              CaseRefused r -> ["@refused" .= r]
              CaseErrored e -> ["@error" .= e]
+             CaseLimited l e -> ["@error" .= e, "@limit" .= l]
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 
 instance FromJSON OutputSummary where

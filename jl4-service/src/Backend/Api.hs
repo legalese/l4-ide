@@ -294,11 +294,34 @@ data EvaluatorError
     -- The list is the refusal's @presumed@ (T6: "every service response"):
     -- a refusal that rests on a default is one that supplying the input might
     -- turn into an answer, so the caller must be able to see it.
+  | EvaluatorLimited !LimitHit !Text
+    -- ^ The evaluation was stopped by one of the service's limits before it
+    -- finished, with the message the batch endpoint reports. Not an
+    -- 'InterpreterError' either: nothing in the model or the input is known
+    -- to be wrong, and a higher limit or a less busy service might let the
+    -- same case finish. Only the batch endpoint produces it; a single
+    -- evaluation that hits a limit is still a 500.
   | RequiredParameterMissing !ParameterMismatch
   | UnknownArguments ![Text]
   | CannotHandleParameterType !FnLiteral
   | CannotHandleUnknownVars
   deriving stock (Show, Read, Ord, Eq, Generic)
+
+-- | Which of an evaluation's two limits stopped it: @--eval-timeout@ or
+-- @--max-eval-memory-mb@. On the wire, @"time"@ or @"memory"@.
+data LimitHit = TimeLimitHit | AllocationLimitHit
+  deriving stock (Show, Read, Ord, Eq, Enum, Bounded, Generic)
+
+instance ToJSON LimitHit where
+  toJSON = \case
+    TimeLimitHit -> String "time"
+    AllocationLimitHit -> String "memory"
+
+instance FromJSON LimitHit where
+  parseJSON = withText "LimitHit" \case
+    "time" -> pure TimeLimitHit
+    "memory" -> pure AllocationLimitHit
+    other -> fail ("Unknown limit: " <> Text.unpack other)
 
 -- | The derived encoding, except that a refusal keeps its reason as a string
 -- under @contents@, as it was before it carried @presumed@, and puts
@@ -311,12 +334,19 @@ instance ToJSON EvaluatorError where
       , "contents" .= reason
       , "presumed" .= presumedInputs
       ]
+    EvaluatorLimited hit msg -> Aeson.object
+      [ "tag" .= ("EvaluatorLimited" :: Text)
+      , "contents" .= msg
+      , "limit" .= hit
+      ]
     other -> Aeson.genericToJSON Aeson.defaultOptions other
 
 instance FromJSON EvaluatorError where
   parseJSON v = case v of
     Object o | Just (String "EvaluatorRefused") <- Aeson.lookup "tag" o ->
       EvaluatorRefused <$> o .: "contents" <*> (o .:? "presumed" .!= [])
+    Object o | Just (String "EvaluatorLimited") <- Aeson.lookup "tag" o ->
+      EvaluatorLimited <$> o .: "limit" <*> o .: "contents"
     _ -> Aeson.genericParseJSON Aeson.defaultOptions v
 
 prettyEvaluatorError :: EvaluatorError -> Text
@@ -326,6 +356,7 @@ prettyEvaluatorError = \case
     "The model refuses to answer: " <> reason
       <> (if null presumedInputs then ""
           else " (resting on the defaults of " <> Text.intercalate ", " presumedInputs <> ")")
+  EvaluatorLimited _ msg -> msg
   RequiredParameterMissing pm ->
     "Required parameter missing: expected " <> Text.pack (show pm.expected)
     <> " parameter(s), but got " <> Text.pack (show pm.actual)

@@ -129,6 +129,7 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText :: EvaluatorError -> Text
   evalErrorToText (InterpreterError t) = t
   evalErrorToText (EvaluatorRefused reason _) = "The model refuses to answer: " <> reason
+  evalErrorToText (EvaluatorLimited _ msg) = msg
   evalErrorToText (RequiredParameterMissing pm) = "Required parameter missing: expected " <> Text.textShow pm.expected <> ", got " <> Text.textShow pm.actual
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
@@ -281,6 +282,7 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
   evalErrorToText :: EvaluatorError -> Text
   evalErrorToText (InterpreterError t) = t
   evalErrorToText (EvaluatorRefused reason _) = "The model refuses to answer: " <> reason
+  evalErrorToText (EvaluatorLimited _ msg) = msg
   evalErrorToText (RequiredParameterMissing pm) = "Required parameter missing: expected " <> Text.textShow pm.expected <> ", got " <> Text.textShow pm.actual
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit

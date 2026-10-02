@@ -40,6 +40,7 @@ module TestData (
   ownDecodeJL4,
   deonticDefaultJL4,
   spinJL4,
+  spinOrRefuseJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -795,4 +796,22 @@ GIVETH A NUMBER
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE spin IF `count down` n EQUALS 0
+|]
+
+-- | 'spinJL4', except that a negative @n@ is refused: one deployment whose
+-- cases can be answered, refused, errored (no @n@) or stopped by a limit.
+spinOrRefuseJL4 :: Text
+spinOrRefuseJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count down` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE `count down` (n - 1)
+
+@export default spins for n steps and then answers TRUE, refusing a negative n
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE spin IF
+  IF n < 0 THEN REFUSE "n is negative"
+  ELSE `count down` n EQUALS 0
 |]

@@ -105,6 +105,13 @@ instance ToSchema SimpleFunction where
 
 instance ToSchema SimpleResponse
 instance ToSchema EvaluatorError
+-- | As its ToJSON writes it: @"time"@ or @"memory"@, not the constructor names.
+instance ToSchema LimitHit where
+  declareNamedSchema _ =
+    pure $ NamedSchema (Just "LimitHit") $
+      mempty
+        & type_ ?~ OpenApiString
+        & enum_ ?~ ["time", "memory"]
 instance ToSchema ParameterMismatch
 instance ToSchema ResponseWithReason
 instance ToSchema Reasoning

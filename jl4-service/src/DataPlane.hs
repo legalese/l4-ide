@@ -23,7 +23,7 @@ import qualified L4.StateGraph as StateGraph
 import qualified L4.StateGraph.Dot as StateGraph
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 import Compiler (toDecl)
-import EvalLimits (LimitHit, limitHitMessage)
+import EvalLimits (limitHitMessage)
 import qualified EvalLimits
 import Logging (logInfo)
 import Options (Options (..))
@@ -311,10 +311,10 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- before 'withEvalLimits' starts its clock, so waiting for a slot is not
   -- counted either.
   --
-  -- A case that hits a limit is an errored case, like any other (below): it
-  -- does not take the other cases' answers down with it.
+  -- A case that hits a limit is an errored case (below), marked with the
+  -- limit it hit: it does not take the other cases' answers down with it.
   let limitHitCase (hit, allocBytes) =
-        (SimpleError (InterpreterError (limitHitMessage env.options hit)), allocBytes)
+        (SimpleError (EvaluatorLimited hit (limitHitMessage env.options hit)), allocBytes)
   evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase ->
     bracket_ (waitQSem env.batchSlots) (signalQSem env.batchSlots) do
       let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
@@ -336,8 +336,9 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     -- Every case comes back. An answer carries its result; a refusal is a
     -- determinate answer too, and carries its reason and the defaults it
     -- rests on (T6); an error carries its message, so that no case vanishes
-    -- into the count without a reason. Only answers and refusals count as
-    -- processed.
+    -- into the count without a reason, and an error that is a limit hit says
+    -- which limit, so a client can tell it from one that will recur. Only
+    -- answers and refusals count as processed.
     outputCase (rid, simpleRes, _) = case simpleRes of
       SimpleResponse r -> OutputCase
         { id = rid, attributes = r.fnResult, graphviz = r.graphviz
@@ -345,6 +346,9 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
       SimpleError (EvaluatorRefused reason presumedInputs) -> OutputCase
         { id = rid, attributes = Map.empty, graphviz = Nothing
         , presumed = presumedInputs, outcome = CaseRefused reason }
+      SimpleError (EvaluatorLimited hit msg) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseLimited hit msg }
       SimpleError err -> OutputCase
         { id = rid, attributes = Map.empty, graphviz = Nothing
         , presumed = [], outcome = CaseErrored (prettyEvaluatorError err) }
@@ -353,8 +357,9 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nSuccessful = length [ () | c <- outputCases, not (isErrored c.outcome) ]
     nIgnored = nCases - nSuccessful
     isErrored = \case
-      CaseErrored _ -> True
-      _             -> False
+      CaseErrored _   -> True
+      CaseLimited _ _ -> True
+      _               -> False
 
   pure $ addHeader totalAllocBytes $ BatchResponse
     { cases = outputCases
