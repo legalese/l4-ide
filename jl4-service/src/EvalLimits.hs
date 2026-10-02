@@ -1,6 +1,10 @@
--- | The two limits every evaluation runs under, in one place: the data plane
+-- | The two limits an evaluation runs under, in one place: the data plane
 -- (single and batch evaluation) and the MCP server both go through
--- 'withEvalLimits'.
+-- 'withEvalLimits'. Not yet everywhere they should be: the allocation limit
+-- does not stop an evaluation on the generated-wrapper path, and arithmetic
+-- the evaluator leaves unfinished is finished while the response is encoded,
+-- outside both (measured 2026-10-03; the jl4-service README, "What the
+-- limits do not cover yet").
 module EvalLimits (
   LimitHit (..),
   withEvalLimits,

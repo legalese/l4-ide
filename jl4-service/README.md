@@ -299,7 +299,7 @@ The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describ
 
 #### When a case reaches a limit
 
-Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is.
+Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is, with the gaps listed under [What the limits do not cover yet](#what-the-limits-do-not-cover-yet).
 A case that reaches one fails on its own: the other cases keep their answers, and the batch is still a `200`.
 It carries `@error`, and `@limit` beside it:
 
@@ -315,19 +315,22 @@ It carries `@error`, and `@limit` beside it:
 `@limit` is `"time"` when the case did not finish within `--eval-timeout`, and `"memory"` when it allocated more than `--max-eval-memory-mb`.
 No other case has a `@limit` key.
 
-**How to act on it.**
-A case with `@limit` may succeed if it is sent again to a service with a higher limit.
-A `"time"` case may also succeed when the service is less busy, since the time limit is wall-clock (see below); the memory limit counts only the case's own allocation, so a `"memory"` case needs the higher limit.
-A case with `@error` and no `@limit` will fail the same way again.
+**How to read it.**
+`@limit` marks a case the service stopped before it finished, and sending it again may give an answer: to a service with a higher limit, or, for `"time"`, when the service is less busy, since the time limit is wall-clock (see below).
+Neither `@limit` nor its absence promises what the next attempt will do, because a case's outcome can depend on values the deployment has already worked out.
+A value defined at the top level of an imported module is computed once and then kept, across requests, so the first case that needs it pays its time, memory and recursion depth, and later cases find it ready.
+Measured on 2026-10-03: at `+RTS -N1`, four identical cases under a 64 MB limit came back as `"memory"` and then three answers; and a case stopped by the evaluator's recursion-depth limit answered, unchanged, once another case had worked out the value it needed.
+That recursion-depth limit is the evaluator's own, fixed at 1,000,000 levels, and it arrives as a plain `@error`, a message that begins `Stack overflow:`, with no `@limit`.
 
 #### How the cases share the cores
 
 The cases run concurrently, but no more batch cases run at once, counting every batch in flight, than the service has cores (its capabilities, `+RTS -N`; see [CLI Options](#cli-options)).
 A case's clock starts when the case starts running, not when its batch arrives, so waiting behind other cases, of its own batch or another, does not count against it.
-So neither the size of a batch nor the number of batches sent at once decides whether a case meets the time limit: each case has to meet it on its own.
+So neither the size of a batch nor the number of batches sent at once decides whether a case meets the time limit, though the other work listed below can.
 Each request has at most as many cases waiting for a slot as there are slots, and a freed slot goes to the case that has waited longest, so the requests take turns.
 A small batch sent behind a big one therefore waits about one case-time for each request ahead of it, not for the whole of the big batch, and `--max-concurrent-requests` bounds how many requests can be ahead: measured on 2026-10-03 at `+RTS -N2`, a one-case batch sent 0.5 s after a batch of twelve 2-second cases answered in 1.5 s.
-Single evaluations and MCP calls do not wait for a batch slot, so the ones running at the same time as batch cases still share the cores with them.
+Only batch cases take slots.
+Everything else the service does runs beside them on the same cores: single evaluations and MCP calls, compiling deployments, query plans, rendering ladder diagrams and state graphs, and encoding responses, a batch's own included.
 On one core the whole batch takes as long as its cases take together, and more cores shorten it: measured on 2026-10-02 on a machine busy with other work, 100 cases of 0.19 s each took 15.7 s on one core and 4.0 to 5.5 s on ten.
 
 #### What a batch can cost
@@ -577,13 +580,21 @@ By default, error responses return generic messages (e.g., `"Deployment compilat
 The service enforces several resource limits to protect against abuse:
 
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
-- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`. Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
-- **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` and `"@limit": "time"` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. Batch cases, counting every batch in flight, never run more at once than there are cores, so a batch case's clock counts its own work and not other cases', apart from the garbage collector's pauses, which every running evaluation shares. Single evaluations and MCP calls are not held to that bound, so they and the batch cases running beside them do share cores, when together there are more of them than cores.
+- **Evaluation memory**: Each evaluation on the direct path is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`; on the wrapper path it is not yet (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
+- **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` and `"@limit": "time"` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. Batch cases, counting every batch in flight, never run more at once than there are cores, so batch cases do not slow each other down by sharing a core. A batch case's clock still counts the garbage collector's pauses, which every running evaluation shares, and any of the work that takes no slot (single evaluations, MCP calls, compiles, query plans, ladder and state-graph rendering, response encoding) that is sharing its core at the time.
 - **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
 - **Deployment count**: New deployment rejected with `400` if `--max-deployments` is reached.
 - **Ladder size**: `query-plan` and `ladder` return `400` if the decision's ladder diagram exceeds `--max-ladder-nodes`. This bounds a _response_, not a runtime, which is why no timeout covers it: a ladder is drawn in AND/OR normal form, and reaching that form distributes OR over AND, so `(a AND b) OR (c AND d) OR …` over 2n variables becomes 2^n clauses. Eight variables serialize to 12 KB, sixteen to 366 KB, thirty-two to tens of megabytes. The default is far above any diagram a person could read and far below the pathological cases; raise it if a legitimate model meets it. The check short-circuits, so an oversized decision is refused in milliseconds rather than measured at length.
+
+### What the limits do not cover yet
+
+Three gaps, each measured on 2026-10-03, and none fixed yet:
+
+- **The memory limit does not reach the wrapper path.** A request that goes through the generated wrapper (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)), such as one with a `null` inside a record input, is stopped by the time limit only. Four such batch cases under a 64 MB limit came back as `"time"` after 2 s, where the same cases on the direct path came back as `"memory"` at once.
+- **Arithmetic the evaluator leaves unfinished is finished while the response is encoded, outside both limits.** A number built up lazily is only computed when the answer is written out, so a 1-second limit returned an 8 MB number after 1.7 s, and the review that found this saw a 64 MB one after 16.9 s. The worst-case time under [What a batch can cost](#what-a-batch-can-cost) leaves this out.
+- **A single or MCP evaluation that hits a limit inside an imported value spoils that connection.** Later calls on the same kept-alive connection answer `Infinite loop detected while trying to evaluate` instead of evaluating; a new connection evaluates again. Batch cases are not affected: the same batch case after such a call came back with `"@limit": "time"`.
 
 ## Persistence
 

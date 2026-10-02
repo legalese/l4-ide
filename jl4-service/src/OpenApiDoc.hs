@@ -437,7 +437,7 @@ batchResponseSchema fn =
                     , "@limit" .= Aeson.object
                         [ "type" .= ("string" :: Text)
                         , "enum" .= (["time", "memory"] :: [Text])
-                        , "description" .= ("Beside @error when a limit stopped the case: time is --eval-timeout, memory is --max-eval-memory-mb. The case may finish if retried with a higher limit or on a less busy service; an @error without @limit will fail the same way again" :: Text)
+                        , "description" .= ("Beside @error when the service stopped the case at a limit: time is --eval-timeout, memory is --max-eval-memory-mb. Sending the case again may give an answer, with a higher limit, or for time when the service is less busy. Neither @limit nor its absence promises what a retry will do: values the deployment has already worked out are kept, so a case can fail where a later identical one answers. The evaluator's recursion-depth limit is a plain @error, without @limit" :: Text)
                         ]
                     , "@graphviz" .= Aeson.object
                         [ "type" .= ("object" :: Text)

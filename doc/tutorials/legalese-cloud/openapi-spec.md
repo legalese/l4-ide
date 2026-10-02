@@ -82,7 +82,8 @@ The exact path and request shape for each rule come straight from the spec.
 
 Sometimes you have a list of cases rather than one: every row of a spreadsheet of applicants, say, or every claim in last month's file.
 You can send them all in one request, to the rule's batch operation; the spec lists it beside the rule's ordinary operation, under a path that ends in `/evaluation/batch`.
-Give each case an `@id` of your own, such as its row number, so that you can match each answer to its row. For a rule that takes three yes-or-no facts:
+Give each case an `@id` of your own, such as its row number, so that you can match each answer to its row.
+The `@id` must be a whole number, and every case needs one; the service does not check that they are all different. For a rule that takes three yes-or-no facts:
 
 ```json
 {
@@ -96,6 +97,8 @@ Give each case an `@id` of your own, such as its row number, so that you can mat
 
 The request must include `outcomes`; an empty list is fine, because every case comes back with the rule's whole answer.
 
+The request as a whole has to be well formed before any case is looked at. If one case has no `@id`, or an `@id` that is not a whole number (`"APP-0042"`, or `1.5`), or `outcomes` is missing, the service turns the whole request away with an error, and no case is evaluated.
+
 Each case comes back with its own answer, under its `@id`, in the order you sent them:
 
 ```json
@@ -104,12 +107,12 @@ Each case comes back with its own answer, under its `@id`, in the order you sent
 
 What else a case can carry:
 
-- **`@error`**: the case failed, and the message says why, for example a fact the rule needs that the case left out. A case that fails does not spoil the others: they still get their answers.
-- **`@limit`**, beside `@error`: the service stopped the case because it took longer than the service allows (`"time"`) or used more memory than it allows (`"memory"`). A case like that may be worth sending again: a `"time"` case when the service is less busy, and either kind to a service with a higher limit. A case with `@error` and no `@limit` will fail the same way again, so change the case before you send it again.
+- **`@error`**: the case failed, and the message says why, for example a fact the rule needs that the case left out. Once the request has been accepted, a case that fails does not spoil the others: they still get their answers.
+- **`@limit`**, beside `@error`: the service stopped the case because it took longer than the service allows (`"time"`) or used more memory than it allows (`"memory"`). Sending it again may give an answer, for a `"time"` case especially when the service is less busy. Neither `@limit` nor its absence is a promise about the next try, though: the service keeps some of the work it has already done for one case and reuses it for later ones, so a case can fail once and then answer when it is sent again, unchanged.
 - **`@refused`**: the rule itself declined to answer this case, and says why.
 - **`@presumed`**: the facts the case left out for which the rule used its usual value instead, by name. An empty list means the answer rests only on what the case supplied.
 
-For every detail of the request and the response, see the [decision service's own documentation](https://github.com/legalese/l4-ide/blob/main/jl4-service/README.md#batch-evaluation).
+For every detail of the request and the response, see the [decision service's own documentation](../../../jl4-service/README.md#batch-evaluation).
 
 ## Notes
 
