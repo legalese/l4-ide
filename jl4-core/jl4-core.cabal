@@ -282,6 +282,7 @@ test-suite jl4-core-test
     BlawxParseSpec
     ApiStateGraphLensSpec
     SmartPunctuationSpec
+    TypicallyExportSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
