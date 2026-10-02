@@ -1194,6 +1194,11 @@ one place L4 metadata could become executable semantics, and wizard-style consum
 emitted `json_schema` _want_ the defaults. **Not decided.** Whether L4's own semantics should
 follow (that is `TYPICALLY-DEFAULTS-SPEC.md`'s question, not this spec's).
 
+**Extended 2026-10-02** (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T5, W9, branch `feat/typically-w9`, not merged).
+The same lowering applies to a section `GIVEN` and to an `ASSUME` that an exported decision reads: the scope variable is a `context` with an in-scope `definition` of the default, and a note says so.
+A `TYPICALLY` on a **record field** has no Catala form, because a structure's fields carry no defaults; it is dropped and the notes block says so.
+The sentence "a Catala caller may omit it; an L4 caller may not" is still what the note says for a rule's own `GIVEN`, and is not repeated for the other two, because what an L4 caller may omit there differs by kind and is changing (W3, W6).
+
 ### 8.11 R11 — uninspected strings are dropped with a warning; string computation is rejected
 
 **ANSWERED 2026-08-16 — as proposed.**

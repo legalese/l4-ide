@@ -60,7 +60,14 @@ Catala module name rather than writing a file the toolchain would refuse.
 
 The **constitutive subset** — the definitional layer of L4. `WHERE` bindings become `let … in`,
 `CONSIDER` over an enumeration becomes a `match`, `UNLESS` provisos become exception ladders, and
-`TYPICALLY` becomes a Catala `context` variable carrying an in-scope default.
+`TYPICALLY` on an input becomes a Catala `context` variable carrying an in-scope default. That holds
+for a rule's own `GIVEN`, for a section `GIVEN` and for an `ASSUME` the rule reads: a Catala caller
+may leave the variable out and get the default, or supply it and override it.
+
+One place has no Catala form: a `TYPICALLY` on a **record field**. A Catala structure's fields have no
+defaults, so the field is emitted without one, a caller builds the structure with every field, and the
+notes block at the top of the emitted module says that the default was dropped. (The notes block is
+also printed on standard error.)
 
 A pleasant consequence of both backends taking the same subset: the OpenFisca examples compile to
 Catala **unchanged**. The same L4 file feeds both bridges with no edits.

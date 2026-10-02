@@ -62,6 +62,7 @@ import L4.Catala.IR
 import L4.Export
   ( ExportedFunction (..), ParsedDesc (..), getExportedFunctions
   , isNonexhaustiveDecide, parseDescText )
+import L4.Interchange.Typically (classifyDefault, describeDefault)
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..), prettySrcRange)
 import L4.Syntax
 import qualified L4.TypeCheck.Environment as TC
@@ -148,6 +149,9 @@ data RecField = RecField
   , rfUnique :: !Unique
   , rfStatus :: !FieldStatus
   , rfDesc   :: !(Maybe Text)
+  , rfDefault :: !(Maybe (Expr Resolved))
+    -- ^ the field's @TYPICALLY@. A Catala structure field has no default, so it
+    -- is dropped, and 'fieldNotes' says so.
   }
 
 data RecordInfo = RecordInfo
@@ -182,6 +186,10 @@ data AssumeInfo = AssumeInfo
   , aiL4    :: !Text
   , aiType  :: !(Maybe (Type' Resolved))
   , aiRange :: !(Maybe SrcRange)
+  , aiDefault :: !(Maybe (Expr Resolved))
+    -- ^ the @TYPICALLY@ of a section @GIVEN@ or @ASSUME@. Mapped like a rule
+    -- @GIVEN@'s (R10): the scope variable is a @context@ with an in-scope
+    -- default, which a caller may override.
   }
 
 -- | An exported decision's Catala calling convention.
@@ -454,6 +462,18 @@ buildModule opts imports mod' efs =
            \cannot declare a structure with no fields, so `" <> n <> "` is not emitted and this \
            \field goes with it. Reading it is an error."]
         FUnsupported m  -> ["was not emitted: " <> m]
+    ]
+    <>
+    -- A TYPICALLY on a field is dropped whatever happens to the field itself,
+    -- except where the field is computed (a MEANS field is derived, and the
+    -- checker is about to refuse a default there). Catala structures carry data
+    -- and no defaults, so a caller builds the structure with every field.
+    [ "field `" <> f.rfL4 <> "` of `" <> ri.riL4 <> "` carries TYPICALLY "
+        <> describeDefault (classifyDefault d) <> ", which is dropped: a Catala structure's "
+        <> "field has no default, so a Catala caller builds the structure with every field."
+    | ri <- dedupOn (.riL4) (Map.elems records), f <- ri.riFields
+    , Just d <- [f.rfDefault]
+    , f.rfStatus /= FElidedComputed
     ]
 
   structNotes =
@@ -1256,7 +1276,7 @@ lowerExportDi outer assumes assumeUse di ef path =
         outName  = catIdent di.diName
         desc     = if Text.null ef.exportDescription then di.diDesc
                      else Just ef.exportDescription
-    in (\inputs assumeInputs defaults mainRule -> LoweredScope
+    in (\inputs assumeInputs defaults assumeDefaults mainRule -> LoweredScope
           { lsDecl = CatScopeDecl
               { sdName   = catUpper di.diName
               , sdL4     = di.diName
@@ -1265,7 +1285,8 @@ lowerExportDi outer assumes assumeUse di ef path =
               , sdVars   = concat inputs <> assumeInputs <>
                   [ CatScopeVar outName di.diName VarOutput outShape Nothing ]
               }
-          , lsBody  = CatScopeBody (catUpper di.diName) (catMaybes defaults <> [mainRule])
+          , lsBody  = CatScopeBody (catUpper di.diName)
+                        (catMaybes defaults <> catMaybes assumeDefaults <> [mainRule])
           , lsNotes = modeNotes di.diName mainRule <> typicallyNotes
           , lsL4    = di.diName
           , lsDesc  = desc
@@ -1275,6 +1296,7 @@ lowerExportDi outer assumes assumeUse di ef path =
        <$> vList (map scopeInput di.diGivens)
        <*> vList (map assumeInput assumeVs)
        <*> vList (map (typicallyDefault bodyCtx') di.diGivens)
+       <*> vList (map (assumeDefault bodyCtx') assumeVs)
        <*> lowerRule bodyCtx' outName outShape di.diBody
 
   checkGivenShape g = case givenType g of
@@ -1300,7 +1322,11 @@ lowerExportDi outer assumes assumeUse di ef path =
   assumeInput ai = case ai.aiType of
     Nothing -> vBad [LowerError di.diName ai.aiRange
                       ("ASSUME `" <> ai.aiL4 <> "` has no declared type")]
-    Just t  -> (\ty -> CatScopeVar ai.aiName ai.aiL4 VarInput (ShContent ty) Nothing)
+    -- R10, for a section GIVEN or an ASSUME: a TYPICALLY makes the input a
+    -- caller-overridable `context`, exactly as it does for a rule's own GIVEN.
+    Just t  -> (\ty -> CatScopeVar ai.aiName ai.aiL4
+                         (if isJust ai.aiDefault then VarContext else VarInput)
+                         (ShContent ty) Nothing)
                <$> lowerType outer ai.aiRange t
 
   -- R10's disclosed cost (§8.10): the emitted scope is more permissive than its
@@ -1315,6 +1341,17 @@ lowerExportDi outer assumes assumeUse di ef path =
     , isJust (givenTypically g)
     , not (Map.member (getUnique (givenName g)) outer.cxElided)
     ]
+    <>
+    -- The same mapping for a section GIVEN or an ASSUME the decision reads. No
+    -- claim is made here about an L4 caller: what an L4 evaluation does with an
+    -- omitted section GIVEN or ASSUME default is not the same for the two, and
+    -- is changing (TYPICALLY-ONE-BEHAVIOUR-SPEC W3, W6).
+    [ "input `" <> ai.aiL4 <> "` of `" <> di.diName <> "` carries a TYPICALLY, so it is "
+      <> "emitted as a Catala `context` variable with an in-scope default (R10). A Catala caller "
+      <> "that does not supply it gets the default."
+    | ai <- assumeVs
+    , isJust ai.aiDefault
+    ]
 
   -- R10: the scope defines the TYPICALLY value; the caller may override it, and
   -- Catala's default calculus gives the caller's value exception priority.
@@ -1322,6 +1359,20 @@ lowerExportDi outer assumes assumeUse di ef path =
     Nothing -> pure Nothing
     Just d  -> (\e -> Just CatRuleDef
                         { rdVar      = catIdent (givenText g)
+                        , rdModeA    = [CatClause ClPlain Nothing (ConsEquals e)]
+                        , rdModeB    = Nothing
+                        , rdEmitted  = ModeA
+                        , rdFallback = Nothing
+                        , rdEqv      = Nothing
+                        , rdNotes    = []
+                        })
+               <$> lowerExpr innerCtx d
+
+  -- The ASSUME-side twin of 'typicallyDefault'.
+  assumeDefault innerCtx ai = case ai.aiDefault of
+    Nothing -> pure Nothing
+    Just d  -> (\e -> Just CatRuleDef
+                        { rdVar      = ai.aiName
                         , rdModeA    = [CatClause ClPlain Nothing (ConsEquals e)]
                         , rdModeB    = Nothing
                         , rdEmitted  = ModeA
@@ -2261,9 +2312,9 @@ collectRecords mods = Map.fromList $ concat
                }
   ]
  where
-  fieldOf tn@(MkTypedName _ fRes ty _ mMeans) =
+  fieldOf tn@(MkTypedName _ fRes ty mDefault mMeans) =
     RecField (catIdent (resolvedToText fRes)) (resolvedToText fRes) (getUnique fRes)
-             (statusOf ty mMeans) (descOfAnno (getAnno tn))
+             (statusOf ty mMeans) (descOfAnno (getAnno tn)) mDefault
   statusOf ty mMeans
     | isJust mMeans   = FElidedComputed
     | isStringType ty = FElidedString
@@ -2342,8 +2393,9 @@ collectAssumes mods = Map.fromList
         , aiL4    = resolvedToText nRes
         , aiType  = mTy <|> ((\(MkGivethSig _ t) -> t) <$> mGiveth)
         , aiRange = rangeOf a
+        , aiDefault = mDefault
         } )
-  | Assume _ a@(MkAssume _ (MkTypeSig _ _ mGiveth) (MkAppForm _ nRes _ _) mTy _)
+  | Assume _ a@(MkAssume _ (MkTypeSig _ _ mGiveth) (MkAppForm _ nRes _ _) mTy mDefault)
       <- concatMap topDecls mods
   ]
 
