@@ -372,6 +372,25 @@ spec = do
       map (.rdVar) b.sbRules `shouldBe` ["n", "big"]
       map (.clConseq) (ruleOf "n" b).rdModeA `shouldBe` [ConsEquals (ELit (LDec 1000))]
 
+    -- R8 rule 3 (W7): a default may be an expression, and the definition it
+    -- names has to be carried with the scope. Before, `phi` was "defined in this
+    -- module but was not collected as a helper; that is a lowering bug".
+    it "maps a TYPICALLY that is an expression, and carries the definition it names" $ do
+      m <- lowerOk $ Text.unlines
+        [ "GIVETH A NUMBER"
+        , "phi MEANS 8"
+        , ""
+        , "@export"
+        , "GIVEN base IS A NUMBER"
+        , "      rate IS A NUMBER TYPICALLY (phi PLUS 1)"
+        , "GIVETH A NUMBER"
+        , "scaled MEANS base TIMES rate"
+        ]
+      let d = scopeDecl "Scaled" m
+      [ v.svKind | v <- d.sdVars, v.svName == "rate" ] `shouldBe` [VarContext]
+      map (.rdVar) (scopeBody "Scaled" m).sbRules `shouldBe` ["rate", "scaled"]
+      renderModule m `shouldSatisfy` ("declaration phi content decimal" `Text.isInfixOf`)
+
     it "builds a first-match priority ladder for BRANCH (R4, §4.4)" $ do
       m <- lowerOk $ Text.unlines
         [ "@export"

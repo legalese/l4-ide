@@ -1086,8 +1086,14 @@ collectTests modCtx decides mod' =
 -- | Every 'Resolved' occurring anywhere in a decision's body, its @WHERE@
 -- bindings included: @Expr@ is 'Foldable' over its name parameter, so this
 -- over-approximates the reference set, which is exactly what a call graph wants.
+--
+-- A @GIVEN@'s @TYPICALLY@ default is an expression (R8 rule 3) and is lowered
+-- with the body ('typicallyDefault'), so what it names is reached too.
 bodyRefs :: DecideInfo -> Set Unique
-bodyRefs di = Set.fromList (map getUnique (toList di.diBody))
+bodyRefs di =
+  Set.fromList $ map getUnique $
+    toList di.diBody
+      <> concat [ toList d | MkOptionallyTypedName _ _ _ (Just d) <- di.diGivens ]
 
 reachableFrom :: Map Unique DecideInfo -> [Unique] -> [Unique]
 reachableFrom decides = go []
