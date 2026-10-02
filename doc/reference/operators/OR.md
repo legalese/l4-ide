@@ -34,6 +34,9 @@ Implicit operators using punctuation.
 
 OR evaluates lazily - if the first operand is TRUE, the second is not evaluated.
 
+In a trace (`#EVALTRACE`, or the reasoning a service returns), an OR appears as itself, with its first operand and that operand's value beneath it, followed by the second operand when it was needed.
+An operand written as plain `TRUE` or `FALSE` is left out of the first place, since its value is already on the page, and a second operand that was not needed does not appear.
+
 ## Related Keywords
 
 - **[AND](AND.md)** - Logical conjunction
