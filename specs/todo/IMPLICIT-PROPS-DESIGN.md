@@ -1098,7 +1098,9 @@ change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 land
 `GIVEN` binders and `TYPICALLY.md:69-72` carves record fields out. D7.3 rules that a `MAYBE`-typed
 field may be declared `field IS A MAYBE T TYPICALLY NOTHING`, and only then may a construction
 site omit it — same principle, one declaration, the default living where the name is declared.
-Ruled 2026-09-06, **not built**, and **blocked on R8's own named-site half**. The governing text for
+Ruled 2026-09-06, and **built 2026-10-03** with R8's named-site half (W4 and W5 of
+`TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2; `feat/typically-w4w5`, not yet merged), for a
+record's fields. The governing text for
 that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
 `SURFACE-SUGAR-CLUSTER-2026-09.md` §D7.3, which also rules the source/boundary asymmetry R8 does not
 reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
@@ -2423,13 +2425,13 @@ which owns the defect; this section owns the ruling and the limit.
   `L4.Discharge.implicitSupplySites` names so a backend can refuse rather than
   answer wrongly; wiring that refusal into each backend is part of the same
   follow-up.
-- **A rule's own defaulted `GIVEN` still cannot be omitted at a named site.**
-  R8's other half. The default lives on the declaration's `GivenSig`, and
-  `supplyAppNamed` sees only the callee's `Fun` type, which carries names and
-  types but not defaults; supplying it needs the callee's `FunTypeSig` threaded
-  to the call site. `TYPICALLY` therefore has two behaviours today, not the one
-  R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
-  is which.
+- ~~A rule's own defaulted `GIVEN` still cannot be omitted at a named site.~~
+  **Built 2026-10-03 (W4 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2),** on
+  `feat/typically-w4w5`, not yet merged. `supplyAppNamed` now reads the callee's
+  defaults from a table the checker keeps (`CheckEnv.visibleInputDefaults`, built
+  from each `FunTypeSig`'s own checked signature and carried across `IMPORT`) and
+  adds the default as one more named argument; a positional site still gives
+  every input (R8 rule 1).
 - ~~R5, field-opening, is not built.~~ **Built 2026-09-16**, see §11.7.1 for
   what is in the tree and what is not (typed binders only; no synonyms, no
   lambdas, nothing inside a regulative or an `EVENT`; constructors and top-level
