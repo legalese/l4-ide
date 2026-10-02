@@ -35,6 +35,7 @@ module TestData (
   twoDatesJL4,
   ruleDefaultJL4,
   namedSiteDefaultJL4,
+  constructorNamedDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
   sectionSecondJL4,
@@ -785,6 +786,53 @@ combine MEANS
   IF use
   THEN (scaled WITH base IS n) PLUS (Config WITH retries IS rate)'s timeout
   ELSE 0
+|]
+
+-- | Defaults whose value is a bare constructor (FALSE, an enum value), taken at
+-- a NAMED site inside the rules (W4, W5). A constructor is a name, and every use
+-- of it in a run used to share one cell, so a default that was never read was
+-- listed in @presumed@ as soon as the same constructor was evaluated later
+-- (review F1, 2026-10-03). With @x@ FALSE the AND stops at @a@, so @b@ is never
+-- read, although the rule goes on to evaluate FALSE; the second rule's @d@ is
+-- never read while the first's @b@ is, and they are the same constructor.
+constructorNamedDefaultJL4 :: Text
+constructorNamedDefaultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+both MEANS a AND b
+
+GIVEN a IS A BOOLEAN
+      d IS A BOOLEAN TYPICALLY FALSE
+GIVETH A NUMBER
+ignoreD MEANS 0
+
+GIVEN a IS A BOOLEAN
+      c IS A Colour TYPICALLY Red
+GIVETH A NUMBER
+ignoreC MEANS 0
+
+@export default short circuits
+GIVEN x IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`short circuits` MEANS IF (both WITH a IS x) THEN 1 ELSE 0
+
+@export default two of one constructor
+GIVEN x IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`two of one constructor` MEANS
+  IF (ignoreD WITH a IS x) EQUALS 0 THEN (both WITH a IS TRUE) ELSE TRUE
+
+@export default enum never mentioned
+GIVEN x IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A Colour
+`enum never mentioned` MEANS IF (ignoreC WITH a IS x) EQUALS 0 THEN Red ELSE Green
 |]
 
 -- | Record-field defaults, one of them an enum constructor, and an enum
