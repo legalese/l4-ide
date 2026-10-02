@@ -27,7 +27,8 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), checkWithImports, emptyVFS)
+import L4.API.VirtualFS
+  ( ResolvedImport (..), TypeCheckWithDepsResult (..), checkWithImports, vfsFromList )
 import L4.Annotation (emptyAnno)
 import L4.Blawx.Emit (renderPlDumpWith)
 import L4.Blawx.Lower (lowerBlawx)
@@ -62,7 +63,11 @@ import qualified L4.Yscript.Lower as Yscript
 -- The two export-publication refusals are stepped over for the reason
 -- 'BlawxAssumeSpec' gives: they are about publishing a web API.
 checked :: Text -> TypeCheckWithDepsResult
-checked src = case checkWithImports emptyVFS src of
+checked = checkedIn []
+
+-- | The same, for a module that imports others, given as (module name, source).
+checkedIn :: [(Text, Text)] -> Text -> TypeCheckWithDepsResult
+checkedIn files src = case checkWithImports (vfsFromList files) src of
   Left errs -> error ("source failed to parse: " <> show errs)
   Right r
     | errs@(_ : _) <-
@@ -74,6 +79,10 @@ checked src = case checkWithImports emptyVFS src of
 
 moduleOf :: Text -> Module Resolved
 moduleOf = (.tcdModule) . checked
+
+-- | The modules a checked module imports, as @l4 export@ hands them to a backend.
+importsOf :: TypeCheckWithDepsResult -> [Module Resolved]
+importsOf tc = [ ri.riTypeChecked.program | ri <- tc.tcdResolvedImports ]
 
 -- | Rewrite every @TYPICALLY@ into an expression: a number @n@ becomes @n PLUS 1@
 -- and anything else @IF d THEN d ELSE d@. Both are defaults the checker would
@@ -320,6 +329,50 @@ yscriptUnreadSrc = Text.unlines
   , "`may contract` MEANS `has capacity` AND `is adult`"
   ]
 
+-- | A library whose defaults a rule in another file reads (W9 review F1: a
+-- default read through an @IMPORT@ was dropped without a note). A record field
+-- and an @ASSUME@ the main module reads, one it does not, and a rule whose own
+-- @GIVEN@ carries a default.
+importedLib :: Text
+importedLib = Text.unlines
+  [ "DECLARE Config HAS"
+  , "    timeout IS A NUMBER TYPICALLY 30"
+  , "    retries IS A NUMBER"
+  , ""
+  , "ASSUME allowance IS A NUMBER TYPICALLY 100"
+  , ""
+  , "ASSUME `an unrelated fact` IS A NUMBER TYPICALLY 7"
+  , ""
+  , "ASSUME `is in good standing` IS A BOOLEAN TYPICALLY TRUE"
+  , ""
+  , "GIVEN k IS A NUMBER TYPICALLY 9"
+  , "GIVETH A NUMBER"
+  , "`library rule` k MEANS k"
+  ]
+
+importedDmnMain, importedBpmnMain :: Text
+importedDmnMain = Text.unlines
+  [ "IMPORT ratelib"
+  , ""
+  , "@export The budget"
+  , "GIVEN c IS A Config"
+  , "GIVETH A NUMBER"
+  , "`the budget` c MEANS (c's timeout) TIMES (c's retries) PLUS allowance"
+  ]
+importedBpmnMain = Text.unlines
+  [ "IMPORT ratelib"
+  , ""
+  , "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    PROVIDED `is in good standing`"
+  , "    WITHIN 14"
+  ]
+
 -- ---------------------------------------------------------------------------
 -- Per-backend helpers
 -- ---------------------------------------------------------------------------
@@ -336,6 +389,7 @@ dmnDrg m tc =
       , dloMissingMatchRanges = []
       , dloClauseMatrixRanges = []
       , dloExternalRefNames = Just Set.empty
+      , dloImports          = importsOf tc
       }
     m
 
@@ -379,8 +433,13 @@ yscriptErrors m = case Yscript.lowerModule m of
   Right _ -> []
 
 bpmnNotes :: Module Resolved -> Text -> [FidelityNote]
-bpmnNotes m rule =
-  concat [ bpmnDefaultNotes m g | g <- extractStateGraphs m, g.sgName == rule ]
+bpmnNotes = bpmnNotesWith []
+
+-- | The same, for a module that imports others: the imports' modules go in as
+-- the CLI passes them.
+bpmnNotesWith :: [Module Resolved] -> Module Resolved -> Text -> [FidelityNote]
+bpmnNotesWith imports m rule =
+  concat [ bpmnDefaultNotes imports m g | g <- extractStateGraphs m, g.sgName == rule ]
 
 -- | Does some message in the list contain this text?
 mentions :: Text -> [Text] -> Bool
@@ -543,6 +602,22 @@ spec = do
       let src = withoutDefault ruleGivenSrc
       dmnTypicallyNotes (dmnDrg (moduleOf src) (checked src)) `shouldBe` []
 
+    it "reports a default it reads through an IMPORT, names the module, and leaves an unread one alone" $ do
+      let tcI = checkedIn [("ratelib", importedLib)] importedDmnMain
+          ns  = dmnTypicallyNotes (dmnDrg tcI.tcdModule tcI)
+      map (.element) ns `shouldMatchList` ["Config.timeout", "allowance"]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "(in the imported module `ratelib`)")
+      map (.message) ns `shouldSatisfy` (not . mentions "an unrelated fact")
+      -- a rule's own GIVEN default in the library is not this model's loss
+      map (.message) ns `shouldSatisfy` (not . mentions "library rule")
+      -- the dmnmd report carries them too
+      length [ () | n <- (markdownReport (dmnDrg tcI.tcdModule tcI)).notes, n.code == "D-TYPICALLY" ] `shouldBe` 2
+
+    it "would have said nothing of an imported default before it was handed the imports (the control)" $ do
+      let tcI  = checkedIn [("ratelib", importedLib)] importedDmnMain
+          bare = dmnDrg tcI.tcdModule (tcI { tcdResolvedImports = [] })
+      dmnTypicallyNotes bare `shouldBe` []
+
   ------------------------------------------------------------------------
   describe "BPMN: a process cannot carry a default, so each is reported" $ do
     it "reports a default on the drawn rule's own GIVEN" $
@@ -562,6 +637,17 @@ spec = do
 
     it "reports nothing when the module writes no TYPICALLY" $
       bpmnNotes (moduleOf bpmnPlainSrc) "the duty" `shouldBe` []
+
+    it "reports a default on an ASSUME the rule reads through an IMPORT, and names the module" $ do
+      let tcI = checkedIn [("ratelib", importedLib)] importedBpmnMain
+          ns  = bpmnNotesWith (importsOf tcI) tcI.tcdModule "the duty"
+      map (.code) ns `shouldBe` ["P-TYPICALLY"]
+      map (.message) ns `shouldSatisfy`
+        mentions "the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE"
+
+    it "says nothing of that default when it is not handed the imports (the control)" $ do
+      let tcI = checkedIn [("ratelib", importedLib)] importedBpmnMain
+      bpmnNotes tcI.tcdModule "the duty" `shouldBe` []
 
     it "prints an expression default too, instead of missing it" $
       map (.message) (bpmnNotes (withComputedDefaults (moduleOf bpmnGivenSrc)) "the duty")

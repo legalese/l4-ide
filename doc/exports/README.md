@@ -95,13 +95,19 @@ it quietly, and none of them replaces it with a default of the target's own.**
 | **[BPMN](dmn-bpmn.md)**           | dropped; `P-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | not carried (the process draws no record fields) |
 | **[yscript](yscript.md)**         | not exportable (a rule with `GIVEN`s is refused already)          | **refused**, naming the fact and its default | not exportable                                   |
 
-Two things the table cannot show:
+Three things the table cannot show:
 
 - **A default the checker does not yet accept still gets one of these answers.** `TYPICALLY` must
   be a literal today. When it is allowed to be an expression, OpenFisca will turn it into a formula
   that a supplied input overrides (and refuse an expression it cannot lower), Catala will lower it
   as the in-scope definition, DMN, BPMN and Blawx will print it in their notes, docassemble will
   refuse it (or skip that export with a blocking note), and yscript will refuse it. No export is left with an arm that never saw one.
+- **A default written in an imported file counts when the export reads it.** DMN, dmn-md, BPMN and
+  Catala report it, and name the imported module in the note. OpenFisca, Blawx, docassemble and
+  yscript refuse an imported `ASSUME` or an imported record field that the exported rule reads
+  (measured on the 2026-10-03 build: exit 1, nothing written), so none of them can carry one away
+  unannounced. A default on an imported rule's own `GIVEN` is not reported, because the exported
+  rule reaches that rule by calling it, and a call supplies every argument.
 - **OpenFisca is the one target that cannot be left to say nothing.** It gives every variable a
   default whether or not you wrote one (`0.0`, `False`, the first member of an enum), so a
   `TYPICALLY` it did not write out would be silently replaced by that. It maps every default, and

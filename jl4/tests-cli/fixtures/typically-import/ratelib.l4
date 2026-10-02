@@ -1,0 +1,18 @@
+-- A library whose TYPICALLY defaults a rule in another file reads.
+-- A record field and an ASSUME that dmn-main.l4 reads, an ASSUME that bpmn-main.l4
+-- reads, an ASSUME nobody reads, and a rule whose own GIVEN carries a default.
+-- (A default read through an IMPORT used to be dropped by DMN, dmn-md and BPMN
+-- without a note.)
+DECLARE Config HAS
+    timeout IS A NUMBER TYPICALLY 30
+    retries IS A NUMBER
+
+ASSUME allowance IS A NUMBER TYPICALLY 100
+
+ASSUME `an unrelated fact` IS A NUMBER TYPICALLY 7
+
+ASSUME `is in good standing` IS A BOOLEAN TYPICALLY TRUE
+
+GIVEN k IS A NUMBER TYPICALLY 9
+GIVETH A NUMBER
+`library rule` k MEANS k

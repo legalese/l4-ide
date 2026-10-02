@@ -215,6 +215,15 @@ typicallyGolden         = "examples/dmn/expected/defaults.dmn"
 typicallyMarkdownGolden = "examples/dmn/expected/defaults.dmn.md"
 typicallyEngineCases    = "examples/dmn/defaults.cases.json"
 
+-- A default the export reads through an IMPORT. `ratelib.l4` writes the
+-- defaults; `dmn-main.l4` reads two of them (a record field and an ASSUME) and
+-- `bpmn-main.l4` reads a third. A default in an imported file is lost to the
+-- model exactly as a local one is, and used to be dropped without a note.
+typicallyImportLib, typicallyImportDmn, typicallyImportBpmn :: FilePath
+typicallyImportLib  = fixtureDir </> "typically-import" </> "ratelib.l4"
+typicallyImportDmn  = fixtureDir </> "typically-import" </> "dmn-main.l4"
+typicallyImportBpmn = fixtureDir </> "typically-import" </> "bpmn-main.l4"
+
 -- The BPMN side: one regulative rule, with the default written on its own GIVEN,
 -- on a section GIVEN it reads, on an ASSUME it reads, and on a rule it reaches by
 -- HENCE. Each must be reported as P-TYPICALLY.
@@ -450,6 +459,7 @@ fixtures =
   , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
   , typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases
   , bpmnTypicallyGiven, bpmnTypicallySection, bpmnTypicallyAssume, bpmnTypicallyHence
+  , typicallyImportLib, typicallyImportDmn, typicallyImportBpmn
   ]
 
 spec :: FilePath -> Spec
@@ -920,6 +930,36 @@ spec bin = do
 
     it "reports P-TYPICALLY for a default on a rule reached through HENCE" $
       bpmnReportsTypically bin bpmnTypicallyHence "the filing"
+
+    it "reports a default it reads through an IMPORT, names the module, and leaves an unread one alone" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn", typicallyImportDmn, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      let notes = filter ("[D-TYPICALLY] lossy" `isInfixOf`) (lines serr)
+      length notes `shouldBe` 2
+      serr `shouldSatisfy` ("the field `timeout` of `Config` (in the imported module `ratelib`) carries TYPICALLY 30" `isInfixOf`)
+      serr `shouldSatisfy` ("the ASSUME `allowance` (in the imported module `ratelib`) carries TYPICALLY 100" `isInfixOf`)
+      -- an ASSUME nobody reads, and a rule's own GIVEN, are not this model's loss.
+      -- (Only the note lines are searched: the library's ASSUME deprecation
+      -- warnings, also on stderr, name every ASSUME it declares.)
+      let noteLines = filter ("carries TYPICALLY" `isInfixOf`) (lines serr)
+      noteLines `shouldSatisfy` (not . any ("an unrelated fact" `isInfixOf`))
+      noteLines `shouldSatisfy` (not . any ("library rule" `isInfixOf`))
+
+    it "reports the same imported defaults in the dmnmd report" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn-md", typicallyImportDmn, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[D-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 2
+
+    it "reports P-TYPICALLY for a default on an ASSUME the rule reads through an IMPORT" $ do
+      Output code sout serr <-
+        runL4 bin ["export", "bpmn", typicallyImportBpmn, "--rule", "the duty", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[P-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 1
+      serr `shouldSatisfy`
+        ("the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE" `isInfixOf`)
+      filter ("carries TYPICALLY" `isInfixOf`) (lines serr)
+        `shouldSatisfy` (not . any ("an unrelated fact" `isInfixOf`))
+      sout `shouldSatisfy` ("<bpmn:process" `isInfixOf`)
 
     it "says nothing about TYPICALLY on a process that writes none" $ do
       Output code _ serr <- runL4 bin ["export", "bpmn", bpmnOfferingSource, "--fidelity-report"]

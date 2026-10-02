@@ -1,0 +1,6 @@
+IMPORT ratelib
+
+@export The budget
+GIVEN c IS A Config
+GIVETH A NUMBER
+`the budget` c MEANS (c's timeout) TIMES (c's retries) PLUS allowance
