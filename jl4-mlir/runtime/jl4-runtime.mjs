@@ -3512,13 +3512,11 @@ export function createRuntime(opts) {
     // compile-time metadata has `special` set (M5 slice 4A), we patch
     // the children list to match what `traceToReasoning` produces:
     //
-    //   * short-circuit filter — drop the rhs sibling when the prelude
-    //     would have skipped it (AND with FALSE lhs, OR with TRUE lhs);
-    //     our wasm codegen is eager so both frames exist in the pool.
-    //   * synthetic IF sub-tree — `__AND__ a b` desugars to
-    //     @IF a THEN b ELSE FALSE@; jl4-service's trace shows this IF as
-    //     an additional child of the AND node, with `a`/`b` Var leaves.
-    //     Mirror the same shape here.
+    //   * short-circuit filter — drop the rhs sibling when jl4-core would
+    //     have skipped it (AND or IMPLIES with a FALSE lhs, OR with a TRUE
+    //     lhs). jl4-core evaluates the connectives in frames of their own,
+    //     so its trace shows the connective with a child per operand it
+    //     evaluated, and no IF sub-tree (UNKNOWN-EVALUATION-SPEC §4.4).
     // M5 — second arg is the label inherited from an enclosing
     // WHERE/LET binding wrapper. jl4-core's `traceToReasoning`
     // propagates the wrapper's label down through the LAST
@@ -3596,13 +3594,12 @@ export function createRuntime(opts) {
         };
       }
       let kidFrames = frame.children;
-      let extras = [];
-      if (node.special === "AND" || node.special === "OR") {
-        const filtered = filterShortCircuitChildren(frame, node, lookupNode);
-        kidFrames = filtered.kids;
-        extras = synthesizeBoolDesugar(node, filtered, resultText, lookupNode);
-      } else if (node.special === "NOT") {
-        extras = synthesizeNotDesugar(frame, node, resultText, lookupNode);
+      if (
+        node.special === "AND" ||
+        node.special === "OR" ||
+        node.special === "IMPLIES"
+      ) {
+        kidFrames = filterShortCircuitChildren(frame, node, lookupNode).kids;
       }
       // Effective label for THIS frame: the schema's bindingLabel if
       // the frame is a wrapper, else whatever the parent passed down.
@@ -3620,7 +3617,7 @@ export function createRuntime(opts) {
       return {
         exampleCode: ec,
         explanation: ["Result: " + resultText],
-        children: [...renderedKids, ...extras],
+        children: renderedKids,
       };
     };
     // Synthesised top: `<fn name> OF <args>` Result: …. Children list
@@ -3691,139 +3688,23 @@ export function createRuntime(opts) {
     return null;
   }
 
-  // M5 slice 4A — drop the rhs frame when the prelude would have
-  // short-circuited. Our wasm codegen evaluates AND/OR eagerly so both
-  // arg frames exist in the pool; this filter brings the trace shape
-  // back in line with jl4-service's lazy evaluation order.
+  // M5 slice 4A — drop the rhs frame when jl4-core would have
+  // short-circuited. Our wasm codegen may evaluate the operands eagerly
+  // so both arg frames can exist in the pool; this filter brings the
+  // trace shape back in line with jl4-service's lazy evaluation order.
   function filterShortCircuitChildren(frame, node, lookupNode) {
     const kids = frame.children;
-    if (kids.length < 1) return { kids, dropped: false, lhsTruth: null };
-    // M5 slice 4D — always read lhs from the FIRST child if present.
-    // With slice-4D's short-circuit AND/OR codegen, the rhs frame is
-    // absent (only 1 child); we still need lhsTruth to drive the IF
-    // sub-tree's taken-branch leaf (FALSE / TRUE / b).
+    if (kids.length < 2) return { kids, dropped: false };
+    // M5 slice 4D — the lhs is the FIRST child. With slice-4D's
+    // short-circuit codegen the rhs frame is already absent.
     const lhsTruth = frameTruth(kids[0], lookupNode);
-    if (kids.length < 2) return { kids, dropped: false, lhsTruth };
-    let kept = kids;
-    let dropped = false;
-    if (node.special === "AND" && lhsTruth === false) {
-      kept = kids.slice(0, 1);
-      dropped = true;
-    } else if (node.special === "OR" && lhsTruth === true) {
-      kept = kids.slice(0, 1);
-      dropped = true;
-    }
-    return { kids: kept, dropped, lhsTruth };
-  }
-
-  // M5 slice 4A — append the synthetic IF sub-tree the prelude desugar
-  // for @__AND__@ / @__OR__@ produces in jl4-service's trace.
-  //
-  //   __AND__ a b ⟶ IF a THEN b ELSE FALSE
-  //   __OR__  a b ⟶ IF a THEN TRUE ELSE b
-  //
-  // The IF sub-tree's "a" and "b" leaves use the *evaluated* truths
-  // from the AND/OR's sibling sub-traces — the lambda body sees @a@
-  // and @b@ already reduced to WHNF. When short-circuit dropped the
-  // rhs, we drop the corresponding child from the IF sub-tree too.
-  function synthesizeBoolDesugar(node, filtered, parentResultText, lookupNode) {
-    const kids = filtered.kids;
-    if (kids.length < 1) return [];
-    const lhsTruth = filtered.lhsTruth;
-    const rhsTruth = kids.length >= 2 ? frameTruth(kids[1], lookupNode) : null;
-    const aText =
-      lhsTruth === true ? "TRUE" : lhsTruth === false ? "FALSE" : "";
-    const bText =
-      rhsTruth === true ? "TRUE" : rhsTruth === false ? "FALSE" : "";
-    // IF sub-tree's exampleCode literal differs by operator. AND emits
-    // `IF a THEN b ELSE FALSE`; OR emits `IF a THEN TRUE ELSE b`.
-    const ifText =
-      node.special === "AND"
-        ? "IF a THEN b ELSE FALSE"
-        : "IF a THEN TRUE ELSE b";
-    const ifChildren = [
-      { exampleCode: ["a"], explanation: ["Result: " + aText], children: [] },
-    ];
-    // The second IF child is the *taken* branch:
-    //   AND, lhs TRUE  → `b` (the rhs eval)            ⇒ Result = b's truth
-    //   AND, lhs FALSE → `FALSE` (the ELSE literal)    ⇒ Result = FALSE
-    //   OR,  lhs TRUE  → `TRUE`  (the THEN literal)    ⇒ Result = TRUE
-    //   OR,  lhs FALSE → `b` (the rhs eval)            ⇒ Result = b's truth
-    // jl4-service traces the taken branch as a leaf node with the
-    // branch expression as exampleCode and its NF result as the line.
-    if (node.special === "AND") {
-      if (lhsTruth === true && kids.length >= 2) {
-        ifChildren.push({
-          exampleCode: ["b"],
-          explanation: ["Result: " + bText],
-          children: [],
-        });
-      } else if (lhsTruth === false) {
-        ifChildren.push({
-          exampleCode: ["FALSE"],
-          explanation: ["Result: FALSE"],
-          children: [],
-        });
-      }
-    } else {
-      // OR
-      if (lhsTruth === true) {
-        ifChildren.push({
-          exampleCode: ["TRUE"],
-          explanation: ["Result: TRUE"],
-          children: [],
-        });
-      } else if (lhsTruth === false && kids.length >= 2) {
-        ifChildren.push({
-          exampleCode: ["b"],
-          explanation: ["Result: " + bText],
-          children: [],
-        });
-      }
-    }
-    return [
-      {
-        exampleCode: [ifText],
-        explanation: ["Result: " + parentResultText],
-        children: ifChildren,
-      },
-    ];
-  }
-
-  // M5 slice 4A — synthetic IF sub-tree for `__NOT__ a` ⟶
-  // `IF a THEN FALSE ELSE TRUE`. Single arg, no short-circuit.
-  function synthesizeNotDesugar(frame, _node, parentResultText, lookupNode) {
-    if (frame.children.length < 1) return [];
-    const argTruth = frameTruth(frame.children[0], lookupNode);
-    const aText =
-      argTruth === true ? "TRUE" : argTruth === false ? "FALSE" : "";
-    // Mirror 'synthesizeBoolDesugar' for AND/OR — the IF sub-tree
-    // includes a 'taken-branch' leaf after the @a@ input leaf:
-    //   argTruth === true  → @FALSE@ (the THEN literal)
-    //   argTruth === false → @TRUE@  (the ELSE literal)
-    const ifChildren = [
-      { exampleCode: ["a"], explanation: ["Result: " + aText], children: [] },
-    ];
-    if (argTruth === true) {
-      ifChildren.push({
-        exampleCode: ["FALSE"],
-        explanation: ["Result: FALSE"],
-        children: [],
-      });
-    } else if (argTruth === false) {
-      ifChildren.push({
-        exampleCode: ["TRUE"],
-        explanation: ["Result: TRUE"],
-        children: [],
-      });
-    }
-    return [
-      {
-        exampleCode: ["IF a THEN FALSE ELSE TRUE"],
-        explanation: ["Result: " + parentResultText],
-        children: ifChildren,
-      },
-    ];
+    const decided =
+      ((node.special === "AND" || node.special === "IMPLIES") &&
+        lhsTruth === false) ||
+      (node.special === "OR" && lhsTruth === true);
+    return decided
+      ? { kids: kids.slice(0, 1), dropped: true }
+      : { kids, dropped: false };
   }
 
   // M5 — walk a wasm-allocated compound value at `raw` using the

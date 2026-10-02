@@ -1,0 +1,38 @@
+{
+  "membership-implies-payment": [
+    {
+      "is a member": true,
+      "has paid": true
+    },
+    {
+      "is a member": true,
+      "has paid": false
+    },
+    {
+      "is a member": false,
+      "has paid": true
+    },
+    {
+      "is a member": false,
+      "has paid": false
+    }
+  ],
+  "member-implies-paid": [
+    {
+      "member": true,
+      "paid": true
+    },
+    {
+      "member": true,
+      "paid": false
+    },
+    {
+      "member": false,
+      "paid": true
+    },
+    {
+      "member": false,
+      "paid": false
+    }
+  ]
+}
