@@ -117,10 +117,12 @@ instance Arbitrary Reasoning where
         Q.shuffle (first : rest)
 
 instance Arbitrary ResponseWithReason where
-  arbitrary = ResponseWithReason <$> arbitrary <*> pure emptyTree <*> pure Nothing
+  arbitrary = ResponseWithReason <$> arbitrary <*> pure emptyTree <*> pure Nothing <*> arbitrary
 
 instance Arbitrary EvaluatorError where
-  arbitrary = Q.oneof [InterpreterError <$> arbitrary]
+  arbitrary = Q.oneof
+    [ InterpreterError <$> arbitrary
+    , EvaluatorLimited <$> Q.arbitraryBoundedEnum <*> arbitrary ]
 
 instance Arbitrary SimpleResponse where
   arbitrary =
@@ -162,7 +164,10 @@ instance Arbitrary TraceEvent where
   arbitrary = TraceEvent <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary FnArguments where
-  arbitrary = FnArguments <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+  arbitrary = FnArguments <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary Presumption where
+  arbitrary = Q.chooseEnum (minBound, maxBound)
 
 instance Arbitrary SimpleFunction where
   arbitrary = SimpleFunction <$> arbitrary <*> arbitrary
@@ -185,6 +190,7 @@ instance Arbitrary BatchRequest where
     BatchRequest
       <$> arbitrary
       <*> arbitrary
+      <*> arbitrary
 
 instance Arbitrary BatchResponse where
   arbitrary =
@@ -204,6 +210,10 @@ instance Arbitrary OutputCase where
       <$> arbitrary
       <*> arbitrary
       <*> pure Nothing  -- Exclude GraphViz from QuickCheck
+      <*> arbitrary
+      <*> Q.oneof
+            [ pure CaseAnswered, CaseRefused <$> arbitrary, CaseErrored <$> arbitrary
+            , CaseLimited <$> Q.arbitraryBoundedEnum <*> arbitrary ]
 
 instance Arbitrary OutputSummary where
   arbitrary =

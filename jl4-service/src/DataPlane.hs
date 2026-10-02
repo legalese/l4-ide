@@ -23,6 +23,8 @@ import qualified L4.StateGraph as StateGraph
 import qualified L4.StateGraph.Dot as StateGraph
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 import Compiler (toDecl)
+import EvalLimits (limitHitMessage)
+import qualified EvalLimits
 import Logging (logInfo)
 import Options (Options (..))
 import Shared (jsonError)
@@ -33,10 +35,12 @@ import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch, evaluate)
+import Control.Exception (bracket_, evaluate)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
+import Data.Functor ((<&>))
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
 import Data.List (find)
 import Data.Map.Strict (Map)
@@ -46,8 +50,6 @@ import Data.Scientific (Scientific)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
-import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Servant
 import System.FilePath ((<.>))
 import System.Timeout (timeout)
@@ -246,6 +248,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
       rawArgs = Map.toList fnArgs.fnArguments
       remappedArgs = remapArguments reverseMap rawArgs
+      presumption = Maybe.fromMaybe PresumeSoft fnArgs.presumption
 
   (result, allocBytes) <- case (isDeontic, fnArgs.startTime, fnArgs.events) of
     -- Non-deontic function: reject deontic params
@@ -255,7 +258,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
       throwError err400 { errBody = jsonError "startTime and events are only valid for functions returning DEONTIC" }
     -- Non-deontic function: existing path
     (False, Nothing, Nothing) ->
-      runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz
+      runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz presumption
     -- Deontic function: require both startTime and events
     (True, Nothing, _) ->
       throwError err400 { errBody = jsonError "startTime is required for functions returning DEONTIC" }
@@ -265,7 +268,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
     (True, Just st, Just evts) ->
       runDeonticEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs st evts
         vf.fnImpl.deonticPartyType vf.fnImpl.deonticActionType
-        mTraceHeader mTraceParam mGraphViz
+        mTraceHeader mTraceParam mGraphViz presumption
   case result of
     SimpleError _ -> throwEvalError allocBytes result
     _ -> pure $ addHeader allocBytes result
@@ -296,13 +299,44 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
 
-  -- Evaluate all cases in parallel, collecting alloc bytes per case
-  evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase -> do
-    let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-    r <- runAppM env (runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz)
-    pure (inputCase.id, r)
+  -- Evaluate the cases concurrently, but each case only once it holds one of
+  -- the process's batch slots ('batchSlots', one per capability, shared with
+  -- every other batch in flight), collecting alloc bytes per case.
+  --
+  -- A case's time limit is wall-clock, so it counts whatever shares the core
+  -- while the case runs. With every case started at once, each case's timer
+  -- counted its siblings' work as well as its own: on one core, forty cases of
+  -- a fifth of a second each failed the batch under a three-second limit that
+  -- no case came near (TRAFFICJAM, 2026-10-02). A case acquires its slot
+  -- before 'withEvalLimits' starts its clock, so waiting for a slot is not
+  -- counted either.
+  --
+  -- A case that hits a limit is an errored case (below), marked with the
+  -- limit it hit: it does not take the other cases' answers down with it.
+  let limitHitCase (hit, allocBytes) =
+        (SimpleError (EvaluatorLimited hit (limitHitMessage env.options hit)), allocBytes)
 
-  -- Check for fatal errors and propagate
+  -- In front of the shared slots, each request has a bound of its own, as
+  -- many units as there are shared slots, so that a request never has more
+  -- than that many cases waiting for a shared slot. Without it, every case of
+  -- a big batch queued at once, and a one-case batch from another client sent
+  -- 0.5 s later waited for the whole big batch: 11.5 s, against 0.1 s before
+  -- the slots were shared (-N2, 12 slow cases, 2026-10-03). This depends on
+  -- base's QSem granting a released unit to the oldest waiter ("guaranteed
+  -- FIFO ordering for satisfying blocked waitQSem calls"): the small batch's
+  -- case is then next in line. Do not swap in an STM TSem, which wakes every
+  -- waiter and lets any of them take the unit, so a big batch can keep it.
+  local <- liftIO $ newQSem env.batchSlots.count
+  evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase ->
+    bracket_ (waitQSem local) (signalQSem local) $
+    bracket_ (waitQSem env.batchSlots.shared) (signalQSem env.batchSlots.shared) do
+      let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
+      r <- runAppM env (runEvaluatorForDirectLimited vf Nothing args outputFilter traceLevel includeGraphViz
+                          (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
+      pure (inputCase.id, either limitHitCase id <$> r)
+
+  -- Check for fatal errors and propagate. None is a case's own: the one left
+  -- is a function with no evaluator for its backend, which fails every case.
   case [err | (_, Left err) <- evalResults] of
     (err:_) -> throwError err
     [] -> pure ()
@@ -312,26 +346,36 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case comes back. An answer carries its result; a refusal is a
+    -- determinate answer too, and carries its reason and the defaults it
+    -- rests on (T6); an error carries its message, so that no case vanishes
+    -- into the count without a reason, and an error that is a limit hit says
+    -- which limit, so a client can tell it from one that will recur. Only
+    -- answers and refusals count as processed.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , presumed = r.presumed, outcome = CaseAnswered }
+      SimpleError (EvaluatorRefused reason presumedInputs) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = presumedInputs, outcome = CaseRefused reason }
+      SimpleError (EvaluatorLimited hit msg) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseLimited hit msg }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, not (isErrored c.outcome) ]
     nIgnored = nCases - nSuccessful
+    isErrored = \case
+      CaseErrored _   -> True
+      CaseLimited _ _ -> True
+      _               -> False
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful
@@ -585,11 +629,12 @@ runEvaluatorFor
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorFor vf engine args outputFilter mTraceHeader mTraceParam mGraphViz = do
+runEvaluatorFor vf engine args outputFilter mTraceHeader mTraceParam mGraphViz presumption = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
-  runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz
+  runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption
 
 -- | Core evaluator logic. Returns the response and GHC allocation bytes consumed.
 runEvaluatorForDirect
@@ -599,24 +644,42 @@ runEvaluatorForDirect
   -> Maybe (Set.Set Text)
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz = do
+runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption =
+  runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption
+    >>= either (const resourceLimitExceeded) pure
+
+-- | 'runEvaluatorForDirect', returning a limit hit (and the bytes allocated up
+-- to it) instead of failing the request, so that the batch endpoint can report
+-- it on the one case that hit it.
+runEvaluatorForDirectLimited
+  :: ValidatedFunction
+  -> Maybe EvalBackend
+  -> [(Text, Maybe FnLiteral)]
+  -> Maybe (Set.Set Text)
+  -> TraceLevel
+  -> Bool
+  -> Presumption
+  -> AppM (Either (LimitHit, Int64) (SimpleResponse, Int64))
+runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption = do
   let evalBackend = Maybe.fromMaybe JL4 engine
   case Map.lookup evalBackend vf.fnEvaluator of
     Nothing -> throwError err500 { errBody = jsonError "No evaluator available for backend" }
     Just runFn -> do
-      (evaluationResult, allocBytes) <-
-        timeoutAction $
+      limited <-
+        withEvalLimits $
           runExceptT
             ( runFn.runFunction
                 args
                 outputFilter
                 traceLevel
                 includeGraphViz
+                presumption
             )
-      case evaluationResult of
-        Left err -> pure (SimpleError err, allocBytes)
-        Right r -> pure (SimpleResponse r, allocBytes)
+      pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
+        Left err -> (SimpleError err, allocBytes)
+        Right r -> (SimpleResponse r, allocBytes)
 
 -- | Run deontic evaluation with EVALTRACE.
 runDeonticEvaluatorFor
@@ -630,8 +693,9 @@ runDeonticEvaluatorFor
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType mTraceHeader mTraceParam mGraphViz = do
+runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType mTraceHeader mTraceParam mGraphViz presumption = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
 
@@ -658,6 +722,7 @@ runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType m
             mActionType
             traceLevel
             includeGraphViz
+            presumption
         )
 
   case evaluationResult of
@@ -671,23 +736,18 @@ runAppM env action = runHandler $ runReaderT action env
 -- | Timeout and memory-limited evaluation action.
 -- Uses configurable eval timeout and per-evaluation allocation limits.
 -- Returns the result and the number of GHC allocation bytes consumed.
+-- Hitting either limit fails the request with a 500.
 timeoutAction :: IO b -> AppM (b, Int64)
-timeoutAction act = do
+timeoutAction act = withEvalLimits act >>= either (const resourceLimitExceeded) pure
+
+resourceLimitExceeded :: AppM a
+resourceLimitExceeded = throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+
+-- | 'EvalLimits.withEvalLimits' under the service's configured limits.
+withEvalLimits :: IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
+withEvalLimits act = do
   cfg <- asks (.options)
-  let timeoutMicros = cfg.evalTimeout * 1_000_000
-      memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
-  result <- liftIO $
-    (timeout timeoutMicros $ do
-      setAllocationCounter memLimitBytes
-      enableAllocationLimit
-      r <- act
-      remaining <- getAllocationCounter
-      pure (r, memLimitBytes - remaining)
-    ) `catch` \AllocationLimitExceeded ->
-      pure Nothing
-  case result of
-    Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
-    Just x -> pure x
+  liftIO (EvalLimits.withEvalLimits cfg act)
 
 -- ----------------------------------------------------------------------------
 -- Helpers

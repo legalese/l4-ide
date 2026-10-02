@@ -1,0 +1,14 @@
+-- l4 batch over a section GIVEN with a TYPICALLY default
+-- (specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md, W3). A row that leaves
+-- `has capacity` out takes TRUE, and lists it in `presumed`, but only when
+-- the rule actually reads it: `is adult` FALSE short-circuits it away.
+
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Can contract
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`can contract` MEANS `is adult` AND `has capacity`
+
+#EVAL `can contract` TRUE

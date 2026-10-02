@@ -1,0 +1,8 @@
+-- l4 batch over a STRING input beside a defaulted NUMBER: a CSV cell may be
+-- quoted and hold a newline, and the row is still one row.
+
+@export Note
+GIVEN note IS A STRING
+      n IS A NUMBER TYPICALLY 2
+GIVETH A NUMBER
+`note count` MEANS n

@@ -664,9 +664,36 @@ checkRegulativeBinOp ec opname op ctx ann e1 e2 t = do
 
 -- Phase 4.
 inferDeclare :: Declare Name -> Check (Declare Resolved, [CheckInfo])
-inferDeclare (MkDeclare ann _tysig appForm _t) =
+inferDeclare (MkDeclare ann _tysig appForm t) =
   errorContext (WhileCheckingDeclare (getName appForm)) do
-    lookupDeclareCheckedByAnno ann >>= \ d -> pure (d.payload, d.publicNames)
+    d <- lookupDeclareCheckedByAnno ann
+    payload <- checkFieldDefaults t d.payload
+    pure (payload, d.publicNames)
+
+-- | Check each field's @TYPICALLY@ default, now that every constructor is in
+-- scope.
+--
+-- Phase 1 ('inferTyDeclDeclare') checks a DECLARE while only the type NAMES
+-- are known, so a field default naming an enum constructor could not resolve
+-- there: @colour IS A Colour TYPICALLY Red@ failed with "I could not find a
+-- definition for the identifier Red", and then, the reference being
+-- unresolved, with the misleading "must be a literal" (p10 of
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md, L4 there). The same default on a @GIVEN@
+-- checked fine. 'inferSelector' therefore leaves a field's default unchecked,
+-- and it is checked here, against the field type phase 1 resolved.
+checkFieldDefaults :: TypeDecl Name -> Declare Resolved -> Check (Declare Resolved)
+checkFieldDefaults t (MkDeclare dann dsig daf rt) =
+  MkDeclare dann dsig daf <$> case (t, rt) of
+    (RecordDecl _ _ tns, RecordDecl rann mcon rtns) ->
+      RecordDecl rann mcon <$> fields tns rtns
+    (EnumDecl _ cds, EnumDecl rann rcds) ->
+      EnumDecl rann <$> zipWithM conFields cds rcds
+    _ -> pure rt
+ where
+  conFields (MkConDecl _ _ tns) (MkConDecl cann cn rtns) = MkConDecl cann cn <$> fields tns rtns
+  fields = zipWithM \ (MkTypedName _ n _ mTypically _) (MkTypedName fann fn fty _ fmeans) -> do
+    rTypically <- checkTypically n fty mTypically
+    pure (MkTypedName fann fn fty rTypically fmeans)
 
 -- | Where an 'Assume' node came from. Only an author-written @ASSUME@ is the
 -- deprecated spelling; the 0-ary @ASSUME@ that 'desugarSectionGivens' prepends
@@ -1766,9 +1793,11 @@ rejectTypicallyOnType _ Nothing  = pure Nothing
 rejectTypicallyOnType n (Just _) = Nothing <$ addError (TypicallyOnTypeVariable n)
 
 inferSelector :: AppForm Resolved -> TypedName Name -> Check (TypedName Resolved, [CheckInfo])
-inferSelector rappForm (MkTypedName ann n t mTypically _mMeans) = do
+inferSelector rappForm (MkTypedName ann n t _mTypically _mMeans) = do
   rt <- inferType t
-  rTypically <- checkTypically n rt mTypically
+  -- The field's TYPICALLY is checked in phase 4, by 'checkFieldDefaults':
+  -- here no constructor is in scope yet, so an enum default cannot resolve.
+  let rTypically = Nothing
   dn <- def n
   let selectorInfo = KnownTerm (forall' (view appFormArgs rappForm) (fun_ [appFormType rappForm] rt)) Selector
   -- Record @desc annotation for LSP hover
