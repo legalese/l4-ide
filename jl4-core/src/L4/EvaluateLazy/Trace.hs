@@ -4,6 +4,7 @@ module L4.EvaluateLazy.Trace where
 import Base
 import qualified Base.DList as DList
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.Annotation (emptyAnno)
 import L4.Syntax
@@ -137,15 +138,25 @@ instance LayoutPrinter EvalTraceAction where
 -- with no expression of its own) is passed over to the application waiting on
 -- it, and the event is a child of that application.
 --
--- A default first forced while the RESULT is being normalised, after the main
--- expression has finished (a defaulted field of a returned record that nothing
--- else read), has no frame open to hang from. 'hoistLateDefaults' moves such an
--- event to just before the result of the main expression, so that it hangs on
--- the expression that built the result. If the main expression did not end the
--- usual way, it is dropped; it is still in the directive's @presumed@ list.
+-- A default can also be read where the trace has nowhere to show it: while the
+-- RESULT is being normalised, after the main expression has finished (a
+-- defaulted field of a returned record that nothing else read), or inside a
+-- definition with no inputs, whose evaluation the trace does not unfold. Such an
+-- event is NOT dropped. 'hangUnplacedDefaults' finds every event that the
+-- finished pre-trace does not reach and hangs it on the main expression, on its
+-- last step, in the order the defaults were read: the trace shows a line for each
+-- default the directive's @presumed@ lists, and where it cannot say which step
+-- needed it, it hangs the line on the main expression.
+--
+-- An event that the trace CAN reach stays where it was read, also when the thing
+-- that read it ran late: a rule that runs while the result is written out
+-- (@JUST (rule …)@, a list of rule results, every service request that goes
+-- through the wrapper) shows the event under the step that needed the value,
+-- inside the trace of that run.
 --
 -- 'addDefaultToStack' never fails and never hides a frame: with no frame to
--- hang from, or one that has its result already, the event is dropped.
+-- hang from, or one that has its result already, the event is not placed there,
+-- and 'hangUnplacedDefaults' places it.
 
 -- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
 -- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
@@ -223,7 +234,7 @@ pattern TraceValue v = Trace Nothing [] (Right v)
 
 -- | Implements step 2 of Note [Lazy evaluation tracing]
 splitEvalTraceActions :: [EvalTraceAction] -> Map (Maybe Address) (Either WHNF [EvalTraceAction])
-splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty . hoistLateDefaults
+splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
   where
     -- In order to split the trace actions into sublists, we need to keep track of
     -- a stack of addresses.
@@ -287,10 +298,11 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty . hoistLateDefault
       -- to pop the stack when it is empty.
       m
     go (-1) [] m (TookDefault _ _ : as) =
-      -- A default first forced while the result is being normalised, which
-      -- 'hoistLateDefaults' could not move (see Note [Defaults in the trace]):
-      -- nothing is open to hang it from. The 'SetRef' that follows it is
-      -- handled by the next equation.
+      -- A default first forced while the result is being normalised, with
+      -- nothing open to hang it from. It is left out of the lists here, and
+      -- 'hangUnplacedDefaults' puts it on the main expression (see Note
+      -- [Defaults in the trace]). The 'SetRef' that follows it is handled by
+      -- the next equation.
       go (-1) [] m as
     go (-1) [] m as@(SetRef _ : _) =
       -- This case occurs if after we're done with the main expression, we
@@ -318,38 +330,6 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty . hoistLateDefault
 
     insertIfMissing :: Ord k => k -> a -> Map k a -> Map k a
     insertIfMissing = Map.insertWith (\ _new old -> old)
-
--- | Move each 'TookDefault' that comes after the main expression has finished
--- to just before the result of the main expression. See Note [Defaults in the
--- trace].
---
--- The main expression is over at the 'Pop' that closes depth 0, the one the
--- splitter below ends on. What follows it is the result being normalised, one
--- 'SetRef' at a time. The main list ends with that result, @Exit@, and the
--- closing @Pop@; an event is put in front of the @Exit@. With nothing late, or
--- a main list that ends any other way, the actions are returned as they were.
-hoistLateDefaults :: [EvalTraceAction] -> [EvalTraceAction]
-hoistLateDefaults actions
-  | not (any isDefaultEvent actions) = actions
-  | otherwise = case afterMain 0 [] actions of
-      Just (Pop : Exit r : mainRev, late)
-        | (events@(_ : _), rest) <- partition isDefaultEvent late ->
-            reverse mainRev <> events <> [Exit r, Pop] <> rest
-      _ -> actions
-  where
-    isDefaultEvent :: EvalTraceAction -> Bool
-    isDefaultEvent = \ case
-      TookDefault {} -> True
-      _              -> False
-
-    -- the main expression's actions, newest first, and everything after
-    afterMain :: Int -> [EvalTraceAction] -> [EvalTraceAction] -> Maybe ([EvalTraceAction], [EvalTraceAction])
-    afterMain _ _   []       = Nothing
-    afterMain d acc (a : as) = case a of
-      Push            -> afterMain (d + 1) (a : acc) as
-      Pop | d == 0    -> Just (a : acc, as)
-          | otherwise -> afterMain (d - 1) (a : acc) as
-      _               -> afterMain d (a : acc) as
 
 -- | Just used in error messages to produce a reasonably readable version
 -- of the split address action map maintained during 'splitEvalTraceActions'.
@@ -588,6 +568,48 @@ buildEvalPreTrace as = case as of
 
 buildEvalPreTraces :: Map (Maybe Address) (Either WHNF [EvalTraceAction]) -> Map (Maybe Address) (Either WHNF EvalPreTrace)
 buildEvalPreTraces = Map.map (bimap id buildEvalPreTrace)
+
+-- | Hang on the main expression every default event that the pre-trace does not
+-- reach, on its last step and in the order the actions give (see Note
+-- [Defaults in the trace]).
+--
+-- An event is reached when its 'PreDefault' is in the main pre-trace, or in the
+-- pre-trace of a placeholder that is reached, which is what zonking inlines
+-- ('buildEvalTrace'). The walk follows each placeholder once, so a thunk that is
+-- referenced from many places is not walked again for each. With no event in
+-- the actions it costs one pass over them.
+hangUnplacedDefaults
+  :: [EvalTraceAction]
+  -> Map (Maybe Address) (Either WHNF EvalPreTrace)
+  -> EvalPreTrace
+  -> EvalPreTrace
+hangUnplacedDefaults actions heap root = case root of
+  PreTrace esubs w
+    | (_ : _) <- unplaced, (e, subs) : earlier <- reverse esubs ->
+        PreTrace (reverse ((e, subs <> [PreDefault p a | (p, a) <- unplaced]) : earlier)) w
+  _ -> root
+  where
+    unplaced :: [(Presumed, Address)]
+    unplaced = [ (p, r.address) | TookDefault p r <- actions, r.address `Set.notMember` reached ]
+
+    reached :: Set.Set Address
+    reached = snd (visit (Set.empty, Set.empty) root)
+
+    -- the placeholders followed so far, and the defaults reached
+    visit :: (Set.Set Address, Set.Set Address) -> EvalPreTrace -> (Set.Set Address, Set.Set Address)
+    visit acc = \ case
+      PreTrace esubs _ -> foldl' visit acc (concatMap snd esubs)
+      PrePlaceholder a -> follow acc a
+      PreDefault _ a   -> follow (second (Set.insert a) acc) a
+
+    follow :: (Set.Set Address, Set.Set Address) -> Address -> (Set.Set Address, Set.Set Address)
+    follow acc@(followed, found) a
+      | a `Set.member` followed = acc
+      | otherwise =
+          let acc' = (Set.insert a followed, found)
+          in case Map.lookup (Just a) heap of
+               Just (Right t) -> visit acc' t
+               _              -> acc'
 
 collectTraceLabels :: [EvalTraceAction] -> Map Address Resolved
 collectTraceLabels = foldl' go Map.empty
