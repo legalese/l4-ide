@@ -1,0 +1,18 @@
+3 is equal to `n`
+`n` is equal to 3
+consider the case distinctions of `n` :  when 0 then zero. in any other case other
+`double` is equal to `f`
+`n` as string
+`TOSTRING` with `n`
+`JSONENCODE` with `n`
+`JSONENCODE` with list of 1 and `n`
+`JSONENCODE` with 1 followed by `xs`
+`EVER BETWEEN` with 5 January 2024, 7 January 2024 and `holds on`
+`ALWAYS BETWEEN` with 5 January 2024, 7 January 2024 and `holds on`
+`WHEN LAST` with 5 January 2024 and `holds on`
+`WHEN NEXT` with 5 January 2024 and `holds on`
+`x`
+`TRUE` and `x`
+`TRUE` implies `x`
+the following must refuse: `x`
+list of `n` and `total`

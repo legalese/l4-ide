@@ -1,0 +1,63 @@
+-- What an input nobody supplied does where the evaluator needs its value.
+--
+-- Every input in the section below is unsupplied, so it is an unknown, and a
+-- directive that needs its value stops with "I needed to know the value of …"
+-- (`Stuck`), naming it. Until UNKNOWN-EVALUATION-SPEC §8 step 1, several
+-- sites reported something else: `3 EQUALS n`, and a literal pattern matched
+-- against `n`, blamed the type; the string and JSON coercions blamed the type
+-- or reported an internal error; the temporal iterators blamed the predicate;
+-- and `#EVAL x` printed `x` as a value. The row numbers below are §4.12's.
+--
+-- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN: a directive that cannot evaluate
+-- is a crash (ruled by Meng 2026-08-01; see L4.Cli.Run.evalDirectiveCrashed).
+
+IMPORT prelude
+IMPORT daydate
+
+DECIDE total IS 1 PLUS 2 PLUS 3
+
+GIVEN z IS A NUMBER
+GIVETH A NUMBER
+double z MEANS z TIMES 2
+
+§ `Unknown inputs`
+    GIVEN x IS A BOOLEAN
+          n IS A NUMBER
+          xs IS A LIST OF NUMBER
+          f IS A FUNCTION FROM NUMBER TO NUMBER
+
+GIVEN day IS A DATE
+GIVETH A BOOLEAN
+`holds on` day MEANS x
+
+-- EQUALS names an unknown on either side (row 12), and so does a literal
+-- pattern, which compares the literal with the value considered ...
+#EVAL 3 EQUALS n
+#EVAL n EQUALS 3
+#EVAL CONSIDER n WHEN 0 THEN "zero", OTHERWISE "other"
+-- ... while a function on the left is still an unsupported equality.
+#EVAL double EQUALS f
+
+-- The coercions (rows 83 and 84).
+#EVAL n AS STRING
+#EVAL TOSTRING n
+#EVAL JSONENCODE n
+#EVAL JSONENCODE (LIST 1, n)
+#EVAL JSONENCODE (1 FOLLOWED BY xs)
+
+-- A temporal iterator whose predicate returns an unknown.
+#EVAL `EVER BETWEEN` (Date 5 1 2024) (Date 7 1 2024) `holds on`
+#EVAL `ALWAYS BETWEEN` (Date 5 1 2024) (Date 7 1 2024) `holds on`
+#EVAL `WHEN LAST` (Date 5 1 2024) `holds on`
+#EVAL `WHEN NEXT` (Date 5 1 2024) `holds on`
+
+-- A bare unknown as the result: stuck, as #ASSERT already reported it (row 52).
+#EVAL x
+#EVAL TRUE AND x
+#EVAL TRUE IMPLIES x
+
+-- An input is a value in every case, so it never refuses: failed (row 72).
+#ASSERT REFUSED x
+
+-- An unknown that is only carried along is printed as it is (row 60).
+#EVAL LIST n, total
