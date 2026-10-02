@@ -1,0 +1,98 @@
+-- A section input's TYPICALLY default is a module-scope expression (R8 rule 3,
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7): it may name a definition or another
+-- section input, and it is worked out when something reads it, from the same
+-- values the rest of the evaluation uses. A rule's input and a record's field
+-- take an expression too: see typically-expression-sites.l4.
+--
+-- A default that is not a literal or a bare name is written in parentheses,
+-- the way the grammar takes any compound operand after TYPICALLY.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+-- A section input whose default names a definition.
+§ `Rates`
+    GIVEN beta IS A NUMBER TYPICALLY phi
+
+GIVETH A NUMBER
+doubled MEANS beta TIMES 2
+
+#EVAL doubled
+#EVAL doubled WITH beta IS 5
+#ASSERT doubled EQUALS 16
+#ASSERT (doubled WITH beta IS 5) EQUALS 10
+
+-- A section input whose default reads another section input. The default is
+-- worked out from what the ROOT supplies: a WITH on `list price` reaches the
+-- default of `discount`, so the three answers below are 90, 180 and 195.
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
+
+#EVAL `final price`
+#EVAL `final price` WITH `list price` IS 200
+#EVAL `final price` WITH `list price` IS 200, discount IS 5
+#ASSERT `final price` EQUALS 90
+#ASSERT (`final price` WITH `list price` IS 200) EQUALS 180
+#ASSERT (`final price` WITH `list price` IS 200, discount IS 5) EQUALS 195
+
+-- A rule that reads `discount` only through another rule it calls still
+-- charges the root for `list price`.
+GIVETH A NUMBER
+`price with handling` MEANS `final price` PLUS 7
+
+#ASSERT (`price with handling` WITH `list price` IS 200) EQUALS 187
+
+-- An inner WITH overrides an input for the part of the calculation it wraps, but
+-- not the default the root already worked out from it: here `discount` comes
+-- from the ROOT's `list price` (100, or the 200 a WITH gives), and the inner
+-- 1000 is what `final price` itself reads. So 1000 - 10, and 1000 - 20.
+GIVETH A NUMBER
+`priced as if dearer` MEANS `final price` WITH `list price` IS 1000
+
+#ASSERT `priced as if dearer` EQUALS 990
+#ASSERT (`priced as if dearer` WITH `list price` IS 200) EQUALS 980
+
+-- A chain: each default reads the one before.
+§ `Chain`
+    GIVEN `step one` IS A NUMBER TYPICALLY 2
+          `step two` IS A NUMBER TYPICALLY (`step one` TIMES 3)
+          `step three` IS A NUMBER TYPICALLY (`step two` PLUS `step one`)
+
+GIVETH A NUMBER
+`the third step` MEANS `step three`
+
+#ASSERT `the third step` EQUALS 8
+#ASSERT (`the third step` WITH `step one` IS 10) EQUALS 40
+#ASSERT (`the third step` WITH `step two` IS 1) EQUALS 3
+
+-- A default that supplies the input it would otherwise read is no circle: a
+-- WITH names `base` for the call, so the default does not read it.
+§ `Supplied`
+    GIVEN base IS A NUMBER TYPICALLY 4
+          `base doubled` IS A NUMBER TYPICALLY (`double it` WITH base IS 10)
+
+GIVETH A NUMBER
+`double it` MEANS base TIMES 2
+
+GIVETH A NUMBER
+`read the doubled` MEANS `base doubled`
+
+#ASSERT `read the doubled` EQUALS 20
+
+-- A default may call a definition that reads another section input.
+§ `Through a helper`
+    GIVEN gamma IS A NUMBER TYPICALLY 5
+          delta IS A NUMBER TYPICALLY (`gamma plus one` PLUS 0)
+
+GIVETH A NUMBER
+`gamma plus one` MEANS gamma PLUS 1
+
+GIVETH A NUMBER
+`read delta` MEANS delta
+
+#ASSERT `read delta` EQUALS 6
+#ASSERT (`read delta` WITH gamma IS 9) EQUALS 10

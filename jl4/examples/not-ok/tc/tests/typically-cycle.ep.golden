@@ -1,0 +1,30 @@
+-- R8 rule 3: a section input's TYPICALLY default may not read the input it
+-- stands in for, directly or through anything else (W7). Each circle is
+-- reported once, at the first input on it.
+
+-- ERROR: reads itself
+§ `Itself`
+    GIVEN a IS A NUMBER TYPICALLY (a PLUS 1)
+
+-- ERROR: two defaults, each reading the other
+§ `Pair`
+    GIVEN b IS A NUMBER TYPICALLY (c PLUS 1)
+          c IS A NUMBER TYPICALLY (b PLUS 1)
+
+-- ERROR: through a definition the default calls
+§ `Through a definition`
+    GIVEN d IS A NUMBER TYPICALLY `d plus one`
+
+GIVETH A NUMBER
+`d plus one` MEANS d PLUS 1
+
+-- ERROR: through another input's default, three steps round
+§ `Three`
+    GIVEN e IS A NUMBER TYPICALLY f
+          f IS A NUMBER TYPICALLY g
+          g IS A NUMBER TYPICALLY e
+
+-- NOT an error: a default that reads the OTHER input, and a chain with no end
+§ `Fine`
+    GIVEN h IS A NUMBER TYPICALLY 1
+          i IS A NUMBER TYPICALLY (h PLUS 1)

@@ -1,0 +1,19 @@
+`doubled`
+`doubled` where `beta` is 5
+`doubled` is equal to 16
+`doubled` where `beta` is 5 is equal to 10
+`final price`
+`final price` where `list price` is 200
+`final price` where `list price` is 200 and `discount` is 5
+`final price` is equal to 90
+`final price` where `list price` is 200 is equal to 180
+`final price` where `list price` is 200 and `discount` is 5 is equal to 195
+`price with handling` where `list price` is 200 is equal to 187
+`priced as if dearer` is equal to 990
+`priced as if dearer` where `list price` is 200 is equal to 980
+`the third step` is equal to 8
+`the third step` where `step one` is 10 is equal to 40
+`the third step` where `step two` is 1 is equal to 3
+`read the doubled` is equal to 20
+`read delta` is equal to 6
+`read delta` where `gamma` is 9 is equal to 10
