@@ -185,6 +185,7 @@ The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an a
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
 Every response says which defaults the answer rests on, in `presumed`, beside `result`: the names of inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
 A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same way.
+A default the rules themselves take, where a `WITH` call or a record construction inside them leaves out an input or a field that has one, is listed too, as `WITH` and the rule or record, a colon, and the input or field (`WITH scaled: rate`, `WITH Config: timeout`), once, and only if the evaluation read it. No request could supply it, so `"presumption": "hard"` leaves it in place.
 A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
