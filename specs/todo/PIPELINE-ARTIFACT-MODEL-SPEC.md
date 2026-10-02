@@ -77,7 +77,7 @@ flag, which now refuses. The distinction above is the load-bearing part and has 
 | R6     | **ANSWERED · IMPLEMENTED** | artifacts are witnesses: they accumulate and are compared, not clobbered, §3.6                          |
 | R7     | **ANSWERED · IMPLEMENTED** | replay crosses run boundaries, except for a closed list of stages, §3.7                                 |
 | R8     | **ANSWERED · IMPLEMENTED** | a run directory stays self-contained; borrowed artifacts are copied, §3.8                               |
-| R9     | **ANSWERED · IMPLEMENTED** | G0–G4 are capability milestones, not lifecycle phases, and have stopped being run labels, §3.9          |
+| R9     | **ANSWERED · IMPLEMENTED** | G0–G4 are not run labels; every run declares every stage (amended 2026-09-30), §3.9                     |
 | R10    | **ANSWERED · IMPLEMENTED** | three other senses of "corpus" are retained deliberately, §3.10                                         |
 | R11    | **ANSWERED · IMPLEMENTED** | the HG1 blessing is a durable ledger edge, and the serving path defaults to deny, §3.11                 |
 | R12    | ANSWERED 2026-08-20, §3.12 | a subject may declare `encoding.state: "unwritten"`; `go.sh new-subject` scaffolds one, §3.12           |
@@ -510,6 +510,38 @@ milestones belong in a changelog.
 is the only thing that selects it. G0–G4 survive in `SPEC.md` §6, where they are capability
 descriptions and correct; nothing labels a run with them any more.
 
+#### AMENDED 2026-09-30 — every run declares every stage
+
+R9 moved the choice of stage list from a capability label to the selected encoding, and kept two
+lists: a run about the committed encoding (`primary`) got the projections, and a run about any other
+encoding got the deposit validators. So a subject's **first** encoding could not have its fork
+register checked and its projections produced in one run. A session encoding a new subject reported
+exactly that, and worked around it in two passes: validate the agents' output as an additional
+encoding, then promote it to primary for the projections.
+
+Meng ruled on 2026-09-29: _"we should absolutely produce a fork register and all the other good stuff
+on every run -- i think we got caught up in the difference between a de novo run vs whatever"_, and
+_"the notion of an 'additional encoding' is beginning to be more trouble than it's worth. i always just
+thought of runs as being independent 'make distbuild' kinds of processes."_
+
+So, in `legalese/l4-pipeline` (the pipeline's home since legalese/l4-ide#517):
+
+- **One stage list for every run**: `STAGES_BEFORE_LEGS` (P0, P1–P5, both halves of P3, P6), the
+  subject's declared p7 legs, then `STAGES_AFTER_LEGS` (`p8-verify`, `p8-diff`, `p9-cost`,
+  `p9-report`, `p9-explain`). They replace `PRIMARY_STAGES` and `DEPOSIT_STAGES` (`STAGES_BEFORE_LEGS`/`STAGES_AFTER_LEGS` now). The HG1 set and the
+  gate digest are still derived, as below, from whatever is declared.
+- **Every encoding is an equal row** of the sidecar's `encodings`, carrying its own entry module,
+  module set, floors, projection goldens and explainer. The singular `encoding` and `canon.primary_row`
+  are gone; a row's id is its canon row name. `--encoding` names a row, may be omitted when the subject
+  has one, and refuses a guess when it has several. `primary` and `undeclared` are refused as retired.
+- **A projection leg over a row with no golden runs emit-only**: the projection is produced and kept,
+  and its receipt says nothing was diffed.
+- **The explainer is the row's**, so a run renders its own row's narrative or none, which is what made
+  declaring `p9-explain` on every run safe.
+
+The table in "The value space is the driver's own" below, and the "which stages run" row of "What the
+flag was doing", describe the driver between 2026-08-25 and this amendment.
+
 #### The value space is the driver's own, in both directions
 
 `--encoding` takes exactly the three values `GO_S_ENCODING_ID` can hold, so what you type and what
@@ -546,12 +578,12 @@ of one are different things and only the anchor tells them apart.
 
 #### What the flag was doing, and where each job went
 
-| job                                 | now                                                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| which stages run                    | the encoding: `primary` → `PRIMARY_STAGES`, otherwise `DEPOSIT_STAGES`. Contents unchanged — R9 retires the label, not the stage sets. |
-| which module set the stages iterate | already R2/R3's: `GO_MODULES` from the selected encoding. Only the label mention was left to delete.                                   |
-| which stages HG1 gates              | **derived**: every declared stage from P6 onward, minus `gated_by_HG2`.                                                                |
-| what a gate binds to                | **derived**: `GO_MODULES`, plus every deposit a declared stage of this run reads.                                                      |
+| job                                 | now                                                                                                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| which stages run                    | the encoding: `primary` → `PRIMARY_STAGES`, otherwise `DEPOSIT_STAGES` (one list, `STAGES_BEFORE_LEGS`…`STAGES_AFTER_LEGS`, since 2026-09-30). |
+| which module set the stages iterate | already R2/R3's: `GO_MODULES` from the selected encoding. Only the label mention was left to delete.                                           |
+| which stages HG1 gates              | **derived**: every declared stage from P6 onward, minus `gated_by_HG2`.                                                                        |
+| what a gate binds to                | **derived**: `GO_MODULES`, plus every deposit a declared stage of this run reads.                                                              |
 
 The gating rule is SPEC.md §7.3's own sentence — _HG1 blocks P6 onward_ — written once and applied,
 in place of one hand-kept list per stage set. Measured byte-equal to both lists it replaces, in
@@ -622,7 +654,7 @@ schemas in one chain. That is the existing, deliberate behaviour (§5.1), not a 
 `gate-payload.mjs` chose its refusal ARM by `begin.milestone === "g2"`. Dropping the field flipped
 it to the other arm, which still refused — same exit code, same absence of a signable document —
 while telling the reader to _"run p0-preflight in this run"_. `p0-preflight` is not in
-`DEPOSIT_STAGES` and `--only p0-preflight` intersects to nothing, so the advice could not be
+`DEPOSIT_STAGES` (it is in every run's `STAGES_BEFORE_LEGS` since 2026-09-30) and `--only p0-preflight` intersected to nothing, so the advice could not be
 followed: a correct refusal silently downgraded to an impossible instruction. The arm now keys on
 `declared_stages`, which every schema from 2 onward records, so both spellings resolve to the same
 advice. Pinned by three fixtures.
@@ -983,7 +1015,7 @@ are recorded because each is a trap for the next reader, and every one now has a
   null for exactly the cross-run case it exists to serve.
 
 - **`subject-report`'s declarable universe was empty of primary-path stages**, because the
-  primary stage list (then `G1_STAGES`, renamed `PRIMARY_STAGES` by R9) is
+  primary stage list (then `G1_STAGES`, renamed `PRIMARY_STAGES` by R9, one list with `STAGES_BEFORE_LEGS`/`STAGES_AFTER_LEGS` since 2026-09-30) is
   assembled only for commands that resolve a subject and `subject-report` was not one of them. And
   it ordered runs **lexicographically by run id**, which sorts date, then a _content hash_, then
   counter — so two runs on one day over different corpora sorted arbitrarily. Runs are now ordered
