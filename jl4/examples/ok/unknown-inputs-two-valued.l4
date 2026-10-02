@@ -30,11 +30,18 @@ DECLARE Actor IS ONE OF
     Seller HAS name IS A STRING
 DECLARE Action IS ONE OF
     Deliver HAS item IS A Kind
+    Pay     HAS amount IS A NUMBER, memo IS A STRING
 
 alice MEANS Seller OF "Alice"
 
 GIVETH A NUMBER
 undecided MEANS REFUSE "not decided"
+
+GIVETH A NUMBER
+zero MEANS 0
+
+GIVETH A NUMBER
+fee MEANS REFUSE "the fee is not decided"
 
 GIVEN it IS A Kind
 GIVETH A BOOLEAN
@@ -70,6 +77,14 @@ GIVETH A DEONTIC Actor Action
 `must not deliver for sale` MEANS
     PARTY alice
     SHANT  Deliver it PROVIDED `is for sale` it
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+GIVETH A DEONTIC Actor Action
+`must pay rent` MEANS
+    PARTY alice
+    MUST   Pay (fee) "rent"
     WITHIN 14
     HENCE  FULFILLED
     LEST   BREACH
@@ -116,6 +131,18 @@ GIVETH A BOOLEAN
 -- A clash counts only if the match reaches it: here it would first read
 -- `undecided`, which refuses, so the branch could refuse and this is stuck.
 #EVAL CONSIDER Triple n undecided 5 WHEN Triple 0 7 0 THEN "first", WHEN Triple x y z THEN "second"
+-- An expression pattern is evaluated before any later position is read, so a
+-- later clash never stops it raising or refusing. A harmless one, then the
+-- clash: "second" ...
+#EVAL CONSIDER Pair n "x" WHEN Pair (EXACTLY zero) "y" THEN "first", WHEN Pair a b THEN "second"
+-- ... and ones that raise or refuse, with EXACTLY and in brackets.
+#EVAL CONSIDER Pair n "x" WHEN Pair (EXACTLY (1 DIVIDED BY 0)) "y" THEN "first", WHEN Pair a b THEN "second"
+#EVAL CONSIDER Pair n "x" WHEN Pair (EXACTLY undecided) "y" THEN "first", WHEN Pair a b THEN "second"
+#EVAL CONSIDER Pair n "x" WHEN Pair (1 DIVIDED BY 0) "y" THEN "first", WHEN Pair a b THEN "second"
+-- The same in an event: the obligation names `fee`, which refuses, so this
+-- refuses whatever `n` is.
+#TRACE `must pay rent` AT 0 WITH
+  PARTY alice DOES Pay n "deposit" AT 1
 
 -- EQUALS names an unknown on either side (row 12), and so does a literal
 -- pattern, which compares the literal with the value considered ...

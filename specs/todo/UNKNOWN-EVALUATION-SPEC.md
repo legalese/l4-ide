@@ -981,7 +981,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
      Its JSON kind moves from "value" to "error" now, and to "undetermined" at step 3; the four `doc/reference/syntax/` examples of §6 are repaired in the same PR.
    - The selector's `Stuck` names the record input `d`; the field path arrives with step 3.
    - Tests: one new `ok/` corpus file carrying these cases, with `#EVAL LIST n, total` as C4's control and its four goldens read before blessing, and a `tests-cli` test that `#EVAL x` exits 1.
-   - The refinement also runs before a literal or expression pattern raises (`PatLit0`, `PatLit1`, through `metUnknown`), so `CONSIDER Pair n "x" WHEN Pair 0 "y" …` fails that branch whatever `n` is (assumed, not ruled).
+   - The refinement also runs before a literal or expression pattern raises, so `CONSIDER Pair n "x" WHEN Pair 0 "y" …` fails that branch whatever `n` is (assumed, not ruled); it runs in `PatLit1`, once an expression pattern's own expression has been evaluated, because evaluating it can raise or refuse whatever `n` is (review finding F1, 2026-10-03).
 
    **Built** 2026-10-02: rows 12, 34, 35, 52, 56, 70, 83 and 84 and the iterators, in `jl4/examples/ok/unknown-inputs-two-valued.l4` and `jl4/tests-cli/fixtures/eval-assumed.l4`, with controls 60, 71 and 72 held; the four doc examples, which the bare-result arm turns red; the U12 and U12b work; rows 86 and 87 under LOUDHAILER, above.
 
