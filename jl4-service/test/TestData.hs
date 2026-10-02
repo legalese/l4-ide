@@ -24,6 +24,8 @@ module TestData (
   missingBooleanJL4,
   sectionBooleanJL4,
   deonticBooleanJL4,
+  considerBooleanJL4,
+  deonticConsiderJL4,
   maybeInputsJL4,
   timeInputsJL4,
   wireProbeJL4,
@@ -514,6 +516,51 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A BOOLEAN input read by a CONSIDER with an OTHERWISE. Until
+-- UNKNOWN-EVALUATION-SPEC §8 step 1, a missing one on the wrapper path failed
+-- the WHEN TRUE pattern and the OTHERWISE took it, so the answer was the
+-- OTHERWISE's value, with a 200.
+considerBooleanJL4 :: Text
+considerBooleanJL4 =
+  [i|
+@export default fee
+GIVEN `is member`   IS A BOOLEAN
+      amount        IS A NUMBER
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+fee MEANS
+    CONSIDER `is member`
+    WHEN TRUE THEN 0
+    OTHERWISE amount
+|]
+
+-- | 'deonticBooleanJL4' with the branch written as a CONSIDER and an
+-- OTHERWISE, which a missing input used to take.
+deonticConsiderJL4 :: Text
+deonticConsiderJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver        IS A Driver
+      `is motorway` IS A BOOLEAN
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    CONSIDER `is motorway`
+    WHEN TRUE THEN
+        PARTY driver
+        MUST `wear seatbelt`
+        WITHIN 1
+    OTHERWISE
+        PARTY driver
+        MAY `drive`
 |]
 
 -- | A MAYBE DATE and a MAYBE NUMBER input, each followed by another input. On
