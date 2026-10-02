@@ -984,6 +984,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - The refinement also runs before a literal or expression pattern raises, so `CONSIDER Pair n "x" WHEN Pair 0 "y" …` fails that branch whatever `n` is (assumed, not ruled); it runs in `PatLit1`, once an expression pattern's own expression has been evaluated, because evaluating it can raise or refuse whatever `n` is (review finding F1, 2026-10-03).
 
    **Built** 2026-10-02: rows 12, 34, 35, 52, 56, 70, 83 and 84 and the iterators, in `jl4/examples/ok/unknown-inputs-two-valued.l4` and `jl4/tests-cli/fixtures/eval-assumed.l4`, with controls 60, 71 and 72 held; the four doc examples, which the bare-result arm turns red; the U12 and U12b work; rows 86 and 87 under LOUDHAILER, above.
+   **What review changed** (step-1 review, 2026-10-03): an expression pattern's own expression is evaluated before a later clash can fail its branch (F1, above); the literal-position check takes the in-order scan (F2); `jl4-service` tests and README pin the `422` for a missing input read by `CONSIDER … OTHERWISE` on the wrapper and deontic paths (F3); docs and the skill stop saying `WITH` cannot supply a section `GIVEN` (F4) or that `OTHERWISE` never answers on a missing input (F5).
 
 2. **Step 0** (§4.4, U2, U2b): the built-in connectives as frames, with the trace golden, the service reasoning tree and jl4-mlir's parity harness moved together, measured.
    Row 51.
