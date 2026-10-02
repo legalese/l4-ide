@@ -1,0 +1,14 @@
+-- A written ASSUME's TYPICALLY on an INPUT is metadata until W6, which is
+-- deferred (TYPICALLY-ONE-BEHAVIOUR-SPEC.md section 4: "I'd be ok with skipping or
+-- deferring W6 as ASSUME is being deprecated."), so a named site that leaves
+-- that input out is the error it was before W4 (review silent M3, 2026-10-03).
+-- It used to check in the file that declares the ASSUME and fail in a file that
+-- imports it; both now give this error.
+
+GIVEN x IS A NUMBER TYPICALLY 3
+      y IS A NUMBER
+GIVETH A NUMBER
+ASSUME f IS A NUMBER
+
+GIVETH A NUMBER
+g MEANS f WITH y IS 1

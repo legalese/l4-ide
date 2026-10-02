@@ -1,0 +1,42 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-assume-input.l4
+  Hidden: no
+  Range: 11:8-11:9
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+
+      `f`
+
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+
+      § <heading>
+          GIVEN f IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+
+    The manual explains the move: doc/reference/types/ASSUME.md.
+
+File: typically-assume-input.l4
+  Hidden: no
+  Range: 14:9-14:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    In this use of
+
+      f (defined at typically-assume-input.l4:11:8-9)
+
+    you have not supplied these inputs:
+
+      x of type NUMBER
