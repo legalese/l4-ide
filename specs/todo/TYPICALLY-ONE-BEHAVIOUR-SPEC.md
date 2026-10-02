@@ -288,7 +288,7 @@ Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", eight ca
 
 **How each surface says it** (all assumed, not ruled; the sentence is one function, `defaultEventText`, so that every surface says the same thing):
 
-- _Text trace_ (`#EVALTRACE` in the editor and the golden harness; `l4 trace`'s diagnostics; the LSP, which renders traces only as this text, in its diagnostics and in the inspector panel's `prettyText`).
+- _Text trace_ (`#EVALTRACE` in the editor and the golden harness; `l4 trace`'s diagnostics; the LSP, which renders traces only as this text, in its diagnostics and in the inspector panel's `prettyText`; `jl4-lsp/test/InspectorTraceSpec.hs` holds that to what the inspector sends).
   Laid out like a binding, the sentence first and the value last:
   ```
   ├ `the rate` TIMES 2
