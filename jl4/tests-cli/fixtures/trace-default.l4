@@ -1,0 +1,12 @@
+§ `Trace default fixture`
+
+-- W8: `l4 trace` draws a default that took effect, and an IF still labels its
+-- condition and its branch.
+
+    GIVEN `the rate`     IS A NUMBER  TYPICALLY 3
+          `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+GIVETH A NUMBER
+`rate if able` MEANS IF `has capacity` THEN `the rate` ELSE 0
+
+#EVALTRACE `rate if able`

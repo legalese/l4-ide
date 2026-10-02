@@ -412,22 +412,6 @@ defaultEventText p =
 defaultEventHeader :: Presumed -> Doc ann
 defaultEventHeader = pretty . defaultEventText
 
--- | The trace as it was before defaults were events: every 'TraceDefault'
--- removed, with whatever it showed of the default's own evaluation.
---
--- For a surface that has not been taught to show them, so that a program that
--- takes a default answers there exactly as it did.
-withoutDefaultEvents :: EvalTrace -> EvalTrace
-withoutDefaultEvents = \ case
-  Trace lbl steps v      -> Trace lbl (inSteps steps) v
-  TraceDefault _ steps v -> Trace Nothing (inSteps steps) v
-  where
-    inSteps = fmap (second (concatMap go))
-
-    go :: EvalTrace -> [EvalTrace]
-    go (TraceDefault {})      = []
-    go (Trace lbl steps v)    = [Trace lbl (inSteps steps) v]
-
 -- | Helper function to display an exception or final value in a trace.
 printExceptionOrNF :: Either EvalException NF -> Doc ann
 printExceptionOrNF (Left e)  = "↯ " <> printEvalExceptionShort e

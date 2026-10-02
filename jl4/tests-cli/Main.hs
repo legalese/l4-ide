@@ -198,10 +198,11 @@ decodeArray sout =
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
-batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture :: FilePath
 batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+traceDefaultFixture = fixtureDir </> "trace-default.l4"
 
 -- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
 descAttachmentFixture :: FilePath
@@ -326,7 +327,7 @@ coreFixtures =
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
-  , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+  , batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
   , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
@@ -889,6 +890,17 @@ spec bin = do
       -- it just produces no output but still exits 0.
       Output code _ _ <- runL4 bin ["trace", evalFixture]
       code `shouldBe` ExitSuccess
+
+    -- W8: a default that took effect is a node of the graph, as it is a line
+    -- of the text trace, and an IF still labels its condition by position.
+    it "draws a default that took effect, and an IF keeps its labelled condition" $ do
+      Output code sout _ <- runL4 bin ["trace", traceDefaultFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("the rate took its default (declared at trace-default.l4:" `isInfixOf`)
+      sout `shouldSatisfy` ("has capacity took its default (declared at trace-default.l4:" `isInfixOf`)
+      -- one edge is the IF's, and it is the one into the condition, not into
+      -- the default that hangs below the condition
+      countInfix "label=IF" sout `shouldBe` 1
 
   describe "l4 state-graph" $ do
     it "fails on a file without regulative rules" $ do

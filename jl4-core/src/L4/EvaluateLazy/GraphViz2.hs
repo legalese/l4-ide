@@ -17,7 +17,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import Control.Applicative ((<|>))
-import L4.EvaluateLazy.Trace (EvalTrace(..), withoutDefaultEvents)
+import L4.EvaluateLazy.Trace (EvalTrace(..), defaultEventText)
 import L4.EvaluateLazy.Machine (boolView)
 import L4.EvaluateLazy.Exceptions (EvalException (..), Refusal (..))
 import L4.EvaluateLazy.GraphVizOptions (GraphVizOptions(..), defaultGraphVizOptions)
@@ -56,10 +56,8 @@ type EvalGraph = FGL.Gr NodeAttrs EdgeAttrs
 
 -- | Main entry point: convert trace to GraphViz DOT format
 traceToGraphViz :: GraphVizOptions -> Maybe (Module Resolved) -> EvalTrace -> Text
-traceToGraphViz opts mModule evalTrace0 =
-  let -- a default's event (W8) is not drawn: the graph is the same as it was
-      evalTrace = withoutDefaultEvents evalTrace0
-      (nodes, edges, _) = buildGraph opts mModule 0 0 evalTrace
+traceToGraphViz opts mModule evalTrace =
+  let (nodes, edges, _) = buildGraph opts mModule 0 0 evalTrace
       graph = FGL.mkGraph nodes edges
 
       -- Apply local optimizations (graph-to-graph transformations)
@@ -245,10 +243,23 @@ deduplicateBindingsPass graph =
 -- Returns (nodes, edges, next available node ID)
 buildGraph :: GraphVizOptions -> Maybe (Module Resolved) -> Int -> Node -> EvalTrace
            -> ([LNode NodeAttrs], [LEdge EdgeAttrs], Node)
--- 'traceToGraphViz' has removed the events, so none is met here; one that is
--- stands for the steps of the default it records.
-buildGraph opts mModule depth nodeId (TraceDefault _ steps result) =
-  buildGraph opts mModule depth nodeId (Trace Nothing steps result)
+-- A default that took effect (W8) is a node of its own, in the colour of
+-- neither a value nor an error, saying what the text trace says. It is no
+-- binding, so it is never merged with one.
+buildGraph opts mModule depth nodeId (TraceDefault p steps result) =
+  let -- the label of a node for no binding, led by what happened: the
+      -- expression of a computed default and the value follow on lines
+      -- of their own
+      rest = formatTraceLabel opts Nothing steps result
+      nodeAttrs = NodeAttrs
+        { nodeLabel = defaultEventText p <> (if "\n" `Text.isPrefixOf` rest then "" else "\n") <> rest
+        , fillColor = if isRight result then "#fff2cc" else "#ffcccc"
+        , nodeStyle = "filled"
+        , bindingId = Nothing
+        }
+      (childNodes, childEdges, nextId) =
+        buildSteps opts mModule (depth + 1) (nodeId + 1) nodeId steps
+  in ((nodeId, nodeAttrs) : childNodes, childEdges, nextId)
 buildGraph opts mModule depth nodeId (Trace mlabel steps result) =
   let -- Create node for this trace
       baseLabel = formatTraceLabel opts mlabel steps result
@@ -336,7 +347,7 @@ buildSubtraces opts mModule depth nodeId parentId (tr:trs) [] =
 buildStubs :: GraphVizOptions -> Node -> Node -> Expr Resolved -> [EvalTrace]
            -> ([LNode NodeAttrs], [LEdge EdgeAttrs], Node)
 buildStubs _opts nodeId parentId (IfThenElse _ _ thenE elseE) subtraces =
-  case (traceBoolValue <$> listToMaybe subtraces) of
+  case (traceBoolValue <$> listToMaybe (filter (not . isDefaultEvent) subtraces)) of
     Just (Just True) ->
       -- THEN taken, stub ELSE
       let elseNode = (nodeId, NodeAttrs
@@ -422,8 +433,26 @@ data EdgeConfig = EdgeConfig
 defaultEdgeConfig :: EdgeConfig
 defaultEdgeConfig = EdgeConfig Nothing False
 
+-- | The edge into each subtrace. An IF labels its condition and then its
+-- branch, a CONSIDER its branches, by position, so a default's event (W8) is
+-- left out of the counting and gets a plain edge of its own.
 edgeConfigsFor :: Expr Resolved -> [EvalTrace] -> [EdgeConfig]
-edgeConfigsFor (IfThenElse _ _ _ _) subtraces = labelIf subtraces
+edgeConfigsFor expr subtraces = weave subtraces (positionalEdgeConfigs expr (filter (not . isDefaultEvent) subtraces))
+  where
+    weave [] _ = []
+    weave (t : ts) cfgs
+      | isDefaultEvent t = defaultEdgeConfig : weave ts cfgs
+      | otherwise = case cfgs of
+          c : cs -> c : weave ts cs
+          []     -> defaultEdgeConfig : weave ts []
+
+isDefaultEvent :: EvalTrace -> Bool
+isDefaultEvent = \ case
+  TraceDefault {} -> True
+  Trace {}        -> False
+
+positionalEdgeConfigs :: Expr Resolved -> [EvalTrace] -> [EdgeConfig]
+positionalEdgeConfigs (IfThenElse _ _ _ _) subtraces = labelIf subtraces
   where
     labelIf [] = []
     labelIf [_] = [EdgeConfig (Just "IF") True]
@@ -435,7 +464,7 @@ edgeConfigsFor (IfThenElse _ _ _ _) subtraces = labelIf subtraces
       in EdgeConfig (Just "IF") True
          : replicate (length branchTraces) (EdgeConfig (Just branchLabel) False)
 
-edgeConfigsFor (Consider _ _ branches) subtraces =
+positionalEdgeConfigs (Consider _ _ branches) subtraces =
   let branchLabels = map branchLabel branches
       labelFor idx = listToMaybe $ drop idx branchLabels
   in defaultEdgeConfig : map (\lbl -> EdgeConfig (Just lbl) False) (catMaybes [labelFor i | i <- [0..length subtraces - 2]])
@@ -444,7 +473,7 @@ edgeConfigsFor (Consider _ _ branches) subtraces =
       When _ pat -> "when " <> prettyLayout pat
       Otherwise _ -> "otherwise"
 
-edgeConfigsFor _ subtraces =
+positionalEdgeConfigs _ subtraces =
   replicate (length subtraces) defaultEdgeConfig
 
 -- ============================================================================
@@ -625,7 +654,9 @@ graphToDot graph ifPatterns =
                   then GV.RGB 208 232 242
                   else if attrs.fillColor == "#e0e0e0"
                     then GV.RGB 224 224 224
-                    else GV.RGB 255 204 204
+                    else if attrs.fillColor == "#fff2cc"
+                      then GV.RGB 255 242 204
+                      else GV.RGB 255 204 204
             in [ GV.Label (GV.StrLabel (Text.Lazy.fromStrict attrs.nodeLabel))
                , GV.FillColor [GV.toWC color]
                , GV.Style [GV.SItem GV.Filled []]
