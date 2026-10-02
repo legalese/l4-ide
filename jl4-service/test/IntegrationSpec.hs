@@ -526,26 +526,31 @@ spec = describe "integration" do
         expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
 
     -- W4, W5: a default the RULES take at a named site is not the request's to
-    -- supply, so it is taken in both presumption modes, and listed under the
-    -- application that took it, on both paths. The request's own `rate` is 7;
-    -- `scaled` still takes its 3.
-    it "lists a default a named site inside the rules took, on both paths and in both modes" do
+    -- supply, so it is taken in both presumption modes. Under soft `presumed`
+    -- keeps what a request could have supplied (T6b), as for a rule's own
+    -- JSONDECODE, so it lists nothing; under hard the answer rests on it and
+    -- lists it under the application that took it (T4b), on both paths. The
+    -- request's own `rate` is 7; `scaled` still takes its 3.
+    it "takes a default a named site inside the rules took in both modes, and lists it under hard, on both paths" do
       withServiceFromSources "ty-named" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
         let used = ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= True]
             presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
         soft <- evalFunction baseUrl mgr "ty-named" "combine"
           (args ("unused flag" Aeson..= False : used))
-        expectAnswer soft (FnLitInt 60) presumedHere
+        expectAnswer soft (FnLitInt 60) []
         hardRun <- evalFunction baseUrl mgr "ty-named" "combine"
           (hard ("unused flag" Aeson..= False : used))
         expectAnswer hardRun (FnLitInt 60) presumedHere
         -- a {} on the unread flag sends the request down the wrapper path
         wrapped <- evalFunction baseUrl mgr "ty-named" "combine"
           (args ("unused flag" Aeson..= uncertain : used))
-        expectAnswer wrapped (FnLitInt 60) presumedHere
+        expectAnswer wrapped (FnLitInt 60) []
+        wrappedHard <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrappedHard (FnLitInt 60) presumedHere
         -- The positive control: `use` FALSE never reaches either site.
         skipped <- evalFunction baseUrl mgr "ty-named" "combine"
-          (args ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+          (hard ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
         expectAnswer skipped (FnLitInt 0) []
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
@@ -554,10 +559,12 @@ spec = describe "integration" do
     -- later use of the same constructor to trip it, on both paths.
     it "lists a constructor default a named site took only if the answer read it, on both paths" do
       withServiceFromSources "ty-ctor" [("ctor.l4", constructorNamedDefaultJL4)] \baseUrl mgr -> do
+        -- under hard, which is where `presumed` lists a default taken inside the
+        -- rules: under soft it lists none, so a wrong listing could not show
         let flag = "unused flag" Aeson..= False
-            run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (args (extra <> [flag]))
+            run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (hard (extra <> [flag]))
             runWrapped fn extra = evalFunction baseUrl mgr "ty-ctor" fn
-              (args (extra <> ["unused flag" Aeson..= uncertain]))
+              (hard (extra <> ["unused flag" Aeson..= uncertain]))
         -- x FALSE: the AND stops at `a`; x TRUE: `b` is read
         stops <- run "short circuits" ["x" Aeson..= False]
         expectAnswer stops (FnLitInt 0) []
