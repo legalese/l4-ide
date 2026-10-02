@@ -16,6 +16,9 @@ consider the case distinctions of `Pair` with `n` and x :  when `Pair` has is ex
 executing contract `must pay rent` at 0 with the following events: party `alice` did `Pay` with `n` and deposit at 1
 3 is equal to `n`
 `n` is equal to 3
+a is equal to `s`
+1 January 2024 is equal to `dt`
+`Person` with 3 is equal to `d`
 consider the case distinctions of `n` :  when 0 then zero. in any other case other
 `double` is equal to `f`
 `n` as string
