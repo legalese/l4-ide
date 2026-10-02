@@ -1,13 +1,14 @@
 # Specification: Evaluating with unknowns — connectives as an algebra, not as `IF`
 
 **Status:** proposed, not built (2026-10-01).
+On 2026-10-02 Meng authorised build steps 1 to 3 (STABILISERS), not landed, and parked steps 4 to 7 until a user asks for them (MOTHBALL, §8).
 Nothing in this document is in the tree.
 §4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day, and §4.11 (the correspondence with the established designs) and D1 were added later that day; the seven rulings of the bench "Symbolic Evaluation Conflicts" on §4.13 were recorded in §9 and applied to §4 the same evening.
 Every statement about today's behaviour is a probe result or a `file:line` read on `unstable` at `f9a504b77`, and says which.
 Probes for §2 ran on the installed `l4` (`~/.cabal/bin/l4`, a store build linked 2026-09-30; the only evaluator-path commit after 2026-09-26 is `8848df744`, `WHOSE`, which touches none of the code cited here); probes for §4.12 ran on a snapshot of the `unstable` binary built from `f9a504b77`.
 Probe files are in the session scratchpad, not in the tree.
 On 2026-10-02 the Track B audit, fifteen agents asking whether the recorded rulings suffice to build §8's seven steps, was applied under TIPPEX, and its one open semantic question, M1, was ruled as U13 under RAINCHECK (M2 to M4, outward actions and a `CLAUDE.md` edit, are left to Meng in §8) and amended the same day as U13b under YOYO.
-The questions that three reviews of that work and a verification of the fixes raised for Meng, and the choices made overnight to keep build steps 1 to 3 buildable, are listed in §9's "Open for Meng (raised 2026-10-02)".
+The questions that three reviews of that work and a verification of the fixes raised for Meng, and the choices made overnight to keep build steps 1 to 3 buildable, are listed in §9's "Open for Meng (raised and ruled 2026-10-02)"; Meng ruled all six questions that day.
 Citations added that day were read on `unstable` at `6ed297629`, where no file under `jl4-core/src`, `jl4/app`, `jl4-service/src`, `jl4-lsp/src` or `jl4-mlir` differs from `f9a504b77` (`git diff --stat`, empty); probes added that day (`t01` to `t27`, `vf/s1` to `s6`, and the TIPPEX fact-check's `c01` to `e04`, re-run) ran on a byte-identical snapshot of the installed `l4`, the store build `jl4-0.1-b69f17a4`, built 2026-09-28.
 
 **Trigger:** SCHRODINGER, widened by Meng on 2026-10-01: _"continue your investigation of the evaluator lift with kand. It sounds like we'll need to redo the rewriting-to-IF in favour of something more algebraically principled."_
@@ -434,7 +435,7 @@ At a result that join is U4b's opaque unknown, so it is reported as undetermined
 A `REFUSE` reached in an arm under a term condition is a guarded refusal leaf in the same way (U13): `IF x THEN TBD ELSE FALSE` is "`FALSE` unless `x`; refuses (TBD: this rule has not been written yet) if `x`" (row 74).
 
 **`CONSIDER` on a term scrutinee stays unknown for now** (U4): the result is a `fresh` unknown of the result type, naming the scrutinee, and never the no-branch message of §2.4; it carries the scrutinee's guarded leaves into its result (DU11).
-Its arms are not evaluated, so an arm that errors or refuses leaves no leaf, and whether `AND FALSE` or `OR TRUE` may then absorb that `fresh` atom is pending the open question in §9 (O6).
+Its arms are not evaluated, so an arm that errors or refuses leaves no leaf, and §9 (O6) rules that `AND FALSE` and `OR TRUE` may not absorb that `fresh` atom: it carries an "unevaluated arms" leaf.
 The disjunction over arms that an earlier draft proposed needs atoms of the form `s = C` under an exactly-one constraint, and is not ruled.
 
 **The step counter.**
@@ -446,7 +447,7 @@ It counts steps, not depth: the existing cap is on frame depth only (`maximumFra
 **Running out of steps** unwinds as today's exceptions do, restoring every thunk it passes (`restoreThunkOnUnwind`, `Machine.hs:818`), and becomes **`gave-up [c]`** at the join or connective that catches it, so no thunk ever caches a give-up (C4); `c` is the path condition that frame was working under: the conjunction of the term conditions whose unknownness caused the evaluation in progress, innermost last.
 That mechanism alone does not give C4's "no thunk ever caches a give-up": a thunk whose body contains the catching join is still written back (`UpdateThunk`'s backward arm, `Machine.hs:1919`), and an imported module's thunks outlive the directive (its base environment is "allocated once", `EvaluateLazy.hs:816`), so `UpdateThunk` must also decline to write back a value that carries a `gave-up` (assumed, not ruled; §8 step 5).
 Once the counter has run out nothing new is evaluated: every pending operand and arm becomes `gave-up` under its own path condition, and the values already computed combine with the leaves by the tables (C3).
-Row 59 is reachable only if "nothing new" is read as "no closure body is entered": literals, constructors, already-evaluated thunks and built-in operations still compute; that reading is pending the open question in §9 (O3).
+§9 (O3) amends that sentence: work continues under a second budget of its own, charged for closure bodies too, and only when the second budget runs out does every pending operand and arm become `gave-up`.
 Read literally, it turns every operand of row 59 still pending into a leaf, so every assignment meets some guard and the report would be a bare "gave up" (traced by hand in the Track B audit, in either arm order).
 A strict operation, a comparison, an arithmetic operation or a selector, applied to a `gave-up` returns the leaf with its guard, never a `fresh` atom (C3).
 It is reported as "gave up; needed _i_" for the inputs in `c` (U11), and it is never a `StackOverflow`.
@@ -518,7 +519,7 @@ The residual's **support** is the set of inputs whose atoms can change its value
 **A guarded leaf is a hole, never a value**: a residual containing `error [c] e`, `refuses [c] r` or `gave-up [c]` is decided over the assignments in which no guard holds, and the report names the guards, as "FALSE unless `x`; errors if `x`" (U11b, U13).
 That outcome is its own, on the wire, in the K3 report and in every consumer listed under 4 below.
 If no assignment of the atoms escapes every guard, no assignment is left to decide over and both tests above would pass vacuously, so the directive is never `TRUE` or `FALSE` (U13b).
-When every leaf is a refusal with one reason, the outcome is that refusal, exit 0, as for `IF x THEN TBD ELSE TBD` as a `BOOLEAN` (row 80), and whether the same holds for a join of any other type is pending the open question in §9 (O2); otherwise it is undetermined, listing each leaf, exit 1, as for `IF x THEN (1 DIVIDED BY 0 GREATER THAN 0) ELSE (2 DIVIDED BY 0 GREATER THAN 0)`.
+When every leaf is a refusal with one reason, the outcome is that refusal, exit 0, as for `IF x THEN TBD ELSE TBD` as a `BOOLEAN` (row 80), and §9 (O2) rules that the same holds for a join of any type; otherwise it is undetermined, listing each leaf, exit 1, as for `IF x THEN (1 DIVIDED BY 0 GREATER THAN 0) ELSE (2 DIVIDED BY 0 GREATER THAN 0)`.
 
 How it is computed: by truth table over the residual's atoms, which needs no solver and so runs the same on every host (DU3b); this is what decides rows 14, 36 and 38 `FALSE`.
 When every atom is a `BOOLEAN` input, the answer is also complete over the inputs; otherwise it can miss a decision that only the inputs' values force, which is the first gap above.
@@ -572,7 +573,7 @@ The value stands: exit 0, and an `#ASSERT` on it is satisfied, as `l4 verify`'s 
 A `gave-up` is reported as "gave up; needed _i_" under every report.
 A guarded refusal is undetermined under every report: exit 1, batch status undetermined, the refusal's reason listed, and never a determinate refusal with exit 0 (U13).
 The exception is U13b's case of §4.7.2, where no assignment escapes every guard and every leaf is a refusal with one reason: that is the refusal, exit 0, batch status "refused" (`Batch.hs:369-370`), and on the service today's refusal response, a 422 whose body is the tagged error, `{"tag":"Error","contents":{"tag":"EvaluatorRefused","contents":<reason>}}` (`DataPlane.hs:270`, `:698-701`; `Types.hs:350-354`; `Backend/Api.hs:251-262`), which MCP renders as "The model refuses to answer: …" (`Api.hs:267`, `McpServer.hs:587`).
-That is the default report's outcome; what the K3 and residual reports show for it is pending the open question in §9 (O1).
+That is the default report's outcome; what the K3 and residual reports show for it is ruled in §9 (O1).
 A guarded error is its own outcome (U11b) and exits 1: U11b states no exit code, but U13b's error-leaf control does ("the same with `1 DIVIDED BY 0 GREATER THAN 0` for an error leaf", exit 1), as U13 (2) does for a guarded refusal.
 `#ASSERT REFUSED e` (`EvaluateLazy.hs:308-319`) on a residual that holds a guarded refusal holds where the guard holds and fails where it does not, so it is undetermined, exit 1, as U13 (2) rules for a directive whose refusal is reached only under an undetermined guard (row 81).
 `#ASSERT REFUSED e BECAUSE r` is undetermined too when `r` matches only some of several refusal leaves (row 82), as a consequence of U13b (2) and U1b (assumed, not ruled).
@@ -955,6 +956,11 @@ Each step names the §4.12 rows it must answer and, where the rulings leave a ch
 An assumption is not a ruling: a builder who finds one wrong changes it here, in the same PR, and says why.
 Row 58, every corpus directive not stuck after build step 1, holds from step 2 on; each step measures it by rerunning §2.6's census on its own build and comparing every directive's result kind and value with the tree after step 1, while §7's item 4 measures wall clock.
 
+**Steps 4 to 7 are parked** (Meng, 2026-10-02, MOTHBALL): they are not planned until a user asks for them, and the build stops after step 3.
+Their text below, and the rulings whose full form lands in them, stay as recorded, so that a later build starts from the decisions already made; none is reversed.
+Where steps 1 to 3 carry an interim for such a ruling (step 3's step counter, its re-raising of an error or refusal under an unknown as `Stuck`, and `IF`, `BRANCH` and `CONSIDER` on a term staying `Stuck`), the interim is what ships.
+The decision followed a review that weighed this spec, none of whose §4 to §8 is built, against §2.6's census: 9 stuck results among the corpus's 7,211.
+
 1. **Two-valued fixes, no lift.** A `ValAssumed` scrutinee of a `CONSIDER` raises `Stuck`, naming it (§2.4); the selector path raises the same (§2.4, probe `p05-record.l4`); the right-operand misdiagnosis of `runBinOpEquals` is fixed (U6); and a bare assumed term as the result of an `#EVAL` is reported as `Stuck`, as `#ASSERT` already does (`EvaluateLazy.hs:306`; §2.4, probe `p17-bare.l4`).
    The last is covered by the rulings: U7b makes the default report today's "I needed to know the value of …", row 52 expects exactly that with exit 1, and the 2026-08-01 ruling makes `Stuck` exit 1 (`Run.hs:78-94`); only its timing was open, and it lands here so that the silent exit-0 path closes first.
    Independent; small.
@@ -1043,7 +1049,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
 
 4. **The boundary decider and the residual report.** §4.7.2 by truth table over the residual's atoms on every host (DU3b), the three counts, the K3 and residual reports, residuals printed as source and round-tripped through `prettyLayout`, and the §3.2.1 differential extended to residual results; C5's scope-pending field arrives here, with the first decided `TRUE`.
    Rows 4, 7, 8, 14, 15's count clause, 25, 26, 36, 38, 41, 43, 61, 62 and 63.
-   It builds U13b's decision for a residual no assignment of whose atoms escapes every guard (§4.7.2), for the default report, while the K3 and residual reports' rendering of it is pending the open question in §9 (O1); the row that exercises it, row 80, is in step 5, because it needs that step's join and leaves, as rows 64 and 65 need its definedness guards.
+   It builds U13b's decision for a residual no assignment of whose atoms escapes every guard (§4.7.2), for the default report, while the K3 and residual reports' rendering of it is ruled in §9 (O1); the row that exercises it, row 80, is in step 5, because it needs that step's join and leaves, as rows 64 and 65 need its definedness guards.
    **Documentation:** U1b's wording on the DMN limits page, `doc/exports/dmn-bpmn.md`, whose "Limits, stated plainly" block (`:367`) has none of it yet: "propositional supervaluation of a Boolean residual", its two gaps (atoms are independent; non-Boolean results are not settled), and `x OR NOT x`, `TRUE` at L4's boundary and `null` in FEEL; and a page for the `--unknowns` flag and its three reports.
    _Assumed, not ruled:_
    - The decider is Shannon expansion with constant folding, stopping once one `TRUE` and one `FALSE` completion are found.
@@ -1063,16 +1069,16 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - The extended differential runs under each report from a script under `etc/`, which `etc/verify-branch.sh` names where it already prints the §3.2.1 reminder; a one-line pointer in repo `CLAUDE.md` §3.2.1 is a `CLAUDE.md` edit and needs Meng's word.
 5. **Joins, the step counter and guarded leaves** (§4.5, U4, U4b, U11, U11b, U13, U13b).
    Rows 9, 16, 19 to 22, 27 to 34, 57, 59, 60, 64, 65, 67, 68, 73, 74, 78, 79, 80, 81 and 82, row 70, whose step-3 answer `CONSIDER` on a term keeps, and rows 86 and 87, which stay loud; row 80 exercises step 4's decision for a residual no assignment of whose atoms escapes every guard.
-   It builds joins, and `CONSIDER` on a term as a `fresh` unknown that carries the scrutinee's guarded leaves (U4, DU11), which ends step 3's interim for `IF`, `BRANCH` and `CONSIDER`; whether that `fresh` atom may be absorbed is pending the open question in §9 (O6).
+   It builds joins, and `CONSIDER` on a term as a `fresh` unknown that carries the scrutinee's guarded leaves (U4, DU11), which ends step 3's interim for `IF`, `BRANCH` and `CONSIDER`; that `fresh` atom is never absorbed, carrying an "unevaluated arms" leaf (§9, O6).
    The pattern frames' lifted rule applies only when the unwind's target is a `ConsiderWhen1`: under `Contract11`, and at `EVERY`'s cast test, step 1's `Stuck` stands, so the action matcher and the cast test stay loud (rows 86 and 87).
    It builds U13b's carrying of a term's guarded leaves through the agreeing-arms rule and the identity rule (§4.5, §4.6).
-   How it reads C3 (2)'s "nothing new is evaluated" once the counter has run out, which row 59 depends on, is pending the open question in §9 (O3); row 59's expected text holds under the narrower reading, "no closure body is entered".
+   How it reads C3 (2)'s "nothing new is evaluated" once the counter has run out, which row 59 depends on, is ruled in §9 (O3): a second budget.
    This step's branch carries §7's measurement again: with the joins and the leaves built, §7's items 2, 3 and 5 run on that branch and set both the step limit and the decider's budget anew before the branch merges, since the joins are most of what the decider will meet.
    It builds U13's guarded refusal leaf, which ends U13's interim; the comment at `Machine.hs:838-849` already carries U13's restatement, from step 3.
    **Documentation:** the guarded-error, guarded-refusal and gave-up outcomes; and the DMN limits page records that FEEL takes the else arm on an `IF` over an unknown (U1b).
    _Assumed, not ruled:_
    - A non-Boolean join that holds a leaf is, at a result, U4b's opaque unknown, reported as undetermined with its guard (row 29, §4.5); row 33 holds as written.
-     Where every leaf of such a join is one refusal, the outcome is pending the open question in §9 (O2).
+     Where every leaf of such a join is one refusal, the outcome is that refusal, at any type (§9, O2).
    - A leaf inside a guard is read as not `TRUE` when deciding whether another leaf can be reached, so an arm that can never run drops its leaf.
    - Error leaves come from every `UserEvalException` except `Stuck` and `StackOverflow`, so the `Stuck` fallbacks of steps 3 and 5 always reach the directive boundary; an `InternalEvalException` propagates as today; a `RefusalException` becomes U13's leaf.
      Each guard is stored relative to the join or connective that encloses its leaf, and the full guard is composed at the root.
@@ -1092,7 +1098,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - On every path, direct, service wrapper, deontic wrapper and `l4 batch`, the boundary decision, the report and C5 apply to the exported function's own result and body, not to the wrapper's `JUST` (§6): either the `JUST` is unwrapped before reporting, or a decode failure raises so that the `#EVAL` is the bare call; either way the root bare-result rule of step 1 then applies to the function's own result (§6).
    - Routes `…/evaluation/residual` and `…/evaluation/k3`, with batch equivalents; `/evaluation` keeps the default report, and `FnArguments` stays lenient.
      A top-level `"report"` goes on every evaluation and batch response.
-     What the batch request's OPA-shaped `knownOutcomeStyle` and `unknownOutcomeStyle` (`jl4-service/src/Types.hs:392-393`) do once reports exist is pending the open question in §9 (O4).
+     What the batch request's OPA-shaped `knownOutcomeStyle` and `unknownOutcomeStyle` (`jl4-service/src/Types.hs:392-393`) do once reports exist is ruled in §9 (O4).
    - Under the default report an undetermined, guarded-leaf or gave-up result is a 422, with MCP's `isError`; the residual and K3 routes return 200; a scope-pending `TRUE` is 200.
      K3's unknown is a string tag, never JSON `null`, which the wire already uses for other things.
    - One three-way parse, absent, `null` or `{}`, or a value, is shared by `/evaluation`, batch and MCP, and an MCP argument that fails to parse is rejected with -32602, never read as absent.
@@ -1100,7 +1106,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
      An empty CSV cell stays `null`, so it is Declined and never defaulted, while a column left out is absent and takes its default; the doc page says so.
    - MCP gets one extra tool per function for the residual report, with `required: []`, mirrored in WebMCP; `needs` gives both the L4 name and the wire key, and the residual prints unsanitised.
      `l4 batch --validate-only` warns on an absent or `null` input, without marking the row invalid.
-     Whether a case that hits the resource limit stops failing the whole batch is not this step's to change; it is pending the open question in §9 (O5).
+     Whether a case that hits the resource limit stops failing the whole batch is not this step's to change; §9 (O5) makes it a service fix of its own.
      Deontic functions are accepted, and their regulative sites stay `Stuck`.
    - The residual planner sits beside `/query-plan` on a route of its own, so the ladder's atom ids stay joinable with `GET /ladder`; the language server's and the browser's planners stay on the static tree.
      It re-evaluates with every supplied value, presumption off, and adds as assertions only answers to askable atoms that are not inputs (§4.7.3); it ranks by §25f's information gain with T4's priors, rolled up per input for atoms that cannot be asked.
@@ -1161,7 +1167,7 @@ Note (Track B audit, 2026-10-02): U2's "flag off" reads as "before the lift land
 **AMENDED 2026-10-01**, by bench card U4b, which an independent skeptic reviewed before it was folded in. Meng ruled in chat at 10:20Z: _"These are my rulings prior to SEQUEL. Please fold in any additional recommendations due to SEQUEL."_ The amendment, as the card printed it: Join for `IF` and `BRANCH` under the explore-only step counter, as ruled. Inside the evaluator, a non-Boolean join keeps `c ? t : e` and pushes a strict operation that returns a Boolean (a comparison) into each arm; at a result, a field or any non-strict consumer it falls back to the opaque unknown, so U3's boundary promise holds. An error in one arm joins as a guarded error, exactly as TRIPWIRE's error leaf does for `AND`/`OR`, and it always appears in the response with its guard.
 C4 (above) replaces "explore-only" here as it does in U4: the counter starts when a site in §4.3's table first receives a term operand.
 Note (2026-10-02): C4's "a site that raises `Stuck` today" is read against the tree after build step 1, which makes a `CONSIDER` on an unknown raise; §4.3's conservativity claim is made against the same tree.
-Note (Track B audit, 2026-10-02): C3's own control, row 59, is reachable only if C3 (2)'s "nothing new is evaluated" is read as "no closure body is entered once the counter has run out", with literals, constructors, already-evaluated thunks and built-in operations still computing; it is not a ruling, and Meng is asked to confirm it ("Open for Meng", O3, below).
+Note (Track B audit, 2026-10-02): read literally, C3 (2)'s "nothing new is evaluated" leaves C3's own control, row 59, a bare "gave up"; Meng ruled on 2026-10-02 ("Open for Meng", O3, below) that work continues under a second budget once the counter has run out.
 
 ### U5 — Comparisons become atoms (the membrane)
 
@@ -1291,49 +1297,19 @@ Clause (2) narrows U13's clauses 2 and 3 for the case in which no assignment esc
 **What it costs.** A `z3` binary on every host that runs `jl4-service` with the planner, discovered as R-V6 says (`Z3_EXE`, then `PATH`), and a named degradation when it is absent.
 DU3b (recorded in full under U3b, 14:09:03Z) confirms the scope: z3 decides for these two consumers only, and every evaluation's boundary stays propositional on every host.
 
-### Open for Meng (raised 2026-10-02)
+### Open for Meng (raised and ruled 2026-10-02)
 
-These came out of three adversarial reviews of the TIPPEX commits and a verification of the fixes, on 2026-10-02, while Meng was asleep.
-Each question below is undecided: the steps it names are written so that they do not depend on the answer, or they point here.
-The choices made overnight to keep steps 1 to 3 buildable follow the questions; each is labelled in the text "decided by Claude overnight 2026-10-02, pending Meng's review", and none is a ruling.
+These came out of three adversarial reviews of the TIPPEX commits and a verification of the fixes, on 2026-10-02, and were put to Meng on the bench "Open for Meng" (claude.ai artifact `J9xUbswcat53JthnzfsKFN`, db collection `l4-open-for-meng-1002`), where each card's question, evidence and skeptic's objection are kept.
+Meng ruled all six on 2026-10-02 between 12:55 and 12:56Z, each on the card's recommended option, with no note.
+Several cards also asked for §4.12 rows and rewordings in the sections they name; those wait for the step that builds the ruling, and each card on the bench lists them.
+The choices made overnight to keep steps 1 to 3 buildable follow the rulings; each is labelled in the text "decided by Claude overnight 2026-10-02, pending Meng's review", and none is a ruling.
 
-**O1. Which reports show U13b's all-guarded refusal?**
-The question: under U13b (2), `IF x THEN TBD ELSE TBD` refuses, exit 0, which is a decision over every assignment; C2 has the K3 report read the residual "through the K3 tables, never the boundary's decision", and step 4's rule that the exit code follows the outcome as the chosen report shows it would then give exit 1 under K3.
-Options: (a) every report shows the refusal, exit 0; (b) the default report shows the refusal, exit 0, K3 shows the K3 quotient per C2, "unknown; refuses if x; refuses if not x", exit 1, and the residual report prints the residual with the default report's outcome.
-Recommendation: (b), which keeps C2 as ruled.
-Blocks: build step 4 (§4.7.4, §8 step 4).
-
-**O2. Does U13b (2) apply to a join of any type?**
-The question: YOYO's control, `IF x THEN TBD ELSE TBD`, names no type, and `TBD` is polymorphic (`GIVEN a IS A TYPE GIVETH AN a`, `jl4-core/libraries/prelude.l4:764-767`); row 80 types it as a `BOOLEAN`, and at any other type the same structure is U4b's opaque join at a result, undetermined, exit 1.
-Options: (a) Boolean results only; (b) any type whose every leaf is one refusal.
-Recommendation: (b), since every two-valued completion refuses with that reason whatever the type.
-Blocks: build step 5 (§4.7.2, §8 step 5).
-
-**O3. Confirm C3 (2)'s reading.**
-The question: C3 (2) says that once the counter runs out "nothing new is evaluated"; read literally, C3's own control, row 59, reports a bare "gave up", as the Track B audit traced by hand and the 2026-10-02 review re-traced.
-Options: (a) confirm the narrower reading, "no closure body is entered", under which literals, constructors, already-evaluated thunks and built-in operations still compute; (b) keep the literal reading and change row 59's expected text, which amends C3's ruled control text, since row 59 is C3's card verbatim.
-Recommendation: (a); the note under U4 already records the reading.
-Blocks: build step 5 (§4.5, §8 step 5).
-
-**O4. What does the service do with `knownOutcomeStyle` and `unknownOutcomeStyle` once reports exist?**
-The question: the service batch request accepts both, each a `Maybe OutcomeStyle` over `ValueOnly`, `DecisionReport` and `BaseAttributes` (`jl4-service/src/Types.hs:387-401`), and nothing reads either; U7b says a report choice is never dropped silently, and a client that sets `unknownOutcomeStyle` is choosing one.
-Options: (a) keep accepting and ignoring them, with the response's `"report"` saying which report was used; (b) map each onto a report where it corresponds, and reject any value that disagrees with the route's report or has no corresponding report, such as `BaseAttributes`, naming the route to use; (c) reject both with a 400.
-Recommendation: (b), which keeps clients written to the OPA shape working where their choice can be honoured and refuses it where it cannot, rather than accepting and ignoring it, which U7b forbids ("the report choice cannot be dropped silently").
-Blocks: build step 6 (§8 step 6).
-
-**O5. Should a service batch case that hits the resource limit stop failing the whole batch?**
-The question: today the first failing case fails the whole batch (`jl4-service/src/DataPlane.hs:305-308`), and the resource limit is a 500 (`:689`); a per-case status would change inputs with no unknowns at all, outside every ruling and outside §4.3's claim.
-Options: (a) a per-case status "error" that does not abort the batch, built in step 6; (b) leave the batch as it is; (c) make it a service change of its own, separate from the lift.
-Recommendation: (c).
-Blocks: build step 6, which is written not to change it (§8 step 6).
-
-**O6. May `AND FALSE` or `OR TRUE` absorb a `CONSIDER` on a term?**
-The question: from step 5 a `CONSIDER` on a term is a `fresh` atom that carries only the scrutinee's guarded leaves (§4.5, DU11), because its arms are not evaluated, and §4.3's table absorbs a term with no leaf under `AND FALSE` and `OR TRUE`.
-So with `` `r` MEANS CONSIDER m WHEN JUST z THEN TBD OTHERWISE FALSE ``, `` `r` OR TRUE `` would be `TRUE`, exit 0, while the two-valued run refuses where `m` is `JUST 5` and is `TRUE` where it is `NOTHING` (probes `vf/s4` to `vf/s6`); an erroring arm is absorbed the same way, which is what U11b's and U13's "never absorbed" exist to stop.
-This was in the design before the TIPPEX commits; the review of 2026-10-02 found it.
-Options: (a) a `CONSIDER` on a term evaluates its arms, as a join does, and carries their leaves, without deciding over them; (b) its `fresh` atom counts as holding a guarded leaf for §4.3's absorption rows, so `` `r` OR TRUE `` stays undetermined; (c) leave it absorbable.
-Recommendation: (b), which is loud, needs no new semantics for the arms, and keeps U4's "stays unknown for now"; (a) is the fuller answer if U4's "for now" is reopened.
-Blocks: build step 5 (§4.5, §8 step 5).
+- **O1, BROKENRECORD, option (b).** Two arms that each refuse with the same reason join into that refusal, carrying the condition's leaves, at any type, so row 80 refuses, exit 0, under every report. A refusal on every assignment that only the boundary sees, such as `(x AND TBD) OR (NOT x AND TBD)`, is the refusal, exit 0, in the default report; the K3 quotient "unknown; refuses if x; refuses if not x", exit 1, in the K3 report (C2 kept); and the residual with the default report's outcome in the residual report. The service's default route keeps 422 for a refusal, and the residual and K3 routes return 200 with the outcome in the body. This confirms step 4's assumption that the exit code follows the report shown. Lands with steps 4 and 5, which are parked.
+- **O2, CHAMELEON, option (b).** U13b (2) applies at any type, when no assignment escapes every guard and every leaf is a refusal with one reason. This narrows U3 and U1b's second gap to "a non-Boolean value is not settled; an outcome that refuses under every assignment is". Lands with step 5, parked.
+- **O3, OVERTIME, option (a).** After the step counter runs out, work continues under a second budget of its own, charged for literals, constructors, forcing thunks (evaluated or not), built-ins and closure bodies. When that runs out, everything pending becomes gave-up under its own path condition. §7 sets both limits, and C4 (4) checks their sum against the service's timeout and allocation cap. Row 59 holds; the cyclic list and the long-list re-walk become gave-up instead of reaching the frame cap. Lands with step 5, parked.
+- **O4, DOORMAN, option (c).** From step 6, a service batch request whose outcome object carries any key the service does not honour gets a 400 naming the key and the batch report route. Lands with step 6, parked.
+- **O5, TRAFFICJAM, option (c).** Answered outside the lift, as a service fix of its own: a per-case limit that does not count sibling cases' work, and a case that hits the limit gets a per-case error without discarding the other answers. Not part of any step.
+- **O6, TRAPDOOR, option (b).** A `CONSIDER` on an unknown carries, beside its `fresh` atom, an "unevaluated arms" leaf guarded by its path condition. That leaf is never absorbed by §4.3, by §4.5's agreeing arms, by §4.6's identity or at §4.7.2's boundary, so, with `` `r` MEANS CONSIDER m WHEN JUST z THEN TBD OTHERWISE FALSE ``, both `` `r` OR TRUE `` and `IF r THEN 1 ELSE 1` are undetermined, naming `m`, exit 1. A `CONSIDER` that covers every case (`OTHERWISE`, or every constructor) with all-literal arms is exempt, and absorbs as today. Lands with step 5, parked.
 
 **Decided by Claude overnight 2026-10-02, pending Meng's review.**
 
