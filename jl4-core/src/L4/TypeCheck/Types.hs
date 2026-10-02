@@ -320,6 +320,10 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | TypicallyOnComputedField Name
+    -- ^ A TYPICALLY default was written on a computed field (one with a MEANS
+    -- clause). The field is derived, so a default would never be used
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1). Carries the field.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -778,6 +782,7 @@ instance HasSrcRange CheckErrorContext where
 
 instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
+  rangeOf (TypicallyOnComputedField n)      = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
