@@ -254,7 +254,7 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 
 ### Batch Evaluation
 
-Evaluate a function across many input cases in parallel:
+Evaluate a function across many input cases:
 
 ```bash
 curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualifies/evaluation/batch \
@@ -272,6 +272,15 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 Every case comes back, under its `@id`, with its own `@presumed`.
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
 Neither has a result.
+
+Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is.
+A case that reaches one fails on its own: it carries `@error`, such as `Evaluation resource limit exceeded: this case ran past the time limit of 3 s (--eval-timeout)`, and the other cases keep their answers.
+The batch is still a `200`.
+
+The cases run concurrently, but no more of them at once than the service has cores (its capabilities, `+RTS -N`; see [CLI Options](#cli-options)).
+A case's clock starts when the case starts running, not when the batch arrives, so waiting behind other cases does not count against it.
+So the size of a batch does not decide whether its cases meet the time limit: each case has to meet it on its own.
+On one core the whole batch takes as long as its cases take together, and more cores shorten it: measured on 2026-10-02 on a machine busy with other work, 100 cases of 0.19 s each took 15.7 s on one core and 4.0 to 5.5 s on ten.
 
 ### Query Planning
 
@@ -486,6 +495,9 @@ All options can also be set via environment variables. CLI arguments take preced
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 
+The service runs GHC's threaded runtime on every core of the machine (`-N`), and a batch runs as many of its cases at once as there are cores.
+To use fewer, pass runtime options on the command line, `jl4-service +RTS -N2 -RTS`, or in the environment, `GHCRTS=-N2`.
+
 ## Logging
 
 All output is structured JSON (one object per line) to stdout, suitable for log aggregators:
@@ -506,8 +518,8 @@ By default, error responses return generic messages (e.g., `"Deployment compilat
 The service enforces several resource limits to protect against abuse:
 
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
-- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`. Returns `500` on limit exceeded.
-- **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout.
+- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`. Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` instead, and the batch is still a `200` (see [Batch Evaluation](#batch-evaluation)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
+- **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. A batch never runs more cases at once than there are cores, so a case's clock counts its own work and not its siblings', apart from the garbage collector's pauses, which every running evaluation shares. Separate requests evaluating at the same time do share cores, when there are more of them than cores.
 - **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
