@@ -35,6 +35,7 @@ module TestData (
   twoDatesJL4,
   ruleDefaultJL4,
   namedSiteDefaultJL4,
+  expressionDefaultJL4,
   constructorNamedDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -788,6 +789,23 @@ combine MEANS
   IF use
   THEN (scaled WITH base IS n) PLUS (Config WITH retries IS rate)'s timeout
   ELSE 0
+|]
+
+-- | A section input whose @TYPICALLY@ is an expression that reads another section
+-- input (R8 rule 3, W7). A request that leaves @discount@ out has it worked out
+-- from the @list price@ the same request supplies, which the rule itself never
+-- names: only the default reads it.
+expressionDefaultJL4 :: Text
+expressionDefaultJL4 =
+  [i|
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+@export default final price
+GIVEN `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS discount TIMES 2
 |]
 
 -- | Defaults whose value is a bare constructor (FALSE, an enum value), taken at

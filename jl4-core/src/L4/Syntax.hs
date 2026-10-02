@@ -1036,15 +1036,61 @@ data DefaultFill = MkDefaultFill
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
--- | The mark of an added default, read off the value it sits on. Only the two
--- shapes a default can take are looked at ('L4.TypeCheck.isTypicallyLiteral':
--- a literal, or a nullary constructor), which keeps the test to one constructor
--- check for every other expression.
+-- | The mark of an added default, read off the value it sits on: the root of
+-- the default's expression, whatever shape it has (R8 rule 3 admits any
+-- expression over what the module declares).
+--
+-- Read on every argument of every application the evaluator allocates, so it is
+-- a plain case over the constructors and not the generic 'getAnno', which made
+-- @fib 27@ about twice as slow (measured). The case is exhaustive on purpose: a
+-- constructor added to 'Expr' is a compile error here until it says where its
+-- annotation is.
 exprDefaultFill :: Expr n -> Maybe DefaultFill
 exprDefaultFill = \ case
-  Lit ann _     -> (.extra.defaultFill) ann
-  App ann _ []  -> (.extra.defaultFill) ann
-  _             -> Nothing
+  And a _ _        -> fill a
+  Or a _ _         -> fill a
+  RAnd a _ _       -> fill a
+  ROr a _ _        -> fill a
+  Implies a _ _    -> fill a
+  Equals a _ _     -> fill a
+  Not a _          -> fill a
+  Plus a _ _       -> fill a
+  Minus a _ _      -> fill a
+  Times a _ _      -> fill a
+  DividedBy a _ _  -> fill a
+  Modulo a _ _     -> fill a
+  Cons a _ _       -> fill a
+  Leq a _ _        -> fill a
+  Geq a _ _        -> fill a
+  Lt a _ _         -> fill a
+  Gt a _ _         -> fill a
+  Proj a _ _       -> fill a
+  Lam a _ _        -> fill a
+  App a _ _        -> fill a
+  AppNamed a _ _ _ -> fill a
+  IfThenElse a _ _ _ -> fill a
+  MultiWayIf a _ _ -> fill a
+  Regulative a _   -> fill a
+  Consider a _ _   -> fill a
+  Lit a _          -> fill a
+  Percent a _      -> fill a
+  List a _         -> fill a
+  Where a _ _      -> fill a
+  LetIn a _ _      -> fill a
+  Event a _        -> fill a
+  Fetch a _        -> fill a
+  Env a _          -> fill a
+  Post a _ _ _     -> fill a
+  Record a _ _ _ _ _ -> fill a
+  ReadCell a _ _ _ _ -> fill a
+  Concat a _       -> fill a
+  AsString a _     -> fill a
+  Breach a _ _     -> fill a
+  Refuse a _       -> fill a
+  Inert a _ _      -> fill a
+ where
+  fill :: Anno -> Maybe DefaultFill
+  fill a = a.extra.defaultFill
 
 -- | A named argument the type checker added, as opposed to one the author wrote.
 isDefaultFill :: NamedExpr n -> Bool

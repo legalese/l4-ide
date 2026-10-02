@@ -234,6 +234,15 @@ batchTyLabels, batchTyLabelsJson :: FilePath
 batchTyLabels     = fixtureDir </> "batch-typically-named-labels.l4"
 batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 
+-- | @TYPICALLY@ that is an EXPRESSION (W7, R8 rule 3): on a rule's input, a
+-- section input and a record's field; taken from the case, and at a named site
+-- inside the rules; and a circle of defaults, which is no program.
+batchTyExpr, batchTyExprJson, batchTyCycle, batchTyCycleJson :: FilePath
+batchTyExpr         = fixtureDir </> "batch-typically-expression.l4"
+batchTyExprJson     = fixtureDir </> "batch-typically-expression.json"
+batchTyCycle        = fixtureDir </> "batch-typically-cycle.l4"
+batchTyCycleJson    = fixtureDir </> "batch-typically-cycle.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -426,6 +435,7 @@ coreFixtures =
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
+  , batchTyExpr, batchTyExprJson, batchTyCycle, batchTyCycleJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -1950,6 +1960,41 @@ spec bin = do
         [ ( Just (Number 140)
           , presumedOf ["WITH scaled: rate", "WITH scaled by: factor", "WITH Config: timeout"] )
         ]
+
+  -- W7 (R8 rule 3): a default that is an expression is worked out from the
+  -- values the SAME case supplies. Before, a default had to be a literal, so none
+  -- of these modules checked.
+  describe "l4 batch: a section input's TYPICALLY that is an expression (W7)" $ do
+    -- `discount` is a tenth of the case's own `list price`: 200 - 20, then the
+    -- case's own 200 - 5, then 50 - 5.
+    it "works the default out from the case, and lists it by name" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExpr, "--inputs", batchTyExprJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 180), presumedOf ["discount"])
+        , (Just (Number 195), presumedOf [])
+        , (Just (Number 45),  presumedOf ["discount"])
+        ]
+
+    -- Under hard no default is used, an expression among them: the row that
+    -- leaves `discount` out is an error that names it.
+    it "uses no default under --presumption hard, and names what the row left out" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyExpr, "--inputs", batchTyExprJson
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows
+        `shouldBe` [Just (String "error"), Just (String "success"), Just (String "error")]
+      sout `shouldSatisfy` ("Missing required field 'discount'" `isInfixOf`)
+
+    -- Two defaults that read one another cannot be worked out: the module does
+    -- not check, so there is no row to run.
+    it "refuses a module whose defaults read one another, before any row" $ do
+      Output code sout serr <- runL4 bin ["batch", batchTyCycle, "--inputs", batchTyCycleJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      (sout <> serr) `shouldSatisfy` ("depend on one another in a circle" `isInfixOf`)
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

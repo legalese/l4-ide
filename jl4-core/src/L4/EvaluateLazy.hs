@@ -55,7 +55,7 @@ module L4.EvaluateLazy
 where
 
 import Base
-import L4.Discharge (dischargeModuleWith, sectionBinders, Binder (..))
+import L4.Discharge (dischargeModuleWith, defaultThunkUnique, sectionBinders, Binder (..))
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Set as Set
@@ -885,7 +885,7 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
   -- one that nothing supplies stays an assumed term.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig rootFills m0 imported st0
+  let st = withDefaultsKnown evalConfig rootFills m imported st0
   r <- try (withAllocationLimit evalConfig.allocationLimit (runEval st (evalModuleAndDirectivesWith runDirective env m)))
   case r of
     Left exc -> do
@@ -925,6 +925,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   unknownReached <- newIORef []
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
+  globalEnv  <- newIORef emptyEnvironment
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
@@ -934,6 +935,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
     , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    , globalEnv
     }
 
 -- | Tell a run where defaults come from: the section binders of the evaluated
@@ -949,17 +951,22 @@ withDefaultsKnown evalConfig rootFills m imported st =
   binderDefaults
     | evalConfig.presumeDefaults =
       Map.fromList
-        [ ( u
-          , MkPresumed
-              { path       = [rawNameToText (rawName (getActual b.resolved))]
-              , declaredAt = rangeOf d
-              , origin     = FromSectionBinder
-              }
-          )
+        [ (u', p)
         | (u, b) <- Map.toList (sectionBinders m)
         , Just d <- [b.typically]
+        , let p = MkPresumed
+                { path       = [rawNameToText (rawName (getActual b.resolved))]
+                , declaredAt = rangeOf d
+                , origin     = FromSectionBinder
+                }
+          -- the binder's own definition, and the function a root applies to
+          -- its values when the default reads other binders
+          -- ('L4.Discharge.defaultThunkUnique'): whichever is forced reports
+          -- the default
+        , u' <- [u, defaultThunkUnique moduleUri b]
         ]
     | otherwise = Map.empty
+  MkModule _ moduleUri _ = m
 
 -- | Every @DECLARE@ in a module, in any section.
 moduleDeclares :: Module Resolved -> [Declare Resolved]
@@ -1163,7 +1170,7 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
+  let st = withDefaultsKnown evalConfig noRootFills m [] st0
   r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
     Left exc -> do

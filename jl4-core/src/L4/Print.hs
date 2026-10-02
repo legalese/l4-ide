@@ -37,6 +37,16 @@ prettyLayout a = docText $ printWithLayout a
 docText :: Doc ann -> Text
 docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
 
+-- | A @TYPICALLY@ default as the text that follows the keyword in source. The
+-- grammar takes a literal, a name, or a parenthesised expression there, so
+-- anything else is bracketed: @TYPICALLY (list price DIVIDED BY 10)@. Every
+-- place that writes a default out as source goes through this one.
+prettyTypicallyOperand :: LayoutPrinterWithName a => Expr a -> Text
+prettyTypicallyOperand = docText . typicallyOperand
+
+typicallyOperand :: LayoutPrinterWithName a => Expr a -> Doc ann
+typicallyOperand = parensIfNeeded
+
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
 type ConstructorFieldNames = Map Unique [Text]
@@ -573,7 +583,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (OptionallyTypedName a) where
         _ -> mempty
       <> case typically of
         Nothing -> mempty
-        Just e -> space <> "TYPICALLY" <+> printWithLayout e
+        Just e -> space <> "TYPICALLY" <+> typicallyOperand e
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
   printWithLayout = \ case
@@ -588,7 +598,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
     where
       printTypically = \ case
         Nothing -> mempty
-        Just e -> space <> "TYPICALLY" <+> printWithLayout e
+        Just e -> space <> "TYPICALLY" <+> typicallyOperand e
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypeSig a) where
   printWithLayout = \ case
@@ -698,7 +708,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
             Just ty' -> space <> "IS" <+> printWithLayout ty'
           <> case typically of
             Nothing -> mempty
-            Just e -> space <> "TYPICALLY" <+> printWithLayout e
+            Just e -> space <> "TYPICALLY" <+> typicallyOperand e
         ]
 
 instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
