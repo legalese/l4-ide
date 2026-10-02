@@ -5,7 +5,8 @@
 -- its named-field variant). So a default that took effect shows in the editor
 -- exactly when the text trace has it, and these cases hold that to what the
 -- inspector actually sends: the real oneshot pipeline, the LSP's own trace
--- policy, and the inspector's own conversion.
+-- policy, and the inspector's own conversion. A directive with no trace
+-- (an @#EVAL@) says it in a NOTE line after its answer (W11, §4.3).
 module InspectorTraceSpec (spec) where
 
 import qualified Data.Text as T
@@ -67,13 +68,19 @@ spec = describe "a TYPICALLY default in the editor's trace (W8)" do
               Nothing  -> ""
             pushed r = maybe "" (.prettyText) (evalDirectiveToUpdateItem mempty (\_ _ -> "") r)
             said t = "the rate took its default (declared at w8-inspector.l4:2:44-45)" `T.isInfixOf` t
-        -- the traced directive that read the default says so, in all three
+        -- the traced directive that read the default says so, in all three,
+        -- and once: its trace has it, so the NOTE line of W11 does not repeat it
         inspector traced `shouldSatisfy` said
         pushed traced `shouldSatisfy` said
         prettyEvalDirectiveResult traced `shouldSatisfy` said
+        T.count "took its default" (inspector traced) `shouldBe` 1
         -- the value was given, so nothing was presumed
         inspector supplied `shouldSatisfy` (not . T.isInfixOf "took its default")
-        -- and an #EVAL has no trace to show it in: it answers as it always did
-        inspector plain `shouldSatisfy` (not . T.isInfixOf "took its default")
-        T.strip (inspector plain) `shouldBe` "6"
+        -- and an #EVAL has no trace to show it in: it says so in a NOTE line
+        -- after its answer (W11, TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3), in
+        -- the inspector and in the diagnostic alike
+        T.lines (T.strip (inspector plain))
+          `shouldBe` ["6", "NOTE: the rate took its default (declared at w8-inspector.l4:2:44-45)"]
+        pushed plain `shouldSatisfy` said
+        prettyEvalDirectiveResult plain `shouldSatisfy` said
       other -> expectationFailure ("expected three results, got " <> show (length other))
