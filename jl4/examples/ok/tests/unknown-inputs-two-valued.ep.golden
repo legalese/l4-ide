@@ -3,16 +3,72 @@
 -- Every input in the section below is unsupplied, so it is an unknown, and a
 -- directive that needs its value stops with "I needed to know the value of …"
 -- (`Stuck`), naming it. Until UNKNOWN-EVALUATION-SPEC §8 step 1, several
--- sites reported something else: `3 EQUALS n`, and a literal pattern matched
--- against `n`, blamed the type; the string and JSON coercions blamed the type
--- or reported an internal error; the temporal iterators blamed the predicate;
--- and `#EVAL x` printed `x` as a value. The row numbers below are §4.12's.
+-- sites reported something else: a CONSIDER took a catch-all branch on the
+-- unknown and printed that branch's answer as though it were the result; an
+-- exhaustive CONSIDER, and every field read on an unknown record, said it had
+-- no branch for the value; `3 EQUALS n`, and a literal pattern matched against
+-- `n`, blamed the type; the string and JSON coercions blamed the type or
+-- reported an internal error; the temporal iterators blamed the predicate;
+-- and `#EVAL x` printed `x` as a value. A CONSIDER read by the regulative
+-- action matcher, in an event's act or in a PROVIDED condition, answered on
+-- the catch-all's guess too. The row numbers below are §4.12's.
 --
 -- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN: a directive that cannot evaluate
 -- is a crash (ruled by Meng 2026-08-01; see L4.Cli.Run.evalDirectiveCrashed).
 
 IMPORT prelude
 IMPORT daydate
+
+DECLARE Kind IS ONE OF Retail, Wholesale
+DECLARE Claim HAS kind IS A Kind, amount IS A NUMBER
+DECLARE Person HAS age IS A NUMBER
+DECLARE Pair HAS num IS A NUMBER, tag IS A STRING
+DECLARE Box HAS kind IS A Kind
+
+DECLARE Actor IS ONE OF
+    Seller HAS name IS A STRING
+DECLARE Action IS ONE OF
+    Deliver HAS item IS A Kind
+
+alice MEANS Seller OF "Alice"
+
+GIVEN it IS A Kind
+GIVETH A BOOLEAN
+`is for sale` it MEANS
+    CONSIDER it
+    WHEN Wholesale THEN FALSE
+    OTHERWISE TRUE
+
+GIVEN it IS A Kind
+GIVETH A Kind
+`same kind` it MEANS
+    CONSIDER it
+    WHEN Retail    THEN Retail
+    WHEN Wholesale THEN Wholesale
+
+GIVETH A DEONTIC Actor Action
+`must deliver retail` MEANS
+    PARTY alice
+    MUST   Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+GIVETH A DEONTIC Actor Action
+`must deliver for sale` MEANS
+    PARTY alice
+    MUST   Deliver it PROVIDED `is for sale` it
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+GIVETH A DEONTIC Actor Action
+`must not deliver for sale` MEANS
+    PARTY alice
+    SHANT  Deliver it PROVIDED `is for sale` it
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
 
 DECIDE total IS 1 PLUS 2 PLUS 3
 
@@ -23,12 +79,36 @@ double z MEANS z TIMES 2
 § `Unknown inputs`
     GIVEN x IS A BOOLEAN
           n IS A NUMBER
+          m IS A MAYBE NUMBER
+          d IS A Person
+          k IS A Kind
+          b IS A Box
           xs IS A LIST OF NUMBER
           f IS A FUNCTION FROM NUMBER TO NUMBER
 
 GIVEN day IS A DATE
 GIVETH A BOOLEAN
 `holds on` day MEANS x
+
+-- CONSIDER on an unknown: stuck, naming it (rows 34 and 70).
+#EVAL CONSIDER m WHEN NOTHING THEN 1, WHEN JUST y THEN 2
+#EVAL CONSIDER m WHEN JUST y THEN 2, OTHERWISE 1
+#EVAL CONSIDER x WHEN TRUE THEN 1, OTHERWISE 2
+#EVAL CONSIDER xs WHEN EMPTY THEN 0, OTHERWISE 1
+#EVAL CONSIDER xs WHEN h FOLLOWED BY t THEN h, OTHERWISE 0
+
+-- A field read on an unknown record: stuck on the record (row 35).
+#EVAL d's age
+
+-- An unknown inside a known value. The first branch fails whatever `k` is,
+-- because `5` is not `0`, so the second is the answer (row 71) ...
+#EVAL CONSIDER Claim k 5 WHEN Claim Retail 0 THEN "first", WHEN Claim kk a THEN "second"
+-- ... but here the first branch matches if `k` is `Retail`, so it is stuck.
+#EVAL CONSIDER Claim k 0 WHEN Claim Retail 0 THEN "first", WHEN Claim kk a THEN "second"
+-- The same for an unknown met by a literal pattern: "x" is not "y" ...
+#EVAL CONSIDER Pair n "x" WHEN Pair 0 "y" THEN "first", WHEN Pair a b THEN "second"
+-- ... and here the first branch matches if `n` is `0`.
+#EVAL CONSIDER Pair n "y" WHEN Pair 0 "y" THEN "first", WHEN Pair a b THEN "second"
 
 -- EQUALS names an unknown on either side (row 12), and so does a literal
 -- pattern, which compares the literal with the value considered ...
@@ -55,6 +135,18 @@ GIVETH A BOOLEAN
 #EVAL x
 #EVAL TRUE AND x
 #EVAL TRUE IMPLIES x
+
+-- A CONSIDER the action matcher reads on an unknown: in a PROVIDED, where the
+-- catch-all used to make these FULFILLED and BREACHED, ...
+#TRACE `must deliver for sale` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
+#TRACE `must not deliver for sale` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
+-- ... and in the act, through an exhaustive CONSIDER and through a field read.
+#TRACE `must deliver retail` AT 0 WITH
+  PARTY alice DOES Deliver (`same kind` k) AT 1
+#TRACE `must deliver retail` AT 0 WITH
+  PARTY alice DOES Deliver (b's kind) AT 1
 
 -- An input is a value in every case, so it never refuses: failed (row 72).
 #ASSERT REFUSED x

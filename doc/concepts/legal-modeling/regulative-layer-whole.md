@@ -144,7 +144,7 @@ The rules of the clock are few and worth having in one place:
 - time passes only through events, so ``(`WAIT UNTIL` 8)`` is how to say "day 8 came and nobody did anything";
 - an event that does not fit the obligation is passed over, but the clock still moves to its time;
 - an event whose act holds a fact the case has not supplied, at a place where the act written in the obligation's `MUST`, `MAY` or `SHANT` line names one particular kind of thing (Alice delivered goods of a kind nobody has stated, and the line says `MUST Deliver Retail`), is not passed over: the run stops and names the missing fact, because passing it over would mean deciding that she delivered the wrong kind;
-- one exception is still being worked on: when that missing fact is checked by a rule that uses `CONSIDER` with an `OTHERWISE` line, in the act or in a `PROVIDED` condition, the rule answers as if the fact were whatever `OTHERWISE` covers, without stopping, so the event can be passed over, or taken as the act, on that guess — and under a `SHANT` that can put the party in breach;
+- the same holds when that missing fact is checked by a rule that uses `CONSIDER`, in the act or in a `PROVIDED` condition: the run stops and names it, even where the `CONSIDER` has an `OTHERWISE` line;
 - a chain's next clock starts where the previous link ended — for `HENCE`, at the act that discharged it; for `LEST`, at the deadline that was missed (for a prohibition, at the forbidden act), and not at the later event that brought the miss to light.
 
 **How an event matches an act** is the part of this question that carries the most weight, because it is where a fact from the world enters the obligation. Two ways:

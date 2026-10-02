@@ -1,3 +1,13 @@
+consider the case distinctions of `m` :  when `NOTHING` has  then 1. when `JUST` has `y` then 2
+consider the case distinctions of `m` :  when `JUST` has `y` then 2. in any other case 1
+consider the case distinctions of `x` :  when `TRUE` has  then 1. in any other case 2
+consider the case distinctions of `xs` :  when `EMPTY` has  then 0. in any other case 1
+consider the case distinctions of `xs` :  when `h` is followed by `t` then `h`. in any other case 0
+`d` 's `age`
+consider the case distinctions of `Claim` with `k` and 5 :  when `Claim` has `Retail` has  and 0 then first. when `Claim` has `kk` and `a` then second
+consider the case distinctions of `Claim` with `k` and 0 :  when `Claim` has `Retail` has  and 0 then first. when `Claim` has `kk` and `a` then second
+consider the case distinctions of `Pair` with `n` and x :  when `Pair` has 0 and y then first. when `Pair` has `a` and `b` then second
+consider the case distinctions of `Pair` with `n` and y :  when `Pair` has 0 and y then first. when `Pair` has `a` and `b` then second
 3 is equal to `n`
 `n` is equal to 3
 consider the case distinctions of `n` :  when 0 then zero. in any other case other
@@ -14,5 +24,9 @@ consider the case distinctions of `n` :  when 0 then zero. in any other case oth
 `x`
 `TRUE` and `x`
 `TRUE` implies `x`
+executing contract `must deliver for sale` at 0 with the following events: party `alice` did `Deliver` with `k` at 1
+executing contract `must not deliver for sale` at 0 with the following events: party `alice` did `Deliver` with `k` at 1
+executing contract `must deliver retail` at 0 with the following events: party `alice` did `Deliver` with `same kind` with `k` at 1
+executing contract `must deliver retail` at 0 with the following events: party `alice` did `Deliver` with `b` 's `kind` at 1
 the following must refuse: `x`
 list of `n` and `total`
