@@ -926,6 +926,23 @@ lookupByFirstKeyword kw reg =
 lookupByCanonicalName :: RawName -> MixfixRegistry -> [FunTypeSig]
 lookupByCanonicalName cn reg = fromMaybe [] $ Map.lookup cn reg.byCanonicalName
 
+-- | The @TYPICALLY@ default of one rule input or record field, as the checker
+-- keeps it for the sites that leave it out.
+data InputDefault = MkInputDefault
+  { binder     :: !Name
+    -- ^ The input or field, as declared.
+  , declaredAt :: !(Maybe SrcRange)
+    -- ^ The @TYPICALLY@ that gave the value.
+  , value      :: !(Expr Resolved)
+    -- ^ The checked default: a literal or a nullary constructor.
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | The defaults a rule or a record constructor declares, keyed by its
+-- 'Unique', then by the 'Unique' of the input or field that carries each.
+type InputDefaults = Map Unique (Map Unique InputDefault)
+
 data CheckEnv =
   MkCheckEnv
     { moduleUri            :: !NormalizedUri
@@ -969,6 +986,13 @@ data CheckEnv =
     -- the spelling (R-X2, smucclaw\/l4-ide#956).
     --
     -- Reset across imports for the same reason 'sectionBinderNames' is.
+    , visibleInputDefaults :: !InputDefaults
+    -- ^ The @TYPICALLY@ defaults of every rule input and record field this
+    -- module can see, keyed by the rule or record constructor that declares
+    -- them. A named application ('L4.TypeCheck.supplyAppNamed') that leaves one
+    -- out reads the value from here instead of reporting it missing
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5). Unlike 'functionTypeSigs'
+    -- this accumulates: a @WHERE@ body can still see its enclosing rules'.
     , importedImplicitReaders :: !(Set Unique)
     -- ^ Definitions in IMPORTED modules whose read-set is non-empty: they take
     -- section binders as parameters once their own module is discharged, and
@@ -1080,6 +1104,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , cyclicSynonyms = mempty
     , sectionBinderNames = mempty
     , sectionBinderDecls = mempty
+    , visibleInputDefaults = accEnv.visibleInputDefaults
     , importedImplicitReaders =
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
@@ -2323,6 +2348,7 @@ extendEnv cis env =
     , cyclicSynonyms = e.cyclicSynonyms
     , sectionBinderNames = e.sectionBinderNames
     , sectionBinderDecls = e.sectionBinderDecls
+    , visibleInputDefaults = e.visibleInputDefaults
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation
