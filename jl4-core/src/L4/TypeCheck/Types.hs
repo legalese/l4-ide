@@ -1055,7 +1055,9 @@ data InputDefault = MkInputDefault
   , declaredAt :: !(Maybe SrcRange)
     -- ^ The @TYPICALLY@ that gave the value.
   , value      :: !(Expr Resolved)
-    -- ^ The checked default: a literal or a nullary constructor.
+    -- ^ The checked default: any expression over what the module declares (R8
+    -- rule 3), which a site that leaves the input out has copied into it
+    -- ('L4.TypeCheck.defaultValueAt').
   }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
