@@ -415,7 +415,8 @@ jl4-mlir's by-name mirror (`synthesizeBoolDesugar`, `synthesizeNotDesugar`) is d
 No golden or trace output may name the built-ins' parameters `a` and `b`, and the indirect-call golden is read before it is blessed.
 The lift of §4.3 lives in these frames; a lift written at `:1198` would never fire.
 `BRANCH` stays an `IF` chain, because its guards are a first-match ordering, which `IF` expresses exactly.
-What the trace keeps: today a variable operand's value appears only as the `IF`'s `a` or `b` leaf (`lazytrace-exception.golden:57-58`, `:61-62`), so each connective node gets a child per operand labelled with the operand's own source text and its value, such as `x` then `TRUE`, and an operand the connective skips is shown as skipped, not left out (decided by Claude overnight 2026-10-02, pending Meng's review).
+What the trace keeps: today a variable operand's value appears only as the `IF`'s `a` or `b` leaf (`lazytrace-exception.golden:57-58`, `:61-62`), so each connective node gets a child per operand labelled with the operand's own source text and its value, such as `x` then `TRUE` (decided by Claude overnight 2026-10-02, pending Meng's review).
+An operand the connective skips is drawn as skipped, under its source text, where a renderer draws what was not evaluated, which is GraphViz with `showUnevaluated` on, and is left out of a text trace and of the service's reasoning, as the `IF`'s untaken arm was (decided by Claude overnight 2026-10-03, pending Meng's review).
 U2b allows this: it bans naming the built-ins' parameters `a` and `b`, not showing the operands.
 §8 step 2 states the other assumptions a builder needs: how the frames force their operands, the trace shape, and jl4-mlir's missing `IMPLIES` lowering.
 
@@ -995,7 +996,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
      Probe `s2skeptic/flagmain.l4`, which imports a module whose section `GIVEN` has a `TYPICALLY`, shows both sides today: `TRUE AND` the imported Boolean reader is `TRUE`, while the imported numeric reader `PLUS 1` is an internal error, because a binary built-in forces both operands by `continueRef` (`Machine.hs:1572-1573`, `:1515-1517`).
      A two-file positive control beside `ok/section-given-import-def.l4` and `ok/section-given-import-call.l4` puts a bare imported reader in each operand position.
    - When a known left operand does not decide, the right operand continues in tail position, with no new frame and no Boolean check, which keeps the prelude's `x AND and xs` (`prelude.l4:227`) flat and does not implement step 1's bare-result change by accident.
-   - The frames emit no trace node of their own: the call site's application is the connective's node, with a child per operand labelled with its source text and value, and a skipped operand shown as skipped (§4.4, decided by Claude overnight 2026-10-02, pending Meng's review); an exception from the left operand shows as the bare `• ↯` node the arithmetic built-ins already produce (`lazytrace-exception.golden:145`).
+   - The frames emit no trace node of their own: the call site's application is the connective's node, with a child per operand labelled with its source text and value (§4.4, decided by Claude overnight 2026-10-02, pending Meng's review); in a text trace the right operand, which runs in tail position, is the connective's next step, and in the service's reasoning that makes it the node's last child; a skipped operand is left out of both and drawn only as GraphViz's stub (§4.4, decided by Claude overnight 2026-10-03, pending Meng's review); an exception from the left operand shows as the bare `• ↯` node the arithmetic built-ins already produce (`lazytrace-exception.golden:145`).
      GraphViz draws a stub for a skipped operand only when `showUnevaluated` is on, and `l4 trace` leaves it off: it renders with `defaultGraphVizOptions` (`jl4/app/L4/Cli/Trace.hs:105-109`; `GraphVizOptions.hs:25`), and the `showUnevaluated = True` at `jl4/app/L4/Cli/Common.hs:206` sits in a `TraceOptions` field that nothing reads.
      Where it is on, today's stub is labelled with the `IF`'s skipped arm, `b` (`GraphViz2.hs:332-353`), and the frames label it with the skipped operand's source text instead; the PR records one DOT before and after.
      The service's reasoning tree and jl4-mlir's runtime trace must emit the same operand children, since jl4-mlir reproduces the service's trace shape on purpose (§2.4), and U2b's `IMPLIES` parity fixture checks them.
@@ -1358,6 +1359,11 @@ Blocks: build step 5 (§4.5, §8 step 5).
   The alternatives are every result that holds a term undetermined once the counter has started, or every term printed as a value, which would let such a batch row score "success" silently (step 3).
 - Traces keep each connective operand as a child labelled with its source text and value, and show a skipped operand as skipped (§4.4, §8 step 2).
   The alternative is to drop operand values from the trace, which U2b also allows (step 2).
+
+**Decided by Claude overnight 2026-10-03, pending Meng's review.**
+
+- A skipped connective operand is left out of a text trace and of the service's reasoning, as the `IF`'s untaken arm was, and is drawn, under its source text, only as GraphViz's stub when `showUnevaluated` is on, which no shipped renderer turns on (§4.4, §8 step 2).
+  The alternative is a child marked as not evaluated in every trace, which needs a trace node that has no value, and its jl4-mlir mirror (step 2).
 
 ---
 
