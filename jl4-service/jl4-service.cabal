@@ -151,9 +151,9 @@ test-suite jl4-service-test
     test
 
   -- The threaded RTS, as the executable runs, so that System.Timeout takes the
-  -- timer-manager path it takes in production. But ONE capability (no -N), so
-  -- that a batch test's forty cases share one core on any machine, and the
-  -- test still fails if a batch starts more cases at once than it has cores.
+  -- timer-manager path it takes in production. No -N: a test that depends on
+  -- the capability count sets it itself (setNumCapabilities), so that GHCRTS
+  -- cannot change it underneath the test.
   ghc-options: -threaded
 
   build-tool-depends:

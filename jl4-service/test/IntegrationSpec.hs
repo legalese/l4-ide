@@ -19,9 +19,9 @@ import Types
 
 import Control.Concurrent.Async (forConcurrently)
 import Control.Monad (forM_, guard, unless)
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
-import Control.Exception (try)
+import Control.Exception (bracket, try)
 import Data.Foldable (toList)
 import qualified Data.List as List
 import qualified Codec.Archive.Zip as Zip
@@ -933,33 +933,45 @@ spec = describe "integration" do
     -- counted its siblings' work as well as its own, so forty cases that each
     -- take about a fifth of a second failed the whole batch with a 500 under a
     -- three-second limit, and one slow case took thirty-nine answers with it.
-    it "answers 10 fast cases under a 3-second limit" do
-      withServiceFromSourcesOpts spinOptions "spin-10" [("spin.l4", spinJL4)] \baseUrl mgr -> do
-        resp <- postSpinBatch baseUrl mgr "spin-10" (replicate 10 spinFast)
-        expectBatchOutcomes resp (replicate 10 CaseAnswered)
+    --
+    -- These run at one capability, set here rather than by the RTS options, so
+    -- that GHCRTS=-N10 cannot hand the forty cases ten cores and hide the bug.
+    describe "at one capability" $ around_ (withCapabilities 1) do
+      it "answers 10 fast cases under a 3-second limit" do
+        withServiceFromSourcesOpts spinOptions "spin-10" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-10" (replicate 10 spinFast)
+          expectBatchOutcomes resp (replicate 10 CaseAnswered)
 
-    it "answers 40 fast cases under a 3-second limit that no one case comes near" do
-      withServiceFromSourcesOpts spinOptions "spin-40" [("spin.l4", spinJL4)] \baseUrl mgr -> do
-        resp <- postSpinBatch baseUrl mgr "spin-40" (replicate 40 spinFast)
-        expectBatchOutcomes resp (replicate 40 CaseAnswered)
+      it "answers 40 fast cases under a 3-second limit that no one case comes near" do
+        withServiceFromSourcesOpts spinOptions "spin-40" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-40" (replicate 40 spinFast)
+          expectBatchOutcomes resp (replicate 40 CaseAnswered)
 
-    it "answers 39 fast cases and errs on 1 slow one, without failing the batch" do
-      -- The slow case comes first, so the others wait behind it: a case's
-      -- clock starts when the case starts running, not when the batch arrives.
-      withServiceFromSourcesOpts spinOptions "spin-39-1" [("spin.l4", spinJL4)] \baseUrl mgr -> do
-        resp <- postSpinBatch baseUrl mgr "spin-39-1" (spinSlow : replicate 39 spinFast)
-        expectBatchOutcomes resp
-          ( CaseErrored "Evaluation resource limit exceeded: this case ran past the time limit of 3 s (--eval-timeout)"
-              : replicate 39 CaseAnswered )
+      it "answers 39 fast cases and errs on 1 slow one, without failing the batch" do
+        -- The slow case comes first, so the others wait behind it: a case's
+        -- clock starts when the case starts running, not when the batch arrives.
+        withServiceFromSourcesOpts spinOptions "spin-39-1" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-39-1" (spinSlow : replicate 39 spinFast)
+          expectBatchOutcomes resp
+            ( CaseErrored "Evaluation resource limit exceeded: this case ran past the time limit of 3 s (--eval-timeout)"
+                : replicate 39 CaseAnswered )
 
-    it "errs on the case that allocates too much, and answers the cases after it" do
-      let stingy = testOptions { maxEvalMemoryMb = 64 }
-      withServiceFromSourcesOpts stingy "spin-alloc" [("spin.l4", spinJL4)] \baseUrl mgr -> do
-        resp <- postSpinBatch baseUrl mgr "spin-alloc" [1_000, spinFast, 1_000]
-        expectBatchOutcomes resp
-          [ CaseAnswered
-          , CaseErrored "Evaluation resource limit exceeded: this case allocated more than the limit of 64 MB (--max-eval-memory-mb)"
-          , CaseAnswered ]
+      it "errs on the case that allocates too much, and answers the cases after it" do
+        let stingy = testOptions { maxEvalMemoryMb = 64 }
+        withServiceFromSourcesOpts stingy "spin-alloc" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-alloc" [1_000, spinFast, 1_000]
+          expectBatchOutcomes resp
+            [ CaseAnswered
+            , CaseErrored "Evaluation resource limit exceeded: this case allocated more than the limit of 64 MB (--max-eval-memory-mb)"
+            , CaseAnswered ]
+
+    -- Production runs one capability per core (-N), so a batch runs that many
+    -- cases at once. At two, the forty cases still each meet the limit alone.
+    describe "at two capabilities" $ around_ (withCapabilities 2) do
+      it "answers 40 fast cases, none of them past its limit" do
+        withServiceFromSourcesOpts spinOptions "spin-40-n2" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-40-n2" (replicate 40 spinFast)
+          expectBatchOutcomes resp (replicate 40 CaseAnswered)
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -2450,6 +2462,11 @@ mkBatchCase n = Aeson.object
   , "eats" Aeson..= True
   , "drinks" Aeson..= True
   ]
+
+-- | Run with this many capabilities, then put the count back.
+withCapabilities :: Int -> IO a -> IO a
+withCapabilities n act =
+  bracket (getNumCapabilities <* setNumCapabilities n) setNumCapabilities (const act)
 
 -- | Steps of 'spinJL4' that take about a fifth of a second (0.19 s on an
 -- M-series Mac, 2026-10-02) and allocate about 1 GB.
