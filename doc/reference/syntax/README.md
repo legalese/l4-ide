@@ -578,6 +578,7 @@ For `both p q MEANS p AND q`, `#EVALTRACE both TRUE FALSE` shows:
 
 A first operand written as plain `TRUE` or `FALSE` is not shown, since its value is already in the source: `#EVALTRACE TRUE AND FALSE` is `┌ TRUE AND FALSE`, `├ FALSE`, `└ FALSE`.
 `UNLESS` appears as what it means, so `p UNLESS q` shows as `p AND (NOT q)`.
+A name that took its [`TYPICALLY`](../types/TYPICALLY.md#in-a-trace) default is shown, where it was read, with the line the default was written on.
 
 **Syntax:**
 
