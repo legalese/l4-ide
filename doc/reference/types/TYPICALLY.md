@@ -376,10 +376,10 @@ Limits on a default that is an expression, at the boundary:
   message: with `phi` defined in `§ Rates` and again in a later `§ Other`,
   `rate TYPICALLY (phi PLUS 1)` on an exported rule in `§ Rates` would be 9 at
   `#EVAL` and 10 through `l4 batch`. So an exported rule's input may not take a
-  default that names one, and neither may a section input that an export reads: the file is
-  refused when it is checked, naming the name. Written with its section
-  (`` `Rates`.phi ``), the name means the same on every path, and nothing is
-  refused. The check does not look at types, so it also refuses a name that two
+  default that names one, and neither may a section input that an export reads:
+  the file is refused when it is checked, naming the name. Written with its
+  section (`` `Rates`.phi ``), the name means the same on every path, and nothing
+  is refused. The check does not look at types, so it also refuses a name that two
   sections define for different types, where the answers would agree, and one
   whose own section is the last; two definitions of one name in the same section
   are left alone.
