@@ -8,7 +8,7 @@ is given no value uses it.
 
 `TYPICALLY d` on a name means one thing.
 When nothing supplies a value for the name, at the point where a value has to come from outside the rule, the rule uses `d`.
-That holds wherever the name is declared, and in every tool that runs rules: `#EVAL` and `l4 run`, `l4 batch`, and the decision service.
+That holds wherever the name is declared, and in every tool that runs rules: `#EVAL` and `l4 run`, `l4 batch`, and the decision service, except for the [limits at the boundary](#at-the-boundary-l4-batch-and-the-decision-service), where a tool differs from `#EVAL` and the section says how.
 Three places accept a `TYPICALLY` and no run of the rules uses it: an `ASSUME`, which is deprecated ([below](#on-an-assume-checked-and-recorded-not-used)); a lambda's own `GIVEN`; and a field of an enum constructor that carries data ([below](#on-a-record-field-leaving-a-field-out-of-a-construction)).
 
 Three things hold wherever a `TYPICALLY` is written:
@@ -186,7 +186,9 @@ GIVETH A BOOLEAN
 
 - **`#EVAL` and `l4 run`** get the name back, with the deprecation warning, where a section `GIVEN` would give `TRUE`.
 - **`l4 batch` and the decision service** still ask for the fact.
-  A case that leaves it out is refused (`Missing required field 'person has capacity'`), and the published list of facts has it under `required`, with no `default`.
+  The published list of facts has it under `required`, with no `default`.
+  `l4 batch` refuses a case that leaves it out (`Missing required field 'person has capacity' in JSON object`), and so does the service's direct path (`ASSUME 'person has capacity': missing required parameter`).
+  The service's other path, for a request that sends `{}` for any input, treats the fact as an assumed term instead: the request is answered when the rules never read it, and stops, saying the fact is an assumed term, when they do.
 - **An input of an `ASSUME` that takes inputs** is the same.
   A call that names the inputs and leaves out one that has a `TYPICALLY` is told it has not supplied it, in the file that declares the `ASSUME` and in a file that imports it.
 - **The question wizard still reads it.**
@@ -328,8 +330,12 @@ govern what counts as leaving a fact out:
   given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
   and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
-  takes its default: the case is refused, naming the fact. `{}` means the same,
-  for a record too.
+  takes its default. `l4 batch` and the service's direct path refuse the case,
+  naming the fact. The service's other path, for a request that sends `{}` for any
+  input, treats the fact as an assumed term, as it does one left out that has no
+  default: the request is answered when the rules never read it, and stops, saying
+  the fact is an assumed term, when they do. `{}` means the same as `null`, for a
+  record too.
 - **A name that matches nothing is refused where a default is taken.** In a
   case that leaves out a fact with a default, a name that is not a fact is
   refused, naming the nearest one, since it may misspell the fact left out.
@@ -494,11 +500,16 @@ draws a deprecation warning.
 
 ## What changed
 
-Earlier versions of L4 took a `TYPICALLY` only on a section `GIVEN`.
+Earlier versions of L4 took a `TYPICALLY` only on a section `GIVEN`, and only inside a file.
 On a rule's own `GIVEN` and on a record field it was a note that no evaluation used, so a call or a construction that left such a name out was an error.
 A default had to be a fixed value wherever it was written.
 A `TYPICALLY` on a computed field, which never did anything, is now a check error.
 An `ASSUME` is as it was.
+
+At the boundary, `l4 batch` refused a case that left out a fact with a default, a section `GIVEN`'s included (`Missing required field 'has capacity' in JSON object`), and the published list of facts asked for every defaulted fact under `required`.
+A case may now leave it out.
+The answer lists the default it took under `presumed`, the published list leaves the fact out of `required` and carries its `default`, and `l4 batch --presumption hard`, or `"presumption": "hard"` in a request, brings the refusal back (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service)).
+A client that relied on the refusal, or on `required`, will now get an answer, or a list that does not ask for the fact.
 
 ## See Also
 
