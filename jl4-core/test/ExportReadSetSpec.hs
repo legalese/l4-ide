@@ -180,6 +180,15 @@ spec = do
           , "GIVETH A NUMBER"
           , "`final price` MEANS discount TIMES 2"
           ]
+        inputDefaultReadsAssume = Text.unlines
+          [ "ASSUME k IS A NUMBER"
+          , ""
+          , "@export scaled"
+          , "GIVEN base IS A NUMBER"
+          , "      rate IS A NUMBER TYPICALLY (k PLUS 1)"
+          , "GIVETH A NUMBER"
+          , "scaled MEANS base TIMES rate"
+          ]
         suppliedDefault = Text.unlines
           [ "§ `Supplied`"
           , "    GIVEN base IS A NUMBER TYPICALLY 4"
@@ -202,6 +211,13 @@ spec = do
     -- change; `ok/typically-expression.l4` pins that it is no cycle.
     it "lists an input a default supplies for itself, as it does for a body" $ do
       exportParamNames suppliedDefault `shouldBe` Right ["base", "doubled"]
+
+    -- A request that leaves `rate` out takes its default, which reads the written
+    -- ASSUME `k`, so `k` is an input of the export and a request can supply it. It
+    -- was left out of the schema, and a request that sent it was refused as an
+    -- unknown parameter (W7 second review, rulings S4).
+    it "lists a written ASSUME that an export's own input's default reads" $ do
+      exportParamNames inputDefaultReadsAssume `shouldBe` Right ["base", "rate", "k"]
 
     it "publishes an expression default as its source text, and a literal as its value" $ do
       case exportSchema binderReadsBinder of
