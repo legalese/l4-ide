@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-expression-default-calls-default.l4:22:1-33:
+  assertion satisfied
+typically-expression-default-calls-default.l4:23:1-41:
+  assertion satisfied
+typically-expression-default-calls-default.l4:35:1-41:
+  assertion satisfied
