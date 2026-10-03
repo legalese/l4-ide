@@ -499,6 +499,30 @@ untracedDefaults mtrace presumed =
   where
     shown = Set.fromList (presumedKey <$> maybe [] tracedDefaults mtrace)
 
+-- | Make a finished trace show every default the directive took: an event the
+-- trace does not carry is hung on the main expression's last step, with its
+-- value (the one 'L4.EvaluateLazy.nfDirectiveWith' read when the directive
+-- ended), as 'hangUnplacedDefaults' does for one that no step could show.
+--
+-- The event can be missing here because 'buildEvalTrace' ran out of nodes
+-- ('maxTraceNodes') before it reached the step that read the default. Without
+-- this a truncated trace said nothing of a default the answer rests on, while the
+-- directive's @presumed@ list had it.
+--
+-- A trace with no step of its own (the stand-in 'L4.EvaluateLazy.tracePostprocessFailed'
+-- leaves) has nowhere to hang an event, and is left as it is: a plain directive's
+-- line ('L4.EvaluateLazy.defaultNotes') says the default instead.
+completeDefaults :: [(Presumed, Maybe NF)] -> EvalTrace -> EvalTrace
+completeDefaults [] t = t
+completeDefaults valued t = case t of
+  Trace lbl steps v
+    | (_ : _) <- missing, (e, kids) : earlier <- reverse steps ->
+        Trace lbl (reverse ((e, kids <> [ TraceDefault p [] (Right (fromMaybe Omitted mnf)) | (p, mnf) <- missing ]) : earlier)) v
+  _ -> t
+  where
+    shown   = Set.fromList (presumedKey <$> tracedDefaults t)
+    missing = [ (p, mnf) | (p, mnf) <- valued, presumedKey p `Set.notMember` shown ]
+
 -- | Helper function to display an exception or final value in a trace.
 printExceptionOrNF :: Either EvalException NF -> Doc ann
 printExceptionOrNF (Left e)  = "↯ " <> printEvalExceptionShort e

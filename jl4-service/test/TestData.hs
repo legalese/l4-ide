@@ -57,6 +57,7 @@ module TestData (
   partialClausesJL4,
   deonticSectionDefaultJL4,
   directivesAboveDefaultJL4,
+  truncatedTraceJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1196,4 +1197,23 @@ GIVEN `is adult`    IS A BOOLEAN
       `unused flag` IS A BOOLEAN
 GIVETH A BOOLEAN
 `may contract` MEANS `has capacity` AND `is adult`
+|]
+
+-- | A trace that fills the display limit (10000 nodes) before the step that
+-- reads the default: @fib 16@ first, @the rate@ last. The reasoning tree is cut
+-- off before it, and must show the default all the same (W8 review N2).
+truncatedTraceJL4 :: Text
+truncatedTraceJL4 =
+  [i|
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+fib n MEANS IF n < 2 THEN n ELSE fib (n MINUS 1) PLUS fib (n MINUS 2)
+
+@export default `big then rate`
+GIVEN k IS A NUMBER
+GIVETH A NUMBER
+`big then rate` MEANS fib k PLUS `the rate`
 |]
