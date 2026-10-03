@@ -122,6 +122,8 @@ evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger _n
       EL.Assertion EL.Fails            -> DSError
       EL.Assertion (EL.FailsBecause _) -> DSError
       EL.Assertion (EL.Errored _)      -> DSError
+      -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+      EL.Assertion (EL.Undetermined _) -> DSError
       EL.Assertion EL.Holds            -> DSInformation
       -- Reductions keep their pre-existing uniform Information severity —
       -- including a raising one. That asymmetry with assertions predates

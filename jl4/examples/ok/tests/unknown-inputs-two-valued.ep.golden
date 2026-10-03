@@ -118,7 +118,8 @@ GIVETH A BOOLEAN
 #EVAL CONSIDER xs WHEN EMPTY THEN 0, OTHERWISE 1
 #EVAL CONSIDER xs WHEN h FOLLOWED BY t THEN h, OTHERWISE 0
 
--- A field read on an unknown record: stuck on the record (row 35).
+-- A field read on an unknown record: stuck on the record at build step 1,
+-- and on the field from build step 3, which names it `d's age` (row 35).
 #EVAL d's age
 
 -- An unknown inside a known value. The first branch fails whatever `k` is,

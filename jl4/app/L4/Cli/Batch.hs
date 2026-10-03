@@ -77,6 +77,7 @@ import L4.EvaluateLazy
   , ReductionOutcome(..)
   , prettyEvalException
   , prettyRefusal
+  , prettyUndetermined
   )
 import L4.Lexer (showStringLit)
 import L4.Print (prettyLayout, restoreMixfixPatterns)
@@ -252,17 +253,24 @@ batchCmd opts = do
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
       -- each envelope, let it become garbage, and never build the row list.
       FmtNdjson -> do
-        anyFail <- streamRows opts.batchContinueOnErr inputs process
+        outcome <- streamRows opts.batchContinueOnErr inputs process
           (\env -> BSL8.hPutStrLn h (Aeson.encode env) >> hFlush h)
-        finish anyFail
+        finish outcome
       -- The buffered formats must see every row before they can render, so
       -- here (and only here) we retain the whole list of envelopes.
       _ -> do
-        (envs, anyFail) <- bufferRows opts.batchContinueOnErr inputs process
+        (envs, outcome) <- bufferRows opts.batchContinueOnErr inputs process
         writeBuffered h opts.batchOutputFormat envs
-        finish anyFail
+        finish outcome
   where
-    finish anyFail = if anyFail then exitFailure else exitSuccess
+    -- A batch exits 1 if any row failed, and also if any row was
+    -- undetermined, once every row has run: an undetermined row never stops
+    -- the batch, but the batch has not answered every case
+    -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U7b, build step 3).
+    finish outcome = case outcome of
+      RowFine         -> exitSuccess
+      RowUndetermined -> exitFailure
+      RowFailed       -> exitFailure
 
 -- | Open the requested output sink (a file, or stdout) and run an action
 -- against its handle.
@@ -285,19 +293,24 @@ withOutputHandle (Just path) act = withFile path WriteMode \h -> do
 streamRows
   :: Bool
   -> [Aeson.Value]
-  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
+  -> (Int -> Aeson.Value -> IO (Aeson.Value, RowOutcome))
   -> (Aeson.Value -> IO ())
-  -> IO Bool
-streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) False
+  -> IO RowOutcome
+streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) RowFine
   where
-    go [] !anyFail = pure anyFail
-    go ((idx, input) : rest) !anyFail = do
-      (env, isErr) <- process idx input
+    go [] !worst = pure worst
+    go ((idx, input) : rest) !worst = do
+      (env, outcome) <- process idx input
       emit env
-      let !anyFail' = anyFail || isErr
-      if isErr && not continueOnErr
-        then pure True                   -- stop-on-error (the default)
-        else go rest anyFail'
+      let !worst' = max worst outcome
+      if outcome == RowFailed && not continueOnErr
+        then pure RowFailed              -- stop-on-error (the default)
+        else go rest worst'
+
+-- | What a row came to, for the batch's exit code, worst last. Only a failed
+-- row trips stop-on-error; an undetermined one does not (U7b).
+data RowOutcome = RowFine | RowUndetermined | RowFailed
+  deriving stock (Eq, Ord, Show)
 
 -- | Fold over the input rows for the buffered formats (json/yaml/csv), which
 -- genuinely need every row in hand before they can render. Returns the
@@ -306,18 +319,18 @@ streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) Fal
 bufferRows
   :: Bool
   -> [Aeson.Value]
-  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
-  -> IO ([Aeson.Value], Bool)
-bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] False
+  -> (Int -> Aeson.Value -> IO (Aeson.Value, RowOutcome))
+  -> IO ([Aeson.Value], RowOutcome)
+bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] RowFine
   where
-    go [] acc anyFail = pure (reverse acc, anyFail)
-    go ((idx, input) : rest) acc anyFail = do
-      (env, isErr) <- process idx input
-      let acc'     = env : acc
-          anyFail' = anyFail || isErr
-      if isErr && not continueOnErr
-        then pure (reverse acc', True)   -- stop-on-error (the default)
-        else go rest acc' anyFail'
+    go [] acc worst = pure (reverse acc, worst)
+    go ((idx, input) : rest) acc worst = do
+      (env, outcome) <- process idx input
+      let acc'   = env : acc
+          worst' = max worst outcome
+      if outcome == RowFailed && not continueOnErr
+        then pure (reverse acc', RowFailed)  -- stop-on-error (the default)
+        else go rest acc' worst'
 
 -- | Process a single input row into a result envelope, returning the
 -- envelope and whether the row failed.
@@ -331,7 +344,7 @@ processRow
   -> [ExportedParam]                         -- ^ full schema for validation
   -> Int
   -> Aeson.Value
-  -> IO (Aeson.Value, Bool)
+  -> IO (Aeson.Value, RowOutcome)
 processRow opts evalConfig filteredSource exportFn givenParams assumeParams schema idx input
   | opts.batchValidateOnly =
       let errs = validateRow schema input
@@ -341,7 +354,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
             , Key.fromString "status" Aeson..= (if ok then "valid" else "invalid" :: Text)
             , Key.fromString "errors" Aeson..= errs
             ]
-      in pure (env, not ok)
+      in pure (env, if ok then RowFine else RowFailed)
   | otherwise = do
       let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams assumeParams input
           combinedProgram = filteredSource <> wrapperCode
@@ -359,9 +372,17 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (Left …)`.
               let excMsgs = concatMap resultExceptionMsgs evalResults
+                  undMsgs = concatMap resultUndeterminedMsgs evalResults
                   refMsgs = concatMap resultRefusalMsgs evalResults
               in if not (null excMsgs)
                    then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   -- An UNDETERMINED row is not a failure either: the row did
+                   -- not supply something the rule needs, and the messages
+                   -- name it. It never stops the batch, but the batch exits 1
+                   -- once every row has run (UNKNOWN-EVALUATION-SPEC §4.7.4,
+                   -- U7b, build step 3).
+                   else if not (null undMsgs)
+                   then ("undetermined", Aeson.toJSON evalResults, Aeson.toJSON undMsgs)
                    -- A REFUSED row is a determinate answer, not a failure: the
                    -- model declined to answer this input and said why. It gets
                    -- its own terminal status and, crucially, does NOT stop the
@@ -375,7 +396,10 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
             , Key.fromString "status"      Aeson..= status
             , Key.fromString "diagnostics" Aeson..= diags
             ]
-      pure (env, status == "error")
+      pure (env, case status of
+        "error"        -> RowFailed
+        "undetermined" -> RowUndetermined
+        _              -> RowFine)
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
@@ -384,8 +408,32 @@ resultExceptionMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
   Reduction (ReducedErrored exc) -> prettyEvalException exc
   Assertion (Errored exc)        -> prettyEvalException exc
   -- A refusal is deliberately NOT counted here: it is not an exception, and
-  -- counting it would both mark the row an error and stop the batch.
-  _                              -> []
+  -- counting it would both mark the row an error and stop the batch. Nor is
+  -- an undetermined result, for the same reason ('resultUndeterminedMsgs').
+  Reduction (ReducedRefused _)      -> []
+  Assertion (Refused _)             -> []
+  Reduction (ReducedUndetermined _) -> []
+  Assertion (Undetermined _)        -> []
+  Reduction (Reduced _)             -> []
+  Assertion Holds                   -> []
+  Assertion Fails                   -> []
+  Assertion (FailsBecause _)        -> []
+
+-- | What an undetermined result waits on, as the default report says it, for
+-- any directive in the row that could not be decided. An empty list means
+-- every directive in the row was decided.
+resultUndeterminedMsgs :: EvalDirectiveResult -> [Text]
+resultUndeterminedMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
+  Reduction (ReducedUndetermined ns) -> prettyUndetermined ns
+  Assertion (Undetermined ns)        -> prettyUndetermined ns
+  Reduction (ReducedErrored _)       -> []
+  Assertion (Errored _)              -> []
+  Reduction (ReducedRefused _)       -> []
+  Assertion (Refused _)              -> []
+  Reduction (Reduced _)              -> []
+  Assertion Holds                    -> []
+  Assertion Fails                    -> []
+  Assertion (FailsBecause _)         -> []
 
 -- | Refusal reasons for any directive in the row that REFUSED. An empty list
 -- means nothing in the row declined to answer.
@@ -393,7 +441,14 @@ resultRefusalMsgs :: EvalDirectiveResult -> [Text]
 resultRefusalMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
   Reduction (ReducedRefused r) -> prettyRefusal r
   Assertion (Refused r)        -> prettyRefusal r
-  _                            -> []
+  Reduction (ReducedErrored _)       -> []
+  Assertion (Errored _)              -> []
+  Reduction (ReducedUndetermined _)  -> []
+  Assertion (Undetermined _)         -> []
+  Reduction (Reduced _)              -> []
+  Assertion Holds                    -> []
+  Assertion Fails                    -> []
+  Assertion (FailsBecause _)         -> []
 
 ----------------------------------------------------------------------------
 -- Row validation (for --validate-only)

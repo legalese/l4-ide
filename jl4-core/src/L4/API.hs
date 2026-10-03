@@ -322,6 +322,8 @@ l4EvalDirective source line col directiveType =
                 -- as one is exactly the laundering REFUSE exists to prevent.
                 EL.Assertion (EL.Refused _)      -> Aeson.Null
                 EL.Assertion (EL.Errored _)      -> Aeson.toJSON False
+                -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+                EL.Assertion (EL.Undetermined _) -> Aeson.toJSON False
                 EL.Reduction _ -> Aeson.Null
             , "structuredValue" .= case res of
                 EL.Assertion EL.Holds               -> Aeson.toJSON True
@@ -331,6 +333,8 @@ l4EvalDirective source line col directiveType =
                 EL.Assertion (EL.Errored _)         -> Aeson.Null
                 EL.Reduction (EL.ReducedErrored _)  -> Aeson.Null
                 EL.Reduction (EL.ReducedRefused _)  -> Aeson.Null
+                EL.Assertion (EL.Undetermined _)    -> Aeson.Null
+                EL.Reduction (EL.ReducedUndetermined _) -> Aeson.Null
                 EL.Reduction (EL.Reduced nf)        -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
             ]
@@ -582,12 +586,16 @@ evalResultToJson fields edr = Aeson.object $
     isSuccess (EL.Reduction (EL.Reduced _)) = Aeson.Bool True
     isSuccess (EL.Reduction (EL.ReducedRefused _)) = Aeson.Null
     isSuccess (EL.Reduction (EL.ReducedErrored _)) = Aeson.Bool False
+    -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+    isSuccess (EL.Assertion (EL.Undetermined _)) = Aeson.Bool False
+    isSuccess (EL.Reduction (EL.ReducedUndetermined _)) = Aeson.Bool False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
 prettyEvalResult _fields (EL.Assertion a)                    = EL.prettyAssertionOutcome a
 prettyEvalResult _fields (EL.Reduction (EL.ReducedErrored e)) = Text.unlines (prettyEvalException e)
 prettyEvalResult _fields (EL.Reduction (EL.ReducedRefused r)) = Text.unlines (prettyRefusal r)
+prettyEvalResult _fields (EL.Reduction o@(EL.ReducedUndetermined _)) = EL.prettyReductionOutcome o
 prettyEvalResult fields  (EL.Reduction (EL.Reduced v))        = prettyLayoutNF fields v
 
 -- | Generate ladder diagram visualization data for a specific DECIDE rule by name.

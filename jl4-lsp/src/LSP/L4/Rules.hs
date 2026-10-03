@@ -1124,6 +1124,9 @@ jl4Rules evalConfig rootDirectory recorder = do
               EvaluateLazy.Assertion (EvaluateLazy.FailsBecause _)   -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Assertion (EvaluateLazy.Errored _)        -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Reduction (EvaluateLazy.ReducedErrored _) -> Just LSP.DiagnosticSeverity_Error
+              -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+              EvaluateLazy.Assertion (EvaluateLazy.Undetermined _)        -> Just LSP.DiagnosticSeverity_Error
+              EvaluateLazy.Reduction (EvaluateLazy.ReducedUndetermined _) -> Just LSP.DiagnosticSeverity_Error
               _                                    -> Just LSP.DiagnosticSeverity_Information
         , _code = Nothing
         , _codeDescription = Nothing

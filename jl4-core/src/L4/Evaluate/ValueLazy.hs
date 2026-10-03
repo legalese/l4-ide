@@ -101,7 +101,15 @@ data Value a =
   | ValPartialTernary2 TernaryBuiltinFun a a          -- Ternary with 2 args applied
   | ValUnappliedConstructor Resolved
   | ValConstructor Resolved [a]
-  | ValAssumed Resolved
+  | ValAssumed Resolved (Maybe (Type' Resolved))
+    -- ^ An input nobody supplied, with the type it was declared at, if it
+    -- was (UNKNOWN-EVALUATION-SPEC §4.6, U6b).
+  | ValTerm Term
+    -- ^ A value the evaluator could not determine because it depends on an
+    -- input nobody supplied: a field of an unknown record, a built-in
+    -- operation or a comparison over an unknown, an assumed function applied,
+    -- or a connective whose operands did not decide it (§4.2, build step 3).
+    -- A bare unknown input stays a 'ValAssumed'; a 'ValTerm' is never one.
   | ValEnvironment Environment
   | ValBreached (ReasonForBreach a)
   deriving stock (Show, Functor, Foldable, Traversable)
@@ -109,6 +117,83 @@ data Value a =
 -- | Which built-in connective a 'ValConnective' is.
 data Connective = ConnAnd | ConnOr | ConnImplies | ConnNot
   deriving stock (Eq, Show)
+
+-- | A term (UNKNOWN-EVALUATION-SPEC §4.2): what the evaluator builds where it
+-- needs the value of an input nobody supplied and can say what the value
+-- would be in terms of that input. It is a closed, strict tree: a determined
+-- operand is held as its normal form, so two terms are the same unknown
+-- exactly when they are equal ('Eq', which compares names by 'Unique'), and
+-- that equality is an atom's key (§4.6).
+data Term
+  = TInput Resolved (Maybe (Type' Resolved))
+    -- ^ an unsupplied input, with its declared type
+  | TNumber Rational
+  | TString Text
+  | TDate Day
+  | TTime TimeOfDay
+  | TDateTime UTCTime Text
+  | TNil
+  | TCons Term Term
+  | TCon Resolved [Term]
+    -- ^ a constructor applied; @TRUE@ and @FALSE@ are nullary ones
+  | TField Term Resolved (Maybe (Type' Resolved))
+    -- ^ @t's f@: a field of an unknown record, with the field's type
+  | TCall Term [Term]
+    -- ^ an assumed function applied
+  | TBin BinOp Term Term
+    -- ^ a built-in operation or comparison, at least one operand unknown
+  | TNot Term
+  | TConn Connective Term Term
+    -- ^ @AND@, @OR@ or @IMPLIES@, the left operand unknown
+  deriving stock (Show, Generic)
+  deriving anyclass NFData
+
+instance Eq Term where
+  TInput a _      == TInput b _      = getUnique a == getUnique b
+  TNumber a       == TNumber b       = a == b
+  TString a       == TString b       = a == b
+  TDate a         == TDate b         = a == b
+  TTime a         == TTime b         = a == b
+  TDateTime a _   == TDateTime b _   = a == b
+  TNil            == TNil            = True
+  TCons a as      == TCons b bs      = a == b && as == bs
+  TCon a as       == TCon b bs       = getUnique a == getUnique b && as == bs
+  TField t f _    == TField u g _    = getUnique f == getUnique g && t == u
+  TCall f as      == TCall g bs      = f == g && as == bs
+  TBin o a b      == TBin p c d      = o == p && a == c && b == d
+  TNot a          == TNot b          = a == b
+  TConn c a b     == TConn d e f     = c == d && a == e && b == f
+  _               == _               = False
+
+-- | The names a term waits on, in evaluation order, each once: every input
+-- it reads, except that a field read on an input, or on a field of one,
+-- names the whole path (@d's age@), since that is what is needed (§4.12 row
+-- 35).
+termNames :: Term -> [Term]
+termNames = nubOrdered . go
+  where
+    go = \ case
+      t@TInput{} -> [t]
+      t@(TField b _ _)
+        | isPath b  -> [t]
+        | otherwise -> go b
+      TCons a b   -> go a <> go b
+      TCon _ ts   -> concatMap go ts
+      TCall f as  -> go f <> concatMap go as
+      TBin _ a b  -> go a <> go b
+      TNot a      -> go a
+      TConn _ a b -> go a <> go b
+      TNumber{}   -> []
+      TString{}   -> []
+      TDate{}     -> []
+      TTime{}     -> []
+      TDateTime{} -> []
+      TNil        -> []
+    isPath = \ case
+      TInput{}       -> True
+      TField b _ _   -> isPath b
+      _              -> False
+    nubOrdered = foldr (\ x acc -> x : filter (/= x) acc) []
 
 instance NFData Connective where
   rnf c = c `seq` ()
@@ -302,7 +387,8 @@ instance NFData a => NFData (Value a) where
   rnf (ValPartialTernary2 r a b)  = rnf r `seq` rnf a `seq` rnf b
   rnf (ValUnappliedConstructor r) = rnf r
   rnf (ValConstructor r vs)       = rnf r `seq` rnf vs
-  rnf (ValAssumed r)              = rnf r
+  rnf (ValAssumed r t)            = rnf r `seq` rnf t
+  rnf (ValTerm t)                 = rnf t
   rnf (ValEnvironment env)        = env `seq` ()
   rnf (ValBreached ev)            = rnf ev `seq` ()
   rnf (ValObligation env p a o t f l) = env `seq` p `deepseq` a `deepseq` o `deepseq` t `deepseq` f `deepseq` l `deepseq` ()

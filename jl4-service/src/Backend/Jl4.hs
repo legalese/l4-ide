@@ -696,6 +696,8 @@ handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
   Eval.Reduction (Eval.ReducedRefused ref) -> throwError $ EvaluatorRefused ref.message
   Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  Eval.Reduction o@(Eval.ReducedUndetermined _) -> throwError $ InterpreterError $ Eval.prettyReductionOutcome o
   Eval.Reduction (Eval.Reduced val) -> do
     r <- nfToFnLiteral ei val
     pure $ ResponseWithReason
@@ -877,6 +879,8 @@ handleEvalResult ei result trace _sentinel traceLevel includeGraphViz mModule = 
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
   Eval.Reduction (Eval.ReducedRefused ref) -> throwError $ EvaluatorRefused ref.message
   Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  Eval.Reduction o@(Eval.ReducedUndetermined _) -> throwError $ InterpreterError $ Eval.prettyReductionOutcome o
   Eval.Reduction (Eval.Reduced val) -> do
     r <- nfToFnLiteral ei val
     -- Check if the result is NOTHING (decode failure from LEFT error) or JUST value
@@ -1174,8 +1178,12 @@ valueToFnLiteral ei = \case
         FnObject
           [ (name, FnArray lits)
           ]
-  Eval.ValAssumed var ->
+  Eval.ValAssumed var _ ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+  -- a result that holds a term is undetermined, not a value, so this is only
+  -- for completeness
+  Eval.ValTerm t ->
+    throwError $ InterpreterError $ "#EVAL produced an unknown: " <> prettyLayout t
 
 -- | A constructor's name, as a JSON payload should carry it.
 --
