@@ -94,7 +94,11 @@ scaled MEANS rate TIMES base
   input before it has been given, so a gap cannot be left.
 - **An input with no default is still asked for.** `scaled WITH rate IS 1` is
   told it has not supplied `base`, and a name the rule does not have is still an
-  error, so a misspelling of `rate` is never read as a default taken.
+  error, so a misspelling of `rate` is not read as a default taken. The one
+  misspelling this cannot catch is a name that is itself something else the rule
+  reads, a section `GIVEN` that the call may override (`ratee`, where the rule
+  reads a section input of that name). That is a valid override, and `rate` then
+  takes its default.
 - **The default is used only if the rule reads it.** A rule that never needs the
   input never forces its default, which is also what `presumed` (below) counts.
 
@@ -102,9 +106,11 @@ This works for a rule in the same file, a rule declared in a `WHERE`, and a rule
 in a file you `IMPORT`. Two things it does not do:
 
 - **It does not choose between rules of the same name.** When two rules share a
-  name, a call that leaves out an input with a default is still ambiguous, as it
-  was before, and has to name every input of the one it means. A default is not
-  allowed to decide which rule the author meant.
+  name and each could take the call's inputs, a call that leaves out an input
+  with a default is still ambiguous, as it was before, and has to name every
+  input of the one it means. A default is not allowed to decide which rule the
+  author meant. A rule that shares its name with a record field is not in this
+  case: a field takes no named inputs, so the call can only mean the rule.
 - **It does not reach an `ASSUME`.** An `ASSUME` that takes inputs (`ASSUME` is
   deprecated) keeps its inputs' `TYPICALLY` as a note only, in the file that
   declares it and in a file that imports it alike.
@@ -201,8 +207,9 @@ govern what counts as leaving a fact out:
 - **An event's record in the decision service is not a place a default can
   be left out.** When a request for a rule that describes obligations replays
   events, each event's party or action record has to give every field, whether
-  or not a field has a default: the record is part of the request, and the
-  service refuses one that leaves a field out.
+  or not a field has a default, and so does a record nested inside it: the
+  record is part of the request, and the service refuses one that leaves a
+  field out.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact

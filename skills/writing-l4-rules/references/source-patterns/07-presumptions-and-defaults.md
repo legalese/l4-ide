@@ -235,7 +235,9 @@ out (`28`, `"yes"`, `TRUE`, `NOTHING`, a constructor of your own `ONE OF` type);
 write it as in [7.3](#e7-3): a named definition plus `fromMaybe`.
 
 **Not** a way to show that an answer rests on a presumption inside the file. `#EVAL` does not list the
-defaults it took; `l4 batch` and the service do, under `presumed`.
+defaults it took. `l4 batch` and the service list, under `presumed`, a default a case left out and the
+answer read; a default the rules take themselves, as here, is listed there only under
+`--presumption hard` (`"presumption": "hard"` on the service), as `WITH the rule: the input`.
 
 **See** the corpus examples `jl4/examples/ok/typically-named-site.l4` (a rule's inputs) and
 `jl4/examples/ok/typically-record-construction.l4` (a record's fields), and `jl4/examples/ok/typically-basic.l4`
