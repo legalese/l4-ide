@@ -134,7 +134,7 @@ mkInitialCheckState substitution =
     , constBodies  = Map.empty
     , sectionPaths = Map.empty
     , deferredChoices = 0
-    , overloadedCallees = Set.empty
+    , overloadedCallees = Map.empty
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -4447,9 +4447,21 @@ inferExpr' g =
         Just reassociated -> inferExpr reassociated
         Nothing -> inferFlatApp fixityErrEmitted ann n es
     AppNamed ann n nes _morder -> asValue do
+      -- Whether the callee is an overload is a fact about THIS site: it is read
+      -- straight after the name resolves, from a mark cleared just before, so
+      -- that a choice made at an earlier site cannot reach this one (review
+      -- silent N3: the mark used to persist, and a later, unambiguous site of
+      -- the chosen rule then lost its default). 'resolveTermFilteredIn' sets it,
+      -- with the types of the candidates the callee was chosen over; which of
+      -- them are rivals depends on the inputs this site names.
+      binderSupplies <- traverse (\ (MkNamedExpr _ nm _) -> isSectionBinderSupply nm) nes
+      assign #overloadedCallees Map.empty
       (rn, pt) <- resolveTerm n
+      rivals <- Map.findWithDefault [] (getUnique rn) <$> use #overloadedCallees
+      let binderOnly = not (null nes) && and binderSupplies
+          overloaded = any (couldTakeNamedSite binderOnly) rivals
       t <- instantiate pt
-      (ornes, rt) <- inferAppNamed rn t nes
+      (ornes, rt) <- inferAppNamed overloaded rn t nes
       let (order, rnes) = unzip ornes
       pure (AppNamed ann rn rnes (Just order), rt)
     IfThenElse ann e1 e2 e3 -> do
@@ -4655,11 +4667,14 @@ inferEvent (MkEvent ann party action timestamp atFirst) = do
 -- supplied. This ordering is returned as well (and then stored in the
 -- AST after type-checking, to be used by the evaluator).
 --
-inferAppNamed :: Resolved -> Type' Resolved -> [NamedExpr Name] -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
-inferAppNamed r (Fun _ onts t) nes = do
-  ornes <- supplyAppNamed r (zip [0 ..] onts) nes
+-- The 'Bool' says the callee was chosen over another that could also take the
+-- site's named inputs ('couldTakeNamedSite'), in which case it takes no
+-- @TYPICALLY@ default ('supplyAppNamed').
+inferAppNamed :: Bool -> Resolved -> Type' Resolved -> [NamedExpr Name] -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
+inferAppNamed overloaded r (Fun _ onts t) nes = do
+  ornes <- supplyAppNamed overloaded r (zip [0 ..] onts) nes
   pure (ornes, t)
-inferAppNamed r t nes = do
+inferAppNamed _overloaded r t nes = do
   -- A definition with no parameters of its own can still be applied to named
   -- arguments, provided every one of them supplies a SECTION BINDER (R1). It
   -- has no function type yet because the parameters discharge gives it are a
@@ -4675,6 +4690,24 @@ inferAppNamed r t nes = do
       addError (IllegalAppNamed r t)
       v <- fresh (NormalName "v")
       pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
+
+-- | Could a candidate of this type be what a named application means? It is the
+-- test a callee's rivals have to pass for the callee to count as an overload
+-- ('overloadedCallees'), and it only has to be wide enough never to let a
+-- default decide between two readings of a site; it never says a candidate
+-- WILL take it. A function takes named inputs if any of its parameters is
+-- named, so a record field selector, @FUNCTION FROM Order TO NUMBER@ with
+-- nothing to name, is no rival to a rule that shares its name (review silent
+-- N2, rulings R2-1). A candidate that is not a function takes a named site only
+-- when every name the site gives is a section binder ('inferAppNamed'), so a
+-- bare definition beside a rule is a rival only to such a site. A type still
+-- being inferred is a rival, to stay on the loud side.
+couldTakeNamedSite :: Bool -> Type' Resolved -> Bool
+couldTakeNamedSite binderOnly = \ case
+  Forall _ _ t -> couldTakeNamedSite binderOnly t
+  Fun _ onts _ -> any (\ (MkOptionallyNamedType _ mn _) -> isJust mn) onts
+  InfVar {}    -> True
+  _            -> binderOnly
 
 -- | Is this name one the module's section-level @GIVEN@s bind?
 --
@@ -4782,9 +4815,9 @@ sectionBinderFor n = do
             pure (Just (Ref n' u o, rt))
           _ -> pure Nothing
 
-supplyAppNamed :: Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
-supplyAppNamed _r []   [] = pure []
-supplyAppNamed  r onts [] = do
+supplyAppNamed :: Bool -> Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
+supplyAppNamed _overloaded _r []   [] = pure []
+supplyAppNamed  overloaded  r onts [] = do
   -- What the site left out. An input or field that declares a TYPICALLY is not
   -- missing: it takes its default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 for a
   -- rule's inputs, W5 for a record's fields). Only a NAMED site gets here, so
@@ -4796,9 +4829,8 @@ supplyAppNamed  r onts [] = do
   -- needs) into one that quietly chooses the candidate whose default fills the
   -- gap and runs it on a presumed value, with nothing said. Such a site stays
   -- as it was before W4: it needs every input written out.
-  overloaded <- use #overloadedCallees
   defaults <-
-    if getUnique r `Set.member` overloaded
+    if overloaded
       then pure Map.empty
       else asks (Map.findWithDefault Map.empty (getUnique r) . (.visibleInputDefaults))
   let
@@ -4809,12 +4841,12 @@ supplyAppNamed  r onts [] = do
   unless (null missing) $
     addError (IncompleteAppNamed r missing)
   pure fills
-supplyAppNamed  r onts (ne@(MkNamedExpr ann n e) : nes) =
+supplyAppNamed  overloaded r onts (ne@(MkNamedExpr ann n e) : nes) =
   case lookupOptionallyNamedType n onts of
     Just (i, n', t, onts') -> do
       rn <- ref n n'
       re <- checkExpr (ExpectNamedArgContext r rn) e t
-      rnes <- supplyAppNamed r onts' nes
+      rnes <- supplyAppNamed overloaded r onts' nes
       pure ((i, MkNamedExpr ann rn re) : rnes)
     Nothing -> do
       -- Not one of the callee's own parameters. Under R1 it may still be a
@@ -4826,12 +4858,12 @@ supplyAppNamed  r onts (ne@(MkNamedExpr ann n e) : nes) =
       if isBinder
         then do
           orne <- implicitSupply r ne
-          rnes <- supplyAppNamed r onts nes
+          rnes <- supplyAppNamed overloaded r onts nes
           pure (orne : rnes)
         else do
           (i, rn, t, onts') <- findOptionallyNamedType n onts
           re <- checkExpr (ExpectNamedArgContext r rn) e t
-          rnes <- supplyAppNamed r onts' nes
+          rnes <- supplyAppNamed overloaded r onts' nes
           pure ((i, MkNamedExpr ann rn re) : rnes)
 
 -- | The declared parameter this name supplies, if it is one of them, together

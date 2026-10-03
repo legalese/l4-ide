@@ -95,15 +95,24 @@ data CheckState =
     -- 'prune', which all start from the same state, so the absolute value is
     -- meaningless and is never reset: 'prune' prefers the viable outcome with
     -- the fewest such choices when exactly one has the fewest.
-    , overloadedCallees :: !(Set Unique)
-    -- ^ The callees THIS branch of the nondeterministic search chose from among
-    -- several candidates that were all still in the running ('resolveTermFilteredIn'),
-    -- so that a named application of one of them can tell that its name is an
-    -- overload. A named site whose callee is an overload takes no @TYPICALLY@
-    -- default ('L4.TypeCheck.supplyAppNamed'): R8 does not rule on overloads, and
-    -- letting a default decide which overload an under-specified site means would
-    -- change a site that was ambiguous into one that quietly picks a rule and
-    -- runs it on a presumed value (review silent F3, 2026-10-03).
+    , overloadedCallees :: !(Map Unique [Type' Resolved])
+    -- ^ For each callee THIS branch of the nondeterministic search chose from
+    -- among several candidates that were all still in the running
+    -- ('resolveTermFilteredIn'), the types of the OTHER candidates, so that a
+    -- named application of it can tell whether its name is an overload for the
+    -- inputs it names. A named site whose callee is an overload takes no
+    -- @TYPICALLY@ default ('L4.TypeCheck.supplyAppNamed'): R8 does not rule on
+    -- overloads, and letting a default decide which overload an under-specified
+    -- site means would change a site that was ambiguous into one that quietly
+    -- picks a rule and runs it on a presumed value (review silent F3,
+    -- 2026-10-03).
+    --
+    -- It is cleared before each named application resolves its callee and read
+    -- straight after ('L4.TypeCheck.inferExpr', @AppNamed@), so it describes
+    -- that site and no other (review silent N3). Why the types and not a flag:
+    -- whether another candidate is a rival depends on the site, since a record
+    -- field selector takes no named inputs and a bare definition takes only
+    -- section binders (review silent N2).
     }
   deriving stock (Generic)
 
@@ -1979,16 +1988,20 @@ resolveTermFilteredIn shadowing preambleErr p viab n kont = do
     [(_t, x)] -> x >>= kont
     xs ->
       let
-        kept0 = [ x | (t', x) <- xs, viab t' ]
+        keptT = [ (t', x) | (t', x) <- xs, viab t' ]
+        kept0 = map snd keptT
         -- Several candidates remain in the running: remember, on each branch,
-        -- which one it chose, so that a named site can see its callee is an
-        -- overload ('overloadedCallees'). A single survivor is no overload.
+        -- which one it chose and what the others were, so that a named site can
+        -- see whether its callee is an overload ('overloadedCallees'). A single
+        -- survivor is no overload. Which of the others count as rivals is the
+        -- site's to say, not this function's: it knows the inputs it names.
         kept
-          | length kept0 > 1 = map markOverloaded kept0
+          | length kept0 > 1 = zipWith markOverloaded [0 :: Int ..] keptT
           | otherwise        = kept0
-        markOverloaded cand = do
+        markOverloaded i (_, cand) = do
           chosen@(rn, _) <- cand
-          modifying #overloadedCallees (Set.insert (getUnique rn))
+          modifying #overloadedCallees
+            (Map.insert (getUnique rn) [ t' | (j, (t', _)) <- zip [0 :: Int ..] keptT, j /= i ])
           pure chosen
         fallback = do
           v <- fresh (rawName n)
