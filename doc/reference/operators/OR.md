@@ -47,7 +47,8 @@ The first operand may depend on a fact nobody has supplied yet, such as a sectio
 Then OR looks at the second operand too.
 If the second is `TRUE`, the answer is `TRUE`, whatever the missing fact turns out to be: `x OR TRUE` is `TRUE`.
 Otherwise the answer is not known yet, and asking for it stops and names every fact it is waiting for, as [AND](AND.md#when-the-first-operand-is-not-known) does.
-If the second operand stops with an error or a refusal, the answer is still reported as waiting for the first operand's facts.
+If the second operand stops with an error or a refusal, or takes more than the 250,000 steps evaluation allows over a missing fact, the answer is still reported as waiting for the first operand's facts.
+Nor does the second operand do anything outside the rule while the first is not known, as with [AND](AND.md#when-the-first-operand-is-not-known).
 
 ## Related Keywords
 
