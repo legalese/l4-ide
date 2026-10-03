@@ -629,21 +629,20 @@ GIVETH A NUMBER
 |]
 
 -- | Expression defaults taken at a NAMED site inside the rules, each naming a
--- section input the request supplies.
+-- definition. A default there may not read a section input
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3, decision 1), so it is one value
+-- wherever it is taken.
 expressionSiteDefaultJL4 :: Text
 expressionSiteDefaultJL4 =
   [i|
 GIVETH A NUMBER
 phi MEANS 8
 
-§ `Rates`
-    GIVEN alpha IS A NUMBER
-
 DECLARE Config HAS
-  timeout IS A NUMBER TYPICALLY (phi TIMES alpha)
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
   retries IS A NUMBER
 
-GIVEN rate IS A NUMBER TYPICALLY (phi PLUS alpha)
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
       base IS A NUMBER
 GIVETH A NUMBER
 scaled MEANS rate TIMES base

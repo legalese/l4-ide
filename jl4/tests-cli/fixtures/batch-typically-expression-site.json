@@ -1,1 +1,1 @@
-[{"n": 10, "use": true, "alpha": 2}, {"n": 10, "use": false, "alpha": 2}, {"n": 10, "use": true, "alpha": 5}]
+[{"n": 10, "use": true}, {"n": 10, "use": false}, {"n": 5, "use": true}]

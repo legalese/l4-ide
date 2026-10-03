@@ -492,14 +492,8 @@ assumesReadBy
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [Assume Resolved]
-assumesReadBy mod' assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ body) =
-  -- The export's own inputs' defaults are read too, when a request leaves the
-  -- input out: a default that names a section binder makes it an input of the
-  -- export, so a request can supply it (R8 rule 3, W7).
-  let referencedUniques =
-        Set.unions
-          (map (transitiveReferencedUniques mod')
-             (body : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]))
+assumesReadBy mod' assumes (MkDecide _ _ _ body) =
+  let referencedUniques = transitiveReferencedUniques mod' body
   in [ assume
      | (uniq, assume) <- Map.toList assumes
      , Set.member uniq referencedUniques

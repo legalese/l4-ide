@@ -66,6 +66,7 @@ module L4.Discharge
   , ambiguousRootBinders
   , implicitReaders
   , defaultCycles
+  , inputDefaultReads
   , defaultThunkUnique
   ) where
 
@@ -228,6 +229,65 @@ defaultCycles mod'
                   , uniqOf c `Set.member` readsOf b
                   , uniqOf b `Set.member` readsOf c ]
         in map (.resolved) members : go (map uniqOf members <> seen) bs
+
+-- | The section binders that the @TYPICALLY@ default of a rule's input or a
+-- record's field reads, directly or through the definitions it calls: one entry
+-- for each such input or field that reads any, with the binders it reads in
+-- declaration order. The checker refuses each ('L4.TypeCheck.Types.TypicallyReadsInput').
+--
+-- A section binder's default is worked out ONCE, at the root, from the root's
+-- values (R8 rule 3). A default on a rule's input or a record's field is copied
+-- to every call or construction that leaves it out, so what it reads there is
+-- whatever that site reads, and the one expression gives one answer under an
+-- inner @WITH@, another at a directive that supplies the same binder, and a
+-- third through @l4 batch@ and the service, which work it out at the root. R8
+-- says where a section's is worked out and does not say where these are, so a
+-- default that would depend on it is refused (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- §4.3, decision 1). A default that reads only definitions that read no binder
+-- has one value wherever it is taken and is not in this list.
+--
+-- The section binders' own defaults are not in it: they are the 'sectionBinders'
+-- themselves and 'defaultCycles' is where they are checked.
+inputDefaultReads :: Module Resolved -> [(Resolved, [Binder])]
+inputDefaultReads mod'
+  | Map.null binders = []
+  | otherwise =
+      [ (owner, reads')
+      | (owner, d) <- ruleInputDefaults <> fieldDefaults
+      , let reads' = exprReads d
+      , not (null reads')
+      ]
+ where
+  binders = sectionBinders mod'
+  bodies  = decideBodiesFromModule mod'
+  readSetOf = readSetsAll mod' binders
+
+  -- The same sum a definition's read-set is: what the expression names, and
+  -- what it reaches through its calls less what each call supplies.
+  exprReads e =
+    canonicaliseBinders
+      (directBinderReads binders e <> reachedThrough readSetOf (bodyCallEdges bodies e))
+
+  -- A section's own @GIVEN@ is an 'OptionallyTypedName' too, and is where a
+  -- binder's default is written; it is not a rule's input.
+  ruleInputDefaults =
+    [ (r, d)
+    | MkOptionallyTypedName _ r _ (Just d) <- nodesOfType @(OptionallyTypedName Resolved) mod'
+    , not (Map.member (getUnique r) binders)
+    ]
+  fieldDefaults =
+    [ (r, d)
+    | MkTypedName _ r _ (Just d) _ <- nodesOfType @(TypedName Resolved) mod'
+    ]
+
+-- | Every node of one type in a module, whatever it sits inside: the topmost
+-- ones, and then those nested under each.
+nodesOfType
+  :: forall a. (Optics.GPlate a (Module Resolved), Optics.GPlate a a)
+  => Module Resolved -> [a]
+nodesOfType m =
+  concatMap (Optics.toListOf (Optics.cosmosOf (Optics.gplate @a)))
+    (Optics.toListOf (Optics.gplate @a) m)
 
 -- | The 'Unique' of the function that stands for a binder's default at a root
 -- ('dischargeModuleWith'): one per binder, numbered by where it is declared, so

@@ -659,19 +659,20 @@ spec = describe "integration" do
           (hard [listPrice 200, cfg, "unused flag" Aeson..= False])
         expectError refused "presumption is hard"
 
-    it "takes an expression default at a named site from the request, and lists it under hard (W7)" do
+    it "takes an expression default at a named site, and lists it under hard (W7)" do
       withServiceFromSources "ty-expr-site" [("combine.l4", expressionSiteDefaultJL4)] \baseUrl mgr -> do
-        let used alpha = ["n" Aeson..= (10 :: Int), "use" Aeson..= True, "alpha" Aeson..= (alpha :: Int)]
+        let used = ["n" Aeson..= (10 :: Int), "use" Aeson..= True]
             presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        -- (8 + 1) * 10 for the rate the site takes, and 8 * 2 for the field's timeout
         soft <- evalFunction baseUrl mgr "ty-expr-site" "combine"
-          (args ("unused flag" Aeson..= False : used 2))
-        expectAnswer soft (FnLitInt 116) []
+          (args ("unused flag" Aeson..= False : used))
+        expectAnswer soft (FnLitInt 106) []
         hardRun <- evalFunction baseUrl mgr "ty-expr-site" "combine"
-          (hard ("unused flag" Aeson..= False : used 5))
-        expectAnswer hardRun (FnLitInt 170) presumedHere
+          (hard ("unused flag" Aeson..= False : used))
+        expectAnswer hardRun (FnLitInt 106) presumedHere
         wrapped <- evalFunction baseUrl mgr "ty-expr-site" "combine"
-          (hard ("unused flag" Aeson..= uncertain : used 2))
-        expectAnswer wrapped (FnLitInt 116) presumedHere
+          (hard ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrapped (FnLitInt 106) presumedHere
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each
