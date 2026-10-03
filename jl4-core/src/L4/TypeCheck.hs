@@ -796,17 +796,14 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 -- spelling. It used to be looked up from the top of the file, which passed over
 -- the section's definition, and over a section input of that spelling, with no
 -- error (W7 second review, silent S2).
+--
+-- A default that builds another record leaving a defaulted field out takes that
+-- field's default, so the other record's is checked first and is visible to the
+-- later ones ('dependencyFirst'). A default that did so found none and was refused
+-- for leaving the field out (W7 second review, silent S9).
 withCheckedFieldDefaults :: Module Name -> Check a -> Check a
 withCheckedFieldDefaults m act = do
-  checked <- for (declaresOf m) \ (sects, MkDeclare ann _ appForm t) ->
-    foldr (\ (n, a) k -> withSectionStack n a k)
-      (do
-        dc <- lookupDeclareCheckedByAnno ann
-        payload <-
-          prune $ errorContext (WhileCheckingDeclare (getName appForm)) $
-            checkFieldDefaults t dc.payload
-        pure (ann, MkDeclChecked payload dc.publicNames))
-      sects
+  checked <- checkInOrder (dependencyFirst (recordNames . snd) (fieldMentions . snd) (declaresOf m))
   local
     (\ s -> s
       { declareDeclarations =
@@ -818,6 +815,34 @@ withCheckedFieldDefaults m act = do
       })
     act
  where
+  checkInOrder [] = pure []
+  checkInOrder ((sects, MkDeclare ann _ appForm t) : rest) = do
+    c <- foldr (\ (n, a) k -> withSectionStack n a k)
+           (do
+             dc <- lookupDeclareCheckedByAnno ann
+             payload <-
+               prune $ errorContext (WhileCheckingDeclare (getName appForm)) $
+                 checkFieldDefaults t dc.payload
+             pure (ann, MkDeclChecked payload dc.publicNames))
+           sects
+    cs <- local (\ s -> s { visibleInputDefaults = Map.union (recordInputDefaults (snd c).payload) s.visibleInputDefaults })
+            (checkInOrder rest)
+    pure (c : cs)
+
+  -- The constructor a @DECLARE@ makes a record with, and the names the defaults
+  -- of its fields call.
+  recordNames (MkDeclare _ _ appForm t) = rawName (getName appForm) : case t of
+    RecordDecl _ (Just con) _ -> [rawName con]
+    _                         -> []
+  fieldMentions (MkDeclare _ _ _ t) = concat
+    [ calledNames d
+    | tns <- case t of
+        RecordDecl _ _ ts -> [ts]
+        EnumDecl _ cds    -> [ ts | MkConDecl _ _ ts <- cds ]
+        _                 -> []
+    , MkTypedName _ _ _ (Just d) _ <- tns
+    ]
+
   -- Each @DECLARE@ with the sections around it, outermost first.
   declaresOf (MkModule _ _ sect) = fromSection [] sect
   fromSection outer (MkSection _ name maka _ decls) =
@@ -2185,10 +2210,29 @@ pendingDefaultsOf (MkTypeSig _ (MkGivenSig _ srcs) _) (MkTypeSig _ (MkGivenSig _
 -- definitions in scope, before any body is checked, so that a site that leaves
 -- the input out finds the checked default ('functionInputDefaults').
 checkPendingDefaults :: [FunTypeSig] -> Check [FunTypeSig]
-checkPendingDefaults = traverse \ sig ->
-  if null sig.pendingDefaults
-    then pure sig
-    else do
+checkPendingDefaults sigs = do
+  let indexed   = zip [0 :: Int ..] sigs
+      (waiting, plain) = List.partition (not . null . (.pendingDefaults) . snd) indexed
+  done <- checkInOrder (dependencyFirst (ruleNames . snd) (defaultMentions . snd) waiting)
+  pure (map snd (List.sortOn fst (done <> plain)))
+ where
+  -- A default that calls a rule whose own input has a default takes that default
+  -- at the site, so the callee's has to be checked first and be visible when the
+  -- caller's is: each finished signature's defaults are put in scope for the
+  -- ones after it. A default that calls a rule whose default is checked later
+  -- found none, and the call was refused for leaving the input out (W7 second
+  -- review, silent S9).
+  checkInOrder [] = pure []
+  checkInOrder ((i, sig) : rest) = do
+    sig' <- checkOne sig
+    rest' <- local (\ s -> s { visibleInputDefaults = Map.union (functionInputDefaults [sig']) s.visibleInputDefaults })
+               (checkInOrder rest)
+    pure ((i, sig') : rest')
+
+  ruleNames sig = [ rawName (getName sig.rappForm) ]
+  defaultMentions sig = concatMap (calledNames . (.source)) sig.pendingDefaults
+
+  checkOne sig = do
       checked <- for sig.pendingDefaults \ p ->
         prune $ errorContext (contextOf sig) $
           local (\ env -> env { sectionStack = p.sectionPath }) do
@@ -2203,10 +2247,36 @@ checkPendingDefaults = traverse \ sig ->
         { rtysig = MkTypeSig tann (MkGivenSig gann (map patch otns)) mgiveth
         , pendingDefaults = []
         }
- where
+
   contextOf sig = case sig.anno ^. annInfo of
     Just (TypeInfo _ (Just Assumed)) -> WhileCheckingAssume (getName sig.rappForm)
     _                                -> WhileCheckingDecide (getName sig.rappForm)
+
+-- | The names an expression calls or applies, as written.
+calledNames :: Expr Name -> [RawName]
+calledNames e =
+  [ rawName n
+  | x <- Optics.toListOf (Optics.cosmosOf (gplate @(Expr Name))) e
+  , n <- case x of
+      App _ n' _        -> [n']
+      AppNamed _ n' _ _ -> [n']
+      _                 -> []
+  ]
+
+-- | Put each item after the items whose names it mentions, where that can be
+-- done; items on a circle keep the order they had. What a default may call is
+-- decided by the order its owners are checked in ('checkPendingDefaults',
+-- 'withCheckedFieldDefaults').
+dependencyFirst :: (a -> [RawName]) -> (a -> [RawName]) -> [a] -> [a]
+dependencyFirst names mentions = go . zip [0 :: Int ..]
+ where
+  go [] = []
+  go xs =
+    let waits (i, x) = or [ any (`elem` mentions x) (names y) | (j, y) <- xs, j /= i ]
+    in case (filter (not . waits) xs, xs) of
+         (p : _, _)  -> take1 p xs
+         ([], p : _) -> take1 p xs
+  take1 (i, x) xs = x : go (filter ((/= i) . fst) xs)
 
 appFormType :: AppForm Resolved -> Type' Resolved
 appFormType (MkAppForm _ann n args _maka) = app n (tyvar <$> args)
