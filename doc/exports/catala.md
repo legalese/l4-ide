@@ -64,10 +64,12 @@ The **constitutive subset** — the definitional layer of L4. `WHERE` bindings b
 for a rule's own `GIVEN`, for a section `GIVEN` and for an `ASSUME` the rule reads: a Catala caller
 may leave the variable out and get the default, or supply it and override it.
 
-One place has no Catala form: a `TYPICALLY` on a **record field**. A Catala structure's fields have no
-defaults, so the field is emitted without one, a caller builds the structure with every field, and the
-notes block at the top of the emitted module says that the default was dropped. (The notes block is
-also printed on standard error.)
+Two places have no Catala form: a `TYPICALLY` on a **record field**, and one on the field of a **sum
+type's constructor** (`Circle HAS radius IS A NUMBER TYPICALLY 1`). A Catala structure's fields have no
+defaults, and an enumeration case's `content` is a type and nothing more, so the field is emitted
+without one, a caller builds the structure or the case with everything in it, and the notes block at the
+top of the emitted module says that the default was dropped. (The notes block is also printed on standard
+error.)
 
 A pleasant consequence of both backends taking the same subset: the OpenFisca examples compile to
 Catala **unchanged**. The same L4 file feeds both bridges with no edits.

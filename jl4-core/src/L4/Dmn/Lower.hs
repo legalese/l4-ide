@@ -4358,6 +4358,17 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- KIE refuses to load the model (ERR_COMPILING_FEEL, Unknown variable),
       -- with the name supplied or not; Camunda answers when the context supplies
       -- the name and null when it does not.
+      -- The payload of a sum type is not in the model, so neither is the field the
+      -- default sits on; D-SUMTYPE (blocking) says the payload goes, and this note
+      -- says that the default goes with it.
+      | s.kind == DefaultOnConstructorField
+      , maybe False (`Set.member` payloadUnionUniques) s.ownerUnique =
+          dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+            ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and the model keeps no payload "
+                <> "for a sum type at all (see D-SUMTYPE), so the field and its default are both gone: "
+                <> "a model that reads the type sees the constructor's name and nothing it holds" )
+            ( "the presumption, with the payload field it belonged to: the source says an omitted "
+                <> tick s.name <> " is " <> dflt s <> ", and the model has no such field" )
       | undeclared s =
           dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
             ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and the model has no input for it "
@@ -4392,7 +4403,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     --   The note says only what is true of the model: it does not say that an
     --   omitted parameter is @d@.
     omission s = case s.kind of
-      DefaultOnRecordField ->
+      k | k == DefaultOnRecordField || k == DefaultOnConstructorField ->
         -- "builds a `Config` without", and not "leaves it out of the record": the
         -- model carries an itemDefinition for a record no decision reads, and no
         -- evaluation of THIS model leaves a component out of it, but a consumer
@@ -4419,19 +4430,30 @@ lowerModule opts modul@(MkModule _ uri _) =
       DefaultOnSectionGiven -> Set.member s.unique inputUniques
       DefaultOnAssume       -> Set.member s.unique inputUniques
       DefaultOnRecordField  -> maybe False (`Set.member` recordUniques) s.ownerUnique
+      -- the sum type has an itemDefinition like any DECLARE (its payload, if it is a
+      -- union, does not: see 'payloadUnionUniques')
+      DefaultOnConstructorField -> maybe False (`Set.member` recordUniques) s.ownerUnique
 
     dmnElementOf s = case s.kind of
-      DefaultOnRecordField -> maybe s.name (\o -> o <> "." <> s.name) s.owner
-      _                    -> maybe s.name id (Map.lookup s.unique inputByUnique)
+      DefaultOnRecordField      -> maybe s.name (\o -> o <> "." <> s.name) s.owner
+      DefaultOnConstructorField -> maybe s.name (\o -> o <> "." <> s.name) s.owner
+      _                         -> maybe s.name id (Map.lookup s.unique inputByUnique)
 
     carrier s = case s.kind of
-      DefaultOnRecordField -> "an itemComponent"
+      DefaultOnRecordField      -> "an itemComponent"
+      DefaultOnConstructorField -> "an itemComponent"
       DefaultOnRuleGiven | isBkmParam s -> "a BKM parameter"
       _                    -> "an inputData"
 
     noun = \case
-      DefaultOnRecordField -> "component"
-      _                    -> "input"
+      DefaultOnRecordField      -> "component"
+      DefaultOnConstructorField -> "component"
+      _                         -> "input"
+
+    -- A sum type with more than one constructor, one of which carries a payload,
+    -- gets an itemDefinition of its constructor NAMES only (D-SUMTYPE, blocking):
+    -- the payload fields are not in the model at all.
+    payloadUnionUniques = Set.fromList [ d.itdUnique | d <- itemDecls, d.itdPayload ]
 
   -- D-COMPUTEDFIELD: ADVISORY, one per hydrated TYPE, raised on the hydrated
   -- itemDefinition.

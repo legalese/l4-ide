@@ -95,7 +95,7 @@ it quietly, and none of them replaces it with a default of the target's own.**
 | **[BPMN](dmn-bpmn.md)**           | dropped; `P-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | dropped, the same way, for a record the drawn rule handles |
 | **[yscript](yscript.md)**         | not exportable (a rule with `GIVEN`s is refused already)          | **refused**, naming the fact and its default | not exportable                                             |
 
-Three things the table cannot show:
+Four things the table cannot show:
 
 - **A default the checker does not yet accept still gets one of these answers.** `TYPICALLY` must
   be a literal today. When it is allowed to be an expression, OpenFisca will turn it into a formula
@@ -105,6 +105,12 @@ Three things the table cannot show:
   (docassemble already refuses the module for a default it cannot pre-fill that the checker does
   accept: `TYPICALLY NOTHING` on a `MAYBE`. The refusal is whole-module, so it does not matter whether
   the rule carrying it is the default export.)
+- **The field of a sum type's constructor is a fifth place.** A default written as
+  `Circle HAS radius IS A NUMBER TYPICALLY 1` inside `DECLARE Shape IS ONE OF ...` is accepted by the
+  checker, and is neither a record field nor a `GIVEN`. docassemble pre-fills the follow-up question it
+  asks when that constructor is chosen; Catala, DMN, dmn-md, BPMN and Blawx say the default is dropped
+  (DMN adds that it keeps no payload for a sum type at all); OpenFisca refuses the module, naming the
+  field. yscript has no types, and refuses a rule with a parameter before it could meet one.
 - **A default written in an imported file counts when the export reads it.** DMN, dmn-md, BPMN and
   Catala report it, and name the imported module in the note. OpenFisca, Blawx, docassemble and
   yscript refuse an imported `ASSUME` or an imported record field that the exported rule reads

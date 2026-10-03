@@ -3636,7 +3636,7 @@ bpmnDefaultNotes imports modul sg = case sg.sgDecide of
         , message  = describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
                        <> ", and BPMN has no default for a process variable: "
                        <> (case (s.kind, s.owner) of
-                             (DefaultOnRecordField, Just r) ->
+                             (k, Just r) | k == DefaultOnRecordField || k == DefaultOnConstructorField ->
                                "a condition that reads `" <> s.name <> "` of a `" <> r <> "` (by name, or "
                                  <> "by taking the record apart) reads whatever the process instance holds, "
                                  <> "so an instance that holds a `" <> r <> "` without it"

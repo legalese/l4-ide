@@ -231,6 +231,11 @@ typicallyImportBpmnField = fixtureDir </> "typically-import" </> "bpmn-field-mai
 -- reads the imported ASSUME through an imported HELPER (`may act`), never naming it
 typicallyImportBpmnHelper = fixtureDir </> "typically-import" </> "bpmn-helper-main.l4"
 
+-- A TYPICALLY on the field of a sum type's constructor, the fifth place one can
+-- sit. See the fixture's header.
+typicallyConField :: FilePath
+typicallyConField = fixtureDir </> "typically-con-field.l4"
+
 -- The BPMN side: one regulative rule, with the default written on its own GIVEN,
 -- on a section GIVEN it reads, on an ASSUME it reads (also one read by a rule it
 -- reaches by HENCE), and on a record's field. Each must be reported as P-TYPICALLY.
@@ -476,7 +481,7 @@ fixtures =
   , bpmnTypicallyGiven, bpmnTypicallySection, bpmnTypicallyAssume, bpmnTypicallyHence
   , bpmnTypicallyField, bpmnTypicallyHenceFalse, bpmnTypicallyHenceAssume, bpmnTypicallyFieldPattern
   , typicallyImportLib, typicallyImportDmn, typicallyImportBpmn, typicallyImportBpmnField
-  , typicallyImportBpmnHelper
+  , typicallyImportBpmnHelper, typicallyConField
   ]
 
 spec :: FilePath -> Spec
@@ -934,6 +939,26 @@ spec bin = do
     it "trips --fail-on=lossy, which it could not before" $ do
       Output code _ _ <- runL4 bin ["export", "dmn", typicallySource, "--fail-on=lossy"]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    -- The checker accepts a default on a constructor's field. Catala, docassemble
+    -- and DMN used to drop it with exit 0 and no word; none of the exports now
+    -- does. The ones that exit 0 say what they did, and the one that cannot carry
+    -- it refuses by name.
+    it "does not drop a constructor field's TYPICALLY in DMN, Catala or docassemble, and OpenFisca refuses it by name" $ do
+      Output cd _ ed <- runL4 bin ["export", "dmn", typicallyConField, "--fidelity-report"]
+      cd `shouldBe` ExitSuccess
+      ed `shouldSatisfy` ("[D-TYPICALLY] lossy" `isInfixOf`)
+      ed `shouldSatisfy` ("the field `radius` of the constructor `Circle` carries TYPICALLY 1" `isInfixOf`)
+      Output cc oc _ <- runL4 bin ["export", "catala", typicallyConField]
+      cc `shouldBe` ExitSuccess
+      oc `shouldSatisfy` ("field `radius` of the constructor `Circle` carries TYPICALLY 1, which is dropped" `isInfixOf`)
+      Output ca oa ea <- runL4 bin ["export", "docassemble", typicallyConField]
+      ca `shouldBe` ExitSuccess
+      oa `shouldSatisfy` ("default: 1" `isInfixOf`)
+      ea `shouldSatisfy` ("DA-TYPICALLY" `isInfixOf`)
+      Output co _ eo <- runL4 bin ["export", "openfisca", typicallyConField]
+      co `shouldBe` ExitFailure 1
+      eo `shouldSatisfy` ("the field `radius` of the constructor `Circle` carries TYPICALLY 1" `isInfixOf`)
 
     it "says nothing about TYPICALLY on a module that writes none" $ do
       Output code _ serr <- runL4 bin ["export", "dmn", dmnSource, "--fidelity-report"]

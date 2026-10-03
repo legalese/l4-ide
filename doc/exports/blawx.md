@@ -165,6 +165,8 @@ for every place one can be written:
   supplies, so nothing applies the default;
 - on a record field: a Blawx attribute is a fact asserted about an object, or left out, and has no
   default;
+- on the field of a sum type's constructor: a Blawx constructor is a term whose payload is positional,
+  so the field has no default either;
 - on an assumed input (an older `ASSUME`, or a section `GIVEN` that reaches here as one): the name
   becomes an input predicate, and the default is deliberately **not** seeded, because seeding it
   "would answer the question the target's interview exists to ask". That is a design decision

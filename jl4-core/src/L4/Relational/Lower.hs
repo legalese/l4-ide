@@ -2882,12 +2882,14 @@ typicallyNotes m ctx computed assumed =
   decided   = Set.fromList [ p.rpProv.rpvUnique | p <- computed ]
   assumedUs = Set.fromList [ p.rpName.rnUnique | p <- assumed ]
   records   = Set.fromList ctx.ctxRecOrder
+  enums     = Set.fromList ctx.ctxEnumOrder
 
   reached s = case s.kind of
     DefaultOnRuleGiven    -> maybe False (`Set.member` decided) s.ownerUnique
     DefaultOnSectionGiven -> Set.member s.unique assumedUs
     DefaultOnAssume       -> Set.member s.unique assumedUs
     DefaultOnRecordField  -> maybe False (`Set.member` records) s.ownerUnique
+    DefaultOnConstructorField -> maybe False (`Set.member` enums) s.ownerUnique
 
   what = describeSite
 
@@ -2897,6 +2899,8 @@ typicallyNotes m ctx computed assumed =
       \ so nothing applies the default"
     DefaultOnRecordField ->
       "a Blawx attribute is a fact asserted about an object, or left out; it has no default"
+    DefaultOnConstructorField ->
+      "a Blawx constructor is a term whose payload is positional, so its field has no default"
     _ ->
       "the name becomes an input predicate, and seeding it would answer the question the\
       \ target's interview exists to ask"
@@ -2904,6 +2908,7 @@ typicallyNotes m ctx computed assumed =
   lostOf = \case
     DefaultOnRuleGiven   -> "the default value: a query that leaves this argument out gets none"
     DefaultOnRecordField -> "the default value: an object with no such fact has none"
+    DefaultOnConstructorField -> "the default value: a constructor built without that payload has none"
     _                    -> "the default value"
 
 -- | The @ASSUME@d types some emitted predicate's signature mentions, in source
