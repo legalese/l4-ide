@@ -246,6 +246,16 @@ listFieldSrc = Text.unlines
   , "`total` h period MEANS 1"
   ]
 
+-- | A @LIST OF@ number as a rule's own GIVEN, with a default written on it.
+listGivenSrc :: Text
+listGivenSrc = Text.unlines
+  [ "@export Total"
+  , "GIVEN xs IS A LIST OF NUMBER TYPICALLY EMPTY"
+  , "      period IS A STRING"
+  , "GIVETH A NUMBER"
+  , "`total` xs period MEANS 5"
+  ]
+
 -- | Two exported decisions that share an input called @x@: the first writes the
 -- given default, the second writes none. (Neither body reads it; an unread GIVEN
 -- is still an input variable.)
@@ -624,6 +634,14 @@ spec = do
     it "refuses any other default on a LIST OF field, rather than dropping it" $
       refuses (openFiscaOut (withDefaultsAs (const (Lit emptyAnno (NumericLit emptyAnno 1))) (moduleOf listFieldSrc)))
         `shouldSatisfy` mentions "`members` is a LIST OF records and carries TYPICALLY 1"
+
+    it "accepts TYPICALLY EMPTY on a LIST OF GIVEN, as on a LIST OF field, instead of calling EMPTY an unbound reference" $
+      succeeds (openFiscaOut (moduleOf listGivenSrc))
+        `shouldBe` succeeds (openFiscaOut (moduleOf (Text.replace " TYPICALLY EMPTY" "" listGivenSrc)))
+
+    it "refuses any other default on a LIST OF GIVEN, naming the GIVEN" $
+      refuses (openFiscaOut (withDefaultsAs (const (Lit emptyAnno (NumericLit emptyAnno 1))) (moduleOf listGivenSrc)))
+        `shouldSatisfy` mentions "the GIVEN `xs` is a LIST and carries TYPICALLY 1"
 
     it "treats a default equal to OpenFisca's own as no disagreement: 0, FALSE and the first member against none" $ do
       succeeds (openFiscaOut (moduleOf (defaultVsNoneSrc "NUMBER" "TYPICALLY 0"))) `shouldSatisfy` Text.isInfixOf "class x(Variable):"

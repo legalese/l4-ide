@@ -188,10 +188,25 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
        <> ", which OpenFisca supplies from the simulation and not from an input variable"))
   scalarInputs <- forM others \g -> do
     let ty0 = maybe OFFloat (ofTypeOf enums) (givenType g)
+        isList = maybe False isListType (givenType g)
     (ty, dflt, formula) <- case givenDefault g of
       Nothing -> Right (ty0, Nothing, Nothing)
-      Just e  -> mapLeft (LowerError fnName . (("the GIVEN `" <> givenText g <> "`: ") <>))
-                         (lowerDefault env ty0 e)
+      -- A LIST OF GIVEN is the twin of a LIST OF field above: OpenFisca has no
+      -- list-valued variable, so a default list has nowhere to go. @EMPTY@ says
+      -- nothing a variable without a default does not already say, so it is
+      -- accepted and changes nothing in the output; any other default would be
+      -- lost, so it is refused, naming the GIVEN. (Without this arm @EMPTY@ was
+      -- lowered as an expression and refused as an unbound reference.)
+      Just e
+        | isList, isEmptyList e -> Right (ty0, Nothing, Nothing)
+        | isList ->
+            Left (LowerError fnName
+              ("the GIVEN `" <> givenText g <> "` is a LIST and carries TYPICALLY "
+               <> describeDefault (classifyDefault e) <> ", and OpenFisca has no list-valued "
+               <> "variable to put a default on (only EMPTY, which says nothing, is accepted)"))
+        | otherwise ->
+            mapLeft (LowerError fnName . (("the GIVEN `" <> givenText g <> "`: ") <>))
+                    (lowerDefault env ty0 e)
     pure OFVariable
       { varName    = pyIdent (givenText g)
       , varL4      = givenText g
@@ -865,6 +880,11 @@ ofTypeOf enums = \case
              | t `elem` ["string", "text"]                                -> OFStr
            _ -> OFFloat
   _ -> OFFloat
+
+-- | @LIST OF x@, for any @x@.
+isListType :: Type' Resolved -> Bool
+isListType (TyApp _ lname [_]) = Text.toLower (resolvedToText lname) `elem` ["list", "listof"]
+isListType _                   = False
 
 -- ---------------------------------------------------------------------------
 -- Name helpers

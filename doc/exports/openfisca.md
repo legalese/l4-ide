@@ -98,8 +98,9 @@ What it refuses, loudly, because OpenFisca has no value to give it:
   input variable whether or not a formula uses it.
 - **A default on the subject or on `period`.** Those come from the simulation, not from an input
   variable, so there is nothing for a default to attach to.
-- **A default on a `LIST OF` field, other than `EMPTY`.** A role has no default list, so any other
-  default would be lost. `EMPTY` says what a role nobody fills already is, so it is accepted and
+- **A default on a `LIST OF` field or `GIVEN`, other than `EMPTY`.** A role has no default list, and
+  OpenFisca has no list-valued variable to put a default on, so any other default would be lost.
+  `EMPTY` says nothing that a variable with no default does not already say, so it is accepted and
   changes nothing in the output.
 - **Two exported decisions that give one input different defaults.** OpenFisca has one variable of
   that name and so one default; the export names both and stops rather than pick one. "Different"
