@@ -778,14 +778,24 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 --
 -- Errors are reported here, under the record's own context, exactly as
 -- 'inferDeclare' did; 'inferDeclare' now only reads the result.
+--
+-- A field's default is looked up in the section its @DECLARE@ is written in, as a
+-- rule input's is ('checkPendingDefaults'): a name in it means what it means
+-- there, and a section's own definition outranks the file's of the same
+-- spelling. It used to be looked up from the top of the file, which passed over
+-- the section's definition, and over a section input of that spelling, with no
+-- error (W7 second review, silent S2).
 withCheckedFieldDefaults :: Module Name -> Check a -> Check a
 withCheckedFieldDefaults m act = do
-  checked <- for (declaresOf m) \ (MkDeclare ann _ appForm t) -> do
-    dc <- lookupDeclareCheckedByAnno ann
-    payload <-
-      prune $ errorContext (WhileCheckingDeclare (getName appForm)) $
-        checkFieldDefaults t dc.payload
-    pure (ann, MkDeclChecked payload dc.publicNames)
+  checked <- for (declaresOf m) \ (sects, MkDeclare ann _ appForm t) ->
+    foldr (\ (n, a) k -> withSectionStack n a k)
+      (do
+        dc <- lookupDeclareCheckedByAnno ann
+        payload <-
+          prune $ errorContext (WhileCheckingDeclare (getName appForm)) $
+            checkFieldDefaults t dc.payload
+        pure (ann, MkDeclChecked payload dc.publicNames))
+      sects
   local
     (\ s -> s
       { declareDeclarations =
@@ -797,11 +807,13 @@ withCheckedFieldDefaults m act = do
       })
     act
  where
-  declaresOf (MkModule _ _ sect) = fromSection sect
-  fromSection (MkSection _ _ _ _ decls) = concatMap fromDecl decls
-  fromDecl = \ case
-    Declare _ d -> [d]
-    Section _ s -> fromSection s
+  -- Each @DECLARE@ with the sections around it, outermost first.
+  declaresOf (MkModule _ _ sect) = fromSection [] sect
+  fromSection outer (MkSection _ name maka _ decls) =
+    concatMap (fromDecl (outer <> [(name, maka)])) decls
+  fromDecl sects = \ case
+    Declare _ d -> [(sects, d)]
+    Section _ s -> fromSection sects s
     _           -> []
 
 -- | The @TYPICALLY@ defaults a checked module declares, for the modules that
