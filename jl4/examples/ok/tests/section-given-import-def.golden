@@ -3,7 +3,7 @@ Typechecking successful
 Evaluation successful
 section-given-import-def.l4:16:1-19:
   5
-  NOTE: the rate took its default (declared at section-given-import-def.l4:9:44-48)
+  NOTE: the rate took its default 0.05 (declared at section-given-import-def.l4:9:44-48)
 section-given-import-def.l4:17:1-32:
   assertion satisfied
-  NOTE: the rate took its default (declared at section-given-import-def.l4:9:44-48)
+  NOTE: the rate took its default 0.05 (declared at section-given-import-def.l4:9:44-48)

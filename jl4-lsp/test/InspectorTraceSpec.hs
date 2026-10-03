@@ -80,7 +80,8 @@ spec = describe "a TYPICALLY default in the editor's trace (W8)" do
         -- after its answer (W11, TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3), in
         -- the inspector and in the diagnostic alike
         T.lines (T.strip (inspector plain))
-          `shouldBe` ["6", "NOTE: the rate took its default (declared at w8-inspector.l4:2:44-45)"]
-        pushed plain `shouldSatisfy` said
-        prettyEvalDirectiveResult plain `shouldSatisfy` said
+          `shouldBe` ["6", "NOTE: the rate took its default 3 (declared at w8-inspector.l4:2:44-45)"]
+        let saidWithValue = T.isInfixOf "the rate took its default 3 (declared at w8-inspector.l4:2:44-45)"
+        pushed plain `shouldSatisfy` saidWithValue
+        prettyEvalDirectiveResult plain `shouldSatisfy` saidWithValue
       other -> expectationFailure ("expected three results, got " <> show (length other))

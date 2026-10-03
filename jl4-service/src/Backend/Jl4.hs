@@ -498,6 +498,7 @@ rootFill ctx path d = do
             { Eval.path = path
             , Eval.declaredAt = rangeOf d
             , Eval.origin = Eval.FromRootFill
+            , Eval.valueText = Nothing
             }
         }
   put (i + 1, fill : fills)
@@ -949,7 +950,7 @@ wrapperTrace m decide r = mapDefaultEvents relocate <$> r.trace
     MkModule _ authorUri _ = m
     wrapperUri = (\ rng -> rng.moduleUri) <$> r.range
     authors = Map.mapMaybe rangeOf (inputDefaults m decide)
-    relocate p = MkPresumed { path = p.path, origin = p.origin, declaredAt = placed p }
+    relocate p = MkPresumed { path = p.path, origin = p.origin, declaredAt = placed p, valueText = p.valueText }
     placed p = case (p.origin, p.path, p.declaredAt) of
       (FromRequest, [field], _)
         | Just at <- Map.lookup (unInputField field) authors -> Just at
@@ -1994,7 +1995,7 @@ traceToReasoning (TraceDefault p steps val) =
     path = case p.path of
       n : rest -> unInputField n : rest
       []       -> []
-    named = MkPresumed { path, declaredAt = p.declaredAt, origin = p.origin }
+    named = MkPresumed { path, declaredAt = p.declaredAt, origin = p.origin, valueText = p.valueText }
 traceToReasoning (Trace lbl [] val) =
   Reasoning
     { exampleCode = labelExample lbl

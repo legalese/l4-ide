@@ -341,8 +341,14 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- likewise the notes the run raised while producing this value (R-X6's
   -- early act, the empty window): read before the fresh ref is discarded
   directiveNotes <- map (\ (MkNote t) -> t) . toList <$> readEvalRef (.notes)
-  -- and the defaults it forced (W8's event), for the same reason
-  directivePresumed <- presumedEvents <$> readEvalRef (.presumed)
+  -- and the defaults it forced (W8's event), for the same reason, each with its
+  -- value as it stands: a default that was forced is evaluated by now, and
+  -- 'peekNF' forces nothing, so reading it cannot change what the directive did
+  loggedDefaults <- presumedEvents <$> readEvalRef (.presumed)
+  valuedDefaults <- for loggedDefaults \ (p, rf) ->
+    (p,) <$> (peekWHNF rf >>= traverse peekNF)
+  let
+    directivePresumed = [ p { valueText = defaultValueText <$> mnf } | (p, mnf) <- valuedDefaults ]
   reached <- reachedUnknowns
   let
     -- What a directive that could not be decided waits on
@@ -503,8 +509,10 @@ data EvalDirectiveResult =
       -- ^ The @TYPICALLY@ defaults the run actually forced while producing
       -- the value, in the order forced: W8's \"took its default\" event
       -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). The trace shows the
-      -- same events ('TraceDefault'); the list itself is not printed here, and
-      -- @l4 batch@ and @jl4-service@ turn it into their @presumed@ list.
+      -- same events ('TraceDefault'); a plain directive says them in its
+      -- @NOTE:@ lines ('defaultNotes'), each with its value ('Presumed.valueText',
+      -- read when the directive ended), and @l4 batch@ and @jl4-service@ turn
+      -- the list into their @presumed@ list.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -690,26 +698,23 @@ prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 
 -- | W11 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3): a directive that took a
 -- @TYPICALLY@ default says so beside its value, one line for each default that
--- took effect, in the words of the trace's event ('defaultEventText'):
+-- took effect, with its value and where it was declared ('defaultNoteText'):
 --
 -- > 6
--- > NOTE: the rate took its default (declared at rates.l4:2:44-45)
+-- > NOTE: the rate took its default 3 (declared at rates.l4:2:44-45)
 --
 -- R8: "Every directive and trace output names each parameter that took its
--- default". A traced directive has the event in its trace already, so it is
--- not said twice; a default its trace does not show (a truncated trace, or one
--- that failed to post-process) is still said here.
+-- default", and its example is "alpha took its default 10". A traced directive
+-- has the event in its trace already, so it is not said twice; a default its
+-- trace does not show (a truncated trace, or one that failed to post-process) is
+-- still said here.
 defaultNotes :: Maybe EvalTrace -> [Presumed] -> [Text]
-defaultNotes mtrace presumed =
-  [ defaultEventText p | p <- presumed, p `notElem` traced ]
-  where
-    traced = maybe [] tracedDefaults mtrace
+defaultNotes mtrace presumed = defaultNoteText <$> untracedDefaults mtrace presumed
 
--- | The defaults a trace shows.
-tracedDefaults :: EvalTrace -> [Presumed]
-tracedDefaults = \ case
-  Trace _ steps _        -> foldMap (foldMap tracedDefaults . snd) steps
-  TraceDefault p steps _ -> p : foldMap (foldMap tracedDefaults . snd) steps
+-- | A default's value for the line that names it: on one line, as the printer
+-- gives it everywhere else, with what was still unevaluated shown as @…@.
+defaultValueText :: NF -> Text
+defaultValueText = Text.intercalate " " . map Text.strip . Text.lines . prettyLayout
 
 -- ----------------------------------------------------------------------------
 -- ToJSON instances for batch --json output
@@ -983,6 +988,7 @@ withDefaultsKnown evalConfig rootFills m imported st =
               { path       = [rawNameToText (rawName (getActual b.resolved))]
               , declaredAt = rangeOf d
               , origin     = FromSectionBinder
+              , valueText  = Nothing
               }
           )
         | (u, b) <- Map.toList (sectionBinders m)

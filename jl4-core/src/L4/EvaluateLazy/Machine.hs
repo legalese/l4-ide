@@ -61,6 +61,8 @@ module L4.EvaluateLazy.Machine
 , PresumedLog
 , emptyPresumedLog
 , presumedEvents
+, peekWHNF
+, peekNF
 , renderPresumedPath
 , Config (..)
 , forwardExpr
@@ -136,7 +138,7 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
-import L4.EvaluateLazy.Trace (EvalTraceAction (..), Presumed (..), PresumedOrigin (..), renderPresumedPath)
+import L4.EvaluateLazy.Trace (EvalTraceAction (..), Presumed (..), PresumedKey, PresumedOrigin (..), presumedKey, renderPresumedPath)
 import L4.Presumption
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
@@ -414,34 +416,28 @@ data EvalState =
 -- | 'EvalState.presumed': the events in the order forced, and the ones seen,
 -- so that a repeat is dropped without rescanning the list.
 data PresumedLog = MkPresumedLog
-  { events :: !(DList Presumed)
+  { events :: !(DList (Presumed, Reference))
+    -- ^ Each default with the reference whose force reported it, so that its
+    -- value can be read when the directive ends ('peekNF': a default is a thunk
+    -- when it is registered, and has its value only once it has been forced).
   , seen   :: !(Set PresumedKey)
   }
-
--- | What makes two events the same default: where it landed, which fill site
--- supplied it, and the @TYPICALLY@ it came from. The last matters when two
--- sections each declare an input of one name with a default of their own: they
--- are two defaults, each an event, though 'path' names them alike.
-type PresumedKey = ([Text], PresumedOrigin, Maybe SrcRange)
-
-presumedKey :: Presumed -> PresumedKey
-presumedKey p = (p.path, p.origin, p.declaredAt)
 
 emptyPresumedLog :: PresumedLog
 emptyPresumedLog = MkPresumedLog mempty Set.empty
 
-presumedEvents :: PresumedLog -> [Presumed]
+presumedEvents :: PresumedLog -> [(Presumed, Reference)]
 presumedEvents l = DList.toList l.events
 
 -- | Report a default that took effect ('EvalState.presumed'), once.
-tellPresumed :: Presumed -> Eval ()
-tellPresumed p = do
+tellPresumed :: Presumed -> Reference -> Eval ()
+tellPresumed p rf = do
   psRef <- asks (.presumed)
   liftIO $ modifyIORef' psRef \ l ->
     let key = presumedKey p
     in if key `Set.member` l.seen
          then l
-         else MkPresumedLog (l.events `DList.snoc` p) (Set.insert key l.seen)
+         else MkPresumedLog (l.events `DList.snoc` (p, rf)) (Set.insert key l.seen)
 
 -- | Mark a reference as a default, so that forcing it reports one.
 registerPresumable :: Reference -> Presumed -> Eval ()
@@ -492,7 +488,7 @@ notePresumedForce rf = do
     for_ (IntMap.lookup (addressNumber rf.address) m) \ (ptr, p) ->
       when (ptr == rf.pointer) do
         liftIO $ modifyIORef' pRef (IntMap.delete (addressNumber rf.address))
-        tellPresumed p
+        tellPresumed p rf
 
 -- | A note the run reports beside a directive's value ('EvalState.notes').
 -- Plain text: rendered where it is raised, from what the machine has in
@@ -5084,7 +5080,7 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                       fieldRefs <- forM fields $ \(fieldType, fieldAt, given, decision) -> do
                         let fieldTxt = renderPresumedPath fieldAt.fieldPath
                             presumedHere declaredAt =
-                              MkPresumed { path = fieldAt.fieldPath, declaredAt, origin }
+                              MkPresumed { path = fieldAt.fieldPath, declaredAt, origin, valueText = Nothing }
                         case (decision, given) of
                           -- A declared default, reported when it is forced,
                           -- not here: a field the rule never reads did not
