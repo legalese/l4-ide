@@ -719,10 +719,15 @@ validateExportImplicitImports importedReaders entityInfo mod'
           { kind    = ImplicitCrossesImport fnName importedName
           , context = WhileCheckingDecide (getActual fnName) None
           }
-      | MkDecide _ _ (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
+      | MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
       , u <- take 1 (Set.toList
                        (Set.intersection
-                          (transitiveReferencedUniquesWith bodies body)
+                          (Set.unions
+                             (map (transitiveReferencedUniquesWith bodies)
+                                -- A request that leaves an input out takes its
+                                -- default, so what the default calls is reached
+                                -- from the export as much as the body is.
+                                (body : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ])))
                           importedReaders))
       , Just (importedName, _) <- [Map.lookup u entityInfo]
       ]
