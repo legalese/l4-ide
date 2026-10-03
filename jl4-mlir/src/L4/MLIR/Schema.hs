@@ -1789,6 +1789,18 @@ exprDisambiguator = \case
   Gt{}         -> Just "Gt"
   Proj{}       -> Just "Proj"
   Lam{}        -> Just "Lam"
+  -- The built-in connectives as calls, which is how type checking leaves
+  -- them, get the surface forms' tags: @NOT p@ shares its 'SrcRange' with
+  -- @p@ when @p@ is a name, and with @p AND q@ in @NOT (p AND q)@, so under
+  -- one "App" tag the operand's entry overwrote the connective's and its
+  -- trace frame opened under the operand's node. A NOT's tag also carries
+  -- its operand's, because in @NOT (NOT p)@ all three share one range.
+  App _ f [x]
+    | getUnique f == notUnique                    -> Just ("Not(" <> fromMaybe "" (exprDisambiguator x) <> ")")
+  App _ f [_, _]
+    | getUnique f == andUnique                    -> Just "And"
+    | getUnique f == orUnique                     -> Just "Or"
+    | getUnique f == impliesUnique                -> Just "Implies"
   App{}        -> Just "App"
   AppNamed{}   -> Just "AppNamed"
   IfThenElse{} -> Just "IfThenElse"

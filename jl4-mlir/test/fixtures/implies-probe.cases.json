@@ -34,5 +34,57 @@
       "member": false,
       "paid": false
     }
+  ],
+  "not-p": [
+    {
+      "p": true
+    },
+    {
+      "p": false
+    }
+  ],
+  "not-both": [
+    {
+      "p": true,
+      "q": true
+    },
+    {
+      "p": true,
+      "q": false
+    },
+    {
+      "p": false,
+      "q": true
+    },
+    {
+      "p": false,
+      "q": false
+    }
+  ],
+  "not-not-p": [
+    {
+      "p": true
+    },
+    {
+      "p": false
+    }
+  ],
+  "p-unless-q": [
+    {
+      "p": true,
+      "q": true
+    },
+    {
+      "p": true,
+      "q": false
+    },
+    {
+      "p": false,
+      "q": true
+    },
+    {
+      "p": false,
+      "q": false
+    }
   ]
 }
