@@ -539,7 +539,7 @@ Such clauses cannot be published with `@export`, even a single one; see [An @exp
 
 **What you wrote:** ``discount WITH `list price` IS 200``, where `discount` is a [section `GIVEN`](../syntax/section-given.md), not a rule.
 
-**What went wrong:** An input has nothing for a `WITH` to reach: it is worked out from the values the whole evaluation gives.
+**What went wrong:** A `WITH` gives values to the evaluation of a rule, and an input is not a rule. An input's own value is worked out from the values the whole evaluation gives.
 
 **How to fix it:** Put the `WITH` on a rule that reads `discount` (`` `final price` WITH `list price` IS 200 ``), or drop it.
 
