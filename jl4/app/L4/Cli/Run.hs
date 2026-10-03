@@ -194,15 +194,21 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
       -- consumer counting assertions must still see it) with a null value —
       -- neither true nor false — and the reason under "error".
       Assertion a@(Errored _) -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
-      -- An UNDETERMINED directive gets its OWN kind, as a refusing #EVAL
-      -- does: it is neither a value nor an error. "needs" names what it waits
-      -- on, each once, in the order evaluation reached it, and "message" is
-      -- the default report's text (UNKNOWN-EVALUATION-SPEC §4.7.4).
+      -- An UNDETERMINED assertion keeps kind "assertion", as a refused one
+      -- does, since a consumer counting assertions must still count it, with
+      -- a null value and what it waits on under "undetermined" (decided by
+      -- Claude overnight 2026-10-03, pending Meng's review;
+      -- UNKNOWN-EVALUATION-SPEC §8 step 3).
       Assertion a@(Undetermined needs) ->
-        ("undetermined", Aeson.Null,
-         [ Key.fromString "needs"   Aeson..= map termNeedText (toList needs)
-         , Key.fromString "message" Aeson..= prettyAssertionOutcome a
-         ])
+        ("assertion", Aeson.Null,
+         [Key.fromString "undetermined" Aeson..= Aeson.object
+            [ Key.fromString "needs"   Aeson..= map termNeedText (toList needs)
+            , Key.fromString "message" Aeson..= prettyAssertionOutcome a
+            ]])
+      -- An UNDETERMINED #EVAL gets its OWN kind, as a refusing one does: it
+      -- is neither a value nor an error. "needs" names what it waits on, each
+      -- once, in the order evaluation reached it, and "message" is the
+      -- default report's text (UNKNOWN-EVALUATION-SPEC §4.7.4).
       Reduction o@(ReducedUndetermined needs) ->
         ("undetermined", Aeson.Null,
          [ Key.fromString "needs"   Aeson..= map termNeedText (toList needs)
