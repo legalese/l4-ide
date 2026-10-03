@@ -7141,9 +7141,9 @@ prettyCheckError (ImplicitSupplyToInput callee binder)   =
   , ""
   , "  " <> quotedName (getName binder)
   , ""
-  , "to " <> quotedName (getName callee) <> ", which is an input of a section and not a rule,"
-  , "so there is nothing there for the value to reach. An input is worked out"
-  , "from the values the whole case gives."
+  , "to " <> quotedName (getName callee) <> ", which is an input of a section and not a rule."
+  , "A WITH gives values to the evaluation of a rule, and an input is not one: its"
+  , "own value is worked out from the values the whole case gives."
   , ""
   , "Give the value to a rule that reads " <> quotedName (getName callee) <> ", or drop it from"
   , "this call."
