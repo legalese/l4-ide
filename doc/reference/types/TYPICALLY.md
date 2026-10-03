@@ -185,10 +185,26 @@ after `TYPICALLY` is written; a literal or a bare name needs none.
 input, from the values the evaluation was started with, and once, like any other
 default. In the second line above, `WITH `list price` IS 200` reaches
 `discount` as well: the discount is a tenth of the 200 the call gave, so the
-price is 180. A rule that reads `discount` only through another rule is still
-told which inputs it needs, so a `WITH` that names `list price` for it is
-accepted. Because the answer needs `list price` whenever it needs the
+price is 180. Because the answer needs `list price` whenever it needs the
 `discount`, a published rule asks for `list price` too (see below).
+
+**Where a `WITH` reaches.** An evaluation is started at a _root_: a directive
+(`#EVAL`, `#ASSERT`), or the call that `l4 batch` or the decision service makes. A
+`WITH` at a root reaches a default, as above, even for a rule that reads
+`discount` only through another rule. A `WITH` written _inside_ a rule does not:
+it reaches only what the rule it calls reads in its own body, or through the rules
+that one calls, because `discount`'s default is worked out at the root, from the
+root's values. A `WITH` inside a rule that names `list price`, for a rule that
+reaches it only through `discount`, is refused, as one that would do nothing.
+
+A root is a matter of where a call is _written_, not of where it runs. Everything
+written inside a directive is at the root, a lambda there included, and nothing
+written inside a rule is. So ``#EVAL `final price` WITH `list price` IS 1000`` is
+900, while the same call written as a rule,
+`` `priced as if dearer` MEANS `final price` WITH `list price` IS 1000 ``, is 990,
+which takes `discount` from the root's own `list price`, and an `#ASSERT` that
+compares the two fails. Whether a root should be where an evaluation starts
+instead is not settled.
 
 **A default may not depend on itself.** `a TYPICALLY (b PLUS 1)` with
 `b TYPICALLY (a PLUS 1)` cannot be worked out, and neither can a default that
@@ -214,9 +230,16 @@ or the construction is, as if it were written there. With
   default to the section `GIVEN` instead, or write one that reads only
   definitions that read no section input. A default that _supplies_ the input it
   would read (`` `double it` WITH alpha IS 1 ``) reads nothing of it and is fine.
-- **It cannot name the rule's other inputs.** `rate TYPICALLY (base PLUS 1)` is
-  reported as naming something that does not exist, since a default is worked
-  out where the rule's inputs are not yet known.
+- **It cannot name the rule's other inputs, or a record's other fields.** A
+  default is worked out where those are not known, so `rate TYPICALLY (base PLUS 1)`
+  is reported as naming something that does not exist. When the file also defines
+  something called `base`, the name would quietly mean that, so it is a check error
+  all the same, naming the name: rename one of the two, or write the name with its
+  section (`` `Rates`.base ``), which says which it means.
+
+A name in a default means what it means where the default is written: a section's
+own definition outranks the file's of the same name, for a rule's input and for a
+record's field alike.
 
 A default that calls the rule it belongs to, or builds the record it is a field
 of, directly is a check error ("you have not supplied these inputs"). One that
@@ -298,14 +321,32 @@ Three limits on a default that is an expression, at the boundary:
   list does not change with the mode, and a case that leaves it out is refused,
   naming it.
 - **`l4 batch` writes each default into the module it generates as text**, and so
-  does the decision service for a request that sends `{}` for an input nothing
-  reads. A name in a default that two sections both define is then ambiguous, and
-  the rows or the request are refused, naming both. The service's other path
-  works the default out from the checked expression and is not affected. Written
-  with its section (`` `Rates`.phi ``), the name is not ambiguous, on either path.
+  does the decision service for a request that sends `{}` for any input (its other
+  path works the default out from the checked expression and is not affected). The
+  text is read again at the top level of the file, so a name in it must mean the
+  same there. A name that two sections both define is ambiguous there, and the
+  rows or the request are refused, naming both. A name defined in a section and
+  also at the top level would quietly mean the file's there, so an exported rule's
+  input may not take a default that names one, and neither may a section input
+  that an export reads: the file is refused when it is checked. Written with its
+  section (`` `Rates`.phi ``), the name means the same on every path.
 - **A default is published in the spelling the checker prints**, not the
-  author's: a name is unqualified and backticked where needed, and a call that
-  names its inputs is written on one line, comma-separated.
+  author's: a name is unqualified and backticked where needed (one the author
+  wrote with its section keeps it), and a call that names its inputs is written on
+  one line, comma-separated. Two operators that share their leading words are
+  printed by those words alone, so the text can name neither; `l4 batch` refuses
+  such a default, loudly.
+- **The query plan does not ask for a fact that only an expression default
+  reads**, although the published list requires it. The plan orders the questions
+  that decide the answer, and what a default reads is not among them, so a client
+  that answers every question the plan asks can still be refused for a missing
+  fact. Give the fact a default, or ask for it yourself.
+- **`l4 batch` cannot run a rule whose default supplies an input the export also
+  reads.** A default such as `` `base doubled` TYPICALLY (`double it` WITH base IS 10) ``
+  is fine at `#EVAL` and in the service. In `l4 batch` an export that also reads
+  `base` has it bound to the row, and a `WITH` to a bound input is not a supply, so
+  every row is refused. This is older than expression defaults: any `WITH` on a
+  section input, inside an exported rule's body, does the same.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
