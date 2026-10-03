@@ -532,6 +532,8 @@ Evaluate an expression and display the full execution trace, showing each step o
 **Example:**
 
 ```l4
+-- #EVALTRACE shows the steps behind an answer, not only the answer.
+
 GIVEN age IS A NUMBER
       `is a resident` IS A BOOLEAN
 GIVETH A BOOLEAN
@@ -568,13 +570,17 @@ Trace:
 Read it from the top: the first line is what was asked, each line starting `├` is one step in working it out, and the last line, `└ TRUE`, is the answer.
 The indented lines beside a step are the smaller questions that step had to answer first.
 
+Two lines in it are ones you did not write.
+`IF a THEN b ELSE FALSE` is how L4 itself works out an `AND`: `a` is the left side and `b` is the right, and if `a` is not true the answer is `FALSE`.
+`<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
+
 **Seeing the trace from the command line.**
 
 - `l4 run FILE` prints the trace of every `#EVALTRACE` in the file, under `Trace:` below its result.
   This is the default.
   To leave the traces out and see only the results, add `--trace none`.
 - `l4 trace FILE` draws the same traces as diagrams instead of text.
-  It prints a description of the diagram in GraphViz, a free diagram-drawing program.
+  It prints a description of the diagram in GraphViz DOT: GraphViz is a free diagram-drawing program, and DOT is its text format.
   With `--format png` or `--format svg` and `-o DIR` it writes one picture per `#EVALTRACE` into the directory `DIR`; that needs GraphViz installed.
   See [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md).
 
@@ -585,7 +591,19 @@ The indented lines beside a step are the smaller questions that step had to answ
   That is not a fault in your file; change the `#EVAL` to `#EVALTRACE` to see the working.
 - `l4 run --json` carries no trace, whatever `--trace` says.
   `--trace` changes only the text output.
+- An `#EVALTRACE` inside a module that other files `IMPORT` is worked out but not shown.
+  `l4 run` prints only the results of the file you gave it, yet it still collects the trace, which costs time and memory for nothing.
+  Leave `#EVALTRACE` out of modules that other files import.
 - A trace grows with the work done: a rule that calls itself a hundred times prints a trace of about a thousand lines.
+- A trace past a fixed size is cut off, and the cut is marked with this line:
+  `• "… trace truncated (exceeded maximum display size)"`
+  In a test with a rule that adds 1 each time it calls itself, 600 calls printed in full and 1,000 were cut.
+  The exact point depends on how big each call is.
+- Lines can be very wide.
+  Each level of nesting adds a character of indentation, so a rule that calls itself 1,000 times prints lines more than 2,000 characters wide.
+- Keeping a trace takes memory, and nothing limits it.
+  The cut-off above limits what is shown, not what is kept: a rule that called itself 100,000 times used about 1.3 GB, against 0.19 GB without the trace.
+  For a large computation, run with `--trace none`.
 
 **See also:** [evaltrace-example.l4](evaltrace-example.l4)
 
