@@ -216,6 +216,14 @@ Each line starting with `├` is one step toward the answer: here the rule first
 The indented lines beside a step are the smaller questions that step had to settle first.
 The last line, `└ 20`, is the answer.
 
+Two kinds of line in it are ones you did not write, and you can pass over both.
+A line reading `<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
+A `CONSIDER Invoice` with a `WHEN Invoice amount …` beneath it is L4 reading one field out of the invoice: it matches the invoice against its list of fields and takes the one it needs.
+
+On a terminal you will see the trace twice.
+It also appears in the messages L4 prints on the error stream, where warnings and errors go, ahead of the results.
+Add `2>/dev/null` to the command to hide that stream and see the trace once.
+
 Traces are on by default.
 If a file has many `#EVALTRACE` lines and you want only the results, add `--trace none`:
 
