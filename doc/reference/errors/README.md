@@ -665,12 +665,12 @@ Evaluation carries a blank along where it can: a comparison, a calculation or a 
 
 An answer that is waiting for a blank is not an error, and the tools say so, each in its own way:
 
-| where           | what it shows                                                                                                                                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `l4 run`        | the message above, and the run exits non-zero                                                                                                                                                                 |
-| `l4 run --json` | an `#EVAL` gets `"kind": "undetermined"`, with `"needs"`, the list of blanks it waits for, and `"message"`; an `#ASSERT` keeps `"kind": "assertion"` with a null `"value"` and the two under `"undetermined"` |
-| `l4 batch`      | the row's `"status"` is `"undetermined"`; the batch does not stop on it, and exits non-zero once every row has run                                                                                            |
-| `jl4-service`   | the same message, as the `422` it has always been; every response says `"report": "default"`                                                                                                                  |
+| where           | what it shows                                                                                                                                                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4 run`        | the message above, and the run exits non-zero                                                                                                                                                                                                                                                            |
+| `l4 run --json` | an `#EVAL` gets `"kind": "undetermined"`, with `"needs"`, the list of blanks it waits for, and `"message"`; an `#ASSERT` keeps `"kind": "assertion"` with a null `"value"` and the two under `"undetermined"`                                                                                            |
+| `l4 batch`      | the row's `"status"` is `"undetermined"`; the batch does not stop on it, and exits non-zero once every row has run                                                                                                                                                                                       |
+| `jl4-service`   | a single evaluation answers with the message above, as the `422` it has always been, and an MCP tool with an error whose text is that `422`'s body; a batch leaves the case out of `"cases"` and counts it in the summary's `"casesIgnored"`, with no message; every response says `"report": "default"` |
 
 **How to fix it:** Decide which of three things you meant.
 
