@@ -394,6 +394,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - A reader that peeks at a thunk without `evalRef` (the deontic machinery's reads of a party) does not report a default; unchanged from §4.1.
 - W7 (expression defaults): a default is still a literal or a nullary constructor, which is what lets the checker copy it into a call site.
   When W7 lifts that restriction, `defaultValueAt` is the place that must learn the new shapes, and the cycle check has to run first.
+  The type a default carries is dropped when its table leaves the declaring module (above), which is harmless while a default is a literal or a nullary constructor and is not once it can be an expression: that drop and `defaultValueAt` are to be revisited together.
 
 **Review fixes (2026-10-03).**
 After the two adversarial reviews (one for silent failures, one for fidelity to the rulings), beyond what is recorded above.
