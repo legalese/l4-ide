@@ -286,3 +286,57 @@ spec = describe "unknown inputs (UNKNOWN-EVALUATION-SPEC §8 step 3)" $ do
         [ Just (Aeson.toJSON ["`the applicant`'s `age in years`" :: Text.Text, "`has criminal record`"])
         , Just (Aeson.toJSON ["d's `age in years`" :: Text.Text])
         ]
+
+  -- Coverage for the step-3 review: each fails under the mutation named
+  -- beside it in the commit that added it.
+  describe "coverage" $ do
+    let unknowns = Text.unlines
+          [ "DECLARE Pair HAS num IS A NUMBER, tag IS A STRING"
+          , "§ `Unknown`"
+          , "    GIVEN x IS A BOOLEAN"
+          , "          n IS A NUMBER"
+          ]
+    -- the biconditional is a connective, combined by §4.3's table, which
+    -- decides nothing here: `x EQUALS FALSE` is `NOT x`, and `NOT x EQUALS x`
+    -- is left for the truth table of build step 4
+    it "leaves (x EQUALS FALSE) EQUALS x undetermined" $ do
+      os <- outcomes $ unknowns <> "#EVAL (x EQUALS FALSE) EQUALS x\n"
+      os `shouldBe` [Waits ["x"]]
+    -- a structural equality whose components include a term is that term,
+    -- conjoined, unless another component is FALSE
+    it "keeps a term component of a structural equality, and lets a FALSE one decide" $ do
+      os <- outcomes $ unknowns <> Text.unlines
+        [ "#EVAL (LIST n) EQUALS (LIST 1)"
+        , "#EVAL (Pair n \"a\") EQUALS (Pair 3 \"b\")"
+        ]
+      os `shouldBe` [Waits ["n"], Value "FALSE"]
+    -- an error in a component after a term is Stuck on the term: had `n`
+    -- not been 1, the two-valued run would have stopped at it
+    it "is Stuck on the term where a later component of a structural equality raises" $ do
+      os <- outcomes $ unknowns <> "#EVAL (LIST n, 1 DIVIDED BY 0) EQUALS (LIST 1, 5)\n"
+      os `shouldBe` [Waits ["n"]]
+    -- A stack overflow in a speculative right operand is Stuck on the left,
+    -- like any error there. The counter limits the right operand to 250,000
+    -- steps, about 9,000 levels of `sink`, so `grow` first fills the stack to
+    -- within 1,000 frames of its cap (1,000,000; measured: `grow` alone
+    -- overflows between 999,414 and 1,000,000 levels) outside any
+    -- speculation, and `sink` overflows it inside one, before it runs out of
+    -- steps. The control below shows the overflow is real.
+    describe "a stack overflow under an unknown" $ do
+      let deep bottom = unknowns <> Text.unlines
+            [ "GIVEN i IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "sink i MEANS IF i EQUALS 0 THEN TRUE ELSE (sink (i MINUS 1)) AND TRUE"
+            , "GIVEN i IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "grow i MEANS IF i EQUALS 0 THEN " <> bottom <> " ELSE (grow (i MINUS 1)) AND TRUE"
+            , "#EVAL grow 999000"
+            ]
+      it "is Stuck on the left operand's inputs" $ do
+        os <- outcomes (deep "x AND (sink 50000)")
+        os `shouldBe` [Waits ["x"]]
+      it "is a stack overflow with the left operand supplied" $ do
+        os <- outcomes (deep "TRUE AND (sink 50000)")
+        os `shouldSatisfy` \ case
+          [Errors t] -> "Stack overflow" `Text.isInfixOf` t
+          _          -> False
