@@ -523,7 +523,7 @@ The printed copies were deleted afterwards.
    No existing golden moves (`jl4-test`, 3859 examples).
    _Alternative:_ flat only in a default's text, leaving a multi-argument `WITH` elsewhere on lines of its own.
 
-5. **A default on a rule's input or a record's field may not name another input of its own rule, or another field of its own record, by spelling** (`typecheck: a default may not name another input of its own rule or record, by spelling`, commit `ad99b3f4c`; `TypicallyNamesSibling`, `Discharge.inputDefaultCaptures`; second review, silent S1, a blocker).
+5. **A default on a rule's input or a record's field may not name another input of its own rule, or another field of its own record, by spelling** (`typecheck: a default may not name another input of its own rule or record, by spelling`, commit `ad99b3f4c`; `TypicallyNamesSibling`, `Discharge.defaultNameCaptures`, asked of each default where it is checked; second review, silent S1, a blocker).
    A default is worked out where the rule's inputs and the record's fields are not in scope, so a name spelled like one of them means whatever else is called that.
    Where nothing is, it was reported as not in scope, as the documentation says.
    Where something is, it was accepted and the answer used it: `bonus TYPICALLY (salary DIVIDED BY 10)` beside the input `salary` and a definition `salary MEANS 50000` gave `6000` for a `salary` of 1000, through `#EVAL`, `l4 batch` and the service, while the schema printed the text that says the opposite.
@@ -583,6 +583,25 @@ Each was re-measured on a fresh build before anything was changed.
   Recorded, not changed: the type residue of W7-D6, below.
 - **W7-D6, the residue of the closed-type fix across an `IMPORT`.** A default node whose type still holds an inference variable after the final substitution is dropped as before, so `JSONDECODE` in such a default across an `IMPORT` would still decode to `NOTHING` silently. It needs a polymorphic record field's default, which is rare, and a refusal at that point would be better than the drop when someone gets to it.
 
+**Tests the second review's fixes added, and how each was shown to fail before.**
+`l4 run`, errors counted, on the snapshot of the head `e24b018e8` and on this build; the hspec, service and CLI cases are named after the table.
+
+| file                                                  | head `e24b018e8`                                        | now                              |
+| ----------------------------------------------------- | ------------------------------------------------------- | -------------------------------- |
+| `not-ok/tc/typically-names-sibling.l4`                | 0 errors                                                | 2, and three controls raise none |
+| `ok/typically-expression-field-scope.l4`              | 1: the field's default gives `2000` where `16` is meant | 0                                |
+| `not-ok/tc/typically-field-reads-input-in-section.l4` | 1, the rule input's                                     | 2, the field's too               |
+| `not-ok/tc/typically-with-through-default.l4`         | 0                                                       | 1, and the controls raise none   |
+| `ok/typically-expression-supplied-chain.l4`           | 1: refused for reading `r`                              | 0                                |
+| `ok/typically-expression-default-calls-default.l4`    | 2: "you have not supplied these inputs"                 | 0                                |
+| `not-ok/tc/typically-default-resolved-elsewhere.l4`   | 0                                                       | 2, and a control raises none     |
+| `not-ok/import/field-default-refused.l4`              | 0                                                       | 1                                |
+
+`jl4-service-test` "answers a request on the generated-module path that supplies an input a default reads, or that reads one (W7)": the head's service refuses the three requests that supply `discount` and the answer is `195` or `99` now.
+`l4-cli-test` "runs an export whose input's default supplies a section input": `200` and `300` on the head, refused on the build between (the closure of `b3ac69fc5`), `200` and `300` now.
+`ExportReadSetSpec`: the written `ASSUME` is listed, the supplied section input is not, and the imported-reader refusal covers a field, a nested record and an export input's default, each with a control.
+I did not run the hspec cases against a pre-fix build of the suites, only the programs they use against the head's binaries.
+
 **Found while probing, older than W7, not changed.**
 On the service's direct path, a request's value for a section `GIVEN` overrides an inner `WITH` that the rules give it.
 `priced as if dearer MEANS final price WITH list price IS 1000` answers `990` with no request value and `190` for `{"list price": 200}`; the same `WITH` at an `#EVAL` root is refused ("does not read it").
@@ -592,7 +611,7 @@ The example of an inner `WITH` in `ok/typically-expression.l4` (`priced as if de
 
 **Assumed, not ruled** (no one outside the code would notice, or the text is new):
 
-- The names `TypicallyCycle`, `TypicallyReadsInput`, `ImplicitSupplyToInput`, `defaultCycles`, `inputDefaultReads`, `implicitSuppliesToInputs`, `defaultFunctionDecl`, `defaultThunkUnique` (sort char `q`), `allowsExpressionDefault`, `PendingDefault`, `prettyTypicallyOperand`, `typicallyIsExpression`, and the text of the three messages.
+- The names `TypicallyNamesSibling`, `TypicallyResolvedElsewhere`, `defaultNameCaptures`, `defaultsMeaningElsewhere`, `readSetStages`, `implicitSupplySitesAt`, `dependencyFirst`, `authoredFieldGroups` (second review), and the text of their two messages, beside the names `TypicallyCycle`, `TypicallyReadsInput`, `ImplicitSupplyToInput`, `defaultCycles`, `inputDefaultReads`, `implicitSuppliesToInputs`, `defaultFunctionDecl`, `defaultThunkUnique` (sort char `q`), `allowsExpressionDefault`, `PendingDefault`, `prettyTypicallyOperand`, `typicallyIsExpression`, and the text of the three messages.
 - A name inside a default that the checker recorded as something other than a constructor is an expression, so `typicallyLiteralValue` leaves it to the environment; one it recorded nothing about is read as the constructor it was before W7 (the schema) or evaluated (the decoder).
 - A default's source text is `prettyLayout` of the checked expression, so it is the unqualified, backticked form, not the author's own spelling.
 - `RequestField`, the record `l4 batch` and the service decode a request into, always allows an expression: it is not the author's, and the decoder works its default out at the root, as a section's is.
