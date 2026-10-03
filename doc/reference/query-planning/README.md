@@ -41,50 +41,32 @@ only questions that can still change the answer.
 
 ## Question ordering
 
-Among the atoms that remain relevant, the planner ranks them. The **current**
-policy is _determinability-first_: prefer the atom that, once answered, settles
-the most of the decision, using the atom's position in the ROBDD as a tiebreak.
-Concretely the ranking key is `[-determinableCount, level]` — ask the most
-decisive question first, and break ties by diagram level.
-
-This is a purely structural policy: it treats every unknown atom as equally
-likely to be `TRUE` or `FALSE`. It is a good default, but it leaves two things on
-the table:
-
-- It has no notion that some facts are _usually_ one way. A contract party is
-  typically not under duress; a transaction is typically at arm's length. A
-  structural policy will still ask about the unusual case as eagerly as the
-  decisive one.
-- It measures "how much does this settle" combinatorially, not by _expected_
-  progress once likelihoods are taken into account.
-
-### Information gain and priors (roadmap)
-
-The designed evolution is an **information-gain** policy. Using
-[model counting](robdd.md#model-counting) over the ROBDD, estimate the
-probability the outcome is `TRUE`, and score each candidate atom by how much
-answering it is _expected_ to reduce uncertainty:
+Among the atoms that remain relevant, the planner ranks them by **information gain**: how much answering an atom is _expected_ to reduce the uncertainty about the outcome.
+Using [model counting](robdd.md#model-counting) over the ROBDD, it estimates the probability that the outcome is `TRUE`, and scores each candidate atom:
 
 ```
 gain(X) = H(before) − [ w_X · H(after X = TRUE) + (1 − w_X) · H(after X = FALSE) ]
 ```
 
-where `H` is Boolean entropy and `w_X` is a per-atom prior — the probability the
-atom is `TRUE`. The weights come from [TYPICALLY](../types/TYPICALLY.md): a
-fact declared `IS A BOOLEAN TYPICALLY TRUE` supplies `w_X` close to `1`.
+where `H` is Boolean entropy and `w_X` is a per-atom prior: the probability that the atom is `TRUE`.
+The atom with the greatest gain is asked first, and atoms of equal gain keep the order of the diagram.
 
-This subsumes the current policy and adds a prior-aware ordering for free: a
-strongly presumed atom carries almost no expected information, so a greedy
-information-gain policy sinks it to the bottom of the ask-order — reproducing the
-"don't ask; allow the user to override the presumption" behaviour without
-special-casing it — and orders the genuinely uncertain questions by how much they
-are expected to resolve.
+### Priors from `TYPICALLY`
 
-> **Status.** The shipped planner uses the determinability-first policy described
-> above. The information-gain policy and TYPICALLY-driven priors are the planned
-> direction; [TYPICALLY](../types/TYPICALLY.md) already parses and stores the
-> per-atom defaults that the policy will read, but no consumer reads them for
-> ordering yet.
+The weights come from [TYPICALLY](../types/TYPICALLY.md).
+A boolean fact declared `TYPICALLY TRUE` has `w_X = 0.9`, a boolean fact declared `TYPICALLY FALSE` has `w_X = 0.1`, and an atom with no prior has `0.5`.
+The prior is soft, not 1 or 0, so a presumed fact stays among the questions.
+A strongly presumed atom carries little expected information, so it sinks toward the end of the ask-order.
+That is the "don't ask; allow the user to override the presumption" behaviour, without special-casing it.
+
+For `presumed OR a OR b`, with `presumed` declared first and `TYPICALLY FALSE`, the planner asks `a`, then `b`, then `presumed`.
+With no `TYPICALLY` it asks them in the order of the diagram, `presumed` first.
+A `TYPICALLY TRUE` in an `AND` sinks the same way.
+A `TYPICALLY` on an `ASSUME` gives a prior too, although no evaluation uses that default.
+A default that is not a plain `TRUE` or `FALSE`, an expression for instance, gives no prior.
+
+The server's planner (`jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs`) ranks this way, and the test "TYPICALLY question ordering (end-to-end)" in `jl4-service/test/QueryPlanSpec.hs` holds it.
+The TypeScript planner (`ts-shared/boolean-analysis/src/decision-query.ts`) ranks by the same gain and takes the priors as an optional argument, built by `typicallyBridge` in `ts-shared/viz-expr`.
 
 ### Interactive explanation surface (backlog)
 
