@@ -1,0 +1,64 @@
+{
+  "note": [
+    "Engine cases for defaults.l4, the TYPICALLY exhibit.",
+    "",
+    "Every case SUPPLIES every input, and that is the point: a DMN model has no",
+    "default for an inputData, a BKM parameter or an itemComponent, so the only",
+    "honest question to put to it is the one where nothing is left out. What",
+    "happens when something IS left out is not asked here; it is the engines'",
+    "own behaviour and is pinned by name: for a top-level input, in",
+    "jl4/tests-cli/fixtures/dmn-null-probe/null-absent.dmn (Camunda 8: the unbound",
+    "name is null; KIE: a model error, the decision SKIPPED); for a record's",
+    "component, in defaults-omit-component.cases.json (both engines: null, no",
+    "error). The exporter's D-TYPICALLY notes say exactly that.",
+    "",
+    "The two cases differ in every default: B supplies the opposite of each",
+    "TYPICALLY (capacity FALSE, rate 5, timeout 10), so a model that quietly",
+    "substituted the source's default for a supplied value would answer A's",
+    "numbers for B.",
+    "",
+    "`the_band` is the one decision that lowers to a decision TABLE (an `income` input column), so it is the only one dmn-md can draw; its input carries the fourth default."
+  ],
+  "cases": [
+    {
+      "name": "A. the source's own defaults, supplied",
+      "context": {
+        "has_capacity": true,
+        "is_adult": true,
+        "rate": 3,
+        "base": 10,
+        "c": {
+          "timeout": 30,
+          "retries": 2
+        },
+        "income": 60000
+      },
+      "expect": {
+        "may_contract": true,
+        "the_fee": 30,
+        "the_budget": 60,
+        "the_band": 2
+      }
+    },
+    {
+      "name": "B. every default overridden",
+      "context": {
+        "has_capacity": false,
+        "is_adult": true,
+        "rate": 5,
+        "base": 10,
+        "c": {
+          "timeout": 10,
+          "retries": 2
+        },
+        "income": 120000
+      },
+      "expect": {
+        "may_contract": false,
+        "the_fee": 50,
+        "the_budget": 20,
+        "the_band": 3
+      }
+    }
+  ]
+}

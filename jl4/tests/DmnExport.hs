@@ -30,7 +30,7 @@ module DmnExport (spec, drgAsCli) where
 import Base
 import qualified Base.Text as Text
 
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
+import L4.API.VirtualFS (ResolvedImport (..), TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
 import qualified Base.Set as Set
 import L4.Annotation (rangeOf)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
@@ -4142,6 +4142,16 @@ goldenSubjects =
     , "refuse"
     , "the refusal exhibit"
     )
+    -- The TYPICALLY exhibit (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5/W9). DMN has
+    -- no default on an inputData, a BKM parameter or an itemComponent, so the
+    -- exporter does not map one and reports each as D-TYPICALLY: a section
+    -- GIVEN, two rules' own GIVENs and a record field. The golden pins the four
+    -- notes (and, in the markdown report, the same four); the engine cases
+    -- supply every input.
+  , ( "dmn" </> "defaults.l4"
+    , "defaults"
+    , "the TYPICALLY exhibit"
+    )
   ]
 
 -- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually
@@ -4323,6 +4333,9 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                     , Just r <- [rangeOf e]
                     ]
                 , dloExternalRefNames = Just Set.empty
+                -- The imports' modules, as the CLI passes them: D-TYPICALLY
+                -- reports a default an emitted decision reads through one.
+                , dloImports = [ ri.riTypeChecked.program | ri <- tc.tcdResolvedImports ]
                 }
           )
           tc.tcdModule

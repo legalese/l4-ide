@@ -1,0 +1,9 @@
+-- A default on a fact the exported rule never reads carries nothing into the
+-- consultation, so it costs nothing and is not refused: R5 is about what the
+-- export would silently change, and this changes nothing.
+ASSUME `has capacity` IS A BOOLEAN
+ASSUME `is adult` IS A BOOLEAN
+ASSUME `an unrelated fact` IS A BOOLEAN TYPICALLY TRUE
+
+@export May contract
+`may contract` MEANS `has capacity` AND `is adult`

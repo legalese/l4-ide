@@ -17,6 +17,7 @@ import Base
 import Control.Applicative ((<|>))
 import Data.Char (isAlphaNum, isDigit, toLower)
 import Data.Either (partitionEithers)
+import Data.Ratio (denominator)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -25,8 +26,12 @@ import Optics ((^.))
 
 import L4.Annotation (getAnno)
 import L4.Export (ExportedFunction (..), getExportedFunctions)
+import L4.Interchange.Typically
+  ( DefaultKind (..), DefaultSite (..), DefaultValue (..), classifyDefault, describeDefault
+  , describeSite, moduleDefaultSites )
 import L4.OpenFisca.IR
 import L4.Syntax
+import L4.TypeCheck.Environment (emptyUnique, nothingUnique)
 
 -- | A reason a decision could not be compiled to OpenFisca.
 data LowerError = LowerError
@@ -56,12 +61,27 @@ data FieldInfo = FieldInfo
   , fiType     :: !OFType
   , fiStored   :: !Bool
   , fiListElem :: !(Maybe Text)
+  , fiDefault  :: !(Maybe (Expr Resolved))
+    -- ^ the field's @TYPICALLY@, if it wrote one. It becomes the input
+    -- variable's @default_value@ (see 'lowerDefault'); OpenFisca has a default
+    -- for every variable, so dropping it would assert a different one.
   }
 
 lowerModule :: Module Resolved -> Either [LowerError] OFPackage
 lowerModule mod' =
   case getExportedFunctions mod' of
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
+    -- The field of a sum type's constructor is the one place a TYPICALLY can sit
+    -- that this export has no variable for: an enum is written as its members
+    -- alone, and the payload (the default with it) is not carried. OpenFisca would
+    -- never say so, and every variable has a default of its own, so the module is
+    -- refused rather than written without it (T5b: refuse what cannot be mapped).
+    _ | conDefaults@(_ : _) <- [ s | s <- moduleDefaultSites mod', s.kind == DefaultOnConstructorField ] ->
+          Left [ LowerError ""
+                   ( describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
+                     <> ", and OpenFisca writes an enum as its members alone, so a constructor's "
+                     <> "field, and the default on it, has no OpenFisca form" )
+               | s <- conDefaults ]
     efs ->
       let (enumDefs, enumCons) = collectEnums mod'
           records      = collectRecords enumDefs mod'
@@ -77,7 +97,7 @@ lowerModule mod' =
           (errs, ok) = partitionEithers results
       in if not (null errs)
            then Left errs
-           else case checkCollisions (concatMap snd ok) of
+           else case checkCollisions enumDefs (concatMap snd ok) of
              Left e     -> Left [e]
              Right vars ->
                Right OFPackage
@@ -134,36 +154,86 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
   (undatedF, datedF) <- mapLeft (LowerError fnName) (lowerBody env body)
 
   -- Stored scalar (non-list) fields of an entity-record become input variables.
-  let inputsFor e ri =
-        [ OFVariable
-            { varName    = fi.fiName
-            , varL4      = fi.fiL4
-            , varType    = fi.fiType
-            , varEntity  = e.entPy
-            , varEntKey  = e.entKey
+  -- A field's @TYPICALLY@ is mapped onto the variable's own default, or refused
+  -- by 'lowerDefault': OpenFisca gives every variable one, so a default left
+  -- unmapped would be replaced by the type's (@0.0@, @False@, the first member).
+  let mkInput ent' fi0 = do
+        let ty0 = fi0.fiType
+        (ty, dflt, formula) <- case fi0.fiDefault of
+          Nothing -> Right (ty0, Nothing, Nothing)
+          Just e  -> mapLeft (LowerError fnName . (("the field `" <> fi0.fiL4 <> "`: ") <>))
+                             (lowerDefault env Nothing ty0 e)
+        pure OFVariable
+            { varName    = fi0.fiName
+            , varL4      = fi0.fiL4
+            , varType    = ty
+            , varEntity  = ent'.entPy
+            , varEntKey  = ent'.entKey
             , varPeriod  = ofPeriod
-            , varLabel   = fi.fiName
-            , varFormula = Nothing
+            , varLabel   = fi0.fiName
+            , varFormula = formula
             , varDated   = []
+            , varDefault = dflt
             }
-        | fi <- ri.riFields, fi.fiStored, isNothing fi.fiListElem
-        ]
-      subjectInputs = maybe [] (inputsFor ent) mSubjRi
-      memberInputs  = concat (zipWith inputsFor memberEntities memberRecords)
-      scalarInputs =
-        [ OFVariable
-            { varName    = pyIdent (givenText g)
-            , varL4      = givenText g
-            , varType    = maybe OFFloat (ofTypeOf enums) (givenType g)
-            , varEntity  = ent.entPy
-            , varEntKey  = ent.entKey
-            , varPeriod  = ofPeriod
-            , varLabel   = givenText g
-            , varFormula = Nothing
-            , varDated   = []
-            }
-        | g <- others
-        ]
+      inputsFor e ri = do
+        -- A @LIST OF R@ field is a role, not an input variable, so 'mkInput' never
+        -- sees it and cannot refuse its default: this is where that is decided.
+        -- A role has no default list. @EMPTY@ says what a role nobody fills
+        -- already is, so it is accepted; anything else would be lost, so it is
+        -- refused.
+        forM_ [ (fi, d) | fi <- ri.riFields, isJust fi.fiListElem
+                        , Just d <- [fi.fiDefault], not (isEmptyList d) ] \(fi, d) ->
+          Left (LowerError fnName
+            ("the field `" <> fi.fiL4 <> "` is a LIST OF records and carries TYPICALLY "
+             <> describeDefault (classifyDefault d) <> ", and OpenFisca turns it into a role, "
+             <> "which has no default list (only EMPTY, which is what a role nobody fills already "
+             <> "is, can be written there)"))
+        traverse (mkInput e) [ fi | fi <- ri.riFields, fi.fiStored, isNothing fi.fiListElem ]
+  subjectInputs <- maybe (Right []) (inputsFor ent) mSubjRi
+  memberInputs  <- concat <$> sequence (zipWith inputsFor memberEntities memberRecords)
+  -- The subject and the period are not inputs, so a default written on either
+  -- has nothing to attach to. Refuse it rather than lose it.
+  forM_ givens \g -> when (isJust (givenDefault g) &&
+                           (Just (getUnique (givenName g)) `elem` [subjU, periodU])) $
+    Left (LowerError fnName
+      ("the GIVEN `" <> givenText g <> "` carries a TYPICALLY, but it is the "
+       <> (if Just (getUnique (givenName g)) == subjU then "subject entity" else "period")
+       <> ", which OpenFisca supplies from the simulation and not from an input variable"))
+  scalarInputs <- forM others \g -> do
+    let ty0 = maybe OFFloat (ofTypeOf enums) (givenType g)
+        unknownTy = givenType g >>= unrecognisedType enums
+        isList = maybe False isListType (givenType g)
+    (ty, dflt, formula) <- case givenDefault g of
+      Nothing -> Right (ty0, Nothing, Nothing)
+      -- A LIST OF GIVEN is the twin of a LIST OF field above: OpenFisca has no
+      -- list-valued variable, so a default list has nowhere to go. @EMPTY@ says
+      -- nothing a variable without a default does not already say, so it is
+      -- accepted and changes nothing in the output; any other default would be
+      -- lost, so it is refused, naming the GIVEN. (Without this arm @EMPTY@ was
+      -- lowered as an expression and refused as an unbound reference.)
+      Just e
+        | isList, isEmptyList e -> Right (ty0, Nothing, Nothing)
+        | isList ->
+            Left (LowerError fnName
+              ("the GIVEN `" <> givenText g <> "` is a LIST and carries TYPICALLY "
+               <> describeDefault (classifyDefault e) <> ", and OpenFisca has no list-valued "
+               <> "variable to put a default on (only EMPTY, which says nothing, is accepted)"))
+        | otherwise ->
+            mapLeft (LowerError fnName . (("the GIVEN `" <> givenText g <> "`: ") <>))
+                    (lowerDefault env unknownTy ty0 e)
+    pure OFVariable
+      { varName    = pyIdent (givenText g)
+      , varL4      = givenText g
+      , varType    = ty
+      , varEntity  = ent.entPy
+      , varEntKey  = ent.entKey
+      , varPeriod  = ofPeriod
+      , varLabel   = givenText g
+      , varFormula = formula
+      , varDated   = []
+      , varDefault = dflt
+      }
+  let
       computed =
         OFVariable
           { varName    = fnName
@@ -177,6 +247,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
                            else ef.exportDescription
           , varFormula = Just undatedF
           , varDated   = datedF
+          , varDefault = Nothing
           }
   pure (ent : memberEntities, subjectInputs <> memberInputs <> scalarInputs <> [computed])
 
@@ -423,8 +494,12 @@ collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
               , riPlural = Text.toLower (pyIdent nm) <> "s"
               , riPy     = pyType nm
               , riFields =
-                  [ fieldInfo enums fRes fTy mMeans
-                  | MkTypedName _ fRes fTy mMeans _ <- fields
+                  -- 4th slot of 'MkTypedName' is the TYPICALLY default, the 5th a
+                  -- computed field's MEANS body. Reading the 4th as the MEANS body
+                  -- made every defaulted field look computed, so it never became an
+                  -- input variable while the formulas that read it still named it.
+                  [ fieldInfo enums fRes fTy mDefault mMeans
+                  | MkTypedName _ fRes fTy mDefault mMeans <- fields
                   ]
               })]
     Section _ sub -> goSection sub
@@ -612,11 +687,15 @@ isoYM y m = tshow y <> "-" <> pad m <> "-01"
  where
   pad n = (if n < 10 then "0" else "") <> tshow n
 
-fieldInfo :: Map Text OFEnumDef -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
-fieldInfo enums fRes fTy mMeans =
+fieldInfo
+  :: Map Text OFEnumDef -> Resolved -> Type' Resolved
+  -> Maybe (Expr Resolved)  -- ^ the TYPICALLY default
+  -> Maybe (Expr Resolved)  -- ^ the MEANS body of a computed field
+  -> FieldInfo
+fieldInfo enums fRes fTy mDefault mMeans =
   case listElemRecord fTy of
-    Just elemName -> FieldInfo nm l4 OFFloat             stored (Just elemName)
-    Nothing       -> FieldInfo nm l4 (ofTypeOf enums fTy) stored Nothing
+    Just elemName -> FieldInfo nm l4 OFFloat             stored (Just elemName) mDefault
+    Nothing       -> FieldInfo nm l4 (ofTypeOf enums fTy) stored Nothing mDefault
  where
   l4     = resolvedToText fRes
   nm     = pyIdent l4
@@ -704,6 +783,9 @@ givenType (MkOptionallyTypedName _ _ ty _) = ty
 givenText :: OptionallyTypedName Resolved -> Text
 givenText = resolvedToText . givenName
 
+givenDefault :: OptionallyTypedName Resolved -> Maybe (Expr Resolved)
+givenDefault (MkOptionallyTypedName _ _ _ d) = d
+
 isPeriodGiven :: OptionallyTypedName Resolved -> Bool
 -- Detect the conventional period parameter by its raw L4 name (not the
 -- keyword-safe pyIdent, which would rename @period@ → @period_@).
@@ -721,6 +803,85 @@ typeRecordName (TyApp _ name _) = Just (resolvedToText name)
 typeRecordName _                = Nothing
 
 -- ---------------------------------------------------------------------------
+-- TYPICALLY
+-- ---------------------------------------------------------------------------
+
+-- | Map a @TYPICALLY@ default onto the OpenFisca variable it is written on.
+--
+-- __OpenFisca always has a default__, so this either maps or refuses; there is
+-- no "say so and carry on" for a backend whose target will write its own
+-- presumption (@0.0@, @False@, the first enum member) into the module the
+-- moment the source's is left out (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5, and
+-- T5b: "OpenFisca maps every default ... it refuses only what it cannot map").
+--
+-- The result is the variable's (possibly adjusted) type, a literal
+-- @default_value@, and a formula; exactly one of the last two is 'Just' unless
+-- the default is the enum's first member, which needs neither.
+--
+-- * A literal of the variable's own type becomes @default_value@. An enum
+--   constructor becomes the enum's default member, replacing the first declared
+--   one that 'ofTypeOf' would otherwise have written.
+-- * An expression becomes a @formula@ on the input variable. OpenFisca computes
+--   a variable's formula only for a period the simulation left without an input
+--   value, so a supplied input overrides it, which is what a default means.
+--   The checker does not accept an expression default today (R8 rule 3 is
+--   unbuilt), so this arm is reached only once it does; it reuses the decision
+--   bodies' lowering, so anything that lowering refuses is refused here too.
+-- * Anything else — @NOTHING@, a literal whose type is not the variable's —
+--   is refused with the reason, because there is no OpenFisca value for it.
+lowerDefault
+  :: LowerEnv
+  -> Maybe Text  -- ^ the variable's L4 type, when the export does not recognise it
+  -> OFType -> Expr Resolved -> Either Text (OFType, Maybe OFDefault, Maybe OFExpr)
+lowerDefault env unknownTy ty e = case (classified, ty) of
+  (DefNumber r, OFFloat) -> Right (ty, Just (OFDefNum r), Nothing)
+  (DefNumber r, OFInt)
+    | denominator r == 1 -> Right (ty, Just (OFDefNum r), Nothing)
+    | otherwise ->
+        Left ("TYPICALLY " <> described <> " is not a whole number, and this variable is an integer")
+  (DefBool b, OFBool) -> Right (ty, Just (OFDefBool b), Nothing)
+  (DefString t, OFStr) -> Right (ty, Just (OFDefStr t), Nothing)
+  (DefConstructor c, OFEnum cls _) -> case Map.lookup (getUnique c) env.envEnumCons of
+    Just (cls', member) | cls' == cls -> Right (OFEnum cls member, Nothing, Nothing)
+    _ -> Left ("TYPICALLY " <> described <> " is not a member of the enum `" <> cls <> "`")
+  (DefComputed ex, _) -> (\f -> (ty, Nothing, Just f)) <$> lowerExpr env ex
+  (d, _) -> Left ("TYPICALLY " <> describeDefault d <> " has no OpenFisca value: "
+                  <> reason d)
+ where
+  -- 'classifyDefault' calls every nullary application a constructor, because the
+  -- AST does not tell @NOTHING@ or an enum member from a reference to another
+  -- input, which has exactly that shape and which R8 rule 3 (W7) admits as a
+  -- default. The checker tells them apart through its entity map; here the
+  -- constructors this module knows are the enum members and @NOTHING@, and a
+  -- nullary application of anything else is the expression it is, which becomes
+  -- a formula like any other expression default.
+  classified = case classifyDefault e of
+    DefConstructor c
+      | getUnique c /= nothingUnique
+      , not (Map.member (getUnique c) env.envEnumCons) -> DefComputed e
+    d -> d
+  described = describeDefault classified
+  reason d = case d of
+    DefConstructor _ -> "OpenFisca has no way to say a variable has no value; every variable has one"
+    _ | Just t <- unknownTy ->
+          "the export does not recognise the type `" <> t <> "` (it knows numbers, whole numbers, "
+            <> "booleans, strings and this module's enums, and not a synonym for one), so it holds "
+            <> "this variable as a " <> typeName <> ", and " <> describeDefault d <> " is not one"
+      | otherwise -> "it is not a " <> typeName <> ", which is what this variable holds"
+  typeName = case ty of
+    OFFloat  -> "number"
+    OFInt    -> "whole number"
+    OFBool   -> "boolean"
+    OFStr    -> "string"
+    OFEnum{} -> "member of an enum"
+
+-- | @EMPTY@, the one nullary list constructor.
+isEmptyList :: Expr Resolved -> Bool
+isEmptyList = \case
+  App _ r [] -> getUnique r == emptyUnique
+  _          -> False
+
+-- ---------------------------------------------------------------------------
 -- Types
 -- ---------------------------------------------------------------------------
 
@@ -733,13 +894,35 @@ ofTypeOf enums = \case
     let nm = resolvedToText name
     in case Map.lookup nm enums of
          Just ed | ((m, _) : _) <- ed.enMembers -> OFEnum ed.enName m
-         _ -> case Text.toLower nm of
-           t | t `elem` ["number", "float", "double", "money", "decimal"] -> OFFloat
-             | t `elem` ["int", "integer"]                                -> OFInt
-             | t `elem` ["boolean", "bool"]                               -> OFBool
-             | t `elem` ["string", "text"]                                -> OFStr
-           _ -> OFFloat
+         _ -> fromMaybe OFFloat (scalarTypeNamed nm)
   _ -> OFFloat
+
+-- | The scalar types the export knows by name.
+scalarTypeNamed :: Text -> Maybe OFType
+scalarTypeNamed nm = case Text.toLower nm of
+  t | t `elem` ["number", "float", "double", "money", "decimal"] -> Just OFFloat
+    | t `elem` ["int", "integer"]                                -> Just OFInt
+    | t `elem` ["boolean", "bool"]                               -> Just OFBool
+    | t `elem` ["string", "text"]                                -> Just OFStr
+  _ -> Nothing
+
+-- | The name of a type 'ofTypeOf' did not recognise and held as a number: a
+-- type synonym (@DECLARE Label IS A STRING@), a record where a scalar is
+-- expected, a list. A variable of such a type is a number to OpenFisca, so a
+-- default of another kind is refused, and the refusal says why.
+unrecognisedType :: Map Text OFEnumDef -> Type' Resolved -> Maybe Text
+unrecognisedType enums = \case
+  TyApp _ name _
+    | Map.member nm enums        -> Nothing
+    | isJust (scalarTypeNamed nm) -> Nothing
+    | otherwise                   -> Just nm
+   where nm = resolvedToText name
+  _ -> Nothing
+
+-- | @LIST OF x@, for any @x@.
+isListType :: Type' Resolved -> Bool
+isListType (TyApp _ lname [_]) = Text.toLower (resolvedToText lname) `elem` ["list", "listof"]
+isListType _                   = False
 
 -- ---------------------------------------------------------------------------
 -- Name helpers
@@ -814,16 +997,76 @@ dedupOn key = go Set.empty
 -- sanitise to the same Python identifier would silently conflate (or, worse,
 -- drop a formula). Reject that. Exact duplicates — the same field read by
 -- several decisions — are collapsed to one.
-checkCollisions :: [OFVariable] -> Either LowerError [OFVariable]
-checkCollisions vs =
-  case [ (nm, grp) | (nm, grp) <- Map.toList byName, length (nub grp) > 1 ] of
-    ((nm, grp) : _) ->
+checkCollisions :: Map Text OFEnumDef -> [OFVariable] -> Either LowerError [OFVariable]
+checkCollisions enums vs =
+  case [ (nm, grp) | (nm, grp) <- Map.toList byName, length (nub (map effective grp)) > 1 ] of
+    ((nm, grp0) : _)
+      -- The same input read by several exported decisions is one variable; if
+      -- they disagree only about its default, there is no single default to
+      -- write, and picking one would silently make the others wrong. "Disagree"
+      -- means the variable would DIFFER in OpenFisca: a decision that writes no
+      -- TYPICALLY gets OpenFisca's own default for the type, so @TYPICALLY 0@
+      -- against none is not a disagreement and @TYPICALLY 3@ against none is.
+      | (g0 : gs) <- nubBy (\a b -> effective a == effective b) (reverse grp0)
+      , all (sameApartFromDefault g0) gs ->
+          Left $ LowerError ""
+            ( "`" <> nm <> "` is an input of more than one exported decision, and they give it "
+            <> "different TYPICALLY defaults (" <> Text.intercalate " and " (map defaultText (g0 : gs))
+            <> (if any ((== "none") . defaultText) (g0 : gs)
+                  then ", where none means that decision writes no TYPICALLY, and OpenFisca then "
+                       <> "gives the input its own default for its type: 0.0, False, '' or the first "
+                       <> "member of the enum"
+                  else "")
+            <> "). OpenFisca has one variable of that name, and so one default for it: "
+            <> "make the decisions agree, or rename one." )
+      | otherwise ->
       Left $ LowerError ""
         ( "name collision: distinct L4 definitions ("
-        <> Text.intercalate ", " [ "`" <> v.varL4 <> "`" | v <- nub grp ]
+        <> Text.intercalate ", " [ "`" <> v.varL4 <> "`" | v <- nub grp0 ]
         <> ") both compile to the OpenFisca variable `" <> nm
         <> "`. A decision, field, or parameter that shares a (sanitised) name "
         <> "with another is unsafe in OpenFisca — rename one." )
-    [] -> Right (dedupOn (.varName) vs)
+    [] -> Right (dedupOn (.varName) (map prefer vs))
  where
   byName = Map.fromListWith (<>) [ (v.varName, [v]) | v <- vs ]
+
+  -- Variables that agree once each is given the default OpenFisca would give it
+  -- are one variable. Of such a group the artifact carries the one that WROTE a
+  -- default, so the generated class says what the source said.
+  best = Map.mapMaybe (\grp -> find (isJust . (.varDefault)) (reverse grp) <|> listToMaybe (reverse grp)) byName
+  prefer v = fromMaybe v (Map.lookup v.varName best)
+
+  -- The default a variable has in OpenFisca: what was written, else its own.
+  -- (An enum's is carried in its type, which already holds the member.)
+  effective v = v { varDefault = effectiveDefault v }
+  effectiveDefault v = case v.varDefault of
+    Just d -> Just d
+    Nothing
+      | isJust v.varFormula -> Nothing
+      | otherwise -> case v.varType of
+          OFFloat  -> Just (OFDefNum 0)
+          OFInt    -> Just (OFDefNum 0)
+          OFBool   -> Just (OFDefBool False)
+          OFStr    -> Just (OFDefStr "")
+          OFEnum{} -> Nothing
+
+  -- Two variables that are the same input apart from the default each carries.
+  sameApartFromDefault a b = bare a == bare b
+  bare v = v { varDefault = Nothing, varType = bareType v.varType }
+  bareType = \case OFEnum cls _ -> OFEnum cls ""; t -> t
+
+  defaultText v = case (v.varDefault, v.varFormula, v.varType) of
+    (Just (OFDefNum r), _, _)  -> describeDefault (DefNumber r)
+    (Just (OFDefBool b), _, _) -> if b then "TRUE" else "FALSE"
+    (Just (OFDefStr t), _, _)  -> "\"" <> t <> "\""
+    (_, Just _, _)             -> "a computed default"
+    -- An enum's default is its member, written or not: the first declared
+    -- member is also what a decision that writes nothing gets, so it is said so.
+    (_, _, OFEnum cls m)
+      | isFirstMember cls m    -> cls <> "." <> m <> " (the first member, which is also what no TYPICALLY gives)"
+      | otherwise              -> cls <> "." <> m
+    _                          -> "none"
+
+  isFirstMember cls m = case Map.lookup cls enums of
+    Just ed | ((m0, _) : _) <- ed.enMembers -> m0 == m
+    _                                       -> False

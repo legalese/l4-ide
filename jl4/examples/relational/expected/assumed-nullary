@@ -24,5 +24,5 @@ stratification:
 
 fidelity report — relational
   [R-TYPICALLY] lossy — days allowed  (assumed-nullary.l4:29:11-50)
-      a TYPICALLY default on an ASSUME is dropped: the name becomes an input predicate, and seeding it would answer the question the target's interview exists to ask
+      the section GIVEN `days allowed` carries TYPICALLY 28, which is dropped: the name becomes an input predicate, and seeding it would answer the question the target's interview exists to ask
       lost: the default value

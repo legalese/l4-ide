@@ -1311,11 +1311,15 @@ scalarArts ctx var l4 dsc kind dflt = do
                             \is refused"))
       _ -> do
         fctl <- controlOf fkind f.fsL4
+        -- A constructor field's TYPICALLY prefills its follow-up question, as a
+        -- record field's and a GIVEN's do; a default that is not a literal is
+        -- refused by 'lowerDefaultLit', exactly as there.
+        payloadDflt <- traverse (lowerDefaultLit ctx) f.fsDefault
         pure MkDAQuestion
           { qId = "q_" <> payloadVar var f.fsSan, qVar = payloadVar var f.fsSan
           , qLabel = f.fsL4, qText = f.fsL4
           , qHelp = f.fsDesc <|> typeDescOf ctx f.fsTy
-          , qControl = fctl, qDefault = Nothing
+          , qControl = fctl, qDefault = payloadDflt
           , qShowIf = Just (DACmp DAEq (DAVar var) (DAStrLit ci.ciName))
           , qUndefine = [] }
 

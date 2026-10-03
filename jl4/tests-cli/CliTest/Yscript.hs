@@ -57,6 +57,34 @@ spec bin = do
       code `shouldNotBe` ExitSuccess
       shouldContain' "stderr" serr "not BOOLEAN"
 
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC T5b: "yscript refuses a module whose exported
+    -- rule reads an input with a TYPICALLY default, as R5 requires; it gets no
+    -- channel." A consultation asks the user for every fact, so the default would
+    -- be dropped and the user asked a question the source had already answered.
+    it "refuses an ASSUME that carries a TYPICALLY and is read by the exported rule (R5)" $ do
+      Output code sout serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-typically-assume.l4"]
+      code `shouldNotBe` ExitSuccess
+      shouldContain' "stderr" serr "`has capacity`: carries TYPICALLY TRUE"
+      shouldContain' "stderr" serr "yscript has no default"
+      -- all-or-nothing: no rules are written
+      sout `shouldBe` ""
+
+    it "refuses a section GIVEN that carries a TYPICALLY the same way" $ do
+      Output code sout serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-typically-section.l4"]
+      code `shouldNotBe` ExitSuccess
+      shouldContain' "stderr" serr "`has capacity`: carries TYPICALLY TRUE"
+      sout `shouldBe` ""
+
+    it "compiles the same module once the TYPICALLY is gone (the control)" $ do
+      Output code sout _ <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-typically-control.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("RULE" `isInfixOf`)
+
+    it "does not refuse a TYPICALLY on a fact the exported rule never reads" $ do
+      Output code sout _ <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-typically-unread.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("RULE" `isInfixOf`)
+
     it "batches every offender into one refusal (R5), not first-error-wins" $ do
       Output code _ serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-multiple-offenders.l4"]
       code `shouldNotBe` ExitSuccess

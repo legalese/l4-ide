@@ -28,6 +28,7 @@ import Optics ((^.))
 import L4.Annotation (getAnno, rangeOf)
 import L4.Desugar (carameliseNode)
 import L4.Export (collectExportedDecides)
+import L4.Interchange.Typically (classifyDefault, describeDefault)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
 import L4.Print (docText, prefixKeywordBuiltin, prettyTypeForDisplay)
 import L4.Syntax
@@ -199,9 +200,22 @@ visitUnique decides assumes u nm = do
           markDone u
 
 checkAssumeShape :: Assume Resolved -> Either Text ()
-checkAssumeShape (MkAssume _ (MkTypeSig _ (MkGivenSig _ params) _) _ mty _)
+checkAssumeShape (MkAssume _ (MkTypeSig _ (MkGivenSig _ params) _) _ mty mDefault)
   | not (null params) =
       Left "has parameters; yscript has no functional/predicate layer to receive them (R1)"
+  -- A TYPICALLY says "if nothing supplies this, it is d". A yscript fact is
+  -- asked of the user in every consultation, so the default would be dropped and
+  -- the consultation would ask a question the source had already answered. That
+  -- is a silent change of meaning, which R5's all-or-nothing rule exists to
+  -- stop, so it is refused (TYPICALLY-ONE-BEHAVIOUR-SPEC T5b: "yscript refuses a
+  -- module whose exported rule reads an input with a TYPICALLY default, as R5
+  -- requires; it gets no channel"). A section GIVEN reaches here too, because the
+  -- checker elaborates it into an ASSUME.
+  | Just d <- mDefault =
+      Left ("carries TYPICALLY " <> describeDefault (classifyDefault d)
+             <> ", and yscript has no default: a consultation asks the user for every fact, "
+             <> "so the default would be dropped and the user asked a question the source has "
+             <> "already answered (R5). Remove the TYPICALLY to export this rule, and let the consultation ask")
   | Just ty <- mty, isBooleanTy ty = Right ()
   | Just ty <- mty =
       Left ("is typed " <> prettyTypeForDisplay ty

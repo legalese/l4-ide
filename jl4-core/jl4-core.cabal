@@ -211,6 +211,7 @@ library
     L4.Viz.VizExpr
     L4.Import.Resolution
     L4.Interchange.Fidelity
+    L4.Interchange.Typically
     L4.Instances.Serialise
     L4.API
     L4.API.VirtualFS
@@ -276,6 +277,7 @@ test-suite jl4-core-test
     BlawxLiftSpec
     BlawxParseSpec
     ApiStateGraphLensSpec
+    TypicallyExportSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

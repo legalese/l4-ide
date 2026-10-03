@@ -124,6 +124,10 @@ import L4.Syntax
 import qualified L4.TypeCheck as TC
 import L4.Viz.GuardedRows (GuardedRows (..), hasEffectfulNode, normaliseGuarded)
 import L4.Interchange.Fidelity
+import L4.Export (transitiveReferencedUniques)
+import L4.Interchange.Typically
+  ( DefaultKind (..), DefaultSite (..), classifyDefault, describeDefault, describeSite
+  , importedDefaultSites, moduleDefaultSites )
 
 import qualified L4.Dmn.Analysis as A
 import L4.Dmn.IR
@@ -503,6 +507,12 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- filter then FAILS SAFE (drops nothing, reports what it would have
     -- dropped). The CLI supplies a sibling-directory scan; the golden harness
     -- supplies its VFS's contents.
+  , dloImports :: ![Module Resolved]
+    -- ^ the modules this one imports, each once, for 'typicallyNotes' alone. A
+    -- @TYPICALLY@ written in an imported file and read by an emitted decision is
+    -- as lost to the model as a local one, and the root module cannot see it.
+    -- Nothing else in the lowering reads this: a name from an imported module is
+    -- still emitted as the model emits it today.
   }
 
 defaultDmnLowerOptions :: DmnLowerOptions
@@ -515,6 +525,7 @@ defaultDmnLowerOptions = MkDmnLowerOptions
   , dloMissingMatchRanges = []
   , dloClauseMatrixRanges = []
   , dloExternalRefNames   = Nothing
+  , dloImports            = []
   }
 
 -- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
@@ -3597,6 +3608,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , drgNotes     = sharedInputNotes <> renameNotes <> feelNameCollisionNotes
                        <> itemDefNotes <> componentMaybeNotes <> inputMaybeNotes
                        <> ruleDateNotes <> computedFieldNotes <> hydratorVerbatimNotes
+                       <> typicallyNotes
                        <> concatMap snd lowered
                        <> phase4Notes
                        <> serviceNotes
@@ -4297,6 +4309,151 @@ lowerModule opts modul@(MkModule _ uri _) =
              , getUnique n == getUnique cf.cfSel] of
       (ty : _) -> let (t, _, _) = classifyType typeEnv ty in t
       []       -> DmnAny
+
+  -- D-TYPICALLY: LOSSY, one per @TYPICALLY@ the model reaches. DMN carries
+  -- none of them.
+  --
+  -- __Why a note and not a mapping.__ DMN has no default on an @inputData@, a
+  -- BKM @formalParameter@ or a record's @itemComponent@: an evaluation context
+  -- that leaves the name out reads @null@ (on KIE, for a top-level @inputData@,
+  -- a model error instead; see 'omission' for what was measured where). A
+  -- default could be spelled as a
+  -- @if x = null then d else x@ at every read (and that would not even help on
+  -- KIE for a top-level input, where a missing required input is a model error
+  -- and the decision is skipped before any expression runs:
+  -- jl4/tests-cli/fixtures/dmn-null-probe/null-absent.dmn measured both
+  -- engines, 2026-07-31), but that rewrites every decision
+  -- that reads the name and makes the model say something the source never did,
+  -- so the mapping is not one T5 admits ("only where the target's mechanism means
+  -- what T1-T4 rule TYPICALLY means", TYPICALLY-ONE-BEHAVIOUR-SPEC). What is
+  -- lost is the presumption itself: the source says an omitted input is @d@,
+  -- the model says it is nothing.
+  --
+  -- /Reached/ means the model has the element: the rule is one of the emitted
+  -- decisions (a rule the population filter dropped has no element), the
+  -- section @GIVEN@ or @ASSUME@ is one of the inputData terms, and a record
+  -- field is on an itemDefinition (every @DECLARE@d record gets one, read or
+  -- not). A default of any shape reaches the same note: the value is printed,
+  -- not interpreted, so an expression default (R8 rule 3, unbuilt) is reported
+  -- the same way instead of being missed.
+  typicallyNotes :: [FidelityNote]
+  typicallyNotes = map note
+    ( [ s | s <- moduleDefaultSites modul, reached s ]
+      -- A default written in an imported module is reported when an emitted
+      -- decision reads the name, which is the only way the model can have lost
+      -- it: the imported file's own elements are not in this model. "Reads" is
+      -- the bodies' own references, taken through this module's helpers
+      -- ('transitiveReferencedUniques'); a reference into an imported rule stops
+      -- there, because that rule's body is not emitted.
+      <> [ s | s <- importedDefaultSites opts.dloImports, Set.member s.unique readByEmitted ]
+    )
+   where
+    note s
+      -- An ASSUME written in an imported module that a decision reads has no
+      -- inputData: free terms are collected only from the module being lowered
+      -- (decideFreeTerms), so the FEEL expression names a variable nothing in
+      -- the model declares. The note must not say "DMN has no default for an
+      -- inputData" about an inputData that is not there. Measured 2026-10-03
+      -- (Camunda 8.7.6, KIE 8.44.0.Final) on typically-import/dmn-main.l4:
+      -- KIE refuses to load the model (ERR_COMPILING_FEEL, Unknown variable),
+      -- with the name supplied or not; Camunda answers when the context supplies
+      -- the name and null when it does not.
+      -- The payload of a sum type is not in the model, so neither is the field the
+      -- default sits on; D-SUMTYPE (blocking) says the payload goes, and this note
+      -- says that the default goes with it.
+      | s.kind == DefaultOnConstructorField
+      , maybe False (`Set.member` payloadUnionUniques) s.ownerUnique =
+          dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+            ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and the model keeps no payload "
+                <> "for a sum type at all (see D-SUMTYPE), so the field and its default are both gone: "
+                <> "a model that reads the type sees the constructor's name and nothing it holds" )
+            ( "the presumption, with the payload field it belonged to: the source says an omitted "
+                <> tick s.name <> " is " <> dflt s <> ", and the model has no such field" )
+      | undeclared s =
+          dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+            ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and the model has no input for it "
+                <> "at all: a decision reads " <> tick s.name <> ", but nothing in the model declares it "
+                <> "(an imported ASSUME is not turned into an inputData), so KIE cannot load the model "
+                <> "and Camunda 8 reads `null` for it unless the evaluation context supplies it. "
+                <> "Neither applies " <> dflt s )
+            ( "the presumption: the source says an omitted input is " <> dflt s
+                <> ", and the model does not even declare the input" )
+      | otherwise =
+          dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+            ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and DMN has no default for "
+                <> carrier s <> ": " <> omission s )
+            ( "the presumption: the source says an omitted " <> noun s.kind
+                <> " is " <> dflt s <> ", and the model says it is nothing" )
+
+    undeclared s = s.kind == DefaultOnAssume && isJust s.origin
+
+    dflt s = describeDefault (classifyDefault s.value)
+
+    -- What an engine does with a name the evaluation leaves out, said only where
+    -- it was measured (2026-10-03, Camunda 8.7.6 and KIE 8.44.0.Final):
+    --
+    -- * a top-level inputData: Camunda reads null, KIE reports a model error and
+    --   skips the decision (jl4/tests-cli/fixtures/dmn-null-probe/null-absent.dmn);
+    -- * a record's itemComponent: BOTH read null and neither reports anything.
+    --   KIE does not treat a missing component like a missing input, so a
+    --   reader who trusts KIE to catch the omission gets null downstream
+    --   (jl4/examples/dmn/defaults-omit-component.cases.json, pinned by the
+    --   opt-in engine legs in jl4/tests-cli/CliTest/DmnBpmn.hs);
+    -- * a BKM parameter: not measured, so nothing is claimed about an engine.
+    --   The note says only what is true of the model: it does not say that an
+    --   omitted parameter is @d@.
+    omission s = case s.kind of
+      k | k == DefaultOnRecordField || k == DefaultOnConstructorField ->
+        -- "builds a `Config` without", and not "leaves it out of the record": the
+        -- model carries an itemDefinition for a record no decision reads, and no
+        -- evaluation of THIS model leaves a component out of it, but a consumer
+        -- that builds the record from the itemDefinition can.
+        "an evaluation that builds " <> maybe "the record" (\o -> "a " <> tick o) s.owner
+          <> " without " <> tick s.name <> " gets `null` for it on "
+          <> "Camunda 8 and on KIE alike, and neither reports an error, not " <> dflt s
+      _ | isBkmParam s ->
+            "the model does not say that an omitted " <> tick s.name <> " is " <> dflt s
+        | otherwise ->
+            "an evaluation that leaves " <> tick s.name <> " out gets no value for it "
+              <> "(`null` on Camunda 8, a model error on KIE), not " <> dflt s
+
+    isBkmParam s = s.kind == DefaultOnRuleGiven && Set.member s.unique bkmParamSet
+
+    readByEmitted = Set.unions
+      [ transitiveReferencedUniques modul body | MkDecide _ _ _ body <- decides ]
+    emittedDecides = Set.fromList (map (getUnique . decideResolved) decides)
+    inputUniques   = Set.fromList (map fst freeTerms)
+    recordUniques  = Set.fromList (map (.itdUnique) itemDecls)
+
+    reached s = case s.kind of
+      DefaultOnRuleGiven    -> maybe False (`Set.member` emittedDecides) s.ownerUnique
+      DefaultOnSectionGiven -> Set.member s.unique inputUniques
+      DefaultOnAssume       -> Set.member s.unique inputUniques
+      DefaultOnRecordField  -> maybe False (`Set.member` recordUniques) s.ownerUnique
+      -- the sum type has an itemDefinition like any DECLARE (its payload, if it is a
+      -- union, does not: see 'payloadUnionUniques')
+      DefaultOnConstructorField -> maybe False (`Set.member` recordUniques) s.ownerUnique
+
+    dmnElementOf s = case s.kind of
+      DefaultOnRecordField      -> maybe s.name (\o -> o <> "." <> s.name) s.owner
+      DefaultOnConstructorField -> maybe s.name (\o -> o <> "." <> s.name) s.owner
+      _                         -> maybe s.name id (Map.lookup s.unique inputByUnique)
+
+    carrier s = case s.kind of
+      DefaultOnRecordField      -> "an itemComponent"
+      DefaultOnConstructorField -> "an itemComponent"
+      DefaultOnRuleGiven | isBkmParam s -> "a BKM parameter"
+      _                    -> "an inputData"
+
+    noun = \case
+      DefaultOnRecordField      -> "component"
+      DefaultOnConstructorField -> "component"
+      _                         -> "input"
+
+    -- A sum type with more than one constructor, one of which carries a payload,
+    -- gets an itemDefinition of its constructor NAMES only (D-SUMTYPE, blocking):
+    -- the payload fields are not in the model at all.
+    payloadUnionUniques = Set.fromList [ d.itdUnique | d <- itemDecls, d.itdPayload ]
 
   -- D-COMPUTEDFIELD: ADVISORY, one per hydrated TYPE, raised on the hydrated
   -- itemDefinition.

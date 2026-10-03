@@ -61,6 +61,7 @@
 --    there is no honest shape to draw instead. See 'multiHenceFindings'.
 module L4.Bpmn.Lower
   ( stateGraphToBpmn
+  , bpmnDefaultNotes
   ) where
 
 import Base
@@ -72,8 +73,13 @@ import qualified Data.Set as Set
 
 import L4.Bpmn.IR
 import L4.Interchange.Fidelity
+import L4.Interchange.Typically
+  ( DefaultKind (..), DefaultSite (..), classifyDefault, decideDefaultSites, describeDefault
+  , describeSite )
 import L4.StateGraph
-import L4.Syntax (DeonticModal (..))
+import L4.Syntax
+  ( AppForm (..), Decide (..), DeonticModal (..), Module (..), Resolved, Section (..)
+  , TopDecl (..), getUnique )
 
 --------------------------------------------------------------------------------
 -- Entry point
@@ -3593,3 +3599,63 @@ ncName raw =
   keep c
     | isAscii c && (isAlphaNum c || c == '-' || c == '_' || c == '.') = c
     | otherwise = '_'
+
+--------------------------------------------------------------------------------
+-- TYPICALLY
+--------------------------------------------------------------------------------
+
+-- | The @P-TYPICALLY@ notes a process owes for the @TYPICALLY@ defaults its rule
+-- depends on: the rule's own @GIVEN@s, and the section @GIVEN@s, @ASSUME@s and
+-- record fields it reads or handles, through any rule it reaches. What counts,
+-- and why a reached rule's own @GIVEN@ does not, is 'decideDefaultSites'.
+--
+-- BPMN has no default for a process variable, and this exporter does not even
+-- carry the variable: a @PROVIDED@ condition becomes an opaque
+-- @conditionExpression@ (@F4@), which reads whatever the process instance holds.
+-- So the source's presumption ("if nothing says otherwise, this is TRUE") has no
+-- form in the artifact, and a process instance that never set the variable does
+-- not get it. That is a loss, and a note is how a reader finds out
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5: "map or say").
+--
+-- Separate from 'stateGraphToBpmn' because the graph has forgotten the module:
+-- it knows which @DECIDE@ it came from ('sgDecide') and nothing about the
+-- binders that decide reads. A hand-built graph (no @sgDecide@) owes none.
+--
+-- The first argument is the modules the checked one imports: an imported
+-- @ASSUME@ or record field that the rule's condition names is read exactly as a
+-- local one is, and its default is lost the same way.
+bpmnDefaultNotes :: [Module Resolved] -> Module Resolved -> StateGraph -> [FidelityNote]
+bpmnDefaultNotes imports modul sg = case sg.sgDecide of
+  Nothing -> []
+  Just u ->
+    [ MkFidelityNote
+        { code     = "P-TYPICALLY"
+        , severity = Lossy
+        , element  = s.name
+        , range    = s.range
+        , message  = describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
+                       <> ", and BPMN has no default for a process variable: "
+                       <> (case (s.kind, s.owner) of
+                             (k, Just r) | k == DefaultOnRecordField || k == DefaultOnConstructorField ->
+                               "a condition that reads `" <> s.name <> "` of a `" <> r <> "` (by name, or "
+                                 <> "by taking the record apart) reads whatever the process instance holds, "
+                                 <> "so an instance that holds a `" <> r <> "` without it"
+                             _ ->
+                               "a condition that tests `" <> s.name <> "` reads whatever the process "
+                                 <> "instance holds, so an instance that never set it")
+                       <> " does not get " <> describeDefault (classifyDefault s.value)
+        , lost     = "the presumption: the source says an unsupplied `" <> s.name
+                       <> "` is " <> describeDefault (classifyDefault s.value)
+                       <> ", and the process says nothing"
+        }
+    | d@(MkDecide _ _ (MkAppForm _ n _ _) _) <- decidesOf modul
+    , getUnique n == u
+    , s <- decideDefaultSites imports modul d
+    ]
+ where
+  decidesOf (MkModule _ _ sect) = goSection sect
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \case
+    Decide _ d -> [d]
+    Section _ sub -> goSection sub
+    _ -> []

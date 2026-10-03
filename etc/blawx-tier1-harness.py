@@ -76,6 +76,7 @@ SEEDS = [
     "antisocial", "antisocial-twin",
     "alcohol", "alcohol-twin",
     "housing-grounds",
+    "defaults",
 ]
 
 # --- the ASSUME seeds' oracle, and why it is not written here --------------
