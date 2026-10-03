@@ -952,7 +952,8 @@ data FunTypeSig = MkFunTypeSig
 
 -- | A rule input's @TYPICALLY@ default whose check waits until the module's
 -- definitions are in scope (R8 rule 3: a default is a module-scope expression
--- and may name a definition or a section binder). Only a plain literal is
+-- and may name a definition, though on a rule's input not a section binder:
+-- 'TypicallyReadsInput'). Only a plain literal is
 -- checked at once, which keeps every error a literal could raise where it was.
 data PendingDefault = MkPendingDefault
   { input        :: Resolved

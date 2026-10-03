@@ -133,8 +133,10 @@ bump n MEANS n TIMES `the rate`
   [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out
   a field that does; the default is taken. A call that gives its inputs by
   position still gives them all. An input with no default is still asked for. A
-  default may be an expression, worked out where the call is, as if written
-  there.
+  default may be an expression over definitions and constructors, worked out
+  where the call is, as if written there; on a section `GIVEN` it may also read
+  other section `GIVEN`s (see [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out)).
+  `WITH` cannot be given to a section `GIVEN` itself: it goes on a rule that reads it.
 
 ## Example
 

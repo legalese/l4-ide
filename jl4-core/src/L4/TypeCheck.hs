@@ -462,8 +462,10 @@ withCheckedSignatures rdecides = local \ s -> s
 -- one the signature already carries: a plain literal was checked when the
 -- signature was scanned ('checkTypicallyOpt'), and any other expression once
 -- every signature had been ('checkPendingDefaults'), against the declared type.
--- It may name the module's definitions and section inputs, not the rule's other
--- inputs, which are not in scope where it is checked.
+-- It may name the module's definitions and constructors, not the rule's other
+-- inputs, which are not in scope where it is checked, and it may not read a
+-- section input: that is refused once the module is checked
+-- ('L4.Discharge.inputDefaultReads', 'TypicallyReadsInput').
 --
 -- Keyed by every name the rule is known by, because they share one 'Unique'
 -- ('withQualified', the mixfix canonical alias).
@@ -2300,10 +2302,12 @@ typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emp
 --
 -- A default is a module-scope expression (R8 rule 3, TYPICALLY-ONE-BEHAVIOUR-SPEC.md
 -- W7): a literal, a nullary constructor, or any expression over what the module
--- declares, which may name a definition or a section binder. Whether a section
--- binder's default reads the binder itself is a fact about the whole module, so
--- it is checked once the module is: 'L4.Discharge.defaultCycles', reported as
--- 'TypicallyCycle'.
+-- declares, which may name a definition, and in a section binder's own default
+-- another section binder. A default on a rule's input or a record's field may not
+-- read a section binder ('TypicallyReadsInput'). Whether a section binder's
+-- default reads the binder itself is a fact about the whole module, so both are
+-- checked once the module is: 'L4.Discharge.defaultCycles', reported as
+-- 'TypicallyCycle', and 'L4.Discharge.inputDefaultReads'.
 --
 -- The checked default is kept where a site that leaves the binder out reads it
 -- ('functionInputDefaults', 'recordInputDefaults') and where discharge and the
@@ -5103,8 +5107,8 @@ defaultNamedExpr binderRef d =
 --
 -- A literal or a nullary constructor, the common cases, is re-made node for
 -- node with the shape the generic traversals expect (see 'defaultNamedExpr').
--- Any other expression (R8 rule 3: a module-scope expression, which may name a
--- definition or a section binder) is copied with every source annotation
+-- Any other expression (R8 rule 3: a module-scope expression, which here may name
+-- a definition and not a section binder, 'TypicallyReadsInput') is copied with every source annotation
 -- cleared, in every node of it: the checker's own bookkeeping stays, but no
 -- token or range of the declaration it was written in does, so the semantic-token,
 -- exact-print and find-references traversals see nothing at the site, and the
