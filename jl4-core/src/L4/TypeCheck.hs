@@ -323,13 +323,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (owner, bs) <- Discharge.inputDefaultReads rprog
                   ]
                   ++
-                  -- ... and one that names, by spelling, another input of its own
-                  -- rule or another field of its own record means whatever else
-                  -- is called that (W7 review S1).
-                  [ MkCheckErrorWithContext (TypicallyNamesSibling owner names) None
-                  | (owner, names) <- Discharge.inputDefaultCaptures rprog
-                  ]
-                  ++
                   -- ... and an exported rule's default that names a section's
                   -- definition that is also defined at the top level would mean
                   -- the top level's in the module l4 batch and the service write
@@ -940,9 +933,17 @@ checkFieldDefaults t (MkDeclare dann dsig daf rt) =
     _ -> pure rt
  where
   conFields (MkConDecl _ _ tns) (MkConDecl cann cn rtns) = MkConDecl cann cn <$> fields tns rtns
-  fields = zipWithM \ (MkTypedName _ n _ mTypically _) (MkTypedName fann fn fty _ fmeans) -> do
+  fields tns rtns = zipWithM (\ (MkTypedName _ n _ mTypically _) (MkTypedName fann fn fty _ fmeans) -> do
     rTypically <- checkTypicallyAt place n fty mTypically
-    pure (MkTypedName fann fn fty rTypically fmeans)
+    -- A name spelled like another field of this record means whatever else is
+    -- called that, since the fields are not in scope here (W7 second review,
+    -- silent S1). Not asked of the record a request is decoded into, which is not
+    -- the author's.
+    case (place, rTypically) of
+      (RequestField, _)    -> pure ()
+      (_, Just d)          -> namesSibling fn [ r | MkTypedName _ r _ _ _ <- rtns ] d
+      (_, Nothing)         -> pure ()
+    pure (MkTypedName fann fn fty rTypically fmeans)) tns rtns
   place
     | rawNameToText (rawName (getName daf)) == requestRecordName = RequestField
     | otherwise                                                  = RecordField
@@ -1957,6 +1958,10 @@ checkPendingDefaults sigs = do
         prune $ errorContext (contextOf sig) $
           local (\ env -> env { sectionStack = p.sectionPath }) do
             rd <- checkTypically p.inputName p.declaredType (Just p.source)
+            -- A name spelled like another input of this rule means whatever else
+            -- is called that, since the inputs are not in scope here (W7 second
+            -- review, silent S1).
+            for_ rd \ d -> namesSibling p.input (siblings sig) d
             pure (getUnique p.input, rd)
       let byInput = Map.fromList [ (u, d) | (u, Just d) <- checked ]
           patch otn@(MkOptionallyTypedName a r t _)
@@ -1968,9 +1973,21 @@ checkPendingDefaults sigs = do
         , pendingDefaults = []
         }
 
+  siblings sig = case sig.rtysig of
+    MkTypeSig _ (MkGivenSig _ otns) _ -> [ r | MkOptionallyTypedName _ r _ _ <- otns ]
+
   contextOf sig = case sig.anno ^. annInfo of
     Just (TypeInfo _ (Just Assumed)) -> WhileCheckingAssume (getName sig.rappForm)
     _                                -> WhileCheckingDecide (getName sig.rappForm)
+
+-- | Refuse a checked default that names, by spelling, one of the siblings of the
+-- input or field it is on ('L4.Discharge.defaultNameCaptures',
+-- 'TypicallyNamesSibling').
+namesSibling :: Resolved -> [Resolved] -> Expr Resolved -> Check ()
+namesSibling owner sibs d =
+  case Discharge.defaultNameCaptures sibs d of
+    []    -> pure ()
+    names -> addError (TypicallyNamesSibling owner names)
 
 -- | The names an expression calls or applies, as written.
 calledNames :: Expr Name -> [RawName]
