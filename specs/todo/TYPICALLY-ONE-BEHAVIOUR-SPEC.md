@@ -1,6 +1,6 @@
 # `TYPICALLY`: one behaviour
 
-**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); W7 built 2026-10-03 in `feat/typically-w7`, on top of `feat/typically-w4w5`, and the findings of the review of its first build fixed or recorded the same day, and those of a second review of its rebuild fixed, disputed or recorded in the night of 2026-10-03 (§4.3); the rest not built.
+**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); W7 built 2026-10-03 in `feat/typically-w7`, on top of `feat/typically-w4w5`, and the findings of the review of its first build fixed or recorded the same day, and those of a second review of its rebuild fixed, disputed or recorded in the night of 2026-10-03 (§4.3); W10 built 2026-10-04 in `feat/typically-w10`, on top of `feat/typically-w7`, documentation and records only (§4.4); the rest not built.
 This spec is an implementation plan, not a new design.
 The design was ruled on 2026-09-04 as **R8** (`IMPLICIT-PROPS-DESIGN.md` §11.5) and extended on 2026-09-06 by **D7.3** (`SURFACE-SUGAR-CLUSTER-2026-09.md`).
 R8 is the owning ruling, and anything this spec settles is recorded back there (repo `CLAUDE.md` §4).
@@ -28,7 +28,7 @@ GIVEN rate IS A NUMBER TYPICALLY 3          -- omit it: check error
 The split is wider than section versus rule.
 It also runs between tools: `#EVAL` honours a section default that `l4 batch` and `jl4-service` refuse, the ladder presumes a rule default that `#EVAL` will not use, and Catala, docassemble and DMN each do something different again.
 
-The props work package shipped on 2026-09-05 with R8 half-built, and its "Deferred" list (`IMPLICIT-PROPS-DESIGN.md:2391`) says so.
+The props work package shipped on 2026-09-05 with R8 half-built, and its "Deferred" list (`IMPLICIT-PROPS-DESIGN.md`, "Deferred, each with why") said so on 2026-10-01.
 Its text there reads: _"`TYPICALLY` therefore has two behaviours today, not the one R8 asks for — but they are two, down from three."_
 Measured across every tool, there are more than two.
 
@@ -140,13 +140,13 @@ Each is independently landable unless it names a dependency.
 | W1  | The service stops making `{}` and `null` FALSE. Under T3 both become an assumed term for a non-`MAYBE` input: stuck if the rule needs it, harmless if it short-circuits away. Under `UNKNOWN-EVALUATION-SPEC.md` they later become Unknown.                                                                                                                                                                                                              | S1, L6, S5   | **Built in #530.** `Backend/CodeGen.hs` (placeholder assumed terms; section `GIVEN`s by `WITH`); `Backend/Jl4.hs` `splitAssumeParams`                        |
 | W2  | The service's schema carries `default` and leaves a defaulted input out of `required`.                                                                                                                                                                                                                                                                                                                                                                   | R8 surface   | **Built in this branch** (§4.1). `Compiler.hs` `parametersFromExport`; `L4.Export.isRequiredInput`, `honouredDefault`                                        |
 | W3  | `l4 batch` and the service fill an absent defaulted input with its default, at the root. In `l4 batch` this covers JSON, YAML and CSV input, and an empty CSV cell is absent (T3c).                                                                                                                                                                                                                                                                      | L2           | **Built in this branch** (§4.1). `L4/Cli/Batch.hs`; `Backend/Jl4.hs` root fills; the JSON decoder in `Machine.hs`                                            |
-| W4  | A rule's own defaulted `GIVEN` may be omitted at a named site. R8's unbuilt half: thread the callee's `FunTypeSig` defaults to `supplyAppNamed` (`IMPLICIT-PROPS-DESIGN.md:2421`). Positional sites stay as they are (R8 rule 1). **Built in this branch** (§4.2).                                                                                                                                                                                       | L1, S4       | `TypeCheck.hs` named-application supply; `Discharge.hs`                                                                                                      |
+| W4  | A rule's own defaulted `GIVEN` may be omitted at a named site. R8's unbuilt half: thread the callee's `FunTypeSig` defaults to `supplyAppNamed` (`IMPLICIT-PROPS-DESIGN.md`, "Deferred, each with why"). Positional sites stay as they are (R8 rule 1). **Built in this branch** (§4.2).                                                                                                                                                                 | L1, S4       | `TypeCheck.hs` named-application supply; `Discharge.hs`                                                                                                      |
 | W5  | Record fields: a defaulted field may be omitted at construction (D7.3, widened by T1); fix the field-default scoping defect and its message. **Built in this branch** (§4.2), with T1's `MEANS` check.                                                                                                                                                                                                                                                   | L3, L4       | `TypeCheck.hs` `supplyAppNamed` (raises `IncompleteAppNamed`; D7.3's `:3146` has since moved), `inferSelector`'s `checkTypically`                            |
 | W6  | `ASSUME … TYPICALLY` per T2. **Deferred, not built.** Meng, 2026-10-02: _"I'd be ok with skipping or deferring W6 as ASSUME is being deprecated."_ T2 stays ruled; `ASSUME … TYPICALLY` is still ignored by `#EVAL` and stays in `required`, and S2 stays open.                                                                                                                                                                                          | S2           | `Discharge.hs` `fillInDefault` (`:281-295`), the deprecation message                                                                                         |
 | W7  | Expression defaults with the cycle check (R8 rule 3). **Built in this branch** (§4.3); a rule's or a field's default may not read a section `GIVEN`.                                                                                                                                                                                                                                                                                                     | L5           | `TypeCheck.hs` `checkTypically`, `checkPendingDefaults`; `Discharge.hs` `defaultCycles`, `readSetsAll`; `FunctionSchema.typicallyToJson` carries source text |
 | W8  | The trace records "took its default", with the declaration line (R8 surface).                                                                                                                                                                                                                                                                                                                                                                            | —            | **The event is built in this branch** (§4.1, and raised by W4 and W5's fills, §4.2), not its trace rendering. `L4.EvaluateLazy.Trace`                        |
 | W9  | Every exporter either maps the default to the target's own mechanism or emits a fidelity note (T5).                                                                                                                                                                                                                                                                                                                                                      | §2 exporters | `Dmn/`, `OpenFisca/`, `Blawx/` lowerings                                                                                                                     |
-| W10 | Documentation and stale records: `doc/reference/types/TYPICALLY.md` (one behaviour; delete the "everywhere else: metadata only" half), `typically-example.l4`, the header comment of `ok/typically-basic.l4`, the status headers of `TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`, the deferred list in `IMPLICIT-PROPS-DESIGN.md:2391`. Canon's restated constants (S3) can go once W5 lands; that is a canon change, not this repo's. | —            | —                                                                                                                                                            |
+| W10 | Documentation and stale records: `doc/reference/types/TYPICALLY.md` (one behaviour; delete the "everywhere else: metadata only" half), `typically-example.l4`, the header comment of `ok/typically-basic.l4`, the status headers of `TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`, the deferred list in `IMPLICIT-PROPS-DESIGN.md`. Canon's restated constants (S3) is a canon change, not this repo's. **Built in this branch** (§4.4) | —            | —                                                                                                                                                            |
 
 ### 4.1 W2 and W3, as built (2026-10-02)
 
@@ -634,6 +634,104 @@ The example of an inner `WITH` in `ok/typically-expression.l4` (`priced as if de
 4. **What a root is, and where a rule's or a field's default that reads a section input is worked out.** Decision 1 refuses such a default. R8 says it is "filled in once per evaluation at the root" and that a function's own may be omitted only at a named site; for an expression that reads a section input those differ, so say which should win: from the root's values, or from the site's. Both need "root" defined, and today it is syntactic: a call written in a directive is at the root, a lambda there included, and a call written in a rule is not, so `#EVAL final price WITH list price IS 1000` is `900`, the same call written as a rule is `990`, and an `#ASSERT` comparing them fails. Say whether a root is where a call is written, as it is now, or where an evaluation starts.
 5. **The query plan and the requirement disagree for a fact that only an expression default reads.** The plan never asks for `age` where `is adult TYPICALLY (age AT LEAST 18)`, and the schema requires it, so a client that answers everything the plan asks is refused for lacking `age`. W7 did not cause it (decision 3 rules the requirement, and TU-wire-b parked the lazy binding on the direct path that would remove it), but it is W7 that makes defaults read inputs. The ways out are the lazy binding, or a schema that can say "needed only if `is adult` is left out" (`anyOf`). Which, if either, is yours.
 6. **Canon's `regcf-denovo.l4` still carries a comment** (lines 134 to 135, at the canon commit `6b6476d`) saying the checker requires a `TYPICALLY` value to be a literal, which W7 makes stale. It is in `legalese/canon`, which this repository may not edit, so it is not touched here.
+
+### 4.4 W10, as built (2026-10-04)
+
+Built in `feat/typically-w10`, on top of `feat/typically-w7` (at `68c32ea44`).
+It is documentation and records: it changes no Haskell, TypeScript, corpus file or golden (`git diff --stat 68c32ea44..HEAD` lists only files under `doc/` and `specs/todo/`).
+Every behaviour claim written or kept in the page, its example, the query planner's page and the `ASSUME` pages was checked on 2026-10-04 against `l4` and `jl4-service` built from this branch (the corpus files and CLI fixtures named below, and probes of my own: a script of 132 checks over the page's claims, the example, the planner's page and the `ASSUME` pages, run on this branch's `l4` and `jl4-service`, all passing; five of them pin the limit under "Found while checking", two in `l4 batch` and three in the service, and will fail when it is fixed; the same script's "before" block passes 6 of 6 on `unstable`'s `l4` (`7768812fa`) and 1 of 6 on this build, so the checks tell the two apart; the script and its output are in the build report's directory, not in the tree).
+
+**What each of W10's items became.**
+
+- **`doc/reference/types/TYPICALLY.md`.**
+  The one behaviour is stated once, at the top: `TYPICALLY d` on a name means that when nothing supplies a value for the name, at the point where a value has to come from outside the rule, the rule uses `d`.
+  Three things hold wherever it is written (a supplied value wins; "not known" is not "left out"; inside a file a call or a construction by position gives everything), and a table says how a name comes to be left out for each place it is written.
+  The "everywhere else: metadata only" half had already gone with W4, W5 and W7.
+  What was left of it is the `ASSUME`, now said plainly in a section of its own ("On an `ASSUME`: checked and recorded, not used", with what each tool does), beside the two other places that accept a `TYPICALLY` and never use it (a lambda's own `GIVEN`, and a field of an enum constructor that carries data).
+  The "Landed in stages" note, a status line in a reference page, is gone; "What changed" says what the page used to say, as R8's own note asks (`IMPLICIT-PROPS-DESIGN.md` §11.5).
+  Two sentences the checks found wrong are corrected: "Three limits … at the boundary" listed five, and the last of them called an expression default that supplies an input the export also reads "fine … in the service" (see "Found while checking", below).
+- **`typically-example.l4`.**
+  Holds each example the page quotes, and an `#ASSERT` for every answer the page gives.
+  `doc/test-docs.sh` runs it, and a false `#ASSERT` is a `DiagnosticSeverity_Error`, which that script rejects (shown by making two of them false).
+- **`ok/typically-basic.l4`.**
+  Its header is left as it is, as the brief for this run says.
+  It no longer asserts a metadata-only reading: W5 (`d9f7cdaf5`) replaced "metadata-only default values … no runtime behaviour" with a pointer to the page and to the corpus files that exercise a default, and that is true on this branch.
+- **`TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`.**
+  Status headers say what is built and where, and that the body below each is the December 2025 design.
+  The second's "BLOCKED - depends on TYPICALLY" is gone: what exists of its four cells is `L4.Presumption.fillDecision`, and the types and the API it sketches are not built (searched; one unrelated `SessionState` in `ts-shared/legalese-agent`).
+- **`IMPLICIT-PROPS-DESIGN.md`.**
+  The trace-event item in the deferred list now says what exists (the event, not a trace line) and what a trace shows today (measured), and three items are added that the one-behaviour work leaves open: `ASSUME … TYPICALLY` (W6, deferred), a construction that leaves out every field with an enum constructor's payload fields, and T5 (W9, not on this branch).
+  §11.5's "says so when R8 lands" is brought up to date.
+
+**Stale records found on the way**, each a claim a reader would believe:
+
+- `doc/reference/query-planning/README.md` said the shipped planner is "determinability-first", that information gain with `TYPICALLY` priors is "the planned direction", and that "no consumer reads them for ordering yet".
+  `BooleanDecisionQuery.hs` and `decision-query.ts` both rank by information gain, `QueryPlanSpec` pins the priors end to end, and the service's `/query-plan` asks `a`, `b`, `presumed` for `presumed OR a OR b` when `presumed` is `TYPICALLY FALSE`, and `presumed`, `a`, `b` when it has no `TYPICALLY`.
+  The section is rewritten to say that, with that example; `doc/reference/README.md`'s one-line description of the page follows.
+- S2's documentation half: `errors/README.md` called the `ASSUME` to `GIVEN` rewrite "safe to take", and `ASSUME.md` said a default on an `ASSUME` is applied "nowhere".
+  Both now say what is true; `GLOSSARY.md`'s row agrees. _Decided overnight; below._
+- Six citations by line number into the two spec files whose headers grew (`TYPICALLY-DEFAULTS-SPEC.md:420-428` twice and `:14-41`, `RUNTIME-INPUT-STATE-SPEC.md:3-11` twice and `:62-72`) are now by section name, and `UNKNOWN-EVALUATION-SPEC.md` §3.6, which called the second header stale, says what the header now says.
+
+**Found while checking, not fixed** (W10 changes no code):
+
+1. **The decision service stops with an internal error on a request that supplies an input that an expression default supplies, when the default's own input is left out.**
+   The page said such a default is "fine at `#EVAL` and in the service", and §4.3 recorded only the `l4 batch` half of the limit (R-S3).
+   Take
+
+   ```l4
+   § `Supplied`
+       GIVEN base IS A NUMBER TYPICALLY 4
+             `base doubled` IS A NUMBER TYPICALLY (`double it` WITH base IS 10)
+
+   GIVETH A NUMBER
+   `double it` MEANS base TIMES 2
+
+   @export default Total
+   GIVETH A NUMBER
+   total MEANS `base doubled` PLUS base
+   ```
+
+   and the request `{"arguments":{"base":1}}`.
+   The answer is `Internal error: I encountered a type error during evaluation: named application supplying an implicit input reached the evaluator undischarged: ... (1 implicit argument(s)). This is a compiler bug: L4.Discharge.dischargeModule must run before evaluation.`
+   `{}` answers 24, `{"base doubled":3}` answers 7, and `#EVAL total WITH base IS 1` is 21.
+   The same happens when the default is on the export's own input, `rate`, in place of a section input, with an export that reads `base` and the request `{"base":1}`.
+   It is on `68c32ea44`, W7's head (the snapshot of that head gives the same), so it is W7's, in the direct path's root fills; `l4 batch` refuses the same files at check time, which is the limit R-S3 recorded.
+   The page now says what the service does.
+
+2. **S4 stays open for an `ASSUME`.**
+   The ladder carries an `ASSUME`'s boolean default as the atom's presumed value (`typically: true`), and the query plan uses it as a prior, while no evaluation uses it.
+   W4 closed S4 for a rule's `GIVEN` and W6, which would close it here, is deferred.
+   The page says so, under "On an `ASSUME`" (decision 2, below).
+
+**Decided by Claude overnight 2026-10-03, pending Meng's review.**
+Each in its own commit, so that it can be reverted alone.
+
+1. **The documentation half of S2 is done, although W6 is deferred.**
+   T2 names `errors/README.md` and `ASSUME.md` as part of W6; the pages said the `ASSUME` to `GIVEN` rewrite is "safe to take" and that an `ASSUME`'s default is applied "nowhere", and the first is false for an `ASSUME` that carries a `TYPICALLY` (probed: the same rule gives the bare name before and `TRUE` after).
+   Prefer loud over silent.
+   The deprecation warning's own text ("Nothing is broken: the file still checks, runs and exports as before") is the compiler's, not changed here, and is still silent on the point.
+   _Alternative:_ leave both pages until W6 rewords the warning and them together.
+2. **The page says that the ladder and the query plan read an `ASSUME`'s default.**
+   A reader who moves a fact to an `ASSUME` to keep it out of the rules will find the wizard still presumes it; the page says so rather than leave "metadata only" to suggest otherwise.
+   _Alternative:_ say nothing about the wizard on the `ASSUME` section until W6 lands or the ladder stops drawing a presumed value for an `ASSUME`.
+
+**Assumed, not ruled** (no one outside the code would notice, or the text is new):
+
+- The shape of the page's top: a rule, three things that hold, a table, three places that accept and do not use a default.
+- "Being retired" beside "deprecated (ruled 2026-09-04)": the compiler's warning says "being retired", and the ruling says deprecated.
+- The planner section of `query-planning/README.md` is rewritten although it is outside the brief, because it contradicted the code and `reviewing-encoded-law.md` already described the shipped behaviour.
+  _Alternative:_ list it here and leave it.
+- The six citations are by section name, not by new line number, so they do not move again.
+
+**Not done, and why.**
+
+- Canon: S3's restated constants and the comment in `regcf-denovo.l4` (Open for Meng 6) are a canon change.
+- The exporters' pages (W9's: `feat/typically-w9` rewrites `doc/exports/*` and `l4-to-blawx.md`).
+  The page links to the exports and names only the three pages that say anything about a default on this branch.
+- The trace and the directive's `NOTE:` line (W8 and W11, on `feat/typically-w8`).
+  That branch adds two sections to the page at the place where "Landed in stages" stood; they merge by keeping its sections and dropping the note.
+  Two sentences become false when it lands: the skill's §7.4 "`#EVAL` does not list the defaults it took", and the deferred-list item above.
+- `skills/`: the three entries that describe `TYPICALLY` (`source-patterns.md`, `01-definitions-and-scope.md`, `07-presumptions-and-defaults.md` §7.4) were read against the probes, and the two worked examples of §7.4 were run (28; 14 and 30); none is false on this branch, so none is changed.
 
 ---
 
