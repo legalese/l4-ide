@@ -86,5 +86,19 @@
       "p": false,
       "q": false
     }
+  ],
+  "implies-a-division": [
+    {
+      "p": false,
+      "n": 0
+    },
+    {
+      "p": true,
+      "n": 2
+    },
+    {
+      "p": false,
+      "n": 2
+    }
   ]
 }

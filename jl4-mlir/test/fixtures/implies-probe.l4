@@ -4,7 +4,9 @@ IMPORT prelude
 -- step 2): jl4-mlir lowers IMPLIES with a short circuit, as it does AND and
 -- OR, and its trace shows each connective with a child for each operand it
 -- evaluated. Each function's cases are its truth table; the ones with a FALSE
--- left operand to IMPLIES never need the right one.
+-- left operand to IMPLIES never need the right one, and `implies a division`
+-- shows it: with p FALSE and n 0 the right operand would divide by zero, so
+-- the answer is TRUE only if the right operand is skipped.
 --
 -- The NOT functions pin the trace of a negation: `NOT p` shares its source
 -- range with `p`, and `NOT (p AND q)` with `p AND q`, so each needs a key of
@@ -53,3 +55,9 @@ GIVEN p IS A BOOLEAN
       q IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `p unless q` IS p UNLESS q
+
+@export An implication whose right operand would divide by zero
+GIVEN p IS A BOOLEAN
+      n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `implies a division` IS p IMPLIES (1 DIVIDED BY n GREATER THAN 0)
