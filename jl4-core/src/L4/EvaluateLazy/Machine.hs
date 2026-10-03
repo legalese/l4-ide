@@ -5651,7 +5651,11 @@ constructorFieldType con i = do
 -- | Whether the match in progress is a record's generated selector (built by
 -- 'evalConDecl'): its own one-branch CONSIDER, with no source position, that
 -- matches the constructor and answers with one of the fields it binds. If so,
--- that field's name and declared type.
+-- and the constructor is the only one its type has, that field's name and
+-- declared type. A type with several constructors gets no field path: an
+-- unknown of it may be one without the field, whose selector has no branch
+-- for it, so @s's radius@ for a @Shape@ that may be a @Square@ stays Stuck on
+-- @s@, as it was before this step.
 selectorProjection :: Resolved -> [Pattern Resolved] -> Machine (Maybe (Resolved, Maybe (Type' Resolved)))
 selectorProjection con ps = do
   stack <- liftIO . readIORef =<< asks (.stack)
@@ -5660,13 +5664,36 @@ selectorProjection con ps = do
       | isNothing ann.range
       , Just vars <- traverse patVar ps
       , Just i <- elemIndex (getUnique body) (map getUnique vars) -> do
-          ty <- constructorFieldType con i
-          pure (Just (body, ty))
+          sole <- isSoleConstructor con
+          if sole
+            then do
+              ty <- constructorFieldType con i
+              pure (Just (body, ty))
+            else pure Nothing
     _ -> pure Nothing
   where
     patVar = \ case
       PatVar _ v -> Just v
       _          -> Nothing
+
+-- | Whether a constructor is the only one the type it builds has, as the
+-- module's entity information describes that type. 'False' when the
+-- constructor or its type is not described.
+isSoleConstructor :: Resolved -> Machine Bool
+isSoleConstructor con = do
+  entityInfo <- getEntityInfo
+  pure case Map.lookup (getUnique con) entityInfo >>= builds . snd of
+    Nothing -> False
+    Just u  -> length [ () | (_, e) <- Map.elems entityInfo, builds e == Just u ] == 1
+  where
+    builds = \ case
+      TypeCheck.KnownTerm ty Constructor -> resultHead ty
+      _                                  -> Nothing
+    resultHead = \ case
+      Forall _ _ t          -> resultHead t
+      Fun _ _ (TyApp _ r _) -> Just (getUnique r)
+      TyApp _ r _           -> Just (getUnique r)
+      _                     -> Nothing
 
 -- | The names a term waits on, non-empty.
 termNamesNE :: Term -> NonEmpty Term

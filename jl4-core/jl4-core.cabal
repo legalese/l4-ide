@@ -247,6 +247,7 @@ test-suite jl4-core-test
     NlgPercentSpec
     NlgRenderSpec
     TracePostprocessSpec
+    UnknownInputsSpec
     GraphVizStubSpec
     EdgeCrashSpec
     PrintRoundtripSpec
