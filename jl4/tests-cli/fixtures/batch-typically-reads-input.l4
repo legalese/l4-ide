@@ -1,0 +1,12 @@
+-- A rule's input whose TYPICALLY default reads a section input
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3, decision 1): not a program l4 batch
+-- can run, so it is refused before any row. The same default on the section's own
+-- input is fine, and `batch-typically-expression.l4` is that.
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+
+@export default Final price
+GIVEN discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount

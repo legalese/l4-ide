@@ -24,7 +24,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Prettyprinter
 import Prettyprinter.Render.Text
 import qualified Data.List.NonEmpty as NE
-import L4.Utils.Ratio (prettyRatio)
+import L4.Utils.Ratio (prettyRatio, prettyRatioExact)
 import L4.Evaluate.Operators
 import L4.Names
 import L4.Desugar
@@ -36,6 +36,16 @@ prettyLayout a = docText $ printWithLayout a
 
 docText :: Doc ann -> Text
 docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
+
+-- | A @TYPICALLY@ default as the text that follows the keyword in source. The
+-- grammar takes a literal, a name, or a parenthesised expression there, so
+-- anything else is bracketed: @TYPICALLY (list price DIVIDED BY 10)@. Every
+-- place that writes a default out as source goes through this one.
+prettyTypicallyOperand :: LayoutPrinterWithName a => Expr a -> Text
+prettyTypicallyOperand = docText . typicallyOperand
+
+typicallyOperand :: LayoutPrinterWithName a => Expr a -> Doc ann
+typicallyOperand = parensIfNeeded
 
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
@@ -522,7 +532,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (OptionallyTypedName a) where
         _ -> mempty
       <> case typically of
         Nothing -> mempty
-        Just e -> space <> "TYPICALLY" <+> printWithLayout e
+        Just e -> space <> "TYPICALLY" <+> typicallyOperand e
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
   printWithLayout = \ case
@@ -537,7 +547,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
     where
       printTypically = \ case
         Nothing -> mempty
-        Just e -> space <> "TYPICALLY" <+> printWithLayout e
+        Just e -> space <> "TYPICALLY" <+> typicallyOperand e
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypeSig a) where
   printWithLayout = \ case
@@ -647,7 +657,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
             Just ty' -> space <> "IS" <+> printWithLayout ty'
           <> case typically of
             Nothing -> mempty
-            Just e -> space <> "TYPICALLY" <+> printWithLayout e
+            Just e -> space <> "TYPICALLY" <+> typicallyOperand e
         ]
 
 instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
@@ -829,10 +839,27 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     App        _ n es -> printWithLayout n <> case es of
       [] -> mempty
       exprs@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
+    -- A named argument the checker ADDED from a TYPICALLY default
+    -- ('DefaultFill') is not part of what the author wrote, and printing it
+    -- would turn the default into an explicit value: the module re-checked from
+    -- this text (@l4 batch@ re-emits one) would no longer take the default, and
+    -- so could not report that it did.
     AppNamed   _ n namedExpr _ ->
-          printWithLayout n
-      <+> "WITH"
-      <+> align (vcatHard (fmap printWithLayout namedExpr))
+      case filter (not . isDefaultFill) namedExpr of
+        []      -> printWithLayout n
+        [one]   -> printWithLayout n <+> "WITH" <+> printWithLayout one
+        -- Several arguments print on ONE line, comma-separated. They used to
+        -- print one to a line, aligned under the first, which parses only where
+        -- the text starts a line of its own: inside brackets, or spliced after
+        -- a prefix on a line (a default written into the wrapper @l4 batch@
+        -- generates, or published as the schema's @default@), the second
+        -- argument's column no longer lines up and the parse fails at it
+        -- (review F3 of W7). A value that has an open tail of its own, such as
+        -- a comma list, is bracketed so that the comma after it is this list's.
+        written ->
+              printWithLayout n
+          <+> "WITH"
+          <+> hsep (punctuate comma (fmap printNamedArgument written))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
@@ -1289,6 +1316,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (NamedExpr a) where
     MkNamedExpr _ name e ->
       printWithLayout name <+> "IS" <+> printWithLayout e
 
+-- | One argument of a @WITH@ list that shares a line with the others
+-- ('printWithLayout' of an 'AppNamed'): the value is bracketed when its own
+-- rendering is open-tailed ('parensIfOpenTailed').
+printNamedArgument :: LayoutPrinterWithName a => NamedExpr a -> Doc ann
+printNamedArgument = \ case
+  MkNamedExpr _ name e ->
+    printWithLayout name <+> "IS" <+> parensIfOpenTailed e
+
 -- | Print a LocalDecl in LET context (without DECIDE keyword and without type signature)
 -- Uses "BE" as the binding keyword in honour of The Beatles' "Let It Be"
 printLetBinding :: LayoutPrinterWithName a => LocalDecl a -> Doc ann
@@ -1304,7 +1339,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where
 
 instance LayoutPrinter Lit where
   printWithLayout = \ case
-    NumericLit _ t -> pretty (prettyRatio t)
+    -- exact, not through Double: a re-printed module must be the same program
+    NumericLit _ t -> pretty (prettyRatioExact t)
     StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where

@@ -1,8 +1,8 @@
 -- Kept on ASSUME deliberately (IMPLICIT-PROPS-DESIGN.md §11.1, R0: ASSUME is deprecated): jl4-service/test/QueryPlanSpec.hs pins the ladder atomIds of `may purchase alcohol` captured from a live jl4-lsp (and a TS fixture in another repo pins the same ids); moving these declarations moves them.
--- Test file for the TYPICALLY keyword: metadata-only default values.
--- TYPICALLY stores a default on DECLARE fields, GIVEN parameters and
--- ASSUME declarations; the value is type-checked against the annotated
--- type but has no runtime behaviour.
+-- Test file for the TYPICALLY keyword on DECLARE fields, GIVEN parameters and
+-- ASSUME declarations. The value is type-checked against the annotated type.
+-- What a default does is in doc/reference/types/TYPICALLY.md, and is exercised
+-- by ok/typically-named-site.l4 and ok/typically-record-construction.l4.
 
 IMPORT prelude
 
@@ -21,11 +21,11 @@ DECLARE Config HAS
 DECLARE Contract HAS
   governing_law IS A STRING TYPICALLY "Singapore"
 
--- TYPICALLY combined with MEANS on a computed field:
--- the MEANS clause defines the field; the TYPICALLY default is inert metadata.
+-- A computed field (one with a MEANS clause) takes no TYPICALLY: its value
+-- always comes from the MEANS expression, and a default is an error here.
 DECLARE Widget HAS
   price IS A NUMBER TYPICALLY 10
-  taxed IS A NUMBER TYPICALLY 11
+  taxed IS A NUMBER
     MEANS price * 1.09
 
 -- TYPICALLY on ASSUME declarations

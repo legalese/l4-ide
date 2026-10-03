@@ -1,0 +1,14 @@
+-- A TYPICALLY that is an expression is worked out wherever it is taken: a
+-- section input's, a rule input's and a record field's (W7). What it names has
+-- to be in the module's own scope.
+
+-- ERROR: a rule's default is worked out where the module's definitions are,
+-- which does not include the rule's own other inputs
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (base PLUS 1)
+GIVETH A NUMBER
+scaled MEANS base TIMES rate
+
+-- ERROR: nothing by that name
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (nosuchname PLUS 1)

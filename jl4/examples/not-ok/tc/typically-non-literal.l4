@@ -1,5 +1,7 @@
--- TYPICALLY default values must be literals (compile-time constants).
+-- A TYPICALLY that nothing evaluates must be a literal. A written ASSUME's is
+-- not used (W6 is deferred), so an expression there would be a default that
+-- quietly does nothing. A section input's, a rule input's and a record field's
+-- are evaluated, and take an expression (ok/typically-expression.l4).
 
 -- ERROR: not a literal (a compound expression)
-DECLARE Flags HAS
-  x IS A BOOLEAN TYPICALLY (TRUE AND FALSE)
+ASSUME flag IS A BOOLEAN TYPICALLY (TRUE AND FALSE)

@@ -56,8 +56,8 @@ Structural rules and special syntax patterns:
 
 Turning a Boolean decision into an interactive question-and-answer wizard:
 
-- **[Query Planner](query-planning/README.md):** determinability, question
-  ordering, and the roadmap toward information-gain ordering with priors
+- **[Query Planner](query-planning/README.md):** determinability, and question
+  ordering by information gain, with priors from `TYPICALLY`
 - **[Binary Decision Diagrams (ROBDD)](query-planning/robdd.md):** the canonical
   Boolean-function substrate the planner is built on
 

@@ -1,0 +1,10 @@
+`imported scaled` where `base` is 10, `rate` is the sum of `the usual rate` and 1 by default and `colour` is if `the usual rate` is greater than 100 then `Red` else `the usual colour` by default is equal to 40
+`imported scaled` where `base` is 10, `rate` is 2 and `colour` is if `the usual rate` is greater than 100 then `Red` else `the usual colour` by default is equal to 20
+`imported scaled` where `base` is 10, `colour` is `Red` and `rate` is the sum of `the usual rate` and 1 by default is equal to 0
+`some paint` 's `coats` is equal to 6
+`some paint` 's `colour` is equal to `Green`
+`some paint` 's `layers` is equal to 2
+`some paint`
+`the decoded age` is equal to 25
+`some contact` 's `who`
+`some contact` 's `born`

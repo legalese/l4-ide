@@ -421,12 +421,10 @@ the house style still run green; [entry 11.9](11-when-the-encoding-cannot-answer
 reading` `` — `WITH` names a rule's own inputs, and `` `the reading` `` is not one of them, so
 that line is a check error: the rule's two real inputs are reported unsupplied and
 `` `the reading` `` is reported undefined. **Not** a `TYPICALLY` default to make one reading win: a
-`TYPICALLY` value must be a literal, and `` `the staff reading` `` is a defined name of record type,
-so the typechecker rejects it — _"The TYPICALLY value for `the reading` must be a literal: a number,
-a string, or a nullary constructor such as TRUE, FALSE or NOTHING."_ A constructor of your own
-`ONE OF` type is a literal and is accepted, so a reading modelled as a bare enum could carry one —
-and it would still not decide anything, because `TYPICALLY` is metadata in this release and the
-input stays required either way. **Not**, above all, silently picking a reading and presenting it as the text.
+`TYPICALLY` may name a definition, so `` TYPICALLY `the staff reading` `` on `` `the reading` ``
+type-checks — and then every rule that reads `` `the reading` `` and is given no value takes the staff
+reading without anyone having chosen it, which is the next **Not**. **Not**, above all, silently
+picking a reading and presenting it as the text.
 
 **See** [entry 1.4](#e1-4) (the confinement), and [drafting-patterns.md](../drafting-patterns.md), "Provenance —
 pin every inert string".

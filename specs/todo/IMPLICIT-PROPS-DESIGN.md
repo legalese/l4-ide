@@ -1091,19 +1091,30 @@ declaration line and value; the JSON schema lists a `TYPICALLY` parameter as opt
 **What decided it.** Three images today (schema required-and-defaulted, Catala `context`,
 evaluator discards) and a reference page saying defaults do not change evaluation. Meng's own
 note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
-change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
+change in its own right; `doc/reference/types/TYPICALLY.md` says so, under "What changed". Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
 
 **EXTENDED 2026-09-06 to `DECLARE` record fields (D7.3, upstream #645).** R8 as written governs
-`GIVEN` binders and `TYPICALLY.md:69-72` carves record fields out. D7.3 rules that a `MAYBE`-typed
+`GIVEN` binders and `TYPICALLY.md:69-72` (at `7768812fa`, a passage W5 and W10 removed) carved record fields out. D7.3 rules that a `MAYBE`-typed
 field may be declared `field IS A MAYBE T TYPICALLY NOTHING`, and only then may a construction
 site omit it — same principle, one declaration, the default living where the name is declared.
-Ruled 2026-09-06, **not built**, and **blocked on R8's own named-site half**. The governing text for
-that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
+Ruled 2026-09-06, and **built 2026-10-03** with R8's named-site half (W4 and W5 of
+`TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2; `feat/typically-w4w5`, not yet merged), for a
+record's fields. The governing text for
+that ruling is `TYPICALLY-DEFAULTS-SPEC.md`, Edge Cases 1 ("TYPICALLY on Optional Fields"), and the record is
 `SURFACE-SUGAR-CLUSTER-2026-09.md` §D7.3, which also rules the source/boundary asymmetry R8 does not
 reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
 (`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
 gate it.
+
+**Rule 3 built 2026-10-03 (W7 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.3; `feat/typically-w7`, on top of `feat/typically-w4w5`, not yet merged).**
+A default is a module-scope expression.
+On a section `GIVEN` it may read other section `GIVEN`s and is worked out lazily, from the root's values; a cycle `b ∈ R*(default(b))` among section binders is a check error; the default's read-set joins the requirement of every root that may use it; and the JSON schema gives an expression default as source text.
+On a rule's `GIVEN` and a record field it may name definitions and constructors and may not read a section `GIVEN`.
+For an expression that reads one, "filled in once per evaluation at the root" and rule 1 (a function's own default may be omitted only at a named site) give different answers, from the root's values or from the site's, so the checker refuses the default that would depend on it (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3, decision 1, pending Meng's review).
+An earlier version of this note said R8 does not say where a function's default is worked out; a second review found that wrong.
+A root is where a call is written: a directive, a lambda there included, and not a rule.
+Two places the ruling does not name keep a literal: a written `ASSUME` and a lambda's `GIVEN`.
 
 **EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
 T1: any field declared `TYPICALLY`, not only a `MAYBE … TYPICALLY NOTHING` field, may be omitted at construction and may be absent in JSON, taking its default.
@@ -2167,8 +2178,9 @@ body is `d`. Every reader takes the binder as a parameter and every call passes
 it on, so the only site that can reach that definition is a root that supplied
 nothing — and a 0-ary definition is a shared thunk, so `d` is forced at most
 once per evaluation and every reader sees the same value. `WITH` still wins,
-being an argument. The default's own read-set joins the call graph, so R8 rule 3
-("Closure") holds by construction. `doc/reference/types/TYPICALLY.md` now says
+being an argument. The default's own read-set joins the call graph (R8 rule 3,
+"Closure"; built with W7, see the note on the call-graph edge below, which says how
+and why it was not so before). `doc/reference/types/TYPICALLY.md` now says
 this is a change of meaning and says where it stops, which is Meng's own note in
 §11.5.
 
@@ -2329,14 +2341,26 @@ the corpus it was taken on is not a figure.** Two true measurements disagreed fo
 a week's worth of confusion in one evening because neither said which corpus it
 ran on.
 
-**The `TYPICALLY` call-graph edge is gone.** `readSets` used to add each binder's
-default as an edge keyed by the binder's own `Unique`. A default is literal-only
-so the edge is always empty, but if that restriction is ever lifted the edge
-makes `rewriteCall` rewrite every reference to that binder — including the
-value-bound parameter references inside readers — into an application. **R8 rule
-3 ("Closure") is therefore DEFERRED, not implemented**, with the literal
-restriction as its guard. The earlier wording here, that it "holds by
-construction", was a sharpening past the evidence actually gathered.
+**The `TYPICALLY` call-graph edge is back, as R8 rule 3 (W7, built 2026-10-03).**
+`readSets` used to add each binder's default as an edge keyed by the binder's own
+`Unique`, and was changed to add none: the edge made `rewriteCall` rewrite every
+reference to that binder — including the value-bound parameter references inside
+readers — into an application, and with literal-only defaults it was always empty.
+Rule 3 ("Closure") was DEFERRED, with the literal restriction as its guard. W7 lifts
+the restriction, so the edge returns, with the hazard answered: a defaulted binder is a
+pseudo-definition in the call graph (`decideBodiesFromModule`), so whatever reads
+the binder is charged with what its default reads, and `readSets` then leaves the
+binder itself out of its result, so a reference to it is still a reader's own
+parameter and is never turned into an application. The cycle check is the same table
+read the other way: `b ∈ R*(default(b))` is `L4.Discharge.defaultCycles`, a check error.
+The pass computes what each definition reads itself first, with a call site's `WITH` subtracted, and closes each set under the defaults of the binders in it afterwards; with the two mixed, `a TYPICALLY (h WITH b IS 1)` beside `b TYPICALLY (a PLUS 1)` was refused as a circle.
+A root is where the default's reads are supplied: at a directive (which is also how
+`l4 batch` and the service evaluate a request), the binder reaches a call as a
+function of its default, applied to the root's values for what it reads
+(`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3), so that a `WITH` on an input a default reads
+reaches the default. The earlier wording here, that closure "holds by construction",
+was a sharpening past the evidence actually gathered, and it was true only of
+literals.
 
 **Crossing an `IMPORT` was reachable and crashed; it is now handled in the
 evaluator.** Measured on the sweep tree (`a1525a89`): exactly one module declares
@@ -2415,32 +2439,50 @@ which owns the defect; this section owns the ruling and the limit.
   it exercised, it wants a compiler test, not a corpus row.
 - **The backends still see the undischarged module.** R10 (§11.10) moves DMN,
   Catala, Docassemble, OpenFisca, Blawx and MLIR onto the discharged AST, keys
-  the export schema by (name, tier), makes defaulted implicits optional and adds
-  `BatchRequest.world`. Keeping them on the module the author wrote is what lets
+  the export schema by (name, tier) and adds `BatchRequest.world`. (Its clause
+  that defaulted implicits are not `required` is built, as W2 of
+  `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.1: `L4.Export.isRequiredInput`, and the
+  service's schema leaves a defaulted fact out of `required` and carries its
+  `default`. `x-l4-tier` is in no `.hs`, `.ts` or `.json` file of the tree, and
+  `BatchRequest` in `jl4-service/src/Types.hs` has no `world` field; searched
+  2026-10-04.) Keeping them on the module the author wrote is what lets
   this change land without moving a single backend golden, and lets the sweep's
   269 rewrites be gated on their own oracle rather than on this one. The one
   construct they cannot see is an inner `WITH` on a binder, which
   `L4.Discharge.implicitSupplySites` names so a backend can refuse rather than
   answer wrongly; wiring that refusal into each backend is part of the same
   follow-up.
-- **A rule's own defaulted `GIVEN` still cannot be omitted at a named site.**
-  R8's other half. The default lives on the declaration's `GivenSig`, and
-  `supplyAppNamed` sees only the callee's `Fun` type, which carries names and
-  types but not defaults; supplying it needs the callee's `FunTypeSig` threaded
-  to the call site. `TYPICALLY` therefore has two behaviours today, not the one
-  R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
-  is which.
+- ~~A rule's own defaulted `GIVEN` still cannot be omitted at a named site.~~
+  **Built 2026-10-03 (W4 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2),** on
+  `feat/typically-w4w5`, not yet merged. `supplyAppNamed` now reads the callee's
+  defaults from a table the checker keeps (`CheckEnv.visibleInputDefaults`, built
+  from each `FunTypeSig`'s own checked signature and carried across `IMPORT`) and
+  adds the default as one more named argument; a positional site still gives
+  every input (R8 rule 1).
 - ~~R5, field-opening, is not built.~~ **Built 2026-09-16**, see §11.7.1 for
   what is in the tree and what is not (typed binders only; no synonyms, no
   lambdas, nothing inside a regulative or an `EVENT`; constructors and top-level
   definitions rank with the selectors, below every opened field).
 - **R11, `@reads`, and the hover/index surfaces of §2.9 are not built.** They are
   §6 item 6 with the backends.
-- **A defaulted binder gets no dedicated trace event.** §2.5 asks for one naming
-  the binder, the declaration line and the value. Because the default becomes an
-  ordinary 0-ary definition, the trace records it as a definition force, which
-  is accurate but is not the "alpha took its default 10" line the directive
+- **A defaulted binder gets no dedicated trace line.** §2.5 asks for one naming
+  the binder, the declaration line and the value. The event exists (W8's, raised
+  when the default is first read; `presumed` in `l4 batch` and the service is
+  built from it) and no trace renders it. Measured on `feat/typically-w10`:
+  `#EVALTRACE doubled`, over a section `GIVEN` with a default, shows
+  `` doubled OF `the rate` ``, `` `the rate` TIMES 2 `` and `6`, and no step for the
+  default. Rendering it is W8 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (§4), not built
+  on this branch; it is not the "alpha took its default 10" line the directive
   output was supposed to render from.
+- **`ASSUME … TYPICALLY` is still not used.** T2 (§11.5) rules it honoured; W6 of
+  `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` is deferred by Meng's word of 2026-10-02,
+  because `ASSUME` is being deprecated. `doc/reference/types/TYPICALLY.md` says so,
+  under "On an `ASSUME`".
+- **A construction that leaves out every field of a record has no spelling, and an
+  enum constructor's payload fields take no default at a construction.** Both are
+  open: `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2, "Not built here".
+- **T5, exporters that map a default or say they drop it, is not on this branch.**
+  It is W9 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`.
 - ~~A rule that reads a binder cannot be passed as a first-class value.~~
   **Built after review.** The pass now eta-expands a bare reference to a reader
   with parameters of its own, minting `Unique`s with the sort char `'d'` (no

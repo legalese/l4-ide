@@ -1,0 +1,16 @@
+-- Defaults declared in an IMPORTED module are taken at a named site and at a
+-- construction here (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5 across an
+-- IMPORT). The declaring half is ok/typically-import-def.l4.
+
+IMPORT `typically-import-def`
+
+#ASSERT (`imported scaled` WITH base IS 10) EQUALS 30
+#ASSERT (`imported scaled` WITH base IS 10, rate IS 2) EQUALS 20
+#ASSERT (`imported scaled` WITH base IS 10, colour IS Red) EQUALS 0
+
+GIVETH A Paint
+`some paint` MEANS Paint WITH coats IS 2
+
+#ASSERT (`some paint`'s colour) EQUALS Red
+#ASSERT (`some paint`'s coats) EQUALS 2
+#EVAL `some paint`

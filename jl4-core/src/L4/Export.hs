@@ -2,6 +2,9 @@
 module L4.Export (
   ExportedFunction (..),
   ExportedParam (..),
+  ParamSource (..),
+  honouredDefault,
+  isRequiredInput,
   DescFlags (..),
   ParsedDesc (..),
   TypeDescMap,
@@ -46,7 +49,7 @@ import L4.Annotation (getAnno)
 import L4.Syntax
 import L4.Names (filterGivenSigTo, getName, isSectionBinderElaboration, sectionGivenNames)
 import L4.TypeCheck.Environment (maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, typeHeads)
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -70,11 +73,42 @@ data ExportedParam = ExportedParam
   , paramDescription :: !(Maybe Text)
   , paramRequired :: !Bool
   , paramDefault :: !(Maybe (Expr Resolved)) -- ^ TYPICALLY default value, if declared
+  , paramSource :: !ParamSource -- ^ how the input was declared
   }
   deriving stock (Eq, Show, Generic)
 #if defined(SERIALISE_ENABLED)
   deriving anyclass (Serialise)
 #endif
+
+-- | How an export's input was declared. It decides whether a @TYPICALLY@ on
+-- it is a default anything honours yet ('honouredDefault').
+data ParamSource
+  = GivenInput         -- ^ the export's own @GIVEN@
+  | SectionGivenInput  -- ^ a section @GIVEN@ the export reads
+  | AssumeInput        -- ^ an @ASSUME@ the export reads
+  deriving stock (Eq, Show, Generic)
+#if defined(SERIALISE_ENABLED)
+  deriving anyclass (Serialise)
+#endif
+
+-- | The default a caller may leave this input out for, if any: a @TYPICALLY@
+-- on a rule or section @GIVEN@ (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+--
+-- Not on a written @ASSUME@: @#EVAL@ does not honour that default either
+-- (§2, p6), and honouring it is W6 (ruling T2), which lands the schema half
+-- after this. Until then it is published as no default, so that the schema,
+-- @l4 batch@ and the service agree with @#EVAL@ about it.
+honouredDefault :: ExportedParam -> Maybe (Expr Resolved)
+honouredDefault p = case p.paramSource of
+  AssumeInput -> Nothing
+  _           -> p.paramDefault
+
+-- | Whether a request must supply this input while presumption is on (the
+-- default, T4): a @MAYBE@ input may be left out and is @NOTHING@, and one
+-- with an honoured default may be left out and takes it. With presumption
+-- off, every input is required (T1b, T3c).
+isRequiredInput :: ExportedParam -> Bool
+isRequiredInput p = p.paramRequired && isNothing (honouredDefault p)
 
 data DescFlags = DescFlags
   { isDefault :: !Bool
@@ -242,6 +276,7 @@ buildExportedFunction mod' typeDescMap assumes decide@(MkDecide _ tySig appForm 
   guard (parsed.flags.isExport)
   let givenParams = extractParams typeDescMap tySig
       assumedParams = extractAssumedDependencies mod' typeDescMap assumes decide
+                        (sectionBinderUniques mod')
   pure
     ExportedFunction
       { exportName = resolvedToText (extractAppFormName appForm)
@@ -268,7 +303,21 @@ extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       , paramDefault = mTypically
+      , paramSource = GivenInput
       }
+
+-- | The ASSUMEs that are a section @GIVEN@'s elaboration
+-- ('L4.Desugar.desugarSectionGivens'), as opposed to written ones.
+sectionBinderUniques :: Module Resolved -> Set.Set Unique
+sectionBinderUniques (MkModule _ _ sect) = go sect
+ where
+  go (MkSection _ _ _ mgiven decls) =
+    Set.fromList
+      [ getUnique r
+      | d@(Assume _ (MkAssume _ _ (MkAppForm _ r [] _) _ _)) <- decls
+      , isSectionBinderElaboration (sectionGivenNames mgiven) d
+      ]
+    <> foldMap go [ s | Section _ s <- decls ]
 
 extractReturnType :: TypeSig Resolved -> Maybe (Type' Resolved)
 extractReturnType (MkTypeSig _ _ giveth) =
@@ -379,13 +428,25 @@ collectReferencedUniques =
 -- | The body of every module-level DECIDE (in any section), keyed by the
 -- 'Unique' of the name it defines. This is the call graph's edge table:
 -- 'transitiveReferencedUniques' follows a reference into its body.
+--
+-- A section binder's @TYPICALLY@ default is in it too, under the binder's own
+-- 'Unique': a default is an expression and reads what it names (R8 rule 3,
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7), so whatever reads the binder is charged
+-- with the default's own reads, which is the default's read-set joining the
+-- requirement of every root that may use it. Only the elaboration the checker
+-- made of a section @GIVEN@ counts: a written @ASSUME@'s default is not used
+-- (W6 is deferred), so it reads nothing.
 decideBodiesFromModule :: Module Resolved -> Map.Map Unique (Expr Resolved)
 decideBodiesFromModule (MkModule _ _ section) =
   Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
+  goSection (MkSection _ _ _ mgiven decls) =
+    let binders = sectionGivenNames mgiven
+    in decls >>= goDecl binders
+  goDecl binders = \case
     Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) -> [(getUnique name, body)]
+    d@(Assume _ (MkAssume _ _ (MkAppForm _ name [] _) _ (Just dflt)))
+      | isSectionBinderElaboration binders d -> [(getUnique name, dflt)]
     Section _ sub -> goSection sub
     _ -> []
 
@@ -431,8 +492,29 @@ assumesReadBy
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [Assume Resolved]
-assumesReadBy mod' assumes (MkDecide _ _ _ body) =
-  let referencedUniques = transitiveReferencedUniques mod' body
+assumesReadBy mod' assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ body) =
+  -- The export's own inputs' defaults are read too, when a request leaves the
+  -- input out: a default that names a written ASSUME makes it an input of the
+  -- export, so a request can supply it and the answer can use it. A default on a
+  -- rule's input cannot read a section input (decision 1, 'TypicallyReadsInput'),
+  -- so what this adds is a written ASSUME; it was left out once on the ground that
+  -- there was nothing to add, and an ASSUME the default reads was then neither
+  -- published nor accepted, so the default could never be used (W7 second review,
+  -- rulings S4).
+  --
+  -- A SECTION input is left out of what a default adds, though the closure does
+  -- not subtract a WITH: a default that SUPPLIES the input it would read
+  -- (@rate TYPICALLY (`double it` WITH base IS 1)@) reads none of it, and making
+  -- it an input of the export would bind it to the row in @l4 batch@, where a WITH
+  -- to a bound input is not a supply and every row is refused.
+  let binders = sectionBinderUniques mod'
+      referencedUniques =
+        Set.union
+          (transitiveReferencedUniques mod' body)
+          (Set.filter (`Set.notMember` binders)
+             (Set.unions
+                (map (transitiveReferencedUniques mod')
+                   [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ])))
   in [ assume
      | (uniq, assume) <- Map.toList assumes
      , Set.member uniq referencedUniques
@@ -487,13 +569,14 @@ extractAssumedDependencies
   -> TypeDescMap
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
+  -> Set.Set Unique
   -> [ExportedParam]
-extractAssumedDependencies mod' typeDescMap assumes decide =
-  map (assumeToParam typeDescMap) (assumesReadBy mod' assumes decide)
+extractAssumedDependencies mod' typeDescMap assumes decide binders =
+  map (assumeToParam typeDescMap binders) (assumesReadBy mod' assumes decide)
 
 -- | Convert an ASSUME declaration to an ExportedParam
-assumeToParam :: TypeDescMap -> Assume Resolved -> ExportedParam
-assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
+assumeToParam :: TypeDescMap -> Set.Set Unique -> Assume Resolved -> ExportedParam
+assumeToParam typeDescMap binders (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
   let
     paramDesc = fmap getDesc (ann ^. annDesc)
     fallbackDesc = mType >>= getTypeDesc typeDescMap
@@ -504,6 +587,8 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypicall
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       , paramDefault = mTypically
+      , paramSource =
+          if getUnique name `Set.member` binders then SectionGivenInput else AssumeInput
       }
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
@@ -520,9 +605,10 @@ extractAssumeParamTypes
 extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
--- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
--- value (if any) declared on each ASSUME, and the ASSUME's own @\@desc@
--- text (if any). Used by the function schema to expose defaults and
+-- | Like 'extractAssumeParamTypes' but also returns the default a request may
+-- leave the input out for (a section @GIVEN@'s @TYPICALLY@; a written
+-- ASSUME's is not honoured yet, see 'honouredDefault'), and the ASSUME's own
+-- @\@desc@ text (if any). Used by the function schema to expose defaults and
 -- descriptions to API consumers.
 extractAssumeParamsWithDefaults
   :: Module Resolved
@@ -531,9 +617,11 @@ extractAssumeParamsWithDefaults
 extractAssumeParamsWithDefaults mod' decide =
   mapMaybe assumeInfo (assumesReadBy mod' (assumesFromModule mod') decide)
  where
+  binders = sectionBinderUniques mod'
   assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)
   assumeInfo (MkAssume ann _ (MkAppForm _ name _ _) (Just ty) mTypically) =
-    Just (resolvedToText name, ty, mTypically, getDesc <$> ann ^. annDesc)
+    let honoured = if getUnique name `Set.member` binders then mTypically else Nothing
+    in Just (resolvedToText name, ty, honoured, getDesc <$> ann ^. annDesc)
   assumeInfo _ = Nothing
 
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of
@@ -652,15 +740,53 @@ validateExportImplicitImports importedReaders entityInfo mod'
           { kind    = ImplicitCrossesImport fnName importedName
           , context = WhileCheckingDecide (getActual fnName) None
           }
-      | MkDecide _ _ (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
+      | MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
       , u <- take 1 (Set.toList
                        (Set.intersection
-                          (transitiveReferencedUniquesWith bodies body)
+                          (Set.unions
+                             (map (transitiveReferencedUniquesWith bodies)
+                                -- A request that leaves an input out takes its
+                                -- default, so what the default calls is reached
+                                -- from the export as much as the body is. So is
+                                -- the default of a field of a record an input
+                                -- carries: the decoder takes it when the request
+                                -- leaves the field out.
+                                (body
+                                   : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]
+                                   <> recordFieldDefaultsReachedBy mod'
+                                        [ ty | MkOptionallyTypedName _ _ (Just ty) _ <- otns ])))
                           importedReaders))
       , Just (importedName, _) <- [Map.lookup u entityInfo]
       ]
  where
   bodies = decideBodiesFromModule mod'
+
+-- | The @TYPICALLY@ defaults of the fields of the records that these types
+-- reach: the records this module declares whose names they mention, and in turn
+-- the records the types of those records' fields mention. A record declared in
+-- an imported module is not in the module's own declarations and is not walked.
+recordFieldDefaultsReachedBy :: Module Resolved -> [Type' Resolved] -> [Expr Resolved]
+recordFieldDefaultsReachedBy (MkModule _ _ sect) tys = go Set.empty (concatMap names tys)
+ where
+  names = map getUnique . typeHeads
+
+  records = Map.fromList (declared sect)
+  declared (MkSection _ _ _ _ decls) = concatMap fromDecl decls
+  fromDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ n _ _) decl) -> case decl of
+      RecordDecl _ _ tns -> [(getUnique n, tns)]
+      EnumDecl _ cds     -> [(getUnique n, concat [ tns | MkConDecl _ _ tns <- cds ])]
+      _                  -> []
+    Section _ s -> declared s
+    _           -> []
+
+  go _ [] = []
+  go seen (u : us)
+    | Set.member u seen = go seen us
+    | Just tns <- Map.lookup u records =
+        [ d | MkTypedName _ _ _ (Just d) _ <- tns ]
+          <> go (Set.insert u seen) (concat [ names ty | MkTypedName _ _ ty _ _ <- tns ] <> us)
+    | otherwise = go (Set.insert u seen) us
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
