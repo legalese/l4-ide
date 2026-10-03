@@ -304,6 +304,10 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (callee, binder) <- Discharge.unreadImplicitSupplies rprog
                   ]
                   ++
+                  [ MkCheckErrorWithContext (ImplicitSupplyToInput callee binder) None
+                  | (callee, binder) <- Discharge.implicitSuppliesToInputs rprog
+                  ]
+                  ++
                   -- R8 rule 3 (W7): a section binder's default that reads the
                   -- binder itself, or reaches it through another default or a
                   -- definition, cannot be worked out. A whole-module fact, like
@@ -7327,6 +7331,18 @@ prettyCheckError (UnreadImplicitSupply callee binder)       =
   , "go, so the override would do nothing."
   , ""
   , "Supply it to whichever definition does read it, or drop it from this call."
+  ]
+prettyCheckError (ImplicitSupplyToInput callee binder)   =
+  [ "This call gives"
+  , ""
+  , "  " <> quotedName (getName binder)
+  , ""
+  , "to " <> quotedName (getName callee) <> ", which is an input of a section and not a rule,"
+  , "so there is nothing there for the value to reach. An input is worked out"
+  , "from the values the whole case gives."
+  , ""
+  , "Give the value to a rule that reads " <> quotedName (getName callee) <> ", or drop it from"
+  , "this call."
   ]
 prettyCheckError (AmbiguousImplicitSupply callee binder)   =
   [ "This call supplies"

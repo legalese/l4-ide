@@ -171,6 +171,11 @@ data CheckError =
     -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; there is
     -- nowhere to put a value for one outside it, so the override would silently
     -- do nothing. See 'L4.Discharge.unreadImplicitSupplies'.
+  | ImplicitSupplyToInput Resolved Resolved
+    -- ^ A @WITH@ site gave a value to a section input as though it were a rule:
+    -- @discount WITH \`list price\` IS 200@. An input has nothing for a @WITH@ to
+    -- reach; the value belongs on a rule that reads it. Arguments: the input
+    -- called, and the binder supplied. See 'L4.Discharge.implicitSuppliesToInputs'.
   | AmbiguousImplicitSupply Resolved Resolved
     -- ^ A @WITH@ site named a binder the callee reads under two or more
     -- same-spelled binders, and its own 'Unique' matched none of them, so there
@@ -855,6 +860,7 @@ instance HasSrcRange CheckError where
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
+  rangeOf (ImplicitSupplyToInput _ b)       = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
   rangeOf (MisdeliveredImplicitSupply _ r _) = rangeOf r
   rangeOf (AmbiguousRootBinders r _ _)      = rangeOf r
