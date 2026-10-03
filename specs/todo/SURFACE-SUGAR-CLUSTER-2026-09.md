@@ -76,7 +76,7 @@ is declared, never inferred from the type.**
 **What decided it.** The modified form is additive and re-means **0** sites — omitting a field is a
 check error today (`IncompleteAppNamed`, `TypeCheck.hs:3146`) — and the machinery already exists:
 field-level `TYPICALLY` parses (`Parser.hs:1292-1301`), type-checks, has a doc page
-(`TYPICALLY.md:22,107-115`) and a fixture (`ok/typically-basic.l4`).
+(`TYPICALLY.md:22,107-115` at `7768812fa`) and a fixture (`ok/typically-basic.l4`).
 
 **Adversarially weakened, and one thing it found must be ruled with it.** _"No diagnostic anywhere"
 is already false at every deploy boundary: the batch decoder, `jl4-service` and the JSON schema
@@ -88,8 +88,8 @@ an evaluation and keeps defaulting an absent `MAYBE` field to `NOTHING`; `TYPICA
 not gate it. Encoders annotate; callers over the wire do not have to.
 
 **Two corrections to the record for whoever builds it.** Cite `TYPICALLY-DEFAULTS-SPEC.md`, Edge Cases 1 ("TYPICALLY on Optional Fields"),
-as the governing text, not `IMPLICIT-PROPS-DESIGN.md` §11.5 R8, which carves `DECLARE` fields out
-(`TYPICALLY.md:69-72`) — R8's own note now carries a line saying it extends to them. And this was
+as the governing text, not `IMPLICIT-PROPS-DESIGN.md` §11.5 R8, which carved `DECLARE` fields out
+(`TYPICALLY.md:69-72` at `7768812fa`, a passage W5 and W10 removed) — R8's own note now carries a line saying it extends to them. And this was
 **blocked on R8's named-site half**, which W4 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` built with it
 (§4.2, 2026-10-03, `feat/typically-w4w5`, not yet merged); #645 closes when that lands.
 
