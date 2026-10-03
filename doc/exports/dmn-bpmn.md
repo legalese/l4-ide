@@ -124,7 +124,7 @@ reaches through `HENCE`, and for the section `GIVEN`s, `ASSUME`s and record fiel
 from another file included, with its module named), and for nothing else; a default on an input of an
 unrelated rule is not this process's loss, and neither is a default on a field of a record the rule is
 given when nothing the process says names that field. The process draws no record, but a condition such
-as `PROVIDED s's \`in good standing\``names the field, so the instance that holds an`s` without it does
+as ``PROVIDED s's `in good standing` `` names the field, so the instance that holds an `s` without it does
 not get the default.
 
 Neither note is `blocking` (the notations are not at fault for lacking a default), so

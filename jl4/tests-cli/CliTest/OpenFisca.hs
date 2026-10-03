@@ -64,7 +64,7 @@ spec bin = do
       expectGolden bin ["export", "openfisca", "examples/openfisca/defaults.l4"]
                        "examples/openfisca/expected/defaults.py"
 
-    it "maps a number, a boolean and an enum member, on a field and on a GIVEN" $ do
+    it "maps a number and a boolean on a field and on a GIVEN, and an enum member on a GIVEN" $ do
       Output code sout _ <- runL4 bin ["export", "openfisca", "examples/openfisca/defaults.l4"]
       code `shouldBe` ExitSuccess
       -- record fields

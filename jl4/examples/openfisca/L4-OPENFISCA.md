@@ -213,6 +213,15 @@ OpenFisca output as float32-approximate, not exact.
   that disagree about one input's default (`TYPICALLY 3` against none is a
   disagreement; `TYPICALLY 0` against none is not, since OpenFisca's own default
   is already 0).
+- **A call to another exported decision sends no arguments.** It is lowered to
+  `entity('other_var', period)`, which OpenFisca computes from the entity's own
+  inputs, so a value written after the callee's name (`scaled base 5`) is not
+  passed: the callee's input is what the simulation supplied, else its
+  `TYPICALLY` default, else OpenFisca's own (`0.0`). L4 evaluates the call with
+  the value written; both exit 0, with no report. (Measured on `doubled base
+  MEANS scaled base 5`, `scaled`'s `rate` being `TYPICALLY 3`: L4 gives 50 for
+  a `base` of 10, OpenFisca 30, and 0 with the `TYPICALLY` removed.) Pass each
+  argument as the caller's own input of the same name.
 - **`members of` is recognised by name**, and is assumed to concatenate the
   subject's role lists (= all members). If you define it to mean something else,
   aggregations over it will silently disagree with L4.

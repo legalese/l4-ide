@@ -101,7 +101,10 @@ Three things the table cannot show:
   be a literal today. When it is allowed to be an expression, OpenFisca will turn it into a formula
   that a supplied input overrides (and refuse an expression it cannot lower), Catala will lower it
   as the in-scope definition, DMN, BPMN and Blawx will print it in their notes, docassemble will
-  refuse it (or skip that export with a blocking note), and yscript will refuse it. No export is left with an arm that never saw one.
+  refuse the module, and yscript will refuse it. No export is left with an arm that never saw one.
+  (docassemble already refuses the module for a default it cannot pre-fill that the checker does
+  accept: `TYPICALLY NOTHING` on a `MAYBE`. The refusal is whole-module, so it does not matter whether
+  the rule carrying it is the default export.)
 - **A default written in an imported file counts when the export reads it.** DMN, dmn-md, BPMN and
   Catala report it, and name the imported module in the note. OpenFisca, Blawx, docassemble and
   yscript refuse an imported `ASSUME` or an imported record field that the exported rule reads
