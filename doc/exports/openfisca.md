@@ -102,6 +102,11 @@ What it refuses, loudly, because OpenFisca has no value to give it:
   OpenFisca has no list-valued variable to put a default on, so any other default would be lost.
   `EMPTY` says nothing that a variable with no default does not already say, so it is accepted and
   changes nothing in the output.
+- **A default of a kind the variable does not hold, and a variable of a type the export does not
+  recognise.** The export knows numbers, whole numbers, booleans, strings and the enums of the module.
+  A synonym such as `DECLARE Label IS A STRING` is none of them, so a variable of that type is held
+  as a number, and a string default on it is refused; the message names the type, so you can see that
+  the type is the cause.
 - **Two exported decisions that give one input different defaults.** OpenFisca has one variable of
   that name and so one default; the export names both and stops rather than pick one. "Different"
   means different in OpenFisca, where a decision that writes no `TYPICALLY` gets OpenFisca's own
