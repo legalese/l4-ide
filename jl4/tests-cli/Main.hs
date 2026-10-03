@@ -428,7 +428,8 @@ spec bin = do
     it "says which TYPICALLY default a directive took, and not when the value was supplied" $ do
       Output code sout _ <- runL4 bin ["run", runDefaultFixture]
       code `shouldBe` ExitSuccess
-      countInfix "the rate took its default (declared at run-default.l4:" sout `shouldBe` 1
+      -- with its value, which R8's example line has ("alpha took its default 10")
+      countInfix "the rate took its default 3 (declared at run-default.l4:" sout `shouldBe` 1
       countInfix "Notes:" sout `shouldBe` 1
       env <- jsonEnvelope bin ["run", runDefaultFixture, "--json"]
       case objField env "results" of

@@ -70,6 +70,7 @@ theRate = MkPresumed
   { path = ["the rate"]
   , declaredAt = Just (MkSrcRange (MkSrcPos 4 30) (MkSrcPos 4 31) 1 (uriOf "file:///somewhere/rates.l4"))
   , origin = FromSectionBinder
+  , valueText = Nothing
   }
 
 -- | The events in a trace, in order, wherever they hang: the path of each
@@ -192,15 +193,24 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
     -- list of its address, which the event takes the steps of
     eventsOf t `shouldBe` [(["the rate"], 1)]
 
-  -- W11: the line beside a directive's answer says what the trace would say, and
-  -- is not said twice
-  it "says a default beside the answer when there is no trace, and not again when the trace shows it" $ do
+  -- W11: the line beside a directive's answer says what the trace would say, with
+  -- the value R8's example has, and is not said twice
+  it "says a default beside the answer when there is no trace, with its value, and not again when the trace shows it" $ do
     r <- numberRef 1 3
-    let said = "the rate took its default (declared at rates.l4:4:30-31)"
+    let valued = theRate { valueText = Just "3" }
+        said = "the rate took its default 3 (declared at rates.l4:4:30-31)"
         shown = postprocessTrace
           [ Enter (number 2), TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
-    defaultNotes Nothing [theRate] `shouldBe` [said]
-    defaultNotes (Just shown) [theRate] `shouldBe` []
+    defaultNotes Nothing [valued] `shouldBe` [said]
+    -- the trace has the event; the entry of the list carries a value the event
+    -- does not, and is still the same default
+    defaultNotes (Just shown) [valued] `shouldBe` []
     -- a trace that does not show it (post-processing failed) leaves the line
-    defaultNotes (Just tracePostprocessFailed) [theRate] `shouldBe` [said]
+    defaultNotes (Just tracePostprocessFailed) [valued] `shouldBe` [said]
     defaultNotes Nothing [] `shouldBe` []
+
+  it "says the sentence of the event when there is no value, and a MAYBE left out as what it is" $ do
+    defaultNotes Nothing [theRate] `shouldBe` ["the rate took its default (declared at rates.l4:4:30-31)"]
+    -- no TYPICALLY behind it, so no line to quote; the value is NOTHING by definition
+    defaultNotes Nothing [theRate { declaredAt = Nothing, valueText = Just "NOTHING" }]
+      `shouldBe` ["the rate took its default (a MAYBE left out is NOTHING)"]

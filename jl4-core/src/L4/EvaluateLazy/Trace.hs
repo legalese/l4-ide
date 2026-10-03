@@ -173,9 +173,27 @@ data Presumed =
     , declaredAt :: !(Maybe SrcRange)
       -- ^ The @TYPICALLY@ that supplied the value.
     , origin     :: !PresumedOrigin
+    , valueText  :: !(Maybe Text)
+      -- ^ The default's value on one line, as far as it had been evaluated when
+      -- the directive ended ('L4.EvaluateLazy.nfDirectiveWith'): what a plain
+      -- directive's @NOTE:@ line says ('defaultNoteText'). 'Nothing' everywhere
+      -- else: on an event in a trace, which has its value as the node's, on a
+      -- default that is registered and not yet forced, and on one whose forcing
+      -- did not finish. Not part of what makes two events the same default
+      -- ('presumedKey').
     }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
+
+-- | What makes two events the same default: where it landed, which fill site
+-- supplied it, and the @TYPICALLY@ it came from. The last matters when two
+-- sections each declare an input of one name with a default of their own: they
+-- are two defaults, each an event, though 'path' names them alike. The value is
+-- not part of it.
+type PresumedKey = ([Text], PresumedOrigin, Maybe SrcRange)
+
+presumedKey :: Presumed -> PresumedKey
+presumedKey p = (p.path, p.origin, p.declaredAt)
 
 -- | Which fill site supplied a default. A consumer keeps only the events that
 -- belong to its request (T6b): an L4 program may decode JSON of its own.
@@ -450,6 +468,35 @@ defaultEventText p =
 
 defaultEventHeader :: Presumed -> Doc ann
 defaultEventHeader = pretty . defaultEventText
+
+-- | The sentence a plain directive says beside its answer (W11), where there is
+-- no trace to carry the value on a line of its own: 'defaultEventText' with the
+-- value in it, as R8 words the line (\"alpha took its default 10\"):
+--
+-- > the rate took its default 3 (declared at rates.l4:2:44-45)
+--
+-- The value is what the directive ended with ('Presumed.valueText'); without one
+-- the sentence is the event's. A @MAYBE@ left out says what it is, and not its
+-- value, which would only repeat it.
+defaultNoteText :: Presumed -> Text
+defaultNoteText p =
+  renderPresumedPath p.path <> " took its default " <>
+    case p.declaredAt of
+      Just r  -> maybe "" (<> " ") p.valueText <> "(declared at " <> prettySrcRange r <> ")"
+      Nothing -> "(a MAYBE left out is NOTHING)"
+
+-- | The defaults a trace shows.
+tracedDefaults :: EvalTrace -> [Presumed]
+tracedDefaults = \ case
+  Trace _ steps _        -> foldMap (foldMap tracedDefaults . snd) steps
+  TraceDefault p steps _ -> p : foldMap (foldMap tracedDefaults . snd) steps
+
+-- | The defaults of a directive that its trace does not show.
+untracedDefaults :: Maybe EvalTrace -> [Presumed] -> [Presumed]
+untracedDefaults mtrace presumed =
+  [ p | p <- presumed, presumedKey p `Set.notMember` shown ]
+  where
+    shown = Set.fromList (presumedKey <$> maybe [] tracedDefaults mtrace)
 
 -- | Helper function to display an exception or final value in a trace.
 printExceptionOrNF :: Either EvalException NF -> Doc ann
