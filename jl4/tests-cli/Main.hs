@@ -246,7 +246,7 @@ batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 -- | @TYPICALLY@ that is an EXPRESSION (W7, R8 rule 3): on a rule's input, a
 -- section input and a record's field; taken from the case, and at a named site
 -- inside the rules; and a circle of defaults, which is no program.
-batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson, batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson :: FilePath
+batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson, batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson, batchTySupplies, batchTySuppliesJson :: FilePath
 batchTyExpr         = fixtureDir </> "batch-typically-expression.l4"
 batchTyExprJson     = fixtureDir </> "batch-typically-expression.json"
 batchTyExprAll      = fixtureDir </> "batch-typically-expression-all.l4"
@@ -259,6 +259,8 @@ batchTyReads        = fixtureDir </> "batch-typically-reads-input.l4"
 batchTyReadsJson    = fixtureDir </> "batch-typically-reads-input.json"
 batchTyMulti        = fixtureDir </> "batch-typically-multiarg.l4"
 batchTyMultiJson    = fixtureDir </> "batch-typically-multiarg.json"
+batchTySupplies     = fixtureDir </> "batch-typically-default-supplies.l4"
+batchTySuppliesJson = fixtureDir </> "batch-typically-default-supplies.json"
 
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
@@ -462,7 +464,7 @@ coreFixtures =
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
   , batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson
-  , batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson
+  , batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson, batchTySupplies, batchTySuppliesJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -2093,6 +2095,17 @@ spec bin = do
       map resultAndPresumed rows `shouldBe`
         [ (Just (Number (-5)), presumedOf ["discount", "rate"])
         , (Just (Number 195),  presumedOf [])
+        ]
+
+    -- A default that SUPPLIES a section input it would read reads none of it, so
+    -- the input is not one of the export's, and the rows run.
+    it "runs an export whose input's default supplies a section input" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySupplies, "--inputs", batchTySuppliesJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 200), presumedOf ["rate"])
+        , (Just (Number 300), presumedOf [])
         ]
 
     -- A default on a rule's input that reads a section input is a check error,
