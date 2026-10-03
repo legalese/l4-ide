@@ -1107,7 +1107,7 @@ change in its own right; `doc/reference/types/TYPICALLY.md` says so, under "What
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
 
 **EXTENDED 2026-09-06 to `DECLARE` record fields (D7.3, upstream #645).** R8 as written governs
-`GIVEN` binders and `TYPICALLY.md:69-72` carves record fields out. D7.3 rules that a `MAYBE`-typed
+`GIVEN` binders and `TYPICALLY.md:69-72` (at `7768812fa`, a passage W5 and W10 removed) carved record fields out. D7.3 rules that a `MAYBE`-typed
 field may be declared `field IS A MAYBE T TYPICALLY NOTHING`, and only then may a construction
 site omit it — same principle, one declaration, the default living where the name is declared.
 Ruled 2026-09-06, and **built 2026-10-03** with R8's named-site half (W4 and W5 of
@@ -2451,8 +2451,13 @@ which owns the defect; this section owns the ruling and the limit.
   it exercised, it wants a compiler test, not a corpus row.
 - **The backends still see the undischarged module.** R10 (§11.10) moves DMN,
   Catala, Docassemble, OpenFisca, Blawx and MLIR onto the discharged AST, keys
-  the export schema by (name, tier), makes defaulted implicits optional and adds
-  `BatchRequest.world`. Keeping them on the module the author wrote is what lets
+  the export schema by (name, tier) and adds `BatchRequest.world`. (Its clause
+  that defaulted implicits are not `required` is built, as W2 of
+  `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.1: `L4.Export.isRequiredInput`, and the
+  service's schema leaves a defaulted fact out of `required` and carries its
+  `default`. `x-l4-tier` is in no `.hs`, `.ts` or `.json` file of the tree, and
+  `BatchRequest` in `jl4-service/src/Types.hs` has no `world` field; searched
+  2026-10-04.) Keeping them on the module the author wrote is what lets
   this change land without moving a single backend golden, and lets the sweep's
   269 rewrites be gated on their own oracle rather than on this one. The one
   construct they cannot see is an inner `WITH` on a binder, which

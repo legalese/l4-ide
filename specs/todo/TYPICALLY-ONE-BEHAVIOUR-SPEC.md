@@ -624,6 +624,11 @@ The example of an inner `WITH` in `ok/typically-expression.l4` (`priced as if de
 - **The exporters' notes for DMN, dmn-md, BPMN, OpenFisca, Blawx and yscript**: W9. This is the one place the brief's "a note or refusal is better than silence" is not met on this branch alone.
 - **`l4 batch` and the generated-module path writing a name with its section**, which would remove the limit of F4 and the refusal of decision 7. The checker's section paths (`sectionQualifiedWith`) are the data, and the service's `CompiledModule` does not carry them.
 - **Under hard, dropping the input only a default reads** (decision 3).
+- **The service's direct path stops with an internal error** for a request that supplies an input that an expression default supplies, when the default's own input is left out (§4.4, finding 1).
+  It is W7's: a `WITH` inside a default exists only since W7, and it is on W7's head (`07b62714d`).
+  Wanted before W7 reaches `unstable`, and not a ruling: R8 (`IMPLICIT-PROPS-DESIGN.md` §11.5) fills the default once at the root and lets an inner `WITH` override it for that subtree, so `base` from the request and `` `double it` WITH base IS 10 `` inside the default should answer 21, as `#EVAL total WITH base IS 1` does.
+  The direct path's root fills have to discharge the `WITH` inside a default when the request also supplies that input, with a test pinning `{"base":1}` on that file to 21.
+  It is loud (an error, never a wrong number), and `errors/README.md` recommends this very shape as the remedy for two check errors.
 - **W6**, and so **T2b's "inputs-taking `ASSUME`s are reopened when W7 lands"**: that is a question for Meng (open for Meng 1), and W6 is deferred.
 
 **Open for Meng.**
@@ -634,6 +639,7 @@ The example of an inner `WITH` in `ok/typically-expression.l4` (`priced as if de
 4. **What a root is, and where a rule's or a field's default that reads a section input is worked out.** Decision 1 refuses such a default. R8 says it is "filled in once per evaluation at the root" and that a function's own may be omitted only at a named site; for an expression that reads a section input those differ, so say which should win: from the root's values, or from the site's. Both need "root" defined, and today it is syntactic: a call written in a directive is at the root, a lambda there included, and a call written in a rule is not, so `#EVAL final price WITH list price IS 1000` is `900`, the same call written as a rule is `990`, and an `#ASSERT` comparing them fails. Say whether a root is where a call is written, as it is now, or where an evaluation starts.
 5. **The query plan and the requirement disagree for a fact that only an expression default reads.** The plan never asks for `age` where `is adult TYPICALLY (age AT LEAST 18)`, and the schema requires it, so a client that answers everything the plan asks is refused for lacking `age`. W7 did not cause it (decision 3 rules the requirement, and TU-wire-b parked the lazy binding on the direct path that would remove it), but it is W7 that makes defaults read inputs. The ways out are the lazy binding, or a schema that can say "needed only if `is adult` is left out" (`anyOf`). Which, if either, is yours.
 6. **Canon's `regcf-denovo.l4` still carries a comment** (lines 134 to 135, at the canon commit `6b6476d`) saying the checker requires a `TYPICALLY` value to be a literal, which W7 makes stale. It is in `legalese/canon`, which this repository may not edit, so it is not touched here.
+7. **Whether to reword the `ASSUME` deprecation warning while W6 is deferred.** The warning says "Nothing is broken: the file still checks, runs and exports as before" and suggests a `GIVEN` line that carries the `TYPICALLY` across; for an `ASSUME` with a `TYPICALLY`, taking the suggestion switches the default on (the bare name becomes `TRUE`; §4.4, decision 1). The pages now say so; the warning, which an author sees before any page, does not. The reword is one line in `TypeCheck.hs`, and W6 would make it unnecessary. Say whether it is worth making for a keyword that is being retired (W10's advisor left it to you).
 
 ### 4.4 W10, as built (2026-10-04)
 
@@ -653,13 +659,13 @@ Four statements kept from the earlier builds were read against the code and test
   Three sentences the checks found wrong are corrected: "Three limits … at the boundary" listed five; the last of them called an expression default that supplies an input the export also reads "fine … in the service"; and a name that two sections define was said to be refused, which it is not (findings 1 and 2 of "Found while checking", below).
 - **`typically-example.l4`.**
   Holds each example the page quotes, and an `#ASSERT` for every answer the page gives.
-  `doc/test-docs.sh` runs it, and a false `#ASSERT` is a `DiagnosticSeverity_Error`, which that script rejects (shown by making two of them false).
+  `doc/test-docs.sh` runs it, and a false `#ASSERT` is a `DiagnosticSeverity_Error`, which that script rejects (shown by making one of them false).
 - **`ok/typically-basic.l4`.**
   Its header is left as it is, as the brief for this run says.
   It no longer asserts a metadata-only reading: W5 (`b4763a69f`) replaced "metadata-only default values … no runtime behaviour" with a pointer to the page and to the corpus files that exercise a default, and that is true on this branch.
 - **`TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`.**
   Status headers say what is built and where, and that the body below each is the December 2025 design.
-  The second's "BLOCKED - depends on TYPICALLY" is gone: what exists of its four cells is `L4.Presumption.fillDecision`, and the types and the API it sketches are not built (searched; one unrelated `SessionState` in `ts-shared/legalese-agent`).
+  The second's "BLOCKED - depends on TYPICALLY" is gone: what exists of its four cells is `L4.Presumption.fillDecision`, and the types and the API it sketches are not built (searched; an unrelated type `SessionState` in `ts-shared/legalese-agent`, and an unrelated local `initSession` in `jl4-lsp`).
 - **`IMPLICIT-PROPS-DESIGN.md`.**
   The trace-event item in the deferred list now says what exists (the event, not a trace line) and what a trace shows today (measured), and three items are added that the one-behaviour work leaves open: `ASSUME … TYPICALLY` (W6, deferred), a construction that leaves out every field with an enum constructor's payload fields, and T5 (W9, not on this branch).
   §11.5's "says so when R8 lands" is brought up to date.
@@ -747,7 +753,8 @@ Each in its own commit, so that it can be reverted alone.
 1. **The documentation half of S2 is done, although W6 is deferred.**
    T2 names `errors/README.md` and `ASSUME.md` as part of W6; the pages said the `ASSUME` to `GIVEN` rewrite is "safe to take" and that an `ASSUME`'s default is applied "nowhere", and the first is false for an `ASSUME` that carries a `TYPICALLY` (probed: the same rule gives the bare name before and `TRUE` after).
    Prefer loud over silent.
-   The deprecation warning's own text ("Nothing is broken: the file still checks, runs and exports as before") is the compiler's, not changed here, and is still silent on the point.
+   The deprecation warning's own text ("Nothing is broken: the file still checks, runs and exports as before", in `prettyCheckError`'s `DeprecatedAssume` case in `jl4-core/src/L4/TypeCheck.hs`) and the `GIVEN` line it suggests, which carries the `TYPICALLY` across, are the compiler's, not changed here, and are the half of S2 that stays false: they belong to W6.
+   If W6 stays deferred past the next prerelease cut, a one-line reword of the warning ("if it carries a `TYPICALLY`, the `GIVEN` will use it") is a small code change of its own; whether it is worth making for a deprecated keyword is Meng's call (Open for Meng 7).
    _Alternative:_ leave both pages until W6 rewords the warning and them together.
 2. **The page says that the ladder and the query plan read an `ASSUME`'s default.**
    A reader who moves a fact to an `ASSUME` to keep it out of the rules will find the wizard still presumes it; the page says so rather than leave "metadata only" to suggest otherwise.
