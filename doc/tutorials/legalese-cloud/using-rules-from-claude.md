@@ -161,7 +161,7 @@ The assistant sees two rule tools whose descriptions match the question, and cal
   "content": [
     {
       "type": "text",
-      "text": "{\"contents\":{\"result\":{\"value\":1400}},\"tag\":\"SimpleResponse\"}"
+      "text": "{\"contents\":{\"result\":{\"value\":1400}},\"report\":\"default\",\"tag\":\"SimpleResponse\"}"
     }
   ]
 }
@@ -174,7 +174,7 @@ The assistant sees two rule tools whose descriptions match the question, and cal
   "content": [
     {
       "type": "text",
-      "text": "{\"contents\":{\"result\":{\"value\":true}},\"tag\":\"SimpleResponse\"}"
+      "text": "{\"contents\":{\"result\":{\"value\":true}},\"report\":\"default\",\"tag\":\"SimpleResponse\"}"
     }
   ]
 }
