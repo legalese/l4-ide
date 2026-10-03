@@ -11,10 +11,15 @@ module TracePostprocessSpec (spec) where
 import Base (NormalizedUri, Uri (..), toNormalizedUri)
 import Control.DeepSeq (force)
 import Control.Exception (evaluate)
+import Data.Aeson (Value (..), decodeStrict)
+import qualified Data.Aeson.KeyMap as KeyMap
 import Data.IORef (newIORef)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import qualified Data.Vector as Vector
 import Test.Hspec
 
+import L4.API (l4Eval)
 import L4.EvaluateLazy (defaultNotes, postprocessTrace, safePostprocessTrace, tracePostprocessFailed)
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy (Address (..), NF(..), Reference (..), Thunk (..), Value(..))
@@ -247,3 +252,30 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
 
     it "leaves a trace that has no step of its own, which a plain directive's line then covers" $
       eventsOf (completeDefaults [(theRate, Just three)] tracePostprocessFailed) `shouldBe` []
+
+  -- review N4: the JSON the browser's engine returns carries the lines, under the
+  -- key `l4 run --json` uses, so that a page that shows notes could show them
+  describe "the notes of the WASM API's JSON (W11)" $
+    it "carries the default a plain directive took with its value, and none for one that supplied it" $ do
+      out <- l4Eval (Text.unlines
+        [ "§ `Rates`"
+        , "    GIVEN `the rate` IS A NUMBER TYPICALLY 3"
+        , ""
+        , "GIVETH A NUMBER"
+        , "doubled MEANS `the rate` TIMES 2"
+        , ""
+        , "#EVAL doubled"
+        , "#EVAL doubled WITH `the rate` IS 5"
+        ])
+      let notesOf = \ case
+            Object o | Just (Array rs) <- KeyMap.lookup "results" o ->
+              [ case KeyMap.lookup "notes" r of
+                  Just (Array ns) -> Just [ n | String n <- Vector.toList ns ]
+                  _               -> Nothing
+              | Object r <- Vector.toList rs ]
+            _ -> []
+      case notesOf <$> decodeStrict (Text.encodeUtf8 out) of
+        Just [Just [said], Nothing] -> do
+          said `shouldSatisfy` Text.isPrefixOf "the rate took its default 3 (declared at "
+          said `shouldSatisfy` Text.isSuffixOf ":2:44-45)"
+        other -> expectationFailure ("unexpected notes: " <> show other <> " in " <> Text.unpack out)
