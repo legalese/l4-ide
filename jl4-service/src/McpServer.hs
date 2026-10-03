@@ -45,7 +45,7 @@ import Control.Exception (SomeException, catch)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
-import Backend.Api (EvalBackend (..), FnLiteral (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
+import Backend.Api (EvalBackend (..), FnLiteral (..), Presumption (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
 import Options (Options (..))
 
 -- ----------------------------------------------------------------------------
@@ -575,7 +575,7 @@ runMcpEvaluationIO cfg vf args = do
       mResult <- (timeout timeoutMicros $ do
           setAllocationCounter memLimitBytes
           enableAllocationLimit
-          r <- runExceptT (runFn.runFunction args Nothing TraceNone False)
+          r <- runExceptT (runFn.runFunction args Nothing TraceNone False PresumeSoft)
           remaining <- getAllocationCounter
           let _ = memLimitBytes - remaining
           pure r

@@ -24,7 +24,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Prettyprinter
 import Prettyprinter.Render.Text
 import qualified Data.List.NonEmpty as NE
-import L4.Utils.Ratio (prettyRatio)
+import L4.Utils.Ratio (prettyRatio, prettyRatioExact)
 import L4.Evaluate.Operators
 import L4.Names
 import L4.Desugar
@@ -829,10 +829,18 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     App        _ n es -> printWithLayout n <> case es of
       [] -> mempty
       exprs@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
+    -- A named argument the checker ADDED from a TYPICALLY default
+    -- ('DefaultFill') is not part of what the author wrote, and printing it
+    -- would turn the default into an explicit value: the module re-checked from
+    -- this text (@l4 batch@ re-emits one) would no longer take the default, and
+    -- so could not report that it did.
     AppNamed   _ n namedExpr _ ->
-          printWithLayout n
-      <+> "WITH"
-      <+> align (vcatHard (fmap printWithLayout namedExpr))
+      case filter (not . isDefaultFill) namedExpr of
+        []      -> printWithLayout n
+        written ->
+              printWithLayout n
+          <+> "WITH"
+          <+> align (vcatHard (fmap printWithLayout written))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
@@ -1304,7 +1312,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where
 
 instance LayoutPrinter Lit where
   printWithLayout = \ case
-    NumericLit _ t -> pretty (prettyRatio t)
+    -- exact, not through Double: a re-printed module must be the same program
+    NumericLit _ t -> pretty (prettyRatioExact t)
     StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where

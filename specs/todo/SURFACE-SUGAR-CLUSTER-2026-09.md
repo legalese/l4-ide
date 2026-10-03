@@ -89,8 +89,9 @@ not gate it. Encoders annotate; callers over the wire do not have to.
 
 **Two corrections to the record for whoever builds it.** Cite `TYPICALLY-DEFAULTS-SPEC.md:420-428`
 as the governing text, not `IMPLICIT-PROPS-DESIGN.md` §11.5 R8, which carves `DECLARE` fields out
-(`TYPICALLY.md:69-72`) — R8's own note now carries a line saying it extends to them. And this is
-**blocked on R8's unbuilt named-site half**; #645 does not close before that ships.
+(`TYPICALLY.md:69-72`) — R8's own note now carries a line saying it extends to them. And this was
+**blocked on R8's named-site half**, which W4 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` built with it
+(§4.2, 2026-10-03, `feat/typically-w4w5`, not yet merged); #645 closes when that lands.
 
 **WIDENED 2026-10-01** by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T1 (PR #525, accepted on bench card T1): the omission rule covers every field declared `TYPICALLY`, not only `MAYBE … TYPICALLY NOTHING`, and an absent field in JSON takes its declared default. The JSON boundary's `NOTHING` for an absent `MAYBE` field still stands, for a field with no `TYPICALLY`, and only while presumption is on (T4); with presumption off it does not fire (amendment T1b). All three decoders read a field's default from its `DECLARE` (`Machine.hs:4387-4391`, `Backend/Jl4.hs:436-441`, the wrapper at `CodeGen.hs:431`), and the stale cite `Machine.hs:2282` above is now `:4389`.
 

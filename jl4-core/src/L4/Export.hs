@@ -2,6 +2,9 @@
 module L4.Export (
   ExportedFunction (..),
   ExportedParam (..),
+  ParamSource (..),
+  honouredDefault,
+  isRequiredInput,
   DescFlags (..),
   ParsedDesc (..),
   TypeDescMap,
@@ -70,11 +73,42 @@ data ExportedParam = ExportedParam
   , paramDescription :: !(Maybe Text)
   , paramRequired :: !Bool
   , paramDefault :: !(Maybe (Expr Resolved)) -- ^ TYPICALLY default value, if declared
+  , paramSource :: !ParamSource -- ^ how the input was declared
   }
   deriving stock (Eq, Show, Generic)
 #if defined(SERIALISE_ENABLED)
   deriving anyclass (Serialise)
 #endif
+
+-- | How an export's input was declared. It decides whether a @TYPICALLY@ on
+-- it is a default anything honours yet ('honouredDefault').
+data ParamSource
+  = GivenInput         -- ^ the export's own @GIVEN@
+  | SectionGivenInput  -- ^ a section @GIVEN@ the export reads
+  | AssumeInput        -- ^ an @ASSUME@ the export reads
+  deriving stock (Eq, Show, Generic)
+#if defined(SERIALISE_ENABLED)
+  deriving anyclass (Serialise)
+#endif
+
+-- | The default a caller may leave this input out for, if any: a @TYPICALLY@
+-- on a rule or section @GIVEN@ (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+--
+-- Not on a written @ASSUME@: @#EVAL@ does not honour that default either
+-- (§2, p6), and honouring it is W6 (ruling T2), which lands the schema half
+-- after this. Until then it is published as no default, so that the schema,
+-- @l4 batch@ and the service agree with @#EVAL@ about it.
+honouredDefault :: ExportedParam -> Maybe (Expr Resolved)
+honouredDefault p = case p.paramSource of
+  AssumeInput -> Nothing
+  _           -> p.paramDefault
+
+-- | Whether a request must supply this input while presumption is on (the
+-- default, T4): a @MAYBE@ input may be left out and is @NOTHING@, and one
+-- with an honoured default may be left out and takes it. With presumption
+-- off, every input is required (T1b, T3c).
+isRequiredInput :: ExportedParam -> Bool
+isRequiredInput p = p.paramRequired && isNothing (honouredDefault p)
 
 data DescFlags = DescFlags
   { isDefault :: !Bool
@@ -242,6 +276,7 @@ buildExportedFunction mod' typeDescMap assumes decide@(MkDecide _ tySig appForm 
   guard (parsed.flags.isExport)
   let givenParams = extractParams typeDescMap tySig
       assumedParams = extractAssumedDependencies mod' typeDescMap assumes decide
+                        (sectionBinderUniques mod')
   pure
     ExportedFunction
       { exportName = resolvedToText (extractAppFormName appForm)
@@ -268,7 +303,21 @@ extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       , paramDefault = mTypically
+      , paramSource = GivenInput
       }
+
+-- | The ASSUMEs that are a section @GIVEN@'s elaboration
+-- ('L4.Desugar.desugarSectionGivens'), as opposed to written ones.
+sectionBinderUniques :: Module Resolved -> Set.Set Unique
+sectionBinderUniques (MkModule _ _ sect) = go sect
+ where
+  go (MkSection _ _ _ mgiven decls) =
+    Set.fromList
+      [ getUnique r
+      | d@(Assume _ (MkAssume _ _ (MkAppForm _ r [] _) _ _)) <- decls
+      , isSectionBinderElaboration (sectionGivenNames mgiven) d
+      ]
+    <> foldMap go [ s | Section _ s <- decls ]
 
 extractReturnType :: TypeSig Resolved -> Maybe (Type' Resolved)
 extractReturnType (MkTypeSig _ _ giveth) =
@@ -487,13 +536,14 @@ extractAssumedDependencies
   -> TypeDescMap
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
+  -> Set.Set Unique
   -> [ExportedParam]
-extractAssumedDependencies mod' typeDescMap assumes decide =
-  map (assumeToParam typeDescMap) (assumesReadBy mod' assumes decide)
+extractAssumedDependencies mod' typeDescMap assumes decide binders =
+  map (assumeToParam typeDescMap binders) (assumesReadBy mod' assumes decide)
 
 -- | Convert an ASSUME declaration to an ExportedParam
-assumeToParam :: TypeDescMap -> Assume Resolved -> ExportedParam
-assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
+assumeToParam :: TypeDescMap -> Set.Set Unique -> Assume Resolved -> ExportedParam
+assumeToParam typeDescMap binders (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
   let
     paramDesc = fmap getDesc (ann ^. annDesc)
     fallbackDesc = mType >>= getTypeDesc typeDescMap
@@ -504,6 +554,8 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypicall
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       , paramDefault = mTypically
+      , paramSource =
+          if getUnique name `Set.member` binders then SectionGivenInput else AssumeInput
       }
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
@@ -520,9 +572,10 @@ extractAssumeParamTypes
 extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
--- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
--- value (if any) declared on each ASSUME, and the ASSUME's own @\@desc@
--- text (if any). Used by the function schema to expose defaults and
+-- | Like 'extractAssumeParamTypes' but also returns the default a request may
+-- leave the input out for (a section @GIVEN@'s @TYPICALLY@; a written
+-- ASSUME's is not honoured yet, see 'honouredDefault'), and the ASSUME's own
+-- @\@desc@ text (if any). Used by the function schema to expose defaults and
 -- descriptions to API consumers.
 extractAssumeParamsWithDefaults
   :: Module Resolved
@@ -531,9 +584,11 @@ extractAssumeParamsWithDefaults
 extractAssumeParamsWithDefaults mod' decide =
   mapMaybe assumeInfo (assumesReadBy mod' (assumesFromModule mod') decide)
  where
+  binders = sectionBinderUniques mod'
   assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)
   assumeInfo (MkAssume ann _ (MkAppForm _ name _ _) (Just ty) mTypically) =
-    Just (resolvedToText name, ty, mTypically, getDesc <$> ann ^. annDesc)
+    let honoured = if getUnique name `Set.member` binders then mTypically else Nothing
+    in Just (resolvedToText name, ty, honoured, getDesc <$> ann ^. annDesc)
   assumeInfo _ = Nothing
 
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of

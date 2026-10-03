@@ -246,6 +246,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
       rawArgs = Map.toList fnArgs.fnArguments
       remappedArgs = remapArguments reverseMap rawArgs
+      presumption = Maybe.fromMaybe PresumeSoft fnArgs.presumption
 
   (result, allocBytes) <- case (isDeontic, fnArgs.startTime, fnArgs.events) of
     -- Non-deontic function: reject deontic params
@@ -255,7 +256,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
       throwError err400 { errBody = jsonError "startTime and events are only valid for functions returning DEONTIC" }
     -- Non-deontic function: existing path
     (False, Nothing, Nothing) ->
-      runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz
+      runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz presumption
     -- Deontic function: require both startTime and events
     (True, Nothing, _) ->
       throwError err400 { errBody = jsonError "startTime is required for functions returning DEONTIC" }
@@ -265,7 +266,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
     (True, Just st, Just evts) ->
       runDeonticEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs st evts
         vf.fnImpl.deonticPartyType vf.fnImpl.deonticActionType
-        mTraceHeader mTraceParam mGraphViz
+        mTraceHeader mTraceParam mGraphViz presumption
   case result of
     SimpleError _ -> throwEvalError allocBytes result
     _ -> pure $ addHeader allocBytes result
@@ -299,7 +300,8 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Evaluate all cases in parallel, collecting alloc bytes per case
   evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase -> do
     let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-    r <- runAppM env (runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz)
+    r <- runAppM env (runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz
+                        (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
     pure (inputCase.id, r)
 
   -- Check for fatal errors and propagate
@@ -312,26 +314,31 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case comes back. An answer carries its result; a refusal is a
+    -- determinate answer too, and carries its reason and the defaults it
+    -- rests on (T6); an error carries its message, so that no case vanishes
+    -- into the count without a reason. Only answers and refusals count as
+    -- processed.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , presumed = r.presumed, outcome = CaseAnswered }
+      SimpleError (EvaluatorRefused reason presumedInputs) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = presumedInputs, outcome = CaseRefused reason }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, not (isErrored c.outcome) ]
     nIgnored = nCases - nSuccessful
+    isErrored = \case
+      CaseErrored _ -> True
+      _             -> False
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful
@@ -585,11 +592,12 @@ runEvaluatorFor
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorFor vf engine args outputFilter mTraceHeader mTraceParam mGraphViz = do
+runEvaluatorFor vf engine args outputFilter mTraceHeader mTraceParam mGraphViz presumption = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
-  runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz
+  runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption
 
 -- | Core evaluator logic. Returns the response and GHC allocation bytes consumed.
 runEvaluatorForDirect
@@ -599,8 +607,9 @@ runEvaluatorForDirect
   -> Maybe (Set.Set Text)
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz = do
+runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption = do
   let evalBackend = Maybe.fromMaybe JL4 engine
   case Map.lookup evalBackend vf.fnEvaluator of
     Nothing -> throwError err500 { errBody = jsonError "No evaluator available for backend" }
@@ -613,6 +622,7 @@ runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz = d
                 outputFilter
                 traceLevel
                 includeGraphViz
+                presumption
             )
       case evaluationResult of
         Left err -> pure (SimpleError err, allocBytes)
@@ -630,8 +640,9 @@ runDeonticEvaluatorFor
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType mTraceHeader mTraceParam mGraphViz = do
+runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType mTraceHeader mTraceParam mGraphViz presumption = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
 
@@ -658,6 +669,7 @@ runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType m
             mActionType
             traceLevel
             includeGraphViz
+            presumption
         )
 
   case evaluationResult of

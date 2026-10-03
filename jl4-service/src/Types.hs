@@ -18,6 +18,7 @@ module Types (
   BatchResponse (..),
   InputCase (..),
   OutputCase (..),
+  CaseOutcome (..),
   OutputSummary (..),
   Outcomes (..),
   OutcomeObject (..),
@@ -34,7 +35,7 @@ module Types (
   AppM,
 ) where
 
-import Backend.Api (EvalBackend, FnLiteral, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
+import Backend.Api (EvalBackend, FnLiteral, Presumption, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
 import Backend.DecisionQueryPlan (CachedDecisionQuery)
 import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
@@ -376,6 +377,8 @@ type Id = Int
 data BatchRequest = BatchRequest
   { outcomes :: [Outcomes]
   , cases :: [InputCase]
+  , presumption :: Maybe Presumption
+    -- ^ T4's switch, for every case; absent means @"soft"@
   }
   deriving stock (Show, Eq, Ord)
 
@@ -410,7 +413,19 @@ data OutputCase = OutputCase
   { id :: Id
   , attributes :: Map Text FnLiteral
   , graphviz :: Maybe GraphVizResponse
+  , presumed :: [Text]
+    -- ^ the case's @presumed@ list ('Backend.Api.ResponseWithReason'), as @\@presumed@
+  , outcome :: CaseOutcome
+    -- ^ whether the case was answered; a refusal as @\@refused@, an error as @\@error@
   }
+  deriving stock (Show, Eq, Ord)
+
+-- | How one case of the batch endpoint ended. A refused or errored case is
+-- still returned, with its reason, rather than only counted.
+data CaseOutcome
+  = CaseAnswered
+  | CaseRefused Text
+  | CaseErrored Text
   deriving stock (Show, Eq, Ord)
 
 data BatchResponse = BatchResponse
@@ -490,29 +505,47 @@ instance FromJSON BatchRequest where
     BatchRequest
       <$> o .: "outcomes"
       <*> o .: "cases"
+      <*> o .:? "presumption"
 
 instance ToJSON BatchRequest where
   toJSON br =
     Aeson.object
-      [ "outcomes" .= br.outcomes
-      , "cases" .= br.cases
-      ]
+      ( [ "outcomes" .= br.outcomes
+        , "cases" .= br.cases
+        ]
+        <> maybe [] (\p -> ["presumption" .= p]) br.presumption
+      )
 
 instance FromJSON OutputCase where
   parseJSON = Aeson.withObject "OutputCase" $ \o -> do
     caseId <- o .: "@id"
     graphvizVal <- o .:? "@graphviz"
+    presumedVal <- o .:? "@presumed" .!= []
+    refusedVal <- o .:? "@refused"
+    errorVal <- o .:? "@error"
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@error" $
+          Aeson.KeyMap.delete "@refused" $
+          Aeson.KeyMap.delete "@presumed" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
+        outcomeVal = case (refusedVal, errorVal) of
+          (Just r, _)       -> CaseRefused r
+          (Nothing, Just e) -> CaseErrored e
+          _                 -> CaseAnswered
     parsedAttrs <- traverse parseJSON attrs
-    pure $ OutputCase caseId parsedAttrs graphvizVal
+    pure $ OutputCase caseId parsedAttrs graphvizVal presumedVal outcomeVal
 
 instance ToJSON OutputCase where
   toJSON oc =
     Aeson.object $
       [ "@id" .= oc.id
+      , "@presumed" .= oc.presumed
       ] <> maybe [] (\gv -> ["@graphviz" .= gv]) oc.graphviz
+        <> case oc.outcome of
+             CaseAnswered  -> []
+             CaseRefused r -> ["@refused" .= r]
+             CaseErrored e -> ["@error" .= e]
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 
 instance FromJSON OutputSummary where

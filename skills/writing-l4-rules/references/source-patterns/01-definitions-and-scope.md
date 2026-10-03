@@ -425,8 +425,8 @@ that line is a check error: the rule's two real inputs are reported unsupplied a
 so the typechecker rejects it — _"The TYPICALLY value for `the reading` must be a literal: a number,
 a string, or a nullary constructor such as TRUE, FALSE or NOTHING."_ A constructor of your own
 `ONE OF` type is a literal and is accepted, so a reading modelled as a bare enum could carry one —
-and it would still not decide anything, because `TYPICALLY` is metadata in this release and the
-input stays required either way. **Not**, above all, silently picking a reading and presenting it as the text.
+and a `WITH` call that left the input out would then take that reading without anyone having
+chosen it, which is the next **Not**. **Not**, above all, silently picking a reading and presenting it as the text.
 
 **See** [entry 1.4](#e1-4) (the confinement), and [drafting-patterns.md](../drafting-patterns.md), "Provenance —
 pin every inert string".
