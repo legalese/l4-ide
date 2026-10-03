@@ -159,13 +159,33 @@ defaultReads mod' binders =
   Map.restrictKeys (readSetsAll mod' binders) (Map.keysSet binders)
 
 readSetsAll :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binder]
-readSetsAll mod' binders
-  | Map.null binders = Map.empty
+readSetsAll mod' binders = (readSetStages mod' binders).closed
+
+-- | The read-sets in the two stages they are computed in. @own@ is what each
+-- definition reads itself: its own names and its callees' own reads, less what
+-- each call supplies. @closed@ is @own@ closed under the defaults of the binders
+-- in each set, which is what a root is asked for.
+--
+-- A @WITH@ written inside a definition reaches only @own@: a binder that only a
+-- default reads is worked out at the root, from the root's values, and a
+-- supply written below the root never gets there. A @WITH@ at a directive (a
+-- root) reaches @closed@.
+data ReadSetStages = ReadSetStages
+  { own    :: Map.Map Unique [Binder]
+  , closed :: Map.Map Unique [Binder]
+  }
+
+readSetStages :: Module Resolved -> Map.Map Unique Binder -> ReadSetStages
+readSetStages mod' binders
+  | Map.null binders = ReadSetStages Map.empty Map.empty
   | otherwise =
-      Map.mapMaybe nonEmptyRead
-        (iterateToFixpoint (Map.size bodies + 1) closeStep
-           (iterateToFixpoint (Map.size bodies + 1) ownStep direct))
+      ReadSetStages
+        { own    = Map.mapMaybe nonEmptyRead ownSets
+        , closed = Map.mapMaybe nonEmptyRead
+            (iterateToFixpoint (Map.size bodies + 1) closeStep ownSets)
+        }
  where
+  ownSets = iterateToFixpoint (Map.size bodies + 1) ownStep direct
   bodies = decideBodiesFromModule mod'
 
   -- Per definition: the binders its body names, and the definitions it calls
@@ -769,6 +789,30 @@ implicitSupplySites mod' =
   , i < 0
   ]
 
+-- | 'implicitSupplySites', each with whether it is written at a ROOT: inside a
+-- directive, a lambda or a @WHERE@ written there included. That is what
+-- 'dischargeModuleWith' means by a root, a syntactic fact, and the one thing a
+-- supply's reach depends on: a @WITH@ at a root reaches a binder that only a
+-- default reads, and one written in a definition does not.
+implicitSupplySitesAt :: Module Resolved -> [(Bool, Resolved, Resolved)]
+implicitSupplySitesAt (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ mgiven decls) =
+    maybe [] (sitesIn False) mgiven <> concatMap goTopDecl decls
+  goTopDecl = \ case
+    Section _ s   -> goSection s
+    Directive _ d -> sitesIn True d
+    other         -> sitesIn False other
+  sitesIn :: Optics.GPlate (Expr Resolved) a => Bool -> a -> [(Bool, Resolved, Resolved)]
+  sitesIn root x =
+    [ (root, n, r)
+    | e <- concatMap (Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved))))
+             (Optics.toListOf (Optics.gplate @(Expr Resolved)) x)
+    , AppNamed _ n nes (Just order) <- [e]
+    , (i, MkNamedExpr _ r _) <- zip order nes
+    , i < 0
+    ]
+
 -- | Named call sites that supply a section binder the callee does not read.
 --
 -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; naming one
@@ -790,15 +834,23 @@ unreadImplicitSupplies mod'
   | Map.null binders = []
   | otherwise =
       [ (n, r)
-      | (n, r) <- implicitSupplySites mod'
+      | (root, n, r) <- implicitSupplySitesAt mod'
       , not (Map.member (getUnique n) binders)
-      , not (any (suppliesBinder (readSetOf n) r) (readSetOf n))
-      , not (ambiguousFor (readSetOf n) r)
+      , let reach = readSetAt root n
+      , not (any (suppliesBinder reach r) reach)
+      , not (ambiguousFor reach r)
       ]
  where
   binders = sectionBinders mod'
-  rs      = readSets mod' binders
-  readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
+  stages  = readSetStages mod' binders
+  -- A supply at a root reaches what the callee needs from its root, defaults
+  -- included. One written in a definition reaches only what the callee reads
+  -- itself: a binder that only a default reads is worked out at the root, from the
+  -- root's values, so a supply for it written below the root would have nowhere to
+  -- go (W7 second review, silent S4). The base refused that WITH for the same
+  -- reason, since no default could read an input then.
+  readSetAt root n =
+    fromMaybe [] (Map.lookup (getUnique n) ((if root then stages.closed else stages.own) `Map.withoutKeys` Map.keysSet binders))
 
 -- | Call sites that give a @WITH@ to a section INPUT as though it were a rule:
 -- @discount WITH \`list price\` IS 200@, where @discount@ is a binder. An input

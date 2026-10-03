@@ -1,0 +1,29 @@
+-- A WITH inside a rule reaches only what the rule it calls reads in its own body
+-- and through the rules that one calls. It does not reach an input that only a
+-- default reads: `b`'s default reads `r`, and a root works `b` out from the root's
+-- own `r` (R8 rule 3), so a WITH on `r` written inside `h` would go nowhere. It is
+-- refused, as it was before defaults could read inputs (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- W7, §4.3, silent review S4).
+
+§ `S`
+    GIVEN r IS A NUMBER TYPICALLY 2
+          b IS A NUMBER TYPICALLY (r PLUS 1)
+
+-- `g` names `b` and not `r`
+GIVETH A NUMBER
+g MEANS b TIMES 10
+
+-- ERROR: nothing in `g` reads `r` itself, so the value has nowhere to go
+GIVETH A NUMBER
+h MEANS g WITH r IS 100
+
+-- Fine, and the control: at a #EVAL the same WITH reaches `b`'s default, because
+-- a root works it out from its own values
+#EVAL g WITH r IS 100
+
+-- Fine: a rule that reads `r` itself takes a WITH on it
+GIVETH A NUMBER
+`g and r` MEANS b PLUS r
+
+GIVETH A NUMBER
+`h and r` MEANS `g and r` WITH r IS 100
