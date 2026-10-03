@@ -148,10 +148,18 @@ prettyUserEvalException = \ case
     <> [ "During the evaluation of the operation:"
        , prettyLayout op
        ]
-  Stuck ts ->
+  Stuck (t :| []) ->
     [ "I could not continue evaluating, because I needed to know the value of" ]
-    <> concatMap indentStuckName (toList ts)
+    <> indentStuckName t
     <> [ "but it is an assumed term." ]
+  -- Several names: the same message, in the plural (decided by Claude
+  -- overnight 2026-10-03, pending Meng's review; UNKNOWN-EVALUATION-SPEC §8
+  -- step 3). The one-name message above is unchanged, so every page that
+  -- quotes it stays true.
+  Stuck ts ->
+    [ "I could not continue evaluating, because I needed to know the values of" ]
+    <> concatMap indentStuckName (toList ts)
+    <> [ "but they are assumed terms." ]
   RanOutOfSteps ->
     [ "I gave up evaluating: working this out over an unknown took more than "
       <> Text.textShow maximumUnknownSteps <> " steps." ]
