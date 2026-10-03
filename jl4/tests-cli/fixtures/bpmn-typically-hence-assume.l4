@@ -1,0 +1,21 @@
+-- The rule the drawn one reaches through HENCE reads an ASSUME that carries a
+-- default. That default IS this process's loss (nothing supplies an ASSUME the
+-- way an argument is supplied), so it is reported, by way of the rule reached.
+DECLARE Actor IS ONE OF Filer
+DECLARE Action IS ONE OF file, acknowledge
+
+ASSUME `is complete` IS A BOOLEAN TYPICALLY TRUE
+
+GIVETH A DEONTIC Actor Action
+`the acknowledgement` MEANS
+    PARTY Filer
+    MUST acknowledge
+    PROVIDED `is complete`
+    WITHIN 7
+
+GIVETH A DEONTIC Actor Action
+`the filing` MEANS
+    PARTY Filer
+    MUST file
+    WITHIN 30
+    HENCE `the acknowledgement`

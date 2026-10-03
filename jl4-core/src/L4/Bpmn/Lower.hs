@@ -3605,8 +3605,9 @@ ncName raw =
 --------------------------------------------------------------------------------
 
 -- | The @P-TYPICALLY@ notes a process owes for the @TYPICALLY@ defaults its rule
--- depends on: the rule's own @GIVEN@s, those of any rule it reaches, and the
--- section @GIVEN@s, @ASSUME@s and record fields it reads.
+-- depends on: the rule's own @GIVEN@s, and the section @GIVEN@s, @ASSUME@s and
+-- record fields it reads or handles, through any rule it reaches. What counts,
+-- and why a reached rule's own @GIVEN@ does not, is 'decideDefaultSites'.
 --
 -- BPMN has no default for a process variable, and this exporter does not even
 -- carry the variable: a @PROVIDED@ condition becomes an opaque
@@ -3633,11 +3634,15 @@ bpmnDefaultNotes imports modul sg = case sg.sgDecide of
         , element  = s.name
         , range    = s.range
         , message  = describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
-                       <> ", and BPMN has no default for a process variable: a condition that tests `"
-                       <> s.name <> "` reads whatever the process instance holds, so an instance "
+                       <> ", and BPMN has no default for a process variable: "
                        <> (case (s.kind, s.owner) of
-                             (DefaultOnRecordField, Just r) -> "that holds a `" <> r <> "` without it"
-                             _                              -> "that never set it")
+                             (DefaultOnRecordField, Just r) ->
+                               "a condition that reads `" <> s.name <> "` of a `" <> r <> "` (by name, or "
+                                 <> "by taking the record apart) reads whatever the process instance holds, "
+                                 <> "so an instance that holds a `" <> r <> "` without it"
+                             _ ->
+                               "a condition that tests `" <> s.name <> "` reads whatever the process "
+                                 <> "instance holds, so an instance that never set it")
                        <> " does not get " <> describeDefault (classifyDefault s.value)
         , lost     = "the presumption: the source says an unsupplied `" <> s.name
                        <> "` is " <> describeDefault (classifyDefault s.value)

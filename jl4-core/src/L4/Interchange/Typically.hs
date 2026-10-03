@@ -49,11 +49,12 @@ module L4.Interchange.Typically
 import Base
 import qualified Base.Set as Set
 import qualified Base.Text as Text
+import qualified Data.Map.Strict as Map
 import Data.Ratio (denominator, numerator)
 import System.FilePath (takeBaseName)
 
 import L4.Annotation (rangeOf)
-import L4.Export (transitiveReferencedUniques)
+import L4.Export (decideBodiesFromModule, transitiveReferencedUniquesWith)
 import L4.Names (isSectionBinderElaboration, sectionGivenNames)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print (prettyLayout)
@@ -190,39 +191,124 @@ moduleLabel :: Module Resolved -> Text
 moduleLabel (MkModule _ uri _) =
   Text.pack (takeBaseName (Text.unpack (fromNormalizedUri uri).getUri))
 
--- | The defaults a decision depends on: its own @GIVEN@s, the @GIVEN@s of every
--- rule it reaches by name, and every section @GIVEN@, @ASSUME@ and record field
--- that its body reads, directly or through anything it reaches. A backend that
--- exports one rule at a time (BPMN draws one process, and a @HENCE@ into another
--- rule is part of that process) reports on this, and not on the whole module, so
--- a default on an unrelated input does not appear in a note about this rule.
+-- | The defaults a process drawn from one rule loses: the rule's own @GIVEN@s,
+-- every section @GIVEN@ and @ASSUME@ its body reads, and the record fields of
+-- the types it handles. A backend that exports one rule at a time (BPMN draws
+-- one process, and a @HENCE@ into another rule is part of that process) reports
+-- on this, and not on the whole module, so a default on an unrelated input does
+-- not appear in a note about this rule.
 --
--- A record field counts when the body /names/ it (@s's field@, or @field OF s@,
--- in this rule or any rule it reaches): that is the only way a condition can
--- depend on it. The other fields of a record the rule is given are not reported,
--- because nothing the process says reads them.
+-- __What counts, by site__
 --
--- The first argument is the modules the checked one imports. An imported
--- @ASSUME@ or record field the rule's body names (directly, or through a rule of
--- this module) is reported too; an imported rule's own @GIVEN@ is not (see
+-- * A rule's own @GIVEN@: only the /drawn/ rule's. It is a process input, so the
+--   source's presumption is what an instance that never set it should get. The
+--   @GIVEN@ of a rule the drawn one reaches is not: whether it is reached by
+--   @HENCE@ or called from a condition, the call supplies every argument
+--   positionally, so the source never relies on that default in this process.
+--   (What the process does lose there is the argument the @HENCE@ passes, which
+--   BPMN does not draw and which has no note of its own: that is older than
+--   @TYPICALLY@. A note about the default pointed the reader at the wrong loss,
+--   and said the source presumed a value in a process where it supplied one.)
+-- * A section @GIVEN@ or an @ASSUME@: when the rule's body reads it, directly or
+--   through any rule it reaches, in this module or an imported one.
+-- * A record field: when its record (or the sum type whose constructor carries
+--   it) is one the rule handles, or when a body names the field. The rule
+--   handles a type when it appears in the signature of the drawn rule or of any
+--   rule it reaches, or in the type of an @ASSUME@ it reads, or is the type of a
+--   field of such a type. Naming the field is not required: a helper may read it
+--   by destructuring (@CONSIDER s WHEN Standing g y THEN g@), which names no
+--   selector, and a condition is opaque text in the BPMN, so the process has lost
+--   the default of every field of a record it handles.
+--
+-- The first argument is the modules the checked one imports. The call graph is
+-- followed through their rules too: a condition that calls an imported helper
+-- reads whatever the helper reads, and the imported file's @ASSUME@ is as lost
+-- as a local one. An imported rule's own @GIVEN@ is never reported (see
 -- 'importedDefaultSites').
 decideDefaultSites :: [Module Resolved] -> Module Resolved -> Decide Resolved -> [DefaultSite]
-decideDefaultSites imports modul (MkDecide _ _ (MkAppForm _ self _ _) body) =
-  [ s
-  | s <- moduleDefaultSites modul
-  , case s.kind of
-      DefaultOnRuleGiven    -> maybe False (\o -> o == getUnique self || Set.member o readSet) s.ownerUnique
-      DefaultOnSectionGiven -> Set.member s.unique readSet
-      DefaultOnAssume       -> Set.member s.unique readSet
-      DefaultOnRecordField  -> Set.member s.unique readSet
-  ]
+decideDefaultSites imports modul self@(MkDecide _ _ (MkAppForm _ selfName _ _) body) =
+  [ s | s <- moduleDefaultSites modul, wanted s ]
   <>
-  [ s
-  | s <- importedDefaultSites imports
-  , Set.member s.unique readSet
-  ]
+  [ s | s <- importedDefaultSites imports, wanted s ]
  where
-  readSet = transitiveReferencedUniques modul body
+  allModules = modul : imports
+
+  -- The call graph across the whole import closure.
+  readSet = transitiveReferencedUniquesWith
+              (Map.unions (map decideBodiesFromModule allModules)) body
+
+  wanted s = case s.kind of
+    DefaultOnRuleGiven    -> s.ownerUnique == Just (getUnique selfName)
+    DefaultOnSectionGiven -> Set.member s.unique readSet
+    DefaultOnAssume       -> Set.member s.unique readSet
+    DefaultOnRecordField  -> Set.member s.unique readSet || handled s
+
+  handled s = maybe False (`Set.member` typesHandled) s.ownerUnique
+
+  -- The drawn rule and every rule its body reaches.
+  reachedRules = self :
+    [ d
+    | m <- allModules
+    , d@(MkDecide _ _ (MkAppForm _ n _ _) _) <- moduleDecides m
+    , getUnique n /= getUnique selfName
+    , Set.member (getUnique n) readSet
+    ]
+
+  -- Every name in those signatures (binders and TYPICALLY expressions come with
+  -- them, and are harmless: only a type's 'Unique' is ever looked up) and the
+  -- type of each ASSUME the rule reads.
+  seeds = Set.fromList $
+       [ getUnique r | MkDecide _ sig _ _ <- reachedRules, r <- toList sig ]
+    <> [ getUnique r
+       | m <- allModules, (u, ty) <- moduleAssumeTypes m, Set.member u readSet, r <- toList ty ]
+
+  -- ... and the types of the fields of any type already handled.
+  fieldTypes = Map.fromListWith (<>) (concatMap moduleFieldTypes allModules)
+  typesHandled = close seeds
+  close seen =
+    let more = Set.fromList
+          [ getUnique r
+          | t <- Set.toList seen
+          , tys <- maybeToList (Map.lookup t fieldTypes)
+          , ty <- tys
+          , r <- toList ty ]
+        seen' = Set.union seen more
+     in if Set.size seen' == Set.size seen then seen else close seen'
+
+-- | Every module-level @DECIDE@, in any section.
+moduleDecides :: Module Resolved -> [Decide Resolved]
+moduleDecides (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \case
+    Decide _ d    -> [d]
+    Section _ sub -> goSection sub
+    _             -> []
+
+-- | The 'Unique' and declared type of every @ASSUME@ (a section @GIVEN@'s
+-- elaboration included) that has one.
+moduleAssumeTypes :: Module Resolved -> [(Unique, Type' Resolved)]
+moduleAssumeTypes (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \case
+    Assume _ (MkAssume _ _ (MkAppForm _ n _ _) (Just ty) _) -> [(getUnique n, ty)]
+    Section _ sub -> goSection sub
+    _             -> []
+
+-- | For each declared type, the types of its fields (a record's, or those of the
+-- constructors of a sum type).
+moduleFieldTypes :: Module Resolved -> [(Unique, [Type' Resolved])]
+moduleFieldTypes (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ ty _ _) (RecordDecl _ _ fields)) ->
+      [(getUnique ty, [ fty | MkTypedName _ _ fty _ _ <- fields ])]
+    Declare _ (MkDeclare _ _ (MkAppForm _ ty _ _) (EnumDecl _ cons)) ->
+      [(getUnique ty, [ fty | MkConDecl _ _ fields <- cons, MkTypedName _ _ fty _ _ <- fields ])]
+    Section _ sub -> goSection sub
+    _             -> []
 
 -- | What a default is, as far as a backend needs to tell.
 data DefaultValue

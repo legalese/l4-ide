@@ -123,13 +123,22 @@ default.
 
 **BPMN** (`P-TYPICALLY`). A process draws no data: a `PROVIDED` condition becomes an opaque
 `conditionExpression` (`F4`), which reads whatever the process instance holds, so an instance that never
-set the variable does not get the default. The note is raised for the rule being drawn, for any rule it
-reaches through `HENCE`, and for the section `GIVEN`s, `ASSUME`s and record fields they read (one imported
-from another file included, with its module named), and for nothing else; a default on an input of an
-unrelated rule is not this process's loss, and neither is a default on a field of a record the rule is
-given when nothing the process says names that field. The process draws no record, but a condition such
-as ``PROVIDED s's `in good standing` `` names the field, so the instance that holds an `s` without it does
-not get the default.
+set the variable does not get the default. The note is raised for the drawn rule's own `GIVEN`s (they are
+the process's inputs), for the section `GIVEN`s and `ASSUME`s its body reads, and for every defaulted field
+of a record the process handles. "Reads" follows the call graph through every rule the body reaches, in
+this file or an imported one, and the note names the module when the default is written in an imported
+file. A record is "handled" when it, or the sum type whose constructor holds the field, is named in the
+signature of the drawn rule or of any rule it reaches, or in the type of an `ASSUME` it reads, or is the
+type of a field of one of those. A condition is opaque text, so nothing says that no condition reads a
+field of a record the rule handles, whether it names the field (``PROVIDED s's `in good standing` ``) or a
+helper takes the record apart; the note is raised for each defaulted field, read or not, and says what the
+process lost: an instance that holds an `s` without it does not get the default.
+
+Two things are left out on purpose. The `GIVEN` of a rule the drawn one reaches, by `HENCE` or from a
+condition, is not reported: the call supplies every argument, so the source does not rely on that
+default in this process. What the process loses there is the argument itself, which BPMN has never drawn,
+and which has no note of its own (it is older than `TYPICALLY`). And a default on an input of an unrelated
+rule is not this process's loss.
 
 Neither note is `blocking` (the notations are not at fault for lacking a default), so
 `--fail-on=lossy` is the setting that makes a default you meant to carry stop a pipeline.
