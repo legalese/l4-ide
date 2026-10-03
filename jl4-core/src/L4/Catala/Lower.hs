@@ -475,6 +475,20 @@ buildModule opts imports mod' efs =
     , Just d <- [f.rfDefault]
     , f.rfStatus /= FElidedComputed
     ]
+    <>
+    -- The same for the field of an enumeration's constructor, which is a fifth
+    -- place a TYPICALLY can be written. An enumeration case's `content` is a type
+    -- and nothing more (and the field's name goes with it), so the default is
+    -- dropped whenever the enumeration is emitted.
+    [ "field `" <> resolvedToText fRes <> "` of the constructor `" <> resolvedToText c
+        <> "` carries TYPICALLY " <> describeDefault (classifyDefault d)
+        <> ", which is dropped: a Catala enumeration case's content has no default, so a "
+        <> "Catala caller builds the case with its content."
+    | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ cons)) <- concatMap topDecls declModules
+    , Set.member (getUnique tyRes) neededTypes
+    , MkConDecl _ c payload <- cons
+    , MkTypedName _ fRes _ (Just d) _ <- payload
+    ]
 
   structNotes =
     [ "structure `" <> l4 <> "` is not emitted at all: every one of its fields was elided (R11), \

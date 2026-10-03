@@ -96,6 +96,9 @@ What it refuses, loudly, because OpenFisca has no value to give it:
 - **`NOTHING`.** Every OpenFisca variable has a value; there is no "no value". The export refuses
   it even for a field that no decision reads, because every stored field of the subject becomes an
   input variable whether or not a formula uses it.
+- **A default on the field of a sum type's constructor.** The export writes an enum as its members
+  alone, so the constructor's field has no OpenFisca form, and neither has the default on it. The
+  module is refused, naming the field.
 - **A default on the subject or on `period`.** Those come from the simulation, not from an input
   variable, so there is nothing for a default to attach to.
 - **A default on a `LIST OF` field or `GIVEN`, other than `EMPTY`.** A role has no default list, and

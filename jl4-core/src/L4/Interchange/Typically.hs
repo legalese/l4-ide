@@ -12,12 +12,13 @@
 -- every backend asked for itself, or did not ask:
 --
 -- 1. __Where is a default written?__ ('moduleDefaultSites', 'decideDefaultSites').
---    There are four places a @TYPICALLY@ can sit: a rule's own @GIVEN@, a
---    section @GIVEN@, a (deprecated) @ASSUME@, and a record field. They are four
---    different 'DefaultKind's because a target may honour one and not another —
---    OpenFisca can carry a record field's default and cannot carry a section
---    @GIVEN@ at all — and because a note that says "a @GIVEN@" about an
---    @ASSUME@ sends the reader to the wrong line.
+--    There are five places a @TYPICALLY@ can sit: a rule's own @GIVEN@, a
+--    section @GIVEN@, a (deprecated) @ASSUME@, a record field, and the field of
+--    a sum type's constructor. They are five different 'DefaultKind's because a
+--    target may honour one and not another — OpenFisca can carry a record
+--    field's default and cannot carry a section @GIVEN@ at all, and no target
+--    keeps a constructor field's — and because a note that says "a @GIVEN@"
+--    about an @ASSUME@ sends the reader to the wrong line.
 -- 2. __What is the default?__ ('classifyDefault'). Today the checker accepts
 --    only literals, so a default is a number, a string, @TRUE@\/@FALSE@, or a
 --    nullary constructor. R8 rule 3 (W7 of the spec) widens that to expressions
@@ -61,7 +62,7 @@ import L4.Print (prettyLayout)
 import L4.Syntax
 import L4.TypeCheck.Environment (falseUnique, trueUnique)
 
--- | Which of the four places a @TYPICALLY@ was written.
+-- | Which of the five places a @TYPICALLY@ was written.
 data DefaultKind
   = DefaultOnRuleGiven
     -- ^ a rule's own @GIVEN@: @GIVEN rate IS A NUMBER TYPICALLY 3@ above a @DECIDE@
@@ -74,6 +75,12 @@ data DefaultKind
     -- the author wrote.
   | DefaultOnRecordField
     -- ^ a @DECLARE@d record's field
+  | DefaultOnConstructorField
+    -- ^ the field of a constructor of a sum type:
+    -- @DECLARE Shape IS ONE OF Circle HAS radius IS A NUMBER TYPICALLY 1 ...@.
+    -- The checker accepts it, and a survey that walked records only never saw it,
+    -- so every backend that dropped a record field's default in silence dropped
+    -- this one too.
   deriving stock (Eq, Ord, Show)
 
 -- | One written @TYPICALLY@.
@@ -82,13 +89,17 @@ data DefaultSite = MkDefaultSite
   , name    :: !Text
     -- ^ the L4 name of the binder or field, as written
   , owner   :: !(Maybe Text)
-    -- ^ the rule a @GIVEN@ belongs to, or the record a field belongs to
+    -- ^ the rule a @GIVEN@ belongs to, the record a field belongs to, or the
+    -- constructor a constructor's field belongs to
   , unique  :: !Unique
     -- ^ the binder's own 'Unique', which is how a lowering that has already
     -- resolved names asks "is this one of mine?"
   , ownerUnique :: !(Maybe Unique)
-    -- ^ the 'Unique' of 'owner': the rule's name for a @GIVEN@, the record
-    -- type's for a field
+    -- ^ the 'Unique' of what a backend asks about when it asks "is the owner in
+    -- play?": the rule's name for a @GIVEN@, the record type's for a field, and
+    -- the /sum type's/ for a constructor's field (its 'owner' text is the
+    -- constructor, which is what a reader points at, but the type is what a
+    -- backend emits or does not)
   , value   :: !(Expr Resolved)
   , range   :: !(Maybe SrcRange)
   , origin  :: !(Maybe Text)
@@ -138,6 +149,20 @@ moduleDefaultSites (MkModule _ _ section) = goSection section
           , origin = Nothing
           }
       | tn@(MkTypedName _ fn _ (Just dflt) _) <- fields
+      ]
+    Declare _ (MkDeclare _ _ (MkAppForm _ ty _ _) (EnumDecl _ cons)) ->
+      [ MkDefaultSite
+          { kind   = DefaultOnConstructorField
+          , name   = resolvedText fn
+          , owner  = Just (resolvedText con)
+          , unique = getUnique fn
+          , ownerUnique = Just (getUnique ty)
+          , value  = dflt
+          , range  = rangeOf tn
+          , origin = Nothing
+          }
+      | MkConDecl _ con fields <- cons
+      , tn@(MkTypedName _ fn _ (Just dflt) _) <- fields
       ]
     Section _ s -> goSection s
     _ -> []
@@ -242,6 +267,9 @@ decideDefaultSites imports modul self@(MkDecide _ _ (MkAppForm _ selfName _ _) b
     DefaultOnSectionGiven -> Set.member s.unique readSet
     DefaultOnAssume       -> Set.member s.unique readSet
     DefaultOnRecordField  -> Set.member s.unique readSet || handled s
+    -- A constructor's field is never named by a selector (the payload is taken
+    -- apart by a pattern), so the only question is whether the rule handles the type.
+    DefaultOnConstructorField -> handled s
 
   handled s = maybe False (`Set.member` typesHandled) s.ownerUnique
 
@@ -345,15 +373,17 @@ isLiteralDefault = \case
   _             -> True
 
 -- | "the GIVEN @rate@ of @scaled@", "the section GIVEN @rate@", "the ASSUME
--- @rate@", "the field @timeout@ of @Config@": the site as a reader would
--- point at it, with the imported module's name when it is not in the file they
--- exported.
+-- @rate@", "the field @timeout@ of @Config@", "the field @radius@ of the
+-- constructor @Circle@": the site as a reader would point at it, with the
+-- imported module's name when it is not in the file they exported.
 describeSite :: DefaultSite -> Text
 describeSite s = case s.kind of
   DefaultOnRuleGiven    -> "the GIVEN `" <> s.name <> "`" <> ofOwner <> inModule
   DefaultOnSectionGiven -> "the section GIVEN `" <> s.name <> "`" <> inModule
   DefaultOnAssume       -> "the ASSUME `" <> s.name <> "`" <> inModule
   DefaultOnRecordField  -> "the field `" <> s.name <> "`" <> ofOwner <> inModule
+  DefaultOnConstructorField ->
+    "the field `" <> s.name <> "` of the constructor `" <> fromMaybe "?" s.owner <> "`" <> inModule
  where
   ofOwner = maybe "" (\o -> " of `" <> o <> "`") s.owner
   inModule = maybe "" (\m -> " (in the imported module `" <> m <> "`)") s.origin

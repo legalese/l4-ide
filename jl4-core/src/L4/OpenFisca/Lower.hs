@@ -26,7 +26,9 @@ import Optics ((^.))
 
 import L4.Annotation (getAnno)
 import L4.Export (ExportedFunction (..), getExportedFunctions)
-import L4.Interchange.Typically (DefaultValue (..), classifyDefault, describeDefault)
+import L4.Interchange.Typically
+  ( DefaultKind (..), DefaultSite (..), DefaultValue (..), classifyDefault, describeDefault
+  , describeSite, moduleDefaultSites )
 import L4.OpenFisca.IR
 import L4.Syntax
 import L4.TypeCheck.Environment (emptyUnique, nothingUnique)
@@ -69,6 +71,17 @@ lowerModule :: Module Resolved -> Either [LowerError] OFPackage
 lowerModule mod' =
   case getExportedFunctions mod' of
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
+    -- The field of a sum type's constructor is the one place a TYPICALLY can sit
+    -- that this export has no variable for: an enum is written as its members
+    -- alone, and the payload (the default with it) is not carried. OpenFisca would
+    -- never say so, and every variable has a default of its own, so the module is
+    -- refused rather than written without it (T5b: refuse what cannot be mapped).
+    _ | conDefaults@(_ : _) <- [ s | s <- moduleDefaultSites mod', s.kind == DefaultOnConstructorField ] ->
+          Left [ LowerError ""
+                   ( describeSite s <> " carries TYPICALLY " <> describeDefault (classifyDefault s.value)
+                     <> ", and OpenFisca writes an enum as its members alone, so a constructor's "
+                     <> "field, and the default on it, has no OpenFisca form" )
+               | s <- conDefaults ]
     efs ->
       let (enumDefs, enumCons) = collectEnums mod'
           records      = collectRecords enumDefs mod'

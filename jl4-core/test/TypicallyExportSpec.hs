@@ -43,7 +43,7 @@ import qualified L4.Docassemble.Lower as Docassemble
 import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport (..), FidelitySeverity (..))
 import L4.Interchange.Typically
   ( DefaultKind (..), DefaultSite (..), classifyDefault
-  , describeDefault, isLiteralDefault, moduleDefaultSites )
+  , describeDefault, describeSite, isLiteralDefault, moduleDefaultSites )
 import qualified L4.OpenFisca.Emit as OpenFisca
 import qualified L4.OpenFisca.Lower as OpenFisca
 import L4.Relational.IR (RelProgram (..), renderLowerError)
@@ -109,6 +109,10 @@ withDefaultsAs bump (MkModule ann uri section) = MkModule ann uri (goSection sec
     Declare a (MkDeclare da ts af (RecordDecl ra con fields)) ->
       Declare a (MkDeclare da ts af
         (RecordDecl ra con [ MkTypedName fa n ty (fmap bump d) m | MkTypedName fa n ty d m <- fields ]))
+    Declare a (MkDeclare da ts af (EnumDecl ea cons)) ->
+      Declare a (MkDeclare da ts af
+        (EnumDecl ea [ MkConDecl ca c [ MkTypedName fa n ty (fmap bump d) m | MkTypedName fa n ty d m <- fields ]
+                     | MkConDecl ca c fields <- cons ]))
     Section a s -> Section a (goSection s)
     other -> other
 
@@ -179,6 +183,37 @@ blawxSrc = Text.unlines
   , "      rate IS A NUMBER TYPICALLY 3"
   , "GIVETH A NUMBER"
   , "`budget` c rate MEANS (c's timeout) TIMES (c's retries) TIMES rate"
+  ]
+
+-- | A sum type whose constructor's field carries a TYPICALLY, read by an exported
+-- decision. The fifth place a default can sit: it is not a record field, no selector
+-- names it, and a survey that walked records only never saw it.
+conFieldSrc, conFieldDecl, conFieldBpmnSrc :: Text
+conFieldDecl = Text.unlines
+  [ "DECLARE Shape IS ONE OF"
+  , "  Circle HAS radius IS A NUMBER TYPICALLY 1"
+  , "  Square HAS side IS A NUMBER"
+  , ""
+  ]
+conFieldSrc = conFieldDecl <> Text.unlines
+  [ "@export default the area"
+  , "GIVEN s IS A Shape"
+  , "GIVETH A NUMBER"
+  , "DECIDE `the area` IS"
+  , "  CONSIDER s"
+  , "  WHEN Circle r THEN r TIMES r TIMES 3"
+  , "  WHEN Square x THEN x TIMES x"
+  ]
+conFieldBpmnSrc = conFieldDecl <> Text.unlines
+  [ "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "GIVEN s IS A Shape"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` s MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    WITHIN 14"
   ]
 
 -- | A decision with a rule GIVEN and a record field, both defaulted, and an
@@ -653,7 +688,7 @@ spec = do
     let sites = sitesOf (moduleOf fourPlaces)
         kindOf n = [ s.kind | s <- sites, s.name == n ]
 
-    it "finds all four places, in source order" $
+    it "finds a record field, a section GIVEN, an ASSUME and a rule GIVEN, in source order" $
       map (\s -> (s.name, s.kind)) sites `shouldBe`
         [ ("timeout", DefaultOnRecordField)
         , ("rate", DefaultOnSectionGiven)
@@ -1055,3 +1090,64 @@ spec = do
     it "refuses an expression default rather than dropping it" $
       Docassemble.lowerModule Docassemble.noSideInputs (withComputedDefaults (moduleOf ruleGivenSrc))
         `shouldSatisfy` either (any (Text.isInfixOf "unsupported TYPICALLY default" . Docassemble.renderLowerError)) (const False)
+
+  ------------------------------------------------------------------------
+  -- The checker accepts a TYPICALLY on the field of a sum type's constructor
+  -- (`Circle HAS radius IS A NUMBER TYPICALLY 1`). It is a fifth place a default
+  -- can sit, and the survey that found four walked records only: Catala,
+  -- docassemble and DMN dropped it with exit 0 and no note, which the exports
+  -- README's "none of them drops it quietly" denied. A new kind of site has to
+  -- reach each backend's fallback, whatever it is.
+  describe "a constructor's field is the fifth place a TYPICALLY can sit" $ do
+    let sum' = moduleOf conFieldSrc
+
+    it "is found, owned by the constructor, with the sum type as the thing a backend asks about" $ do
+      let found = sitesOf sum'
+      map (.kind) found `shouldBe` [DefaultOnConstructorField]
+      map (.name) found `shouldBe` ["radius"]
+      map (.owner) found `shouldBe` [Just "Circle"]
+      map describeSite found `shouldBe` ["the field `radius` of the constructor `Circle`"]
+
+    it "Catala: says in the notes that it is dropped" $
+      succeeds (catalaOut sum') `shouldSatisfy`
+        Text.isInfixOf "field `radius` of the constructor `Circle` carries TYPICALLY 1, which is dropped"
+
+    it "docassemble: prefills the follow-up question, and reports the prefill" $
+      case Docassemble.lowerModule Docassemble.noSideInputs sum' of
+        Left es -> expectationFailure (show (map Docassemble.renderLowerError es))
+        Right (_, report) ->
+          [ n.message | n <- report.notes, n.code == "DA-TYPICALLY" ] `shouldSatisfy` mentions "s_radius"
+
+    it "docassemble: refuses an expression default there, as it does for any other" $
+      Docassemble.lowerModule Docassemble.noSideInputs (withComputedDefaults sum')
+        `shouldSatisfy` either (any (Text.isInfixOf "unsupported TYPICALLY default" . Docassemble.renderLowerError)) (const False)
+
+    it "DMN and dmn-md: report it, and say that the payload of a sum type is not in the model" $ do
+      let tc  = checked conFieldSrc
+          drg = dmnDrg tc.tcdModule tc
+          ns  = dmnTypicallyNotes drg
+      map (.element) ns `shouldBe` ["Circle.radius"]
+      map (.message) ns `shouldSatisfy` mentions "the field `radius` of the constructor `Circle` carries TYPICALLY 1"
+      map (.message) ns `shouldSatisfy` mentions "the model keeps no payload for a sum type at all (see D-SUMTYPE)"
+      length [ () | n <- (markdownReport drg).notes, n.code == "D-TYPICALLY" ] `shouldBe` 1
+
+    it "OpenFisca: refuses the module, naming the field, rather than writing the enum without it" $
+      refuses (openFiscaOut sum') `shouldSatisfy`
+        mentions "the field `radius` of the constructor `Circle` carries TYPICALLY 1, and OpenFisca writes an enum as its members alone"
+
+    it "OpenFisca: says nothing of a sum type that carries no default (the control)" $
+      refuses (openFiscaOut (moduleOf (Text.replace " TYPICALLY 1" "" conFieldSrc)))
+        `shouldSatisfy` (not . mentions "carries TYPICALLY")
+
+    it "Blawx: reports it, as it does a record field" $ do
+      let prg = succeeds (relational (conFieldDecl <> blawxSrc))
+          ns  = relationalTypically prg
+      map (.element) ns `shouldContain` ["radius"]
+      map (.message) ns `shouldSatisfy` mentions "the field `radius` of the constructor `Circle` carries TYPICALLY 1, which is dropped"
+
+    it "BPMN: reports it for a rule that handles the sum type, and for no other" $ do
+      let ns = bpmnNotes (moduleOf conFieldBpmnSrc) "the duty"
+      map (.element) ns `shouldBe` ["radius"]
+      map (.message) ns `shouldSatisfy` mentions "the field `radius` of the constructor `Circle` carries TYPICALLY 1"
+      -- a rule that never mentions Shape owes nothing for it
+      bpmnNotes (moduleOf (conFieldBpmnSrc <> unrelatedRuleSrc)) "the unrelated duty" `shouldBe` []
