@@ -5963,7 +5963,9 @@ termEqualityType :: Term -> Machine EqualityType
 termEqualityType = \ case
   TInput _ ty    -> equalityType ty
   TField _ _ ty  -> equalityType ty
-  TCall (TInput _ (Just fty)) args -> equalityType (callResultType fty (length args))
+  TCall (TInput _ (Just fty)) args -> do
+    fty' <- expandTypeHead fty
+    equalityType (callResultType fty' (length args))
   TCall{}        -> pure EqualityExcluded
   TBin{}         -> pure EqualitySupported
   TNot{}         -> pure EqualitySupported
@@ -5987,19 +5989,21 @@ termEqualityType = \ case
 -- | The declared type's verdict: a function or @CONTRACT@ type itself is
 -- unsupported; a type with one anywhere inside, through declared records, or
 -- a type variable, an inference variable or a type the module does not
--- describe, is excluded; anything else is supported. @typeHasFunctionComponent@
+-- describe, is excluded; anything else is supported. A synonym is read as
+-- the type it names, at the top and inside ('expandTypeHead'), so @f@ of a
+-- synonym @Fn@ for a function type is a function. @typeHasFunctionComponent@
 -- (in the DMN exporter) walks the same structure.
 equalityType :: Maybe (Type' Resolved) -> Machine EqualityType
 equalityType = \ case
   Nothing -> pure EqualityExcluded
-  Just ty -> case ty of
+  Just ty0 -> expandTypeHead ty0 >>= \ ty -> case ty of
     Fun{} -> pure EqualityUnsupported
     TyApp _ r _ | getUnique r == TypeCheck.contractUnique -> pure EqualityUnsupported
     _ -> do
       ok <- functionFree Set.empty ty
       pure (if ok then EqualitySupported else EqualityExcluded)
   where
-    functionFree seen = \ case
+    functionFree seen ty0 = expandTypeHead ty0 >>= \ case
       TyApp _ r ts
         | u `elem` primitives -> pure True
         | u `elem` [TypeCheck.listUnique, TypeCheck.maybeUnique, TypeCheck.eitherUnique] ->
@@ -6017,12 +6021,13 @@ equalityType = \ case
     allM f = foldr (\ x acc -> f x >>= \ b -> if b then acc else pure False) (pure True)
 
 -- | The field types of a declared type with no parameters, read from its
--- constructors; 'Nothing' if the module does not describe it so.
+-- constructors; 'Nothing' if the module does not describe it so. A synonym
+-- is not such a type: 'expandTypeHead' reads it as the type it names first.
 typeComponents :: Unique -> Machine (Maybe [Type' Resolved])
 typeComponents u = do
   entityInfo <- getEntityInfo
   case Map.lookup u entityInfo of
-    Just (_, TypeCheck.KnownType 0 _ _) ->
+    Just (_, TypeCheck.KnownType 0 _ Nothing) ->
       let fields =
             [ map (\ (MkOptionallyNamedType _ _ t) -> t) ps
             | (_, (_, TypeCheck.KnownTerm (Fun _ ps (TyApp _ r [])) Constructor)) <- Map.toList entityInfo
@@ -6030,6 +6035,23 @@ typeComponents u = do
             ]
       in pure (Just (concat fields))
     _ -> pure Nothing
+
+-- | A type with any synonym at its head replaced by the type it names, as
+-- the type checker's @tryExpandTypeSynonym@ does, until the head is not a
+-- synonym: @Fn@, declared @IS FUNCTION FROM NUMBER TO NUMBER@, is that
+-- function type. A synonym in a declaration cycle is installed without a
+-- body and does not expand; the fuel bounds a cycle that arrives otherwise.
+expandTypeHead :: Type' Resolved -> Machine (Type' Resolved)
+expandTypeHead ty0 = do
+  entityInfo <- getEntityInfo
+  let go :: Int -> Type' Resolved -> Type' Resolved
+      go fuel ty = case ty of
+        TyApp _ r args
+          | fuel > 0
+          , Just (_, TypeCheck.KnownType _ params (Just body)) <- Map.lookup (getUnique r) entityInfo ->
+              go (fuel - 1) (TypeCheck.substituteType (Map.fromList (zipWith (\ p a -> (getUnique p, a)) params args)) body)
+        _ -> ty
+  pure (go 100 ty0)
 
 -- | The type of a constructor's i-th field, as its declaration gives it.
 constructorFieldType :: Resolved -> Int -> Machine (Maybe (Type' Resolved))
