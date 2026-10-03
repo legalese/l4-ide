@@ -23,7 +23,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException, prettyReductionOutcome)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException, prettyReductionOutcome, undeterminedJson)
 import L4.Print (termNeedText)
 import L4.Parser.SrcSpan (prettySrcRange)
 
@@ -199,12 +199,9 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
       -- a null value and what it waits on under "undetermined" (decided by
       -- Claude overnight 2026-10-03, pending Meng's review;
       -- UNKNOWN-EVALUATION-SPEC §8 step 3).
-      Assertion a@(Undetermined needs) ->
+      Assertion (Undetermined _) ->
         ("assertion", Aeson.Null,
-         [Key.fromString "undetermined" Aeson..= Aeson.object
-            [ Key.fromString "needs"   Aeson..= map termNeedText (toList needs)
-            , Key.fromString "message" Aeson..= prettyAssertionOutcome a
-            ]])
+         [Key.fromString "undetermined" Aeson..= undeterminedJson result])
       -- An UNDETERMINED #EVAL gets its OWN kind, as a refusing one does: it
       -- is neither a value nor an error. "needs" names what it waits on, each
       -- once, in the order evaluation reached it, and "message" is the

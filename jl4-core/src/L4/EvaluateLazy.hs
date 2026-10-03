@@ -27,6 +27,7 @@ module L4.EvaluateLazy
 , prettyAssertionOutcome
 , prettyReductionOutcome
 , prettyUndetermined
+, undeterminedJson
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
@@ -665,12 +666,13 @@ instance Aeson.ToJSON EvalDirectiveValue where
     , "value" Aeson..= Aeson.Null
     , "error" Aeson..= prettyAssertionOutcome a
     ]
-  -- Rendered as the 'Stuck' it used to be, with what it waits on beside it.
-  toJSON (Assertion a@(Undetermined ns)) = Aeson.object
-    [ "type"  Aeson..= ("assertion" :: Text)
-    , "value" Aeson..= Aeson.Null
-    , "error" Aeson..= prettyAssertionOutcome a
-    , "needs" Aeson..= map termNeedText (toList ns)
+  -- Still an assertion, as in @l4 run --json@, with a null value and what it
+  -- waits on under "undetermined": not an "error", which it is not
+  -- ('undeterminedJson').
+  toJSON v@(Assertion (Undetermined _)) = Aeson.object
+    [ "type"         Aeson..= ("assertion" :: Text)
+    , "value"        Aeson..= Aeson.Null
+    , "undetermined" Aeson..= undeterminedJson v
     ]
   toJSON (Reduction (Reduced val)) = Aeson.toJSON val
   toJSON (Reduction (ReducedRefused r)) = Aeson.object
@@ -679,10 +681,26 @@ instance Aeson.ToJSON EvalDirectiveValue where
   toJSON (Reduction (ReducedErrored exc)) = Aeson.object
     [ "error" Aeson..= Text.unlines (prettyEvalException exc)
     ]
-  toJSON (Reduction (ReducedUndetermined ns)) = Aeson.object
-    [ "error" Aeson..= Text.unlines (prettyUndetermined ns)
-    , "needs" Aeson..= map termNeedText (toList ns)
+  -- Under its own key, as a refusal is: neither a value nor an error.
+  toJSON v@(Reduction (ReducedUndetermined _)) = Aeson.object
+    [ "undetermined" Aeson..= undeterminedJson v
     ]
+
+-- | What an undetermined result waits on, as every JSON surface reports it
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4): @{"needs": [...], "message": "..."}@,
+-- the inputs each once, in the order evaluation reached them, and the
+-- default report's text. 'Nothing' for any other result. @l4 run --json@,
+-- the JSON above and the API's result objects all carry this one object.
+undeterminedJson :: EvalDirectiveValue -> Maybe Aeson.Value
+undeterminedJson = \ case
+  Assertion a@(Undetermined ns)        -> Just (needsAnd ns (prettyAssertionOutcome a))
+  Reduction o@(ReducedUndetermined ns) -> Just (needsAnd ns (prettyReductionOutcome o))
+  _                                    -> Nothing
+  where
+    needsAnd ns message = Aeson.object
+      [ "needs"   Aeson..= map termNeedText (toList ns)
+      , "message" Aeson..= message
+      ]
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
 prettyEvalDirectiveValueWithFields _fields (Assertion a)                    = prettyAssertionOutcome a
