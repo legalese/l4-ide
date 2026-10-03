@@ -2441,9 +2441,9 @@ which owns the defect; this section owns the ruling and the limit.
   default that is read is an event in the text trace, the service's reasoning
   tree and the graph, naming the binder, the declaration and the value. The
   "alpha took its default" line of a plain `#EVAL` or `#ASSERT` is built beside
-  it as W11 (§4.3, same branch, not landed): a `NOTE:` line naming the binder and
-  the declaration. Still open: it does not carry the value, and a default read
-  through an `IMPORT` has no event at all (§4.2, F5).
+  it as W11 (§4.3, same branch, not landed): a `NOTE:` line naming the binder,
+  its value and the declaration. Still open: a default read through an `IMPORT`
+  has no event at all (§4.2, F5).
 - ~~A rule that reads a binder cannot be passed as a first-class value.~~
   **Built after review.** The pass now eta-expands a bare reference to a reader
   with parameters of its own, minting `Unique`s with the sort char `'d'` (no

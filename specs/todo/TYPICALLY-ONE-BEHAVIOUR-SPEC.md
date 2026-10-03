@@ -140,7 +140,7 @@ Each is independently landable unless it names a dependency.
 | W8  | The trace records "took its default", with the declaration line (R8 surface).                                                                                                                                                                                                                                                                                                                                                                            | —            | **Built in `feat/typically-w8`** (§4.2): the event (W2+W3) is rendered in the text trace, the service's reasoning tree and the graph. `L4.EvaluateLazy.Trace` |
 | W9  | Every exporter either maps the default to the target's own mechanism or emits a fidelity note (T5).                                                                                                                                                                                                                                                                                                                                                      | §2 exporters | `Dmn/`, `OpenFisca/`, `Blawx/` lowerings                                                                                                                      |
 | W10 | Documentation and stale records: `doc/reference/types/TYPICALLY.md` (one behaviour; delete the "everywhere else: metadata only" half), `typically-example.l4`, the header comment of `ok/typically-basic.l4`, the status headers of `TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`, the deferred list in `IMPLICIT-PROPS-DESIGN.md:2391`. Canon's restated constants (S3) can go once W5 lands; that is a canon change, not this repo's. | —            | —                                                                                                                                                             |
-| W11 | A plain `#EVAL` or `#ASSERT` names each default it took, in a `NOTE:` line after its answer (R8: "every directive and trace output names each parameter that took its default").                                                                                                                                                                                                                                                                         | R8 surface   | **Built in `feat/typically-w8`** (§4.3). `L4.EvaluateLazy.defaultNotes`; `l4 run`'s `Notes:` and JSON `notes`                                                 |
+| W11 | A plain `#EVAL` or `#ASSERT` names each default it took, with its value, in a `NOTE:` line after its answer (R8: "every directive and trace output names each parameter that took its default").                                                                                                                                                                                                                                                         | R8 surface   | **Built in `feat/typically-w8`** (§4.3). `L4.EvaluateLazy.defaultNotes`; `l4 run`'s `Notes:` and JSON `notes`                                                 |
 
 ### 4.1 W2 and W3, as built (2026-10-02)
 
@@ -287,8 +287,10 @@ A builtin operator's frame (`TIMES`, `>=`, `EQUALS`) is pushed to wait for its o
 The event stays where the default was read also when the rule that read it ran late, while the result is written out after the main expression has finished (`JUST rule`, a `LIST` of rule results, `map`, every service request through the wrapper, every `DEONTIC` function): that run is a placeholder in the main trace, and the event is in it, under the step that needed the value.
 An event that no step of the finished trace can show it under is hung by `hangUnplacedDefaults` on the last step of the main expression, in the order the defaults were read.
 Two shapes need it: a default first read while the result is written out with no run of a rule to hang from (a defaulted field of a record the function hands back, which nothing computed with), and a read inside a definition with no inputs, whose evaluation the trace does not unfold (a module-level definition that decodes JSON and leaves a field out).
-The post-processing drops no event: the walk finds every event the main trace does not reach, following each placeholder once; a trace cut off at its display limit (`maxTraceNodes`) carries its own marker.
-Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", ten cases, and one more for W11, §4.3); the service's "a TYPICALLY default in the reasoning tree" (eleven cases, among them the wrapper and deontic placement and the quoted range); the corpus files `ok/typically-trace.l4` and `ok/typically-trace-where.l4`.
+The post-processing drops no event: the walk finds every event the main trace does not reach, following each placeholder once.
+A trace cut off at its display limit (`maxTraceNodes`, 10000 nodes) can lose the event of a step it never reached, so `completeDefaults` runs once more after the trace is built and hangs each such event on the main expression's last step, with the value the driver read when the directive ended (review N2, below).
+The one trace it cannot complete is the stand-in that failed post-processing leaves (`tracePostprocessFailed`), which has no step to hang an event on; there the plain directive's line (§4.3) says the default.
+Tests: `TracePostprocessSpec` ("a TYPICALLY default in the trace (W8)", ten cases, two more for W11 (§4.3), five for `completeDefaults` and one for the WASM API's JSON (second review, N2 and N4)); the service's "a TYPICALLY default in the reasoning tree" (twelve cases, among them the wrapper and deontic placement, the quoted range and a truncated tree); the corpus files `ok/typically-trace.l4` and `ok/typically-trace-where.l4`.
 
 **How each surface says it.**
 Decided by Claude overnight 2026-10-03, pending Meng's review: a reader of the output sees these words and R8 does not give them, and there is no conservative option to prefer, since keeping today's behaviour would be not building W8.
@@ -309,7 +311,10 @@ Commits `3fcf9c4fe` (text) and `47922a4c6` (service); each alternative is stated
 - _Service reasoning tree_ (`trace=full`).
   A node with `exampleCode: ["the rate"]` (the string `presumed` uses for the same default, `presumedName`: the path, with the wrapper's own ` (input)` suffix put back to the input's, and `JSONDECODE Settings: limit` for a field of a decode the rules made, review F6) and `explanation: ["the rate took its default (declared at rates.l4:2:44-45)", "Result: 3"]`; a computed default's own steps are its child.
   Alternative: no `exampleCode`, the sentence alone.
-  A client that reads `explanation[0]` as the node's title still reads sensibly either way.
+  Every other node's `explanation` is the one entry `Result: …`, so this node's has one entry more, and the rule a client can rely on is that **the result is the last entry** of every node's (said in `jl4-service/README.md` and the reference page).
+  `explanation` is a list of text in the type (`Backend.Api.Reasoning`) and no document promises it one entry; no reader of the tree in this repository exists, other than the tests (grep of `ts-apps`, `jl4-mlir/runtime`, the service and the docs, review N5); and a node that did not exist before cannot regress a client written before it.
+  A client that read `explanation[0]` as the result would show this node's sentence, which says what it is.
+  Alternative: `explanation: ["Result: 3"]` and the sentence carried nowhere, which loses the line the default came from for every client.
 - _Graph_ (`l4 trace`, and `graphviz` in a service response): see the decision below.
 
 **Decided by Claude overnight 2026-10-03, pending Meng's review.**
@@ -327,6 +332,12 @@ Commits `3fcf9c4fe` (text) and `47922a4c6` (service); each alternative is stated
 - **A default that no step of the trace can show it under hangs on the main expression's last step** (`hangUnplacedDefaults`; commit `ae593d742` built it as `hoistLateDefaults`, which moved every event read after the main expression finished and is replaced, see "What review changed").
   _Alternative:_ drop it from the trace, where it is still in `presumed`, which is what the first version of the branch did.
   Chosen over dropping because T6b says the trace shows every event, and a trace that says nothing about a default the answer rests on is the silent shape this spec ranks first.
+
+- **A trace cut off at its display limit still shows a default that it did not reach** (commit `f82e71cfb`; the repair is `completeDefaults` and its one call in `nfDirectiveWith`, and taking those out brings back the CLI's `NOTE:` line above a truncated trace and the silence on the service).
+  T6b says the trace shows every event; a truncated trace that said nothing of a default the answer rests on, while `presumed` listed it, was the silent shape.
+  The event is hung on the main expression's last step, which is where `hangUnplacedDefaults` puts one that no step can show, with its value.
+  It changes what a reader of a truncated trace sees (one more node at the end), in the text, in the service's tree and in the graph; before, the CLI said it in a `NOTE:` line above the trace and the service did not say it.
+  _Alternative:_ keep the CLI's `NOTE:` line for the truncated case and leave the tree as it was; that is the behaviour it replaces, and it is silent on the service.
 
 **Assumed, not ruled (nobody outside the code is likely to notice):**
 
@@ -367,6 +378,37 @@ Five are repaired and one is deferred; each repair has a test that fails without
   The node said `limit` and the list `JSONDECODE Settings: limit`; both now come from `presumedName` (commit `f75ac1bf0`).
   Test: "names a node as presumed does, for a default the rule's own decode filled".
 
+**What the second review changed (2026-10-03).**
+A second pair of adversarial passes over `dca732452`, with the build report and an advisor's reading of the user-visible choices, found five more silent defects (N1 to N5) and one fidelity point.
+Each was re-probed on this branch's own binaries before anything was changed.
+
+- **N1 (major): W11's `NOTE:` line broke the encoding skill's self-check.**
+  `skills/encoding-a-subject/assets/check.sh` counts assertions by a single-line grep for `Message: assertion satisfied`; `l4 run` prints a diagnostic's message on that line only when it fits in 80 columns, and a `NOTE:` line always makes it not fit, so an assertion that took a default was counted as neither satisfied nor failed, at the same exit status.
+  Measured on a module of four assertions (three reading defaults, one satisfied and one failed among them): the script said `errors 1, satisfied 1, failed 0` where `l4 run` on unstable says `satisfied 3, failed 1`; over the 289 modules of `jl4/examples/ok` it said 136 satisfied where there are 143, seven assertions in five modules.
+  The script now reads the first words of the message wherever they are (commit `f2ebddd1f`), and gives the same tables as the unstable binary on all 289 modules.
+  Test: `l4-cli-test` "is counted by the encoding skill's check.sh whichever line the message sits on" runs the script, on the real binary, over a fixture with both layouts (`tests-cli/fixtures/check-sh/rates.l4`); with the old script it says `1 1 0` and the test fails.
+  Not repaired here: two copies of the old grep outside this repository, `canon`'s `subjects/sg/penal-code-1871/encodings/legalese-whole-code/check.sh` and `pc-encode/deposit/check.sh`, and the `l4-plugin` bundle, which regenerates from `skills/` (`etc/build-plugin-bundle.mjs`).
+  The review also said that on an `#EVAL` the note sits on the `Message:` line after the value (`Message:  9 NOTE: …`).
+  That is the R-X6 note channel's layout and was so before W11 (`ok/every/tests/run-after.golden` carries one), so it is not W11's; the self-check does not read an `#EVAL`'s value.
+- **N2 (minor): a truncated trace dropped the event on the service.**
+  Repaired by `completeDefaults` (above, commit `f82e71cfb`), with the CLI test "shows a default that a truncated trace did not reach", the service test of the same name, and five unit cases.
+- **N3 (minor): the order of the tree's nodes is not the order the defaults were read.**
+  Probed: a default no step could show comes last, and a rule that runs while the answer is written out is placed where it was set up, so an `#EVALTRACE` shows `the rate` and then `timeout` where the plain `#EVAL`'s lines say `timeout` and then `the rate`.
+  Not changed in the code: the order of a tree is the order of its steps.
+  The service README and the reference page said "in the order they were read"; they now say to match nodes to `presumed` by name and not by position.
+- **N4 (minor): "every directive" did not reach the browser playground.**
+  Repaired as far as the engine goes (commit `7fdcce16a`): `evalResultToJson` (the WASM API's JSON, `L4.API`) now carries the default lines in `notes`, as `l4 run --json` does.
+  Not repaired: the page shows `result` and no `notes` (`ts-apps/jl4-web/src/lib/wasm/wasm-bridge.ts:691` has no such field), so it shows no R-X6 note either; showing them is a change to the TypeScript that this slice could not build or run.
+  The reference page said the line is shown by "a plain `#EVAL`" without qualification and now lists where it is shown.
+  The review did not name the REPL, which has the same gap: it collects a trace for every directive and showed none, so a plain expression read a default in silence (`jl4> doubled` printed `6`); it now says every default, as for a directive with no trace.
+  Its place is the REPL's own copy of the file, not the author's: the REPL re-prints the module before it evaluates, so a line says `declared at .repl_eval_0.l4:2:42-43` where the file has the value at `rates.l4:2:44-45` (measured, and the same in its `:traceascii`, which said so since W8).
+  Left so, and stated on the reference page: the name and the value are right, and relocating a range in re-printed text to the author's columns is not possible from what the REPL keeps.
+- **N5 (minor): the default node's `explanation` has one entry more than the others.**
+  Disputed, and kept as labelled decision 6 (above); the rule that the result is the last entry is now stated where the node is documented.
+- **F-W11 (fidelity): the spec called W11 "ruled" while the commit said "pending Meng's review".**
+  R8 rules that every directive names the parameter, with the value; it does not rule the `NOTE:` channel, the REPL and the JSON `notes`.
+  §4.3 now says what is ruled and what was decided, and its claim that W11 "can be reverted alone" is made exact there.
+
 **Not built, and why.**
 
 - **A line for the default in the output of a plain `#EVAL`** was left out of W8, which was assigned the trace, and is built as W11 (§4.3).
@@ -380,41 +422,56 @@ Five are repaired and one is deferred; each repair has a test that fails without
 
 ### 4.3 W11, as built (2026-10-03)
 
-**Treated as ruled, not as an open question.**
+**What is ruled, and what was decided overnight, pending Meng's review.**
 R8's surface has two halves, and the first W8 build did one.
 `PROPS-REDTEAM-2026-09-03.md` §2.5 says _"Every directive and trace output names each parameter that took its default"_, and, under "Two surfaces, confirmed with Meng on 2026-09-04", that the trace event _"is what every directive's 'alpha took its default 10' line is rendered from"_.
 The one-line summaries of that ruling (`IMPLICIT-PROPS-DESIGN.md` §11.5, this spec's §1.1) name only the trace and the schema, which is how the directive half fell out of the work table; it was not dropped by a decision.
 T4b adds that the mark covers every default that took effect, wherever filled.
 After W8, a plain `#EVAL` was the one evaluation surface that left no mark: `EvalDirectiveResult.presumed` carried the defaults and the printers discarded it, so `#EVAL doubled` printed `6` beneath a trace that said a default was taken, which is a wrong-by-omission answer with exit 0 in the surface a rule author uses most.
-Built as its own commit, so that it can be reverted alone; Meng can object to the noise on a program with many defaults, which is the only part of it that is his.
+
+So **a line beside a plain directive's answer, naming the parameter, its value and where it was declared, is ruled** (R8's own example is "alpha took its default 10").
+What R8 does not rule is the channel, and that is **decided by Claude overnight 2026-10-03, pending Meng's review**: that the line is a `NOTE:` (R-X6's existing channel, which also puts it in the editor's diagnostic text, in `l4 run`'s `Notes:` block and in the `notes` of `l4 run --json`, and the REPL and the WASM API's JSON `notes`), and its wording.
+The first W8 pass left the line out as the conservative choice; the second built it, in `c3f279785` with its LSP test `96954056d`; the value was added afterwards, in its own commit `a3a462594` (below), and the REPL and the WASM API's `notes` in `7fdcce16a`.
+_Alternative:_ leave a plain `#EVAL` as it was, at the price of the wrong-by-omission answer above.
+To take the line away, revert `7fdcce16a`, `a3a462594`, `96954056d` and `c3f279785`, newest first: the four goldens that existed before W8 return to what they were, and the docs of this section go with them.
+The value commit is not reverted alone, since the repair of a truncated trace (§4.2, N2) reads the value the same way.
+The part that is Meng's: a program that reads many defaults prints one `NOTE:` line for each, which may be noise; if so the repair is one line for the directive naming them all, and not dropping them.
 
 **What it does.**
-A directive that took a default says so after its answer, one `NOTE:` line for each, in the words of the trace's event (`defaultEventText`):
+A directive that took a default says so after its answer, one `NOTE:` line for each, with the value and where it was declared (`defaultNoteText`):
 
 ```
 6
-NOTE: the rate took its default (declared at typically-trace.l4:9:49-50)
+NOTE: the rate took its default 3 (declared at typically-trace.l4:9:49-50)
 ```
 
 - On `#EVAL` and `#ASSERT` alike, because both go through `prettyEvalDirectiveResult`.
 - Not on a directive that supplied the value (`doubled WITH the rate IS 5`), and not on one that never read the default (`FALSE AND` the defaulted name): the lines are the directive's `presumed` events, which are the defaults forced.
-- Not twice: `defaultNotes` leaves out an event that the directive's own trace shows, and says one the trace does not show (a truncated trace, or one that failed to post-process).
+- Not twice: `defaultNotes` leaves out an event that the directive's own trace shows, and says one the trace does not show (the stand-in trace that failed post-processing has no step to hang an event on).
   `l4 run` captures no trace for any directive (§4.2), so there it says all of them, in its `Notes:` block and in the `notes` of `l4 run --json`: a consumer that read only `value` would otherwise be handed an answer that rests on a presumption, unsaid (the argument of R-X6's notes, which share the channel).
+  The REPL collects a trace for every directive and shows none, so it also says all of them (second review, N4).
 - Every event counts, a rule's own `JSONDECODE` default included, as the trace shows every event (T6b).
   `l4 batch` and the decision service say the same facts in `presumed` and are unchanged.
+- The WASM API's JSON (`L4.API.evalResultToJson`) carries the lines in `notes`, as `l4 run --json` does; the browser page shows `result` only and displays no note (§4.2, N4).
+
+**The value.**
+R8's example has it ("alpha took its default 10"), and the first build of this line did not carry it.
+An advisor's reading of the overnight choices said the ruling implies it, and that without it a changed default leaves the line byte-identical (`TYPICALLY 3` to `TYPICALLY 4` moves the answer from 6 to 8 under the same `NOTE:`), so a golden review sees a changed answer under an unchanged explanation.
+Carried, in a commit of its own (`a3a462594`): the log of defaults keeps the reference whose force reported each one, and when the directive ends the driver reads it with `peekNF`, which forces nothing, onto `Presumed.valueText` as one line.
+Every default is a literal until W7 (the checker refuses anything else: "must be a literal: a number, a string, or a nullary constructor"), so what is read is already evaluated; strings are quoted as everywhere else (`the label took its default "gold" (declared at …)`).
+A default whose forcing did not finish has no value, and its line is the sentence without one.
+A `MAYBE` left out says what it is and not `NOTHING` twice.
+_Alternative:_ the line without the value, which is what `c3f279785` built; the value commit goes back to that by being reverted together with the truncated-trace repair, or by taking `valueText` out of `defaultNoteText`.
 
 **Churn, measured.**
-Five goldens under `jl4/examples/ok/` moved, 14 directives, each by added `NOTE:` lines and nothing else: `section-given-typically` (4), `section-given-bridge` (4), `section-given-computed-field` (2), `section-given-import-def` (2) and `typically-trace` (2); `typically-trace.ep.golden` moved with the fixture's comment.
+Five goldens under `jl4/examples/ok/tests/` carry `NOTE:` lines for a plain directive, 14 directives and 15 lines, each added by W11 and each now carrying its value: `section-given-typically` (4 lines), `section-given-bridge` (4), `section-given-computed-field` (2), `section-given-import-def` (2) and `typically-trace` (3, on two directives).
+The first four existed before W8 and moved by those lines and nothing else; `typically-trace` is W8's own fixture, and `typically-trace.ep.golden` moved with its comment.
+The value commit changed each of the 15 lines by the inserted value and nothing else (read).
 No file under `legal/` or the canon mirror has a section `GIVEN … TYPICALLY`, and the two directives of `section-given-import-call` read a default through an `IMPORT`, which W8 does not record (§4.2, F5), so they print as before.
 The first estimate of 13 section defaults in 11 corpus files counted declarations; what moves an `#EVAL` golden is an untraced directive that reads one.
 
-**Not carried: the value.**
-R8's example has the value ("alpha took its default 10") and this line has the declaration, where the value is written, and not the value.
-`Presumed` does not hold it (a default is a thunk when it is registered), and carrying it needs the reference kept in the log and read when the directive ends; it is cheap for a literal and wants W7's computed defaults in view.
-Decided overnight, pending Meng's review; the alternative is `NOTE: the rate took its default 3 (declared at …)`.
-
 **Tests.**
-The six moved goldens, read before blessing (the diff of each is only the added lines); `TracePostprocessSpec` "says a default beside the answer when there is no trace, and not again when the trace shows it"; `l4-cli-test` "says which TYPICALLY default a directive took, and not when the value was supplied" (text and JSON, fails with `defaultNotes` switched off).
+The moved goldens, read before blessing; `TracePostprocessSpec` "says a default beside the answer when there is no trace, with its value, and not again when the trace shows it" and "says the sentence of the event when there is no value, and a MAYBE left out as what it is"; `l4-cli-test` "says which TYPICALLY default a directive took, and not when the value was supplied" (text and JSON); `jl4-lsp-test` `InspectorTraceSpec`, which holds the line, with its value, in the inspector's text and the diagnostic's.
 
 ---
 
