@@ -243,8 +243,8 @@ cannot introduce the hazard.
 ## What a section `GIVEN` does in this release
 
 **A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
-as an older `ASSUME` did.** A rule that reads one cannot be run to an answer
-until the name is supplied; `#EVAL` on such a rule reports
+as an older `ASSUME` did.** A rule whose answer depends on one cannot be run to
+an answer until the name is supplied; `#EVAL` on such a rule reports
 
 ```
 I could not continue evaluating, because I needed to know the value of

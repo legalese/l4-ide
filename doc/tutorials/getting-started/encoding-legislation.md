@@ -253,26 +253,34 @@ all. An encoding that paraphrases cannot.
 ### Asking before the blanks are filled
 
 Ask the rule for an answer with none of the seven facts supplied and it tells
-you so, naming the first thing it needed:
+you so, naming every fact it is waiting for:
 
 ```
-I could not continue evaluating, because I needed to know the value of
+I could not continue evaluating, because I needed to know the values of
   `the person is a body corporate`
-but it is an assumed term.
+  `the person engages in business for profit`
+  `the person is a public house`
+  `the person is a hotel`
+  `the person has an unspent conviction for fraud`
+  `the person has an unspent conviction for providing misleading information`
+  `the person has an alcohol banning order`
+but they are assumed terms.
 ```
 
 Two words in that message are worth unpacking. "Evaluating" is L4's word for
 working the rule out. An **"assumed term"** is a name the file assumes someone
 will supply for the case in hand, and never settles for itself — which is
 exactly what a `GIVEN` is, whether you wrote it under the heading as a section
-`GIVEN` or above one rule as a rule `GIVEN`. So the message reads: _I got as
-far as limb (a) and stopped, because nobody has told me whether this person is
-a body corporate._
+`GIVEN` or above one rule as a rule `GIVEN`. So the message reads: _I could
+not finish, because nobody has told me any of these seven facts about this
+person._
 
 That is not a bug and it is not a failure of the rule. It is the rule telling
-you which blank is still empty — one blank, the first one it needed, in the
-order the rule reads them. Fill that one and ask again, and it will name the
-next one it needs.
+you which blanks are still empty — every one its answer is waiting for. Fill
+some of them and ask again: it names the ones still missing, and once the facts
+you have given settle the answer, it answers. Tell it only that the person is
+not a body corporate, and the answer is `FALSE` whatever the other six are,
+because limb (a) already fails.
 
 ---
 

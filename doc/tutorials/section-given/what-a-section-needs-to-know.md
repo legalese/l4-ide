@@ -306,12 +306,13 @@ Put `#EVAL` on the question and run the file with no case at all, and the answer
 
 ```
 Result:
-  I could not continue evaluating, because I needed to know the value of
+  I could not continue evaluating, because I needed to know the values of
     `annual income`
-  but it is an assumed term.
+    `net worth`
+  but they are assumed terms.
 ```
 
-That is easy to mistake for a complaint about your rule. It is not; the rule is fine. "An assumed term" is a fact the file names but does not settle — exactly what you wrote the `GIVEN` to say. The tool says _assumed_ of any fact left open, whichever keyword named it: a section `GIVEN` and an older `ASSUME` report in exactly these words, so meeting the word here is not a sign that your `GIVEN` was quietly treated as something else. L4 names the first blank it reached and stops, rather than guessing a value and handing you a number that looks like an answer. (That is why the `#EVAL` line is shown here and is not in the companion file: a run ending this way counts as a run that did not succeed, and every file in this documentation must succeed.)
+That is easy to mistake for a complaint about your rule. It is not; the rule is fine. "An assumed term" is a fact the file names but does not settle — exactly what you wrote the `GIVEN` to say. The tool says _assumed_ of any fact left open, whichever keyword named it: a section `GIVEN` and an older `ASSUME` report in exactly these words, so meeting the word here is not a sign that your `GIVEN` was quietly treated as something else. L4 names every blank the answer is waiting for and stops, rather than guessing a value and handing you a number that looks like an answer. (That is why the `#EVAL` line is shown here and is not in the companion file: a run ending this way counts as a run that did not succeed, and every file in this documentation must succeed.)
 
 What you _can_ do with no facts at all is ask what kind of answer a rule gives:
 

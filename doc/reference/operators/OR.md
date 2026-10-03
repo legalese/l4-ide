@@ -41,6 +41,14 @@ If the first operand is written as plain `TRUE` or `FALSE`, the trace does not s
 
 A rule that calls itself without end through the second operand, such as `loop n MEANS FALSE OR loop n`, runs until it is stopped, as one that calls itself through an `IF`'s branch does.
 
+### When the first operand is not known
+
+The first operand may depend on a fact nobody has supplied yet, such as a section `GIVEN` the case leaves out.
+Then OR looks at the second operand too.
+If the second is `TRUE`, the answer is `TRUE`, whatever the missing fact turns out to be: `x OR TRUE` is `TRUE`.
+Otherwise the answer is not known yet, and asking for it stops and names every fact it is waiting for, as [AND](AND.md#when-the-first-operand-is-not-known) does.
+If the second operand stops with an error or a refusal, the answer is still reported as waiting for the first operand's facts.
+
 ## Related Keywords
 
 - **[AND](AND.md)** - Logical conjunction
