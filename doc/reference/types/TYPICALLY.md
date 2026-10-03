@@ -4,15 +4,26 @@ Attaches a default value to a name. The default is a _rebuttable presumption_:
 it records what should be presumed when nobody supplies a value, and a rule that
 is given no value uses it.
 
-It is used wherever the name is left out:
+## One behaviour
 
-- **on a section `GIVEN`**, by every rule that reads the name and is given no
-  value for it;
-- **on a rule's own `GIVEN`**, by a call that names its inputs with
-  [`WITH`](../functions/WITH.md) and leaves this one out;
-- **on a record field**, by a construction that leaves the field out; and
-- **at the boundary**, `l4 batch` and the decision service, by a case that
-  leaves the fact out.
+`TYPICALLY d` on a name means one thing.
+When nothing supplies a value for the name, at the point where a value has to come from outside the rule, the rule uses `d`.
+That holds wherever the name is declared, and in every tool that runs rules: `#EVAL` and `l4 run`, `l4 batch`, and the decision service.
+Three places accept a `TYPICALLY` and no run of the rules uses it: an `ASSUME`, which is deprecated ([below](#on-an-assume-checked-and-recorded-not-used)); a lambda's own `GIVEN`; and a field of an enum constructor that carries data ([below](#on-a-record-field-leaving-a-field-out-of-a-construction)).
+
+Three things hold wherever a `TYPICALLY` is written:
+
+- **A value that is supplied wins.** A default is never an override.
+- **"Not known" is not "left out".** At the boundary, `null` says that the fact is not known, and a fact that is not known never takes its default.
+- **Inside a file, a call or a construction by position gives every input and every field.** There is nothing left for a default to fill, so only a call or a construction that names its inputs with [`WITH`](../functions/WITH.md) may leave one out.
+
+What differs from one place to the next is only how a name comes to be left out:
+
+| `TYPICALLY` is written on | it is left out when                                                                                                       | for example              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| a section `GIVEN`         | a rule reads the name and the call, or the case, gives it no value; at the boundary, the case does not mention it         | `doubled`                |
+| a rule's own `GIVEN`      | a call that names the rule's inputs with `WITH` leaves it out; at the boundary, the case does not mention it              | `scaled WITH base IS 10` |
+| a record field            | a construction that names the fields with `WITH` leaves the field out; at the boundary, the JSON object has no key for it | `Paint WITH coats IS 2`  |
 
 Each is described below, with what a default does _not_ excuse.
 
@@ -36,8 +47,10 @@ names listed after `GIVEN`). `TYPICALLY` may appear on:
 3. **A `GIVEN` under a section heading** (a **"section `GIVEN`"**) — default
    values for a name declared once for every rule in the section
 4. **`ASSUME` declarations, in older files** — default values for assumed
-   names. `ASSUME` is deprecated (ruled 2026-09-04) and still works; a fact
-   supplied for each case belongs under its section's heading instead. See
+   names, which are checked and recorded and not used (see
+   [below](#on-an-assume-checked-and-recorded-not-used)). `ASSUME` is
+   deprecated (ruled 2026-09-04) and still works; a fact supplied for each case
+   belongs under its section's heading instead. See
    [the section `GIVEN`](../syntax/section-given.md) and
    [ASSUME (deprecated)](ASSUME.md).
 
@@ -118,7 +131,8 @@ in a file you `IMPORT`. Two things it does not do:
   case: a field takes no named inputs, so the call can only mean the rule.
 - **It does not reach an `ASSUME`.** An `ASSUME` that takes inputs (`ASSUME` is
   deprecated) keeps its inputs' `TYPICALLY` as a note only, in the file that
-  declares it and in a file that imports it alike.
+  declares it and in a file that imports it alike (see
+  [below](#on-an-assume-checked-and-recorded-not-used)).
 
 ## On a record field: leaving a field out of a construction
 
@@ -154,6 +168,32 @@ quiet choice:
 - **A computed field**, one with a `MEANS` clause, cannot carry a `TYPICALLY`
   at all: its value always comes from the `MEANS`, so a default could never be
   used. That is a check error.
+
+## On an `ASSUME`: checked and recorded, not used
+
+[`ASSUME`](ASSUME.md) is deprecated (ruled 2026-09-04) and is being retired.
+A `TYPICALLY` on one is checked against the type, as anywhere else, and kept, and no run of the rules uses it:
+
+```l4
+ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `person has capacity`
+
+#EVAL `may contract` TRUE     -- `person has capacity`, the bare name: not TRUE
+```
+
+- **`#EVAL` and `l4 run`** get the name back, with the deprecation warning, where a section `GIVEN` would give `TRUE`.
+- **`l4 batch` and the decision service** still ask for the fact.
+  A case that leaves it out is refused (`Missing required field 'person has capacity'`), and the published list of facts has it under `required`, with no `default`.
+- **An input of an `ASSUME` that takes inputs** is the same.
+  A call that names the inputs and leaves out one that has a `TYPICALLY` is told it has not supplied it, in the file that declares the `ASSUME` and in a file that imports it.
+
+To make the default count, move the declaration under its section's heading, as a section `GIVEN`.
+The same rule then works out `TRUE`, `l4 batch` and the service take the default and list it under `presumed`, and the default may be an expression.
+That changes the answer, so it is more than a respelling.
+The `GIVEN` line the deprecation warning suggests carries the `TYPICALLY` across.
 
 ## A default that is worked out
 
@@ -267,9 +307,9 @@ A default is checked when it is written:
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
-- **On an `ASSUME` it is still not used** ([`ASSUME`](ASSUME.md) is deprecated),
-  and must stay a fixed value; move the declaration under its section's heading
-  to make the default count, and to be allowed an expression.
+- **On an `ASSUME` it is not used** (see
+  [above](#on-an-assume-checked-and-recorded-not-used)), and must be a fixed
+  value; a section `GIVEN` is where a default counts and may be an expression.
 
 ## At the boundary: `l4 batch` and the decision service
 
@@ -314,7 +354,7 @@ govern what counts as leaving a fact out:
   record is part of the request, and the service refuses one that leaves a
   field out.
 
-Three limits on a default that is an expression, at the boundary:
+Limits on a default that is an expression, at the boundary:
 
 - **Under `hard`, a fact that only a default reads is still asked for.** Nothing
   reads that default under `hard`, so the fact is never used, but the published
@@ -341,17 +381,22 @@ Three limits on a default that is an expression, at the boundary:
   that decide the answer, and what a default reads is not among them, so a client
   that answers every question the plan asks can still be refused for a missing
   fact. Give the fact a default, or ask for it yourself.
-- **`l4 batch` cannot run a rule whose default supplies an input the export also
-  reads.** A default such as `` `base doubled` TYPICALLY (`double it` WITH base IS 10) ``
-  is fine at `#EVAL` and in the service. In `l4 batch` an export that also reads
-  `base` has it bound to the row, and a `WITH` to a bound input is not a supply, so
-  every row is refused. This is older than expression defaults: any `WITH` on a
-  section input, inside an exported rule's body, does the same.
+- **A default that supplies an input the export also reads is not run
+  everywhere.** A default such as
+  `` `base doubled` TYPICALLY (`double it` WITH base IS 10) ``, in a file whose
+  export also reads `base`, is fine at `#EVAL`. `l4 batch` refuses every row: it
+  binds `base` to the row, and a `WITH` to a bound input is not a supply. The
+  decision service answers a request that leaves `base` out, or that supplies
+  `base doubled`, and stops with an internal error for one that supplies `base`
+  and leaves `base doubled` out: "named application supplying an implicit input
+  reached the evaluator undischarged ... This is a compiler bug". The `l4 batch`
+  limit is older than expression defaults: any `WITH` on a section input, inside
+  an exported rule's body, does the same.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
-either, and is not published, in the service's schema or in the query plan's.
+either: the service's schema leaves it out, and the fact stays under `required`.
 
 **A default that is an expression is published as its source text**, a JSON
 string, whatever the fact's type: `"default": "`list price` DIVIDED BY 10"` for a
@@ -363,14 +408,6 @@ service works the expression out itself, from the other facts in the same
 request. A section `GIVEN` that a default reads is a fact of the published rule
 too, and is listed under `required` unless it has a default of its own, because
 the service cannot know that a request will not need it.
-
-_Landed in stages (2026-10-02 and 2026-10-03). A **section** `GIVEN` may be left
-out, and a rule that reads it then uses the default; the published list of facts
-asks for a defaulted fact as optional, which the boundary then honours; a
-**rule's own** `GIVEN` and a **record field** may be left out at a call that
-names its inputs and at a construction; and a default may be an expression.
-Still to come: nothing yet says how to write a construction that leaves out
-every field._
 
 ## Examples
 
@@ -423,10 +460,11 @@ ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
 ```
 
 `ASSUME` is deprecated (ruled 2026-09-04) and still works. On an `ASSUME` the
-default stays metadata, as does the default of an input of an `ASSUME` that takes
-inputs; moving the declaration under its section's heading, as the previous
-example does, is what makes the default take effect for a rule given no value.
-The companion file no longer carries this spelling.
+default is checked and recorded and no rule uses it, nor the default of an input
+of an `ASSUME` that takes inputs; moving the declaration under its section's
+heading, as the previous example does, is what makes the default take effect for
+a rule given no value. The companion file does not use this spelling, because it
+draws a deprecation warning.
 
 ## Behavior
 
@@ -434,12 +472,23 @@ The companion file no longer carries this spelling.
   supplied always wins, and `null` (not known) is never an omission.
 - The default must match the annotated type, or type checking fails.
 - The default is a fixed value like `18` or `"yes"`, or an expression over what
-  the file declares, which is worked out when something reads it.
+  the file declares, which is worked out when something reads it. An `ASSUME`
+  and a lambda's `GIVEN` take only a fixed value.
 - A call that gives its inputs by position, and a construction that gives its
   fields by position, give all of them: only `WITH` may leave one out.
 - On a computed field (one with a MEANS clause) a TYPICALLY is an error.
 - A default that reads the input it stands in for, directly or through another
   default or a definition, is a check error.
+- On an `ASSUME` a `TYPICALLY` is checked and recorded, and no run of the rules
+  uses it.
+
+## What changed
+
+Earlier versions of L4 took a `TYPICALLY` only on a section `GIVEN`.
+On a rule's own `GIVEN` and on a record field it was a note that no evaluation used, so a call or a construction that left such a name out was an error.
+A default had to be a fixed value wherever it was written.
+A `TYPICALLY` on a computed field, which never did anything, is now a check error.
+An `ASSUME` is as it was.
 
 ## See Also
 
@@ -451,5 +500,7 @@ The companion file no longer carries this spelling.
 - [GIVEN](../functions/GIVEN.md) — the inputs of one rule
 - [Query Planning](../query-planning/README.md) — how a stored default becomes
   the per-atom prior `w_v` for the question-ordering wizard
+- [Exports](../../exports/README.md) — the Catala, docassemble and Blawx pages
+  say what each does with a default
 - [Web Form Generation](../../courses/advanced/module-a4-production.md#web-form-generation)
   — using TYPICALLY defaults in an autogenerated wizard

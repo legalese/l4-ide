@@ -519,7 +519,7 @@ Such clauses cannot be published with `@export`, even a single one; see [An @exp
 
 **What went wrong:** A default is worked out from the other inputs it reads, so none in a circle can be worked out first.
 
-**How to fix it:** Make one default in the circle a plain value, or have it supply the input it would read (``(`double it` WITH base IS 10)`` reads nothing of `base`; `l4 batch` cannot run an export that also reads `base`, see the [limits at the boundary](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+**How to fix it:** Make one default in the circle a plain value, or have it supply the input it would read (``(`double it` WITH base IS 10)`` reads nothing of `base`; `l4 batch` cannot run an export that also reads `base`, and the decision service stops on a request that supplies it, see the [limits at the boundary](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
 
 ---
 
@@ -531,7 +531,7 @@ Such clauses cannot be published with `@export`, even a single one; see [An @exp
 
 **What went wrong:** A section `GIVEN`'s default is worked out once, from the values the whole evaluation was started with. A default on a rule's input or a record field is taken at each call or construction that leaves it out, so what it read there would depend on the call, and the same default could give different answers. Which should win is not settled, so the file is refused.
 
-**How to fix it:** Give the default to the section `GIVEN` instead. Or write one that reads only definitions that read no section input, or have it supply the input it would read (``(`double it` WITH alpha IS 1)`` reads nothing of `alpha`). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+**How to fix it:** Give the default to the section `GIVEN` instead. Or write one that reads only definitions that read no section input, or have it supply the input it would read (``(`double it` WITH alpha IS 1)`` reads nothing of `alpha`; if the export also reads `alpha`, see the [limits at the boundary](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
 
 ---
 
