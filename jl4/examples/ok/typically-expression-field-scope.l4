@@ -1,0 +1,26 @@
+-- A record field's TYPICALLY default is worked out where its DECLARE is written,
+-- like a rule's input: a name in it means what that name means in the section
+-- the record is declared in, not what it means at the top of the file
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3, silent review S2). It was looked up
+-- from the top of the file, so a section's own `phi` was passed over for the
+-- file's, with no error.
+
+GIVETH A NUMBER
+phi MEANS 1000
+
+§ `Rates`
+    GIVETH A NUMBER
+    phi MEANS 8
+
+    DECLARE Config HAS
+      timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+      retries IS A NUMBER
+
+    -- the same default, on a rule's input, in the same section
+    GIVEN n IS A NUMBER
+          k IS A NUMBER TYPICALLY (phi TIMES 2)
+    GIVETH A NUMBER
+    f MEANS n PLUS k
+
+#ASSERT (Config WITH retries IS 1)'s timeout EQUALS 16
+#ASSERT (f WITH n IS 0) EQUALS 16

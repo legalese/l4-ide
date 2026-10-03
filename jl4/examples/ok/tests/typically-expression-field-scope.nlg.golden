@@ -1,0 +1,2 @@
+`Config` where `retries` is 1 and `timeout` is the product of `phi` and 2 by default 's `timeout` is equal to 16
+`f` where `n` is 0 and `k` is the product of `phi` and 2 by default is equal to 16
