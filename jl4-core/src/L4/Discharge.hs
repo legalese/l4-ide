@@ -298,13 +298,25 @@ inputDefaultReads mod'
  where
   binders = sectionBinders mod'
   bodies  = decideBodiesFromModule mod'
-  readSetOf = readSetsAll mod' binders
+  stages  = readSetStages mod' binders
 
-  -- The same sum a definition's read-set is: what the expression names, and
-  -- what it reaches through its calls less what each call supplies.
+  -- The same two steps a definition's read-set is: what the expression names and
+  -- what it reaches through its calls, less what each call supplies, and then
+  -- that closed under the defaults of the binders in it. The subtraction acts on
+  -- the first: a default that SUPPLIES an input gives the rule it calls that
+  -- input, so the input's own default is never taken and what it reads is not
+  -- read (@k TYPICALLY (h WITH b IS 1)@ with @b TYPICALLY (r PLUS 1)@ reads
+  -- neither; it was refused as reading @r@, W7 second review, silent S7). A
+  -- reference to a binder is itself closed under that binder's default, as in
+  -- 'readSetStages'.
   exprReads e =
-    canonicaliseBinders
-      (directBinderReads binders e <> reachedThrough readSetOf (bodyCallEdges bodies e))
+    let direct =
+          canonicaliseBinders
+            (directBinderReads binders e
+               <> reachedThrough stages.own
+                    (filter (\ (g, _) -> not (Map.member g binders)) (bodyCallEdges bodies e)))
+    in canonicaliseBinders
+         (direct <> concat [ Map.findWithDefault [] (getUnique b.resolved) stages.closed | b <- direct ])
 
   -- A section's own @GIVEN@ is an 'OptionallyTypedName' too, and is where a
   -- binder's default is written; it is not a rule's input.
