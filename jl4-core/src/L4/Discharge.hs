@@ -159,28 +159,43 @@ readSetsAll :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binde
 readSetsAll mod' binders
   | Map.null binders = Map.empty
   | otherwise =
-      Map.mapMaybe nonEmptyRead (iterateToFixpoint (Map.size bodies + 1) step direct)
+      Map.mapMaybe nonEmptyRead
+        (iterateToFixpoint (Map.size bodies + 1) closeStep
+           (iterateToFixpoint (Map.size bodies + 1) ownStep direct))
  where
   bodies = decideBodiesFromModule mod'
 
   -- Per definition: the binders its body names, and the definitions it calls
   -- together with what each call supplies by name.
   direct = Map.map (directBinderReads binders) bodies
-  edges  = Map.map (bodyCallEdges bodies) bodies
+  -- A reference to a binder is an edge to its default's pseudo-definition too
+  -- ('decideBodiesFromModule'), and is left out here: it is what the closure
+  -- below does, and taking it through the call graph would put a default's
+  -- reads into the part a @WITH@ subtracts from.
+  edges  = Map.map (filter (\ (g, _) -> not (Map.member g binders)) . bodyCallEdges bodies) bodies
 
-  step current =
+  -- What a definition reads, not counting what a binder's default adds: its own
+  -- names and its callees' own reads, less what each call supplies. This is the
+  -- part a call site's @WITH@ takes away from. It has to be kept apart from the
+  -- closure below, which is not subtracted from by a @WITH@: with the two mixed,
+  -- @a TYPICALLY (h WITH b IS 1)@ was charged with what @b@'s default reads
+  -- through @h@, although the site never takes @b@'s default, and a pair of
+  -- defaults that are no circle was refused as one.
+  ownStep current =
     Map.mapWithKey
-      (\ u own ->
-         let here = own <> reachedThrough current (Map.findWithDefault [] u edges)
-         in canonicalise (here <> defaultsOf current (here <> Map.findWithDefault [] u current)))
+      (\ u cur -> canonicalise (cur <> reachedThrough current (Map.findWithDefault [] u edges)))
       current
 
-  -- What the defaults of these binders read. A root that supplies nothing for a
-  -- binder works its default out from the root's own values, so a definition
-  -- that takes the binder as a parameter is charged with what its default reads
-  -- even when it never names the reads itself: @h MEANS (g WITH r IS 1)@ takes
-  -- @b@ from its root, and the root works out @b@'s default from the root's @r@.
-  -- A binder with no default has no entry in @current@ and adds nothing.
+  -- Then each set is closed under the defaults of the binders in it. A root that
+  -- supplies nothing for a binder works its default out from the root's own
+  -- values, so a definition that takes the binder as a parameter is charged with
+  -- what its default reads even when it never names the reads itself:
+  -- @h MEANS (g WITH r IS 1)@ takes @b@ from its root, and the root works out
+  -- @b@'s default from the root's @r@. A binder with no default has no entry in
+  -- @current@ and adds nothing.
+  closeStep current =
+    Map.map (\ bs -> canonicalise (bs <> defaultsOf current bs)) current
+
   defaultsOf current bs =
     concat [ Map.findWithDefault [] (key b) current | b <- bs ]
 
