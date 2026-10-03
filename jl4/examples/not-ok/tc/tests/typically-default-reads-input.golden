@@ -1,0 +1,59 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-default-reads-input.l4
+  Hidden: no
+  Range: 18:7-18:11
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `rate` reads the section input
+      `alpha`,
+    directly or through a definition it calls.
+
+    A rule's input or a record's field takes its default at the call or the
+    construction that leaves it out, so what the default reads there depends on
+    that call and one default could give different answers. Only a section
+    input's default is worked out once, from the values the whole case gives.
+
+    Give the default to a section input instead, or write one that reads only
+    definitions that read no section input.
+
+File: typically-default-reads-input.l4
+  Hidden: no
+  Range: 27:7-27:11
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `rate` reads the section input
+      `alpha`,
+    directly or through a definition it calls.
+
+    A rule's input or a record's field takes its default at the call or the
+    construction that leaves it out, so what the default reads there depends on
+    that call and one default could give different answers. Only a section
+    input's default is worked out once, from the values the whole case gives.
+
+    Give the default to a section input instead, or write one that reads only
+    definitions that read no section input.
+
+File: typically-default-reads-input.l4
+  Hidden: no
+  Range: 33:3-33:8
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `limit` reads the section input
+      `alpha`,
+    directly or through a definition it calls.
+
+    A rule's input or a record's field takes its default at the call or the
+    construction that leaves it out, so what the default reads there depends on
+    that call and one default could give different answers. Only a section
+    input's default is worked out once, from the values the whole case gives.
+
+    Give the default to a section input instead, or write one that reads only
+    definitions that read no section input.
