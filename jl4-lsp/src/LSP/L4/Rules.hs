@@ -1022,7 +1022,7 @@ jl4Rules evalConfig rootDirectory recorder = do
             -- co-equal for overload resolution (spec §5.5, FIX C).
           , sectionPaths = Map.union cState.sectionPaths tcRes.sectionPaths
           , deferredChoices = 0
-          , overloadedCallees = Set.empty
+          , overloadedCallees = Map.empty
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as
