@@ -563,11 +563,14 @@ spec bin = do
               Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
               other -> expectationFailure ("Expected an error string, got " ++ show other)
             -- One stuck on an input nobody supplied did not raise an error: it
-            -- is undetermined, and says what it waits on
+            -- is undetermined, still an assertion, and says what it waits on
             -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3).
-            objField waiting "kind"  `shouldBe` Just (String "undetermined")
+            objField waiting "kind"  `shouldBe` Just (String "assertion")
             objField waiting "value" `shouldBe` Just Null
-            arrayField waiting "needs" `shouldBe` Just [String "x"]
+            objField waiting "error" `shouldBe` Nothing
+            case objField waiting "undetermined" of
+              Just und -> arrayField und "needs" `shouldBe` Just [String "x"]
+              other    -> expectationFailure ("Expected an undetermined field, got " ++ show other)
           other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
