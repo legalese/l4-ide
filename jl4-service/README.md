@@ -215,8 +215,9 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
 Two kinds of request go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list, and every request to a `DEONTIC` function.
-On that path a missing `BOOLEAN` input is an assumed term, which costs nothing if the rule never needs its value.
-If the rule needs it — tests it with `IF`, `AND`, `OR` or `NOT`, compares it, or returns it — evaluation stops and names it:
+On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
+A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
+If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -229,6 +230,9 @@ It stops however the rule reads the input, including through a `CONSIDER` with a
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
 A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
+
+Every evaluation and batch response says which report it carries, as `"report": "default"`.
+The default report is the only one so far: it shows an answer that is still waiting for an input as the `422` above (UNKNOWN-EVALUATION-SPEC §4.7.4).
 
 Limits, measured 2026-10-02:
 

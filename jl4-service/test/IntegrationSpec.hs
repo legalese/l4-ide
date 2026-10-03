@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -412,6 +412,16 @@ spec = describe "integration" do
                 ]
             ])
         assertNotSupplied resp "is member"
+
+    it "answers when a missing BOOLEAN the rule reads cannot change the answer" do
+      withServiceFromSources "w1-anyway" [("eligible.l4", decidedAnywayJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-anyway" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "unused flag" Aeson..= uncertain ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
 
     it "uses a BOOLEAN read by CONSIDER when it is supplied" do
       withServiceFromSources "w1-consider-given" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
@@ -1069,6 +1079,8 @@ spec = describe "integration" do
             batch.summary.casesRead `shouldBe` 10
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
+        -- every response states its report (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        reportOf resp `shouldBe` Just "default"
 
     -- TRAFFICJAM (2026-10-02). A case's time limit is wall-clock, and the batch
     -- used to start every case at once. On one core each case's timer then
@@ -1360,6 +1372,30 @@ spec = describe "integration" do
           again <- callTool 3 0
           LBS.toStrict again `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           LBS.toStrict again `shouldSatisfy` BS.isInfixOf "true"
+
+  -- U7b: the report a response carries is never left to be guessed. Until
+  -- build step 6 adds the others it is always the default one.
+  describe "the stated report" do
+    it "is \"default\" on a successful evaluation and on one that stopped" do
+      withServiceFromSources "report" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        decided <- evalFunction baseUrl mgr "report" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= False
+                , "unused flag" Aeson..= Aeson.object []
+                ]
+            ])
+        statusCode' decided `shouldBe` 200
+        reportOf decided `shouldBe` Just "default"
+        waiting <- evalFunction baseUrl mgr "report" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "unused flag" Aeson..= Aeson.object []
+                ]
+            ])
+        statusCode' waiting `shouldBe` 422
+        reportOf waiting `shouldBe` Just "default"
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -3458,6 +3494,12 @@ evalFunction :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response
 evalFunction baseUrl mgr deployId fnName body = do
   req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/evaluation") body
   httpLbs req mgr
+
+-- | The report a response states it carries, if it states one.
+reportOf :: Response LBS.ByteString -> Maybe Text
+reportOf resp = case Aeson.decode (responseBody resp) of
+  Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
+  _ -> Nothing
 
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
