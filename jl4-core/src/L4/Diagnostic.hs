@@ -126,9 +126,14 @@ evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger _n
       EL.Assertion (EL.Undetermined _) -> DSError
       EL.Assertion EL.Holds            -> DSInformation
       -- Reductions keep their pre-existing uniform Information severity —
-      -- including a raising one. That asymmetry with assertions predates
-      -- REFUSE and is deliberately not changed here.
-      EL.Reduction _                   -> DSInformation
+      -- including a raising one, and an undetermined one, which was a
+      -- raising Stuck. That asymmetry with assertions predates REFUSE and is
+      -- deliberately not changed here. One arm each, no wildcard, so a new
+      -- outcome must choose (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b).
+      EL.Reduction (EL.Reduced _)             -> DSInformation
+      EL.Reduction (EL.ReducedRefused _)      -> DSInformation
+      EL.Reduction (EL.ReducedErrored _)      -> DSInformation
+      EL.Reduction (EL.ReducedUndetermined _) -> DSInformation
   , sdMessage  = EL.prettyEvalDirectiveResult r
   , sdSource   = "eval"
   }
