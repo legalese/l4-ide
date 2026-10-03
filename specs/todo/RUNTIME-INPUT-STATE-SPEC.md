@@ -1,14 +1,22 @@
 # Specification: Runtime Input State Model
 
-**Status:** ⚠️ BLOCKED (December 2025) - depends on TYPICALLY
-**Related:** `TYPICALLY-DEFAULTS-SPEC.md` (compile-time defaults), `BOOLEAN-MINIMIZATION-SPEC.md` (partial evaluation), `doc/default-values.md` (conceptual background)
+**Status:** PARTLY BUILT, IN A DIFFERENT SHAPE (re-audited 2026-10-04 on `feat/typically-w10`, which stacks W2 to W7 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` on `unstable`; those are not merged into `unstable`, by the local refs of that day).
+This spec depends on `TYPICALLY`, which is operational (`TYPICALLY-DEFAULTS-SPEC.md`, status header).
+**What exists is the four cells, not the types and the API this spec sketches.**
+The cells are decided in one function, `L4.Presumption.fillDecision` (`jl4-core/src/L4/Presumption.hs`, W2 and W3): an input or a field is `Absent` (the key is not there), `SuppliedNull` (not known) or `Supplied v`, and whether it has a default is a separate argument.
+On the wire a missing key is `Left`, `null` is `Right Nothing` ("I don't know": never the default, an error naming the fact at the boundary), `{}` is read as `null` (`FnUncertain`, `jl4-service/src/Backend/Api.hs`), and a value is `Right (Just v)`.
+`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (T3) is the current statement of that table and §4.1 says how it is built.
+The ladder keeps the `Left` cell as its own map, `ViewSpec.defaults`, beneath the user's answers, with `respectDefaults` to withdraw the presumptions (`ts-shared/ladder-core/src/types.ts`).
+**Not built:** `WithDefault`, `InputState`, `L4.Runtime.InputState` and `initSession` (no `*.hs`, `*.ts`, `*.svelte`, `*.cabal` or `*.yaml` file in the tree mentions `InputState`, `WithDefault`, `initSession`, `NotProvided` or `explicitUnknown` as a word; searched 2026-10-04, and the one hit for this spec's `SessionState` is an unrelated type in `ts-shared/legalese-agent`); the `{"_notProvided": true}` marker, the `explicitUnknowns` list and the `inputResolution` response of "API Design" (the service answers with `presumed`, the inputs that took their default and were read, in place of `inputResolution`); and the resolution to three-valued logic (`TriBool`, "Integration with Three-Valued Logic": no `.hs` file mentions it; an unknown input stops the case, refused by name at the boundary, and on the service's wrapper path a missing boolean is an assumed term that stops the answer only if the rules read it; `UNKNOWN-EVALUATION-SPEC.md` specifies three-valued evaluation, and its own status header, 2026-10-01, says not built).
+The fourth state of the summary, "not applicable", is not modelled.
+`initializeInputState` evaluates "a literal"; a default is now a literal or an expression (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3).
+**The body below is the December 2025 design, kept for its reasoning, and is not a description of the tree.**
+**Related:** `TYPICALLY-DEFAULTS-SPEC.md` (compile-time defaults), `BOOLEAN-MINIMIZATION-SPEC.md` (partial evaluation), `doc/default-values.md` (conceptual background; deleted in `a3f56bdc7`, so the file is not in the tree)
 
-> **⚠️ IMPLEMENTATION STATUS: BLOCKED**
+> **⚠️ IMPLEMENTATION STATUS: PARTLY BUILT, SEE THE STATUS ABOVE**
 >
-> This spec depends on the TYPICALLY keyword implementation, which was reverted due to
-> a critical heisenbug. See `TYPICALLY-DEFAULTS-SPEC.md` for details.
->
-> The specification below remains valid as a design document for future implementation.
+> `TYPICALLY` is operational (`TYPICALLY-DEFAULTS-SPEC.md`), and what of this model has been built is above.
+> The specification below remains a design document.
 
 ## Executive Summary
 

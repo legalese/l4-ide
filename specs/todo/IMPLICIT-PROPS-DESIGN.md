@@ -1091,7 +1091,7 @@ declaration line and value; the JSON schema lists a `TYPICALLY` parameter as opt
 **What decided it.** Three images today (schema required-and-defaulted, Catala `context`,
 evaluator discards) and a reference page saying defaults do not change evaluation. Meng's own
 note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
-change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
+change in its own right; `doc/reference/types/TYPICALLY.md` says so, under "What changed". Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
 
 **EXTENDED 2026-09-06 to `DECLARE` record fields (D7.3, upstream #645).** R8 as written governs
@@ -1101,7 +1101,7 @@ site omit it — same principle, one declaration, the default living where the n
 Ruled 2026-09-06, and **built 2026-10-03** with R8's named-site half (W4 and W5 of
 `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2; `feat/typically-w4w5`, not yet merged), for a
 record's fields. The governing text for
-that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
+that ruling is `TYPICALLY-DEFAULTS-SPEC.md`, Edge Cases 1 ("TYPICALLY on Optional Fields"), and the record is
 `SURFACE-SUGAR-CLUSTER-2026-09.md` §D7.3, which also rules the source/boundary asymmetry R8 does not
 reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
 (`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
@@ -2460,11 +2460,24 @@ which owns the defect; this section owns the ruling and the limit.
   definitions rank with the selectors, below every opened field).
 - **R11, `@reads`, and the hover/index surfaces of §2.9 are not built.** They are
   §6 item 6 with the backends.
-- **A defaulted binder gets no dedicated trace event.** §2.5 asks for one naming
-  the binder, the declaration line and the value. Because the default becomes an
-  ordinary 0-ary definition, the trace records it as a definition force, which
-  is accurate but is not the "alpha took its default 10" line the directive
+- **A defaulted binder gets no dedicated trace line.** §2.5 asks for one naming
+  the binder, the declaration line and the value. The event exists (W8's, raised
+  when the default is first read; `presumed` in `l4 batch` and the service is
+  built from it) and no trace renders it. Measured on `feat/typically-w10`:
+  `#EVALTRACE doubled`, over a section `GIVEN` with a default, shows
+  `` doubled OF `the rate` ``, `` `the rate` TIMES 2 `` and `6`, and no step for the
+  default. Rendering it is W8 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (§4), not built
+  on this branch; it is not the "alpha took its default 10" line the directive
   output was supposed to render from.
+- **`ASSUME … TYPICALLY` is still not used.** T2 (§11.5) rules it honoured; W6 of
+  `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` is deferred by Meng's word of 2026-10-02,
+  because `ASSUME` is being deprecated. `doc/reference/types/TYPICALLY.md` says so,
+  under "On an `ASSUME`".
+- **A construction that leaves out every field of a record has no spelling, and an
+  enum constructor's payload fields take no default at a construction.** Both are
+  open: `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2, "Not built here".
+- **T5, exporters that map a default or say they drop it, is not on this branch.**
+  It is W9 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`.
 - ~~A rule that reads a binder cannot be passed as a first-class value.~~
   **Built after review.** The pass now eta-expands a bare reference to a reader
   with parameters of its own, minting `Unique`s with the sort char `'d'` (no

@@ -87,7 +87,7 @@ silently treat an absent `MAYBE` field as `NOTHING` today — `Machine.hs:2282`,
 an evaluation and keeps defaulting an absent `MAYBE` field to `NOTHING`; `TYPICALLY NOTHING` does
 not gate it. Encoders annotate; callers over the wire do not have to.
 
-**Two corrections to the record for whoever builds it.** Cite `TYPICALLY-DEFAULTS-SPEC.md:420-428`
+**Two corrections to the record for whoever builds it.** Cite `TYPICALLY-DEFAULTS-SPEC.md`, Edge Cases 1 ("TYPICALLY on Optional Fields"),
 as the governing text, not `IMPLICIT-PROPS-DESIGN.md` §11.5 R8, which carves `DECLARE` fields out
 (`TYPICALLY.md:69-72`) — R8's own note now carries a line saying it extends to them. And this was
 **blocked on R8's named-site half**, which W4 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` built with it

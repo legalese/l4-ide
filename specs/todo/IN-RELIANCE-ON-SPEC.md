@@ -552,8 +552,8 @@ prelude `MAYBE` has a single `NOTHING` constructor (`jl4-core/libraries/prelude.
 show its two-constructor pattern matches), and nothing in the evaluator tags _why_ a value is
 absent. The design that would make the split — the four-state input model distinguishing
 explicit-value / explicit-unknown / not-yet-asked / not-applicable, `Either (Maybe a) (Maybe
-a)` — exists but is marked **BLOCKED** in its own status header
-(`specs/todo/RUNTIME-INPUT-STATE-SPEC.md:3-11`). Today the distinction is representable only
+a)` — exists as a design, and its own status header says what of it is built
+(`specs/todo/RUNTIME-INPUT-STATE-SPEC.md`). Today the distinction is representable only
 operationally (next paragraph) or by convention.
 
 **The convergence.** Checked against the spec rather than taken on trust: the question-ordering
@@ -717,8 +717,8 @@ exercising the convention on the corpus.
    now as an interpretive fork on the Reg CF corpus, ahead of any implementation? (§8 says
    yes; recorded here as open because the corpus, not this spec, owns its fork register.)
 8. **The runtime representation of the two NOTHINGs.** `MAYBE` cannot carry
-   unknown-vs-unexamined (§7.1), and the four-state design that could is blocked
-   (`RUNTIME-INPUT-STATE-SPEC.md:3-11`). Does the split need a runtime representation in the
+   unknown-vs-unexamined (§7.1), and the four-state design that could is not built in the object language
+   (the status header of `RUNTIME-INPUT-STATE-SPEC.md`). Does the split need a runtime representation in the
    object language at all — or is "unexamined" always a _policy-level_ fact (the wizard's
    unasked set) that belongs to the interaction layer, never to the evaluator?
 
