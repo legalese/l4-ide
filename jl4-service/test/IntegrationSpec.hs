@@ -636,6 +636,31 @@ spec = describe "integration" do
         statusCode' waiting `shouldBe` 422
         reportOf waiting `shouldBe` Just "default"
 
+    it "is \"default\" in an MCP tool's answer, and in its undetermined error" do
+      withServiceFromSources "report-mcp" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        let call args = do
+              req <- buildJsonPost (baseUrl <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("eligible" :: Text)
+                    , "arguments" Aeson..= args
+                    ]
+                ]
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 200
+              pure (mcpToolText (responseBody resp))
+        decided <- call $ Aeson.object
+          [ "is resident" Aeson..= False, "unused flag" Aeson..= Aeson.object [] ]
+        fmap fst decided `shouldBe` Just False
+        (reportOfText . snd =<< decided) `shouldBe` Just "default"
+        waiting <- call $ Aeson.object
+          [ "is resident" Aeson..= True, "unused flag" Aeson..= Aeson.object [] ]
+        fmap fst waiting `shouldBe` Just True
+        (reportOfText . snd =<< waiting) `shouldBe` Just "default"
+        (snd <$> waiting) `shouldSatisfy` maybe False ("I needed to know the value" `Text.isInfixOf`)
+
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
       withEmptyService \baseUrl mgr -> do
@@ -2483,6 +2508,26 @@ reportOf :: Response LBS.ByteString -> Maybe Text
 reportOf resp = case Aeson.decode (responseBody resp) of
   Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
   _ -> Nothing
+
+-- | The report an MCP tool result's text states, the text being an encoded
+-- evaluation response.
+reportOfText :: Text -> Maybe Text
+reportOfText t = case Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t)) of
+  Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
+  _ -> Nothing
+
+-- | Whether an MCP @tools/call@ result is an error, and its first text.
+mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
+mcpToolText body = do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  Aeson.Object c : _ <- pure (toList cs)
+  Aeson.String t <- Aeson.KeyMap.lookup "text" c
+  let isErr = case Aeson.KeyMap.lookup "isError" r of
+        Just (Aeson.Bool b) -> b
+        _                   -> False
+  pure (isErr, t)
 
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
