@@ -324,6 +324,13 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (owner, bs) <- Discharge.inputDefaultReads rprog
                   ]
                   ++
+                  -- ... and one that names, by spelling, another input of its own
+                  -- rule or another field of its own record means whatever else
+                  -- is called that (W7 review S1).
+                  [ MkCheckErrorWithContext (TypicallyNamesSibling owner names) None
+                  | (owner, names) <- Discharge.inputDefaultCaptures rprog
+                  ]
+                  ++
                   [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
@@ -7770,6 +7777,32 @@ prettyCheckError (TypicallyReadsInput owner bs) =
   , ""
   , "Give the default to a section input instead, or write one that reads only"
   , "definitions that read no section input."
+  ]
+prettyCheckError (TypicallyNamesSibling owner names) =
+  ( case List.nub (map (rawNameToText . rawName . getActual) names) of
+      [n] ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " names"
+        , "  " <> quotedName (MkName emptyAnno (NormalName n)) <> ","
+        , "which is also the name of another input of the same rule, or another field"
+        , "of the same record."
+        ]
+      ns ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " names these,"
+        , "each also the name of another input of the same rule, or another field of"
+        , "the same record:"
+        , ""
+        ] <>
+        [ "  " <> quotedName (MkName emptyAnno (NormalName n)) | n <- ns ]
+  ) <>
+  [ ""
+  , "A default is worked out outside the rule or the record it is written on, where"
+  , "that rule's inputs and that record's fields are not known. A name spelled like"
+  , "one of them therefore means whatever else is called that, and the answer would"
+  , "use that value without a word."
+  , ""
+  , "Rename the input or field, or the definition, so that they differ, or write the"
+  , "default without it. A default that needs another input belongs on a section"
+  , "input, which may read the section's other inputs."
   ]
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."
