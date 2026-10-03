@@ -3,7 +3,7 @@ fidelity report — dmnmd
       dmnmd is a table format, not a graph: the 6 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-TYPICALLY] lossy — Config.timeout  (main.l4:20:5-37)
-      the field `timeout` of `Config` carries TYPICALLY 30, and DMN has no default for an itemComponent: an evaluation that leaves `timeout` out of the record gets `null` for it on Camunda 8 and on KIE alike, and neither reports an error, not 30
+      the field `timeout` of `Config` carries TYPICALLY 30, and DMN has no default for an itemComponent: an evaluation that builds a `Config` without `timeout` gets `null` for it on Camunda 8 and on KIE alike, and neither reports an error, not 30
       lost: the presumption: the source says an omitted component is 30, and the model says it is nothing
   [D-TYPICALLY] lossy — input_has_capacity  (main.l4:24:11-53)
       the section GIVEN `has capacity` carries TYPICALLY TRUE, and DMN has no default for an inputData: an evaluation that leaves `has capacity` out gets no value for it (`null` on Camunda 8, a model error on KIE), not TRUE
