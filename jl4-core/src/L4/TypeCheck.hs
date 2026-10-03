@@ -331,6 +331,16 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (owner, names) <- Discharge.inputDefaultCaptures rprog
                   ]
                   ++
+                  -- ... and an exported rule's default that names a section's
+                  -- definition that is also defined at the top level would mean
+                  -- the top level's in the module l4 batch and the service write
+                  -- the default into (W7 second review, silent S6).
+                  [ MkCheckErrorWithContext
+                      (TypicallyResolvedElsewhere owner (map (sectionQualifiedWith s'.sectionPaths) names))
+                      None
+                  | (owner, names) <- Discharge.defaultsMeaningElsewhere s'.sectionPaths env.environment rprog
+                  ]
+                  ++
                   [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
@@ -7815,6 +7825,29 @@ prettyCheckError (TypicallyNamesSibling owner names) =
   , "Rename the input or field, or the definition, so that they differ, or write the"
   , "default without it. A default that needs another input belongs on a section"
   , "input, which may read the section's other inputs."
+  ]
+prettyCheckError (TypicallyResolvedElsewhere owner names) =
+  ( case List.nub (map prettyLayout names) of
+      [n] ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " names"
+        , "  " <> n <> ","
+        , "which is defined in a section and also at the top level of the file."
+        ]
+      ns ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " names these, each of"
+        , "which is defined in a section and also at the top level of the file:"
+        , ""
+        ] <>
+        [ "  " <> n | n <- ns ]
+  ) <>
+  [ ""
+  , "Here the name means the section's. But l4 batch and the decision service write"
+  , "the default out as text, in a module of their own at the top level, and read"
+  , "it again there, where the name means the file's. The same input would give two"
+  , "answers, and neither would say so."
+  , ""
+  , "Write the name with its section, as above, or give the two definitions"
+  , "different names."
   ]
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."
