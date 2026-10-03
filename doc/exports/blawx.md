@@ -187,9 +187,11 @@ fidelity report — Blawx
 % lossy R-TYPICALLY — timeout: the field `timeout` of `Config` carries TYPICALLY 30, which is dropped: …
 ```
 
-A module that writes no `TYPICALLY` prints nothing and its `.pl` header is unchanged. The note is the
-only kind of note this channel carries; the lowering keeps others (a sort it could not name, a
-disjunction it factored) that are not printed. A scalar section `GIVEN` with a default never gets as
+A module that writes no `TYPICALLY` prints nothing and its `.pl` header is unchanged. The channel
+prints a loss, by severity and not by code: any note the lowering raises at `blocking` or `lossy`
+severity, and `R-TYPICALLY` is the only one it raises for the modules in this repository today. The
+advisory notes the lowering keeps (a sort recovered from how the name is used, a disjunction it
+factored) are not printed. A scalar section `GIVEN` with a default never gets as
 far as a note, because Blawx refuses a section input with no category to hang it on (an "input
 predicate with no category subject"); the older `ASSUME` spelling of a predicate over a category
 does, and says so.

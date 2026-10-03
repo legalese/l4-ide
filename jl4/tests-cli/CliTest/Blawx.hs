@@ -117,6 +117,19 @@ spec bin = do
       serr `shouldSatisfy` (not . ("TYPICALLY" `isInfixOf`))
       sout `shouldSatisfy` (not . ("R-TYPICALLY" `isInfixOf`))
 
+    -- The channel prints a LOSS (Blocking or Lossy), by severity and not by code.
+    -- An Advisory the middle end raises stays off it: relational/assumed.l4 makes
+    -- the middle end raise R-SORT at Advisory (see its golden) and exports, and
+    -- the export says nothing of it. (The control is the test above: a Lossy
+    -- note, R-TYPICALLY, is printed.) No corpus file raises a Lossy note other
+    -- than R-TYPICALLY through Blawx today, so a loss of another kind is covered
+    -- by the filter and not by a test.
+    it "does not print an Advisory note the middle end raises" $ do
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/relational/assumed.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("R-SORT" `isInfixOf`))
+      serr `shouldSatisfy` (not . ("could not carry" `isInfixOf`))
+
     it "compiles the minimal mortality example to its golden .blawx stream" $
       expectGolden bin ["export", "blawx", "examples/blawx/mortality.l4"]
                        "examples/blawx/expected/mortality.blawx"
