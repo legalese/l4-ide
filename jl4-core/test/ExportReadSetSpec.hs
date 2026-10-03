@@ -416,3 +416,27 @@ spec = do
       it "raises nothing for a default that names an imported rule that reads no input" $ do
         cs <- crossings (exportTaking "`doubled`")
         cs `shouldBe` []
+      -- The same control for an export's own input's default, which F7 refuses when it
+      -- reaches a reader: a rule that reads no input is not one.
+      it "raises nothing for an export input's default that names an imported rule that reads no input" $ do
+        cs <- crossings (Text.unlines
+          [ "IMPORT rates"
+          , ""
+          , "@export cost"
+          , "GIVEN amount IS A NUMBER"
+          , "      markup IS A NUMBER TYPICALLY (`doubled` 100)"
+          , "GIVETH A NUMBER"
+          , "`cost with markup` MEANS amount PLUS markup"
+          ])
+        cs `shouldBe` []
+      it "is refused for an export input's default that names an imported reader" $ do
+        cs <- crossings (Text.unlines
+          [ "IMPORT rates"
+          , ""
+          , "@export cost"
+          , "GIVEN amount IS A NUMBER"
+          , "      markup IS A NUMBER TYPICALLY (`scaled by the rate` 100)"
+          , "GIVETH A NUMBER"
+          , "`cost with markup` MEANS amount PLUS markup"
+          ])
+        cs `shouldBe` [("cost with markup", "scaled by the rate")]
