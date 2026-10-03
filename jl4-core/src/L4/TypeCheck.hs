@@ -333,6 +333,15 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | (owner, names) <- Discharge.defaultsMeaningElsewhere s'.sectionPaths env.environment rprog
                   ]
                   ++
+                  -- ... and one that names a definition that another section also
+                  -- defines is read in the scope of the file's last section there
+                  -- (W10 review, F1).
+                  [ MkCheckErrorWithContext
+                      (TypicallyInTwoSections owner (map (sectionQualifiedWith s'.sectionPaths) names))
+                      None
+                  | (owner, names) <- Discharge.defaultsDefinedInTwoSections s'.sectionPaths env.environment rprog
+                  ]
+                  ++
                   [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
@@ -7615,6 +7624,29 @@ prettyCheckError (TypicallyResolvedElsewhere owner names) =
   , ""
   , "Write the name with its section, as above, or give the two definitions"
   , "different names."
+  ]
+prettyCheckError (TypicallyInTwoSections owner names) =
+  ( case List.nub (map prettyLayout names) of
+      [n] ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " names"
+        , "  " <> n <> ","
+        , "which is defined in a section and also in another section of the file."
+        ]
+      ns ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " names these, each of"
+        , "which is defined in a section and also in another section of the file:"
+        , ""
+        ] <>
+        [ "  " <> n | n <- ns ]
+  ) <>
+  [ ""
+  , "Here the name means the one in its own section. But l4 batch and the decision"
+  , "service write the default out as text, after the last section, and read it"
+  , "again there, where the name can mean another one. The same input would give"
+  , "two answers, and neither would say so."
+  , ""
+  , "Write the name with its section, as above, or give the definitions different"
+  , "names."
   ]
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."

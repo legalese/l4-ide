@@ -449,13 +449,13 @@ result MEANS
 
 ### A default that means something else in a generated module
 
-**Error message:** `The TYPICALLY default of … names …, which is defined in a section and also at the top level of the file.`, or `… names these, each of which is defined …` followed by the names.
+**Error message:** `The TYPICALLY default of … names …, which is defined in a section and also at the top level of the file.`, or `… which is defined in a section and also in another section of the file.`, or `… names these, each of which is defined …` followed by the names.
 
-**What you wrote:** A `TYPICALLY` on the `GIVEN` of an `@export`ed rule, or on a section `GIVEN` that an export reads, whose expression names a definition that is in a section and is also defined, under the same name, at the top level of the file.
+**What you wrote:** A `TYPICALLY` on the `GIVEN` of an `@export`ed rule, or on a section `GIVEN` that an export reads, whose expression names a definition that is in a section and is also defined, under the same name, at the top level of the file or in another section.
 
-**What went wrong:** Where you wrote the default, the name means the section's definition. `l4 batch` and the decision service write the default out as text, in a module of their own at the top level, and read it again there, where the name means the file's. The same input would give two answers, and neither would say so.
+**What went wrong:** Where you wrote the default, the name means the definition in its own section. `l4 batch` and the decision service write the default out as text, in a module of their own after the last section, and read it again there, where the name can mean another definition. The same input would give two answers, and neither would say so.
 
-**How to fix it:** Write the name with its section, as the message shows it (``(`Rates`.phi PLUS 1)``), which means the same everywhere. Or give the two definitions different names. See [`TYPICALLY`](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service).
+**How to fix it:** Write the name with its section, as the message shows it (``(`Rates`.phi PLUS 1)``), which means the same everywhere. Or give the definitions different names. The check does not look at types, so a name that two sections define for different types is refused too, and the same way out applies. See [`TYPICALLY`](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service).
 
 ---
 

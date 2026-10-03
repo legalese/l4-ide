@@ -1,0 +1,56 @@
+-- `l4 batch` and the decision service write a default into a module of their own
+-- as text, after the file's last section, and read its names again there. A name
+-- that two sections define means the one in its own section where the default is
+-- written, and the last section's (or, when the last section does not define it,
+-- nothing the author wrote) there, so the same input would give two answers, with
+-- no error. It is refused for an exported rule, like a name that is defined in a
+-- section and at the top level (typically-default-resolved-elsewhere.l4)
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W10, §4.4, review F1). Written with its
+-- section, the name says which it is.
+
+§ `Rates`
+    -- ERROR: a section input's default naming `phi`, which `§ Other` also
+    -- defines; an exported rule below reads it
+    GIVEN scale IS A NUMBER TYPICALLY (phi PLUS 1)
+
+GIVETH A NUMBER
+phi MEANS 8
+
+-- ERROR: an exported rule's input default naming `phi`
+@export default Pay
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (phi PLUS 1)
+GIVETH A NUMBER
+pay MEANS (base TIMES rate) PLUS scale
+
+-- Fine: the same, with the section named. This rule does not read `scale`.
+@export Pay, with the section named
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (`Rates`.phi PLUS 1)
+GIVETH A NUMBER
+`pay in the section` MEANS base TIMES rate
+
+-- Fine: two definitions of one name in the same section, for different types,
+-- resolve the same way in both places.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+size MEANS n PLUS 1
+
+GIVEN s IS A STRING
+GIVETH A NUMBER
+size MEANS 100
+
+@export Sized
+GIVEN rate IS A NUMBER TYPICALLY (size OF 3)
+GIVETH A NUMBER
+sized MEANS rate
+
+-- Fine: a rule that is not exported is not written out again by `l4 batch` or
+-- the service.
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+GIVETH A NUMBER
+`not exported` MEANS rate
+
+§ `Other`
+GIVETH A NUMBER
+phi MEANS 9
