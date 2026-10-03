@@ -61,6 +61,7 @@ module L4.Discharge
   , readSets
   , implicitSupplySites
   , unreadImplicitSupplies
+  , implicitSuppliesToInputs
   , ambiguousImplicitSupplies
   , misdeliveredImplicitSupplies
   , ambiguousRootBinders
@@ -689,6 +690,7 @@ unreadImplicitSupplies mod'
   | otherwise =
       [ (n, r)
       | (n, r) <- implicitSupplySites mod'
+      , not (Map.member (getUnique n) binders)
       , not (any (suppliesBinder (readSetOf n) r) (readSetOf n))
       , not (ambiguousFor (readSetOf n) r)
       ]
@@ -696,6 +698,24 @@ unreadImplicitSupplies mod'
   binders = sectionBinders mod'
   rs      = readSets mod' binders
   readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
+
+-- | Call sites that give a @WITH@ to a section INPUT as though it were a rule:
+-- @discount WITH \`list price\` IS 200@, where @discount@ is a binder. An input
+-- has no read-set of its own for a @WITH@ to reach ('readSets' leaves binders
+-- out), so 'unreadImplicitSupplies' would say it does not read the value, which
+-- is false when its default does. The writer's mistake is a different one: the
+-- value belongs on a rule that reads the input. One entry per site: the input
+-- called, and the binder supplied.
+implicitSuppliesToInputs :: Module Resolved -> [(Resolved, Resolved)]
+implicitSuppliesToInputs mod'
+  | Map.null binders = []
+  | otherwise =
+      [ (n, r)
+      | (n, r) <- implicitSupplySites mod'
+      , Map.member (getUnique n) binders
+      ]
+ where
+  binders = sectionBinders mod'
 
 -- | Supplies whose 'Unique' matches no binder the callee reads and whose
 -- SPELLING matches two or more of them.
