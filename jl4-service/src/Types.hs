@@ -347,18 +347,28 @@ data SimpleResponse
   | SimpleError !EvaluatorError
   deriving stock (Show, Read, Ord, Eq, Generic)
 
+-- | Every evaluation response states the report it carries
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4, U7b): how a result that is not yet known
+-- is shown. Until build step 6 adds the others, it is always the default
+-- report, which shows one as the "I needed to know the value of …" error.
 instance ToJSON SimpleResponse where
   toJSON (SimpleError err) = Aeson.object
     [ "tag" .= ("Error" :: Text)
     , "contents" .= err
+    , "report" .= defaultReportName
     ]
   toJSON (SimpleResponse rwr) = Aeson.object
     [ "tag" .= tag
     , "contents" .= rwr
+    , "report" .= defaultReportName
     ]
    where
     tag :: Text
     tag = responseTag rwr
+
+-- | The name of the default report (UNKNOWN-EVALUATION-SPEC §4.7.4).
+defaultReportName :: Text
+defaultReportName = "default"
 
 instance FromJSON SimpleResponse where
   parseJSON = Aeson.withObject "SimpleResponse" $ \o -> do
@@ -553,6 +563,7 @@ instance ToJSON BatchResponse where
     Aeson.object
       [ "cases" .= br.cases
       , "summary" .= br.summary
+      , "report" .= defaultReportName
       ]
 
 -- ----------------------------------------------------------------------------

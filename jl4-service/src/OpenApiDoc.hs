@@ -309,6 +309,11 @@ buildComponents = Aeson.object
           , "properties" .= Aeson.object
               [ "tag" .= Aeson.object ["type" .= ("string" :: Text)]
               , "contents" .= Aeson.object ["type" .= ("object" :: Text)]
+              , "report" .= Aeson.object
+                  [ "type" .= ("string" :: Text)
+                  , "enum" .= (["default"] :: [Text])
+                  , "description" .= ("How a result that is not yet known is shown. Always \"default\" for now: such a result is an error that names every input it needs." :: Text)
+                  ]
               ]
           ]
       , "BatchRequest" .= Aeson.object
