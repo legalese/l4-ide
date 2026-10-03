@@ -1572,14 +1572,15 @@ instance LayoutPrinter Lazy.Term where
         Lazy.ConnImplies -> "IMPLIES"
         Lazy.ConnNot     -> "NOT"
 
--- | A name an undetermined result waits on, as plain text for a wire or a
--- JSON @needs@ list: the input's own name, or the path to a field of one
--- (@d's age@), with no quoting; any other term as L4 source.
+-- | A name an undetermined result waits on, for a JSON @needs@ list, spelled
+-- as L4 source and so as the message lists it: an input's name, quoted when
+-- it has to be (@`has criminal record`@), or the path to a field of one
+-- (@`the applicant`'s `age in years`@); any other term likewise. Unquoted,
+-- a path with spaces could not be split back into its parts.
 termNeedText :: Lazy.Term -> Text
 termNeedText = \ case
-  Lazy.TInput r _   -> nameToText (getActual r)
-  Lazy.TField b f _ -> termNeedText b <> "'s " <> nameToText (getActual f)
-  t                 -> prettyLayout t
+  Lazy.TInput r _ -> prettyLayout r
+  t               -> prettyLayout t
 
 -- | A term in an operand position: bracketed unless it is a name, a literal
 -- or a nullary constructor.

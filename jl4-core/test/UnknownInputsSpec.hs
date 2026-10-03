@@ -270,3 +270,19 @@ spec = describe "unknown inputs (UNKNOWN-EVALUATION-SPEC §8 step 3)" $ do
       let v = decodeText one
       (v >>= field "success") `shouldBe` Just Aeson.Null
       (v >>= needsOf) `shouldBe` Just (Aeson.toJSON ["x" :: Text.Text])
+    -- Each need is spelled as L4 source, as the message lists it, so a
+    -- path whose names have spaces can be split back into them.
+    it "spells each need as L4 source, quoting a name with spaces" $ do
+      vs <- resultsJson $ Text.unlines
+        [ "DECLARE Person HAS `age in years` IS A NUMBER"
+        , "§ `Unknown`"
+        , "    GIVEN `the applicant` IS A Person"
+        , "          `has criminal record` IS A BOOLEAN"
+        , "          d IS A Person"
+        , "#EVAL `the applicant`'s `age in years` GREATER THAN 18 AND `has criminal record`"
+        , "#EVAL d's `age in years` GREATER THAN 1"
+        ]
+      map needsOf vs `shouldBe`
+        [ Just (Aeson.toJSON ["`the applicant`'s `age in years`" :: Text.Text, "`has criminal record`"])
+        , Just (Aeson.toJSON ["d's `age in years`" :: Text.Text])
+        ]
