@@ -1,0 +1,37 @@
+-- A TYPICALLY default that is a named call with SEVERAL arguments (W7, R8 rule 3).
+-- Its text is written out where a module is generated (`l4 batch`'s wrapper) and
+-- published (the schema's `default`), and the printer used to put each argument
+-- on a line of its own, which does not survive being spliced after a prefix: the
+-- second argument no longer lines up and the parse fails at it. It is now one
+-- line, comma-separated, with a bracket round an argument that has an open tail
+-- of its own.
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+combine MEANS a PLUS b
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+pair MEANS x TIMES y
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 200
+          discount IS A NUMBER TYPICALLY (combine WITH a IS `list price`, b IS 1)
+          nested IS A NUMBER TYPICALLY (combine WITH a IS (pair WITH x IS 2, y IS 3), b IS discount)
+
+GIVETH A NUMBER
+net MEANS discount MINUS `list price`
+
+GIVEN rate IS A NUMBER TYPICALLY (combine WITH a IS 2, b IS 3)
+      base IS A NUMBER
+GIVETH A NUMBER
+rated MEANS rate TIMES base
+
+#ASSERT discount EQUALS 201
+#ASSERT nested EQUALS 207
+-- 11 less 10: it is 1 only if the default saw the 10 the WITH gave
+#ASSERT (net WITH `list price` IS 10) EQUALS 1
+#ASSERT (rated WITH base IS 10) EQUALS 50
+#ASSERT (rated WITH base IS 10, rate IS 1) EQUALS 10

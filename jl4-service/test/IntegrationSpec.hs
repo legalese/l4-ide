@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4, expressionDefaultJL4, expressionAllDefaultJL4, expressionSiteDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4, expressionDefaultJL4, expressionAllDefaultJL4, expressionSiteDefaultJL4, expressionMultiargJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -825,6 +825,37 @@ spec = describe "integration" do
         wrapped <- evalFunction baseUrl mgr "ty-expr-site" "combine"
           (hard ("unused flag" Aeson..= uncertain : used))
         expectAnswer wrapped (FnLitInt 106) presumedHere
+
+    -- A default that is a call with several arguments is written out as source
+    -- twice: in the wrapper a request with an uncertain input gets, and as the
+    -- schema's `default`. It used to put each argument on a line of its own,
+    -- so the wrapper did not parse and the schema text carried a newline and
+    -- column padding.
+    it "works a default that is a call with several arguments out, on both paths, and publishes it on one line (W7)" do
+      withServiceFromSources "ty-expr-multiarg" [("price.l4", expressionMultiargJL4)] \baseUrl mgr -> do
+        let listPrice = "list price" Aeson..= (200 :: Int)
+        -- (200 - (200 + 1)) * (2 + 3)
+        direct <- evalFunction baseUrl mgr "ty-expr-multiarg" "final price"
+          (args [listPrice, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitInt (-5)) ["discount", "rate"]
+        wrapped <- evalFunction baseUrl mgr "ty-expr-multiarg" "final price"
+          (args [listPrice, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitInt (-5)) ["discount", "rate"]
+        req <- parseRequest (baseUrl <> "/deployments/ty-expr-multiarg/functions/final%20price")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            props = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            defaultOf key = case Aeson.KeyMap.lookup key props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "rate" `shouldBe` Just (Aeson.String "combine WITH a IS 2, b IS 3")
+        defaultOf "discount" `shouldBe` Just (Aeson.String "combine WITH a IS `list price`, b IS 1")
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each

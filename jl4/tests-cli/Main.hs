@@ -237,7 +237,7 @@ batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 -- | @TYPICALLY@ that is an EXPRESSION (W7, R8 rule 3): on a rule's input, a
 -- section input and a record's field; taken from the case, and at a named site
 -- inside the rules; and a circle of defaults, which is no program.
-batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson, batchTyReads, batchTyReadsJson :: FilePath
+batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson, batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson :: FilePath
 batchTyExpr         = fixtureDir </> "batch-typically-expression.l4"
 batchTyExprJson     = fixtureDir </> "batch-typically-expression.json"
 batchTyExprAll      = fixtureDir </> "batch-typically-expression-all.l4"
@@ -248,6 +248,8 @@ batchTyCycle        = fixtureDir </> "batch-typically-cycle.l4"
 batchTyCycleJson    = fixtureDir </> "batch-typically-cycle.json"
 batchTyReads        = fixtureDir </> "batch-typically-reads-input.l4"
 batchTyReadsJson    = fixtureDir </> "batch-typically-reads-input.json"
+batchTyMulti        = fixtureDir </> "batch-typically-multiarg.l4"
+batchTyMultiJson    = fixtureDir </> "batch-typically-multiarg.json"
 
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
@@ -442,7 +444,7 @@ coreFixtures =
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
   , batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson
-  , batchTyReads, batchTyReadsJson
+  , batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -2031,6 +2033,19 @@ spec bin = do
     -- The default each site takes names `phi`, a definition, so it is one value
     -- wherever it is taken: (8 + 1) * 10 + 8 * 2, then no site reached, then
     -- (8 + 1) * 5 + 8 * 2.
+    -- A default that is a call with several arguments is written into the module
+    -- l4 batch generates. Its second argument used to land on a line of its own
+    -- there, the generated module did not parse, and every row failed, the row
+    -- that supplied both inputs too: (200 - 201) * 5, then 200 - 5 times 1.
+    it "works out a default that is a call with several arguments" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyMulti, "--inputs", batchTyMultiJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number (-5)), presumedOf ["discount", "rate"])
+        , (Just (Number 195),  presumedOf [])
+        ]
+
     -- A default on a rule's input that reads a section input is a check error,
     -- so there is no row to run (decision 1): the message names both.
     it "refuses a rule input's default that reads a section input, before any row" $ do
