@@ -543,6 +543,35 @@ spec bin = do
         Just (Array v) -> length v `shouldBe` 2
         other          -> expectationFailure ("Expected results array, got " ++ show other)
 
+    -- The trace does not only reach stdout. The directive's own diagnostic
+    -- carries it too ("TRUE", then a line of ─────, then the trace), and `l4 run`
+    -- writes diagnostics to stderr and puts them in the JSON "diagnostics". So
+    -- "no trace under --trace none / --json" has to be pinned in those two places
+    -- as well as in the Trace: section, or a trace collected and not shown would
+    -- leak there unseen. The first case is the positive control: it shows the
+    -- marker really does reach stderr when a trace is collected, so the two
+    -- cases after it are not vacuous.
+    it "puts the trace into stderr too, by default (the control for the next two)" $ do
+      Output _ _ serr <- runL4 bin ["run", runEvalTraceFixture]
+      serr `shouldSatisfy` ("─────" `isInfixOf`)
+
+    it "`--trace none` leaves the trace out of stderr as well" $ do
+      Output _ _ serr <- runL4 bin ["run", "--trace", "none", runEvalTraceFixture]
+      -- the diagnostics are still there; only the trace is not
+      serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
+      serr `shouldNotSatisfy` ("─────" `isInfixOf`)
+
+    it "`--json` keeps the trace out of its diagnostics" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          -- the diagnostics are still there; only the trace is not
+          length diags `shouldSatisfy` (> 0)
+          diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
   describe "l4 check" $ do
     it "succeeds on a clean file" $
       expectOk bin ["check", cleanFixture] "Check succeeded."
