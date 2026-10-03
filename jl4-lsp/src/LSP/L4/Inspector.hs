@@ -152,16 +152,21 @@ evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _rang
         -- declined to give.
         EL.Assertion (EL.Refused _)        -> Nothing
         EL.Assertion (EL.Errored _)        -> Just False
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        EL.Assertion (EL.Undetermined _)   -> Just False
         EL.Reduction (EL.Reduced _)        -> Just True
         EL.Reduction (EL.ReducedRefused _) -> Nothing
         EL.Reduction (EL.ReducedErrored _) -> Just False
+        EL.Reduction (EL.ReducedUndetermined _) -> Just False
     , structuredValue = case res of
         EL.Assertion EL.Holds              -> Just (Aeson.toJSON True)
         EL.Assertion EL.Fails              -> Just (Aeson.toJSON False)
         EL.Assertion (EL.FailsBecause _)   -> Just (Aeson.toJSON False)
         EL.Assertion (EL.Refused _)        -> Nothing
         EL.Assertion (EL.Errored _)        -> Nothing
+        EL.Assertion (EL.Undetermined _)   -> Nothing
         EL.Reduction (EL.ReducedErrored _) -> Nothing
+        EL.Reduction (EL.ReducedUndetermined _) -> Nothing
         EL.Reduction (EL.ReducedRefused _) -> Nothing
         EL.Reduction (EL.Reduced nf)       -> Just (nfToJson nf)
     , range = rng
@@ -196,7 +201,10 @@ valueToJson = \case
         _       -> Aeson.String name
       _  -> Aeson.object [Aeson.fromText name .= Aeson.toJSON (map nfToJson args)]
   Val.ValUnappliedConstructor resolved -> Aeson.String (prettyLayout (getActual resolved))
-  Val.ValAssumed resolved -> Aeson.object ["$assumed" .= prettyLayout (getActual resolved)]
+  Val.ValAssumed resolved _ -> Aeson.object ["$assumed" .= prettyLayout (getActual resolved)]
+  -- a result that holds a term is undetermined, not a value, so this is
+  -- only for completeness
+  Val.ValTerm t -> Aeson.object ["$unknown" .= prettyLayout t]
   -- Closures and builtins cannot be meaningfully serialized
   Val.ValClosure{} -> Aeson.String "<function>"
   Val.ValNullaryBuiltinFun{} -> Aeson.String "<builtin>"
@@ -297,9 +305,12 @@ evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Jus
         -- See 'evalDirectiveToResult': a refusal is not a FALSE verdict.
         EL.Assertion (EL.Refused _)        -> Nothing
         EL.Assertion (EL.Errored _)        -> Just False
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        EL.Assertion (EL.Undetermined _)   -> Just False
         EL.Reduction (EL.Reduced _)        -> Just True
         EL.Reduction (EL.ReducedRefused _) -> Nothing
         EL.Reduction (EL.ReducedErrored _) -> Just False
+        EL.Reduction (EL.ReducedUndetermined _) -> Just False
     , body        = getLines startLine endLine
     }
 evalDirectiveToUpdateItem _ _ _ = Nothing

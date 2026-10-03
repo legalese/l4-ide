@@ -158,6 +158,8 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
       -- either verdict.
       EL.Assertion (EL.Refused r) -> defaultResponseError $ Text.unlines $ EL.prettyRefusal r
       EL.Assertion a@(EL.Errored _) -> defaultResponseError $ EL.prettyAssertionOutcome a
+      -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+      EL.Assertion a@(EL.Undetermined _) -> defaultResponseError $ EL.prettyAssertionOutcome a
       EL.Reduction v ->
         case v of
           EL.Reduced (EL.MkNF val) ->
@@ -167,6 +169,7 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
           EL.Reduced EL.Omitted    -> defaultResponseError "Evaluation exceeded maximum depth limit"
           EL.ReducedRefused r      -> defaultResponseError $ Text.unlines $ EL.prettyRefusal r
           EL.ReducedErrored err    -> defaultResponseError $ Text.unlines $ EL.prettyEvalException err
+          o@(EL.ReducedUndetermined _) -> defaultResponseError $ EL.prettyReductionOutcome o
 
     throwExpectBoolResultError :: ExceptT (TResponseError method) m a
     throwExpectBoolResultError = defaultResponseError "Ladder visualizer is expecting a boolean result (and it should be impossible to have got a fn with a non-bool return type in the first place)"

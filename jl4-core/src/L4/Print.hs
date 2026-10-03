@@ -1660,7 +1660,8 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValTernaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValPartialTernary{}       -> "<partial-function>"
     Lazy.ValPartialTernary2{}      -> "<partial-function>"
-    Lazy.ValAssumed r              -> bareName r
+    Lazy.ValAssumed r _            -> bareName r
+    Lazy.ValTerm t                 -> printWithLayout t
     Lazy.ValUnappliedConstructor r -> bareName r
     Lazy.ValConstructor r vs       -> bareName r <> case vs of
       [] -> mempty
@@ -1696,6 +1697,62 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValAssumed{}              -> printWithLayout v
     Lazy.ValConstructor r []       -> bareName r
     _ -> surround (printWithLayout v) "(" ")"
+
+-- | A term (UNKNOWN-EVALUATION-SPEC §4.2) as L4 source over the inputs it
+-- reads, so that it can be read, and pasted back, as a rule: @x AND (NOT y)@,
+-- @(n PLUS 1) GREATER THAN 3@, @d's age@. Every compound operand is
+-- bracketed, whatever the operator's precedence, so that the text reads one
+-- way only. Names print bare, as in a value.
+instance LayoutPrinter Lazy.Term where
+  printWithLayout = \ case
+    Lazy.TInput r _     -> bareName r
+    Lazy.TNumber q      -> pretty (prettyRatio q)
+    Lazy.TString s      -> surround (pretty $ escapeStringLiteral s) "\"" "\""
+    Lazy.TDate day      -> printWithLayout (Lazy.ValDate day :: Lazy.Value Lazy.NF)
+    Lazy.TTime tod      -> printWithLayout (Lazy.ValTime tod :: Lazy.Value Lazy.NF)
+    Lazy.TDateTime u tz -> printWithLayout (Lazy.ValDateTime u tz :: Lazy.Value Lazy.NF)
+    Lazy.TNil           -> "EMPTY"
+    t@(Lazy.TCons a rest) -> case termList t of
+      Just ts -> "LIST" <+> hsep (punctuate comma (map termOperand ts))
+      Nothing -> termOperand a <+> "FOLLOWED BY" <+> termOperand rest
+    Lazy.TCon c []      -> bareName c
+    Lazy.TCon c ts      -> bareName c <+> "OF" <+> hsep (punctuate comma (map termOperand ts))
+    Lazy.TField b f _   -> termOperand b <> "'s" <+> bareName f
+    Lazy.TCall f ts     -> hsep (termOperand f : map termOperand ts)
+    Lazy.TBin op a b    -> termOperand a <+> printWithLayout op <+> termOperand b
+    Lazy.TNot a         -> "NOT" <+> termOperand a
+    Lazy.TConn c a b    -> termOperand a <+> connectiveKeyword c <+> termOperand b
+    where
+      termList = \ case
+        Lazy.TNil         -> Just []
+        Lazy.TCons a rest -> (a :) <$> termList rest
+        _                 -> Nothing
+      connectiveKeyword = \ case
+        Lazy.ConnAnd     -> "AND"
+        Lazy.ConnOr      -> "OR"
+        Lazy.ConnImplies -> "IMPLIES"
+        Lazy.ConnNot     -> "NOT"
+
+-- | A name an undetermined result waits on, as plain text for a wire or a
+-- JSON @needs@ list: the input's own name, or the path to a field of one
+-- (@d's age@), with no quoting; any other term as L4 source.
+termNeedText :: Lazy.Term -> Text
+termNeedText = \ case
+  Lazy.TInput r _   -> nameToText (getActual r)
+  Lazy.TField b f _ -> termNeedText b <> "'s " <> nameToText (getActual f)
+  t                 -> prettyLayout t
+
+-- | A term in an operand position: bracketed unless it is a name, a literal
+-- or a nullary constructor.
+termOperand :: Lazy.Term -> Doc ann
+termOperand t = case t of
+  Lazy.TInput{}    -> printWithLayout t
+  Lazy.TNumber{}   -> printWithLayout t
+  Lazy.TString{}   -> printWithLayout t
+  Lazy.TNil        -> printWithLayout t
+  Lazy.TCon _ []   -> printWithLayout t
+  Lazy.TField{}    -> printWithLayout t
+  _                -> surround (printWithLayout t) "(" ")"
 
 -- | Pretty-print an 'NF' value, using named fields (WITH / IS syntax) for
 -- constructors whose field names are provided in the map.

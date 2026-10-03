@@ -35,6 +35,7 @@ module L4.EvaluateLazy
 , prettyNotes
 , prettyAssertionOutcome
 , prettyReductionOutcome
+, prettyUndetermined
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
@@ -251,6 +252,16 @@ captureDeonticSteps m = do
 
 runConfig :: Config -> Eval WHNF
 runConfig = \ case
+  DoneMachine whnf ->
+    pure whnf
+  config -> do
+    -- UNKNOWN-EVALUATION-SPEC §4.5: every step counts once the counter has
+    -- started, and none before
+    tickUnknownSteps
+    runConfigStep config
+
+runConfigStep :: Config -> Eval WHNF
+runConfigStep = \ case
   ForwardMachine env expr -> do
     traceEval (Enter expr)
     next <- forwardExpr env expr
@@ -289,6 +300,9 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- 'unwindFrame' — but a successful directive legitimately leaves its own
   -- reads in the root accumulator; spans are directive-local, so clear it.)
   _ <- swapCtxReads noReads
+  -- UNKNOWN-EVALUATION-SPEC §4.5 (C4): the step counter starts afresh, and
+  -- stopped, for every directive.
+  resetUnknownSteps
   -- Snapshot the ambient temporal context and restore it unconditionally
   -- after the directive. 'unwindFrame' already restores saved contexts
   -- frame by frame during exceptional unwinding; this directive boundary is
@@ -324,7 +338,15 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   directiveNotes <- map (\ (MkNote t) -> t) . toList <$> readEvalRef (.notes)
   -- and the defaults it forced (W8's event), for the same reason
   directivePresumed <- presumedEvents <$> readEvalRef (.presumed)
+  reached <- reachedUnknowns
   let
+    -- What a directive that could not be decided waits on
+    -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3): a 'Stuck' names it,
+    -- and running out of steps names every input that reached a §4.3 site.
+    stuckOnExc = \ case
+      UserEvalException (Stuck ns)    -> Just ns
+      UserEvalException RanOutOfSteps -> nonEmpty reached
+      _                               -> Nothing
     v' = case assertKind of
       NotAnAssert -> Reduction
         case v of
@@ -332,12 +354,17 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- answer, and every surface must be able to say so without calling
           -- the program broken.
           Left (RefusalException ref) -> ReducedRefused ref
+          -- Not an error either: a result not yet known, the undetermined
+          -- outcome of the default report.
+          Left exc | Just ns <- stuckOnExc exc -> ReducedUndetermined ns
           Left exc                    -> ReducedErrored exc
-          -- A result that is a bare assumed term is no value: report it as
-          -- the 'Stuck' that '#ASSERT' already reports for it, below, rather
-          -- than print the unknown as though it were the answer
-          -- (UNKNOWN-EVALUATION-SPEC §2.4, row 52).
-          Right (MkNF (ValAssumed a)) -> ReducedErrored (UserEvalException (Stuck a))
+          -- A result that is a bare assumed term is no value (row 52), and
+          -- neither is one that holds any term but a bare input (decided by
+          -- Claude overnight 2026-10-02, pending Meng's review; §8 step 3):
+          -- each was Stuck before the lift, and is undetermined, naming what
+          -- it waits on. One whose only terms are bare inputs below its root
+          -- prints as the value it is, @LIST n, 6@ (C4, row 60).
+          Right nfv | Just ns <- resultUnknowns nfv -> ReducedUndetermined ns
           Right nfv                   -> Reduced nfv
       AssertHolds -> Assertion
         case v of
@@ -351,15 +378,18 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- failed: the evaluator could not decide it. Collapsing the
           -- exception into 'False' made '#ASSERT P' and '#ASSERT NOT P'
           -- both report "assertion failed" whenever P raised, so a test
-          -- suite could not tell a wrong answer from an error.
+          -- suite could not tell a wrong answer from an error. One that
+          -- could not be decided for want of an input is undetermined.
+          Left exc | Just ns <- stuckOnExc exc -> Undetermined ns
           Left exc                    -> Errored exc
           Right (MkNF (ValBool True)) -> Holds
-          -- A result that is a bare assumed term did not raise, but it is
-          -- no verdict either — neither TRUE nor FALSE. Report it exactly as
-          -- the raising polarity does ('#ASSERT NOT b' forces b and raises
-          -- 'Stuck'), so both polarities of an '#ASSERT' on an assumed
-          -- BOOLEAN agree instead of one of them collapsing to "failed".
-          Right (MkNF (ValAssumed a)) -> Errored (UserEvalException (Stuck a))
+          -- A result that is an unknown did not raise, but it is no verdict
+          -- either — neither TRUE nor FALSE: a bare assumed term, or a
+          -- residual such as @x AND y@ (§4.12 rows 23, 24). Report it as the
+          -- raising polarity does ('#ASSERT NOT b' forces b and is Stuck), so
+          -- both polarities of an '#ASSERT' agree instead of one of them
+          -- collapsing to "failed".
+          Right nfv | Just ns <- resultUnknowns nfv -> Undetermined ns
           Right _                     -> Fails
       AssertRefuses mwanted -> Assertion
         case v of
@@ -371,7 +401,12 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
             | otherwise -> Holds
           -- An error is not a refusal. Conflating them would destroy exactly
           -- the distinction '#ASSERT REFUSED' exists to test.
+          Left exc | Just ns <- stuckOnExc exc -> Undetermined ns
           Left exc -> Errored exc
+          -- A value, an unknown or a residual: none of them refuses, since
+          -- an input never refuses and, before build step 5, no residual
+          -- holds a refusal (row 72; decided by Claude overnight 2026-10-02,
+          -- pending Meng's review).
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
@@ -380,6 +415,30 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
     captureSteps
       | withSteps = captureDeonticSteps
       | otherwise = fmap (, [])
+
+-- | What a directive's result waits on, if it is not a value
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3): a result that is itself an
+-- unknown input, or that holds any term but a bare input anywhere inside it.
+-- Then every unknown in it is named, bare inputs included, in the order they
+-- occur. A result whose only unknowns are bare inputs below its root, such as
+-- @LIST n, 6@, is a value (C4, row 60).
+resultUnknowns :: NF -> Maybe (NonEmpty Term)
+resultUnknowns = \ case
+  MkNF (ValAssumed r ty) -> Just (TInput r ty :| [])
+  nfv
+    | holdsTerm nfv -> nonEmpty (nubTerms (unknownsIn nfv))
+    | otherwise     -> Nothing
+  where
+    holdsTerm = \ case
+      MkNF (ValTerm _) -> True
+      MkNF v           -> any holdsTerm (toList v)
+      Omitted          -> False
+    unknownsIn = \ case
+      MkNF (ValTerm t)       -> termNames t
+      MkNF (ValAssumed r ty) -> [TInput r ty]
+      MkNF v                 -> concatMap unknownsIn (toList v)
+      Omitted                -> []
+    nubTerms = foldr (\ x acc -> x : filter (/= x) acc) []
 
 -- | 'postprocessTrace', guarded so it can never escape an exception: if trace
 -- post-processing throws (e.g. a malformed action sequence produced by an
@@ -473,6 +532,9 @@ data AssertionOutcome
     -- ^ The expression REFUSED: the model declined to answer.
   | Errored !EvalException
     -- ^ The expression raised before it could be decided.
+  | Undetermined !(NonEmpty Term)
+    -- ^ The expression could not be decided for want of these inputs
+    -- (UNKNOWN-EVALUATION-SPEC §4.7.4); rendered as a 'Stuck' always was.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -483,6 +545,11 @@ data ReductionOutcome
   = Reduced !NF
   | ReducedRefused !Refusal
   | ReducedErrored !EvalException
+  | ReducedUndetermined !(NonEmpty Term)
+    -- ^ The result is not known: it waits on these inputs, each once, in the
+    -- order evaluation reached them (UNKNOWN-EVALUATION-SPEC §4.7.4, the
+    -- default report). Rendered exactly as a 'Stuck' always was, since that
+    -- is what the default report shows; not an error.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -502,12 +569,22 @@ prettyAssertionOutcome (Refused r)      =
   Text.unlines ("assertion refused:" : prettyRefusal r)
 prettyAssertionOutcome (Errored exc)    =
   Text.unlines ("assertion could not be evaluated:" : prettyEvalException exc)
+prettyAssertionOutcome (Undetermined ns) =
+  Text.unlines ("assertion could not be evaluated:" : prettyUndetermined ns)
+
+-- | What an undetermined result says: the default report, which is the
+-- 'Stuck' message it always was, naming every input it waits on
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4).
+prettyUndetermined :: NonEmpty Term -> [Text]
+prettyUndetermined ns = prettyEvalException (UserEvalException (Stuck ns))
 
 -- | The outcomes of an @#EVAL@, as the user sees them.
 prettyReductionOutcome :: ReductionOutcome -> Text
 prettyReductionOutcome (Reduced v)          = prettyLayout v
 prettyReductionOutcome (ReducedRefused r)   = Text.unlines (prettyRefusal r)
 prettyReductionOutcome (ReducedErrored exc) = Text.unlines (prettyEvalException exc)
+prettyReductionOutcome (ReducedUndetermined ns) =
+  Text.unlines (prettyUndetermined ns)
 
 -- | STATE-AS-LEDGER M2/M4: render the per-party store a directive produced, as
 -- labelled sections. Returns the empty 'Text' when the directive wrote nothing,
@@ -645,6 +722,13 @@ instance Aeson.ToJSON EvalDirectiveValue where
     , "value" Aeson..= Aeson.Null
     , "error" Aeson..= prettyAssertionOutcome a
     ]
+  -- Rendered as the 'Stuck' it used to be, with what it waits on beside it.
+  toJSON (Assertion a@(Undetermined ns)) = Aeson.object
+    [ "type"  Aeson..= ("assertion" :: Text)
+    , "value" Aeson..= Aeson.Null
+    , "error" Aeson..= prettyAssertionOutcome a
+    , "needs" Aeson..= map termNeedText (toList ns)
+    ]
   toJSON (Reduction (Reduced val)) = Aeson.toJSON val
   toJSON (Reduction (ReducedRefused r)) = Aeson.object
     [ "refused" Aeson..= Aeson.object [ "reason" Aeson..= r.message ]
@@ -652,11 +736,16 @@ instance Aeson.ToJSON EvalDirectiveValue where
   toJSON (Reduction (ReducedErrored exc)) = Aeson.object
     [ "error" Aeson..= Text.unlines (prettyEvalException exc)
     ]
+  toJSON (Reduction (ReducedUndetermined ns)) = Aeson.object
+    [ "error" Aeson..= Text.unlines (prettyUndetermined ns)
+    , "needs" Aeson..= map termNeedText (toList ns)
+    ]
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
 prettyEvalDirectiveValueWithFields _fields (Assertion a)                    = prettyAssertionOutcome a
 prettyEvalDirectiveValueWithFields _fields (Reduction (ReducedErrored exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValueWithFields _fields (Reduction (ReducedRefused r))   = Text.unlines (prettyRefusal r)
+prettyEvalDirectiveValueWithFields _fields (Reduction o@(ReducedUndetermined _)) = prettyReductionOutcome o
 prettyEvalDirectiveValueWithFields fields  (Reduction (Reduced v))          = prettyLayoutNF fields v
 
 -- | Evaluate WHNF to NF, with a cutoff (which possibly could be made configurable).
@@ -697,7 +786,8 @@ nfAux _d (ValUnappliedConstructor n) = pure (MkNF (ValUnappliedConstructor n))
 nfAux  d (ValConstructor n rs)       = do
   vs <- traverse (evalAndNF d) rs
   pure (MkNF (ValConstructor n vs))
-nfAux _d (ValAssumed n)              = pure (MkNF (ValAssumed n))
+nfAux _d (ValAssumed n ty)           = pure (MkNF (ValAssumed n ty))
+nfAux _d (ValTerm t)                 = pure (MkNF (ValTerm t))
 nfAux _d (ValEnvironment env)        = pure (MkNF (ValEnvironment env))
 nfAux d (ValBreached r')             = do
   -- Every reference inside the breach — the revealing event's party and
@@ -812,13 +902,16 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   notes        <- newIORef mempty
   -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
   let deonticLog = Nothing
+  -- UNKNOWN-EVALUATION-SPEC §4.5: stopped until a directive's first term
+  unknownSteps   <- newIORef (-1)
+  unknownReached <- newIORef []
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
-    , reofferedEvents, notes, deonticLog
+    , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
