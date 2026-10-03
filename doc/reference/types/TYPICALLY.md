@@ -189,6 +189,9 @@ GIVETH A BOOLEAN
   A case that leaves it out is refused (`Missing required field 'person has capacity'`), and the published list of facts has it under `required`, with no `default`.
 - **An input of an `ASSUME` that takes inputs** is the same.
   A call that names the inputs and leaves out one that has a `TYPICALLY` is told it has not supplied it, in the file that declares the `ASSUME` and in a file that imports it.
+- **The question wizard still reads it.**
+  The ladder the service publishes carries a boolean default on an `ASSUME` as the fact's presumed value, and the query plan uses it as a prior, as it does for a section `GIVEN`.
+  They order the questions and draw a tentative answer, and never answer for the rules, so for an `ASSUME` they presume a value that no evaluation uses.
 
 To make the default count, move the declaration under its section's heading, as a section `GIVEN`.
 The same rule then works out `TRUE`, `l4 batch` and the service take the default and list it under `presumed`, and the default may be an expression.
