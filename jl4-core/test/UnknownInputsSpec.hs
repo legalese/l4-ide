@@ -102,3 +102,42 @@ spec = describe "unknown inputs (UNKNOWN-EVALUATION-SPEC §8 step 3)" $ do
         , "#EVAL d's age GREATER THAN 0"
         ]
       os `shouldBe` [Satisfied, Satisfied, Satisfied, Waits ["d's age"]]
+
+  -- The identity rule applies only where equality is defined, and a synonym
+  -- is the type it names. Every supplied `f` makes `f EQUALS f` the
+  -- unsupported-equality error; step 3 first answered it "satisfied", and
+  -- the same for a LIST of them, a record holding one and a synonym of that
+  -- record.
+  describe "equality on an unknown whose type is a synonym" $ do
+    let synonyms = Text.unlines
+          [ "DECLARE Fn IS FUNCTION FROM NUMBER TO NUMBER"
+          , "DECLARE Holder HAS op IS A Fn"
+          , "DECLARE Held IS Holder"
+          , "DECLARE Amount IS NUMBER"
+          , "ASSUME mk IS A FUNCTION FROM NUMBER TO Fn"
+          , "§ `Unknown`"
+          , "    GIVEN f IS A Fn"
+          , "          fs IS A LIST OF Fn"
+          , "          h IS A Holder"
+          , "          h2 IS A Held"
+          , "          k IS AN Amount"
+          ]
+        unsupported = \ case
+          Errors t -> "Trying to check equality on types that do not support it" `Text.isPrefixOf` t
+          _        -> False
+    it "is the unsupported-equality error for a synonym of a function type" $ do
+      os <- outcomes $ synonyms <> Text.unlines
+        [ "#ASSERT f EQUALS f"
+        , "#ASSERT mk 3 EQUALS mk 3"
+        ]
+      map unsupported os `shouldBe` [True, True]
+    it "stays Stuck for a type with one inside, through a synonym" $ do
+      os <- outcomes $ synonyms <> Text.unlines
+        [ "#ASSERT fs EQUALS fs"
+        , "#ASSERT h EQUALS h"
+        , "#ASSERT h2 EQUALS h2"
+        ]
+      os `shouldBe` [Waits ["fs"], Waits ["h"], Waits ["h2"]]
+    it "is the identity for a synonym of a type equality supports" $ do
+      os <- outcomes $ synonyms <> "#ASSERT k EQUALS k\n"
+      os `shouldBe` [Satisfied]
