@@ -208,9 +208,17 @@ makeTracePolicyForEval =
     }
 
 -- | Trace policy used by `l4 run`. Collecting a trace costs time and memory, so
--- it is collected only where it will be printed: for @#EVALTRACE@ directives,
--- and only when @--trace@ is @full@. A plain @#EVAL@ (or @#ASSERT@) never
--- collects one, whatever the mode, and keeps its "no trace captured" line.
+-- it is collected for @#EVALTRACE@ directives only, and only when @--trace@ is
+-- @full@. A plain @#EVAL@ (or @#ASSERT@) never collects one, whatever the mode,
+-- and keeps its "no trace captured" line.
+--
+-- The policy is global, not per module. 'LSP.L4.Rules' evaluates every module
+-- in the import closure with the one 'EvalConfig', and @l4 run@ prints only the
+-- entry module's results, so an @#EVALTRACE@ inside an IMPORTed module is
+-- collected and then discarded: its cost is paid and its trace shown nowhere.
+-- (Measured on a 100000-step @#EVALTRACE@ in a library: 0.57 s and 205 MB
+-- before this policy, 2.59 s and 1.4 GB after.) A policy that depends on the
+-- module is the real fix; it is not built.
 makeTracePolicyForRun :: TraceTextMode -> TracePolicy
 makeTracePolicyForRun = \case
   TraceTextNone -> makeTracePolicyForEval
