@@ -4,6 +4,10 @@
 Retained because its four-cell model (`WithDefault a = Either (Maybe a) (Maybe a)`, below) is the reference for the interview layer: `ladder-diagrams-2026/DESIGN.md` §22 and `ts-shared/ladder-core/src/types.ts` cite it, and the distinction it draws between "never asked" and "said I don't know" is the one T3 keeps as absent versus `null`.
 Nothing below is an implementation plan any more; the API and test sections describe a design that was never built in this form.
 **Related:** `TYPICALLY-DEFAULTS-SPEC.md`, `BOOLEAN-MINIMIZATION-SPEC.md`, `doc/default-values.md`
+What of this model exists, as the W10 audit of 2026-10-04 found it (`feat/typically-w10`):
+The cells are decided in one function, `L4.Presumption.fillDecision` (`jl4-core/src/L4/Presumption.hs`, W2 and W3): an input or a field is `Absent` (the key is not there), `SuppliedNull` (not known) or `Supplied v`, and whether it has a default is a separate argument.
+**Not built:** `WithDefault`, `InputState`, `L4.Runtime.InputState` and `initSession` (no `*.hs`, `*.ts`, `*.svelte`, `*.cabal` or `*.yaml` file in the tree mentions `InputState`, `WithDefault`, `initSession`, `NotProvided` or `explicitUnknown` as a word; searched 2026-10-04, and the one hit for this spec's `SessionState` is an unrelated type in `ts-shared/legalese-agent`); the `{"_notProvided": true}` marker, the `explicitUnknowns` list and the `inputResolution` response of "API Design" (the service answers with `presumed`, the inputs that took their default and were read, in place of `inputResolution`); and the resolution to three-valued logic (`TriBool`, "Integration with Three-Valued Logic": no `.hs` file mentions it; an unknown input stops the case, refused by name at the boundary, and on the service's wrapper path a missing boolean is an assumed term that stops the answer only if the rules read it; `UNKNOWN-EVALUATION-SPEC.md` specifies three-valued evaluation, and its own status header, 2026-10-01, says not built).
+The fourth state of the summary, "not applicable", is not modelled.
 
 ## Executive Summary
 

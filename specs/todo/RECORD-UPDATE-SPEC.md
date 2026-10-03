@@ -702,7 +702,7 @@ slot" — is **false, and measured false**. The ledger write requires a _quoted 
 
 ### 5.6 ⚠️ Precedent: the last feature that touched this machinery was reverted
 
-This is the risk with a track record. `specs/todo/TYPICALLY-DEFAULTS-SPEC.md:14-41`:
+This is the risk with a track record. `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`, its "HISTORY: FIRST IMPLEMENTATION REVERTED" block:
 
 > An initial full implementation of TYPICALLY was attempted on branch `mengwong/635` but was
 > **reverted due to a critical heisenbug in the type checker's name disambiguation logic.** … The bug
