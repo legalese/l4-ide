@@ -62,11 +62,10 @@ That is the "don't ask; allow the user to override the presumption" behaviour, w
 For `presumed OR a OR b`, with `presumed` declared first and `TYPICALLY FALSE`, the planner asks `a`, then `b`, then `presumed`.
 With no `TYPICALLY` it asks them in the order of the diagram, `presumed` first.
 A `TYPICALLY TRUE` in an `AND` sinks the same way.
-A `TYPICALLY` on an `ASSUME` gives a prior too, although no evaluation uses that default.
+A `TYPICALLY` on an [`ASSUME`](../types/TYPICALLY.md#on-an-assume-checked-and-recorded-not-used) gives a prior too, although no evaluation uses that default.
 A default that is not a plain `TRUE` or `FALSE`, an expression for instance, gives no prior.
 
-The server's planner (`jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs`) ranks this way, and the test "TYPICALLY question ordering (end-to-end)" in `jl4-service/test/QueryPlanSpec.hs` holds it.
-The TypeScript planner (`ts-shared/boolean-analysis/src/decision-query.ts`) ranks by the same gain and takes the priors as an optional argument, built by `typicallyBridge` in `ts-shared/viz-expr`.
+The server's planner and the browser's both rank this way; where each lives, and the test that holds the ordering, is under [Implementation](#implementation).
 
 ### Interactive explanation surface (backlog)
 
@@ -120,9 +119,13 @@ static form and a guided interview.
 - TypeScript: `ts-shared/boolean-analysis/src/decision-query.ts`
   (`compileDecisionQuery`, the `rank` policy) over
   `ts-shared/boolean-analysis/src/robdd.ts`. This is the path the browser-side
-  wizard uses.
+  wizard uses. It ranks by information gain and takes the priors as an optional
+  argument, built by `typicallyBridge` in `ts-shared/viz-expr`.
 - Haskell: `jl4-query-plan/src/L4/Decision/QueryPlan.hs` over
-  `BooleanDecisionQuery.hs`, for server-side query planning.
+  `BooleanDecisionQuery.hs`, for server-side query planning. It ranks by
+  information gain with the same priors, and the test "TYPICALLY question
+  ordering (end-to-end)" in `jl4-service/test/QueryPlanSpec.hs` holds the
+  ordering.
 
 ## See also
 
