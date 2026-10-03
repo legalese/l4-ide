@@ -359,7 +359,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
               , inputDefaults =
-                  Map.union (moduleInputDefaults rprog) checkEnv.visibleInputDefaults
+                  Map.union (moduleInputDefaults s'.substitution rprog) checkEnv.visibleInputDefaults
               , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
               , substitution = s'.substitution
               , environment = env.environment
@@ -800,13 +800,20 @@ withCheckedFieldDefaults m act = do
 -- import it ('CheckResult.inputDefaults'): those of its rules' inputs, found on
 -- each rule's own signature, and those of its records' fields.
 --
--- The recorded type of each default is dropped. It was inferred in THIS
--- module's substitution, and an importer would otherwise be handed inference
--- variables it has no substitution for (see 'unionImportedCheckEnv', which
--- takes only zonked input). Nothing reads a default's type: it is the declared
--- type of the input, and the application that takes it is checked against that.
-moduleInputDefaults :: Module Resolved -> InputDefaults
-moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection sect)
+-- The type each node of a default carries is kept when it is closed, and dropped
+-- when it is not. A type recorded on a node was inferred in THIS module's
+-- substitution, so it is first resolved by it ('applyFinalSubstitution'); one
+-- that still holds an inference variable would hand an importer a variable it
+-- has no substitution for (see 'unionImportedCheckEnv', which takes only zonked
+-- input), and that one goes. A closed type stays because the evaluator reads it:
+-- @JSONDECODE@ takes the type to decode into from the node it sits on
+-- ('L4.EvaluateLazy.Machine', the @App1@ frame), so a default such as
+-- @JSONDECODE text@ on a record field decoded to @NOTHING@ in an importer once
+-- its type was dropped, with no diagnostic (W7, advisor D2). While a default was
+-- a literal or a nullary constructor nothing read the type; once it can be an
+-- expression, something does.
+moduleInputDefaults :: Substitution -> Module Resolved -> InputDefaults
+moduleInputDefaults subst (MkModule _ uri sect) = Map.map (Map.map closed) (fromSection sect)
  where
   fromSection (MkSection _ _ _ _ decls) = Map.unions (map fromDecl decls)
   fromDecl = \ case
@@ -820,18 +827,22 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
     Declare _ d -> recordInputDefaults d
     Section _ s -> fromSection s
     _           -> Map.empty
-  untyped d =
+  closed d =
     MkInputDefault
       { owner = d.owner
       , binder = d.binder
       , declaredAt = d.declaredAt
       , value = Optics.over (gplate @Anno) forget d.value
       }
-  -- Every node's recorded type goes, but the fact that a name is a constructor
-  -- stays: that is closed (a constructor's declared type has no inference
-  -- variables), and what a consumer reads a name by (see 'defaultValueAt').
+  -- A node's recorded type, resolved, stays if nothing open is left in it. A
+  -- constructor's name stays whatever it holds: its declared type is closed, and
+  -- what a consumer reads a name by is the fact that it is a constructor (see
+  -- 'defaultValueAt').
   forget a = case a.extra.resolvedInfo of
-    Just (TypeInfo _ (Just Constructor)) -> a
+    Just info@(TypeInfo ty kind)
+      | not (hasInferenceVariable ty') -> a { extra = a.extra { resolvedInfo = Just (TypeInfo ty' kind) } }
+      | kind == Just Constructor       -> a { extra = a.extra { resolvedInfo = Just info } }
+      where ty' = applyFinalSubstitution subst uri ty
     _ -> a { extra = a.extra { resolvedInfo = Nothing } }
 
 -- | The defaults of a record's fields, keyed by the record's constructor.
