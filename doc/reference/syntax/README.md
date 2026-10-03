@@ -529,6 +529,66 @@ Evaluate an expression and display the full execution trace, showing each step o
 #EVALTRACE expression
 ```
 
+**Example:**
+
+```l4
+GIVEN age IS A NUMBER
+      `is a resident` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may apply` MEANS age >= 18 AND `is a resident`
+
+#EVAL      `may apply` 25 TRUE
+#EVALTRACE `may apply` 25 TRUE
+```
+
+Both directives give `TRUE`.
+Only the `#EVALTRACE` also keeps its working, which `l4 run` prints under `Trace:` beneath the result:
+
+```
+Evaluation[2] @ evaltrace-example.l4:9:1-31
+
+Result:
+  TRUE
+
+
+Trace:
+  ┌ `may apply` OF 25, TRUE
+  │┌ `may apply`
+  │└ <function>
+  ├ age AT LEAST 18 AND `is a resident`
+  │┌ age AT LEAST 18
+  │└ TRUE
+  ├ IF a THEN b ELSE FALSE
+  │┌ a
+  │└ TRUE
+  ├ b
+  └ TRUE
+```
+
+Read it from the top: the first line is what was asked, each line starting `├` is one step in working it out, and the last line, `└ TRUE`, is the answer.
+The indented lines beside a step are the smaller questions that step had to answer first.
+
+**Seeing the trace from the command line.**
+
+- `l4 run FILE` prints the trace of every `#EVALTRACE` in the file, under `Trace:` below its result.
+  This is the default.
+  To leave the traces out and see only the results, add `--trace none`.
+- `l4 trace FILE` draws the same traces as diagrams instead of text.
+  It prints a description of the diagram in GraphViz, a free diagram-drawing program.
+  With `--format png` or `--format svg` and `-o DIR` it writes one picture per `#EVALTRACE` into the directory `DIR`; that needs GraphViz installed.
+  See [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md).
+
+**What it does not do.**
+
+- A plain `#EVAL` keeps no trace.
+  Its `Trace:` line says so: `(no trace captured; add #EVALTRACE to the directive)`.
+  That is not a fault in your file; change the `#EVAL` to `#EVALTRACE` to see the working.
+- `l4 run --json` carries no trace, whatever `--trace` says.
+  `--trace` changes only the text output.
+- A trace grows with the work done: a rule that calls itself a hundred times prints a trace of about a thousand lines.
+
+**See also:** [evaltrace-example.l4](evaltrace-example.l4)
+
 ### #TRACE
 
 Evaluate a deontic (regulative) expression and display the obligation trace. Shows the sequence of obligations, which parties must act, deadlines, and the resulting state (FULFILLED or BREACH).
