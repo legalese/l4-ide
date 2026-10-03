@@ -1,0 +1,44 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-names-sibling.l4
+  Hidden: no
+  Range: 15:36-15:42
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `bonus` names
+      `salary`,
+    which is also the name of another input of the same rule, or another field
+    of the same record.
+
+    A default is worked out outside the rule or the record it is written on, where
+    that rule's inputs and that record's fields are not known. A name spelled like
+    one of them therefore means whatever else is called that, and the answer would
+    use that value without a word.
+
+    Rename the input or field, or the definition, so that they differ, or write the
+    default without it. A default that needs another input belongs on a section
+    input, which may read the section's other inputs.
+
+File: typically-names-sibling.l4
+  Hidden: no
+  Range: 22:32-22:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `extra` names
+      `salary`,
+    which is also the name of another input of the same rule, or another field
+    of the same record.
+
+    A default is worked out outside the rule or the record it is written on, where
+    that rule's inputs and that record's fields are not known. A name spelled like
+    one of them therefore means whatever else is called that, and the answer would
+    use that value without a word.
+
+    Rename the input or field, or the definition, so that they differ, or write the
+    default without it. A default that needs another input belongs on a section
+    input, which may read the section's other inputs.
