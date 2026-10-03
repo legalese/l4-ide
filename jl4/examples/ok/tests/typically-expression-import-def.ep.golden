@@ -2,6 +2,11 @@
 -- a record's field whose TYPICALLY defaults are EXPRESSIONS over this module's own
 -- definitions, which a module that imports this one may leave out
 -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7 across an IMPORT).
+--
+-- `Contact`'s defaults are the ones that need the type they were checked at:
+-- JSONDECODE decodes into the type of the node it sits on. That type used to be
+-- dropped when this module's defaults were handed to an importer, and the field
+-- decoded to NOTHING there with no diagnostic (advisor D2 on W4 and W5).
 
 DECLARE Colour IS ONE OF Red, Green
 
@@ -21,3 +26,15 @@ GIVEN rate IS A NUMBER TYPICALLY (`the usual rate` PLUS 1)
       colour IS A Colour TYPICALLY (IF `the usual rate` GREATER THAN 100 THEN Red ELSE `the usual colour`)
 GIVETH A NUMBER
 `imported scaled` MEANS IF colour EQUALS Green THEN rate TIMES base ELSE 0
+
+DECLARE Person
+  HAS name IS A STRING
+      age  IS A NUMBER
+
+GIVETH A STRING
+`the usual person` MEANS "{\"name\":\"Bob\",\"age\":25}"
+
+DECLARE Contact
+  HAS who   IS AN EITHER STRING Person TYPICALLY (JSONDECODE `the usual person`)
+      born  IS A MAYBE DATE TYPICALLY (TODATE "2024-02-29")
+      label IS A STRING

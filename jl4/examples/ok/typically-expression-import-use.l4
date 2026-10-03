@@ -16,3 +16,19 @@ GIVETH A Paint
 #ASSERT (`some paint`'s colour) EQUALS Green
 #ASSERT (`some paint`'s layers) EQUALS 2
 #EVAL `some paint`
+
+-- JSONDECODE takes the type to decode into from the call it sits on, and a
+-- default carries that type across the IMPORT: the same default decodes to a
+-- Person here as it does in the module that declares it.
+GIVETH A Contact
+`some contact` MEANS Contact WITH label IS "x"
+
+GIVETH A NUMBER
+`the decoded age` MEANS
+  CONSIDER `some contact`'s who
+  WHEN RIGHT value THEN value's age
+  WHEN LEFT error THEN 0 MINUS 1
+
+#ASSERT `the decoded age` EQUALS 25
+#EVAL `some contact`'s who
+#EVAL `some contact`'s born
