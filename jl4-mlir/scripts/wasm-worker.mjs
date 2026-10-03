@@ -28,8 +28,7 @@ import {
   createRuntime,
   aesonStringify,
   wrapEvaluationEnvelope,
-  MemoryLimitError,
-  DeonticInputError,
+  evaluationErrorResponse,
 } from "../runtime/jl4-runtime.mjs";
 import { createBackend } from "../runtime/wasm-backend.mjs";
 
@@ -108,29 +107,22 @@ parentPort.on("message", (msg) => {
         : { value: rt.invokeFunction(instance, meta, effectiveArgs) };
     body = aesonStringify(wrapEvaluationEnvelope(payload));
   } catch (err) {
-    // Map known errors to HTTP statuses; everything else is 500.
-    // 'DeonticInputError' is a client-side input bug — the worker's
-    // wasm state is untouched, so don't trigger a respawn.
-    // 'MemoryLimitError' / wasm traps leave the bump-pointer or the
-    // instance in inconsistent state and ARE fatal.
-    const isFatal = !(err instanceof DeonticInputError);
-    if (err instanceof DeonticInputError) {
-      status = 400;
-    } else if (err instanceof MemoryLimitError) {
-      status = 413;
-    } else {
-      status = 500;
-    }
-    body = JSON.stringify({ error: String(err.message || err) });
+    // Map known errors to HTTP statuses ('evaluationErrorResponse');
+    // everything else is 500. A missing input and a malformed deontic
+    // request are client-side input bugs — the worker's wasm state is
+    // untouched, so they don't trigger a respawn. 'MemoryLimitError' /
+    // wasm traps leave the bump-pointer or the instance in inconsistent
+    // state and ARE fatal.
+    const response = evaluationErrorResponse(err);
     parentPort.postMessage({
       type: "result",
       id,
-      status,
-      body,
+      status: response.status,
+      body: response.body,
       peakHeap: rt.getPeakHeapBytes(),
       maxHeap: rt.getMaxHeapBytes(),
       backend: backend.name,
-      fatal: isFatal,
+      fatal: response.fatal,
     });
     return;
   }

@@ -58,6 +58,9 @@ echo '{"arguments":{"years of service":5,"performance rating":4}}' \
 ```
 
 The input and output wire format is byte-identical to [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so the same client code works against either backend.
+A required input left out or sent as null, a record input missing a required field, or a list input with a null element is refused, naming the first such input.
+The HTTP wrapper (`scripts/wasm-server.mjs`) answers `422` with `jl4-service`'s own body, `{"contents":{"contents":"Parameter 'y': missing required parameter","tag":"InterpreterError"},"report":"default","tag":"Error"}`; for a field or element sent as null, `jl4-service`'s message is its JSON decoder's instead (`Expected JSON boolean but got: Null`).
+`jl4-mlir run` exits 1: with `Request validation failed: Missing required parameters: p` for an input left out, and with the runtime's `MissingInputError` for one sent as null or missing inside a record or list.
 
 ## Architecture
 

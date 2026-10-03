@@ -1047,6 +1047,8 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
    - Every outcome consumer listed in §4.7.4 gets an explicit arm for the undetermined outcome, with no wildcard, and renders it exactly as today's `Stuck`, `l4 batch` excepted.
    - U7b's batch and service obligations apply from this step, since lifting reaches them here: `l4 batch` gives an undetermined row the status "undetermined", which is not an error and never trips stop-on-error, where today's two wildcards (`Batch.hs:388`, `:396`) would score a residual result "success"; and the service states its report on every response, as `"report": "default"` until step 6 adds the others.
      WASM-served responses state it too, from `wrapEvaluationEnvelope` in `jl4-mlir/runtime/jl4-runtime.mjs`, which `wasm-worker` serves, and from `jl4-mlir run`: they answer the same evaluation API, so a client sees one envelope whichever engine answered, and WASM evaluates only fully supplied inputs, so its report is always the default one (decided by Claude overnight 2026-10-04, pending Meng's review).
+     That holds because the runtime refuses a required input that is missing or null, or a record input missing a required field, or a list input with a null element, with the service's own 422 and body, `Parameter 'y': missing required parameter`; before, it read one as 0, so `{"x": true}` to `x AND y` answered FALSE where the service refuses it (decided by Claude overnight 2026-10-04, pending Meng's review).
+     For a field or element sent as null the service's message is its JSON decoder's, `Expected JSON boolean but got: Null`; the status is the same.
 
    _Assumed, not ruled:_
 
