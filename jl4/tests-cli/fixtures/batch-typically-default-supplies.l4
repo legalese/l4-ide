@@ -1,0 +1,16 @@
+-- l4 batch over an export whose own input's default SUPPLIES a section input
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). The default reads nothing of `base`, so
+-- `base` is no input of the export: binding it to the row would make the `WITH`
+-- in the default a WITH to a bound input, which is not a supply, and every row
+-- would be refused.
+
+§ `Supplied`
+    GIVEN base IS A NUMBER TYPICALLY 4
+
+GIVETH A NUMBER
+`double it` MEANS base TIMES 2
+
+@export default Scaled
+GIVEN rate IS A NUMBER TYPICALLY (`double it` WITH base IS 1)
+GIVETH A NUMBER
+scaled MEANS rate TIMES 100
