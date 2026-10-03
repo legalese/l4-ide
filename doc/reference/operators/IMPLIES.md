@@ -27,7 +27,8 @@ The brackets are doing real work there, and leaving them out changes the meaning
 In legal terms: "If A, then B" - the rule is violated only when A is true but B is false.
 
 IMPLIES evaluates lazily - if A is FALSE, the rule does not apply, the answer is TRUE, and B is not evaluated.
-In a trace (`#EVALTRACE`, or the reasoning a service returns), an IMPLIES appears as itself, with A and its value beneath it (unless A is written as plain `TRUE` or `FALSE`), followed by B when it was needed.
+In a trace (`#EVALTRACE`, or the reasoning a service returns), an IMPLIES appears as itself, with A and its value beneath it, unless A is written as plain `TRUE` or `FALSE`.
+When B was needed it follows: in `#EVALTRACE` it is the next step, at the IMPLIES's own level, and in a service's reasoning it is the IMPLIES's last child.
 
 ## Examples
 
