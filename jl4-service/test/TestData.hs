@@ -31,6 +31,7 @@ module TestData (
   expressionDefaultJL4,
   expressionAllDefaultJL4,
   expressionSiteDefaultJL4,
+  expressionMultiargJL4,
   constructorNamedDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -656,6 +657,29 @@ combine MEANS
   IF use
   THEN (scaled WITH base IS n) PLUS (Config WITH retries IS 1)'s timeout
   ELSE 0
+|]
+
+-- | Defaults that are named calls with SEVERAL arguments, on a section input and
+-- on the export's own input. Each is written out as source, in the wrapper the
+-- service generates for a request with an uncertain input and in the schema's
+-- @default@, and the second argument used to land on a line of its own there.
+expressionMultiargJL4 :: Text
+expressionMultiargJL4 =
+  [i|
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+combine MEANS a PLUS b
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (combine WITH a IS `list price`, b IS 1)
+
+@export default final price
+GIVEN rate IS A NUMBER TYPICALLY (combine WITH a IS 2, b IS 3)
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS (`list price` MINUS discount) TIMES rate
 |]
 
 -- | Defaults whose value is a bare constructor (FALSE, an enum value), taken at

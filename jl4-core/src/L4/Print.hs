@@ -847,10 +847,19 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     AppNamed   _ n namedExpr _ ->
       case filter (not . isDefaultFill) namedExpr of
         []      -> printWithLayout n
+        [one]   -> printWithLayout n <+> "WITH" <+> printWithLayout one
+        -- Several arguments print on ONE line, comma-separated. They used to
+        -- print one to a line, aligned under the first, which parses only where
+        -- the text starts a line of its own: inside brackets, or spliced after
+        -- a prefix on a line (a default written into the wrapper @l4 batch@
+        -- generates, or published as the schema's @default@), the second
+        -- argument's column no longer lines up and the parse fails at it
+        -- (review F3 of W7). A value that has an open tail of its own, such as
+        -- a comma list, is bracketed so that the comma after it is this list's.
         written ->
               printWithLayout n
           <+> "WITH"
-          <+> align (vcatHard (fmap printWithLayout written))
+          <+> hsep (punctuate comma (fmap printNamedArgument written))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
@@ -1306,6 +1315,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (NamedExpr a) where
   printWithLayout = \ case
     MkNamedExpr _ name e ->
       printWithLayout name <+> "IS" <+> printWithLayout e
+
+-- | One argument of a @WITH@ list that shares a line with the others
+-- ('printWithLayout' of an 'AppNamed'): the value is bracketed when its own
+-- rendering is open-tailed ('parensIfOpenTailed').
+printNamedArgument :: LayoutPrinterWithName a => NamedExpr a -> Doc ann
+printNamedArgument = \ case
+  MkNamedExpr _ name e ->
+    printWithLayout name <+> "IS" <+> parensIfOpenTailed e
 
 -- | Print a LocalDecl in LET context (without DECIDE keyword and without type signature)
 -- Uses "BE" as the binding keyword in honour of The Beatles' "Let It Be"
