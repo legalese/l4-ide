@@ -1,0 +1,104 @@
+{
+  "membership-implies-payment": [
+    {
+      "is a member": true,
+      "has paid": true
+    },
+    {
+      "is a member": true,
+      "has paid": false
+    },
+    {
+      "is a member": false,
+      "has paid": true
+    },
+    {
+      "is a member": false,
+      "has paid": false
+    }
+  ],
+  "member-implies-paid": [
+    {
+      "member": true,
+      "paid": true
+    },
+    {
+      "member": true,
+      "paid": false
+    },
+    {
+      "member": false,
+      "paid": true
+    },
+    {
+      "member": false,
+      "paid": false
+    }
+  ],
+  "not-p": [
+    {
+      "p": true
+    },
+    {
+      "p": false
+    }
+  ],
+  "not-both": [
+    {
+      "p": true,
+      "q": true
+    },
+    {
+      "p": true,
+      "q": false
+    },
+    {
+      "p": false,
+      "q": true
+    },
+    {
+      "p": false,
+      "q": false
+    }
+  ],
+  "not-not-p": [
+    {
+      "p": true
+    },
+    {
+      "p": false
+    }
+  ],
+  "p-unless-q": [
+    {
+      "p": true,
+      "q": true
+    },
+    {
+      "p": true,
+      "q": false
+    },
+    {
+      "p": false,
+      "q": true
+    },
+    {
+      "p": false,
+      "q": false
+    }
+  ],
+  "implies-a-division": [
+    {
+      "p": false,
+      "n": 0
+    },
+    {
+      "p": true,
+      "n": 2
+    },
+    {
+      "p": false,
+      "n": 2
+    }
+  ]
+}

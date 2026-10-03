@@ -97,13 +97,10 @@ column rule and L4 accepts it, but it is not the house style:
   the `GIVEN` to a common ancestor heading if it is one thing; **rename** one of
   them if they are two.
 
-  _Proposed, not landed (2026-09-04): a fourth way out, **bridging at the point
-  of use** — `g WITH foo IS foo`, meaning "for this use, this section's `foo` is
-  the one the other section means". Supplying a name with `WITH` does not work
-  today: written after a bare rule name, L4 reports a check error (it cannot
-  apply a rule that takes no inputs to named ones), and written after
-  a rule that already has its values it is rejected at `WITH`. It lands
-  with the discharge pull request; until then, qualify, hoist or rename._
+  A fourth way out is to **bridge at the point of use** — `g WITH foo IS foo`,
+  meaning "for this use, this section's `foo` is the one the other section
+  means". It is written inside a rule whose own section declares `foo`; see
+  [One name, one value](#one-name-one-value).
 
 ## One name, several types
 
@@ -246,8 +243,8 @@ cannot introduce the hazard.
 ## What a section `GIVEN` does in this release
 
 **A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
-as an older `ASSUME` did.** A rule that reads one cannot be run to an answer
-until the name is supplied; `#EVAL` on such a rule reports
+as an older `ASSUME` did.** A rule whose answer depends on one cannot be run to
+an answer until the name is supplied; `#EVAL` on such a rule reports
 
 ```
 I could not continue evaluating, because I needed to know the value of

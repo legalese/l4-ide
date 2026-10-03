@@ -114,6 +114,7 @@ import L4.EvaluateLazy
   , ReductionOutcome (..)
   , execEvalModuleWithDeonticLog
   , prettyEvalException
+  , prettyReductionOutcome
   , prettyRefusal
   )
 import L4.EvaluateLazy.DeonticStep (DeonticStep (..), NormKey (..), StepOutcome (..))
@@ -732,6 +733,8 @@ classify ctx res = case res.result of
   Reduction (Reduced Omitted)      -> Untried "the residual was omitted"
   Reduction (ReducedRefused ref)   -> Untried (Text.unlines (prettyRefusal ref))
   Reduction (ReducedErrored exc)   -> Untried (Text.unlines (prettyEvalException exc))
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  Reduction o@(ReducedUndetermined _) -> Untried (prettyReductionOutcome o)
   Assertion _                      -> Untried "not a #TRACE"
 
 -- | The enabled set: every candidate, tried.

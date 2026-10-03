@@ -629,6 +629,8 @@ The typechecker's exhaustiveness warning lists all missing branches.
 
 **How to fix it:** Add branches for the missing cases, or add an OTHERWISE branch as a catch-all. For matches on NUMBER, STRING, or DATE values, always include OTHERWISE.
 
+A value that nobody supplied never produces this message: a `CONSIDER` on it stops with [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term) instead, `OTHERWISE` or not.
+
 ---
 
 ### DEONTIC rule does not execute
@@ -657,7 +659,18 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
+**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and the answer depends on the blank. The message names, one per line, each blank evaluation reached and needed before it stopped, and a field of a blank record by its path, such as `` `the applicant`'s age ``. A blank it never reached is not named: `#EVAL IF x THEN y ELSE FALSE` names only `x`, though `y` may be needed once `x` is known. Nor is one it would have reached after giving up: working a rule out over a blank may take at most 250,000 steps, and ``#EVAL x OR ((`count up from` 0 EQUALS 20000) OR y)``, which takes more, names only `x`. A directive that stops this way makes `l4 run` exit non-zero.
+
+Evaluation carries a blank along where it can: a comparison (`EQUALS`, `GREATER THAN`, `LESS THAN`, `AT LEAST`, `AT MOST`), `PLUS`, `MINUS` and `TIMES`, and a field of a blank record are worked out in terms of the blank, and `AND`, `OR` and `NOT` combine such answers, so `x AND FALSE` is `FALSE` whatever `x` is. `DIVIDED BY`, `MODULO`, `EXPONENT` and the one-input built-ins such as `FLOOR` and `ROUND` stop at the blank instead, so `(n DIVIDED BY 2 GREATER THAN 1) AND FALSE` waits for `n` where `(n TIMES 2 GREATER THAN 1) AND FALSE` is `FALSE`. So does a field of a blank whose type is declared `IS ONE OF` several kinds, since it may be a kind without that field. It stops when the directive's answer still depends on the blank, and also wherever it would have to choose by the blank's value: to test it with `IF` or `CONSIDER`, to turn it into text with `AS STRING`, `TOSTRING` or `JSONENCODE`, or as the answer, day by day, of `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST` or `WHEN NEXT`. A `CONSIDER` stops even when it has an `OTHERWISE` branch, if a branch before the `OTHERWISE` could still match depending on the blank: `OTHERWISE` is not taken just because the blank is there, since the blank could be any value (see [CONSIDER](../control-flow/CONSIDER.md#otherwise)). An `#EVAL` whose answer _is_ the blank, such as `#EVAL rate`, or `#EVAL TRUE AND eligible` with `eligible` a blank, stops the same way rather than print the name as though it were the answer. A rule that only carries the blank along gives its answer with the name in it: `#EVAL LIST rate, 6` prints `LIST rate, 6`.
+
+An answer that is waiting for a blank is not an error, and the tools say so, each in its own way:
+
+| where           | what it shows                                                                                                                                                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4 run`        | the message above, and the run exits non-zero                                                                                                                                                                                                                                                            |
+| `l4 run --json` | an `#EVAL` gets `"kind": "undetermined"`, with `"needs"`, the list of blanks it waits for, each spelled as the message spells it, and `"message"`; an `#ASSERT` keeps `"kind": "assertion"` with a null `"value"` and the two under `"undetermined"`                                                     |
+| `l4 batch`      | the row's `"status"` is `"undetermined"`; the batch does not stop on it, and exits non-zero once every row has run                                                                                                                                                                                       |
+| `jl4-service`   | a single evaluation answers with the message above, as the `422` it has always been, and an MCP tool with an error whose text is that `422`'s body; a batch leaves the case out of `"cases"` and counts it in the summary's `"casesIgnored"`, with no message; every response says `"report": "default"` |
 
 **How to fix it:** Decide which of three things you meant.
 

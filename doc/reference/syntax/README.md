@@ -522,6 +522,23 @@ Evaluate an expression and display the result. Used for testing functions and in
 ### #EVALTRACE
 
 Evaluate an expression and display the full execution trace, showing each step of the evaluation.
+`AND`, `OR`, `IMPLIES` and `NOT` each appear under their own text, with the first operand and its value beneath them.
+The second operand, when it was needed, is the next step, at the connective's own level, and one that was not needed does not appear.
+For `both p q MEANS p AND q`, `#EVALTRACE both TRUE FALSE` shows:
+
+```
+┌ both OF TRUE, FALSE
+│┌ both
+│└ <function>
+├ p AND q
+│┌ p
+│└ TRUE
+├ q
+└ FALSE
+```
+
+A first operand written as plain `TRUE` or `FALSE` is not shown, since its value is already in the source: `#EVALTRACE TRUE AND FALSE` is `┌ TRUE AND FALSE`, `├ FALSE`, `└ FALSE`.
+`UNLESS` appears as what it means, so `p UNLESS q` shows as `p AND (NOT q)`.
 
 **Syntax:**
 

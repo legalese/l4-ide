@@ -1935,6 +1935,7 @@ lowerExprCases expr expectedTy = case expr of
             -- matching jl4-core's lazy AND/OR evaluation.
             ("__AND__", [a, b])     -> lowerAndShortCircuit a b
             ("__OR__", [a, b])      -> lowerOrShortCircuit  a b
+            ("__IMPLIES__", [a, b]) -> lowerImpliesShortCircuit a b
             ("__NOT__", [a])        -> do
               innerF64 <- lowerExpr a l4NumberType
               innerI1 <- unboxBoolI1 innerF64
@@ -2724,6 +2725,23 @@ lowerOrShortCircuit lhs rhs = do
   (rhsF64, rhsOps) <- collectOps $ lowerExpr rhs l4NumberType
   let thenBlock = Block 0 [] (thenOps ++ [scfYield [trueF64] [l4NumberType]])
       elseBlock = Block 0 [] (rhsOps  ++ [scfYield [rhsF64]  [l4NumberType]])
+  emitVal $ \vid -> scfIf [vid] lhsI1 (Region [thenBlock]) (Region [elseBlock]) [l4NumberType]
+
+-- | Short-circuit IMPLIES: the rhs only when the lhs is TRUE, else TRUE.
+-- Mirror of 'lowerAndShortCircuit' with TRUE for the else-branch fallback,
+-- matching jl4-core's built-in IMPLIES (UNKNOWN-EVALUATION-SPEC §8 step 2).
+lowerImpliesShortCircuit :: Expr Resolved -> Expr Resolved -> LowerM Value
+lowerImpliesShortCircuit lhs rhs = do
+  lhsF64 <- lowerExpr lhs l4NumberType
+  lhsI1  <- unboxBoolI1 lhsF64
+  -- Then branch: evaluate rhs and yield its f64-boxed bool.
+  (rhsF64, rhsOps) <- collectOps $ lowerExpr rhs l4NumberType
+  -- Else branch: yield a fresh f64-boxed TRUE (no rhs eval).
+  (trueF64, elseOps) <- collectOps $ do
+    t <- emitVal $ \vid -> arithConstantBool vid True
+    boxBoolI1 t
+  let thenBlock = Block 0 [] (rhsOps  ++ [scfYield [rhsF64]  [l4NumberType]])
+      elseBlock = Block 0 [] (elseOps ++ [scfYield [trueF64] [l4NumberType]])
   emitVal $ \vid -> scfIf [vid] lhsI1 (Region [thenBlock]) (Region [elseBlock]) [l4NumberType]
 
 -- | Promote an @i1@ SSA value to @f64@ (0.0 / 1.0).

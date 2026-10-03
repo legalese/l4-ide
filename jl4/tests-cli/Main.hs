@@ -93,6 +93,15 @@ refuseBatchJson    = fixtureDir </> "refuse-batch.json"
 assertAssumedFixture :: FilePath
 assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
 
+-- | Typechecks cleanly; one @#EVAL@ whose result is a bare assumed BOOLEAN.
+evalAssumedFixture :: FilePath
+evalAssumedFixture = fixtureDir </> "eval-assumed.l4"
+
+-- | Typechecks cleanly; one @#EVAL@ decided whatever its input is, and one
+-- that waits on two.
+evalUndeterminedFixture :: FilePath
+evalUndeterminedFixture = fixtureDir </> "eval-undetermined.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -132,6 +141,12 @@ decodeArray sout =
     Left err         -> do
       expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
       error "unreachable"
+
+-- | A JSON array field's elements, if the field is an array.
+arrayField :: Value -> String -> Maybe [Value]
+arrayField v k = case objField v k of
+  Just (Array a) -> Just (toList a)
+  _              -> Nothing
 
 -- | Count non-blank lines (each NDJSON row is one line).
 nonBlankLines :: String -> Int
@@ -274,7 +289,8 @@ coreFixtures =
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource
-  , assertRaisesFixture, assertAssumedFixture
+  , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
+  , evalUndeterminedFixture
   ]
 
 spec :: FilePath -> Spec
@@ -412,15 +428,23 @@ spec bin = do
       env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
       case objField env "results" of
-        Just (Array v) -> do
-          length v `shouldBe` 2
-          mapM_ (\r -> do
-                   objField r "kind"  `shouldBe` Just (String "assertion")
-                   objField r "value" `shouldBe` Just Null
-                   case objField r "error" of
-                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
-                     other -> expectationFailure ("Expected an error string, got " ++ show other))
-                (toList v)
+        Just (Array v) -> case toList v of
+          [raised, waiting] -> do
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+              other -> expectationFailure ("Expected an error string, got " ++ show other)
+            -- One stuck on an input nobody supplied did not raise an error: it
+            -- is undetermined, still an assertion, and says what it waits on
+            -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3).
+            objField waiting "kind"  `shouldBe` Just (String "assertion")
+            objField waiting "value" `shouldBe` Just Null
+            objField waiting "error" `shouldBe` Nothing
+            case objField waiting "undetermined" of
+              Just und -> arrayField und "needs" `shouldBe` Just [String "x"]
+              other    -> expectationFailure ("Expected an undetermined field, got " ++ show other)
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "still typechecks the raising fixture — l4 check succeeds on it" $
@@ -486,6 +510,42 @@ spec bin = do
 
     it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
       expectFail bin ["run", assertAssumedFixture]
+
+    -- The same bare term as an #EVAL's result is no value either. It used to
+    -- print as one, with exit 0, while #ASSERT on it was stuck
+    -- (UNKNOWN-EVALUATION-SPEC row 52).
+    it "fails the run when an #EVAL's result is a bare assumed term" $
+      expectFail bin ["run", evalAssumedFixture]
+
+    it "reports a bare assumed #EVAL result as undetermined, never as a value" $ do
+      env <- jsonEnvelope bin ["run", evalAssumedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [r] -> do
+            -- its own kind, from build step 3 (UNKNOWN-EVALUATION-SPEC row 52)
+            objField r "kind"  `shouldBe` Just (String "undetermined")
+            objField r "value" `shouldBe` Just Null
+            arrayField r "needs" `shouldBe` Just [String "x"]
+            case objField r "message" of
+              Just (String e) -> e `shouldSatisfy` ("assumed term" `T.isInfixOf`)
+              other -> expectationFailure ("Expected the default report's text, got " ++ show other)
+          other -> expectationFailure ("Expected 1 result, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- A residual: two inputs, both named, in the order evaluation reached
+    -- them, and the run fails (§4.12 row 23).
+    it "names every input an undetermined #EVAL waits on, and fails the run" $ do
+      env <- jsonEnvelope bin ["run", evalUndeterminedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [decided, waiting] -> do
+            objField decided "kind"  `shouldBe` Just (String "value")
+            objField waiting "kind"  `shouldBe` Just (String "undetermined")
+            arrayField waiting "needs" `shouldBe` Just [String "x", String "y"]
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."

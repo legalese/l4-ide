@@ -133,6 +133,21 @@ main = do
     -- passes.
     let goldenCorpus = okFiles <> legalFiles <> librariesFiles <> canonFiles
     describe "ok files" $ tests evalConfig (True, True) goldenCorpus examplesRoot
+    -- The built-in connectives used to be closures over two parameters named
+    -- @a@ and @b@, whose @IF a THEN b ELSE FALSE@ bodies showed in every trace
+    -- that reached one. They are frames now, with no parameters to name
+    -- (UNKNOWN-EVALUATION-SPEC §4.4, U2b), so no golden may show those bodies.
+    describe "connective traces name no parameters (U2b)" $ do
+      goldens <- runIO (sort <$> globDir1 (compile "**/*.golden") examplesRoot)
+      it "has goldens to read" $ goldens `shouldSatisfy` (not . null)
+      it "no golden shows a connective's old IF body" $ do
+        let oldBodies =
+              [ "IF a THEN b ELSE FALSE", "IF a THEN TRUE ELSE b"
+              , "IF a THEN b ELSE TRUE", "IF a THEN FALSE ELSE TRUE" ]
+        hits <- fmap concat $ for goldens $ \ g -> do
+          txt <- Text.readFile g
+          pure [ g | any (`Text.isInfixOf` txt) oldBodies ]
+        hits `shouldBe` []
     -- Invariant: exactprint is the identity on the source for every parseable
     -- corpus file. This is the single guard against the whole class of
     -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE

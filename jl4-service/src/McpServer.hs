@@ -45,7 +45,7 @@ import Control.Exception (SomeException, catch)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
-import Backend.Api (EvalBackend (..), FnLiteral (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
+import Backend.Api (EvalBackend (..), FnLiteral (..), RunFunction (..), TraceLevel (..))
 import Options (Options (..))
 
 -- ----------------------------------------------------------------------------
@@ -581,10 +581,14 @@ runMcpEvaluationIO cfg vf args = do
           pure r
         ) `catch` \AllocationLimitExceeded ->
           pure Nothing
+      -- An evaluation's answer and its error are both the body the HTTP
+      -- route returns, so each states its report (UNKNOWN-EVALUATION-SPEC
+      -- U7b), an undetermined result's 422 among the errors.
       case mResult of
         Nothing -> pure $ Left "Evaluation resource limit exceeded"
         Just (Left err) ->
-          pure $ Left (prettyEvaluatorError err)
+          let encoded = Aeson.encode (SimpleError err)
+          in pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
         Just (Right rwr) ->
           let encoded = Aeson.encode (SimpleResponse rwr)
           in pure $ Right (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))

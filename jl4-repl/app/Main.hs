@@ -33,7 +33,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyRefusal, prettyNotes)
+import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
@@ -653,9 +653,12 @@ formatResult (MkEvalDirectiveResult _range res _trace _ledger ns) = (<> prettyNo
   -- A refusal is not an error: the model declined to answer and said why.
   Assertion (Refused r)      -> "Refused: " <> r.message
   Assertion a@(Errored _)    -> "Error: " <> prettyAssertionOutcome a
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  Assertion a@(Undetermined _) -> "Error: " <> prettyAssertionOutcome a
   Reduction (Reduced nf)     -> Print.prettyLayout nf
   Reduction (ReducedRefused r) -> "Refused: " <> r.message
   Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
+  Reduction o@(ReducedUndetermined _) -> "Error: " <> prettyReductionOutcome o
 
 -- | Evaluate an expression and show its GraphViz trace
 evalWithTrace :: ReplState -> FilePath -> Text -> IO Text
@@ -767,9 +770,11 @@ formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger _notes) 
         Assertion a@(FailsBecause _) -> "Result: False (" <> prettyAssertionOutcome a <> ")"
         Assertion (Refused r)        -> "Refused: " <> r.message
         Assertion a@(Errored _)      -> "Error: " <> prettyAssertionOutcome a
+        Assertion a@(Undetermined _) -> "Error: " <> prettyAssertionOutcome a
         Reduction (Reduced nf)         -> "Result: " <> Print.prettyLayout nf
         Reduction (ReducedRefused r)   -> "Refused: " <> r.message
         Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
+        Reduction o@(ReducedUndetermined _) -> "Error: " <> prettyReductionOutcome o
   in case mtrace of
     Nothing -> resultText <> "\n(no trace available)"
     Just tr -> resultText <> "\n\nTrace:\n" <> Print.prettyLayout tr
@@ -847,10 +852,14 @@ summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger _notes) = c
   Assertion (Refused r)        -> Text.intercalate "; " ("Refused" : prettyRefusal r)
   Assertion (Errored err)      ->
     Text.intercalate "; " ("Error" : "assertion could not be evaluated" : prettyEvalException err)
+  Assertion (Undetermined ns)  ->
+    Text.intercalate "; " ("Error" : "assertion could not be evaluated" : prettyUndetermined ns)
   Reduction (Reduced nf)         -> Print.prettyLayout nf
   Reduction (ReducedRefused r)   -> Text.intercalate "; " ("Refused" : prettyRefusal r)
   Reduction (ReducedErrored err) ->
     Text.intercalate "; " ("Error" : prettyEvalException err)
+  Reduction (ReducedUndetermined ns) ->
+    Text.intercalate "; " ("Error" : prettyUndetermined ns)
 
 -- | Get information about a name (type and definition)
 getNameInfo :: ReplState -> FilePath -> Text -> IO Text

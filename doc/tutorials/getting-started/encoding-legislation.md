@@ -253,26 +253,34 @@ all. An encoding that paraphrases cannot.
 ### Asking before the blanks are filled
 
 Ask the rule for an answer with none of the seven facts supplied and it tells
-you so, naming the first thing it needed:
+you so, naming every fact it is waiting for:
 
 ```
-I could not continue evaluating, because I needed to know the value of
+I could not continue evaluating, because I needed to know the values of
   `the person is a body corporate`
-but it is an assumed term.
+  `the person engages in business for profit`
+  `the person is a public house`
+  `the person is a hotel`
+  `the person has an unspent conviction for fraud`
+  `the person has an unspent conviction for providing misleading information`
+  `the person has an alcohol banning order`
+but they are assumed terms.
 ```
 
 Two words in that message are worth unpacking. "Evaluating" is L4's word for
 working the rule out. An **"assumed term"** is a name the file assumes someone
 will supply for the case in hand, and never settles for itself — which is
 exactly what a `GIVEN` is, whether you wrote it under the heading as a section
-`GIVEN` or above one rule as a rule `GIVEN`. So the message reads: _I got as
-far as limb (a) and stopped, because nobody has told me whether this person is
-a body corporate._
+`GIVEN` or above one rule as a rule `GIVEN`. So the message reads: _I could
+not finish, because nobody has told me any of these seven facts about this
+person._
 
 That is not a bug and it is not a failure of the rule. It is the rule telling
-you which blank is still empty — one blank, the first one it needed, in the
-order the rule reads them. Fill that one and ask again, and it will name the
-next one it needs.
+you which blanks are still empty — every one its answer is waiting for. Fill
+some of them and ask again: it names the ones still missing, and once the facts
+you have given settle the answer, it answers. Tell it only that the person is
+not a body corporate, and the answer is `FALSE` whatever the other six are,
+because limb (a) already fails.
 
 ---
 
@@ -283,13 +291,10 @@ pin down the shape of section 3: an exempt case, a prohibited case, and a clean
 case. Each gets a named company, so that the reasoning can be followed in
 words.
 
-_Proposed, not landed (2026-09-04): `WITH` at an instruction such as `#EVAL`
-can supply a rule's own `GIVEN`, but not a section `GIVEN`. It is being
-built now, so the three blocks below will not run until it arrives, and they
-are not in the downloadable file. Until then, supply the facts from outside the
-file instead — from a web form, from `l4 batch`, or from a program asking the
-published rule. See "Supplying a case today", below, which is the way that
-works today._
+The three blocks below are not in the downloadable file. Add them at its end
+and each prints the answer its comment expects. "Supplying a case today",
+below, shows the other way: supplying the facts from outside the file — from a
+web form, from `l4 batch`, or from a program asking the published rule.
 
 `WITH` hands the rule its answers: one line for each blank, written as
 `` `name` IS value ``, with commas between them. (If you have met `WITH`
@@ -646,10 +651,9 @@ IF  `is commercial enterprise`
 #CHECK `has disqualifying factors`
 ```
 
-_Proposed, not landed (2026-09-04): the tests in step 4 use `#EVAL … WITH` on
-a section `GIVEN`, which L4 cannot do yet. That is why they are absent from
-the file above: they would not run. Until `WITH` arrives, supply the facts from
-outside the file, the way "Supplying a case today" shows._
+The tests in step 4 are not in the file above. Add them at its end to run them,
+or supply the facts from outside the file, the way "Supplying a case today"
+shows.
 
 ---
 

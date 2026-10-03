@@ -9,7 +9,7 @@ module L4.Cli.Run
   , runCmd
   ) where
 
-import Base (for_)
+import Base (for_, toList)
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
@@ -23,7 +23,8 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException, prettyReductionOutcome, undeterminedJson)
+import L4.Print (termNeedText)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -154,6 +155,11 @@ evalDirectiveCrashed r = case r.result of
   Assertion Holds            -> False
   Assertion Fails            -> False
   Assertion (FailsBecause _) -> False
+  -- An UNDETERMINED directive is no answer at all, as a Stuck one always
+  -- was, so it fails the run as the ruling above has every Stuck do
+  -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b, U7b).
+  Reduction (ReducedUndetermined _) -> True
+  Assertion (Undetermined _)        -> True
 
 ----------------------------------------------------------------------------
 -- JSON shape
@@ -188,6 +194,23 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
       -- consumer counting assertions must still see it) with a null value —
       -- neither true nor false — and the reason under "error".
       Assertion a@(Errored _) -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
+      -- An UNDETERMINED assertion keeps kind "assertion", as a refused one
+      -- does, since a consumer counting assertions must still count it, with
+      -- a null value and what it waits on under "undetermined" (decided by
+      -- Claude overnight 2026-10-03, pending Meng's review;
+      -- UNKNOWN-EVALUATION-SPEC §8 step 3).
+      Assertion (Undetermined _) ->
+        ("assertion", Aeson.Null,
+         [Key.fromString "undetermined" Aeson..= undeterminedJson result])
+      -- An UNDETERMINED #EVAL gets its OWN kind, as a refusing one does: it
+      -- is neither a value nor an error. "needs" names what it waits on, each
+      -- once, in the order evaluation reached it, and "message" is the
+      -- default report's text (UNKNOWN-EVALUATION-SPEC §4.7.4).
+      Reduction o@(ReducedUndetermined needs) ->
+        ("undetermined", Aeson.Null,
+         [ Key.fromString "needs"   Aeson..= map termNeedText (toList needs)
+         , Key.fromString "message" Aeson..= prettyReductionOutcome o
+         ])
       -- A refusing #EVAL gets its OWN kind. It is neither a value nor an
       -- error, and a consumer must be able to tell all three apart.
       Reduction (ReducedRefused ref) ->
