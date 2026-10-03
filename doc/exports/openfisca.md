@@ -129,6 +129,15 @@ and they are worth reading before you trust a number.
   answers with that member when the input is absent, so order your `DECLARE … IS ONE OF` such that
   the first listed value is the safe one. This is a convention the bridge relies on, not something
   it checks. An input that _does_ carry a `TYPICALLY` is different, and is covered next.
+- **A call to another exported decision sends no arguments.** It becomes `entity('other_var', period)`,
+  and OpenFisca computes that variable from the entity's own inputs, so a value the caller writes after
+  the other decision's name is not passed. The other decision's input is whatever the simulation
+  supplied, or its `TYPICALLY` default if it has one, or OpenFisca's own default (`0.0`). L4 evaluates
+  the call with the value written, so the two can disagree, and both exit 0 with no report. Measured:
+  `doubled base MEANS scaled base 5`, where `scaled` has `rate IS A NUMBER TYPICALLY 3`, gives 50 in L4
+  for a `base` of 10 and 30 in OpenFisca; with the `TYPICALLY` removed, OpenFisca gives 0. This is how
+  the export has always lowered a call (the default now fills the gap that `0.0` used to). Write such a
+  call with the caller's own input, under the same name, as each argument, which is what OpenFisca reads.
 
 ## Where to look
 
