@@ -363,17 +363,23 @@ Limits on a default that is an expression, at the boundary:
   naming it.
 - **`l4 batch` writes each default into the module it generates as text**, and so
   does the decision service for a request that sends `{}` for any input (its other
-  path works the default out from the checked expression and is not affected). The
-  text is read again at the top level of the file, so a name in it must mean the
-  same there. A name defined in a section and also at the top level would quietly
-  mean the file's there, so an exported rule's input may not take a default that
-  names one, and neither may a section input that an export reads: the file is
-  refused when it is checked. **A name that two or more sections define is not
-  checked, and `l4 batch` reads the last of them:** with `phi` defined in
-  `§ Rates` and again in a later `§ Other`, and `beta TYPICALLY phi` in
-  `§ Rates`, `beta` is 8 at `#EVAL` and in the service and 9 through `l4 batch`,
-  with no message. Written with its section (`` `Rates`.phi ``), the name means the
-  same on every path.
+  path works the default out from the checked expression and is not affected, and
+  so is a section input's default, which the service works out itself on both
+  paths). The text is put after the last section and read again there, so a name in
+  it must mean the same there. A name defined in a section and also at the top
+  level would quietly mean the file's there, so an exported rule's input may not
+  take a default that names one, and neither may a section input that an export
+  reads: the file is refused when it is checked. **A name that two or more
+  sections define is not checked, and when the last section defines it too, the
+  default reads that one:** with `phi` defined in `§ Rates` and again in a later
+  `§ Other`, `rate TYPICALLY (phi PLUS 1)` on an exported rule in `§ Rates` is 9
+  at `#EVAL` and in the service when no input is sent as `{}`, and 10 through
+  `l4 batch` and through the service when one is, with no message. A section
+  input's `TYPICALLY phi` in `§ Rates` is 8 at `#EVAL` and in the service and 9
+  through `l4 batch`. When the last section does not define the name, `l4 batch`
+  refuses the file instead, with "multiple definitions" naming a file it generated.
+  Written with its section (`` `Rates`.phi ``), the name means the same on every
+  path.
 - **A default is published in the spelling the checker prints**, not the
   author's: a name is unqualified and backticked where needed (one the author
   wrote with its section keeps it), and a call that names its inputs is written on
