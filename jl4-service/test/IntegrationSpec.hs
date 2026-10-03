@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, expressionDefaultJL4, expressionAllDefaultJL4, expressionSiteDefaultJL4, expressionMultiargJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, expressionDefaultJL4, expressionAllDefaultJL4, expressionSiteDefaultJL4, expressionMultiargJL4, expressionWrapperJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -578,6 +578,36 @@ spec = describe "integration" do
         refused <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
           (hard [listPrice 200, "unused flag" Aeson..= False])
         expectError refused "presumption is hard"
+
+    -- A request that sends {} for an input takes the generated-module path, which
+    -- writes each input the request supplies, or leaves to a default, into a record
+    -- it generates. A default that reads another section input sits in that record
+    -- as a field default that reads a section input, and the refusal for a rule's
+    -- input or a record's field (decision 1) took it for the author's: every such
+    -- request that supplied one of the two inputs, and every one under hard, was
+    -- refused with a message about a record the author never wrote (W7 second
+    -- review, silent S3).
+    it "answers a request on the generated-module path that supplies an input a default reads, or that reads one (W7)" do
+      withServiceFromSources "ty-expr-wrapper" [("price.l4", expressionWrapperJL4)] \baseUrl mgr -> do
+        let listPrice n = "list price" Aeson..= (n :: Int)
+            discount n = "discount" Aeson..= (n :: Int)
+            wrapped = "unused flag" Aeson..= uncertain
+            ask fn = evalFunction baseUrl mgr "ty-expr-wrapper" fn
+        -- neither supplied: both defaults are taken (100 - 10)
+        bare <- ask "final price" (args [wrapped])
+        expectAnswer bare (FnLitInt 90) ["list price", "discount"]
+        -- the discount supplied, the list price taken (100 - 1)
+        onlyDiscount <- ask "final price" (args [wrapped, discount 1])
+        expectAnswer onlyDiscount (FnLitInt 99) ["list price"]
+        -- the list price supplied, and the discount worked out from it (200 - 20)
+        onlyPrice <- ask "final price" (args [wrapped, listPrice 200])
+        expectAnswer onlyPrice (FnLitInt 180) ["discount"]
+        -- both supplied
+        both <- ask "final price" (args [wrapped, listPrice 200, discount 5])
+        expectAnswer both (FnLitInt 195) []
+        -- under hard every input is supplied, and none is presumed
+        allHard <- ask "final price" (hard [wrapped, listPrice 200, discount 5])
+        expectAnswer allHard (FnLitInt 195) []
 
     -- The published schema gives an expression default as source text
     -- (IMPLICIT-PROPS-DESIGN §11.5), and still asks for the input it reads.

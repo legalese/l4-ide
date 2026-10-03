@@ -32,6 +32,7 @@ module TestData (
   expressionAllDefaultJL4,
   expressionSiteDefaultJL4,
   expressionMultiargJL4,
+  expressionWrapperJL4,
   constructorNamedDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -1012,4 +1013,20 @@ GIVETH A PROVISION OF Driver, `Driver Action`
     HENCE
         PARTY driver
         MAY `drive`
+|]
+
+-- | A section input whose default reads another section input, read by an export
+-- that also has an input a request can send @{}@ for, so that the request takes
+-- the generated-module path (W7 second review, silent S3).
+expressionWrapperJL4 :: Text
+expressionWrapperJL4 =
+  [i|
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+@export default final price
+GIVEN `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
 |]

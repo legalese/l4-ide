@@ -293,9 +293,17 @@ inputDefaultReads mod'
     | MkOptionallyTypedName _ r _ (Just d) <- nodesOfType @(OptionallyTypedName Resolved) mod'
     , not (Map.member (getUnique r) binders)
     ]
+  -- The record the service and @l4 batch generate for a request is not the
+  -- author's: each input of the exported rule is one of its fields, with the
+  -- input's default as the field's, so a section input's default that reads
+  -- another section input sits there as a field default that reads a section
+  -- input. That is right there, and refusing it refused every request that
+  -- supplied such an input, or sent @{}@ for it, and every request under hard
+  -- (W7 second review, silent S3 and rulings S2).
   fieldDefaults =
     [ (r, d)
-    | MkTypedName _ r _ (Just d) _ <- nodesOfType @(TypedName Resolved) mod'
+    | tns <- authoredFieldGroups mod'
+    , MkTypedName _ r _ (Just d) _ <- tns
     ]
 
 -- | The @TYPICALLY@ defaults of rule inputs and record fields that NAME, by
@@ -344,17 +352,10 @@ inputDefaultCaptures mod' =
 
   recordFields =
     [ (r, siblings, d)
-    | MkDeclare _ _ appForm decl <- nodesOfType @(Declare Resolved) mod'
-    , spellingOf (appFormName appForm) /= requestRecordName
-    , tns <- case decl of
-        RecordDecl _ _ ts  -> [ts]
-        EnumDecl _ cds     -> [ ts | MkConDecl _ _ ts <- cds ]
-        _                  -> []
+    | tns <- authoredFieldGroups mod'
     , let siblings = [ r' | MkTypedName _ r' _ _ _ <- tns ]
     , MkTypedName _ r _ (Just d) _ <- tns
     ]
-
-  appFormName (MkAppForm _ n _ _) = n
 
   captured siblings d =
     [ ref
@@ -380,6 +381,21 @@ inputDefaultCaptures mod' =
   -- What the default binds itself. Type variables a node's annotation holds are
   -- in here too, which cannot be the 'Unique' of a value a default names.
   definedIn d = Set.fromList [ u | Def u _ <- Optics.toListOf (Optics.gplate @Resolved) d ]
+
+-- | The fields of each record the author declared, and of each enum
+-- constructor that carries data, one group per record or constructor. Not the
+-- record 'requestRecordName' that @l4 batch@ and the service generate to decode
+-- a request into.
+authoredFieldGroups :: Module Resolved -> [[TypedName Resolved]]
+authoredFieldGroups mod' =
+  [ tns
+  | MkDeclare _ _ (MkAppForm _ n _ _) decl <- nodesOfType @(Declare Resolved) mod'
+  , spellingOf n /= requestRecordName
+  , tns <- case decl of
+      RecordDecl _ _ ts -> [ts]
+      EnumDecl _ cds    -> [ ts | MkConDecl _ _ ts <- cds ]
+      _                 -> []
+  ]
 
 -- | Every node of one type in a module, whatever it sits inside: the topmost
 -- ones, and then those nested under each.
