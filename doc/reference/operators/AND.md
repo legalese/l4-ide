@@ -103,7 +103,8 @@ I could not continue evaluating, because I needed to know the values of
 but they are assumed terms.
 ```
 
-If the second operand stops with an error or a refusal, the answer is still reported as waiting for the first operand's facts, because those decide whether the second operand matters at all.
+If the second operand stops with an error or a refusal, or takes more than the 250,000 steps evaluation allows over a missing fact, the answer is still reported as waiting for the first operand's facts, because those decide whether the second operand matters at all.
+Nor does the second operand do anything outside the rule while the first is not known: a `RECORD`, a `FETCH` or `POST`, or a read of the environment with `ENV` there stops evaluation instead, and the answer is reported the same way.
 
 ## Related Keywords
 
