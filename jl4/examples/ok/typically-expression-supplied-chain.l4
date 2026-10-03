@@ -1,0 +1,23 @@
+-- A default that supplies the input it would otherwise read reads nothing of it
+-- (R8 rule 3, W7), even when that input's own default reads another input:
+-- `k`'s default gives `h` its `b`, so `b`'s default, which reads `r`, is never
+-- taken, and `r` is not read. It was refused as reading `r`
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3, silent review S7).
+
+§ `S`
+    GIVEN r IS A NUMBER TYPICALLY 2
+          b IS A NUMBER TYPICALLY (r PLUS 1)
+
+GIVETH A NUMBER
+h MEANS b TIMES 10
+
+GIVEN x IS A NUMBER
+      k IS A NUMBER TYPICALLY (h WITH b IS 1)
+GIVETH A NUMBER
+f MEANS x PLUS k
+
+-- k is h with b given as 1, which is 10, whatever `r` is
+#ASSERT (f WITH x IS 0) EQUALS 10
+-- and a root that does not supply b still takes it from its r
+#ASSERT h EQUALS 30
+#ASSERT (h WITH r IS 5) EQUALS 60
