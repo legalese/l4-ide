@@ -492,8 +492,19 @@ assumesReadBy
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [Assume Resolved]
-assumesReadBy mod' assumes (MkDecide _ _ _ body) =
-  let referencedUniques = transitiveReferencedUniques mod' body
+assumesReadBy mod' assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ body) =
+  -- The export's own inputs' defaults are read too, when a request leaves the
+  -- input out: a default that names a written ASSUME makes it an input of the
+  -- export, so a request can supply it and the answer can use it. A default on a
+  -- rule's input cannot read a section input (decision 1, 'TypicallyReadsInput'),
+  -- so what this adds is a written ASSUME; it was left out once on the ground that
+  -- there was nothing to add, and an ASSUME the default reads was then neither
+  -- published nor accepted, so the default could never be used (W7 second review,
+  -- rulings S4).
+  let referencedUniques =
+        Set.unions
+          (map (transitiveReferencedUniques mod')
+             (body : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]))
   in [ assume
      | (uniq, assume) <- Map.toList assumes
      , Set.member uniq referencedUniques
