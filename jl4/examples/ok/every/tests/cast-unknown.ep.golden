@@ -1,0 +1,122 @@
+IMPORT prelude
+-- THE CAST WORD AND AN UNKNOWN ROLL ENTRY (smucclaw/l4-ide#998).
+--
+-- `EVERY Tenant t IN roll` drops a roll entry that the constructor `Tenant`
+-- did not build. An entry whose value is not known may or may not be a
+-- tenant, so dropping it would answer for it: the join would then release
+-- without that member's obligation, which is how this used to report
+-- FULFILLED. Now it is Stuck, naming the unknown, which is what the same
+-- roll gives with no cast word at all.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+
+§ `Facts`
+    GIVEN u    IS AN Actor
+          roll IS A LIST OF Actor
+          rest IS A LIST OF Actor
+
+-- 1. The roll holds an unknown. Alice signs; whether `u` must sign too
+--    depends on what `u` is, so this is Stuck on `u`.
+GIVETH A DEONTIC Actor Action
+`roll with unknown` MEANS
+    EVERY Tenant t IN LIST alice, u
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `roll with unknown` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 2. Control: the second entry is a known tenant. Bob has not signed, so his
+--    obligation is still pending.
+GIVETH A DEONTIC Actor Action
+`roll with bob` MEANS
+    EVERY Tenant t IN LIST alice, bob
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `roll with bob` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 3. Control: no cast word. The unknown is admitted, and the run is Stuck on
+--    it as soon as its obligation is checked against Alice's signature.
+GIVETH A DEONTIC Actor Action
+`roll uncast` MEANS
+    EVERY t IN LIST alice, u
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `roll uncast` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 4. Control: an entry KNOWN to be built by another constructor is still left
+--    out. The landlord is not a tenant, so Alice's signature is enough.
+GIVETH A DEONTIC Actor Action
+`roll with landlord` MEANS
+    EVERY Tenant t IN LIST alice, theLandlord
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `roll with landlord` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 5. The unknown under another cast word. `u` may be a landlord, so the run
+--    is Stuck on `u` rather than released on the one landlord's signature.
+GIVETH A DEONTIC Actor Action
+`landlords with unknown` MEANS
+    EVERY Landlord l IN LIST theLandlord, u
+        MUST   Sign l
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `landlords with unknown` AT 0 WITH
+  PARTY theLandlord DOES Sign theLandlord AT 1
+
+-- 6. The roll itself is not known: nobody can say who the group is. Stuck on
+--    `roll`.
+GIVETH A DEONTIC Actor Action
+`unknown roll` MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `unknown roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+
+-- 7. The roll starts with Alice and the rest is not known. Stuck on `rest`.
+GIVETH A DEONTIC Actor Action
+`unknown rest of roll` MEANS
+    EVERY Tenant t IN alice FOLLOWED BY rest
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `unknown rest of roll` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1

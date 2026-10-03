@@ -282,6 +282,11 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- the program broken.
           Left (RefusalException ref) -> ReducedRefused ref
           Left exc                    -> ReducedErrored exc
+          -- A result that is a bare assumed term is no value: report it as
+          -- the 'Stuck' that '#ASSERT' already reports for it, below, rather
+          -- than print the unknown as though it were the answer
+          -- (UNKNOWN-EVALUATION-SPEC §2.4, row 52).
+          Right (MkNF (ValAssumed a)) -> ReducedErrored (UserEvalException (Stuck a))
           Right nfv                   -> Reduced nfv
       AssertHolds -> Assertion
         case v of
@@ -622,6 +627,7 @@ nfAux d (ValObligation env party act opens due followup lest) = do
   pure (MkNF (ValObligation env party' act opens' due' followup lest))
 nfAux _d (ValUnaryBuiltinFun b)      = pure (MkNF (ValUnaryBuiltinFun b))
 nfAux _d (ValBinaryBuiltinFun b)     = pure (MkNF (ValBinaryBuiltinFun b))
+nfAux _d (ValConnective c)           = pure (MkNF (ValConnective c))
 nfAux _d (ValTernaryBuiltinFun b)    = pure (MkNF (ValTernaryBuiltinFun b))
 nfAux  d (ValPartialTernary b r1)    = do
   v1 <- evalAndNF d r1

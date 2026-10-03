@@ -336,16 +336,21 @@ DECIDE `the appeal must be registered` `the amount solicited` IF
 
 (Probe `a6-input-repaired.l4`, exit 0. `#CHECK` reports
 `FUNCTION FROM NUMBER TO BOOLEAN` at information severity and, crucially, does **not** force the
-section `GIVEN` — which is the only reason the delegating rule can be exercised at all in a file that
-must exit 0.)
+section `GIVEN` — which is why the delegating rule can be checked, with no value for the section
+`GIVEN`, in a file that must exit 0.)
 
 The clause said "exactly the threshold", so the pair is `50000` against `50000` and `49999` against
 `50000`. One assertion on its own does not pin a boundary.
 
-**Not** a `WITH` that supplies the section `GIVEN` at the directive. _Proposed, not landed
-(2026-09-04)_ — it lands with the discharge change. Today `WITH` names only a rule's **own** inputs,
-and both spellings a model reaches for are errors. With a positional value in front of it, the
-parser stops (probe `a8-with-positional.l4`, exit 1):
+**Or** supply the section `GIVEN` at the directive, by name, beside the rule's own input. On the
+file above this is satisfied:
+
+```
+#ASSERT `the appeal must be registered` WITH `the amount solicited` IS 50000, `the prescribed threshold` IS 50000
+```
+
+**Not** either of the two spellings a model reaches for first. With a positional value in front of
+the `WITH`, the parser stops (probe `a8-with-positional.l4`, exit 1):
 
 ```
 11 | #ASSERT `the appeal must be registered` 50000 WITH `the prescribed threshold` IS 50000
@@ -353,8 +358,8 @@ parser stops (probe `a8-with-positional.l4`, exit 1):
 unexpected WITH
 ```
 
-Without one, it parses and the type checker reports two things — the rule's real input unsupplied,
-and the name you tried to bind undefined (probe `a9-with-named.l4`, exit 1):
+Naming only the section `GIVEN`, it parses and the type checker reports the rule's own input
+unsupplied (probe `a9-with-named.l4`, exit 1):
 
 ```
 In this use of
@@ -366,14 +371,8 @@ you have not supplied these inputs:
   `the amount solicited` of type NUMBER
 ```
 
-```
-I could not find a definition for the identifier
-
-  `the prescribed threshold`
-```
-
-Until discharge lands, values for section `GIVEN`s come from outside the file: a web form,
-`l4 batch FILE --inputs cases.json`, or the service request.
+Values for a real case come from outside the file: a web form, `l4 batch FILE --inputs cases.json`,
+or the service request.
 
 **Not** an arbitrary constant substituted into the rule so the assertion runs. That silently answers
 a different question — one where the threshold is fixed — and the file will keep passing after the

@@ -91,6 +91,10 @@ Events are consumed **in order**. As each event is examined, two pieces of inter
 
 If an event sits beyond the deadline, the contract takes its failure branch (or, for `SHANT`, its success branch — see below) without even examining what the event was. If the event is within time, the contract checks whether _this_ event matches _this_ obligation (right party, right action shape, guard satisfied). If it matches, the contract advances along `HENCE` (or `LEST` for a violated prohibition). If it doesn't match, the event is skipped and the next one is tried — with the clock now further along and the remaining window smaller.
 
+If the event's action holds a fact the case has not supplied, at a place where the action written in the `MUST`, `MAY` or `SHANT` line names one particular kind of thing — a delivery of goods of a kind nobody has stated, against `MUST Deliver Retail` — the contract cannot tell whether it matches, so the run stops and names the missing fact rather than skipping the event. An event that plainly cannot match, whatever that fact turns out to be, is still skipped: a different action, or a quantity written out as a number that differs from the number the obligation writes, as long as everything between the missing fact and that number is written out too. Where the run would have to work something out first to see the mismatch, it stops instead.
+
+The same holds when the missing fact is checked by a rule that uses `CONSIDER`, whether in the action or in a `PROVIDED` condition: an `OTHERWISE` line is not taken just because the fact is missing, so where a line before it could still match, the run stops and names it.
+
 The timeline is purely numeric. It can stand for days, seconds, business hours, or any other unit — L4 doesn't care, as long as deadlines and event timestamps use the same units.
 
 ---

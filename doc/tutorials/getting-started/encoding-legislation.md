@@ -283,13 +283,10 @@ pin down the shape of section 3: an exempt case, a prohibited case, and a clean
 case. Each gets a named company, so that the reasoning can be followed in
 words.
 
-_Proposed, not landed (2026-09-04): `WITH` at an instruction such as `#EVAL`
-can supply a rule's own `GIVEN`, but not a section `GIVEN`. It is being
-built now, so the three blocks below will not run until it arrives, and they
-are not in the downloadable file. Until then, supply the facts from outside the
-file instead — from a web form, from `l4 batch`, or from a program asking the
-published rule. See "Supplying a case today", below, which is the way that
-works today._
+The three blocks below are not in the downloadable file. Add them at its end
+and each prints the answer its comment expects. "Supplying a case today",
+below, shows the other way: supplying the facts from outside the file — from a
+web form, from `l4 batch`, or from a program asking the published rule.
 
 `WITH` hands the rule its answers: one line for each blank, written as
 `` `name` IS value ``, with commas between them. (If you have met `WITH`
@@ -646,10 +643,9 @@ IF  `is commercial enterprise`
 #CHECK `has disqualifying factors`
 ```
 
-_Proposed, not landed (2026-09-04): the tests in step 4 use `#EVAL … WITH` on
-a section `GIVEN`, which L4 cannot do yet. That is why they are absent from
-the file above: they would not run. Until `WITH` arrives, supply the facts from
-outside the file, the way "Supplying a case today" shows._
+The tests in step 4 are not in the file above. Add them at its end to run them,
+or supply the facts from outside the file, the way "Supplying a case today"
+shows.
 
 ---
 

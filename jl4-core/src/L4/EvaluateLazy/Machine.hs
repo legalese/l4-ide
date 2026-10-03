@@ -58,6 +58,7 @@ module L4.EvaluateLazy.Machine
 , emptyEnvironment
 , boolView
 , pattern ValBool
+, builtinConnective
 -- * Constants exposed for the eager evaluator
 , builtinBinOps
 , writeJSONToReferences
@@ -127,6 +128,14 @@ import System.IO.Unsafe (unsafePerformIO)
 import Control.Exception (SomeException, catch)
 import qualified Control.Exception
 
+-- | The right operand of a built-in connective, kept until the left has said
+-- whether it is needed: an expression, from a call written as @a AND b@, or
+-- a reference, from a call through a variable holding the connective.
+data ConnRight
+  = ConnRightExpr (Expr Resolved) Environment
+  | ConnRightRef Reference
+  deriving stock Show
+
 data Frame =
     BinOp1 BinOp {- -} (Expr Resolved) Environment
   | BinOp2 BinOp WHNF {- -}
@@ -186,6 +195,9 @@ data Frame =
   | RestoreCurrentParty (Maybe Text) Bool
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
+  | ConnectiveLeft Connective (Maybe ConnRight) {- -}
+    -- ^ the left operand of a built-in connective (NOT's only one) is being
+    -- evaluated; the right operand is still to come, if there is one
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
@@ -766,6 +778,7 @@ unwindFrame = \ case
   ReadCell1 {}                  -> pure ()
   ReadCell2 {}                  -> pure ()
   App1 {}                       -> pure ()
+  ConnectiveLeft {}             -> pure ()
   IfThenElse1 {}                -> pure ()
   ConsiderWhen1 {}              -> pure ()
   PatNil0 {}                    -> pure ()
@@ -1195,14 +1208,13 @@ forwardExpr :: Environment -> Expr Resolved -> Machine Config
 forwardExpr env = \ case
   RAnd _ann e1 e2 -> continueBackward (ValROp env ValRAnd (Left e1) (Left e2))
   ROr  _ann e1 e2 -> continueBackward (ValROp env ValROr (Left e1) (Left e2))
-  And  _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 e2 falseExpr)
-  Or   _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 trueExpr e2)
-  Implies _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 e2 trueExpr)
-  Not _ann e ->
-    continueExpr env (IfThenElse emptyAnno e falseExpr trueExpr)
+  -- The surface connectives do not survive type checking (it rewrites them to
+  -- applications of the built-ins, below), but should one reach here it gets
+  -- the same frames.
+  And  _ann e1 e2 -> connective env ConnAnd e1 (Just e2)
+  Or   _ann e1 e2 -> connective env ConnOr e1 (Just e2)
+  Implies _ann e1 e2 -> connective env ConnImplies e1 (Just e2)
+  Not _ann e -> connective env ConnNot e Nothing
   Equals _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpEquals e2 env)
     continueExpr env e1
@@ -1279,6 +1291,12 @@ forwardExpr env = \ case
                thunkRef <- allocate_ thunkExpr env
                pushFrame (EvalUnderRulesEncodedAt1 thunkRef env)
                continueExpr env dateExpr
+      -- A built-in connective called by name: its operands are evaluated in
+      -- its frames, as expressions, so that each shows in a trace under its
+      -- own source text ('connective').
+      uniq | Just conn <- builtinConnective uniq
+           , Just (left, right) <- connectiveOperands conn es ->
+               connective env conn left right
       _ -> do
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
@@ -1558,6 +1576,16 @@ backward val = withPoppedFrame $ \ case
         -- to ('operandHandoff').
         operandHandoff env rexpr1
         maybeEvaluate env rexpr1 -- TODO: build application
+      ValConnective conn ->
+        case (conn, rs) of
+          (ConnNot, [r]) -> do
+            pushFrame (ConnectiveLeft ConnNot Nothing)
+            autoApplyDischargedImport r
+          (_, [r1, r2]) | conn /= ConnNot -> do
+            pushFrame (ConnectiveLeft conn (Just (ConnRightRef r2)))
+            autoApplyDischargedImport r1
+          _ -> internalException $ RuntimeTypeError $
+            connectiveName conn <> " applied to " <> Text.textShow (length rs) <> " arguments"
       ValUnaryBuiltinFun fn -> do
         r <- expect1 rs
         pushFrame (UnaryBuiltin0 fn mTy)
@@ -1635,6 +1663,8 @@ backward val = withPoppedFrame $ \ case
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
+  Just (ConnectiveLeft conn right) ->
+    connectiveLeft conn right val
   Just (ConsiderWhen1 _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
@@ -1646,6 +1676,8 @@ backward val = withPoppedFrame $ \ case
     case val of
       ValNil ->
         continueBackward (ValEnvironment Map.empty)
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatCons0 p1 env p2) -> do
@@ -1653,6 +1685,8 @@ backward val = withPoppedFrame $ \ case
       ValCons rf1 rf2 -> do
         pushFrame (PatCons1 rf2 env p2)
         continuePattern rf1 env p1
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatCons1 rf2 env p2) -> do
@@ -1685,6 +1719,8 @@ backward val = withPoppedFrame $ \ case
                     continuePattern r env p
             else internalException $ RuntimeTypeError
               "pattern for constructor has the wrong number of arguments"
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatApp1 ambient envs rps) ->
@@ -1699,11 +1735,27 @@ backward val = withPoppedFrame $ \ case
       _ -> internalException $ RuntimeTypeError $
         "expected an environment but found: " <> prettyLayout val <> " when matching constructor"
   Just (PatLit0 env lit) -> do
+    -- The pattern's expression is evaluated whatever the scrutinee is, as
+    -- the match would: it can raise or refuse, and that must not turn into
+    -- a failed branch because a LATER position clashes. 'PatLit1' consults
+    -- the refinement, once both sides are in hand.
     pushFrame (PatLit1 val)
     continueExpr env lit
   Just (PatLit1 lit) -> do
-    pushFrame PatLit2
-    runBinOpEquals lit val
+    -- For a literal pattern 'lit' is the literal and 'val' the scrutinee;
+    -- for an expression pattern 'lit' is the scrutinee and 'val' the
+    -- expression's value. Either can be an unknown. The comparison names it
+    -- ('runBinOpEquals' does on either side, U6), unless a sub-pattern still
+    -- to be matched already clashes ('metUnknown').
+    let compareLit = pushFrame PatLit2 >> runBinOpEquals lit val
+        unknown = \ case
+          ValAssumed _ -> True
+          _            -> False
+    if unknown lit || unknown val
+      then metUnknown >>= \ case
+        BranchClashes  -> patternMatchFailure
+        BranchMayMatch -> compareLit
+      else compareLit
   Just PatLit2 ->
     case val of
       -- NOTE: in future, we may give the pattern that was matched a name, potentially
@@ -1769,7 +1821,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (EverBetweenFrame originalCtx predicate endDay nextDay step)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "EVER BETWEEN expects predicate returning BOOLEAN"
+        iteratorNotBoolean "EVER BETWEEN" val
   Just (AlwaysBetweenFrame originalCtx predicate endDay currentDay step) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1784,7 +1836,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (AlwaysBetweenFrame originalCtx predicate endDay nextDay step)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "ALWAYS BETWEEN expects predicate returning BOOLEAN"
+        iteratorNotBoolean "ALWAYS BETWEEN" val
   Just (WhenLastFrame originalCtx predicate currentDay) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1801,7 +1853,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (WhenLastFrame originalCtx predicate nextDay)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "WHEN LAST expects predicate returning BOOLEAN"
+        iteratorNotBoolean "WHEN LAST" val
   Just (WhenNextFrame originalCtx predicate currentDay limitDay) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1818,7 +1870,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (WhenNextFrame originalCtx predicate nextDay limitDay)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "WHEN NEXT expects predicate returning BOOLEAN"
+        iteratorNotBoolean "WHEN NEXT" val
   -- VALUE AT is the one interval builtin whose result is not forced to a
   -- BOOLEAN/DATE by its own frame, so it needs the same deep pin as the four
   -- EVAL clause builtins (#934). EVER/ALWAYS BETWEEN and WHEN LAST/NEXT demand
@@ -1859,6 +1911,9 @@ backward val = withPoppedFrame $ \ case
             -- More elements to process. Evaluate the head element first
             pushFrame (JsonEncodeListFrame acc nextTailRef False)
             continueRef headRef
+          -- a list whose rest is unknown
+          ValAssumed r ->
+            stuckOnAssumed r
           _ ->
             -- Should not happen - tail should be ValNil or ValCons
             internalException $ RuntimeTypeError "Expected list (ValNil or ValCons) for tail"
@@ -2404,23 +2459,30 @@ backwardContractFrame val = \ case
   -- environment the value happened to capture ('rebindLifecycle').
   Handoff lifecycle ->
     continueBackward (rebindLifecycle lifecycle val)
-  -- EVERY, the roll call. One cons cell of the roll per step.
+  -- EVERY, the roll call. One cons cell of the roll per step. A roll, or the
+  -- rest of one, that is not known is Stuck on it: nobody can say who the
+  -- group is.
   QuantRoll QuantRollFrame {..} ->
     case val of
       ValNil -> assembleQuantified ctx (reverse acc)
       ValCons hd tl -> do
         pushCFrame (QuantCast QuantCastFrame {candidate = hd, rest = tl, ..})
         continueRef hd
+      ValAssumed r -> stuckOnAssumed r
       _ -> internalException $ RuntimeTypeError $
         "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
   -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the
-  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll.
+  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll. An
+  -- unknown entry may or may not be a @Tenant@, so the cast neither admits
+  -- nor drops it: it is Stuck, naming it (smucclaw/l4-ide#998). Dropping it
+  -- was the bug: the join then released without that member's obligation.
   QuantCast QuantCastFrame {..} -> do
-    let admitted = case ctx.cast of
-          Nothing -> True
-          Just c  -> case val of
-            ValConstructor n _ -> n `sameResolved` c
-            _                  -> False
+    admitted <- case ctx.cast of
+      Nothing -> pure True
+      Just c  -> case val of
+        ValConstructor n _ -> pure (n `sameResolved` c)
+        ValAssumed r       -> stuckOnAssumed r
+        _                  -> pure False
     if not admitted
       then quantNext QuantRollFrame {..} rest
       else case ctx.filt of
@@ -4095,6 +4157,149 @@ patternMatchFailure = withPoppedFrame $ \ case
   Just _ ->
     patternMatchFailure
 
+-- | A pattern frame met an unknown where it needed a constructor or a list.
+--
+-- Under the regulative action matcher this is Stuck, naming the unknown
+-- (smucclaw/l4-ide#999): failing the match would move on to the next
+-- event, which asserts that the act was not this one, and nothing says so.
+-- Under a @CONSIDER@ (and so a record selector, a one-branch @CONSIDER@) it
+-- is Stuck too: failing the match would hand the unknown to the next branch,
+-- where a catch-all takes it silently, or would report an exhaustive
+-- @CONSIDER@ as having no branch for it (UNKNOWN-EVALUATION-SPEC §8 step 1).
+-- The exception is a sub-pattern still to be matched that is already KNOWN
+-- to clash, with every sub-pattern the match would reach before it already
+-- known to match; then the branch cannot match whatever the unknown is, and
+-- the match fails exactly as for any mismatch ('metUnknown').
+patternMetUnknown :: Resolved -> Machine Config
+patternMetUnknown r = metUnknown >>= \ case
+  BranchMayMatch -> stuckOnAssumed r
+  BranchClashes  -> patternMatchFailure
+
+-- | What a pattern that met an unknown is to do. The literal patterns
+-- ('PatLit1') ask too, and on 'BranchMayMatch' leave the raising to their
+-- comparison, which names an unknown on either side.
+data MetUnknown
+  = BranchClashes
+    -- ^ a sub-pattern still to be matched already clashes: fail the match
+  | BranchMayMatch
+    -- ^ the branch may match, depending on the unknown: it is Stuck
+
+-- | Decide 'MetUnknown' by reading the stack, without popping it, down to the
+-- frame 'patternMatchFailure' would unwind to. The sub-patterns still to be
+-- matched sit in the 'PatApp1' and 'PatCons1' frames between here and that
+-- handler, innermost first, which is the order the match would take them, and
+-- the refinement ('anyKnownClash') does not depend on which handler it is.
+metUnknown :: Machine MetUnknown
+metUnknown = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  -- the handler is the frame 'patternMatchFailure' would unwind to
+  case break isMatchHandler stack.frames of
+    (pending, handler : _) | metUnknownHandled handler -> do
+      clash <- anyKnownClash (concatMap pendingPositions pending)
+      pure (if clash then BranchClashes else BranchMayMatch)
+    -- No handler: every pattern match is rooted at one, so this cannot
+    -- happen, and failing the match reports 'UnhandledPatternMatch'.
+    _ -> pure BranchClashes
+  where
+    isMatchHandler = \ case
+      ConsiderWhen1{}              -> True
+      ContractFrame (Contract11 _) -> True
+      _                            -> False
+    pendingPositions = \ case
+      PatApp1 _ _ rps -> rps
+      PatCons1 rf _ p -> [(rf, p)]
+      _               -> []
+
+-- | The handlers under which an unknown met by a pattern is Stuck rather than
+-- a failed match: the regulative action matcher, and a @CONSIDER@ (by
+-- UNKNOWN-EVALUATION-SPEC §8 step 1).
+metUnknownHandled :: Frame -> Bool
+metUnknownHandled = \ case
+  ContractFrame (Contract11 _) -> True
+  ConsiderWhen1{}              -> True
+  _                            -> False
+
+-- | What reading a pending position tells us, without forcing anything.
+data PendingVerdict
+  = KnownClash  -- ^ the match would fail here, whatever any unknown is
+  | KnownMatch  -- ^ the match would succeed here, forcing nothing new
+  | Undecided   -- ^ the match would have to force something to say
+
+-- | Whether the pending positions, taken in the order the match would take
+-- them, reach a KNOWN clash before anything the match would have to force.
+--
+-- Cells are read, never forced: a check made only so that a mismatch stays a
+-- mismatch must not raise or diverge where the match itself would not have.
+-- And the scan stops at the first position it cannot decide, rather than
+-- looking past it for a later clash, because the match would force that
+-- position first, and forcing it can refuse, raise or diverge. Skipping it
+-- would answer "no match" for every value of the unknown when some values
+-- would refuse: with @tbd MEANS REFUSE ...@, the event @Send3 k tbd Wholesale@
+-- against @MUST Send3 Retail 7 Retail@ refuses when @k@ is @Retail@, so it is
+-- Stuck, not passed over.
+--
+-- A position is decided when its cell is already a value, or an unevaluated
+-- literal; a variable pattern binds without looking, so it always matches.
+-- A context-dependent cache ('WHNFWhen') is not trusted, since it may not hold
+-- for this context, and a pattern expression other than a literal would be
+-- evaluated, so neither is decided.
+--
+-- So the refinement is conservative. A computed argument (@2 PLUS 3@), or a
+-- list longer than the pattern whose tail is not yet evaluated, is Stuck
+-- rather than skipped, and whether a position counts as decided can depend on
+-- whether something else has already forced its cell. Either way a clash is
+-- claimed only where the match, run in order, would reach one.
+anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
+anyKnownClash positions = pendingVerdict positions >>= \ case
+  KnownClash -> pure True
+  _          -> pure False
+
+-- | The positions in matching order: the first that is not 'KnownMatch' is
+-- the answer.
+pendingVerdict :: [(Reference, Pattern Resolved)] -> Machine PendingVerdict
+pendingVerdict = \ case
+  [] -> pure KnownMatch
+  ((rf, p) : rest) -> knownClash rf p >>= \ case
+    KnownMatch -> pendingVerdict rest
+    verdict    -> pure verdict
+
+knownClash :: Reference -> Pattern Resolved -> Machine PendingVerdict
+knownClash rf pat = case pat of
+  PatVar{} -> pure KnownMatch
+  PatExpr _ e | not (isLiteral e) -> pure Undecided
+  _ -> readThunk rf >>= \ case
+    WHNF v                      -> verdictOn v
+    Unevaluated _ (Lit _ lit) _ -> verdictOn =<< runLit lit
+    Unevaluated{}               -> pure Undecided
+    WHNFWhen{}                  -> pure Undecided
+  where
+    isLiteral = \ case
+      Lit{} -> True
+      _     -> False
+    verdictOn v = case pat of
+      PatApp _ n []
+        | getUnique n == TypeCheck.emptyUnique -> pure case v of
+            ValNil    -> KnownMatch
+            ValCons{} -> KnownClash
+            _         -> Undecided
+      PatApp _ n ps -> case v of
+        ValConstructor n' rfs
+          | sameResolved n n' -> pendingVerdict (zip rfs ps)
+          | otherwise         -> pure KnownClash
+        _ -> pure Undecided
+      PatCons _ p1 p2 -> case v of
+        ValNil        -> pure KnownClash
+        ValCons r1 r2 -> pendingVerdict [(r1, p1), (r2, p2)]
+        _             -> pure Undecided
+      PatLit _ lit          -> pure (literalVerdict lit v)
+      PatExpr _ (Lit _ lit) -> pure (literalVerdict lit v)
+      PatExpr{}             -> pure Undecided
+      PatVar{}              -> pure KnownMatch
+    literalVerdict lit v = case (lit, v) of
+      (NumericLit _ n, ValNumber m) -> if n == m then KnownMatch else KnownClash
+      (StringLit _ s, ValString t)  -> if s == t then KnownMatch else KnownClash
+      _                             -> Undecided
+
 runLit :: Lit -> Machine WHNF
 runLit (NumericLit _ann num) = pure (ValNumber num)
 runLit (StringLit _ann str)  = pure (ValString str)
@@ -4217,6 +4422,8 @@ encodeValueToJson = \case
     internalException $ RuntimeTypeError $
       "Internal error: Constructor encoding should be handled in runBuiltin, not encodeValueToJson: " <>
       nameToText (TypeCheck.getName conRef)
+  -- an unknown cannot be encoded, and it is not an internal error either
+  ValAssumed r -> stuckOnAssumed r
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
     escapeJson :: Text -> Text
@@ -4546,6 +4753,9 @@ coerceToString val = case val of
             internalException $ RuntimeTypeError "DATE values must have three fields (day, month, year) for string conversion"
     | otherwise ->
         incompatible
+  -- an unknown is not of the wrong type: name it
+  ValAssumed r ->
+    stuckOnAssumed r
   _ ->
     incompatible
   where
@@ -5044,10 +5254,36 @@ runBinOpEquals (ValConstructor n1 rs1) (ValConstructor n2 rs2)
   | otherwise                                           = continueBackward $ ValBool False
 -- TODO: we probably also want to check ValObligations for equality
 runBinOpEquals (ValAssumed r)          _                = stuckOnAssumed r
+-- An unknown on the right is as unknown as one on the left (U6): name it,
+-- rather than blame its type. Only where the left operand is of a type that
+-- equality supports; a function, an obligation or an unapplied constructor on
+-- the left is still the unsupported-type error it always was.
+runBinOpEquals v1                      (ValAssumed r)
+  | supportsEquality v1                                 = stuckOnAssumed r
 runBinOpEquals v1                       v2              = userException (EqualityOnUnsupportedType v1 v2)
+
+-- | The value forms 'runBinOpEquals' compares, when both sides have one.
+supportsEquality :: WHNF -> Bool
+supportsEquality = \ case
+  ValNumber {}      -> True
+  ValString {}      -> True
+  ValDate {}        -> True
+  ValTime {}        -> True
+  ValDateTime {}    -> True
+  ValNil            -> True
+  ValCons {}        -> True
+  ValConstructor {} -> True
+  _                 -> False
 
 infinityDay :: Time.Day
 infinityDay = Time.fromGregorian 9999 12 31
+
+-- | A temporal iterator's predicate returned something other than a BOOLEAN.
+-- An unknown is not of the wrong type: name it.
+iteratorNotBoolean :: Text -> WHNF -> Machine a
+iteratorNotBoolean _    (ValAssumed r) = stuckOnAssumed r
+iteratorNotBoolean what _              =
+  userException $ UserError (what <> " expects predicate returning BOOLEAN")
 
 applyDatePredicate :: WHNF -> Time.Day -> Machine Config
 applyDatePredicate predicate day = do
@@ -5747,9 +5983,6 @@ evalConDecl env (MkConDecl _ann n tns) = do
 -- Premade expressions and values
 -----------------------------------------------------------------------------
 
-falseExpr :: Expr Resolved
-falseExpr = App emptyAnno TypeCheck.falseRef []
-
 falseVal :: Value a
 falseVal = ValConstructor TypeCheck.falseRef []
 
@@ -5926,10 +6159,10 @@ initialEnvironment = do
   neverMatchesPartyRef <- allocateValue ValNeverMatchesParty
   neverMatchesActRef <- allocateValue ValNeverMatchesAct
   waitUntilRef <- allocateValue =<< waitUntilVal eventCRef neverMatchesPartyRef neverMatchesActRef
-  andRef <- allocateValue =<< andValClosure trueRef falseRef
-  orRef <- allocateValue =<< orValClosure trueRef falseRef
-  impliesRef <- allocateValue =<< impliesValClosure trueRef falseRef
-  notRef <- allocateValue =<< notValClosure trueRef falseRef
+  andRef <- allocateValue (ValConnective ConnAnd)
+  orRef <- allocateValue (ValConnective ConnOr)
+  impliesRef <- allocateValue (ValConnective ConnImplies)
+  notRef <- allocateValue (ValConnective ConnNot)
 
   builtinBinOpRefs <-
     traverse
@@ -6633,85 +6866,66 @@ expectDateTimeValue (ValDateTime utc tz) = pure (utc, tz)
 expectDateTimeValue val = internalException $ RuntimeTypeError $
   "Expected DATETIME value but got: " <> prettyLayout val
 
-boolBinOpClosure :: Reference -> Reference -> (Resolved -> Resolved -> Expr Resolved) -> Machine (Value a)
-boolBinOpClosure true false buildExpr = do
-  let
-    mkName = MkName emptyAnno . NormalName
-    na = mkName "a"
-    nb = mkName "b"
-  aDef <- def na
-  bDef <- def nb
-  aRef <- ref na aDef
-  bRef <- ref nb bDef
-  pure $ ValClosure
-    (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
-      , MkOptionallyTypedName emptyAnno bDef (Just TypeCheck.boolean) Nothing
-      ])
-    (buildExpr aRef bRef)
-    ( Map.fromList
-      [ (TypeCheck.trueUnique, true)
-      , (TypeCheck.falseUnique, false)
-      ]
-    )
+-- | Evaluate a built-in connective written out as a call (UNKNOWN-EVALUATION-SPEC
+-- §4.4, U2, U2b). The left operand (NOT's only one) is evaluated in a frame of
+-- its own, so it shows in a trace as a child of the call, under its own source
+-- text and with its value; the right operand, if the left does not decide, is
+-- evaluated in tail position ('connectiveLeft'). In two-valued evaluation this
+-- computes exactly what @IF a THEN b ELSE FALSE@ and its siblings did, in the
+-- same order, for programs that finish. One that does not finish through the
+-- right operand, such as @loop n MEANS TRUE AND loop n@, now runs until it is
+-- stopped, since the operand is in tail position, where the @IF@'s closure
+-- body overflowed the frame cap; a recursion through an @IF@'s branch already
+-- ran that way.
+connective :: Environment -> Connective -> Expr Resolved -> Maybe (Expr Resolved) -> Machine Config
+connective env conn left right = do
+  pushFrame (ConnectiveLeft conn ((`ConnRightExpr` env) <$> right))
+  continueExpr env left
 
-boolUnaryOpClosure :: Reference -> Reference -> (Resolved -> Expr Resolved) -> Machine (Value a)
-boolUnaryOpClosure true false buildExpr = do
-  let
-    mkName = MkName emptyAnno . NormalName
-    na = mkName "a"
-  aDef <- def na
-  aRef <- ref na aDef
-  pure $ ValClosure
-    (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
-      ])
-    (buildExpr aRef)
-    ( Map.fromList
-      [ (TypeCheck.trueUnique, true)
-      , (TypeCheck.falseUnique, false)
-      ]
-    )
+-- | The left operand's value has arrived: decide, or go on to the right
+-- operand. The right operand continues in tail position, with no frame of its
+-- own and no check that it is a BOOLEAN, so the prelude's @x AND and xs@ stays
+-- flat and its value is whatever the right operand's is.
+connectiveLeft :: Connective -> Maybe ConnRight -> WHNF -> Machine Config
+connectiveLeft conn right val =
+  case val of
+    ValBool b ->
+      case (conn, b) of
+        (ConnNot,     _)     -> continueBackward (valBool (not b))
+        (ConnAnd,     False) -> continueBackward (valBool False)
+        (ConnOr,      True)  -> continueBackward (valBool True)
+        (ConnImplies, False) -> continueBackward (valBool True)
+        _ -> case right of
+          Just (ConnRightExpr e env) -> continueExpr env e
+          Just (ConnRightRef r)      -> autoApplyDischargedImport r
+          Nothing -> internalException $ RuntimeTypeError $
+            connectiveName conn <> " has no right operand"
+    ValAssumed r -> stuckOnAssumed r
+    _ -> internalException $ RuntimeTypeError $
+      "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating " <> connectiveName conn
 
-andValClosure :: Reference -> Reference -> Machine (Value a)
-andValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        (Var emptyAnno bRef)
-        falseExpr
-    )
+-- | The built-in connective a name stands for, if it is one.
+builtinConnective :: Unique -> Maybe Connective
+builtinConnective u
+  | u == TypeCheck.andUnique     = Just ConnAnd
+  | u == TypeCheck.orUnique      = Just ConnOr
+  | u == TypeCheck.impliesUnique = Just ConnImplies
+  | u == TypeCheck.notUnique     = Just ConnNot
+  | otherwise                    = Nothing
 
-notValClosure :: Reference -> Reference -> Machine (Value a)
-notValClosure true false =
-  boolUnaryOpClosure true false
-    (\aRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        falseExpr
-        trueExpr
-    )
+-- | A connective's operands, if the call has the connective's arity.
+connectiveOperands :: Connective -> [Expr Resolved] -> Maybe (Expr Resolved, Maybe (Expr Resolved))
+connectiveOperands ConnNot [e]      = Just (e, Nothing)
+connectiveOperands ConnNot _        = Nothing
+connectiveOperands _       [e1, e2] = Just (e1, Just e2)
+connectiveOperands _       _        = Nothing
 
-orValClosure :: Reference -> Reference -> Machine (Value a)
-orValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        trueExpr
-        (Var emptyAnno bRef)
-    )
-
-impliesValClosure :: Reference -> Reference -> Machine (Value a)
-impliesValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        (Var emptyAnno bRef)
-        trueExpr
-    )
+connectiveName :: Connective -> Text
+connectiveName = \ case
+  ConnAnd     -> "AND"
+  ConnOr      -> "OR"
+  ConnImplies -> "IMPLIES"
+  ConnNot     -> "NOT"
 
 ----------------------------------------------------------------------------
 -- JSON to Environment conversion for batch processing

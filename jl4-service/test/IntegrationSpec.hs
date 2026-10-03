@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -391,6 +391,41 @@ spec = describe "integration" do
     it "stops a deontic rule instead of taking its ELSE branch" do
       withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "w1-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertNotSupplied resp "is motorway"
+
+    it "stops and names a missing BOOLEAN read by CONSIDER, not taking its OTHERWISE" do
+      withServiceFromSources "w1-consider" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-consider" "fee"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "amount" Aeson..= (10 :: Int)
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertNotSupplied resp "is member"
+
+    it "uses a BOOLEAN read by CONSIDER when it is supplied" do
+      withServiceFromSources "w1-consider-given" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-consider-given" "fee"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "amount" Aeson..= (10 :: Int)
+                , "is member" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 10)
+
+    it "stops a deontic rule instead of taking its OTHERWISE" do
+      withServiceFromSources "w1-deontic-consider" [("seatbelt.l4", deonticConsiderJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-deontic-consider" "seatbelt requirement"
           (Aeson.object
             [ "arguments" Aeson..= Aeson.object
                 [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]

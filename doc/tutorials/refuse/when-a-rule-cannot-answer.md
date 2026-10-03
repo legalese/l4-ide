@@ -319,7 +319,7 @@ The section `GIVEN` has a tutorial of its own, [What a Section Needs to Know](..
 
 The field test also sorts out an `ASSUME`, which you will meet in older files. `ASSUME` is deprecated — it still works, and it is still how a good deal of existing L4 is written, but it is no longer the way to write new rules — and it was used for both jobs at once. Apply the same test to one you find. If a person could supply the value, the `ASSUME` was standing in for a fact nobody has supplied yet, and it becomes a `GIVEN` under the section heading. If nobody could, it was standing in for a refusal, and it becomes a `REFUSE`. See [`ASSUME`](../../reference/types/ASSUME.md).
 
-_Proposed, not landed (2026-09-04): supplying such a fact at the point where a rule is used, by writing `WITH`, as in `` `the issuer is a smaller reporting company` WITH `the issuer's annual revenue` IS 4000000 ``. It lands with the change that lets a rule be handed its facts from inside the file; until then, values are supplied from outside the file — the web form, the `l4 batch` command, which runs a file over a list of cases you have prepared in advance, or the rules published as a service._
+Such a fact can also be supplied at the point where a rule is used, by writing `WITH`, as in `` `the issuer is a smaller reporting company` WITH `the issuer's annual revenue` IS 4000000 ``; that supplies it for that one use. Values for a real case come from outside the file — the web form, the `l4 batch` command, which runs a file over a list of cases you have prepared in advance, or the rules published as a service.
 
 ### Two more you may meet, which are not absences at all
 
