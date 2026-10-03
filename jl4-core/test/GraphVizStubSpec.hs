@@ -35,6 +35,7 @@ traceOf src = do
   cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
   case checkWithImports (vfsFromList []) src of
     Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r | not r.tcdSuccess -> fail ("typecheck failed: " <> show r.tcdErrors)
     Right r -> do
       (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
       case [ t | MkEvalDirectiveResult {trace = Just t} <- results ] of
