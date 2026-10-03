@@ -68,6 +68,7 @@ module L4.Discharge
   , implicitReaders
   , defaultCycles
   , inputDefaultReads
+  , inputDefaultCaptures
   , defaultThunkUnique
   ) where
 
@@ -78,6 +79,7 @@ import qualified Base.Text as Text
 import qualified Data.Set as Set
 import L4.Annotation (emptyAnno)
 import L4.Export (collectExportedDecides, collectReferencedUniques, decideBodiesFromModule, transitiveReferencedUniquesWith)
+import L4.Presumption (requestRecordName)
 import L4.Syntax
 import L4.TypeCheck.Types (typeKey)
 import qualified Optics
@@ -295,6 +297,89 @@ inputDefaultReads mod'
     [ (r, d)
     | MkTypedName _ r _ (Just d) _ <- nodesOfType @(TypedName Resolved) mod'
     ]
+
+-- | The @TYPICALLY@ defaults of rule inputs and record fields that NAME, by
+-- spelling, another input of the same rule or another field of the same record:
+-- one entry for each such default, with the names it uses, in the order they
+-- occur.
+--
+-- A default is worked out outside the rule or record it is written on, where
+-- that rule's inputs and that record's fields are not in scope
+-- ('L4.TypeCheck.checkPendingDefaults', 'L4.TypeCheck.checkFieldDefaults'). So a
+-- name spelled like a sibling resolves to something else, when something else
+-- is called that, and the answer quietly uses it:
+-- @bonus TYPICALLY (salary DIVIDED BY 10)@ beside the input @salary@ and a
+-- definition @salary MEANS 50000@ is a tenth of the 50000 and not of the
+-- input, with no error and the schema printing the opposite. When nothing else
+-- is called that, the name is reported as not in scope, which is the wording
+-- the documentation gives ("It cannot name the rule's other inputs"); this is
+-- the same refusal for the case where it is not (smucclaw/l4-ide W7, silent
+-- review S1).
+--
+-- A name the author qualified with its section is exempt: it says which
+-- definition it means. So is a name the default binds itself (a lambda's
+-- parameter, a @LET@ or @WHERE@ binding): it never reaches the module's scope.
+-- The record the service and @l4 batch decode a request into is not the
+-- author's, and carries each input of the exported rule beside the default's
+-- text, so it is not examined.
+inputDefaultCaptures :: Module Resolved -> [(Resolved, [Resolved])]
+inputDefaultCaptures mod' =
+  [ (owner, names)
+  | (owner, siblings, d) <- ruleInputs <> recordFields
+  , let names = captured siblings d
+  , not (null names)
+  ]
+ where
+  binders = sectionBinders mod'
+
+  -- A section's own GIVEN is a 'GivenSig' too; its inputs are binders, whose
+  -- defaults may read each other by name and are resolved among them.
+  ruleInputs =
+    [ (r, siblings, d)
+    | MkGivenSig _ otns <- nodesOfType @(GivenSig Resolved) mod'
+    , let siblings = [ r' | MkOptionallyTypedName _ r' _ _ <- otns ]
+    , MkOptionallyTypedName _ r _ (Just d) <- otns
+    , not (Map.member (getUnique r) binders)
+    ]
+
+  recordFields =
+    [ (r, siblings, d)
+    | MkDeclare _ _ appForm decl <- nodesOfType @(Declare Resolved) mod'
+    , spellingOf (appFormName appForm) /= requestRecordName
+    , tns <- case decl of
+        RecordDecl _ _ ts  -> [ts]
+        EnumDecl _ cds     -> [ ts | MkConDecl _ _ ts <- cds ]
+        _                  -> []
+    , let siblings = [ r' | MkTypedName _ r' _ _ _ <- tns ]
+    , MkTypedName _ r _ (Just d) _ <- tns
+    ]
+
+  appFormName (MkAppForm _ n _ _) = n
+
+  captured siblings d =
+    [ ref
+    | ref <- namesIn d
+    , Ref actual u _ <- [ref]
+    , NormalName t <- [rawName actual]
+    , t `elem` map spellingOf siblings
+    , not (Set.member u (definedIn d))
+    ]
+
+  -- The references that can reach the module's scope: a call, a bare name, or
+  -- the field of a projection.
+  namesIn d =
+    concat
+      [ case e of
+          App _ r _        -> [r]
+          AppNamed _ r _ _ -> [r]
+          Proj _ _ f       -> [f]
+          _                -> []
+      | e <- subExprsOf d
+      ]
+
+  -- What the default binds itself. Type variables a node's annotation holds are
+  -- in here too, which cannot be the 'Unique' of a value a default names.
+  definedIn d = Set.fromList [ u | Def u _ <- Optics.toListOf (Optics.gplate @Resolved) d ]
 
 -- | Every node of one type in a module, whatever it sits inside: the topmost
 -- ones, and then those nested under each.

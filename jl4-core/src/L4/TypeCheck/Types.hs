@@ -345,6 +345,15 @@ data CheckError =
     -- does not say where it is to be worked out. Refused rather than answered
     -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3, decision 1). See
     -- 'L4.Discharge.inputDefaultReads'.
+  | TypicallyNamesSibling Resolved [Resolved]
+    -- ^ The @TYPICALLY@ default of a rule's input or a record's field names, by
+    -- spelling, another input of the same rule or another field of the same
+    -- record. Arguments: the input or field the default is on, and the names the
+    -- default uses (the occurrences, in order). A default is worked out outside
+    -- the rule or record, where its inputs and fields are not in scope, so such
+    -- a name means whatever else is called that, and the answer quietly uses it.
+    -- Refused (smucclaw\/l4-ide W7, silent review S1). See
+    -- 'L4.Discharge.inputDefaultCaptures'.
   | TypicallyRequiresType Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
@@ -785,6 +794,7 @@ instance HasSrcRange CheckError where
   rangeOf (TypicallyOnComputedField n)      = rangeOf n
   rangeOf (TypicallyCycle (b : _))          = rangeOf b
   rangeOf (TypicallyReadsInput r _)         = rangeOf r
+  rangeOf (TypicallyNamesSibling owner ns)  = rangeOf (case ns of n : _ -> n; [] -> owner)
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
