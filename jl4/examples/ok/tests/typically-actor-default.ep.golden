@@ -1,0 +1,44 @@
+-- Who performs an action is read from its record in the order the record
+-- DECLARES its fields, by the subject-first canon (see regulative-actor-duplex.l4),
+-- not in the order a named construction happens to write them, and not with a
+-- default the checker added tacked onto the end.
+--
+-- Each action below is PERFORMED by the party in its `sender` field, and each
+-- obligation names that party. Before the fix, the performer was whichever
+-- party-typed field came first in the LIST: `omitted` and `viaRule` were then
+-- performed by Bob, `reordered` by Alice, and every PARTY below was rejected or
+-- accepted for the wrong reason. The mirror image, each action under the OTHER
+-- party, is in not-ok/tc/typically-actor-default.l4.
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Msg HAS
+    sender    IS A Person TYPICALLY Alice
+    recipient IS A Person
+    body      IS A STRING
+
+-- the sender is left out: it takes its default, Alice
+GIVETH A Msg
+omitted MEANS Msg WITH recipient IS Bob, body IS "hi"
+
+-- the sender is written, but after the recipient: still the first field of the record
+GIVETH A Msg
+reordered MEANS Msg WITH recipient IS Alice, sender IS Bob, body IS "yo"
+
+-- a rule's own defaulted input, left out at a named site (W4)
+GIVEN sender    IS A Person TYPICALLY Alice
+      recipient IS A Person
+GIVETH A Msg
+send MEANS Msg OF sender, recipient, "hi"
+
+GIVETH A Msg
+viaRule MEANS send WITH recipient IS Bob
+
+GIVETH A PROVISION OF Person, Msg
+fromOmitted MEANS PARTY Alice MUST omitted WITHIN 1
+
+GIVETH A PROVISION OF Person, Msg
+fromReordered MEANS PARTY Bob MUST reordered WITHIN 1
+
+GIVETH A PROVISION OF Person, Msg
+fromRule MEANS PARTY Alice MUST viaRule WITHIN 1

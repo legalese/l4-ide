@@ -2889,11 +2889,32 @@ subjectOfActionExpr partyT = go (0 :: Int)
       | depth > 8 = pure Nothing            -- guard against pathological alias chains
       | otherwise = case e of
           App _ _ args@(_ : _) -> subjectField partyT args     -- applied / positional record
-          AppNamed _ _ nes _   -> subjectField partyT [ a | MkNamedExpr _ _ a <- nes ]
+          AppNamed _ _ nes mo  -> subjectField partyT (declaredOrderArgs nes mo)
           App _ f []           ->                              -- a bare name: resolve its body
             use #constBodies >>= \ bodies ->
               maybe (pure Nothing) (go (depth + 1)) (Map.lookup (getUnique f) bodies)
           _                    -> pure Nothing
+
+-- | The written arguments of a named application, in the order of the callee's
+-- declared parameters (the type checker's @order@ list), not in the order they
+-- were written or filled in.
+--
+-- "Positional" in 'subjectField' means the declared order, and a named site
+-- does not write its arguments in it: @Msg WITH recipient IS Bob, sender IS Alice@
+-- is the same record as @Msg OF Alice, Bob@. A default the checker adds
+-- ('supplyAppNamed') comes last in the list as well, so reading the list as it
+-- stands made the performer whichever party-typed field was written first, and
+-- an action that left its subject field out to a @TYPICALLY@ was performed by
+-- the next party (review silent N1, 2026-10-03).
+--
+-- An entry for a section binder the site overrides (a negative index, see
+-- 'implicitSupplyIndex') is not a field of the callee and is left out. With no
+-- order recorded, the written order stands.
+declaredOrderArgs :: [NamedExpr Resolved] -> Maybe [Int] -> [Expr Resolved]
+declaredOrderArgs nes = \ case
+  Just order | length order == length nes ->
+    map snd (sortOn fst [ (i, a) | (i, MkNamedExpr _ _ a) <- zip order nes, i >= 0 ])
+  _ -> [ a | MkNamedExpr _ _ a <- nes ]
 
 -- | Recover an action /expression/ from a regulative action pattern: a bare
 -- pinned action name (already turned into a value reference by the pattern
