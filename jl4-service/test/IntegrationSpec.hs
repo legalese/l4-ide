@@ -18,7 +18,7 @@ import Options (Options (..))
 import Types
 
 import Control.Concurrent.Async (forConcurrently)
-import Control.Monad (forM_, guard, unless)
+import Control.Monad (forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (try)
@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -847,6 +847,34 @@ spec = describe "integration" do
         assertSuccess argSoft \_ -> pure ()
         argHard <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "hard")
         expectError argHard "Missing required field 'driver.licence'"
+
+    -- Review rulings R2-2: the refusal above looked only at the top level of
+    -- an event's record. A record nested in it is generated as source too, so a
+    -- field it left out was filled from its TYPICALLY, in both modes, and the
+    -- event stopped matching its party with status success.
+    it "refuses an event whose nested record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event-nested" [("seatbelt.l4", deonticNestedFieldDefaultJL4)] \baseUrl mgr -> do
+        let address fields = Aeson.object ["Address" Aeson..= Aeson.object fields]
+            zip5 = "zip" Aeson..= (5 :: Int)
+            floor2 = "floor" Aeson..= (2 :: Int)
+            driverWith home = Aeson.object ["name" Aeson..= ("Alice" :: Text), "zhome" Aeson..= home]
+            -- an argument's record is decoded from plain JSON, an event's is generated
+            -- as source and sent constructor-keyed, the shape the service's answers use
+            plainDriver = driverWith (Aeson.object [zip5, floor2])
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= plainDriver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            message = "Missing required field 'events[0].party.zhome.Address.floor' (Address)"
+        softGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5])))
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "hard" (driverWith (address [zip5])))
+        expectError hardGap message
+        -- the positive control: the same request with the nested field written is answered
+        written <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5, floor2])))
+        assertSuccess written \r -> r.presumed `shouldBe` []
 
     -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
     -- an input or a field left out takes its default, a name that matches
@@ -2870,7 +2898,8 @@ evalFunction baseUrl mgr deployId fnName body = do
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
 assertSuccess resp check = do
-  statusCode' resp `shouldBe` 200
+  when (statusCode' resp /= 200) $
+    expectationFailure ("expected status 200 but got " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
   case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r
