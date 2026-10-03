@@ -501,10 +501,20 @@ assumesReadBy mod' assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ bod
   -- there was nothing to add, and an ASSUME the default reads was then neither
   -- published nor accepted, so the default could never be used (W7 second review,
   -- rulings S4).
-  let referencedUniques =
-        Set.unions
-          (map (transitiveReferencedUniques mod')
-             (body : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]))
+  --
+  -- A SECTION input is left out of what a default adds, though the closure does
+  -- not subtract a WITH: a default that SUPPLIES the input it would read
+  -- (@rate TYPICALLY (`double it` WITH base IS 1)@) reads none of it, and making
+  -- it an input of the export would bind it to the row in @l4 batch@, where a WITH
+  -- to a bound input is not a supply and every row is refused.
+  let binders = sectionBinderUniques mod'
+      referencedUniques =
+        Set.union
+          (transitiveReferencedUniques mod' body)
+          (Set.filter (`Set.notMember` binders)
+             (Set.unions
+                (map (transitiveReferencedUniques mod')
+                   [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ])))
   in [ assume
      | (uniq, assume) <- Map.toList assumes
      , Set.member uniq referencedUniques

@@ -189,6 +189,18 @@ spec = do
           , "GIVETH A NUMBER"
           , "scaled MEANS base TIMES rate"
           ]
+        defaultSuppliesInput = Text.unlines
+          [ "§ `Supplied`"
+          , "    GIVEN base IS A NUMBER TYPICALLY 4"
+          , ""
+          , "GIVETH A NUMBER"
+          , "`double it` MEANS base TIMES 2"
+          , ""
+          , "@export scaled"
+          , "GIVEN rate IS A NUMBER TYPICALLY (`double it` WITH base IS 1)"
+          , "GIVETH A NUMBER"
+          , "scaled MEANS rate TIMES 100"
+          ]
         suppliedDefault = Text.unlines
           [ "§ `Supplied`"
           , "    GIVEN base IS A NUMBER TYPICALLY 4"
@@ -218,6 +230,13 @@ spec = do
     -- unknown parameter (W7 second review, rulings S4).
     it "lists a written ASSUME that an export's own input's default reads" $ do
       exportParamNames inputDefaultReadsAssume `shouldBe` Right ["base", "rate", "k"]
+
+    -- The export's closure follows what an export's own input's default calls for a
+    -- written ASSUME, and not for a section input: the default gives `base` itself,
+    -- so `base` is no input of the export. Binding it to the row in l4 batch would
+    -- make the WITH in the default a WITH to a bound input, which is refused.
+    it "does not list a section input that an export's own input's default supplies" $ do
+      exportParamNames defaultSuppliesInput `shouldBe` Right ["rate"]
 
     it "publishes an expression default as its source text, and a literal as its value" $ do
       case exportSchema binderReadsBinder of
