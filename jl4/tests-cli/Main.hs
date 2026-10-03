@@ -25,12 +25,15 @@ import System.Directory
   , createDirectoryIfMissing
   , createFileLink
   , doesFileExist
+  , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
   , removeFile
   , removePathForcibly
   )
+import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..), exitFailure)
+import System.Info (os)
 import System.FilePath ((</>), isAbsolute, normalise)
 import Test.Hspec
 
@@ -204,6 +207,13 @@ batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
 traceDefaultFixture = fixtureDir </> "trace-default.l4"
 runDefaultFixture = fixtureDir </> "run-default.l4"
+
+-- | A directory with one module whose assertions read @TYPICALLY@ defaults, and
+-- the encoding skill's self-check that counts them from the text of @l4 run@.
+-- The tests run from the package directory, so the repository root is above it.
+checkShFixtureDir, checkShScript :: FilePath
+checkShFixtureDir = fixtureDir </> "check-sh"
+checkShScript     = ".." </> "skills" </> "encoding-a-subject" </> "assets" </> "check.sh"
 
 -- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
 descAttachmentFixture :: FilePath
@@ -430,6 +440,26 @@ spec bin = do
             objField second "notes" `shouldBe` Nothing
           other -> expectationFailure ("Expected two results, got " ++ show other)
         other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Review N1 of W11: the encoding skill's check.sh reports "satisfied" and
+    -- "failed" counts, which are the deliverable of an encoding, by reading the
+    -- text of `l4 run`. A NOTE line makes `l4 run` print the message on the lines
+    -- below `Message:` and not on it, and a count that reads only that line
+    -- reports an assertion that took a default as neither satisfied nor failed,
+    -- at the same exit status. The fixture has both layouts.
+    it "is counted by the encoding skill's check.sh whichever line the message sits on" $ do
+      mbash  <- findExecutable "bash"
+      hasIt  <- doesFileExist checkShScript
+      case mbash of
+        Just bash | hasIt, os /= "mingw32" -> do
+          script  <- makeAbsolute checkShScript
+          dir     <- makeAbsolute checkShFixtureDir
+          parent  <- getEnvironment
+          Output _ sout _ <- runL4In Nothing (Just (("L4", bin) : parent)) bash [script, dir]
+          let rows = [ words l | l <- lines sout, "rates.l4" `isPrefixOf` l ]
+          -- errors, satisfied, failed: the failed assertion is the one error
+          rows `shouldBe` [["rates.l4", "1", "3", "1"]]
+        _ -> pendingWith "needs bash and the skills/ directory beside jl4/"
 
     -- The R-X6 note must reach the machine-readable surface too: a consumer
     -- reading only "value" would be handed the silent nullity the ruling
