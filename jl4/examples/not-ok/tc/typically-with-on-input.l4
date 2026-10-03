@@ -1,0 +1,17 @@
+-- A WITH given to a section INPUT as though it were a rule (W7). `discount` is an
+-- input; its default reads `list price`, so the refusal used to say that
+-- `discount` "does not read" it, which is false. An input has nothing for a WITH
+-- to reach, and the value belongs on a rule that reads the input.
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+-- ERROR: `discount` is an input, not a rule
+#EVAL discount WITH `list price` IS 200
+
+-- Fine, and the control: a rule that reads `discount` takes the same WITH
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
+
+#EVAL `final price` WITH `list price` IS 200
