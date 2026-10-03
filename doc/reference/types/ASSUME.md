@@ -264,9 +264,10 @@ been migrated.
   `@export`ed rule it becomes an input of the published rule and must be
   supplied with the request; `ASSUME`s that no published rule reads stay
   module-level assumptions.
-- `TYPICALLY` on an `ASSUME` records a default and applies it nowhere; on a
-  section `GIVEN` a default is what a rule given no value works out. See
-  [`TYPICALLY`](TYPICALLY.md).
+- `TYPICALLY` on an `ASSUME` is checked and recorded, and no run of the rules
+  uses it; on a section `GIVEN` a default is what a rule given no value works
+  out, so moving an `ASSUME` that carries one changes the answer. See
+  [`TYPICALLY`](TYPICALLY.md#on-an-assume-checked-and-recorded-not-used).
 
 **Example file:** [assume-example.l4](assume-example.l4) — the deprecated forms
 above, kept runnable, with the migrated section `GIVEN` at the end of the file
