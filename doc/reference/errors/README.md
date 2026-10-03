@@ -25,6 +25,8 @@ If you already know what error you are looking at, use the table of contents bel
   - [Undefined field access](#undefined-field-access)
   - [Wrong number of inputs](#wrong-number-of-inputs)
   - [Defaults that depend on one another](#defaults-that-depend-on-one-another)
+  - [A default that reads a section input](#a-default-that-reads-a-section-input)
+  - [A WITH given to a section input](#a-with-given-to-a-section-input)
   - [APPEND vs append](#append-vs-append)
   - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
 - [Compiler Warnings](#compiler-warnings)
@@ -416,6 +418,30 @@ result MEANS
 **What went wrong:** A default is worked out from the other inputs it reads, so none in a circle can be worked out first.
 
 **How to fix it:** Make one default in the circle a plain value, or have it supply the input it would read (``(`double it` WITH base IS 10)`` reads nothing of `base`). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+
+---
+
+### A default that reads a section input
+
+**Error message:** `The TYPICALLY default of … reads the section input …`, or `… reads these section inputs, …` followed by the inputs.
+
+**What you wrote:** A `TYPICALLY` on a rule's own `GIVEN`, or on a record field, whose expression reads a [section `GIVEN`](../syntax/section-given.md), directly (`rate TYPICALLY (phi PLUS alpha)`) or through a definition it calls.
+
+**What went wrong:** A section `GIVEN`'s default is worked out once, from the values the whole evaluation was started with. A default on a rule's input or a record field is taken at each call or construction that leaves it out, so what it read there would depend on the call, and the same default could give different answers. Which should win is not settled, so the file is refused.
+
+**How to fix it:** Give the default to the section `GIVEN` instead. Or write one that reads only definitions that read no section input, or have it supply the input it would read (``(`double it` WITH alpha IS 1)`` reads nothing of `alpha`). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+
+---
+
+### A WITH given to a section input
+
+**Error message:** `This call gives … to …, which is an input of a section and not a rule`
+
+**What you wrote:** `` discount WITH `list price` IS 200 ``, where `discount` is a [section `GIVEN`](../syntax/section-given.md), not a rule.
+
+**What went wrong:** An input has nothing for a `WITH` to reach: it is worked out from the values the whole evaluation gives.
+
+**How to fix it:** Put the `WITH` on a rule that reads `discount` (``` `final price` WITH `list price` IS 200 ```), or drop it.
 
 ---
 
