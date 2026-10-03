@@ -1,0 +1,48 @@
+-- A TYPICALLY on a rule's input or a record's field may be an expression, but not
+-- one that reads a section input (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3,
+-- decision 1). A section input's own default is worked out once, from the values
+-- the whole case gives. A default on a rule's input or a record's field is copied
+-- to every call or construction that leaves it out, so what it reads there would
+-- depend on the call, and R8 does not say where it is to be worked out.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Rates`
+    GIVEN alpha IS A NUMBER TYPICALLY 2
+          -- fine: a section input's own default may read another section input
+          beta IS A NUMBER TYPICALLY (alpha PLUS 1)
+
+-- ERROR: reads `alpha` directly
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (phi PLUS alpha)
+GIVETH A NUMBER
+scaled MEANS base TIMES rate
+
+-- ERROR: reads `alpha` through a definition
+GIVETH A NUMBER
+`alpha doubled` MEANS alpha TIMES 2
+
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY `alpha doubled`
+GIVETH A NUMBER
+`scaled twice` MEANS base TIMES rate
+
+-- ERROR: a record's field
+DECLARE Budget HAS
+  limit IS A NUMBER TYPICALLY (phi TIMES alpha)
+  spent IS A NUMBER
+
+-- No error: a definition that reads no section input has one value wherever it
+-- is taken
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (phi PLUS 1)
+GIVETH A NUMBER
+`scaled by phi` MEANS base TIMES rate
+
+-- No error: this default supplies the section input it would otherwise read, so
+-- it reads none
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (`alpha doubled` WITH alpha IS 1)
+GIVETH A NUMBER
+`scaled supplied` MEANS base TIMES rate

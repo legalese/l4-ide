@@ -340,6 +340,16 @@ data CheckError =
     -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). Carries the binders on the cycle, in
     -- declaration order, the first of which is where the error is reported.
     -- See 'L4.Discharge.defaultCycles'.
+  | TypicallyReadsInput Resolved [Resolved]
+    -- ^ The @TYPICALLY@ default of a rule's input or a record's field reads a
+    -- section input, directly or through a definition it calls. Arguments: the
+    -- input or field the default is on, and the section inputs it reads, in
+    -- declaration order. A section input's own default is worked out once, from
+    -- the root's values; one of these is copied to each call or construction
+    -- that leaves it out, so what it reads would depend on the call, and R8
+    -- does not say where it is to be worked out. Refused rather than answered
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3, decision 1). See
+    -- 'L4.Discharge.inputDefaultReads'.
   | TypicallyRequiresType Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
@@ -810,6 +820,7 @@ instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (TypicallyOnComputedField n)      = rangeOf n
   rangeOf (TypicallyCycle (b : _))          = rangeOf b
+  rangeOf (TypicallyReadsInput r _)         = rangeOf r
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r

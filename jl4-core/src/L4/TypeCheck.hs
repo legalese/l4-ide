@@ -312,6 +312,14 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | bs <- Discharge.defaultCycles rprog
                   ]
                   ++
+                  -- A rule's input or a record's field takes its default where a
+                  -- call or construction leaves it out, so one that reads a
+                  -- section input is refused (decision 1, §4.3 of
+                  -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+                  [ MkCheckErrorWithContext (TypicallyReadsInput owner (map (.resolved) bs)) None
+                  | (owner, bs) <- Discharge.inputDefaultReads rprog
+                  ]
+                  ++
                   [ MkCheckErrorWithContext (AmbiguousImplicitSupply callee binder) None
                   | (callee, binder) <- Discharge.ambiguousImplicitSupplies rprog
                   ]
@@ -2324,8 +2332,14 @@ data DefaultPlace
 -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). A section @GIVEN@'s is worked out at the
 -- root, which is what the ruling describes. A rule's input and a record's field
 -- take their default where a call or a construction leaves them out, and
--- whether that may be an expression is the one choice the ruling leaves
--- (§4.3): this switch is the whole of it, so it can be turned back alone.
+-- whether that may be an expression is the one choice the ruling leaves (§4.3):
+-- this switch is where the choice is made, and with those two False they check
+-- as literals again.
+--
+-- They are True, with one limit that is not this switch's: a default there may
+-- not read a section input ('L4.Discharge.inputDefaultReads', reported as
+-- 'TypicallyReadsInput'), which is the case where the answer would depend on
+-- where it is worked out.
 allowsExpressionDefault :: DefaultPlace -> Bool
 allowsExpressionDefault = \ case
   SectionInput -> True
@@ -7703,6 +7717,29 @@ prettyCheckError (TypicallyCycle bs) =
       , "Each default is worked out from the other inputs it reads, so none of them"
       , "can be worked out first. Break the circle by making one default a plain value."
       ]
+prettyCheckError (TypicallyReadsInput owner bs) =
+  ( case bs of
+      [b] ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " reads the section input"
+        , "  " <> quotedName (getName b) <> ","
+        , "directly or through a definition it calls."
+        ]
+      _ ->
+        [ "The TYPICALLY default of " <> quotedName (getName owner) <> " reads these section inputs,"
+        , "directly or through a definition it calls:"
+        , ""
+        ] <>
+        [ "  " <> quotedName (getName b) | b <- bs ]
+  ) <>
+  [ ""
+  , "A rule's input or a record's field takes its default at the call or the"
+  , "construction that leaves it out, so what the default reads there depends on"
+  , "that call and one default could give different answers. Only a section"
+  , "input's default is worked out once, from the values the whole case gives."
+  , ""
+  , "Give the default to a section input instead, or write one that reads only"
+  , "definitions that read no section input."
+  ]
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."
   , "Add a type annotation (for example IS A NUMBER) so the default can be type-checked."

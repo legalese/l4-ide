@@ -19,7 +19,12 @@ import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions)
 import L4.FunctionSchema (Parameters(..), Parameter(..), parametersFromDecide)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
+import L4.Syntax (Resolved, getActual, rawName, unqualifiedRawNameToText)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
+
+-- | A resolved name as the author wrote it, without its section.
+nameOf :: Resolved -> Text
+nameOf = unqualifiedRawNameToText . rawName . getActual
 
 -- | The parameter names of the single export in a source snippet.
 exportParamNames :: Text -> Either [Text] [Text]
@@ -229,9 +234,17 @@ spec = do
             `shouldBe` [2]
 
     -- W7, decision 1 (§4.3 of the spec): a rule's own input takes an expression
-    -- too, and what it reads is an input of the export.
-    it "lists a section input that only the export's own input's default reads" $ do
-      let inputDefaultReadsBinder = Text.unlines
+    -- too, but not one that reads a section input, so a section input is never
+    -- an input of an export merely because an export's own input's default
+    -- reads it: the module is refused instead.
+    describe "a rule input's or a field's default that reads a section input" $ do
+      let readsOf src =
+            case checkWithImports emptyVFS src of
+              Left errs -> fail $ "Fatal: " ++ show errs
+              Right r ->
+                pure [ (nameOf owner, map nameOf bs)
+                     | MkCheckErrorWithContext{kind = TypicallyReadsInput owner bs} <- r.tcdErrors ]
+          ruleInput = Text.unlines
             [ "§ `Rates`"
             , "    GIVEN alpha IS A NUMBER"
             , ""
@@ -241,4 +254,40 @@ spec = do
             , "GIVETH A NUMBER"
             , "scaled MEANS base TIMES rate"
             ]
-      exportParamNames inputDefaultReadsBinder `shouldBe` Right ["base", "rate", "alpha"]
+          throughDefinition = Text.unlines
+            [ "§ `Rates`"
+            , "    GIVEN alpha IS A NUMBER"
+            , ""
+            , "GIVETH A NUMBER"
+            , "`alpha plus one` MEANS alpha PLUS 1"
+            , ""
+            , "DECLARE Config HAS"
+            , "  timeout IS A NUMBER TYPICALLY `alpha plus one`"
+            , "  retries IS A NUMBER"
+            ]
+          control = Text.unlines
+            [ "GIVETH A NUMBER"
+            , "phi MEANS 8"
+            , ""
+            , "§ `Rates`"
+            , "    GIVEN alpha IS A NUMBER"
+            , "          beta IS A NUMBER TYPICALLY (alpha PLUS 1)"
+            , ""
+            , "@export scaled"
+            , "GIVEN base IS A NUMBER"
+            , "      rate IS A NUMBER TYPICALLY (phi PLUS 1)"
+            , "GIVETH A NUMBER"
+            , "scaled MEANS base TIMES rate"
+            ]
+      it "is refused, naming the input and what it reads" $ do
+        rs <- readsOf ruleInput
+        rs `shouldBe` [("rate", ["alpha"])]
+      it "is refused through a definition, for a record's field too" $ do
+        rs <- readsOf throughDefinition
+        rs `shouldBe` [("timeout", ["alpha"])]
+      -- Positive control: a default that reads only a definition that reads no
+      -- section input, and a section input's own default that reads another,
+      -- raise nothing, so the two above are what the check can see.
+      it "raises nothing for a default that reads no section input" $ do
+        rs <- readsOf control
+        rs `shouldBe` []
