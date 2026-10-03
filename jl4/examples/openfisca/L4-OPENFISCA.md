@@ -209,7 +209,7 @@ OpenFisca output as float32-approximate, not exact.
   replaced by it. Every `TYPICALLY` on a record field or a rule's own `GIVEN`
   is written out (`defaults.l4`, `roundtrip_check.py defaults`); what has no
   OpenFisca value (`NOTHING`) is refused, as is a default on the subject or on
-  `period`, a default on a `LIST OF` field other than `EMPTY`, and two decisions
+  `period`, a default on a `LIST OF` field or GIVEN other than `EMPTY`, and two decisions
   that disagree about one input's default (`TYPICALLY 3` against none is a
   disagreement; `TYPICALLY 0` against none is not, since OpenFisca's own default
   is already 0).
