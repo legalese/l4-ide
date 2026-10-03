@@ -70,6 +70,7 @@ module L4.Discharge
   , inputDefaultReads
   , defaultNameCaptures
   , defaultsMeaningElsewhere
+  , defaultsDefinedInTwoSections
   , defaultThunkUnique
   ) where
 
@@ -388,8 +389,8 @@ defaultNameCaptures siblings d =
 -- @phi MEANS 1000@ at the top, @phi MEANS 8@ in @§ Rates@, and
 -- @rate TYPICALLY (phi PLUS 1)@ is 9 at @#EVAL@ and 1001 through @l4 batch@ and
 -- the service's generated-module path (W7, silent review S6 of the second review
--- and rulings S1). A name two sections define is ambiguous there and is refused
--- by those surfaces; this is the case that is not.
+-- and rulings S1). This function is that case; a name that another SECTION also
+-- defines is 'defaultsDefinedInTwoSections'.
 --
 -- Examined only for a module that has an export, and only the defaults those
 -- surfaces would write out: an export's own inputs', and a section input's that an
@@ -397,7 +398,42 @@ defaultNameCaptures siblings d =
 -- written @ASSUME@ or a section input, which @l4 batch@ binds again at the top
 -- level under the same name; and a name the default binds itself.
 defaultsMeaningElsewhere :: SectionPaths -> Environment -> Module Resolved -> [(Resolved, [Resolved])]
-defaultsMeaningElsewhere paths environment mod'
+defaultsMeaningElsewhere = defaultsAlsoDefined AtTheTopLevel
+
+-- | The same defaults, for a name that ANOTHER section also defines.
+--
+-- @l4 batch@ puts the generated record after the file's last section, and a
+-- field's default is checked in the scope of the section its record is in, so a
+-- name in the text is read there and not in the section the author wrote it in.
+-- When the last section defines the name too, the default gets that one:
+-- @phi MEANS 8@ in @§ Rates@, @phi MEANS 9@ in a later @§ Other@, and
+-- @rate TYPICALLY (phi PLUS 1)@ on an exported rule in @§ Rates@ is 9 at @#EVAL@
+-- and through the service's direct path, and 10 through @l4 batch@ and the
+-- service's generated-module path, with status success and nothing in
+-- @diagnostics@. When the last section does not define it, @l4 batch@ stops with
+-- "multiple definitions", naming a file it generated, which says nothing the
+-- author wrote.
+--
+-- Another SECTION's, not the same section's: two definitions of a name in one
+-- section (overloads by type) resolve the same way in both places, and are left
+-- alone. The check does not look at types, as the top-level one does not, so it
+-- also refuses a name that two sections define for different types, where the
+-- answers agree, and one whose own section is the last, which agrees too until a
+-- section is added after it. Writing the name with its section is the way out in
+-- every case.
+defaultsDefinedInTwoSections :: SectionPaths -> Environment -> Module Resolved -> [(Resolved, [Resolved])]
+defaultsDefinedInTwoSections = defaultsAlsoDefined InAnotherSection
+
+-- | Where the other definition of a name is, for 'defaultsAlsoDefined'.
+data AlsoDefined
+  = AtTheTopLevel
+  | InAnotherSection
+  deriving stock (Eq)
+
+-- | The work of 'defaultsMeaningElsewhere' and 'defaultsDefinedInTwoSections',
+-- which differ only in where the other definition of the name is.
+defaultsAlsoDefined :: AlsoDefined -> SectionPaths -> Environment -> Module Resolved -> [(Resolved, [Resolved])]
+defaultsAlsoDefined also paths environment mod'
   | null exports = []
   | otherwise =
       [ (owner, bad)
@@ -445,8 +481,12 @@ defaultsMeaningElsewhere paths environment mod'
       , not (Set.member u assumed)
       , not (Set.member u (definedIn d))
       -> or [ v /= u
-              && not (Map.member v paths)
               && v.moduleUri == u.moduleUri
+              && case also of
+                   AtTheTopLevel    -> not (Map.member v paths)
+                   InAnotherSection -> case Map.lookup v paths of
+                                         Just vPath -> Just vPath /= Map.lookup u paths
+                                         Nothing    -> False
             | v <- Map.findWithDefault [] (NormalName t) environment ]
     _ -> False
 

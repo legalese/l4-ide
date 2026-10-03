@@ -374,6 +374,16 @@ data CheckError =
     -- own and read it again at the top level, where it means the file's, so one
     -- input would give two answers. Refused (smucclaw\/l4-ide W7, silent review S6
     -- and rulings review S1). See 'L4.Discharge.defaultsMeaningElsewhere'.
+  | TypicallyInTwoSections Resolved [Resolved]
+    -- ^ The same default, naming a definition that lives in a section and that
+    -- ANOTHER section also defines under the same name. Arguments: the input the
+    -- default is on, and the names (each respelled under its section). Where the
+    -- default is written the name means the one in its own section, but @l4 batch@
+    -- puts the text after the last section and reads it there, so a last section
+    -- that defines the name gets its own, and one that does not leaves two
+    -- candidates; the same input would give two answers, or none that the author
+    -- wrote. Refused (W10 review, F1; decided by Claude overnight 2026-10-03).
+    -- See 'L4.Discharge.defaultsDefinedInTwoSections'.
   | TypicallyRequiresType Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
@@ -847,6 +857,7 @@ instance HasSrcRange CheckError where
   rangeOf (TypicallyReadsInput r _)         = rangeOf r
   rangeOf (TypicallyNamesSibling owner ns)  = rangeOf (case ns of n : _ -> n; [] -> owner)
   rangeOf (TypicallyResolvedElsewhere owner ns) = rangeOf (case ns of n : _ -> n; [] -> owner)
+  rangeOf (TypicallyInTwoSections owner ns) = rangeOf (case ns of n : _ -> n; [] -> owner)
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
