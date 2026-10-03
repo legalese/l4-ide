@@ -420,4 +420,12 @@ instance ToSchema BatchResponse where
                            , ("processorQueuedSec", doubleRef)
                            ]
                  )
+                 -- every response states its report (UNKNOWN-EVALUATION-SPEC U7b)
+               , ( "report"
+                 , Inline $
+                    mempty
+                      & type_ ?~ OpenApiString
+                      & enum_ ?~ ["default"]
+                      & description ?~ "How a result that is not yet known is shown. Always \"default\" for now: such a result is an error that names every input it needs."
+                 )
                ]
