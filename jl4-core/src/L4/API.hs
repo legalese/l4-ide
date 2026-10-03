@@ -311,7 +311,7 @@ l4EvalDirective source line col directiveType =
                     [ "start" .= Aeson.object ["line" .= line, "column" .= col]
                     , "end"   .= Aeson.object ["line" .= line, "column" .= col]
                     ]
-          in pure $ encodeJson $ Aeson.object
+          in pure $ encodeJson $ Aeson.object $
             [ "directiveType" .= directiveType
             , "prettyText" .= prettyEvalResult conFields res
             , "success" .= case res of
@@ -322,8 +322,9 @@ l4EvalDirective source line col directiveType =
                 -- as one is exactly the laundering REFUSE exists to prevent.
                 EL.Assertion (EL.Refused _)      -> Aeson.Null
                 EL.Assertion (EL.Errored _)      -> Aeson.toJSON False
-                -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
-                EL.Assertion (EL.Undetermined _) -> Aeson.toJSON False
+                -- NOT False either: an undetermined assertion has no verdict
+                -- yet; what it waits on is under "undetermined"
+                EL.Assertion (EL.Undetermined _) -> Aeson.Null
                 EL.Reduction _ -> Aeson.Null
             , "structuredValue" .= case res of
                 EL.Assertion EL.Holds               -> Aeson.toJSON True
@@ -338,6 +339,9 @@ l4EvalDirective source line col directiveType =
                 EL.Reduction (EL.Reduced nf)        -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
             ]
+            -- what an undetermined result waits on (UNKNOWN-EVALUATION-SPEC
+            -- §4.7.4), only for one, so every other object is unchanged
+            <> [ "undetermined" .= u | Just u <- [EL.undeterminedJson res] ]
 
 -- | Evaluate a list of resolved imports and combine their environments.
 -- Returns the combined evaluation environment.
@@ -566,6 +570,8 @@ evalResultToJson fields edr = Aeson.object $
   -- the run's notes (an early act, R-X6; an empty window), only when there
   -- are any, so a directive with none is unchanged
   ++ [ "notes" .= edr.notes | not (null edr.notes) ]
+  -- what an undetermined result waits on, only for one
+  ++ [ "undetermined" .= u | Just u <- [EL.undeterminedJson edr.result] ]
   where
     -- "success" is a NULLABLE boolean, and a refusal is the null. Saying
     -- @false@ would tell a consumer the assertion FAILED, which is a laundered
@@ -586,9 +592,11 @@ evalResultToJson fields edr = Aeson.object $
     isSuccess (EL.Reduction (EL.Reduced _)) = Aeson.Bool True
     isSuccess (EL.Reduction (EL.ReducedRefused _)) = Aeson.Null
     isSuccess (EL.Reduction (EL.ReducedErrored _)) = Aeson.Bool False
-    -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
-    isSuccess (EL.Assertion (EL.Undetermined _)) = Aeson.Bool False
-    isSuccess (EL.Reduction (EL.ReducedUndetermined _)) = Aeson.Bool False
+    -- An undetermined result is null too: no verdict yet, and not an error;
+    -- what it waits on is under "undetermined" (UNKNOWN-EVALUATION-SPEC
+    -- §4.7.4).
+    isSuccess (EL.Assertion (EL.Undetermined _)) = Aeson.Null
+    isSuccess (EL.Reduction (EL.ReducedUndetermined _)) = Aeson.Null
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text

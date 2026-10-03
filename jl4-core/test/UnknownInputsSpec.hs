@@ -9,11 +9,16 @@
 -- would make it an error, and the cases that must still be decided.
 module UnknownInputsSpec (spec) where
 
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString.Lazy as LBS
 import Data.Foldable (toList)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import Test.Hspec
 
+import L4.API (l4Eval, l4EvalDirective)
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Evaluate.Ledger (LedgerStore (..))
 import L4.Evaluate.ValueLazy (Term (..))
@@ -55,6 +60,27 @@ outcomes src = do
     Right r -> do
       (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
       pure (map (classify . (.result)) results)
+
+-- | Each directive's result, as the core's JSON encodes it.
+resultsJson :: Text.Text -> IO [Aeson.Value]
+resultsJson src = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  case checkWithImports (vfsFromList []) src of
+    Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r | not r.tcdSuccess -> fail ("typecheck failed: " <> show r.tcdErrors)
+    Right r -> do
+      (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+      pure (map (Aeson.toJSON . (.result)) results)
+
+-- | A key of a JSON object.
+field :: Aeson.Key -> Aeson.Value -> Maybe Aeson.Value
+field k = \ case
+  Aeson.Object o -> KeyMap.lookup k o
+  _              -> Nothing
+
+-- | A JSON text, decoded.
+decodeText :: Text.Text -> Maybe Aeson.Value
+decodeText = Aeson.decode . LBS.fromStrict . Text.encodeUtf8
 
 -- | The outcome of each directive, with how many ledger writes it made.
 outcomesAndWrites :: Text.Text -> IO [(Outcome, Int)]
@@ -201,3 +227,46 @@ spec = describe "unknown inputs (UNKNOWN-EVALUATION-SPEC §8 step 3)" $ do
             Errors t -> "Internal error:" `Text.isPrefixOf` t
             _        -> False
         _ -> expectationFailure ("expected two outcomes, got " <> show os)
+
+  -- An undetermined result has one JSON shape, `l4 run --json`'s: what it
+  -- waits on under "undetermined", as {"needs", "message"}, and not an
+  -- "error", which it is not. The API reports it as no verdict, a null
+  -- "success", never the false of a failed assertion.
+  describe "an undetermined result in JSON" $ do
+    let src = Text.unlines
+          [ "§ `Unknown`"
+          , "    GIVEN x IS A BOOLEAN"
+          , "          y IS A BOOLEAN"
+          , "#ASSERT x"
+          , "#EVAL x AND y"
+          ]
+        needsOf v = field "undetermined" v >>= field "needs"
+    it "is the core's, for an #ASSERT and an #EVAL" $ do
+      vs <- resultsJson src
+      case vs of
+        [assertion, eval] -> do
+          field "type" assertion `shouldBe` Just (Aeson.String "assertion")
+          field "value" assertion `shouldBe` Just Aeson.Null
+          field "error" assertion `shouldBe` Nothing
+          needsOf assertion `shouldBe` Just (Aeson.toJSON ["x" :: Text.Text])
+          (field "undetermined" assertion >>= field "message") `shouldSatisfy` \ case
+            Just (Aeson.String m) -> "I needed to know the value of" `Text.isInfixOf` m
+            _                     -> False
+          field "error" eval `shouldBe` Nothing
+          needsOf eval `shouldBe` Just (Aeson.toJSON ["x" :: Text.Text, "y"])
+        _ -> expectationFailure ("expected two results, got " <> show vs)
+    it "is the API's, with a null success" $ do
+      out <- l4Eval src
+      case decodeText out >>= field "results" of
+        Just (Aeson.Array rs) -> case toList rs of
+          [assertion, eval] -> do
+            field "success" assertion `shouldBe` Just Aeson.Null
+            needsOf assertion `shouldBe` Just (Aeson.toJSON ["x" :: Text.Text])
+            field "success" eval `shouldBe` Just Aeson.Null
+            needsOf eval `shouldBe` Just (Aeson.toJSON ["x" :: Text.Text, "y"])
+          other -> expectationFailure ("expected two results, got " <> show other)
+        other -> expectationFailure ("expected results, got " <> show other <> " from " <> show out)
+      one <- l4EvalDirective src 4 1 "ASSERT"
+      let v = decodeText one
+      (v >>= field "success") `shouldBe` Just Aeson.Null
+      (v >>= needsOf) `shouldBe` Just (Aeson.toJSON ["x" :: Text.Text])
