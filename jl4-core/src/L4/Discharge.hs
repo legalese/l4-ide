@@ -68,7 +68,7 @@ module L4.Discharge
   , implicitReaders
   , defaultCycles
   , inputDefaultReads
-  , inputDefaultCaptures
+  , defaultNameCaptures
   , defaultsMeaningElsewhere
   , defaultThunkUnique
   ) where
@@ -339,16 +339,16 @@ inputDefaultReads mod'
     , MkTypedName _ r _ (Just d) _ <- tns
     ]
 
--- | The @TYPICALLY@ defaults of rule inputs and record fields that NAME, by
--- spelling, another input of the same rule or another field of the same record:
--- one entry for each such default, with the names it uses, in the order they
--- occur.
+-- | The names in a @TYPICALLY@ default of a rule's input or a record's field that
+-- are spelled like one of its siblings: the other inputs of the same rule, or the
+-- other fields of the same record, the one the default is on included. In the
+-- order they occur.
 --
 -- A default is worked out outside the rule or record it is written on, where
 -- that rule's inputs and that record's fields are not in scope
 -- ('L4.TypeCheck.checkPendingDefaults', 'L4.TypeCheck.checkFieldDefaults'). So a
--- name spelled like a sibling resolves to something else, when something else
--- is called that, and the answer quietly uses it:
+-- name spelled like a sibling resolves to something else, when something else is
+-- called that, and the answer quietly uses it:
 -- @bonus TYPICALLY (salary DIVIDED BY 10)@ beside the input @salary@ and a
 -- definition @salary MEANS 50000@ is a tenth of the 50000 and not of the
 -- input, with no error and the schema printing the opposite. When nothing else
@@ -361,43 +361,19 @@ inputDefaultReads mod'
 -- definition it means. So is a name the default binds itself (a lambda's
 -- parameter, a @LET@ or @WHERE@ binding): it never reaches the module's scope.
 -- The record the service and @l4 batch decode a request into is not the
--- author's, and carries each input of the exported rule beside the default's
--- text, so it is not examined.
-inputDefaultCaptures :: Module Resolved -> [(Resolved, [Resolved])]
-inputDefaultCaptures mod' =
-  [ (owner, names)
-  | (owner, siblings, d) <- ruleInputs <> recordFields
-  , let names = captured siblings d
-  , not (null names)
+-- author's, and the checker does not ask this of it.
+--
+-- Asked of one checked default at a time, where it is checked, so that a module
+-- without a default pays nothing for it.
+defaultNameCaptures :: [Resolved] -> Expr Resolved -> [Resolved]
+defaultNameCaptures siblings d =
+  [ ref
+  | ref <- namesIn d
+  , Ref actual u _ <- [ref]
+  , NormalName t <- [rawName actual]
+  , t `elem` map spellingOf siblings
+  , not (Set.member u (definedIn d))
   ]
- where
-  binders = sectionBinders mod'
-
-  -- A section's own GIVEN is a 'GivenSig' too; its inputs are binders, whose
-  -- defaults may read each other by name and are resolved among them.
-  ruleInputs =
-    [ (r, siblings, d)
-    | MkGivenSig _ otns <- nodesOfType @(GivenSig Resolved) mod'
-    , let siblings = [ r' | MkOptionallyTypedName _ r' _ _ <- otns ]
-    , MkOptionallyTypedName _ r _ (Just d) <- otns
-    , not (Map.member (getUnique r) binders)
-    ]
-
-  recordFields =
-    [ (r, siblings, d)
-    | tns <- authoredFieldGroups mod'
-    , let siblings = [ r' | MkTypedName _ r' _ _ _ <- tns ]
-    , MkTypedName _ r _ (Just d) _ <- tns
-    ]
-
-  captured siblings d =
-    [ ref
-    | ref <- namesIn d
-    , Ref actual u _ <- [ref]
-    , NormalName t <- [rawName actual]
-    , t `elem` map spellingOf siblings
-    , not (Set.member u (definedIn d))
-    ]
 
 -- | The defaults @l4 batch@ and the decision service would write out as text and
 -- read again at the top level of the file, in which a name means something other
@@ -453,9 +429,14 @@ defaultsMeaningElsewhere paths environment mod'
     , Just d <- [b.typically]
     ]
 
-  assumed =
-    Set.fromList
-      [ getUnique n | MkAssume _ _ (MkAppForm _ n _ _) _ _ <- nodesOfType @(Assume Resolved) mod' ]
+  assumed = case mod' of
+    MkModule _ _ sect -> Set.fromList (goSection sect)
+   where
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+    goDecl = \ case
+      Assume _ (MkAssume _ _ (MkAppForm _ n _ _) _ _) -> [getUnique n]
+      Section _ s                                       -> goSection s
+      _                                                 -> []
 
   meansElsewhere d = \ case
     Ref actual u _
@@ -493,15 +474,17 @@ definedIn d = Set.fromList [ u | Def u _ <- Optics.toListOf (Optics.gplate @Reso
 -- record 'requestRecordName' that @l4 batch@ and the service generate to decode
 -- a request into.
 authoredFieldGroups :: Module Resolved -> [[TypedName Resolved]]
-authoredFieldGroups mod' =
-  [ tns
-  | MkDeclare _ _ (MkAppForm _ n _ _) decl <- nodesOfType @(Declare Resolved) mod'
-  , spellingOf n /= requestRecordName
-  , tns <- case decl of
-      RecordDecl _ _ ts -> [ts]
-      EnumDecl _ cds    -> [ ts | MkConDecl _ _ ts <- cds ]
-      _                 -> []
-  ]
+authoredFieldGroups (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \ case
+    Declare _ (MkDeclare _ _ (MkAppForm _ n _ _) decl)
+      | spellingOf n /= requestRecordName -> case decl of
+          RecordDecl _ _ ts -> [ts]
+          EnumDecl _ cds    -> [ ts | MkConDecl _ _ ts <- cds ]
+          _                 -> []
+    Section _ s -> goSection s
+    _           -> []
 
 -- | Every node of one type in a module, whatever it sits inside: the topmost
 -- ones, and then those nested under each.
