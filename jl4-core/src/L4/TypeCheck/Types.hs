@@ -354,6 +354,16 @@ data CheckError =
     -- a name means whatever else is called that, and the answer quietly uses it.
     -- Refused (smucclaw\/l4-ide W7, silent review S1). See
     -- 'L4.Discharge.inputDefaultCaptures'.
+  | TypicallyResolvedElsewhere Resolved [Resolved]
+    -- ^ The @TYPICALLY@ default of an exported rule's input, or of a section input
+    -- an export reads, names a definition that lives in a section and that is also
+    -- defined at the top level of the file under the same name. Arguments: the
+    -- input the default is on, and the names (each respelled under its section).
+    -- Where the default is written the name means the section's, but @l4 batch@
+    -- and the decision service write the default out as text in a module of their
+    -- own and read it again at the top level, where it means the file's, so one
+    -- input would give two answers. Refused (smucclaw\/l4-ide W7, silent review S6
+    -- and rulings review S1). See 'L4.Discharge.defaultsMeaningElsewhere'.
   | TypicallyRequiresType Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
@@ -795,6 +805,7 @@ instance HasSrcRange CheckError where
   rangeOf (TypicallyCycle (b : _))          = rangeOf b
   rangeOf (TypicallyReadsInput r _)         = rangeOf r
   rangeOf (TypicallyNamesSibling owner ns)  = rangeOf (case ns of n : _ -> n; [] -> owner)
+  rangeOf (TypicallyResolvedElsewhere owner ns) = rangeOf (case ns of n : _ -> n; [] -> owner)
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr

@@ -1,0 +1,32 @@
+-- `l4 batch` and the decision service write a default into a module of their own
+-- as text, and read its names again there, at the top level of the file. A name
+-- that is defined in a section AND at the top level means the section's where the
+-- default is written and the top level's there, so the same input would give two
+-- answers, with no error. It is refused for an exported rule
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3, silent review S6 of the second
+-- review and rulings review S1). Written with its section, the name says which it is.
+
+GIVETH A NUMBER
+phi MEANS 1000
+
+§ `Rates`
+    -- ERROR: a section input's default naming the section's `phi`, which an
+    -- exported rule below reads
+    GIVEN scale IS A NUMBER TYPICALLY (phi PLUS 1)
+
+GIVETH A NUMBER
+phi MEANS 8
+
+-- ERROR: an exported rule's input default naming the section's `phi`
+@export default Pay
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (phi PLUS 1)
+GIVETH A NUMBER
+pay MEANS (base TIMES rate) PLUS scale
+
+-- Fine: the same, with the section named. This rule does not read `scale`.
+@export Pay, with the section named
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (`Rates`.phi PLUS 1)
+GIVETH A NUMBER
+`pay in the section` MEANS base TIMES rate
