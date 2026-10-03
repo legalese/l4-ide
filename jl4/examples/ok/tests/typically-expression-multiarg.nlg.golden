@@ -1,0 +1,5 @@
+`discount` is equal to 201
+`nested` is equal to 207
+`net` where `list price` is 10 is equal to 1
+`rated` where `base` is 10 and `rate` is `combine` where `a` is 2 and `b` is 3 by default is equal to 50
+`rated` where `base` is 10 and `rate` is 1 is equal to 10

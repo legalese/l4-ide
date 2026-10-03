@@ -221,6 +221,29 @@ spec = do
           fmap (.parameterDefault) (Map.lookup "n" ps.parameterMap)
             `shouldBe` Just (Just (Aeson.Number 3))
 
+    -- A call with several arguments is one line, comma-separated, so that it
+    -- reads as source wherever it is written out; it used to put each argument on
+    -- a line of its own, with the column padding that goes with it.
+    it "publishes a default that is a call with several arguments on one line" $ do
+      case exportSchema (Text.unlines
+             [ "GIVEN a IS A NUMBER"
+             , "      b IS A NUMBER"
+             , "GIVETH A NUMBER"
+             , "combine MEANS a PLUS b"
+             , ""
+             , "§ `Pricing`"
+             , "    GIVEN `list price` IS A NUMBER"
+             , "          discount IS A NUMBER TYPICALLY (combine WITH a IS `list price`, b IS 1)"
+             , ""
+             , "@export final"
+             , "GIVETH A NUMBER"
+             , "`final price` MEANS discount TIMES 2"
+             ]) of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps ->
+          fmap (.parameterDefault) (Map.lookup "discount" ps.parameterMap)
+            `shouldBe` Just (Just (Aeson.String "combine WITH a IS `list price`, b IS 1"))
+
     it "reports a default that reads its own input as a check error" $ do
       let src = Text.unlines
             [ "§ `Loop`"
