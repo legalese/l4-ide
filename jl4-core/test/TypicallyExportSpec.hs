@@ -373,6 +373,100 @@ bpmnHenceSrc = Text.unlines
   , "    WITHIN 30"
   , "    HENCE `the acknowledgement` TRUE"
   ]
+-- | The drawn rule reaches another through HENCE, and that rule reads an ASSUME
+-- that carries a default. (bpmnHenceSrc has the default on the reached rule's GIVEN.)
+bpmnHenceAssumeSrc :: Text
+bpmnHenceAssumeSrc = Text.unlines
+  [ "DECLARE Actor IS ONE OF Filer"
+  , "DECLARE Action IS ONE OF file, acknowledge"
+  , ""
+  , "ASSUME `is complete` IS A BOOLEAN TYPICALLY TRUE"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the acknowledgement` MEANS"
+  , "    PARTY Filer"
+  , "    MUST acknowledge"
+  , "    PROVIDED `is complete`"
+  , "    WITHIN 7"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the filing` MEANS"
+  , "    PARTY Filer"
+  , "    MUST file"
+  , "    WITHIN 30"
+  , "    HENCE `the acknowledgement`"
+  ]
+
+-- | The default is on a record's field that a helper reads by taking the record
+-- apart, so no selector is named anywhere.
+bpmnFieldPatternSrc :: Text
+bpmnFieldPatternSrc = Text.unlines
+  [ "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "DECLARE Standing HAS"
+  , "    `in good standing` IS A BOOLEAN TYPICALLY TRUE"
+  , "    `years a member`   IS A NUMBER"
+  , ""
+  , "GIVEN s IS A Standing"
+  , "GIVETH A BOOLEAN"
+  , "`ok` s MEANS"
+  , "  CONSIDER s"
+  , "  WHEN Standing g y THEN g"
+  , ""
+  , "GIVEN s IS A Standing"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` s MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    PROVIDED `ok` s"
+  , "    WITHIN 14"
+  ]
+
+-- | The same ASSUME read through a helper: defined in the file the rule imports
+-- (importedHelperMain, which uses importedLib's `may act`), or in the same file.
+importedHelperMain, localHelperSrc :: Text
+importedHelperMain = Text.unlines
+  [ "IMPORT ratelib"
+  , ""
+  , "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    PROVIDED `may act`"
+  , "    WITHIN 14"
+  ]
+localHelperSrc = Text.unlines
+  [ "DECLARE Actor IS ONE OF Member"
+  , "DECLARE Action IS ONE OF pay"
+  , ""
+  , "ASSUME `is in good standing` IS A BOOLEAN TYPICALLY TRUE"
+  , ""
+  , "GIVETH A BOOLEAN"
+  , "`may act` MEANS `is in good standing`"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the duty` MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    PROVIDED `may act`"
+  , "    WITHIN 14"
+  ]
+
+-- | A second regulative rule that mentions no Standing.
+unrelatedRuleSrc :: Text
+unrelatedRuleSrc = Text.unlines
+  [ ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`the unrelated duty` MEANS"
+  , "    PARTY Member"
+  , "    MUST pay"
+  , "    WITHIN 30"
+  ]
+
 bpmnPlainSrc = Text.unlines
   [ "DECLARE Actor IS ONE OF Member"
   , "DECLARE Action IS ONE OF pay"
@@ -438,6 +532,9 @@ importedLib = Text.unlines
   , "GIVEN k IS A NUMBER TYPICALLY 9"
   , "GIVETH A NUMBER"
   , "`library rule` k MEANS k"
+  , ""
+  , "GIVETH A BOOLEAN"
+  , "`may act` MEANS `is in good standing`"
   ]
 
 importedDmnMain, importedBpmnMain, importedBpmnFieldMain :: Text
@@ -814,20 +911,46 @@ spec = do
     it "reports a default on an ASSUME the rule reads" $
       map (.code) (bpmnNotes (moduleOf bpmnAssumeSrc) "the duty") `shouldBe` ["P-TYPICALLY"]
 
-    it "reports a default on a rule the drawn rule reaches through HENCE" $ do
-      let ns = bpmnNotes (moduleOf bpmnHenceSrc) "the filing"
-      map (.code) ns `shouldBe` ["P-TYPICALLY"]
-      map (.message) ns `shouldSatisfy`
-        mentions "the GIVEN `is complete` of `the acknowledgement` carries TYPICALLY TRUE"
+    -- The call a HENCE makes supplies every argument, so the source never relies
+    -- on the callee's default in this process, and the old note ("the source says
+    -- an unsupplied `is complete` is TRUE") described a presumption that was not
+    -- in play. What the process loses is the argument, which BPMN has never drawn.
+    it "says nothing of a default on the GIVEN of a rule the drawn rule reaches through HENCE" $
+      bpmnNotes (moduleOf bpmnHenceSrc) "the filing" `shouldBe` []
 
-    it "reports a default on a record field the rule's condition names, and not on the field it does not" $ do
-      let ns = bpmnNotes (moduleOf bpmnFieldSrc) "the duty"
+    it "says nothing of it when the HENCE passes the opposite of the default, either" $
+      bpmnNotes (moduleOf (Text.replace "HENCE `the acknowledgement` TRUE" "HENCE `the acknowledgement` FALSE" bpmnHenceSrc))
+        "the filing" `shouldBe` []
+
+    it "still reports a default on the drawn rule's own GIVEN when it is the rule reached (the control)" $
+      -- drawing `the acknowledgement` itself: its GIVEN is a process input, nothing supplies it
+      map (.code) (bpmnNotes (moduleOf bpmnHenceSrc) "the acknowledgement") `shouldBe` ["P-TYPICALLY"]
+
+    it "reports a default on an ASSUME that a rule reached through HENCE reads" $ do
+      let ns = bpmnNotes (moduleOf bpmnHenceAssumeSrc) "the filing"
       map (.code) ns `shouldBe` ["P-TYPICALLY"]
-      map (.element) ns `shouldBe` ["in good standing"]
+      map (.message) ns `shouldSatisfy` mentions "the ASSUME `is complete` carries TYPICALLY TRUE"
+
+    -- A condition is opaque text in the BPMN, and a helper may read a field by
+    -- naming it (`s's field`) or by taking the record apart (`CONSIDER s WHEN
+    -- Standing g y THEN g`), which names no selector. The process has lost the
+    -- default of every field of a record it handles either way.
+    it "reports every defaulted field of a record the rule handles, the one a condition names and the one it does not" $ do
+      let ns = bpmnNotes (moduleOf bpmnFieldSrc) "the duty"
+      map (.code) ns `shouldBe` ["P-TYPICALLY", "P-TYPICALLY"]
+      map (.element) ns `shouldBe` ["in good standing", "years a member"]
       map (.message) ns `shouldSatisfy`
         mentions "the field `in good standing` of `Standing` carries TYPICALLY TRUE"
       map (.message) ns `shouldSatisfy` mentions "an instance that holds a `Standing` without it does not get TRUE"
-      map (.message) ns `shouldSatisfy` (not . mentions "years a member")
+      map (.message) ns `shouldSatisfy` mentions "the field `years a member` of `Standing` carries TYPICALLY 0"
+
+    it "reports a field a helper reads by taking the record apart, though no selector is named" $ do
+      let ns = bpmnNotes (moduleOf bpmnFieldPatternSrc) "the duty"
+      map (.element) ns `shouldBe` ["in good standing"]
+
+    it "says nothing of a record's fields when the rule handles no such record (the control)" $
+      -- the same module drawn from a rule that never mentions Standing
+      bpmnNotes (moduleOf (bpmnFieldPatternSrc <> unrelatedRuleSrc)) "the unrelated duty" `shouldBe` []
 
     it "reports nothing when the module writes no TYPICALLY" $
       bpmnNotes (moduleOf bpmnPlainSrc) "the duty" `shouldBe` []
@@ -839,12 +962,31 @@ spec = do
       map (.message) ns `shouldSatisfy`
         mentions "the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE"
 
-    it "reports a record field read through an IMPORT, and not the imported field nothing reads" $ do
+    it "reports the defaulted fields of an IMPORTED record the rule handles, and nothing else the library writes" $ do
       let tcI = checkedIn [("ratelib", importedLib)] importedBpmnFieldMain
           ns  = bpmnNotesWith (importsOf tcI) tcI.tcdModule "the duty"
-      map (.element) ns `shouldBe` ["timeout"]
+      map (.element) ns `shouldBe` ["timeout", "grace"]
       map (.message) ns `shouldSatisfy`
         mentions "the field `timeout` of `Config` (in the imported module `ratelib`) carries TYPICALLY 30"
+      -- not the ASSUMEs nobody reads, nor the library rule's own GIVEN
+      map (.message) ns `shouldSatisfy` (not . mentions "an unrelated fact")
+      map (.message) ns `shouldSatisfy` (not . mentions "library rule")
+
+    -- The same helper, `may act`, reads the same ASSUME. Defined in the rule's own
+    -- file the note appeared; defined in an imported file the call graph stopped at
+    -- the import and nothing did. Both emit the identical conditionExpression.
+    it "reports an ASSUME read through a helper defined in an IMPORTED file, as it does for a local helper" $ do
+      let tcI = checkedIn [("ratelib", importedLib)] importedHelperMain
+          viaImport = bpmnNotesWith (importsOf tcI) tcI.tcdModule "the duty"
+          viaLocal  = bpmnNotes (moduleOf localHelperSrc) "the duty"
+      map (.code) viaLocal `shouldBe` ["P-TYPICALLY"]
+      map (.code) viaImport `shouldBe` ["P-TYPICALLY"]
+      map (.message) viaImport `shouldSatisfy`
+        mentions "the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE"
+
+    it "says nothing of it when the helper's file is not handed over (the control)" $ do
+      let tcI = checkedIn [("ratelib", importedLib)] importedHelperMain
+      bpmnNotes tcI.tcdModule "the duty" `shouldBe` []
 
     it "says nothing of that default when it is not handed the imports (the control)" $ do
       let tcI = checkedIn [("ratelib", importedLib)] importedBpmnMain

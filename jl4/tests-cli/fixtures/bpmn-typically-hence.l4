@@ -1,5 +1,8 @@
--- The default sits on a rule the drawn rule reaches through HENCE, not on the
--- drawn rule itself: it is part of the same process, so it is reported with it.
+-- The default sits on the GIVEN of a rule the drawn rule reaches through HENCE.
+-- The HENCE passes the argument (TRUE, which happens to equal the default), so the
+-- source never relies on the default in this process and nothing is reported for
+-- it. What the process does lose is the argument itself, which BPMN has never
+-- drawn: that is not a TYPICALLY matter and has no note of its own.
 DECLARE Actor IS ONE OF Filer
 DECLARE Action IS ONE OF file, acknowledge
 

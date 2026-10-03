@@ -1,7 +1,8 @@
 -- The same rule, with the default on a record's field that its PROVIDED reads.
 -- The process draws no record, but the condition names the field, so an
--- instance that holds a Standing without it does not get TRUE. A second
--- defaulted field that no condition reads must not be reported.
+-- instance that holds a Standing without it does not get TRUE. The record's
+-- second defaulted field is reported too: the rule handles a Standing, and a
+-- condition is opaque text, so nothing says that no condition reads it.
 DECLARE Actor IS ONE OF Member
 DECLARE Action IS ONE OF pay
 
