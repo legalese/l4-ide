@@ -247,9 +247,11 @@ GIVETH A NUMBER
 `` #EVAL `the response deadline` `` gives `14`, and with ``WITH `days of notice` IS 60`` it gives `30`: a
 section `GIVEN`'s default is worked out from the values the whole evaluation was started with, so a
 `WITH` on one input reaches the default that reads it. A rule's own input or a record field takes its
-default as if it were written at the call, and cannot name that rule's other inputs. A section
-`GIVEN`'s default that reads itself, directly or through other defaults, is a check error. A written
-`ASSUME` and a lambda's `GIVEN` still take only a literal.
+default as if it were written at the call: it may name definitions and constructors, but not a section
+`GIVEN` (directly or through a definition), which is a check error, and not that rule's other inputs.
+Put a default that reads an input on the section `GIVEN`. A section `GIVEN`'s default that reads
+itself, directly or through other defaults, is a check error. A written `ASSUME` and a lambda's
+`GIVEN` still take only a literal.
 
 **Not** a way to state what an instrument supplies and a party may displace. That is a fallback the
 provision will cite, which the parties set in the record, so write it as in [7.3](#e7-3): a named

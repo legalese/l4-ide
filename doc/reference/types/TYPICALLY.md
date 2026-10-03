@@ -157,8 +157,10 @@ quiet choice:
 
 ## A default that is worked out
 
-A default does not have to be a fixed value. It can be any expression over what
-the file declares: a definition, a constructor, or another section `GIVEN`.
+A default does not have to be a fixed value. On a section `GIVEN` it can be any
+expression over what the file declares: a definition, a constructor, or another
+section `GIVEN`. On a rule's own `GIVEN` or a record field it can be one over
+definitions and constructors (see below).
 
 ```l4
 GIVETH A NUMBER
@@ -195,22 +197,32 @@ error that names the inputs on the circle. A default that _supplies_ the input
 it would otherwise read, such as `` `base doubled` TYPICALLY (`double it` WITH
 base IS 10) ``, reads nothing of it and is no circle.
 
-**On a rule's own `GIVEN` and on a record field**, the default is worked out
-where it is taken, as if it were written there. With
+**On a rule's own `GIVEN` and on a record field**, a default may be an expression
+over the file's definitions and constructors, and it is worked out where the call
+or the construction is, as if it were written there. With
 `rate TYPICALLY (phi PLUS 1)`, the call `scaled WITH base IS 10` means
-`scaled WITH base IS 10, rate IS (phi PLUS 1)`. Three things follow:
+`scaled WITH base IS 10, rate IS (phi PLUS 1)`. Two limits:
 
-- **It sees what that call sees.** A section `GIVEN` it names is the value the
-  rule that makes the call reads. A `WITH` on the rule being called does not
-  reach it: `scaled WITH base IS 10, alpha IS 5` is refused when `scaled` does not
-  itself read `alpha`, because the `5` would go nowhere.
-- **It can name the file's definitions, constructors and section `GIVEN`s, not
-  the rule's other inputs.** `rate TYPICALLY (base PLUS 1)` is reported as
-  naming something that does not exist, since a default is worked out where the
-  rule's inputs are not yet known.
-- **A default that calls the rule it belongs to** is not checked. If the call
-  forces the default again, it runs out of stack ("Recursion depth of 1000000
-  exceeded"), as any rule that calls itself without an end does.
+- **It may not read a section `GIVEN`, directly or through a definition it
+  calls.** That is a check error naming the input. A section `GIVEN`'s default is
+  worked out once, from the values the whole evaluation was started with. A
+  default on a rule's input or a record field is copied to each call that leaves
+  it out, so what it read there would depend on the call: inside a `WITH` that
+  gives the same input another value, at a `#EVAL` that gives it, or in a case
+  sent to `l4 batch` or the service, and the one default could give different
+  answers. Which of those should win is not settled, so none is chosen. Give the
+  default to the section `GIVEN` instead, or write one that reads only
+  definitions that read no section input. A default that _supplies_ the input it
+  would read (`` `double it` WITH alpha IS 1 ``) reads nothing of it and is fine.
+- **It cannot name the rule's other inputs.** `rate TYPICALLY (base PLUS 1)` is
+  reported as naming something that does not exist, since a default is worked
+  out where the rule's inputs are not yet known.
+
+A default that calls the rule it belongs to, or builds the record it is a field
+of, directly is a check error ("you have not supplied these inputs"). One that
+does so through another rule is not checked: if the call forces the default again
+it runs out of stack ("Recursion depth of 1000000 exceeded"), as any rule that
+calls itself without an end does.
 
 Two places never work a default out, and keep asking for a fixed value: an
 `ASSUME` (deprecated; its default is not used) and a lambda's own `GIVEN`.
@@ -225,8 +237,9 @@ A default is checked when it is written:
   `NOTHING`, a constructor of an enumeration
   (`colour IS A Colour TYPICALLY Red`) or a definition, or an expression in
   parentheses (`x IS A BOOLEAN TYPICALLY (a AND b)`), on a section `GIVEN`, a
-  rule's `GIVEN` or a record field. A default that names something that does not
-  exist is reported once, as that.
+  rule's `GIVEN` or a record field; on the last two it may not read a section
+  `GIVEN`. A default that names something that does not exist is reported once,
+  as that.
 - It requires an explicit type: the name must carry an `IS A Type` annotation so
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
@@ -277,6 +290,22 @@ govern what counts as leaving a fact out:
   or not a field has a default, and so does a record nested inside it: the
   record is part of the request, and the service refuses one that leaves a
   field out.
+
+Three limits on a default that is an expression, at the boundary:
+
+- **Under `hard`, a fact that only a default reads is still asked for.** Nothing
+  reads that default under `hard`, so the fact is never used, but the published
+  list does not change with the mode, and a case that leaves it out is refused,
+  naming it.
+- **`l4 batch` writes each default into the module it generates as text**, and so
+  does the decision service for a request that sends `{}` for an input nothing
+  reads. A name in a default that two sections both define is then ambiguous, and
+  the rows or the request are refused, naming both. The service's other path
+  works the default out from the checked expression and is not affected. Written
+  with its section (`` `Rates`.phi ``), the name is not ambiguous, on either path.
+- **A default is published in the spelling the checker prints**, not the
+  author's: a name is unqualified and backticked where needed, and a call that
+  names its inputs is written on one line, comma-separated.
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
