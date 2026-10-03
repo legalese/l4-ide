@@ -65,7 +65,7 @@ pre-filled with the typical answer, which the user can change. Worth contrasting
 that pre-filling would answer the very question its interview exists to ask. The same annotation,
 honoured by one interaction backend and dropped by the other, and both are right for what they are
 for. A default that is an expression (`TYPICALLY (phi PLUS 1)`) cannot be a prefill, and the export
-refuses it, naming the input.
+refuses it, naming the rule when it is on a rule's own `GIVEN` and the input when it is on a section `GIVEN`.
 
 ## What doesn't survive
 
