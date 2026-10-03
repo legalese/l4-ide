@@ -745,25 +745,50 @@ raiseException e = do
 -- it waits on (U7b) rather than the first. Until build step 5 builds the
 -- guarded leaves this is U13's interim for a refusal, and assumed, not ruled,
 -- for the other two. It rewrites the exception; it never catches it and
--- resumes. An internal error propagates as it is.
+-- resumes. A built-in's 'RuntimeTypeError', which is how one reports an
+-- argument it cannot take (FETCH of a string that is no https URL), is
+-- rewritten the same way; the machine's own invariant failures, the other
+-- internal errors, propagate as they are.
 rewriteUnwinding :: Frame -> EvalException -> EvalException
-rewriteUnwinding f e = case leftTerm of
+rewriteUnwinding f e = case speculativeLeft f of
   Nothing -> e
   Just p  -> case e of
     UserEvalException (Stuck ns) -> stuckException (termNames p <> toList ns)
     UserEvalException _          -> stuckException (termNames p)
     RefusalException _           -> stuckException (termNames p)
+    InternalEvalException (RuntimeTypeError _) -> stuckException (termNames p)
     InternalEvalException _      -> e
   where
-    leftTerm = case f of
-      ConnectiveRight _ p      -> Just p
-      EqConstructor1 acc _ _   -> acc
-      EqConstructor2 acc _ _   -> acc
-      EqConstructor3 acc _     -> acc
-      _                        -> Nothing
     stuckException ns = case nubTerms ns of
       (n : rest) -> UserEvalException (Stuck (n :| rest))
       []         -> e
+
+-- | The term on the left of a frame through which what is being evaluated is
+-- speculative (§8 step 3): the right operand of a connective whose left is a
+-- term, or the remaining fields of a structural equality that has already
+-- met one. The two-valued run would have stopped at that term, so what is
+-- evaluated under such a frame is evaluated only because the term might
+-- turn out to need it.
+speculativeLeft :: Frame -> Maybe Term
+speculativeLeft = \ case
+  ConnectiveRight _ p    -> Just p
+  EqConstructor1 acc _ _ -> acc
+  EqConstructor2 acc _ _ -> acc
+  EqConstructor3 acc _   -> acc
+  _                      -> Nothing
+
+-- | An effect on the outside world, a ledger write, an HTTP request or a
+-- read of the process environment, does not happen under a speculative
+-- frame ('speculativeLeft'): the two-valued run would not have reached it
+-- unless the term on that frame's left came out so. It is Stuck on that
+-- term's inputs instead, which unwinding through the frame reports as it
+-- reports any error there.
+refuseEffectUnderUnknown :: Eval ()
+refuseEffectUnderUnknown = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  case mapMaybe speculativeLeft stack.frames of
+    p : _ -> stuckOn (termNamesNE p)
+    []    -> pure ()
 
 -- | Each term once, first occurrence first.
 nubTerms :: [Term] -> [Term]
@@ -1123,6 +1148,7 @@ writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
 -- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
 tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
 tellEventRouted route ev = do
+  refuseEffectUnderUnknown
   noteLedgerWrite -- a write POISONS the current force span (T6+ledger): write-once
   store <- asks (.envLedger)
   case route of
@@ -4878,6 +4904,7 @@ runPost urlVal headersVal bodyVal = do
               queryOptions = map (\p -> let (k,v) = Text.breakOn "=" p in k =: Text.drop 1 v) params
               req_options = mconcat (headerOptions <> queryOptions)
 
+          refuseEffectUnderUnknown
           res <- liftIO $ Req.runReq Req.defaultHttpConfig $ do
             Req.req Req.POST reqWithPath (Req.ReqBodyLbs $ LBS.fromStrict $ TE.encodeUtf8 body) Req.lbsResponse req_options
           continueBackward $ ValString (TE.decodeUtf8 . LBS.toStrict $ Req.responseBody res)
@@ -5062,6 +5089,7 @@ runBuiltin es op mTy = do
                   params = if Text.null options then [] else Text.splitOn "&" (Text.drop 1 options)
                   req_options =
                     mconcat (map (\p -> let (k,v) = Text.breakOn "=" p in k =: Text.drop 1 v) params)
+              refuseEffectUnderUnknown
               res <- liftIO $ Req.runReq Req.defaultHttpConfig $ do
                 Req.req Req.GET reqWithPath Req.NoReqBody Req.lbsResponse req_options
               continueBackward $ ValString (TE.decodeUtf8 . LBS.toStrict $ Req.responseBody res)
@@ -5072,6 +5100,7 @@ runBuiltin es op mTy = do
 #endif
     UnaryEnv -> do
       varName <- expectString es
+      refuseEffectUnderUnknown
       maybeValue <- liftIO $ lookupEnv (Text.unpack varName)
       case maybeValue of
         Just value -> do

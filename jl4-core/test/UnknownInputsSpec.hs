@@ -15,6 +15,7 @@ import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import Test.Hspec
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
+import L4.Evaluate.Ledger (LedgerStore (..))
 import L4.Evaluate.ValueLazy (Term (..))
 import L4.EvaluateLazy
   ( AssertionOutcome (..)
@@ -50,9 +51,23 @@ outcomes src = do
   cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
   case checkWithImports (vfsFromList []) src of
     Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r | not r.tcdSuccess -> fail ("typecheck failed: " <> show r.tcdErrors)
     Right r -> do
       (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
       pure (map (classify . (.result)) results)
+
+-- | The outcome of each directive, with how many ledger writes it made.
+outcomesAndWrites :: Text.Text -> IO [(Outcome, Int)]
+outcomesAndWrites src = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  case checkWithImports (vfsFromList []) src of
+    Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r | not r.tcdSuccess -> fail ("typecheck failed: " <> show r.tcdErrors)
+    Right r -> do
+      (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+      pure [ (classify d.result, writes d.ledger) | d <- results ]
+  where
+    writes store = sum (fmap length store.ownLedgers) + length store.officialLedger
 
 classify :: EvalDirectiveValue -> Outcome
 classify = \ case
@@ -141,3 +156,48 @@ spec = describe "unknown inputs (UNKNOWN-EVALUATION-SPEC §8 step 3)" $ do
     it "is the identity for a synonym of a type equality supports" $ do
       os <- outcomes $ synonyms <> "#ASSERT k EQUALS k\n"
       os `shouldBe` [Satisfied]
+
+  -- The right operand of a connective whose left is unknown is evaluated
+  -- only because the left might need it; the two-valued run would not have
+  -- reached it unless the left came out so. An effect there does not
+  -- happen: the answer is Stuck on the left's inputs, and nothing is
+  -- written. These tests use only a ledger write and a read of the process
+  -- environment; none makes a request.
+  describe "an effect under an unknown" $ do
+    let unknowns = Text.unlines
+          [ "§ `Unknown`"
+          , "    GIVEN x IS A BOOLEAN"
+          , "          n IS A NUMBER"
+          ]
+    it "does not write the ledger, and is Stuck on the left's inputs" $ do
+      os <- outcomesAndWrites $ unknowns <> Text.unlines
+        [ "#EVAL x AND (RECORD `wrote` IS FALSE)"
+        , "#EVAL x OR (RECORD `wrote` IS TRUE)"
+        , "#EVAL (LIST n, RECORD `wrote` IS 2) EQUALS (LIST 1, 3)"
+        ]
+      os `shouldBe` [(Waits ["x"], 0), (Waits ["x"], 0), (Waits ["n"], 0)]
+    it "writes it with the left supplied, as before" $ do
+      os <- outcomesAndWrites $ unknowns <> "#EVAL TRUE AND (RECORD `wrote` IS FALSE)\n"
+      os `shouldBe` [(Value "FALSE", 1)]
+    it "does not read the environment" $ do
+      os <- outcomes $ unknowns <> Text.unlines
+        [ "#EVAL x AND ((ENV \"L4_UNKNOWN_INPUTS_SPEC_NEVER_SET\") EQUALS (JUST \"a\"))"
+        , "#EVAL TRUE AND ((ENV \"L4_UNKNOWN_INPUTS_SPEC_NEVER_SET\") EQUALS (JUST \"a\"))"
+        ]
+      os `shouldBe` [Waits ["x"], Value "FALSE"]
+    -- A built-in that cannot take its argument reports it as an internal
+    -- error; under an unknown that is Stuck on the left, like any other
+    -- error there. `FETCH` of a string that is no https URL fails before it
+    -- makes any request.
+    it "is Stuck where a built-in refuses its argument, not an internal error" $ do
+      os <- outcomes $ unknowns <> Text.unlines
+        [ "#EVAL x AND ((FETCH \"not a url\") EQUALS \"\")"
+        , "#EVAL (FETCH \"not a url\") EQUALS \"\""
+        ]
+      case os of
+        [speculative, supplied] -> do
+          speculative `shouldBe` Waits ["x"]
+          supplied `shouldSatisfy` \ case
+            Errors t -> "Internal error:" `Text.isPrefixOf` t
+            _        -> False
+        _ -> expectationFailure ("expected two outcomes, got " <> show os)
