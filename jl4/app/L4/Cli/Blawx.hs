@@ -69,7 +69,7 @@ import L4.Blawx.Lift (LiftContext (..), liftBlawx, renderLiftDiag)
 import L4.Blawx.Lower (lowerBlawx)
 import L4.Blawx.Parse
 import L4.Blawx.Xml (parseXml)
-import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport (..), renderReport)
+import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
 import L4.Relational.IR (RelProgram (..), renderLowerError)
 import L4.Relational.Lower (defaultLowerOptions, lowerModule)
 import qualified L4.TypeCheck.Types as TypeCheck
@@ -179,9 +179,13 @@ exportCmd opts = do
   -- presumption in the target (TYPICALLY-ONE-BEHAVIOUR-SPEC T5/T5b). The same
   -- notes ride in the .pl header, for a reader who only has the file.
   unless (null notes) $ do
-    hPutStrLn stderr
-      ( "l4 export blawx: " <> show (length notes) <> " TYPICALLY default"
-        <> (if length notes == 1 then "" else "s") <> " not carried — Blawx has no default machinery" )
+    let nTypically = length [ () | n <- notes, n.code == "R-TYPICALLY" ]
+    hPutStrLn stderr $
+      if nTypically == length notes
+        then "l4 export blawx: " <> show nTypically <> " TYPICALLY default"
+               <> (if nTypically == 1 then "" else "s") <> " not carried — Blawx has no default machinery"
+        else "l4 export blawx: " <> show (length notes) <> " note" <> (if length notes == 1 then "" else "s")
+               <> " on what Blawx could not carry (" <> show nTypically <> " of them TYPICALLY defaults)"
     hPutStr stderr (Text.unpack (renderReport (MkFidelityReport "Blawx" notes)))
   let source = Text.pack (takeFileName opts.bxFile)
       plDump = renderPlDumpWith notes source doc
@@ -246,16 +250,19 @@ loadBlawxDoc file = do
                      \an assumed rule is not one. That does not apply to Blawx, where such a \
                      \rule becomes an #abducible the interview asks about, so the export \
                      \proceeds. `l4 check` will report the same diagnostics and exit 1." )
-          -- The middle end's report is read here, and only for @R-TYPICALLY@: it
-          -- holds other notes (@R-SORT@, @R-DNF@, @R-DIRECTIVE@) that nothing
-          -- has ever printed, and surfacing all of them is a change to every
-          -- export, not to the one this channel was promised for.
+          -- The middle end's report is read here, filtered by SEVERITY and not by
+          -- code: a loss (Blocking or Lossy) is printed, whoever raises it, and
+          -- an Advisory is not. The channel was promised for @R-TYPICALLY@, and
+          -- that is the only loss the corpus raises today, so this prints what
+          -- a filter on the code would; what it changes is that the next Lossy
+          -- note the middle end learns to raise is loud by default instead of
+          -- silent on every user channel. (@R-SORT@ at Advisory stays out.)
           case lowerModule defaultLowerOptions tc.entityInfo tc.module' of
             Left lerrs -> lowerFailure lerrs
             Right prog -> case lowerBlawx prog of
               Left lerrs -> lowerFailure lerrs
               Right doc ->
-                pure (doc, [ n | n <- prog.rpgFidelity.notes, n.code == "R-TYPICALLY" ])
+                pure (doc, [ n | n <- prog.rpgFidelity.notes, n.severity <= Lossy ])
     _ -> do
       putDiagnostics errs
       exitFailure
