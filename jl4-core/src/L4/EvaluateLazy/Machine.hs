@@ -7289,7 +7289,11 @@ expectDateTimeValue val = internalException $ RuntimeTypeError $
 -- text and with its value; the right operand, if the left does not decide, is
 -- evaluated in tail position ('connectiveLeft'). In two-valued evaluation this
 -- computes exactly what @IF a THEN b ELSE FALSE@ and its siblings did, in the
--- same order.
+-- same order, for programs that finish. One that does not finish through the
+-- right operand, such as @loop n MEANS TRUE AND loop n@, now runs until it is
+-- stopped, since the operand is in tail position, where the @IF@'s closure
+-- body overflowed the frame cap; a recursion through an @IF@'s branch already
+-- ran that way.
 connective :: Environment -> Connective -> Expr Resolved -> Maybe (Expr Resolved) -> Machine Config
 connective env conn left right = do
   pushFrame (ConnectiveLeft conn ((`ConnRightExpr` env) <$> right))
