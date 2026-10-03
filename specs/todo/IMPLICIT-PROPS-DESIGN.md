@@ -1108,7 +1108,9 @@ reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to
 gate it.
 
 **Rule 3 built 2026-10-03 (W7 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.3; `feat/typically-w7`, on top of `feat/typically-w4w5`, not yet merged).**
-A default is a module-scope expression on a section `GIVEN`, a rule's `GIVEN` and a record field; it is worked out lazily, from the root's values for a section binder; a cycle `b ∈ R*(default(b))` among section binders is a check error; the default's read-set joins the requirement of every root that may use it; and the JSON schema gives an expression default as source text.
+A default is a module-scope expression.
+On a section `GIVEN` it may read other section `GIVEN`s and is worked out lazily, from the root's values; a cycle `b ∈ R*(default(b))` among section binders is a check error; the default's read-set joins the requirement of every root that may use it; and the JSON schema gives an expression default as source text.
+On a rule's `GIVEN` and a record field it may name definitions and constructors and may not read a section `GIVEN`: R8 says where a section's default is worked out and does not say where these are, so the checker refuses the default that would depend on it (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3, decision 1, pending Meng's review).
 Two places the ruling does not name keep a literal: a written `ASSUME` and a lambda's `GIVEN`.
 
 **EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
@@ -2348,6 +2350,7 @@ the binder is charged with what its default reads, and `readSets` then leaves th
 binder itself out of its result, so a reference to it is still a reader's own
 parameter and is never turned into an application. The cycle check is the same table
 read the other way: `b ∈ R*(default(b))` is `L4.Discharge.defaultCycles`, a check error.
+The pass computes what each definition reads itself first, with a call site's `WITH` subtracted, and closes each set under the defaults of the binders in it afterwards; with the two mixed, `a TYPICALLY (h WITH b IS 1)` beside `b TYPICALLY (a PLUS 1)` was refused as a circle.
 A root is where the default's reads are supplied: at a directive (which is also how
 `l4 batch` and the service evaluate a request), the binder reaches a call as a
 function of its default, applied to the root's values for what it reads

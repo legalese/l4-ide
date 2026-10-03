@@ -437,11 +437,11 @@ result MEANS
 
 **Error message:** `This call gives … to …, which is an input of a section and not a rule`
 
-**What you wrote:** `` discount WITH `list price` IS 200 ``, where `discount` is a [section `GIVEN`](../syntax/section-given.md), not a rule.
+**What you wrote:** ``discount WITH `list price` IS 200``, where `discount` is a [section `GIVEN`](../syntax/section-given.md), not a rule.
 
 **What went wrong:** An input has nothing for a `WITH` to reach: it is worked out from the values the whole evaluation gives.
 
-**How to fix it:** Put the `WITH` on a rule that reads `discount` (``` `final price` WITH `list price` IS 200 ```), or drop it.
+**How to fix it:** Put the `WITH` on a rule that reads `discount` (`` `final price` WITH `list price` IS 200 ``), or drop it.
 
 ---
 
