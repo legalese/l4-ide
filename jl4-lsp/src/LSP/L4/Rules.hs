@@ -143,6 +143,12 @@ data TypeCheckResult = TypeCheckResult
     -- dependencies'. Propagated to importers by 'unionCheckEnv' so that an
     -- @\@export@ reaching one can be refused. See
     -- 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
+  , inputDefaults :: TypeCheck.InputDefaults
+    -- ^ The @TYPICALLY@ defaults of this module's rules and records, and its
+    -- dependencies'. Propagated to importers by 'unionCheckEnv' so that a named
+    -- application of an imported rule, or a construction of an imported record,
+    -- can leave a defaulted input or field out. See
+    -- 'L4.TypeCheck.Types.CheckResult.inputDefaults'.
   }
   deriving stock (Generic)
 
@@ -164,6 +170,7 @@ instance NFData TypeCheckResult where
     `seq` rnf mixfixRegistry
     `seq` rnf sectionPaths
     `seq` rnf implicitReaders
+    `seq` rnf inputDefaults
 
 type instance RuleResult EvaluateLazy = [EvaluateLazy.EvalDirectiveResult]
 data EvaluateLazy = EvaluateLazy
@@ -873,12 +880,13 @@ jl4Rules evalConfig rootDirectory recorder = do
             -- co-equal for overload resolution (spec §5.5, FIX C).
           , sectionPaths = Map.union cState.sectionPaths tcRes.sectionPaths
           , deferredChoices = 0
+          , overloadedCallees = Map.empty
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as
         -- 'unionImportedCheckEnv' requires.
         unionCheckEnv cEnv tcRes =
-          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry tcRes.implicitReaders
+          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry tcRes.implicitReaders tcRes.inputDefaults
         -- NOTE: we don't want to leak the inference variables from the substitution
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
         initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies
@@ -906,6 +914,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
         , implicitReaders = result.implicitReaders
+        , inputDefaults = result.inputDefaults
         }
       )
 
@@ -949,7 +958,19 @@ jl4Rules evalConfig rootDirectory recorder = do
     -- put the diagnostic on that IMPORT
     deps    <- fmap catMaybes $ uses (AttachCallStack (f : cs) GetLazyEvaluationDependencies) $ map (.moduleUri) imports
     let environment = mconcat (fst <$> deps)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnv evalConfig tcRes.entityInfo environment tcRes.module')
+        -- the modules this one imports, transitively and once each (a diamond of
+        -- imports would otherwise list a module once per path): the JSON decoder
+        -- fills an absent field of a record declared in any of them from its
+        -- DECLARE (T1b)
+        importedModules = go Map.empty tcRes.dependencies
+          where
+            go seen [] = Map.elems seen
+            go seen (d : ds) =
+              let MkModule _ depUri _ = d.module'
+              in if Map.member depUri seen
+                   then go seen ds
+                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
     pure ([], Just (ownEnv <> environment, ownDirectives))
 
   define shakeRecorder $ \EvaluateLazy uri -> do
@@ -1109,7 +1130,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         }
 
     evalLazyResultToDiagnostic :: EvaluateLazy.EvalDirectiveResult -> Diagnostic
-    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes) = do
+    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes _) = do
       Diagnostic
         { _range = srcRangeToLspRange range
         , _severity =

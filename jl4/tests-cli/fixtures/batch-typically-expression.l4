@@ -1,0 +1,11 @@
+-- l4 batch over a section input whose TYPICALLY default is an EXPRESSION
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, R8 rule 3). A row that leaves `discount`
+-- out takes a tenth of the `list price` THAT row gives, and `presumed` lists it.
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+@export default Final price
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount

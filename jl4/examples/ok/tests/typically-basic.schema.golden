@@ -15,11 +15,6 @@
             "type": "boolean"
         }
     },
-    "required": [
-        "married",
-        "age",
-        "bonus"
-    ],
     "title": "can vote",
     "type": "object"
 }

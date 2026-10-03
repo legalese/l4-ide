@@ -1,0 +1,19 @@
+-- l4 batch over defaults that are named calls with SEVERAL arguments
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). The wrapper l4 batch generates carries
+-- each default as source text, and a call with two arguments used to print its
+-- second on a line of its own, so the generated module did not parse and every
+-- row failed, one that supplied the input included.
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+combine MEANS a PLUS b
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (combine WITH a IS `list price`, b IS 1)
+
+@export default Final price
+GIVEN rate IS A NUMBER TYPICALLY (combine WITH a IS 2, b IS 3)
+GIVETH A NUMBER
+`final price` MEANS (`list price` MINUS discount) TIMES rate

@@ -1,0 +1,34 @@
+-- Expression defaults declared in an IMPORTED module are taken at a named site and
+-- at a construction here (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7 across an IMPORT).
+-- The declaring half is ok/typically-expression-import-def.l4. What each default
+-- names, `the usual rate` and `the usual colour`, is not defined in this file.
+
+IMPORT `typically-expression-import-def`
+
+#ASSERT (`imported scaled` WITH base IS 10) EQUALS 40
+#ASSERT (`imported scaled` WITH base IS 10, rate IS 2) EQUALS 20
+#ASSERT (`imported scaled` WITH base IS 10, colour IS Red) EQUALS 0
+
+GIVETH A Paint
+`some paint` MEANS Paint WITH layers IS 2
+
+#ASSERT (`some paint`'s coats) EQUALS 6
+#ASSERT (`some paint`'s colour) EQUALS Green
+#ASSERT (`some paint`'s layers) EQUALS 2
+#EVAL `some paint`
+
+-- JSONDECODE takes the type to decode into from the call it sits on, and a
+-- default carries that type across the IMPORT: the same default decodes to a
+-- Person here as it does in the module that declares it.
+GIVETH A Contact
+`some contact` MEANS Contact WITH label IS "x"
+
+GIVETH A NUMBER
+`the decoded age` MEANS
+  CONSIDER `some contact`'s who
+  WHEN RIGHT value THEN value's age
+  WHEN LEFT error THEN 0 MINUS 1
+
+#ASSERT `the decoded age` EQUALS 25
+#EVAL `some contact`'s who
+#EVAL `some contact`'s born

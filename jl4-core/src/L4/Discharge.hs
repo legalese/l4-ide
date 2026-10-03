@@ -35,9 +35,10 @@
 -- @R(caller) ⊇ R(callee)@, the caller is guaranteed to have the very key its
 -- call site needs to pass on.
 --
--- The pass mints a 'Unique' in exactly one place: the parameters of the
--- eta-expansion that lets a reader with parameters of its own be passed as a
--- value. See 'dischargeModule'.
+-- The pass mints a 'Unique' in two places: the parameters of the eta-expansion
+-- that lets a reader with parameters of its own be passed as a value (see
+-- 'dischargeModule'), and the function that stands for a binder's default at a
+-- root when that default reads other binders ('defaultThunkUnique').
 --
 -- == What this pass deliberately does not do
 --
@@ -54,15 +55,22 @@
 --   wrongly.
 module L4.Discharge
   ( dischargeModule
+  , dischargeModuleWith
   , sectionBinders
   , Binder (..)
   , readSets
   , implicitSupplySites
   , unreadImplicitSupplies
+  , implicitSuppliesToInputs
   , ambiguousImplicitSupplies
   , misdeliveredImplicitSupplies
   , ambiguousRootBinders
   , implicitReaders
+  , defaultCycles
+  , inputDefaultReads
+  , defaultNameCaptures
+  , defaultsMeaningElsewhere
+  , defaultThunkUnique
   ) where
 
 import Base
@@ -72,8 +80,9 @@ import qualified Base.Text as Text
 import qualified Data.Set as Set
 import L4.Annotation (emptyAnno)
 import L4.Export (collectExportedDecides, collectReferencedUniques, decideBodiesFromModule, transitiveReferencedUniquesWith)
+import L4.Presumption (requestRecordName)
 import L4.Syntax
-import L4.TypeCheck.Types (typeKey)
+import L4.TypeCheck.Types (Environment, SectionPaths, typeKey)
 import qualified Optics
 
 -- | A section binder, as the checker left it on the section's own 'GivenSig'.
@@ -128,32 +137,91 @@ sectionBinders (MkModule _ _ sect) =
 -- cap is never reached in practice, and it guarantees termination should the
 -- spelling half of 'suppliesBinder' ever flip a match.
 --
--- A binder's @TYPICALLY@ default is deliberately NOT an edge here. A default
--- is literal-only today ('L4.TypeCheck.checkTypically'), so it reads nothing;
--- and when that restriction is lifted (R8 rule 3) a default that reads another
--- binder must be reached through the ROOT's supply, which is a different
--- mechanism from a reader's parameter — adding the edge here would turn every
--- reference to the defaulted binder, including a reader's own value-bound
--- parameter, into an application.
+-- A binder's @TYPICALLY@ default is an expression (R8 rule 3), and reading the
+-- binder reads what its default reads, so it is a node of this graph: a
+-- pseudo-definition under the binder's own 'Unique' ('decideBodiesFromModule'),
+-- whose read-set is what the default needs and which every reader of the
+-- binder reaches. That is the default's read-set joining the requirement of
+-- every root that may use it. The binder itself is NOT in the result — only
+-- definitions are: a reference to a binder is a reader's own parameter, and
+-- must not be turned into an application. 'defaultReads' is where the
+-- pseudo-definitions' read-sets are, for the cycle check and for the root's
+-- supply.
 readSets :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binder]
-readSets mod' binders
-  | Map.null binders = Map.empty
+readSets mod' binders =
+  Map.withoutKeys (readSetsAll mod' binders) (Map.keysSet binders)
+
+-- | The read-set of every default a binder carries: the section binders its
+-- expression reads, directly or through the definitions it calls and the other
+-- binders' defaults it needs. Keyed by the binder. A binder whose default
+-- reads nothing has no entry.
+defaultReads :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binder]
+defaultReads mod' binders =
+  Map.restrictKeys (readSetsAll mod' binders) (Map.keysSet binders)
+
+readSetsAll :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binder]
+readSetsAll mod' binders = (readSetStages mod' binders).closed
+
+-- | The read-sets in the two stages they are computed in. @own@ is what each
+-- definition reads itself: its own names and its callees' own reads, less what
+-- each call supplies. @closed@ is @own@ closed under the defaults of the binders
+-- in each set, which is what a root is asked for.
+--
+-- A @WITH@ written inside a definition reaches only @own@: a binder that only a
+-- default reads is worked out at the root, from the root's values, and a
+-- supply written below the root never gets there. A @WITH@ at a directive (a
+-- root) reaches @closed@.
+data ReadSetStages = ReadSetStages
+  { own    :: Map.Map Unique [Binder]
+  , closed :: Map.Map Unique [Binder]
+  }
+
+readSetStages :: Module Resolved -> Map.Map Unique Binder -> ReadSetStages
+readSetStages mod' binders
+  | Map.null binders = ReadSetStages Map.empty Map.empty
   | otherwise =
-      Map.mapMaybe nonEmptyRead (iterateToFixpoint (Map.size bodies + 1) step direct)
+      ReadSetStages
+        { own    = Map.mapMaybe nonEmptyRead ownSets
+        , closed = Map.mapMaybe nonEmptyRead
+            (iterateToFixpoint (Map.size bodies + 1) closeStep ownSets)
+        }
  where
+  ownSets = iterateToFixpoint (Map.size bodies + 1) ownStep direct
   bodies = decideBodiesFromModule mod'
 
   -- Per definition: the binders its body names, and the definitions it calls
   -- together with what each call supplies by name.
   direct = Map.map (directBinderReads binders) bodies
-  edges  = Map.map (bodyCallEdges bodies) bodies
+  -- A reference to a binder is an edge to its default's pseudo-definition too
+  -- ('decideBodiesFromModule'), and is left out here: it is what the closure
+  -- below does, and taking it through the call graph would put a default's
+  -- reads into the part a @WITH@ subtracts from.
+  edges  = Map.map (filter (\ (g, _) -> not (Map.member g binders)) . bodyCallEdges bodies) bodies
 
-  step current =
+  -- What a definition reads, not counting what a binder's default adds: its own
+  -- names and its callees' own reads, less what each call supplies. This is the
+  -- part a call site's @WITH@ takes away from. It has to be kept apart from the
+  -- closure below, which is not subtracted from by a @WITH@: with the two mixed,
+  -- @a TYPICALLY (h WITH b IS 1)@ was charged with what @b@'s default reads
+  -- through @h@, although the site never takes @b@'s default, and a pair of
+  -- defaults that are no circle was refused as one.
+  ownStep current =
     Map.mapWithKey
-      (\ u own ->
-         canonicalise
-           (own <> reachedThrough current (Map.findWithDefault [] u edges)))
+      (\ u cur -> canonicalise (cur <> reachedThrough current (Map.findWithDefault [] u edges)))
       current
+
+  -- Then each set is closed under the defaults of the binders in it. A root that
+  -- supplies nothing for a binder works its default out from the root's own
+  -- values, so a definition that takes the binder as a parameter is charged with
+  -- what its default reads even when it never names the reads itself:
+  -- @h MEANS (g WITH r IS 1)@ takes @b@ from its root, and the root works out
+  -- @b@'s default from the root's @r@. A binder with no default has no entry in
+  -- @current@ and adds nothing.
+  closeStep current =
+    Map.map (\ bs -> canonicalise (bs <> defaultsOf current bs)) current
+
+  defaultsOf current bs =
+    concat [ Map.findWithDefault [] (key b) current | b <- bs ]
 
   iterateToFixpoint :: Int -> (Map.Map Unique [Binder] -> Map.Map Unique [Binder]) -> Map.Map Unique [Binder] -> Map.Map Unique [Binder]
   iterateToFixpoint fuel f x
@@ -171,6 +239,269 @@ readSets mod' binders
   nonEmptyRead bs = Just bs
 
   canonicalise = canonicaliseBinders
+
+-- | Section binders whose @TYPICALLY@ default reads the binder itself, directly
+-- or through another binder's default or a definition either calls: the check
+-- of R8 rule 3, @b ∈ R*(default(b))@. One entry per circle, naming the binders
+-- on it in declaration order; the checker reports each at its first.
+--
+-- A default that SUPPLIES the binder it would otherwise read, as in
+-- @b TYPICALLY (g WITH b IS 1)@, does not read it, by the same subtraction as
+-- everywhere else, so it is no circle.
+defaultCycles :: Module Resolved -> [[Resolved]]
+defaultCycles mod'
+  | Map.null binders = []
+  | otherwise        = go [] (sortOn (.position) onCircle)
+ where
+  binders = sectionBinders mod'
+  reads'  = defaultReads mod' binders
+  uniqOf b = getUnique b.resolved
+  readsOf b = Set.fromList (map uniqOf (Map.findWithDefault [] (uniqOf b) reads'))
+  onCircle = [ b | b <- Map.elems binders, uniqOf b `Set.member` readsOf b ]
+
+  go _    []       = []
+  go seen (b : bs)
+    | uniqOf b `elem` seen = go seen bs
+    | otherwise =
+        let members =
+              [ c | c <- onCircle
+                  , uniqOf c `Set.member` readsOf b
+                  , uniqOf b `Set.member` readsOf c ]
+        in map (.resolved) members : go (map uniqOf members <> seen) bs
+
+-- | The section binders that the @TYPICALLY@ default of a rule's input or a
+-- record's field reads, directly or through the definitions it calls: one entry
+-- for each such input or field that reads any, with the binders it reads in
+-- declaration order. The checker refuses each ('L4.TypeCheck.Types.TypicallyReadsInput').
+--
+-- A section binder's default is worked out ONCE, at the root, from the root's
+-- values (R8 rule 3). A default on a rule's input or a record's field is copied
+-- to every call or construction that leaves it out, so what it reads there is
+-- whatever that site reads, and the one expression gives one answer under an
+-- inner @WITH@, another at a directive that supplies the same binder, and a
+-- third through @l4 batch@ and the service, which work it out at the root. R8
+-- says where a section's is worked out and does not say where these are, so a
+-- default that would depend on it is refused (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- §4.3, decision 1). A default that reads only definitions that read no binder
+-- has one value wherever it is taken and is not in this list.
+--
+-- The section binders' own defaults are not in it: they are the 'sectionBinders'
+-- themselves and 'defaultCycles' is where they are checked.
+inputDefaultReads :: Module Resolved -> [(Resolved, [Binder])]
+inputDefaultReads mod'
+  | Map.null binders = []
+  | otherwise =
+      [ (owner, reads')
+      | (owner, d) <- ruleInputDefaults <> fieldDefaults
+      , let reads' = exprReads d
+      , not (null reads')
+      ]
+ where
+  binders = sectionBinders mod'
+  bodies  = decideBodiesFromModule mod'
+  stages  = readSetStages mod' binders
+
+  -- The same two steps a definition's read-set is: what the expression names and
+  -- what it reaches through its calls, less what each call supplies, and then
+  -- that closed under the defaults of the binders in it. The subtraction acts on
+  -- the first: a default that SUPPLIES an input gives the rule it calls that
+  -- input, so the input's own default is never taken and what it reads is not
+  -- read (@k TYPICALLY (h WITH b IS 1)@ with @b TYPICALLY (r PLUS 1)@ reads
+  -- neither; it was refused as reading @r@, W7 second review, silent S7). A
+  -- reference to a binder is itself closed under that binder's default, as in
+  -- 'readSetStages'.
+  exprReads e =
+    let direct =
+          canonicaliseBinders
+            (directBinderReads binders e
+               <> reachedThrough stages.own
+                    (filter (\ (g, _) -> not (Map.member g binders)) (bodyCallEdges bodies e)))
+    in canonicaliseBinders
+         (direct <> concat [ Map.findWithDefault [] (getUnique b.resolved) stages.closed | b <- direct ])
+
+  -- A section's own @GIVEN@ is an 'OptionallyTypedName' too, and is where a
+  -- binder's default is written; it is not a rule's input.
+  ruleInputDefaults =
+    [ (r, d)
+    | MkOptionallyTypedName _ r _ (Just d) <- nodesOfType @(OptionallyTypedName Resolved) mod'
+    , not (Map.member (getUnique r) binders)
+    ]
+  -- The record the service and @l4 batch generate for a request is not the
+  -- author's: each input of the exported rule is one of its fields, with the
+  -- input's default as the field's, so a section input's default that reads
+  -- another section input sits there as a field default that reads a section
+  -- input. That is right there, and refusing it refused every request that
+  -- supplied such an input, or sent @{}@ for it, and every request under hard
+  -- (W7 second review, silent S3 and rulings S2).
+  fieldDefaults =
+    [ (r, d)
+    | tns <- authoredFieldGroups mod'
+    , MkTypedName _ r _ (Just d) _ <- tns
+    ]
+
+-- | The names in a @TYPICALLY@ default of a rule's input or a record's field that
+-- are spelled like one of its siblings: the other inputs of the same rule, or the
+-- other fields of the same record, the one the default is on included. In the
+-- order they occur.
+--
+-- A default is worked out outside the rule or record it is written on, where
+-- that rule's inputs and that record's fields are not in scope
+-- ('L4.TypeCheck.checkPendingDefaults', 'L4.TypeCheck.checkFieldDefaults'). So a
+-- name spelled like a sibling resolves to something else, when something else is
+-- called that, and the answer quietly uses it:
+-- @bonus TYPICALLY (salary DIVIDED BY 10)@ beside the input @salary@ and a
+-- definition @salary MEANS 50000@ is a tenth of the 50000 and not of the
+-- input, with no error and the schema printing the opposite. When nothing else
+-- is called that, the name is reported as not in scope, which is the wording
+-- the documentation gives ("It cannot name the rule's other inputs"); this is
+-- the same refusal for the case where it is not (smucclaw/l4-ide W7, silent
+-- review S1).
+--
+-- A name the author qualified with its section is exempt: it says which
+-- definition it means. So is a name the default binds itself (a lambda's
+-- parameter, a @LET@ or @WHERE@ binding): it never reaches the module's scope.
+-- The record the service and @l4 batch decode a request into is not the
+-- author's, and the checker does not ask this of it.
+--
+-- Asked of one checked default at a time, where it is checked, so that a module
+-- without a default pays nothing for it.
+defaultNameCaptures :: [Resolved] -> Expr Resolved -> [Resolved]
+defaultNameCaptures siblings d =
+  [ ref
+  | ref <- namesIn d
+  , Ref actual u _ <- [ref]
+  , NormalName t <- [rawName actual]
+  , t `elem` map spellingOf siblings
+  , not (Set.member u (definedIn d))
+  ]
+
+-- | The defaults @l4 batch@ and the decision service would write out as text and
+-- read again at the top level of the file, in which a name means something other
+-- than where it was written: one entry for each such default, with the names.
+--
+-- Both surfaces generate a module of their own after the author's, and put a
+-- default into it as source text (@InputArgs@, with the default as a field's
+-- @TYPICALLY@). That module is at the top level, so a name in the text means what
+-- it means THERE. A name that is defined in a section, and again at the top level,
+-- means the section's where the author wrote it and the top level's in the
+-- generated module, so one input gives two answers with no error:
+-- @phi MEANS 1000@ at the top, @phi MEANS 8@ in @§ Rates@, and
+-- @rate TYPICALLY (phi PLUS 1)@ is 9 at @#EVAL@ and 1001 through @l4 batch@ and
+-- the service's generated-module path (W7, silent review S6 of the second review
+-- and rulings S1). A name two sections define is ambiguous there and is refused
+-- by those surfaces; this is the case that is not.
+--
+-- Examined only for a module that has an export, and only the defaults those
+-- surfaces would write out: an export's own inputs', and a section input's that an
+-- export reads. A name the author wrote with its section is exempt, and so is a
+-- written @ASSUME@ or a section input, which @l4 batch@ binds again at the top
+-- level under the same name; and a name the default binds itself.
+defaultsMeaningElsewhere :: SectionPaths -> Environment -> Module Resolved -> [(Resolved, [Resolved])]
+defaultsMeaningElsewhere paths environment mod'
+  | null exports = []
+  | otherwise =
+      [ (owner, bad)
+      | (owner, d) <- relocated
+      , let bad = [ ref | ref <- namesIn d, meansElsewhere d ref ]
+      , not (null bad)
+      ]
+ where
+  exports = collectExportedDecides mod'
+  binders = sectionBinders mod'
+  stages  = readSetStages mod' binders
+
+  -- The section inputs an export reads, and what their defaults read in turn.
+  exportBinders =
+    Map.fromList
+      [ (getUnique b.resolved, b)
+      | MkDecide _ _ (MkAppForm _ n _ _) _ <- exports
+      , b <- Map.findWithDefault [] (getUnique n) stages.closed
+      ]
+
+  relocated =
+    [ (r, d)
+    | MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ _ <- exports
+    , MkOptionallyTypedName _ r _ (Just d) <- otns
+    ]
+    <>
+    [ (b.resolved, d)
+    | b <- Map.elems exportBinders
+    , Just d <- [b.typically]
+    ]
+
+  assumed = case mod' of
+    MkModule _ _ sect -> Set.fromList (goSection sect)
+   where
+    goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+    goDecl = \ case
+      Assume _ (MkAssume _ _ (MkAppForm _ n _ _) _ _) -> [getUnique n]
+      Section _ s                                       -> goSection s
+      _                                                 -> []
+
+  meansElsewhere d = \ case
+    Ref actual u _
+      | NormalName t <- rawName actual
+      , Map.member u paths
+      , not (Set.member u assumed)
+      , not (Set.member u (definedIn d))
+      -> or [ v /= u
+              && not (Map.member v paths)
+              && v.moduleUri == u.moduleUri
+            | v <- Map.findWithDefault [] (NormalName t) environment ]
+    _ -> False
+
+-- | The references in an expression that can reach the module's scope: a call, a
+-- bare name, or the field of a projection.
+namesIn :: Expr Resolved -> [Resolved]
+namesIn d =
+  concat
+    [ case e of
+        App _ r _        -> [r]
+        AppNamed _ r _ _ -> [r]
+        Proj _ _ f       -> [f]
+        _                -> []
+    | e <- subExprsOf d
+    ]
+
+-- | What an expression binds itself: a lambda's parameters, a @LET@ or @WHERE@
+-- binding. The type variables a node's annotation holds are in here too, which
+-- cannot be the 'Unique' of a value an expression names.
+definedIn :: Expr Resolved -> Set.Set Unique
+definedIn d = Set.fromList [ u | Def u _ <- Optics.toListOf (Optics.gplate @Resolved) d ]
+
+-- | The fields of each record the author declared, and of each enum
+-- constructor that carries data, one group per record or constructor. Not the
+-- record 'requestRecordName' that @l4 batch@ and the service generate to decode
+-- a request into.
+authoredFieldGroups :: Module Resolved -> [[TypedName Resolved]]
+authoredFieldGroups (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
+  goDecl = \ case
+    Declare _ (MkDeclare _ _ (MkAppForm _ n _ _) decl)
+      | spellingOf n /= requestRecordName -> case decl of
+          RecordDecl _ _ ts -> [ts]
+          EnumDecl _ cds    -> [ ts | MkConDecl _ _ ts <- cds ]
+          _                 -> []
+    Section _ s -> goSection s
+    _           -> []
+
+-- | Every node of one type in a module, whatever it sits inside: the topmost
+-- ones, and then those nested under each.
+nodesOfType
+  :: forall a. (Optics.GPlate a (Module Resolved), Optics.GPlate a a)
+  => Module Resolved -> [a]
+nodesOfType m =
+  concatMap (Optics.toListOf (Optics.cosmosOf (Optics.gplate @a)))
+    (Optics.toListOf (Optics.gplate @a) m)
+
+-- | The 'Unique' of the function that stands for a binder's default at a root
+-- ('dischargeModuleWith'): one per binder, numbered by where it is declared, so
+-- that discharge and the evaluator's report of the default agree on it without
+-- either consulting the other. Sort char @\'q\'@, which no other minter uses
+-- (see the list on 'dischargeModule').
+defaultThunkUnique :: NormalizedUri -> Binder -> Unique
+defaultThunkUnique uri b = MkUnique 'q' b.position uri
 
 -- | The binders a body names directly.
 directBinderReads :: Map.Map Unique Binder -> Expr Resolved -> [Binder]
@@ -240,13 +571,46 @@ subExprsOf = Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
 -- module's read-sets, which is §2.2's \"discharge happens at the module
 -- boundary\" and is not in this release.
 dischargeModule :: Module Resolved -> Module Resolved
-dischargeModule mod'
+dischargeModule = dischargeModuleWith True
+
+-- | 'dischargeModule', with T4's presumption switch
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5). With it off, no binder's @TYPICALLY@
+-- is filled in at the root ('fillInDefault' does not fire), so a binder that
+-- nothing supplies stays the assumed term it was before defaults existed:
+-- \"absent with no default\". Every other part of the pass is the same.
+dischargeModuleWith :: Bool -> Module Resolved -> Module Resolved
+dischargeModuleWith presume mod'
   | Map.null binders = mod'
   | Map.null rs      = mod'
   | otherwise        = rewriteExprs (rewriteSignatures mod')
  where
   binders = sectionBinders mod'
-  rs      = readSets mod' binders
+  rsAll   = readSetsAll mod' binders
+  rs      = Map.withoutKeys rsAll (Map.keysSet binders)
+
+  -- The binders whose default discharge fills ('fillInDefault') and whose
+  -- default reads other binders. At a ROOT such a default is worked out from
+  -- the root's own values for what it reads, which is not what the
+  -- module-level definition holds once a @WITH@ has replaced one of them, so a
+  -- root passes the default's function ('defaultFunctionDecl') applied to
+  -- those values instead of the module-level definition (R8: "filled in once
+  -- at the root"). A default that reads nothing needs no function, and the
+  -- module-level definition serves.
+  filledWithReads :: Map.Map Unique (Resolved, [Binder])
+  filledWithReads
+    | not presume = Map.empty
+    | otherwise = Map.fromList
+        [ (u, (defaultThunkName b, bs))
+        | (u, b) <- Map.toList binders
+        , Map.member u elaborated
+        , Just bs <- [Map.lookup u rsAll]
+        ]
+   where
+    elaborated = Map.restrictKeys (decideBodiesFromModule mod') (Map.keysSet binders)
+
+  defaultThunkName b =
+    Def (defaultThunkUnique moduleUriOf b)
+        (MkName emptyAnno (NormalName ("default of " <> unqualifiedRawNameToText (rawName (getOriginal b.resolved)))))
 
   -- Trailing parameters, on the definition's AppForm (which is what
   -- 'L4.EvaluateLazy.Machine.evalDecide' builds the closure's binders from) and
@@ -254,12 +618,14 @@ dischargeModule mod'
   rewriteSignatures (MkModule ann uri sect) = MkModule ann uri (goSection sect)
    where
     goSection (MkSection sann mn maka mgiven decls) =
-      MkSection sann mn maka mgiven (map goTopDecl decls)
+      MkSection sann mn maka mgiven (concatMap goTopDecl decls)
     goTopDecl = \ case
-      Section a s -> Section a (goSection s)
-      Decide a d  -> Decide a (goDecide d)
-      Assume a as -> fromMaybe (Assume a as) (fillInDefault a as)
-      other       -> other
+      Section a s -> [Section a (goSection s)]
+      Decide a d  -> [Decide a (goDecide d)]
+      Assume a as -> case fillInDefault a as of
+        Nothing  -> [Assume a as]
+        Just dec -> dec : maybeToList (defaultFunctionDecl as)
+      other       -> [other]
     goDecide d@(MkDecide dann tysig (MkAppForm afann n args maka) body) =
       case Map.lookup (getUnique n) rs of
         Nothing -> d
@@ -289,9 +655,25 @@ dischargeModule mod'
   -- Nothing when the binder has no default, or when this declaration is not a
   -- section-binder elaboration at all (an ordinary ASSUME keeps its meaning).
   fillInDefault a (MkAssume asann tysig appform@(MkAppForm _ n [] _) mty (Just d))
-    | Map.member (getUnique n) binders =
+    | presume
+    , Map.member (getUnique n) binders =
         Just (Decide a (MkDecide asann (withGiveth mty tysig) appform d))
   fillInDefault _ _ = Nothing
+
+  -- The function a root applies to its own values for what a default reads:
+  -- the default as a definition whose parameters are those binders, which a
+  -- reference to the binder inside it then finds by 'Unique', exactly as any
+  -- reader does ('binderParam'). The call-graph rewrite below passes through
+  -- whatever it calls, so the default may name a definition that reads a binder.
+  defaultFunctionDecl (MkAssume _ tysig (MkAppForm _ n [] _) mty (Just d))
+    | Just (ref, bs) <- Map.lookup (getUnique n) filledWithReads =
+        Just $ Decide emptyAnno $ MkDecide emptyAnno
+          (case withGiveth mty tysig of
+             MkTypeSig tann _ mgiveth ->
+               MkTypeSig tann (MkGivenSig emptyAnno (map binderParam bs)) mgiveth)
+          (MkAppForm emptyAnno ref (map (.resolved) bs) Nothing)
+          d
+  defaultFunctionDecl _ = Nothing
 
   -- The ASSUME carried its declared type in its own field; a DECIDE carries it
   -- on the signature's GIVETH. Keeping it there is what lets a reader (and
@@ -303,44 +685,56 @@ dischargeModule mod'
   -- LET local inside it, a lambda, a directive: all of them are Expr children
   -- of the module, so one traversal reaches them all.
   --
+  -- A directive is a ROOT: nothing above it supplied anything, so what a
+  -- binder's default reads is whatever the directive itself supplies
+  -- ('flowedAt'). Everywhere else a binder reaches a call as the caller's own
+  -- parameter. That is the one thing the traversal has to know about where it is.
+  --
   -- Monadic only to mint the eta-expansion parameters below; the counter is the
   -- whole state.
-  rewriteExprs m =
-    evalState
-      (Optics.traverseOf (Optics.gplate @(Expr Resolved))
-         (Optics.transformMOf (Optics.gplate @(Expr Resolved)) rewriteCall) m)
-      0
+  rewriteExprs (MkModule ann uri sect) =
+    evalState (MkModule ann uri <$> goSection sect) 0
+   where
+    goSection (MkSection sann mn maka mgiven decls) =
+      MkSection sann mn maka <$> traverse (inExprs False) mgiven <*> traverse goTopDecl decls
+    goTopDecl = \ case
+      Section a s   -> Section a <$> goSection s
+      Directive a d -> Directive a <$> inExprs True d
+      other         -> inExprs False other
+    inExprs root =
+      Optics.traverseOf (Optics.gplate @(Expr Resolved))
+        (Optics.transformMOf (Optics.gplate @(Expr Resolved)) (rewriteCall root))
 
   arities = declaredArities mod'
 
-  rewriteCall = \ case
+  rewriteCall root = \ case
     -- A bare reference to a definition that takes parameters of its own: it is
     -- being passed as a VALUE, so the trailing binders cannot simply be appended
     -- — that would put them in the first argument positions. Eta-expand instead.
     App ann n []
       | Just bs <- Map.lookup (getUnique n) rs
       , Just k  <- Map.lookup (getUnique n) arities
-      , k > 0 -> etaExpand ann n k bs
+      , k > 0 -> etaExpand root ann n k bs
     Var ann n
       | Just bs <- Map.lookup (getUnique n) rs
       , Just k  <- Map.lookup (getUnique n) arities
-      , k > 0 -> etaExpand ann n k bs
+      , k > 0 -> etaExpand root ann n k bs
     App ann n args
       | Just bs <- Map.lookup (getUnique n) rs ->
-          pure (App ann n (args <> map flowed bs))
+          pure (App ann n (args <> map (flowedAt root bs []) bs))
     -- 'Var' and 'App _ n []' are the same thing to the evaluator ("still
     -- problematic: similarity / overlap", 'L4.EvaluateLazy.Machine'), so both
     -- have to grow the same arguments or a 'Var' would reach a closure with
     -- none.
     Var ann n
       | Just bs <- Map.lookup (getUnique n) rs ->
-          pure (App ann n (map flowed bs))
+          pure (App ann n (map (flowedAt root bs []) bs))
     -- The evaluator desugars a projection to @App _ field [record]@, so a
     -- COMPUTED field whose body reads a binder needs the same treatment as any
     -- other definition: its selector is an ordinary module-level DECIDE.
     Proj ann e f
       | Just bs <- Map.lookup (getUnique f) rs ->
-          pure (App ann f (e : map flowed bs))
+          pure (App ann f (e : map (flowedAt root bs []) bs))
     -- A named call site supplying an implicit. R1: a site is entirely
     -- positional or entirely named, so the declared parameters are all present
     -- and their permutation is the non-negative half of the order list; the
@@ -352,7 +746,7 @@ dischargeModule mod'
               positional  = map snd (sortOn fst (filter ((>= 0) . fst) paired))
               supplied    = [ ne | (i, ne) <- paired, i < 0 ]
               declared    = [ e | MkNamedExpr _ _ e <- positional ]
-          in pure (App ann n (declared <> map (supply bs supplied) bs))
+          in pure (App ann n (declared <> map (supply root bs supplied) bs))
     other -> pure other
 
   -- @f@, named but not applied, where @f@ takes @k > 0@ parameters of its own
@@ -363,20 +757,23 @@ dischargeModule mod'
   --
   -- This is the one place the pass mints a 'Unique'. They carry the sort char
   -- @\'d\'@, which no other minter uses (@\'c\'@ is 'L4.TypeCheck', @\'e\'@ the
-  -- evaluator, @\'b\'@ the builtins, @\'x\'@ 'L4.Relational.Lower'), so an
-  -- eta parameter cannot collide with a name the module already had.
+  -- evaluator, @\'b\'@ the builtins, @\'x\'@ 'L4.Relational.Lower', @\'l\'@
+  -- the evaluator's lifecycle names, @\'p\'@ the service's per-request root
+  -- fills in @jl4-service@ @Backend.Jl4@, @\'q\'@ a binder's default function,
+  -- 'defaultThunkUnique'), so an eta parameter cannot collide
+  -- with a name the module already had. A new minter adds itself here.
   --
   -- Measured 2026-09-05: without this, @legal\/british-citizen-act.l4@ on the
   -- @ASSUME@ sweep's tree loses both its @#EVAL@s — it passes the 1-ary reader
   -- @\`is a British citizen (variant)\`@ to a higher-order rule, which is
   -- ordinary L4 and must keep working.
-  etaExpand ann n k bs = do
+  etaExpand root ann n k bs = do
     ps <- traverse etaParam [0 .. k - 1]
     pure
       (Lam ann
         (MkGivenSig emptyAnno
           [ MkOptionallyTypedName emptyAnno p Nothing Nothing | p <- ps ])
-        (App emptyAnno n (map (Var emptyAnno) ps <> map flowed bs)))
+        (App emptyAnno n (map (Var emptyAnno) ps <> map (flowedAt root bs []) bs)))
 
   etaParam i = do
     j <- get
@@ -393,10 +790,28 @@ dischargeModule mod'
   -- at a root is still the module-level ASSUME.
   flowed b = App emptyAnno b.resolved []
 
-  supply bs supplied b =
+  -- The same, at a root, for a binder whose default reads other binders: the
+  -- default's function applied to the root's values for them. Each is what the
+  -- site supplies by name, or else what it passes on for the binder, which for
+  -- another such binder is again its default's function. A binder meets itself
+  -- only in a circle ('defaultCycles'), which the checker has refused; the
+  -- guard is for a module that never was checked.
+  flowedAt root bs supplied = flowedFrom [] root bs supplied
+
+  flowedFrom seen root bs supplied b
+    | root
+    , getUnique b.resolved `notElem` seen
+    , Just (ref, reads') <- Map.lookup (getUnique b.resolved) filledWithReads =
+        App emptyAnno ref
+          [ supplyFrom (getUnique b.resolved : seen) root bs supplied c | c <- reads' ]
+    | otherwise = flowed b
+
+  supply = supplyFrom []
+
+  supplyFrom seen root bs supplied b =
     case [ e | MkNamedExpr _ r e <- supplied, suppliesBinder bs r b ] of
       e : _ -> e
-      []    -> flowed b
+      []    -> flowedFrom seen root bs supplied b
 
 -- | Which binder in the callee's read-set a supplied name refers to.
 --
@@ -443,6 +858,30 @@ implicitSupplySites mod' =
   , i < 0
   ]
 
+-- | 'implicitSupplySites', each with whether it is written at a ROOT: inside a
+-- directive, a lambda or a @WHERE@ written there included. That is what
+-- 'dischargeModuleWith' means by a root, a syntactic fact, and the one thing a
+-- supply's reach depends on: a @WITH@ at a root reaches a binder that only a
+-- default reads, and one written in a definition does not.
+implicitSupplySitesAt :: Module Resolved -> [(Bool, Resolved, Resolved)]
+implicitSupplySitesAt (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ mgiven decls) =
+    maybe [] (sitesIn False) mgiven <> concatMap goTopDecl decls
+  goTopDecl = \ case
+    Section _ s   -> goSection s
+    Directive _ d -> sitesIn True d
+    other         -> sitesIn False other
+  sitesIn :: Optics.GPlate (Expr Resolved) a => Bool -> a -> [(Bool, Resolved, Resolved)]
+  sitesIn root x =
+    [ (root, n, r)
+    | e <- concatMap (Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved))))
+             (Optics.toListOf (Optics.gplate @(Expr Resolved)) x)
+    , AppNamed _ n nes (Just order) <- [e]
+    , (i, MkNamedExpr _ r _) <- zip order nes
+    , i < 0
+    ]
+
 -- | Named call sites that supply a section binder the callee does not read.
 --
 -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; naming one
@@ -464,14 +903,41 @@ unreadImplicitSupplies mod'
   | Map.null binders = []
   | otherwise =
       [ (n, r)
-      | (n, r) <- implicitSupplySites mod'
-      , not (any (suppliesBinder (readSetOf n) r) (readSetOf n))
-      , not (ambiguousFor (readSetOf n) r)
+      | (root, n, r) <- implicitSupplySitesAt mod'
+      , not (Map.member (getUnique n) binders)
+      , let reach = readSetAt root n
+      , not (any (suppliesBinder reach r) reach)
+      , not (ambiguousFor reach r)
       ]
  where
   binders = sectionBinders mod'
-  rs      = readSets mod' binders
-  readSetOf n = fromMaybe [] (Map.lookup (getUnique n) rs)
+  stages  = readSetStages mod' binders
+  -- A supply at a root reaches what the callee needs from its root, defaults
+  -- included. One written in a definition reaches only what the callee reads
+  -- itself: a binder that only a default reads is worked out at the root, from the
+  -- root's values, so a supply for it written below the root would have nowhere to
+  -- go (W7 second review, silent S4). The base refused that WITH for the same
+  -- reason, since no default could read an input then.
+  readSetAt root n =
+    fromMaybe [] (Map.lookup (getUnique n) ((if root then stages.closed else stages.own) `Map.withoutKeys` Map.keysSet binders))
+
+-- | Call sites that give a @WITH@ to a section INPUT as though it were a rule:
+-- @discount WITH \`list price\` IS 200@, where @discount@ is a binder. An input
+-- has no read-set of its own for a @WITH@ to reach ('readSets' leaves binders
+-- out), so 'unreadImplicitSupplies' would say it does not read the value, which
+-- is false when its default does. The writer's mistake is a different one: the
+-- value belongs on a rule that reads the input. One entry per site: the input
+-- called, and the binder supplied.
+implicitSuppliesToInputs :: Module Resolved -> [(Resolved, Resolved)]
+implicitSuppliesToInputs mod'
+  | Map.null binders = []
+  | otherwise =
+      [ (n, r)
+      | (n, r) <- implicitSupplySites mod'
+      , Map.member (getUnique n) binders
+      ]
+ where
+  binders = sectionBinders mod'
 
 -- | Supplies whose 'Unique' matches no binder the callee reads and whose
 -- SPELLING matches two or more of them.

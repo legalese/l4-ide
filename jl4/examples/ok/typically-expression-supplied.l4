@@ -1,0 +1,44 @@
+-- A default that SUPPLIES the input it would otherwise read does not read it
+-- (R8 rule 3, W7: the same subtraction as everywhere else), so two defaults that
+-- look like a circle are not one.
+--
+-- `a`'s default calls `h` and gives it `b`, so it never takes `b`'s default;
+-- `b`'s default reads `a`. Reading `b` through `h` was once charged with what
+-- `b`'s default reads, which made `a` read `a`, and the pair was refused as a
+-- circle.
+
+§ `Pair`
+    GIVEN a IS A NUMBER TYPICALLY (h WITH b IS 1)
+          b IS A NUMBER TYPICALLY (a PLUS 1)
+
+GIVETH A NUMBER
+h MEANS b PLUS 0
+
+GIVETH A NUMBER
+total MEANS (a TIMES 10) PLUS b
+
+-- a is h with b given as 1, which is 1; b is a plus one, which is 2
+#ASSERT a EQUALS 1
+#ASSERT b EQUALS 2
+#ASSERT total EQUALS 12
+-- a supplied `a` moves `b`, a supplied `b` moves nothing that `a` reads
+#ASSERT (total WITH a IS 5) EQUALS 56
+#ASSERT (total WITH b IS 7) EQUALS 17
+
+-- The other half: a definition that supplies one input and takes another from its
+-- root. `g` reads `b` and `r`; `h` gives `g` its own `r`, so `h` reads `b` and not
+-- `r`. But `b`'s default reads `r`, and the root works it out from the root's `r`,
+-- so the root is still asked for it, and a WITH on `r` at the root reaches `b`.
+§ `Closure`
+    GIVEN r IS A NUMBER TYPICALLY 2
+          b IS A NUMBER TYPICALLY (r TIMES 10)
+
+GIVETH A NUMBER
+g MEANS b PLUS r
+
+GIVETH A NUMBER
+h MEANS g WITH r IS 1
+
+-- b is 20 and g's own r is 1; with a root r of 5, b is 50
+#ASSERT h EQUALS 21
+#ASSERT (h WITH r IS 5) EQUALS 51

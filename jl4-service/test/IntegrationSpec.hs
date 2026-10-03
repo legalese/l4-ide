@@ -17,7 +17,8 @@ import Logging (newLogger)
 import Options (Options (..))
 import Types
 
-import Control.Monad (guard, unless)
+import Control.Concurrent.Async (forConcurrently)
+import Control.Monad (forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (try)
@@ -43,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, namedSiteDefaultJL4, expressionDefaultJL4, expressionAllDefaultJL4, expressionSiteDefaultJL4, expressionMultiargJL4, expressionWrapperJL4, constructorNamedDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -84,7 +85,7 @@ spec = describe "integration" do
         resp <- evalFunction baseUrl mgr "refuse-eval" "fee"
           (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (1999 :: Int) ] ])
         case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
-          Just (SimpleError e@(EvaluatorRefused _)) ->
+          Just (SimpleError e@(EvaluatorRefused _ _)) ->
             prettyEvaluatorError e `shouldBe`
               "The model refuses to answer: this schedule is not encoded for years before 2000"
           other -> expectationFailure ("Expected a refusal error, got: " <> show other)
@@ -456,6 +457,675 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+  describe "TYPICALLY defaults (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC)" do
+    let uncertain = Aeson.object []
+        args kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs]
+        hard kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs, "presumption" Aeson..= ("hard" :: Text)]
+        expectAnswer resp v ps = assertSuccess resp \r ->
+          (Map.lookup "value" r.fnResult, r.presumed) `shouldBe` (Just v, ps)
+        expectError resp fragment =
+          case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+            Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf fragment
+            other -> expectationFailure ("Expected an error containing " <> show fragment <> ", got: " <> show other)
+
+    -- W2: the published schema is R8's surface: optional, with its default.
+    it "publishes a section GIVEN's default and leaves it out of required (W2)" do
+      withServiceFromSources "ty-schema" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema/functions/may%20contract")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            capacity = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object props) -> Aeson.KeyMap.lookup "has capacity" props
+              _ -> Nothing
+        required `shouldNotContain` ["has capacity"]
+        required `shouldContain` ["is adult"]
+        (capacity >>= \case Aeson.Object c -> Aeson.KeyMap.lookup "default" c; _ -> Nothing)
+          `shouldBe` Just (Aeson.Bool True)
+
+    it "fills a left-out section GIVEN on the direct path and lists it in presumed" do
+      withServiceFromSources "ty-sec-direct" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-direct" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    -- The positive control for presumed: a default the rule never forces is
+    -- not listed, although the request left it out just the same.
+    it "does not list a rule GIVEN's default the rule never read" do
+      withServiceFromSources "ty-rule-unread" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rule-unread" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    it "fills a left-out section GIVEN on the wrapper path too" do
+      withServiceFromSources "ty-sec-wrap" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    it "fills a left-out rule GIVEN on the direct and the wrapper path" do
+      withServiceFromSources "ty-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitBool True) ["has capacity"]
+        wrapped <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["has capacity"]
+
+    it "fills left-out record fields from their DECLARE, enum defaults included (T1b)" do
+      withServiceFromSources "ty-record" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-record" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
+        expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
+
+    -- W4, W5: a default the RULES take at a named site is not the request's to
+    -- supply, so it is taken in both presumption modes. Under soft `presumed`
+    -- keeps what a request could have supplied (T6b), as for a rule's own
+    -- JSONDECODE, so it lists nothing; under hard the answer rests on it and
+    -- lists it under the application that took it (T4b), on both paths. The
+    -- request's own `rate` is 7; `scaled` still takes its 3.
+    it "takes a default a named site inside the rules took in both modes, and lists it under hard, on both paths" do
+      withServiceFromSources "ty-named" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
+        let used = ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= True]
+            presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        soft <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= False : used))
+        expectAnswer soft (FnLitInt 60) []
+        hardRun <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= False : used))
+        expectAnswer hardRun (FnLitInt 60) presumedHere
+        -- a {} on the unread flag sends the request down the wrapper path
+        wrapped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrapped (FnLitInt 60) []
+        wrappedHard <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrappedHard (FnLitInt 60) presumedHere
+        -- The positive control: `use` FALSE never reaches either site.
+        skipped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer skipped (FnLitInt 0) []
+
+    -- W7 (R8 rule 3): a section input's default that is an expression is worked
+    -- out from the values the same request supplies, on both paths.
+    it "works a section input's expression default out from the request, on the direct and the wrapper path (W7)" do
+      withServiceFromSources "ty-expr-sec" [("price.l4", expressionDefaultJL4)] \baseUrl mgr -> do
+        let listPrice n = "list price" Aeson..= (n :: Int)
+        -- twice a tenth of the request's own `list price`, which only the
+        -- default reads
+        direct <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 200, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitInt 40) ["discount"]
+        -- the default follows the request
+        other <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 50, "unused flag" Aeson..= False])
+        expectAnswer other (FnLitInt 10) ["discount"]
+        wrapped <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 200, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitInt 40) ["discount"]
+        -- a value the request supplies wins, and nothing is presumed
+        supplied <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (args [listPrice 200, "discount" Aeson..= (5 :: Int), "unused flag" Aeson..= False])
+        expectAnswer supplied (FnLitInt 10) []
+        -- hard uses no default, an expression among them
+        refused <- evalFunction baseUrl mgr "ty-expr-sec" "final price"
+          (hard [listPrice 200, "unused flag" Aeson..= False])
+        expectError refused "presumption is hard"
+
+    -- A request that sends {} for an input takes the generated-module path, which
+    -- writes each input the request supplies, or leaves to a default, into a record
+    -- it generates. A default that reads another section input sits in that record
+    -- as a field default that reads a section input, and the refusal for a rule's
+    -- input or a record's field (decision 1) took it for the author's: every such
+    -- request that supplied one of the two inputs, and every one under hard, was
+    -- refused with a message about a record the author never wrote (W7 second
+    -- review, silent S3).
+    it "answers a request on the generated-module path that supplies an input a default reads, or that reads one (W7)" do
+      withServiceFromSources "ty-expr-wrapper" [("price.l4", expressionWrapperJL4)] \baseUrl mgr -> do
+        let listPrice n = "list price" Aeson..= (n :: Int)
+            discount n = "discount" Aeson..= (n :: Int)
+            wrapped = "unused flag" Aeson..= uncertain
+            ask fn = evalFunction baseUrl mgr "ty-expr-wrapper" fn
+        -- neither supplied: both defaults are taken (100 - 10)
+        bare <- ask "final price" (args [wrapped])
+        expectAnswer bare (FnLitInt 90) ["list price", "discount"]
+        -- the discount supplied, the list price taken (100 - 1)
+        onlyDiscount <- ask "final price" (args [wrapped, discount 1])
+        expectAnswer onlyDiscount (FnLitInt 99) ["list price"]
+        -- the list price supplied, and the discount worked out from it (200 - 20)
+        onlyPrice <- ask "final price" (args [wrapped, listPrice 200])
+        expectAnswer onlyPrice (FnLitInt 180) ["discount"]
+        -- both supplied
+        both <- ask "final price" (args [wrapped, listPrice 200, discount 5])
+        expectAnswer both (FnLitInt 195) []
+        -- under hard every input is supplied, and none is presumed
+        allHard <- ask "final price" (hard [wrapped, listPrice 200, discount 5])
+        expectAnswer allHard (FnLitInt 195) []
+
+    -- The published schema gives an expression default as source text
+    -- (IMPLICIT-PROPS-DESIGN §11.5), and still asks for the input it reads.
+    it "publishes a section input's expression default as its source text, and leaves it out of required (W7)" do
+      withServiceFromSources "ty-expr-schema" [("price.l4", expressionDefaultJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-expr-schema/functions/final%20price")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            props = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            defaultOf key = case Aeson.KeyMap.lookup key props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "discount" `shouldBe` Just (Aeson.String "`list price` DIVIDED BY 10")
+        required `shouldContain` ["list price"]
+        required `shouldNotContain` ["discount"]
+
+    -- W7, decision 1 (§4.3 of the spec): a rule's input and a record's field take
+    -- an expression too.
+    it "publishes a rule input's and a field's expression default as source text (W7)" do
+      withServiceFromSources "ty-expr-all-schema" [("price.l4", expressionAllDefaultJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-expr-all-schema/functions/final%20price")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            props = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            defaultOf key = case Aeson.KeyMap.lookup key props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+            fieldDefault = case Aeson.KeyMap.lookup "cfg" props of
+              Just (Aeson.Object p) | Just (Aeson.Object fs) <- Aeson.KeyMap.lookup "properties" p ->
+                case Aeson.KeyMap.lookup "timeout" fs of
+                  Just (Aeson.Object t) -> Aeson.KeyMap.lookup "default" t
+                  _ -> Nothing
+              _ -> Nothing
+        defaultOf "rate" `shouldBe` Just (Aeson.String "phi PLUS 1")
+        fieldDefault `shouldBe` Just (Aeson.String "phi TIMES 2")
+        required `shouldNotContain` ["rate", "discount"]
+
+    it "works a rule's, a section's and a field's expression default out from the request (W7)" do
+      withServiceFromSources "ty-expr" [("price.l4", expressionAllDefaultJL4)] \baseUrl mgr -> do
+        let cfg = "cfg" Aeson..= Aeson.object ["retries" Aeson..= (1 :: Int)]
+            listPrice n = "list price" Aeson..= (n :: Int)
+            everything = ["discount", "rate", "cfg.timeout"]
+        -- (200 - 20) * 9 + 16, from the request's own `list price`
+        direct <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [listPrice 200, cfg, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitInt 1636) everything
+        -- the default follows the request: (50 - 5) * 9 + 16
+        other <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [listPrice 50, cfg, "unused flag" Aeson..= False])
+        expectAnswer other (FnLitInt 421) everything
+        wrapped <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [listPrice 200, cfg, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitInt 1636) everything
+        -- a value the request supplies wins, and nothing is presumed
+        supplied <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (args [ listPrice 200, "discount" Aeson..= (5 :: Int), "rate" Aeson..= (2 :: Int)
+                , "cfg" Aeson..= Aeson.object ["retries" Aeson..= (1 :: Int), "timeout" Aeson..= (1 :: Int)]
+                , "unused flag" Aeson..= False ])
+        expectAnswer supplied (FnLitInt 391) []
+        refused <- evalFunction baseUrl mgr "ty-expr" "final price"
+          (hard [listPrice 200, cfg, "unused flag" Aeson..= False])
+        expectError refused "presumption is hard"
+
+    it "takes an expression default at a named site, and lists it under hard (W7)" do
+      withServiceFromSources "ty-expr-site" [("combine.l4", expressionSiteDefaultJL4)] \baseUrl mgr -> do
+        let used = ["n" Aeson..= (10 :: Int), "use" Aeson..= True]
+            presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        -- (8 + 1) * 10 for the rate the site takes, and 8 * 2 for the field's timeout
+        soft <- evalFunction baseUrl mgr "ty-expr-site" "combine"
+          (args ("unused flag" Aeson..= False : used))
+        expectAnswer soft (FnLitInt 106) []
+        hardRun <- evalFunction baseUrl mgr "ty-expr-site" "combine"
+          (hard ("unused flag" Aeson..= False : used))
+        expectAnswer hardRun (FnLitInt 106) presumedHere
+        wrapped <- evalFunction baseUrl mgr "ty-expr-site" "combine"
+          (hard ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrapped (FnLitInt 106) presumedHere
+
+    -- A default that is a call with several arguments is written out as source
+    -- twice: in the wrapper a request with an uncertain input gets, and as the
+    -- schema's `default`. It used to put each argument on a line of its own,
+    -- so the wrapper did not parse and the schema text carried a newline and
+    -- column padding.
+    it "works a default that is a call with several arguments out, on both paths, and publishes it on one line (W7)" do
+      withServiceFromSources "ty-expr-multiarg" [("price.l4", expressionMultiargJL4)] \baseUrl mgr -> do
+        let listPrice = "list price" Aeson..= (200 :: Int)
+        -- (200 - (200 + 1)) * (2 + 3)
+        direct <- evalFunction baseUrl mgr "ty-expr-multiarg" "final price"
+          (args [listPrice, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitInt (-5)) ["discount", "rate"]
+        wrapped <- evalFunction baseUrl mgr "ty-expr-multiarg" "final price"
+          (args [listPrice, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitInt (-5)) ["discount", "rate"]
+        req <- parseRequest (baseUrl <> "/deployments/ty-expr-multiarg/functions/final%20price")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            props = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            defaultOf key = case Aeson.KeyMap.lookup key props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "rate" `shouldBe` Just (Aeson.String "combine WITH a IS 2, b IS 3")
+        defaultOf "discount" `shouldBe` Just (Aeson.String "combine WITH a IS `list price`, b IS 1")
+
+    -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+    -- listed whenever the same constructor was evaluated later in the run. Each
+    -- case is a default that is NOT read (or a pair of which only one is), with a
+    -- later use of the same constructor to trip it, on both paths.
+    it "lists a constructor default a named site took only if the answer read it, on both paths" do
+      withServiceFromSources "ty-ctor" [("ctor.l4", constructorNamedDefaultJL4)] \baseUrl mgr -> do
+        -- under hard, which is where `presumed` lists a default taken inside the
+        -- rules: under soft it lists none, so a wrong listing could not show
+        let flag = "unused flag" Aeson..= False
+            run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (hard (extra <> [flag]))
+            runWrapped fn extra = evalFunction baseUrl mgr "ty-ctor" fn
+              (hard (extra <> ["unused flag" Aeson..= uncertain]))
+        -- x FALSE: the AND stops at `a`; x TRUE: `b` is read
+        stops <- run "short circuits" ["x" Aeson..= False]
+        expectAnswer stops (FnLitInt 0) []
+        reads' <- run "short circuits" ["x" Aeson..= True]
+        expectAnswer reads' (FnLitInt 0) ["WITH both: b"]
+        stopsWrapped <- runWrapped "short circuits" ["x" Aeson..= False]
+        expectAnswer stopsWrapped (FnLitInt 0) []
+        readsWrapped <- runWrapped "short circuits" ["x" Aeson..= True]
+        expectAnswer readsWrapped (FnLitInt 0) ["WITH both: b"]
+        -- two defaults that are the same constructor: `ignoreD`'s `d` is never
+        -- read, `both`'s `b` is, and only `b` is listed
+        pair <- run "two of one constructor" ["x" Aeson..= True]
+        expectAnswer pair (FnLitBool False) ["WITH both: b"]
+        -- an enum default the rule never mentions, then that enum's constructor
+        enumNever <- run "enum never mentioned" ["x" Aeson..= True]
+        expectAnswer enumNever (FnLitString "Red") []
+
+    it "lets a supplied value win, and presumes nothing" do
+      withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-supplied" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    -- T3: null is "I don't know", never an omission.
+    it "never takes a default for null" do
+      withServiceFromSources "ty-null" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-null" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= Aeson.Null])
+        expectError resp "never takes the TYPICALLY default"
+
+    -- T4: presumption hard withdraws the default; the refusal names the input
+    -- and stays loud, on both paths.
+    it "with presumption hard, refuses a left-out input on the direct path" do
+      withServiceFromSources "ty-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectError resp "'has capacity': missing required parameter"
+
+    it "with presumption hard, stops on a left-out input on the wrapper path" do
+      withServiceFromSources "ty-hard-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-wrap" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectError resp "has capacity (not supplied)"
+
+    -- T1b: presumption hard withdraws D7.3's MAYBE fallback too, the same way
+    -- on both paths.
+    it "with presumption hard, refuses a left-out MAYBE input on both paths" do
+      withServiceFromSources "ty-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        -- NOTHING for a left-out MAYBE is a presumption, listed like a default
+        soft <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False])
+        expectAnswer soft (FnLitInt 0) ["premium"]
+        softWrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= uncertain])
+        expectAnswer softWrapped (FnLitInt 0) ["premium"]
+        -- null is a value, not an omission: NOTHING, and nothing presumed
+        nulled <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False, "premium" Aeson..= Aeson.Null])
+        expectAnswer nulled (FnLitInt 0) []
+        direct <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= False])
+        expectError direct "a MAYBE left out is NOTHING only while presumption is soft"
+        wrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= uncertain])
+        -- the wrapper's own field name (`premium (input)`) does not leak (review m6)
+        expectError wrapped "Missing required field 'premium'"
+
+    -- T6: a section default counts when the rule first READS it, not when
+    -- discharge binds it at the root. `FALSE AND <defaulted input>`.
+    it "lists a section default only when the rule reads it, on both paths" do
+      withServiceFromSources "ty-sec-read" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        unread <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer unread (FnLitBool False) []
+        unreadWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= uncertain])
+        expectAnswer unreadWrapped (FnLitBool False) []
+        readWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer readWrapped (FnLitBool True) ["has capacity"]
+
+    -- T3's four cells, on the wrapper path: absent takes the default, null and
+    -- {} do not. (The direct path's null is the "never takes a default for
+    -- null" test above.)
+    it "keeps null apart from absent on the wrapper path" do
+      withServiceFromSources "ty-null-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        absent <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer absent (FnLitBool True) ["has capacity"]
+        nulled <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+        uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
+        expectError uncertainCap "has capacity (not supplied)"
+
+    it "keeps null apart from absent for a section GIVEN on the wrapper path" do
+      withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        nulled <- evalFunction baseUrl mgr "ty-null-sec" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+
+    it "with presumption hard, names every defaulted input left out" do
+      withServiceFromSources "ty-hard-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-two" "may contract" (hard ["is adult" Aeson..= True])
+        expectError resp "Parameter 'of sound mind': missing required parameter"
+        -- a section GIVEN is a parameter, not an ASSUME (review nit 22)
+        expectError resp "Parameter 'has capacity': missing required parameter"
+
+    -- Review M5: a refusal that rests on a default says so, on both
+    -- endpoints, and a refused or errored case of the batch endpoint is
+    -- returned with its reason instead of only being counted (review m5).
+    it "carries presumed on a refusal, and on a refused batch case" do
+      withServiceFromSources "ty-refuse" [("eligible.l4", refuseDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-refuse" "eligible" (args ["age" Aeson..= (30 :: Int)])
+        case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+          Just (SimpleError (EvaluatorRefused reason ps)) -> do
+            reason `shouldBe` "cannot decide for a non-resident"
+            ps `shouldBe` ["is resident"]
+          other -> expectationFailure ("Expected a refusal, got: " <> show other)
+        supplied <- evalFunction baseUrl mgr "ty-refuse" "eligible"
+          (args ["age" Aeson..= (30 :: Int), "is resident" Aeson..= False])
+        case Aeson.decode (responseBody supplied) :: Maybe SimpleResponse of
+          Just (SimpleError (EvaluatorRefused _ ps)) -> ps `shouldBe` []
+          other -> expectationFailure ("Expected a refusal, got: " <> show other)
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "age" Aeson..= (30 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "age" Aeson..= (30 :: Int), "is resident" Aeson..= True]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-refuse/functions/eligible/evaluation/batch") body
+        batchResp <- httpLbs req mgr
+        case Aeson.decode (responseBody batchResp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody batchResp))
+          Just batch -> do
+            map (\c -> (c.outcome, c.presumed)) batch.cases `shouldBe`
+              [ (CaseRefused "cannot decide for a non-resident", ["is resident"]), (CaseAnswered, []) ]
+            batch.summary.casesProcessed `shouldBe` 2
+
+    it "returns an errored batch case with its reason, under presumption hard" do
+      withServiceFromSources "ty-batch-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "presumption" Aeson..= ("hard" :: Text)
+              , "cases" Aeson..= [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False] ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch-hard/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Just batch -> case map (.outcome) batch.cases of
+            [CaseErrored msg] -> msg `shouldSatisfy` Text.isInfixOf "Parameter 'has capacity': missing required parameter"
+            other -> expectationFailure ("Expected one errored case, got: " <> show other)
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+
+    it "refuses an unknown presumption with a 400" do
+      withServiceFromSources "ty-bad-switch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-bad-switch" "may contract"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["is adult" Aeson..= True], "presumption" Aeson..= ("medium" :: Text)])
+        statusCode' resp `shouldBe` 400
+
+    -- Review m1: an exact default reaches the evaluator exactly on both paths.
+    it "keeps a decimal default exact on the direct and the wrapper path" do
+      withServiceFromSources "ty-exact" [("exact.l4", exactDecimalJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-exact" "is exact" (args ["u" Aeson..= True])
+        expectAnswer direct (FnLitBool True) ["r"]
+        wrapped <- evalFunction baseUrl mgr "ty-exact" "is exact" (args ["u" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["r"]
+
+    -- Review m2 and code #7: the schema publishes an enum default as the
+    -- constructor's own name, NOTHING as null, and a rule GIVEN's default;
+    -- and the direct path accepts the published enum value.
+    it "publishes enum, NOTHING and rule GIVEN defaults a request can send back" do
+      withServiceFromSources "ty-schema-enum" [("which.l4", enumSchemaJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema-enum/functions/which")
+        resp <- httpLbs req mgr
+        let props = case lookupKey "parameters" (decodeObject (responseBody resp)) of
+              Just (Aeson.Object o) | Just (Aeson.Object ps) <- Aeson.KeyMap.lookup "properties" o -> ps
+              _ -> mempty
+            defaultOf k = case Aeson.KeyMap.lookup k props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "s" `shouldBe` Just (Aeson.String "Red")
+        defaultOf "m" `shouldBe` Just Aeson.Null
+        defaultOf "k" `shouldBe` Just (Aeson.Number 5)
+        sent <- evalFunction baseUrl mgr "ty-schema-enum" "which" (args ["s" Aeson..= ("Red" :: Text)])
+        expectAnswer sent (FnLitInt 5) ["k"]
+
+    -- Review m8 and m4, report item 5: on the wrapper path a non-BOOLEAN
+    -- input sent as null is refused by name (it used to be "Evaluation
+    -- produced unknown value"), and hard mode compiles a MAYBE default.
+    it "refuses null by name on the wrapper path, and names every input under hard" do
+      withServiceFromSources "ty-wrap-null" [("wp.l4", wrapperNullJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["k" Aeson..= Aeson.Null])
+        expectError direct "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        wrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain, "k" Aeson..= Aeson.Null])
+        expectError wrapped "Field 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        soft <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain])
+        expectAnswer soft (FnLitInt 1050) ["m", "k", "flag"]
+        hardWrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["u" Aeson..= uncertain], "presumption" Aeson..= ("hard" :: Text)])
+        expectError hardWrapped "Missing required fields 'm'"
+        expectError hardWrapped "'k' (it has a TYPICALLY default, but presumption is hard"
+
+    it "refuses null on an enum by name, and reads a MAYBE synonym as a MAYBE" do
+      withServiceFromSources "ty-enum-null" [("red.l4", enumNullJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= False])
+        expectError direct "Parameter 'shade' is null, which means the value is not known"
+        wrapped <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= uncertain])
+        expectError wrapped "Field 'shade' is null, which means the value is not known"
+        synonym <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= ("Red" :: Text), "second" Aeson..= Aeson.Null, "unused flag" Aeson..= False])
+        expectAnswer synonym (FnLitBool True) []
+        synonymAbsent <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= ("Red" :: Text), "unused flag" Aeson..= False])
+        expectAnswer synonymAbsent (FnLitBool True) ["second"]
+
+    it "fills a record field default on the wrapper path, and names it without the wrapper's suffix" do
+      withServiceFromSources "ty-rec-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        filled <- evalFunction baseUrl mgr "ty-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)], "unused flag" Aeson..= uncertain])
+        expectAnswer filled (FnLitInt 32) ["cfg.timeout"]
+        nulled <- evalFunction baseUrl mgr "ty-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= Aeson.Null], "unused flag" Aeson..= uncertain])
+        expectError nulled "Field 'cfg.timeout' is null"
+
+    -- Review M3 / code #1: a rule's own decode is not the request's.
+    it "lets a rule's own JSONDECODE fill its default under hard, and says so" do
+      withServiceFromSources "ty-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        soft <- evalFunction baseUrl mgr "ty-own" "within limit" (args ["amount" Aeson..= (5 :: Int)])
+        expectAnswer soft (FnLitBool True) []
+        hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
+        expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]
+
+    it "fills a default on the deontic wrapper path and lists it" do
+      withServiceFromSources "ty-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
+
+    -- Review F2, 2026-10-03: the wrapper turns an event's party record into
+    -- SOURCE, which since W5 filled a field it left out from its TYPICALLY, under
+    -- "presumption": "hard" as well, and listed it as a default no request could
+    -- supply. The event no longer matched the party it named. An event's record
+    -- is part of the request, so it keeps what it had: every field is written.
+    -- (Decided by Claude overnight 2026-10-03, pending Meng's review.)
+    it "refuses an event whose record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event" [("seatbelt.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+        let driver = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("drive" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= driver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            nameOnly = Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+            whole    = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            message = "Missing required field 'events[0].party.licence' (Driver)"
+        softGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" nameOnly)
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "hard" nameOnly)
+        expectError hardGap message
+        -- the positive control: the same request with the field written is answered,
+        -- and nothing is presumed
+        written <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" whole)
+        assertSuccess written \r -> r.presumed `shouldBe` []
+        -- the argument's own record is decoded from JSON, where the switch applies:
+        -- soft takes the default, hard refuses it. (Whether `presumed` lists the
+        -- default is not asserted: the deontic machinery reads a party without
+        -- forcing it, the known gap of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md 4.2.)
+        let argRequest presumption = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= nameOnly]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= ([] :: [Aeson.Value])
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+        argSoft <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "soft")
+        assertSuccess argSoft \_ -> pure ()
+        argHard <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "hard")
+        expectError argHard "Missing required field 'driver.licence'"
+
+    -- Review rulings R2-2: the refusal above looked only at the top level of
+    -- an event's record. A record nested in it is generated as source too, so a
+    -- field it left out was filled from its TYPICALLY, in both modes, and the
+    -- event stopped matching its party with status success.
+    it "refuses an event whose nested record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event-nested" [("seatbelt.l4", deonticNestedFieldDefaultJL4)] \baseUrl mgr -> do
+        let address fields = Aeson.object ["Address" Aeson..= Aeson.object fields]
+            zip5 = "zip" Aeson..= (5 :: Int)
+            floor2 = "floor" Aeson..= (2 :: Int)
+            driverWith home = Aeson.object ["name" Aeson..= ("Alice" :: Text), "zhome" Aeson..= home]
+            -- an argument's record is decoded from plain JSON, an event's is generated
+            -- as source and sent constructor-keyed, the shape the service's answers use
+            plainDriver = driverWith (Aeson.object [zip5, floor2])
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= plainDriver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            message = "Missing required field 'events[0].party.zhome.Address.floor' (Address)"
+        softGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5])))
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "hard" (driverWith (address [zip5])))
+        expectError hardGap message
+        -- the positive control: the same request with the nested field written is answered
+        written <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5, floor2])))
+        assertSuccess written \r -> r.presumed `shouldBe` []
+
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input or a field left out takes its default, a name that matches
+    -- nothing is refused, naming the nearest; elsewhere it is ignored.
+    it "refuses an unknown argument where a default is taken, and ignores it elsewhere" do
+      withServiceFromSources "ty-typo" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        typo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capasity" Aeson..= False])
+        expectError typo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        wrappedTypo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capasity" Aeson..= False])
+        expectError wrappedTypo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        nothingTaken <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False, "has capasity" Aeson..= True])
+        expectAnswer nothingTaken (FnLitBool False) []
+      withServiceFromSources "ty-typo-rec" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "shade" Aeson..= ("Green" :: Text)])
+        expectError direct "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+        full <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args [ "cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= (5 :: Int), "colour" Aeson..= ("Red" :: Text), "timout" Aeson..= (1 :: Int)]
+                , "shade" Aeson..= ("Green" :: Text) ])
+        expectAnswer full (FnLitInt 7) []
+      withServiceFromSources "ty-typo-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        wrapped <- evalFunction baseUrl mgr "ty-typo-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "unused flag" Aeson..= uncertain])
+        expectError wrapped "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on
+    -- a record input is null, so it is refused by name, as in l4 batch.
+    it "refuses {} on a record input by name" do
+      withServiceFromSources "ty-rec-empty" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rec-empty" "budget"
+          (args ["cfg" Aeson..= Aeson.object [], "unused flag" Aeson..= False])
+        expectError resp "Field 'cfg' is {}, which means the value is not known: supply a value"
+
+    -- Review code #3: the "took its default" registry is per evaluation, so
+    -- concurrent requests on one cached deployment cannot see each other's.
+    it "keeps presumed apart across concurrent requests" do
+      withServiceFromSources "ty-concurrent" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        let request i =
+              let adult = even (i :: Int)
+              in ( adult
+                 , args ["is adult" Aeson..= adult, "unused flag" Aeson..= (if i `mod` 3 == 0 then uncertain else Aeson.Bool False)] )
+        results <- forConcurrently [1 .. 24] \i -> do
+          let (adult, body) = request i
+          resp <- evalFunction baseUrl mgr "ty-concurrent" "may contract" body
+          pure (adult, Aeson.decode (responseBody resp) :: Maybe SimpleResponse)
+        forM_ results \(adult, r) -> case r of
+          Just (SimpleResponse rwr) ->
+            (Map.lookup "value" rwr.fnResult, rwr.presumed) `shouldBe`
+              (Just (FnLitBool adult), [ "has capacity" | adult ])
+          other -> expectationFailure ("Expected an answer, got: " <> show other)
+
+    it "carries presumed on each case of the batch endpoint" do
+      withServiceFromSources "ty-batch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+          Just batch -> map (\c -> c.presumed) batch.cases `shouldBe` [["has capacity"], []]
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
@@ -2410,7 +3080,8 @@ evalFunction baseUrl mgr deployId fnName body = do
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
 assertSuccess resp check = do
-  statusCode' resp `shouldBe` 200
+  when (statusCode' resp /= 200) $
+    expectationFailure ("expected status 200 but got " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
   case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r

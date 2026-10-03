@@ -1,0 +1,24 @@
+-- A record field's default may not read a section input
+-- (`typically-default-reads-input.l4`). The field's default is looked up in the
+-- section the record is declared in, so that holds when a definition at the top of
+-- the file has the same spelling as the section's input: `alpha` there is the
+-- input, and the default is refused. It used to pass over the input for the
+-- definition and give 70, with no error (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3,
+-- silent review S2).
+
+GIVETH A NUMBER
+alpha MEANS 7
+
+§ `S`
+    GIVEN alpha IS A NUMBER TYPICALLY 2
+
+    -- ERROR: reads the section input `alpha`
+    DECLARE Config HAS
+      timeout IS A NUMBER TYPICALLY (alpha TIMES 10)
+      retries IS A NUMBER
+
+    -- The same default on a rule's input is refused the same way
+    GIVEN n IS A NUMBER
+          k IS A NUMBER TYPICALLY (alpha TIMES 10)
+    GIVETH A NUMBER
+    f MEANS n PLUS k

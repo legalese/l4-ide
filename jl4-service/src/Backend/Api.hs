@@ -118,11 +118,34 @@ instance ToJSONKey EvalBackend
 
 instance FromJSONKey EvalBackend
 
+-- | T4's presumption switch (specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5),
+-- under the names of Meng's original Default design (T3c): an argument a
+-- request leaves out takes its @TYPICALLY@ default under @"soft"@ (the
+-- default), and under @"hard"@ is treated as absent with no default. @null@
+-- never takes a default either way (T3).
+data Presumption
+  = PresumeSoft
+  | PresumeHard
+  deriving stock (Show, Read, Ord, Eq, Enum, Bounded, Generic)
+
+instance ToJSON Presumption where
+  toJSON = Aeson.String . \case
+    PresumeSoft -> "soft"
+    PresumeHard -> "hard"
+
+instance FromJSON Presumption where
+  parseJSON = Aeson.withText "Presumption" $ \t -> case Text.toLower t of
+    "soft" -> pure PresumeSoft
+    "hard" -> pure PresumeHard
+    other  -> fail ("presumption must be \"soft\" or \"hard\", not " <> show other)
+
 data FnArguments = FnArguments
   { fnEvalBackend :: Maybe EvalBackend
   , fnArguments :: Map Text (Maybe FnLiteral)
   , startTime :: Maybe Scientific.Scientific
   , events :: Maybe [TraceEvent]
+  , presumption :: Maybe Presumption
+    -- ^ absent means @"soft"@
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
 
@@ -132,6 +155,7 @@ instance ToJSON FnArguments where
     <> maybe [] (\b -> ["evalBackend" .= b]) fa.fnEvalBackend
     <> maybe [] (\t -> ["startTime" .= t]) fa.startTime
     <> maybe [] (\e -> ["events" .= e]) fa.events
+    <> maybe [] (\p -> ["presumption" .= p]) fa.presumption
 
 instance FromJSON FnArguments where
   parseJSON = Aeson.withObject "FnArguments" $ \o ->
@@ -140,6 +164,7 @@ instance FromJSON FnArguments where
       <*> o .: "arguments"
       <*> o .:? "startTime"
       <*> o .:? "events"
+      <*> o .:? "presumption"
 
 -- | A single event for deontic trace evaluation.
 -- Maps to the L4 EVENT constructor: EVENT party action timestamp
@@ -164,6 +189,8 @@ newtype RunFunction = RunFunction
       -- ^ Control whether to return full trace or just result
       Bool ->
       -- ^ Include GraphViz DOT output (only meaningful when trace level is full)
+      Presumption ->
+      -- ^ Whether an argument left out takes its TYPICALLY default
       ExceptT EvaluatorError IO ResponseWithReason
   }
 
@@ -197,6 +224,12 @@ data ResponseWithReason = ResponseWithReason
   -- ^ Result values as a JSON object, mirrors arguments input convention.
   , reasoning :: Reasoning
   , graphviz :: Maybe GraphVizResponse
+  , presumed :: [Text]
+  -- ^ The arguments the request left out whose TYPICALLY default the answer
+  -- rests on: each took its default and the evaluation read it (T6 of
+  -- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). An argument's name, or the
+  -- path to a record field inside one (@config.timeout@). Always present, and
+  -- empty when the answer rests on no default.
   }
   deriving (Show, Read, Ord, Eq, Generic)
 
@@ -209,7 +242,9 @@ responseTag rwr
 
 instance ToJSON ResponseWithReason where
   toJSON rwr = Aeson.object $
-    [ "result" .= rwr.fnResult ]
+    [ "result" .= rwr.fnResult
+    , "presumed" .= rwr.presumed
+    ]
     <> (if isEmptyReasoning rwr.reasoning then [] else ["reasoning" .= rwr.reasoning])
     <> maybe [] (\g -> ["graphviz" .= g]) rwr.graphviz
 
@@ -219,6 +254,7 @@ instance FromJSON ResponseWithReason where
       <$> (o .: "result" <|> o .: "fnResult")
       <*> (o .:? "reasoning" .!= emptyReasoning)
       <*> o .:? "graphviz"
+      <*> (o .:? "presumed" .!= [])
 
 -- | A reasoning tree node with optional children.
 -- Flattened for clean JSON: { exampleCode, explanation, children }
@@ -250,21 +286,46 @@ emptyTree = emptyReasoning
 -- The error message may contain hints of what might have gone wrong.
 data EvaluatorError
   = InterpreterError !Text
-  | EvaluatorRefused !Text
+  | EvaluatorRefused !Text ![Text]
     -- ^ The L4 program REFUSED: it declined to answer, with the reason the
     -- author wrote. Deliberately NOT an 'InterpreterError' — that reads as a
     -- server fault, and a refusal is a designed answer of the model.
+    --
+    -- The list is the refusal's @presumed@ (T6: "every service response"):
+    -- a refusal that rests on a default is one that supplying the input might
+    -- turn into an answer, so the caller must be able to see it.
   | RequiredParameterMissing !ParameterMismatch
   | UnknownArguments ![Text]
   | CannotHandleParameterType !FnLiteral
   | CannotHandleUnknownVars
   deriving stock (Show, Read, Ord, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+
+-- | The derived encoding, except that a refusal keeps its reason as a string
+-- under @contents@, as it was before it carried @presumed@, and puts
+-- @presumed@ beside it: @{"tag": "EvaluatorRefused", "contents": reason,
+-- "presumed": [...]}@.
+instance ToJSON EvaluatorError where
+  toJSON = \case
+    EvaluatorRefused reason presumedInputs -> Aeson.object
+      [ "tag" .= ("EvaluatorRefused" :: Text)
+      , "contents" .= reason
+      , "presumed" .= presumedInputs
+      ]
+    other -> Aeson.genericToJSON Aeson.defaultOptions other
+
+instance FromJSON EvaluatorError where
+  parseJSON v = case v of
+    Object o | Just (String "EvaluatorRefused") <- Aeson.lookup "tag" o ->
+      EvaluatorRefused <$> o .: "contents" <*> (o .:? "presumed" .!= [])
+    _ -> Aeson.genericParseJSON Aeson.defaultOptions v
 
 prettyEvaluatorError :: EvaluatorError -> Text
 prettyEvaluatorError = \case
   InterpreterError msg -> msg
-  EvaluatorRefused reason -> "The model refuses to answer: " <> reason
+  EvaluatorRefused reason presumedInputs ->
+    "The model refuses to answer: " <> reason
+      <> (if null presumedInputs then ""
+          else " (resting on the defaults of " <> Text.intercalate ", " presumedInputs <> ")")
   RequiredParameterMissing pm ->
     "Required parameter missing: expected " <> Text.pack (show pm.expected)
     <> " parameter(s), but got " <> Text.pack (show pm.actual)
