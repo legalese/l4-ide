@@ -149,7 +149,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
         (ty, dflt, formula) <- case fi0.fiDefault of
           Nothing -> Right (ty0, Nothing, Nothing)
           Just e  -> mapLeft (LowerError fnName . (("the field `" <> fi0.fiL4 <> "`: ") <>))
-                             (lowerDefault env ty0 e)
+                             (lowerDefault env Nothing ty0 e)
         pure OFVariable
             { varName    = fi0.fiName
             , varL4      = fi0.fiL4
@@ -188,6 +188,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
        <> ", which OpenFisca supplies from the simulation and not from an input variable"))
   scalarInputs <- forM others \g -> do
     let ty0 = maybe OFFloat (ofTypeOf enums) (givenType g)
+        unknownTy = givenType g >>= unrecognisedType enums
         isList = maybe False isListType (givenType g)
     (ty, dflt, formula) <- case givenDefault g of
       Nothing -> Right (ty0, Nothing, Nothing)
@@ -206,7 +207,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
                <> "variable to put a default on (only EMPTY, which says nothing, is accepted)"))
         | otherwise ->
             mapLeft (LowerError fnName . (("the GIVEN `" <> givenText g <> "`: ") <>))
-                    (lowerDefault env ty0 e)
+                    (lowerDefault env unknownTy ty0 e)
     pure OFVariable
       { varName    = pyIdent (givenText g)
       , varL4      = givenText g
@@ -815,8 +816,11 @@ typeRecordName _                = Nothing
 --   bodies' lowering, so anything that lowering refuses is refused here too.
 -- * Anything else — @NOTHING@, a literal whose type is not the variable's —
 --   is refused with the reason, because there is no OpenFisca value for it.
-lowerDefault :: LowerEnv -> OFType -> Expr Resolved -> Either Text (OFType, Maybe OFDefault, Maybe OFExpr)
-lowerDefault env ty e = case (classified, ty) of
+lowerDefault
+  :: LowerEnv
+  -> Maybe Text  -- ^ the variable's L4 type, when the export does not recognise it
+  -> OFType -> Expr Resolved -> Either Text (OFType, Maybe OFDefault, Maybe OFExpr)
+lowerDefault env unknownTy ty e = case (classified, ty) of
   (DefNumber r, OFFloat) -> Right (ty, Just (OFDefNum r), Nothing)
   (DefNumber r, OFInt)
     | denominator r == 1 -> Right (ty, Just (OFDefNum r), Nothing)
@@ -844,9 +848,13 @@ lowerDefault env ty e = case (classified, ty) of
       , not (Map.member (getUnique c) env.envEnumCons) -> DefComputed e
     d -> d
   described = describeDefault classified
-  reason = \case
+  reason d = case d of
     DefConstructor _ -> "OpenFisca has no way to say a variable has no value; every variable has one"
-    _                -> "it is not a " <> typeName <> ", which is what this variable holds"
+    _ | Just t <- unknownTy ->
+          "the export does not recognise the type `" <> t <> "` (it knows numbers, whole numbers, "
+            <> "booleans, strings and this module's enums, and not a synonym for one), so it holds "
+            <> "this variable as a " <> typeName <> ", and " <> describeDefault d <> " is not one"
+      | otherwise -> "it is not a " <> typeName <> ", which is what this variable holds"
   typeName = case ty of
     OFFloat  -> "number"
     OFInt    -> "whole number"
@@ -873,13 +881,30 @@ ofTypeOf enums = \case
     let nm = resolvedToText name
     in case Map.lookup nm enums of
          Just ed | ((m, _) : _) <- ed.enMembers -> OFEnum ed.enName m
-         _ -> case Text.toLower nm of
-           t | t `elem` ["number", "float", "double", "money", "decimal"] -> OFFloat
-             | t `elem` ["int", "integer"]                                -> OFInt
-             | t `elem` ["boolean", "bool"]                               -> OFBool
-             | t `elem` ["string", "text"]                                -> OFStr
-           _ -> OFFloat
+         _ -> fromMaybe OFFloat (scalarTypeNamed nm)
   _ -> OFFloat
+
+-- | The scalar types the export knows by name.
+scalarTypeNamed :: Text -> Maybe OFType
+scalarTypeNamed nm = case Text.toLower nm of
+  t | t `elem` ["number", "float", "double", "money", "decimal"] -> Just OFFloat
+    | t `elem` ["int", "integer"]                                -> Just OFInt
+    | t `elem` ["boolean", "bool"]                               -> Just OFBool
+    | t `elem` ["string", "text"]                                -> Just OFStr
+  _ -> Nothing
+
+-- | The name of a type 'ofTypeOf' did not recognise and held as a number: a
+-- type synonym (@DECLARE Label IS A STRING@), a record where a scalar is
+-- expected, a list. A variable of such a type is a number to OpenFisca, so a
+-- default of another kind is refused, and the refusal says why.
+unrecognisedType :: Map Text OFEnumDef -> Type' Resolved -> Maybe Text
+unrecognisedType enums = \case
+  TyApp _ name _
+    | Map.member nm enums        -> Nothing
+    | isJust (scalarTypeNamed nm) -> Nothing
+    | otherwise                   -> Just nm
+   where nm = resolvedToText name
+  _ -> Nothing
 
 -- | @LIST OF x@, for any @x@.
 isListType :: Type' Resolved -> Bool

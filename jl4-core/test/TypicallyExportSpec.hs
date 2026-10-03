@@ -256,6 +256,20 @@ listGivenSrc = Text.unlines
   , "`total` xs period MEANS 5"
   ]
 
+-- | A synonym of STRING as a rule's GIVEN, with a string default. OpenFisca holds
+-- a type it does not recognise as a number. (The checker refuses the same default
+-- on a record field of a synonym type, so a field cannot reach the export.)
+synonymGivenSrc :: Text
+synonymGivenSrc = Text.unlines
+  [ "DECLARE Label IS A STRING"
+  , ""
+  , "@export Allowance"
+  , "GIVEN l IS A Label TYPICALLY \"x\""
+  , "      period IS A STRING"
+  , "GIVETH A NUMBER"
+  , "allowance l period MEANS IF l EQUALS \"x\" THEN 1 ELSE 0"
+  ]
+
 -- | Two exported decisions that share an input called @x@: the first writes the
 -- given default, the second writes none. (Neither body reads it; an unread GIVEN
 -- is still an input variable.)
@@ -642,6 +656,17 @@ spec = do
     it "refuses any other default on a LIST OF GIVEN, naming the GIVEN" $
       refuses (openFiscaOut (withDefaultsAs (const (Lit emptyAnno (NumericLit emptyAnno 1))) (moduleOf listGivenSrc)))
         `shouldSatisfy` mentions "the GIVEN `xs` is a LIST and carries TYPICALLY 1"
+
+    it "says why it refuses a string default on a synonym of STRING: the type is not one the export recognises" $ do
+      let msgs = refuses (openFiscaOut (moduleOf synonymGivenSrc))
+      msgs `shouldSatisfy` mentions "does not recognise the type `Label`"
+      -- and does not say what it used to say, which blamed the default for the type
+      msgs `shouldSatisfy` (not . mentions "it is not a number, which is what this variable holds")
+
+    it "still gives a plain mismatch the plain reason (the control)" $
+      -- a string where the variable is a number, with no synonym in sight
+      refuses (openFiscaOut (withDefaultsAs (const (Lit emptyAnno (StringLit emptyAnno "x"))) (moduleOf ruleGivenSrc)))
+        `shouldSatisfy` mentions "it is not a number, which is what this variable holds"
 
     it "treats a default equal to OpenFisca's own as no disagreement: 0, FALSE and the first member against none" $ do
       succeeds (openFiscaOut (moduleOf (defaultVsNoneSrc "NUMBER" "TYPICALLY 0"))) `shouldSatisfy` Text.isInfixOf "class x(Variable):"

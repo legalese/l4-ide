@@ -101,6 +101,12 @@ spec bin = do
       serr `shouldSatisfy` ("different TYPICALLY defaults (3 and none" `isInfixOf`)
       serr `shouldSatisfy` ("OpenFisca then gives the input its own default for its type" `isInfixOf`)
 
+    it "refuses a string default on a synonym of STRING, and blames the type, not the default" $ do
+      Output code _ serr <- runL4 bin ["export", "openfisca", "examples/openfisca/not-ok/defaults-synonym.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("does not recognise the type `Label`" `isInfixOf`)
+      serr `shouldSatisfy` (not . ("it is not a number, which is what this variable holds" `isInfixOf`))
+
     it "rejects a name collision (distinct L4 names → same Python identifier)" $
       expectFail bin ["export", "openfisca", "examples/openfisca/not-ok/name-collision.l4"]
 
