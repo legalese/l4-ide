@@ -248,7 +248,8 @@ GIVETH A NUMBER
 section `GIVEN`'s default is worked out from the values the whole evaluation was started with, so a
 `WITH` on one input reaches the default that reads it. A rule's own input or a record field takes its
 default as if it were written at the call: it may name definitions and constructors, but not a section
-`GIVEN` (directly or through a definition), which is a check error, and not that rule's other inputs.
+`GIVEN` (directly or through a definition), which is a check error, and not that rule's other inputs: a name
+spelled like one is a check error even where the file defines something called that.
 Put a default that reads an input on the section `GIVEN`. A section `GIVEN`'s default that reads
 itself, directly or through other defaults, is a check error. A written `ASSUME` and a lambda's
 `GIVEN` still take only a literal.

@@ -1110,7 +1110,10 @@ gate it.
 **Rule 3 built 2026-10-03 (W7 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.3; `feat/typically-w7`, on top of `feat/typically-w4w5`, not yet merged).**
 A default is a module-scope expression.
 On a section `GIVEN` it may read other section `GIVEN`s and is worked out lazily, from the root's values; a cycle `b ∈ R*(default(b))` among section binders is a check error; the default's read-set joins the requirement of every root that may use it; and the JSON schema gives an expression default as source text.
-On a rule's `GIVEN` and a record field it may name definitions and constructors and may not read a section `GIVEN`: R8 says where a section's default is worked out and does not say where these are, so the checker refuses the default that would depend on it (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3, decision 1, pending Meng's review).
+On a rule's `GIVEN` and a record field it may name definitions and constructors and may not read a section `GIVEN`.
+For an expression that reads one, "filled in once per evaluation at the root" and rule 1 (a function's own default may be omitted only at a named site) give different answers, from the root's values or from the site's, so the checker refuses the default that would depend on it (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.3, decision 1, pending Meng's review).
+An earlier version of this note said R8 does not say where a function's default is worked out; a second review found that wrong.
+A root is where a call is written: a directive, a lambda there included, and not a rule.
 Two places the ruling does not name keep a literal: a written `ASSUME` and a lambda's `GIVEN`.
 
 **EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
