@@ -1,10 +1,14 @@
 IMPORT prelude
 
--- Parity fixture for the built-in IMPLIES (UNKNOWN-EVALUATION-SPEC §8 step 2):
--- jl4-mlir lowers it with a short circuit, as it does AND and OR, and its
--- trace shows the implication with a child for each operand it evaluated.
--- Each function's four cases are the truth table; the two with a FALSE left
--- operand never need the right one.
+-- Parity fixture for the built-in IMPLIES and NOT (UNKNOWN-EVALUATION-SPEC §8
+-- step 2): jl4-mlir lowers IMPLIES with a short circuit, as it does AND and
+-- OR, and its trace shows each connective with a child for each operand it
+-- evaluated. Each function's cases are its truth table; the ones with a FALSE
+-- left operand to IMPLIES never need the right one.
+--
+-- The NOT functions pin the trace of a negation: `NOT p` shares its source
+-- range with `p`, and `NOT (p AND q)` with `p AND q`, so each needs a key of
+-- its own in the trace's range map (jl4-mlir's 'exprDisambiguator').
 --
 -- `member implies paid` takes the facts as its own inputs, and its trace is
 -- byte-identical to jl4-service's. `membership implies payment` reads them as
@@ -27,3 +31,25 @@ GIVEN member IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `member implies paid` IS
     member IMPLIES paid
+
+@export Negation of an input
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `not p` IS NOT p
+
+@export Negation of a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `not both` IS NOT (p AND q)
+
+@export Double negation
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `not not p` IS NOT (NOT p)
+
+@export UNLESS, which is AND NOT
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `p unless q` IS p UNLESS q
