@@ -1,0 +1,18 @@
+-- The cross-IMPORT refusal (`export-refused.l4`, §11.19 OF-7) for an export whose
+-- INPUT DEFAULT reaches the imported reader, which is a way round it that the
+-- check on the body alone left open (W7, R8 rule 3: a default is an expression).
+--
+-- `implicit-rate-lib` declares a section GIVEN `the rate` and a rule that reads
+-- it. The export's own input `markup` takes a default that calls that rule, so a
+-- request that leaves `markup` out reaches an imported reader exactly as a body
+-- that called it would. Discharge does not cross an IMPORT, so it runs out as an
+-- internal error ("running bin op with invalid operation") and not as an
+-- answer. It is refused at check time instead.
+
+IMPORT `implicit-rate-lib`
+
+@export What this amount comes to with a markup that defaults to the rate on 100.
+GIVEN amount IS A NUMBER
+      markup IS A NUMBER TYPICALLY (`scaled by the rate` 100)
+GIVETH A NUMBER
+`cost with markup` MEANS amount PLUS markup
