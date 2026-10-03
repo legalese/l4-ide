@@ -214,3 +214,36 @@ defaultEventSpec = describe "a TYPICALLY default in the trace (W8)" $ do
     -- no TYPICALLY behind it, so no line to quote; the value is NOTHING by definition
     defaultNotes Nothing [theRate { declaredAt = Nothing, valueText = Just "NOTHING" }]
       `shouldBe` ["the rate took its default (a MAYBE left out is NOTHING)"]
+
+  -- review N2: a trace cut off at its display limit is still complete
+  describe "a trace cut off before it reached the step that read a default" $ do
+    let three = MkNF (ValNumber 3)
+        bare  = Trace Nothing [(number 2, [])] (Right (MkNF (ValNumber 2)))
+
+    it "shows the default on the main expression's last step, with its value" $
+      case completeDefaults [(theRate, Just three)] bare of
+        Trace _ [(_, [TraceDefault p [] (Right (MkNF (ValNumber 3)))])] _ -> p `shouldBe` theRate
+        other -> expectationFailure ("unexpected trace: " <> show other)
+
+    it "shows a default whose value could not be read as an omitted one, and does not drop it" $
+      case completeDefaults [(theRate, Nothing)] bare of
+        Trace _ [(_, [TraceDefault _ [] (Right Omitted)])] _ -> pure ()
+        other -> expectationFailure ("unexpected trace: " <> show other)
+
+    it "adds nothing to a trace that shows the default already" $ do
+      r <- numberRef 1 3
+      let shown = postprocessTrace
+            [ Enter (number 2), TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
+      eventsOf (completeDefaults [(theRate, Just three)] shown) `shouldBe` [(["the rate"], 0)]
+      eventsOf (completeDefaults [] bare) `shouldBe` []
+
+    it "adds only the defaults that are missing, after the last step's own" $ do
+      r <- numberRef 1 3
+      let other   = theRate { path = ["the cap"] }
+          shown   = postprocessTrace
+            [ Enter (number 2), TookDefault theRate r, SetRef r, Exit (Right (ValNumber 3)), Pop ]
+          done    = completeDefaults [(theRate, Just three), (other, Just three)] shown
+      map fst (eventsOf done) `shouldBe` [["the rate"], ["the cap"]]
+
+    it "leaves a trace that has no step of its own, which a plain directive's line then covers" $
+      eventsOf (completeDefaults [(theRate, Just three)] tracePostprocessFailed) `shouldBe` []

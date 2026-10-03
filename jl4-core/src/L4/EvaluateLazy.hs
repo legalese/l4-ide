@@ -313,6 +313,8 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
     (p,) <$> (peekWHNF rf >>= traverse peekNF)
   let
     directivePresumed = [ p { valueText = defaultValueText <$> mnf } | (p, mnf) <- valuedDefaults ]
+    -- a trace cut off before it reached a default's step still shows the default
+    shownTrace = completeDefaults valuedDefaults <$> finalTrace
   let
     v' = case assertKind of
       NotAnAssert -> Reduction
@@ -358,7 +360,7 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           Left exc -> Errored exc
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
+  pure (MkEvalDirectiveResult r v' shownTrace directiveLedger directiveNotes directivePresumed, steps)
   where
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
@@ -602,8 +604,8 @@ prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 -- R8: "Every directive and trace output names each parameter that took its
 -- default", and its example is "alpha took its default 10". A traced directive
 -- has the event in its trace already, so it is not said twice; a default its
--- trace does not show (a truncated trace, or one that failed to post-process) is
--- still said here.
+-- trace does not show (one that failed to post-process, which leaves no step to
+-- hang an event on) is still said here.
 defaultNotes :: Maybe EvalTrace -> [Presumed] -> [Text]
 defaultNotes mtrace presumed = defaultNoteText <$> untracedDefaults mtrace presumed
 

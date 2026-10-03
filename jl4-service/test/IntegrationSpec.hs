@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, echoRecordJL4, deonticSectionDefaultJL4, directivesAboveDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, echoRecordJL4, deonticSectionDefaultJL4, directivesAboveDefaultJL4, truncatedTraceJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1554,6 +1554,21 @@ spec = describe "integration" do
               -- is where the rule's own input is read
               parents `shouldSatisfy` all (any (Text.isInfixOf "is motorway (input)"))
               parents `shouldSatisfy` all (not . any (Text.isPrefixOf "JUST OF")))
+          resp
+
+    -- Review N2: a trace is cut off at its display limit (10000 nodes), and the
+    -- step that read the default can be past the cut. The tree must still have
+    -- the node for every default that presumed lists.
+    it "shows a default that a truncated trace did not reach" do
+      withServiceFromSources "w8-truncated" [("rates.l4", truncatedTraceJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-truncated" "big then rate" (args ["k" Aeson..= (16 :: Int)]) baseUrl mgr
+        whenTraced
+          (\r -> do
+              -- the guard: the tree really was cut off
+              [n | n <- nodes r.reasoning, any (Text.isInfixOf "trace truncated") n.explanation]
+                `shouldSatisfy` (not . null)
+              r.presumed `shouldBe` ["the rate"]
+              [(code, result) | (code, _, result) <- events r] `shouldBe` [("the rate", "Result: 3")])
           resp
 
     -- Review F6: a node and an entry of presumed name the same default by the

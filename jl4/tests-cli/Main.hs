@@ -208,6 +208,10 @@ evalTraceFixture   = fixtureDir </> "evaltrace.l4"
 traceDefaultFixture = fixtureDir </> "trace-default.l4"
 runDefaultFixture = fixtureDir </> "run-default.l4"
 
+-- | A trace cut off at its display limit before the step that read a default.
+traceDefaultTruncatedFixture :: FilePath
+traceDefaultTruncatedFixture = fixtureDir </> "trace-default-truncated.l4"
+
 -- | A directory with one module whose assertions read @TYPICALLY@ defaults, and
 -- the encoding skill's self-check that counts them from the text of @l4 run@.
 -- The tests run from the package directory, so the repository root is above it.
@@ -218,6 +222,16 @@ checkShScript     = ".." </> "skills" </> "encoding-a-subject" </> "assets" </> 
 -- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
 descAttachmentFixture :: FilePath
 descAttachmentFixture    = fixtureDir </> "desc-attachment.l4"
+
+-- | Split a string where a needle first occurs: what is before it, and the rest
+-- from the needle on (the rest is empty when the needle does not occur).
+breakOn :: String -> String -> (String, String)
+breakOn needle = go []
+ where
+  go acc [] = (reverse acc, [])
+  go acc s@(c : rest)
+    | needle `isPrefixOf` s = (reverse acc, s)
+    | otherwise             = go (c : acc) rest
 
 -- | How many (possibly overlapping) times a needle occurs in a haystack.
 countInfix :: String -> String -> Int
@@ -952,6 +966,20 @@ spec bin = do
       -- one edge is the IF's, and it is the one into the condition, not into
       -- the default that hangs below the condition
       countInfix "label=IF" sout `shouldBe` 1
+
+    -- Review N2 of W8: a trace cut off at its display limit before the step that
+    -- read the default shows the default all the same, once, inside the trace (and
+    -- not as a line of the note outside it), and in the graph.
+    it "shows a default that a truncated trace did not reach" $ do
+      Output code sout serr <- runL4 bin ["trace", traceDefaultTruncatedFixture]
+      code `shouldBe` ExitSuccess
+      let said = "the rate took its default (declared at trace-default-truncated.l4:"
+          (beforeTrace, fromTrace) = breakOn "─────" serr
+      serr `shouldSatisfy` ("trace truncated" `isInfixOf`)
+      countInfix said serr `shouldBe` 1
+      said `shouldSatisfy` (`isInfixOf` fromTrace)
+      said `shouldSatisfy` (`notInfixOf` beforeTrace)
+      countInfix said sout `shouldBe` 1
 
   describe "l4 state-graph" $ do
     it "fails on a file without regulative rules" $ do
