@@ -11,8 +11,10 @@
 --
 -- There is no directive: a decision that reads a module-level input cannot be a
 -- generated Catala `#[test]` scope (a test scope declares no inputs), and L4 does
--- not evaluate an ASSUME's default, so no L4 oracle exists for this module. The
--- tests that pin the mapping read the emitted text.
+-- not evaluate an ASSUME's default, so no L4 oracle exists for this module. Two
+-- things pin the mapping instead: tests that read the emitted text, and the
+-- hand-written scopes in tests/defaults.catala_en, which etc/validate-catala.mjs
+-- appends to a staged copy of the golden and runs under `clerk test`.
 
 § `Rates`
     GIVEN rate IS A NUMBER TYPICALLY 3

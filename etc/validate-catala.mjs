@@ -42,6 +42,15 @@
 // so the banner alone is not evidence; the counts are parsed below and a run
 // that executed nothing is a failure.
 //
+// COMPANION TESTS. A generated `#[test]` scope declares no inputs, so it cannot
+// call a decision that reads a section GIVEN or an ASSUME, and the module
+// `defaults.catala_en` (the `context` mapping of a TYPICALLY, W9) therefore has
+// no executed test of its own. A file of the same name under
+// jl4/examples/catala/tests/ is appended to the staged copy of the golden
+// before anything runs, so the same typecheck, proof and `clerk test` cover it.
+// It is never written into the golden, which stays byte-for-byte what the
+// exporter prints, and its tests count toward the total below like any other.
+//
 // USAGE
 //
 //   node etc/validate-catala.mjs                  # every golden under
@@ -80,6 +89,7 @@
 // evidence describes a command a reader can actually run.
 
 import {
+  appendFile,
   readdir,
   mkdtemp,
   mkdir,
@@ -95,6 +105,10 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultDir = join(repoRoot, "jl4", "examples", "catala", "expected");
+// Hand-written Catala that is appended to the staged copy of the golden of the
+// same name, for what no generated `#[test]` scope can say. See COMPANION TESTS
+// in the header.
+const companionDir = join(repoRoot, "jl4", "examples", "catala", "tests");
 
 // ---------------------------------------------------------------------------
 // Toolchain discovery
@@ -259,11 +273,19 @@ try {
     const dir = basename(golden).replace(/\.catala_en$/, "");
     await mkdir(join(work, dir), { recursive: true });
     await copyFile(golden, join(work, dir, name));
-    staged.push({ golden, name, dir });
+    // A companion is appended to the STAGED copy only. A catala source is a
+    // sequence of blocks, so appending is a continuation of the same module.
+    const companion = join(companionDir, basename(golden));
+    const hasCompanion = existsSync(companion);
+    if (hasCompanion) {
+      const extra = await readFile(companion, "utf8");
+      await appendFile(join(work, dir, name), `\n${extra}`);
+    }
+    staged.push({ golden, name, dir, hasCompanion });
   }
 
   // Layer 1: typecheck, per file, so a failure names the file.
-  for (const { golden, name, dir } of staged) {
+  for (const { golden, name, dir, hasCompanion } of staged) {
     const tc = run(catala, ["typecheck", `${dir}/${name}`], { cwd: work });
     const out = `${tc.stdout ?? ""}${tc.stderr ?? ""}`;
     if (tc.status !== 0 || !out.includes("Typechecking successful")) {
@@ -279,7 +301,9 @@ try {
       continue;
     }
     console.log(
-      `OK    ${golden}\n       staged as ${dir}/${name}; catala typecheck: successful`,
+      `OK    ${golden}\n       staged as ${dir}/${name}` +
+        (hasCompanion ? ` (+ companion tests)` : ``) +
+        `; catala typecheck: successful`,
     );
   }
 
