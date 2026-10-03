@@ -114,8 +114,12 @@ default `TYPICALLY 50000` gives band 2). The export does not rewrite every read 
 It reports one note per default: a rule's own `GIVEN`, a section `GIVEN`, an `ASSUME`, and every record
 field of every `DECLARE` (the model carries all of them whether a decision reads them or not). A default
 written in a file the module imports is reported too, when an emitted decision reads the name (an
-imported `ASSUME`, or a field of an imported record), and the note says which module it is in. Supply
-every input a DMN model depends on; do not rely on its omission to mean the default.
+imported `ASSUME`, or a field of an imported record), and the note says which module it is in. An
+imported `ASSUME` is a special case: the model gets no `inputData` for it at all (the decision's FEEL
+text names it, and nothing declares it), so KIE cannot load the model, and Camunda 8 reads `null` for
+it unless the evaluation context supplies the name. Its note says that, instead of describing an input
+that is not there. Supply every input the model declares; do not rely on its omission to mean the
+default.
 
 **BPMN** (`P-TYPICALLY`). A process draws no data: a `PROVIDED` condition becomes an opaque
 `conditionExpression` (`F4`), which reads whatever the process instance holds, so an instance that never

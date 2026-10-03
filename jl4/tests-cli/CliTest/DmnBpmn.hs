@@ -957,6 +957,16 @@ spec bin = do
       noteLines `shouldSatisfy` (not . any ("library rule" `isInfixOf`))
       -- a defaulted field of the imported record that no decision reads
       noteLines `shouldSatisfy` (not . any ("`grace`" `isInfixOf`))
+      -- The imported ASSUME gets no inputData in the model (the decision's FEEL
+      -- text names it, and nothing declares it), so its note says that, and does
+      -- not describe an inputData that is not there. The field has an
+      -- itemComponent and keeps the wording about one.
+      let assumeLine = [ l | l <- noteLines, "the ASSUME `allowance`" `isInfixOf` l ]
+          fieldLine  = [ l | l <- noteLines, "the field `timeout`" `isInfixOf` l ]
+      assumeLine `shouldSatisfy` all ("the model has no input for it at all" `isInfixOf`)
+      assumeLine `shouldSatisfy` all (not . ("DMN has no default for an inputData" `isInfixOf`))
+      fieldLine `shouldSatisfy` all ("DMN has no default for an itemComponent" `isInfixOf`)
+      fieldLine `shouldSatisfy` all ("builds a `Config` without `timeout`" `isInfixOf`)
 
     it "reports the same imported defaults in the dmnmd report" $ do
       Output code _ serr <- runL4 bin ["export", "dmn-md", typicallyImportDmn, "--fidelity-report"]

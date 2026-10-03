@@ -4348,12 +4348,33 @@ lowerModule opts modul@(MkModule _ uri _) =
       <> [ s | s <- importedDefaultSites opts.dloImports, Set.member s.unique readByEmitted ]
     )
    where
-    note s =
-      dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
-        ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and DMN has no default for "
-            <> carrier s <> ": " <> omission s )
-        ( "the presumption: the source says an omitted " <> noun s.kind
-            <> " is " <> dflt s <> ", and the model says it is nothing" )
+    note s
+      -- An ASSUME written in an imported module that a decision reads has no
+      -- inputData: free terms are collected only from the module being lowered
+      -- (decideFreeTerms), so the FEEL expression names a variable nothing in
+      -- the model declares. The note must not say "DMN has no default for an
+      -- inputData" about an inputData that is not there. Measured 2026-10-03
+      -- (Camunda 8.7.6, KIE 8.44.0.Final) on typically-import/dmn-main.l4:
+      -- KIE refuses to load the model (ERR_COMPILING_FEEL, Unknown variable),
+      -- with the name supplied or not; Camunda answers when the context supplies
+      -- the name and null when it does not.
+      | undeclared s =
+          dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+            ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and the model has no input for it "
+                <> "at all: a decision reads " <> tick s.name <> ", but nothing in the model declares it "
+                <> "(an imported ASSUME is not turned into an inputData), so KIE cannot load the model "
+                <> "and Camunda 8 reads `null` for it unless the evaluation context supplies it. "
+                <> "Neither applies " <> dflt s )
+            ( "the presumption: the source says an omitted input is " <> dflt s
+                <> ", and the model does not even declare the input" )
+      | otherwise =
+          dmnNote "D-TYPICALLY" Lossy (dmnElementOf s) s.range
+            ( describeSite s <> " carries TYPICALLY " <> dflt s <> ", and DMN has no default for "
+                <> carrier s <> ": " <> omission s )
+            ( "the presumption: the source says an omitted " <> noun s.kind
+                <> " is " <> dflt s <> ", and the model says it is nothing" )
+
+    undeclared s = s.kind == DefaultOnAssume && isJust s.origin
 
     dflt s = describeDefault (classifyDefault s.value)
 
@@ -4372,7 +4393,12 @@ lowerModule opts modul@(MkModule _ uri _) =
     --   omitted parameter is @d@.
     omission s = case s.kind of
       DefaultOnRecordField ->
-        "an evaluation that leaves " <> tick s.name <> " out of the record gets `null` for it on "
+        -- "builds a `Config` without", and not "leaves it out of the record": the
+        -- model carries an itemDefinition for a record no decision reads, and no
+        -- evaluation of THIS model leaves a component out of it, but a consumer
+        -- that builds the record from the itemDefinition can.
+        "an evaluation that builds " <> maybe "the record" (\o -> "a " <> tick o) s.owner
+          <> " without " <> tick s.name <> " gets `null` for it on "
           <> "Camunda 8 and on KIE alike, and neither reports an error, not " <> dflt s
       _ | isBkmParam s ->
             "the model does not say that an omitted " <> tick s.name <> " is " <> dflt s

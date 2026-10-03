@@ -761,6 +761,8 @@ spec = do
       let field = [ n | n <- dmnTypicallyNotes drg, n.element == "Config.timeout" ]
       map (.message) field `shouldSatisfy` all (Text.isInfixOf "`null` for it on Camunda 8 and on KIE alike, and neither reports an error")
       map (.message) field `shouldSatisfy` all (not . Text.isInfixOf "a model error on KIE")
+      -- worded for a consumer that builds the record, which is true whether or not a decision reads it
+      map (.message) field `shouldSatisfy` all (Text.isInfixOf "an evaluation that builds a `Config` without `timeout`")
 
     it "carries the same four notes into the dmnmd report" $
       length [ () | n <- (markdownReport drg).notes, n.code == "D-TYPICALLY" ] `shouldBe` 4
@@ -784,6 +786,15 @@ spec = do
       map (.message) ns `shouldSatisfy` (not . mentions "library rule")
       -- nor a defaulted field of the imported record that no decision reads
       map (.message) ns `shouldSatisfy` (not . mentions "`grace`")
+      -- The imported ASSUME has no inputData in the model (free terms come from
+      -- the module being lowered), so its note must not describe one. The field
+      -- of the imported record does have an itemComponent, and keeps that wording.
+      let assumeNote = [ n.message | n <- ns, n.element == "allowance" ]
+          fieldNote  = [ n.message | n <- ns, n.element == "Config.timeout" ]
+      assumeNote `shouldSatisfy` all (Text.isInfixOf "the model has no input for it at all")
+      assumeNote `shouldSatisfy` all (not . Text.isInfixOf "DMN has no default for an inputData")
+      assumeNote `shouldSatisfy` all (Text.isInfixOf "KIE cannot load the model")
+      fieldNote `shouldSatisfy` all (Text.isInfixOf "DMN has no default for an itemComponent")
       -- the dmnmd report carries them too
       length [ () | n <- (markdownReport (dmnDrg tcI.tcdModule tcI)).notes, n.code == "D-TYPICALLY" ] `shouldBe` 2
 
