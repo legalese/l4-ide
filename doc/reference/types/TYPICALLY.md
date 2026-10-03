@@ -367,12 +367,15 @@ Limits on a default that is an expression, at the boundary:
   does the decision service for a request that sends `{}` for any input (its other
   path works the default out from the checked expression and is not affected). The
   text is read again at the top level of the file, so a name in it must mean the
-  same there. A name that two sections both define is ambiguous there, and the
-  rows or the request are refused, naming both. A name defined in a section and
-  also at the top level would quietly mean the file's there, so an exported rule's
-  input may not take a default that names one, and neither may a section input
-  that an export reads: the file is refused when it is checked. Written with its
-  section (`` `Rates`.phi ``), the name means the same on every path.
+  same there. A name defined in a section and also at the top level would quietly
+  mean the file's there, so an exported rule's input may not take a default that
+  names one, and neither may a section input that an export reads: the file is
+  refused when it is checked. **A name that two or more sections define is not
+  checked, and `l4 batch` reads the last of them:** with `phi` defined in
+  `§ Rates` and again in a later `§ Other`, and `beta TYPICALLY phi` in
+  `§ Rates`, `beta` is 8 at `#EVAL` and in the service and 9 through `l4 batch`,
+  with no message. Written with its section (`` `Rates`.phi ``), the name means the
+  same on every path.
 - **A default is published in the spelling the checker prints**, not the
   author's: a name is unqualified and backticked where needed (one the author
   wrote with its section keeps it), and a call that names its inputs is written on
