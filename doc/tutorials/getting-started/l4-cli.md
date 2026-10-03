@@ -131,15 +131,108 @@ Result:
   20
 
 
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
 Evaluation[2] @ late-fee.l4:28:1-39
 
 Result:
   50
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, with the source range it came from. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
+
+### Seeing how an answer was reached
+
+Under every result, `l4 run` prints a `Trace:` line.
+For an ordinary `#EVAL` it says `(no trace captured; add #EVALTRACE to the directive)`.
+That is not a fault in your file: an `#EVAL` gives you the answer only, and L4 does not keep a record of the steps.
+
+To see the steps, ask with `#EVALTRACE` instead.
+Add one more line to the end of `late-fee.l4`:
+
+```l4
+#EVALTRACE `late fee` `a slightly late invoice`
+```
+
+Run the file again.
+A third block appears, and this time its `Trace:` is the working itself:
+
+```
+Evaluation[3] @ late-fee.l4:29:1-48
+
+Result:
+  20
+
+
+Trace:
+  ┌ `late fee` OF `a slightly late invoice`
+  │┌ `late fee`
+  │└ <function>
+  ├ IF ((invoice's `days overdue`) AT MOST 0) THEN 0 ELSE (IF ((invoice's `days overdue`) AT MOST 30) THEN ((invoice's amount) TIMES 0.02) ELSE ((invoice's amount) TIMES 0.05))
+  │┌ (invoice's `days overdue`) AT MOST 0
+  ││┌ invoice's `days overdue`
+  ││├ `days overdue` OF invoice
+  │││┌ `days overdue`
+  │││└ <function>
+  ││├ CONSIDER Invoice
+  │││   WHEN Invoice amount `days overdue` THEN `days overdue`
+  ││├ `days overdue`
+  ││└ 12
+  │└ FALSE
+  ├ IF ((invoice's `days overdue`) AT MOST 30) THEN ((invoice's amount) TIMES 0.02) ELSE ((invoice's amount) TIMES 0.05)
+  │┌ (invoice's `days overdue`) AT MOST 30
+  ││┌ invoice's `days overdue`
+  ││├ `days overdue` OF invoice
+  │││┌ `days overdue`
+  │││└ <function>
+  ││├ CONSIDER Invoice
+  │││   WHEN Invoice amount `days overdue` THEN `days overdue`
+  ││├ `days overdue`
+  ││└ 12
+  │└ TRUE
+  ├ (invoice's amount) TIMES 0.02
+  │┌ invoice's amount
+  │├ amount OF invoice
+  ││┌ amount
+  ││└ <function>
+  │├ CONSIDER Invoice
+  ││   WHEN Invoice amount `days overdue` THEN amount
+  │├ amount
+  │└ 1000
+  └ 20
+```
+
+Read it from the top.
+The first line is what you asked.
+Each line starting with `├` is one step toward the answer: here the rule first checks whether the invoice is 0 days overdue or fewer (`FALSE`, because it is 12), then whether it is 30 or fewer (`TRUE`), then multiplies the amount, 1000, by `0.02`.
+The indented lines beside a step are the smaller questions that step had to settle first.
+The last line, `└ 20`, is the answer.
+
+Two kinds of line in it are ones you did not write, and you can pass over both.
+A line reading `<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
+A `CONSIDER Invoice` with a `WHEN Invoice amount …` beneath it is L4 reading one field out of the invoice: it matches the invoice against its list of fields and takes the one it needs.
+
+On a terminal you will see the trace twice.
+It also appears in the messages L4 prints on the error stream, where warnings and errors go, ahead of the results.
+Add `2>/dev/null` to the command to hide that stream and see the trace once.
+
+Traces are on by default.
+If a file has many `#EVALTRACE` lines and you want only the results, add `--trace none`:
+
+```bash
+l4 run --trace none late-fee.l4
+```
+
+Only the text output shows traces: `--json` (below) carries none, whatever `--trace` says.
+To see the same working as a diagram, use `l4 trace`, described under "The Other Subcommands" further down.
 
 ### Machine-readable output
 
@@ -312,7 +405,9 @@ Natural-language names work too: exported functions and parameters written with 
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
-- `l4 trace myfile.l4` renders every `#EVALTRACE` in the file as GraphViz DOT (`--format dot|png|svg`, `-o DIR` for image output; PNG/SVG need GraphViz installed).
+- `l4 trace myfile.l4` draws every `#EVALTRACE` in the file as a diagram, where `l4 run` prints it as text.
+  It prints a description of the diagram in GraphViz DOT: GraphViz is a free diagram-drawing program, and DOT is its text format.
+  `--format dot|png|svg` chooses the output and `-o DIR` writes one file per `#EVALTRACE` into a directory; PNG and SVG pictures need GraphViz installed.
 - `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT. With `--dominators` it prints, instead, the acts every path to `FULFILLED` and to `BREACH` must pass through; with `--dominators --dot` it keeps the DOT and draws those acts heavy. See [State graph and `--dominators`](../../reference/regulative/STATE-GRAPH.md).
 - `l4 lts myfile.l4` reads every `#TRACE` out as a plain list: what is owed now, what would discharge it, what would put someone in breach, and the next deadline (`--steps` for the history, `--json` for a program). See [What is owed now](../../reference/regulative/lts-list.md).
 
