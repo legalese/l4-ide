@@ -157,6 +157,7 @@ Result:
 ```
 
 This is a breakdown, not a verdict: `l4 run` exits non-zero, and with `--json` — the machine-readable output, written in JavaScript Object Notation (JSON) — the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"error"`.
+When the reason is a fact nobody supplied, as here, it is under `"undetermined"` instead, beside a `"needs"` list naming every fact the assertion is waiting for: here `["x"]`.
 
 The same holds for a bare yes-or-no fact, left open the same way, asserted directly. `#ASSERT NOT b` has to know the value of `b`, and stops; `#ASSERT b` gets as far as `b` itself without stopping — but that is no verdict either, so it reports the same way rather than as `assertion failed`. (Older files leave such a fact open with `ASSUME b IS A BOOLEAN`; the report reads the same.)
 

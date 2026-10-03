@@ -370,18 +370,19 @@ answers `10`:
 #EVAL `the day the twelve month window opens on` WITH `the closing date` IS 10, `the offer date` IS 20, `the reading` IS `the staff reading`
 ```
 
-Without the `WITH`, a `#EVAL` that reads the unsupplied section `GIVEN` stops, names the input, and
-makes `l4 run` exit non-zero. Reached by the `CONSIDER` above, as here:
+Without the `WITH`, a `#EVAL` that reads the unsupplied section `GIVEN` stops, names what it
+needed, and makes `l4 run` exit non-zero. Reached by the `CONSIDER` above, which reads a field of the
+reading, it names that field by its path (measured on the build-step-3 binary,
+`UNKNOWN-EVALUATION-SPEC.md` §8, with both own inputs supplied):
 
 ```
 I could not continue evaluating, because I needed to know the value of
-  `the reading`
+  `the reading`'s `the twelve month window`
 but it is an assumed term.
 ```
 
-A plain genitive field access on an unsupplied record produces it word for word, with no `CONSIDER`
-anywhere in the file. Measured on the build-step-1 binary (`UNKNOWN-EVALUATION-SPEC.md` §8), whole
-file, exit 1:
+A plain genitive field access on an unsupplied record names the path the same way, with no
+`CONSIDER` anywhere in the file. Measured on the build-step-3 binary, whole file, exit 1:
 
 ```l4
 DECLARE Applicant HAS
@@ -399,12 +400,13 @@ GIVETH A BOOLEAN
 
 ```
 I could not continue evaluating, because I needed to know the value of
-  `the applicant`
+  `the applicant`'s `age in years`
 but it is an assumed term.
 ```
 
-An `l4` built before that fix prints `reached a CONSIDER that has no branch for it` for both of
-these instead. **That message is not about `CONSIDER` there**: read it as "you did not supply this
+An `l4` from build steps 1 and 2 names the record, `` `the applicant` ``, rather than the field, and
+one built before step 1 prints `reached a CONSIDER that has no branch for it` for both of these
+instead. **That message is not about `CONSIDER` there**: read it as "you did not supply this
 input", whatever construct it names.
 
 Reached by arithmetic — a section `GIVEN` `` `the rate` `` read by
@@ -1100,12 +1102,12 @@ to, and a reader scanning `§` headings still sees one entry per clause.
 **Not** an `#ASSERT` on the rule that reads the section `GIVEN` without a `WITH`. A fixture under
 the heading does not hand itself over, so the assertion stops, and `l4 run` exits 1 (probe
 `r11b-assert-on-the-reader.l4`, its message
-re-measured on the build-step-1 binary):
+re-measured on the build-step-3 binary, which names the field the rule reads):
 
 ```
 assertion could not be evaluated:
 I could not continue evaluating, because I needed to know the value of
-  `the month`
+  `the month`'s `hours worked`
 but it is an assumed term.
 ```
 

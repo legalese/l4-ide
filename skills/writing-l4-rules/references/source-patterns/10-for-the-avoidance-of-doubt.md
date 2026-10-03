@@ -291,8 +291,8 @@ threshold must be registered" — where "the prescribed threshold" is a figure t
 caller for rather than one it knows.
 
 **It is doing** fixing a **boundary**: at, not above. That is the class of clause most worth testing
-and, in the house style, the one you most often cannot test as written — because no directive inside
-the file can supply a section `GIVEN`.
+and, in the house style, the one you most often cannot test as written — because the assertion below
+leaves the section `GIVEN` unsupplied.
 
 The assertion does not fail. It cannot run (probe `a5-input-blocked.l4`, exit 1):
 
