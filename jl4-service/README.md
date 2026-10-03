@@ -238,7 +238,7 @@ In `reasoning` it is `{"exampleCode": ["has capacity"], "explanation": ["has cap
 So a client can mark the nodes that `presumed` lists by comparing strings, without reading the sentence.
 Its `explanation` has two entries, the sentence and then `Result: …`; every other node's `explanation` is the result alone, so the result is the last entry of every node's.
 The tree has such a node for each default `presumed` lists, and none for a default the rule never read.
-The nodes come in the order of the tree, which is the order of the steps that read them, and not always the order `presumed` lists them in (a default no step could show comes last, and a rule that runs while the answer is written out is placed where it was set up), so match nodes to `presumed` by comparing the strings and not by position.
+The nodes come in the order of the tree, which is the order of the steps that read them, and not always the order `presumed` lists them in (a default no step could show comes last, and a step that is set up early and run late is shown where it was set up), so match nodes to `presumed` by comparing the strings and not by position.
 A tree that was cut off at its display limit (10000 nodes, marked `… trace truncated`) has the node for a default read after the cut, with its value, under the tree's last step.
 It also has one for a default a rule's own `JSONDECODE` filled, which `presumed` leaves out unless the request asked for `"presumption": "hard"`.
 A second reader of the same default has no node of its own, so a client that collapses subtrees should rely on `presumed` for the defaults of the whole answer.

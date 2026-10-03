@@ -393,7 +393,7 @@ Each was re-probed on this branch's own binaries before anything was changed.
 - **N2 (minor): a truncated trace dropped the event on the service.**
   Repaired by `completeDefaults` (above, commit `f82e71cfb`), with the CLI test "shows a default that a truncated trace did not reach", the service test of the same name, and five unit cases.
 - **N3 (minor): the order of the tree's nodes is not the order the defaults were read.**
-  Probed: a default no step could show comes last, and a rule that runs while the answer is written out is placed where it was set up, so an `#EVALTRACE` shows `the rate` and then `timeout` where the plain `#EVAL`'s lines say `timeout` and then `the rate`.
+  Probed, both shapes on the final build: a default no step could show comes last (`#EVALTRACE` shows `the rate` and then `timeout` where the plain `#EVAL`'s lines say `timeout` and then `the rate`), and a step that is set up early and run late is shown where it was set up (two `WHERE` bindings, the second forced first: the plain directive's lines say `beta` then `alpha`, the trace shows `alpha` then `beta`).
   Not changed in the code: the order of a tree is the order of its steps.
   The service README and the reference page said "in the order they were read"; they now say to match nodes to `presumed` by name and not by position.
 - **N4 (minor): "every directive" did not reach the browser playground.**
