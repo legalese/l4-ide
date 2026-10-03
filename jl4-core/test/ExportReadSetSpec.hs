@@ -15,7 +15,7 @@ import qualified Data.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.API.VirtualFS (checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions)
 import L4.FunctionSchema (Parameters(..), Parameter(..), parametersFromDecide)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
@@ -330,3 +330,70 @@ spec = do
       it "raises nothing for a default that reads no section input" $ do
         rs <- readsOf control
         rs `shouldBe` []
+
+    -- W7 second review, rulings S5 and silent S8: the refusal of an export that
+    -- reaches an imported reader ('validateExportImplicitImports') reads the body
+    -- and the export's own inputs' defaults, and now the defaults of the fields of
+    -- the records those inputs carry, because the decoder takes one when a request
+    -- leaves the field out.
+    describe "a record field's default that reaches an imported reader" $ do
+      let lib = Text.unlines
+            [ "§ `Rates`"
+            , "    GIVEN `the rate` IS A NUMBER TYPICALLY 0.05"
+            , ""
+            , "GIVEN amount IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`scaled by the rate` amount MEANS amount TIMES `the rate`"
+            , ""
+            , "GIVEN amount IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`doubled` amount MEANS amount TIMES 2"
+            ]
+          vfs = vfsFromList [("rates", lib)]
+          crossings src =
+            case checkWithImports vfs src of
+              Left errs -> fail $ "Fatal: " ++ show errs
+              Right r ->
+                pure [ (nameOf fn, unqualifiedRawNameToText (rawName imported))
+                     | MkCheckErrorWithContext{kind = ImplicitCrossesImport fn imported} <- r.tcdErrors ]
+          exportTaking reader = Text.unlines
+            [ "IMPORT rates"
+            , ""
+            , "DECLARE Config HAS"
+            , "  markup IS A NUMBER TYPICALLY (" <> reader <> " 100)"
+            , "  retries IS A NUMBER"
+            , ""
+            , "@export cost"
+            , "GIVEN amount IS A NUMBER"
+            , "      cfg IS A Config"
+            , "GIVETH A NUMBER"
+            , "`cost with config` MEANS amount PLUS cfg's markup"
+            ]
+          -- the record sits in a field of another record the export takes
+          nested = Text.unlines
+            [ "IMPORT rates"
+            , ""
+            , "DECLARE Config HAS"
+            , "  markup IS A NUMBER TYPICALLY (`scaled by the rate` 100)"
+            , "  retries IS A NUMBER"
+            , ""
+            , "DECLARE Wrapper HAS"
+            , "  inner IS A Config"
+            , ""
+            , "@export cost"
+            , "GIVEN amount IS A NUMBER"
+            , "      w IS A Wrapper"
+            , "GIVETH A NUMBER"
+            , "`cost with wrapper` MEANS amount PLUS w's inner's markup"
+            ]
+      it "is refused, naming the export and the reader" $ do
+        cs <- crossings (exportTaking "`scaled by the rate`")
+        cs `shouldBe` [("cost with config", "scaled by the rate")]
+      it "is refused when the record is nested in another the export takes" $ do
+        cs <- crossings nested
+        cs `shouldBe` [("cost with wrapper", "scaled by the rate")]
+      -- Positive control: the same shape with an imported rule that reads no section
+      -- input is not a reader, and raises nothing.
+      it "raises nothing for a default that names an imported rule that reads no input" $ do
+        cs <- crossings (exportTaking "`doubled`")
+        cs `shouldBe` []

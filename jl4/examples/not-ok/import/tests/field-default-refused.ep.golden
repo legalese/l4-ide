@@ -1,0 +1,22 @@
+-- The cross-IMPORT refusal (`export-refused.l4`, §11.19 OF-7) for an export whose
+-- INPUT is a record with a field DEFAULT that reaches the imported reader. A
+-- request that leaves the field out takes its default, so the export reaches an
+-- imported reader exactly as a body that called it would, and the same three
+-- things are true at once: the schema does not list `the rate`, a value sent under
+-- that name is accepted and dropped, and discharge does not cross an IMPORT, so the
+-- evaluation runs out as an internal error ("running bin op with invalid
+-- operation") and not as an answer. It is refused at check time instead
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3, second review: the refusal for an
+-- export's input default, `default-refused.l4`, had left this one open).
+
+IMPORT `implicit-rate-lib`
+
+DECLARE Config HAS
+  markup IS A NUMBER TYPICALLY (`scaled by the rate` 100)
+  retries IS A NUMBER
+
+@export What this amount comes to with a configured markup.
+GIVEN amount IS A NUMBER
+      cfg IS A Config
+GIVETH A NUMBER
+`cost with config` MEANS amount PLUS cfg's markup

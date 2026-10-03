@@ -49,7 +49,7 @@ import L4.Annotation (getAnno)
 import L4.Syntax
 import L4.Names (filterGivenSigTo, getName, isSectionBinderElaboration, sectionGivenNames)
 import L4.TypeCheck.Environment (maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, typeHeads)
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -737,13 +737,46 @@ validateExportImplicitImports importedReaders entityInfo mod'
                              (map (transitiveReferencedUniquesWith bodies)
                                 -- A request that leaves an input out takes its
                                 -- default, so what the default calls is reached
-                                -- from the export as much as the body is.
-                                (body : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ])))
+                                -- from the export as much as the body is. So is
+                                -- the default of a field of a record an input
+                                -- carries: the decoder takes it when the request
+                                -- leaves the field out.
+                                (body
+                                   : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]
+                                   <> recordFieldDefaultsReachedBy mod'
+                                        [ ty | MkOptionallyTypedName _ _ (Just ty) _ <- otns ])))
                           importedReaders))
       , Just (importedName, _) <- [Map.lookup u entityInfo]
       ]
  where
   bodies = decideBodiesFromModule mod'
+
+-- | The @TYPICALLY@ defaults of the fields of the records that these types
+-- reach: the records this module declares whose names they mention, and in turn
+-- the records the types of those records' fields mention. A record declared in
+-- an imported module is not in the module's own declarations and is not walked.
+recordFieldDefaultsReachedBy :: Module Resolved -> [Type' Resolved] -> [Expr Resolved]
+recordFieldDefaultsReachedBy (MkModule _ _ sect) tys = go Set.empty (concatMap names tys)
+ where
+  names = map getUnique . typeHeads
+
+  records = Map.fromList (declared sect)
+  declared (MkSection _ _ _ _ decls) = concatMap fromDecl decls
+  fromDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ n _ _) decl) -> case decl of
+      RecordDecl _ _ tns -> [(getUnique n, tns)]
+      EnumDecl _ cds     -> [(getUnique n, concat [ tns | MkConDecl _ _ tns <- cds ])]
+      _                  -> []
+    Section _ s -> declared s
+    _           -> []
+
+  go _ [] = []
+  go seen (u : us)
+    | Set.member u seen = go seen us
+    | Just tns <- Map.lookup u records =
+        [ d | MkTypedName _ _ _ (Just d) _ <- tns ]
+          <> go (Set.insert u seen) (concat [ names ty | MkTypedName _ _ ty _ _ <- tns ] <> us)
+    | otherwise = go (Set.insert u seen) us
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
