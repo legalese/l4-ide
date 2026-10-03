@@ -6,6 +6,13 @@
 # failure is a DiagnosticSeverity_Error line whose message is "assertion failed".
 # An encoding that "ran green" by exit code can be carrying failed assertions.
 #
+# Where the message sits: `l4 run` prints it on the `Message:` line when it fits
+# in 80 columns, and on the lines below when it does not (an assertion that took
+# a TYPICALLY default carries a `NOTE:` line, which always makes it break). So the
+# count reads the first words of the message wherever they are, and not only a
+# `Message:` line that has them. tests-cli (l4-cli-test) runs this script on a
+# module with both layouts.
+#
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
 # Env:    L4   the l4 binary      (default: `l4` on PATH)
 #
@@ -25,8 +32,16 @@ for f in "$DIR"/*.l4; do
   [ -e "$f" ] || { echo "check.sh: no .l4 files in $DIR" >&2; exit 2; }
   out="$("$L4" run "$f" 2>&1)"
   err=$(printf '%s\n' "$out" | grep -c 'DiagnosticSeverity_Error')
-  ok=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*Message:[[:space:]]+assertion satisfied')
-  bad=$(printf '%s\n' "$out" | grep -cE '^[[:space:]]*Message:[[:space:]]+assertion failed')
+  tally=$(printf '%s\n' "$out" | awk '
+    function note(s) { if (s ~ /^assertion satisfied/) ok++; else if (s ~ /^assertion failed/) bad++ }
+    /^[[:space:]]*Message:/ {
+      s = $0; sub(/^[[:space:]]*Message:[[:space:]]*/, "", s)
+      if (s == "") want = 1; else { want = 0; note(s) }
+      next
+    }
+    want && /[^[:space:]]/ { s = $0; sub(/^[[:space:]]+/, "", s); note(s); want = 0 }
+    END { print ok + 0, bad + 0 }')
+  ok=${tally% *} bad=${tally#* }
   printf '%-40s %7d %9d %7d\n' "$(basename "$f")" "$err" "$ok" "$bad"
   total_err=$((total_err + err)) total_ok=$((total_ok + ok)) total_bad=$((total_bad + bad)) n=$((n + 1))
 done

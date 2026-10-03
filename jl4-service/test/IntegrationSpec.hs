@@ -17,7 +17,8 @@ import Logging (newLogger)
 import Options (Options (..))
 import Types
 
-import Control.Monad (guard, unless)
+import Control.Concurrent.Async (forConcurrently)
+import Control.Monad (forM_, guard, unless)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (try)
@@ -43,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, echoRecordJL4, deonticSectionDefaultJL4, directivesAboveDefaultJL4, truncatedTraceJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -84,7 +85,7 @@ spec = describe "integration" do
         resp <- evalFunction baseUrl mgr "refuse-eval" "fee"
           (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (1999 :: Int) ] ])
         case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
-          Just (SimpleError e@(EvaluatorRefused _)) ->
+          Just (SimpleError e@(EvaluatorRefused _ _)) ->
             prettyEvaluatorError e `shouldBe`
               "The model refuses to answer: this schedule is not encoded for years before 2000"
           other -> expectationFailure ("Expected a refusal error, got: " <> show other)
@@ -456,6 +457,368 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+  describe "TYPICALLY defaults (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC)" do
+    let uncertain = Aeson.object []
+        args kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs]
+        hard kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs, "presumption" Aeson..= ("hard" :: Text)]
+        expectAnswer resp v ps = assertSuccess resp \r ->
+          (Map.lookup "value" r.fnResult, r.presumed) `shouldBe` (Just v, ps)
+        expectError resp fragment =
+          case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+            Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf fragment
+            other -> expectationFailure ("Expected an error containing " <> show fragment <> ", got: " <> show other)
+
+    -- W2: the published schema is R8's surface: optional, with its default.
+    it "publishes a section GIVEN's default and leaves it out of required (W2)" do
+      withServiceFromSources "ty-schema" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema/functions/may%20contract")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            capacity = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object props) -> Aeson.KeyMap.lookup "has capacity" props
+              _ -> Nothing
+        required `shouldNotContain` ["has capacity"]
+        required `shouldContain` ["is adult"]
+        (capacity >>= \case Aeson.Object c -> Aeson.KeyMap.lookup "default" c; _ -> Nothing)
+          `shouldBe` Just (Aeson.Bool True)
+
+    it "fills a left-out section GIVEN on the direct path and lists it in presumed" do
+      withServiceFromSources "ty-sec-direct" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-direct" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    -- The positive control for presumed: a default the rule never forces is
+    -- not listed, although the request left it out just the same.
+    it "does not list a rule GIVEN's default the rule never read" do
+      withServiceFromSources "ty-rule-unread" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rule-unread" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    it "fills a left-out section GIVEN on the wrapper path too" do
+      withServiceFromSources "ty-sec-wrap" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    it "fills a left-out rule GIVEN on the direct and the wrapper path" do
+      withServiceFromSources "ty-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitBool True) ["has capacity"]
+        wrapped <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["has capacity"]
+
+    it "fills left-out record fields from their DECLARE, enum defaults included (T1b)" do
+      withServiceFromSources "ty-record" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-record" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
+        expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
+
+    it "lets a supplied value win, and presumes nothing" do
+      withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-supplied" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    -- T3: null is "I don't know", never an omission.
+    it "never takes a default for null" do
+      withServiceFromSources "ty-null" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-null" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= Aeson.Null])
+        expectError resp "never takes the TYPICALLY default"
+
+    -- T4: presumption hard withdraws the default; the refusal names the input
+    -- and stays loud, on both paths.
+    it "with presumption hard, refuses a left-out input on the direct path" do
+      withServiceFromSources "ty-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectError resp "'has capacity': missing required parameter"
+
+    it "with presumption hard, stops on a left-out input on the wrapper path" do
+      withServiceFromSources "ty-hard-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-wrap" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectError resp "has capacity (not supplied)"
+
+    -- T1b: presumption hard withdraws D7.3's MAYBE fallback too, the same way
+    -- on both paths.
+    it "with presumption hard, refuses a left-out MAYBE input on both paths" do
+      withServiceFromSources "ty-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        -- NOTHING for a left-out MAYBE is a presumption, listed like a default
+        soft <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False])
+        expectAnswer soft (FnLitInt 0) ["premium"]
+        softWrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= uncertain])
+        expectAnswer softWrapped (FnLitInt 0) ["premium"]
+        -- null is a value, not an omission: NOTHING, and nothing presumed
+        nulled <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False, "premium" Aeson..= Aeson.Null])
+        expectAnswer nulled (FnLitInt 0) []
+        direct <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= False])
+        expectError direct "a MAYBE left out is NOTHING only while presumption is soft"
+        wrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= uncertain])
+        -- the wrapper's own field name (`premium (input)`) does not leak (review m6)
+        expectError wrapped "Missing required field 'premium'"
+
+    -- T6: a section default counts when the rule first READS it, not when
+    -- discharge binds it at the root. `FALSE AND <defaulted input>`.
+    it "lists a section default only when the rule reads it, on both paths" do
+      withServiceFromSources "ty-sec-read" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        unread <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer unread (FnLitBool False) []
+        unreadWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= uncertain])
+        expectAnswer unreadWrapped (FnLitBool False) []
+        readWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer readWrapped (FnLitBool True) ["has capacity"]
+
+    -- T3's four cells, on the wrapper path: absent takes the default, null and
+    -- {} do not. (The direct path's null is the "never takes a default for
+    -- null" test above.)
+    it "keeps null apart from absent on the wrapper path" do
+      withServiceFromSources "ty-null-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        absent <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer absent (FnLitBool True) ["has capacity"]
+        nulled <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+        uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
+        expectError uncertainCap "has capacity (not supplied)"
+
+    it "keeps null apart from absent for a section GIVEN on the wrapper path" do
+      withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        nulled <- evalFunction baseUrl mgr "ty-null-sec" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+
+    it "with presumption hard, names every defaulted input left out" do
+      withServiceFromSources "ty-hard-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-two" "may contract" (hard ["is adult" Aeson..= True])
+        expectError resp "Parameter 'of sound mind': missing required parameter"
+        -- a section GIVEN is a parameter, not an ASSUME (review nit 22)
+        expectError resp "Parameter 'has capacity': missing required parameter"
+
+    -- Review M5: a refusal that rests on a default says so, on both
+    -- endpoints, and a refused or errored case of the batch endpoint is
+    -- returned with its reason instead of only being counted (review m5).
+    it "carries presumed on a refusal, and on a refused batch case" do
+      withServiceFromSources "ty-refuse" [("eligible.l4", refuseDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-refuse" "eligible" (args ["age" Aeson..= (30 :: Int)])
+        case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+          Just (SimpleError (EvaluatorRefused reason ps)) -> do
+            reason `shouldBe` "cannot decide for a non-resident"
+            ps `shouldBe` ["is resident"]
+          other -> expectationFailure ("Expected a refusal, got: " <> show other)
+        supplied <- evalFunction baseUrl mgr "ty-refuse" "eligible"
+          (args ["age" Aeson..= (30 :: Int), "is resident" Aeson..= False])
+        case Aeson.decode (responseBody supplied) :: Maybe SimpleResponse of
+          Just (SimpleError (EvaluatorRefused _ ps)) -> ps `shouldBe` []
+          other -> expectationFailure ("Expected a refusal, got: " <> show other)
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "age" Aeson..= (30 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "age" Aeson..= (30 :: Int), "is resident" Aeson..= True]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-refuse/functions/eligible/evaluation/batch") body
+        batchResp <- httpLbs req mgr
+        case Aeson.decode (responseBody batchResp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody batchResp))
+          Just batch -> do
+            map (\c -> (c.outcome, c.presumed)) batch.cases `shouldBe`
+              [ (CaseRefused "cannot decide for a non-resident", ["is resident"]), (CaseAnswered, []) ]
+            batch.summary.casesProcessed `shouldBe` 2
+
+    it "returns an errored batch case with its reason, under presumption hard" do
+      withServiceFromSources "ty-batch-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "presumption" Aeson..= ("hard" :: Text)
+              , "cases" Aeson..= [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False] ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch-hard/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Just batch -> case map (.outcome) batch.cases of
+            [CaseErrored msg] -> msg `shouldSatisfy` Text.isInfixOf "Parameter 'has capacity': missing required parameter"
+            other -> expectationFailure ("Expected one errored case, got: " <> show other)
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+
+    it "refuses an unknown presumption with a 400" do
+      withServiceFromSources "ty-bad-switch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-bad-switch" "may contract"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["is adult" Aeson..= True], "presumption" Aeson..= ("medium" :: Text)])
+        statusCode' resp `shouldBe` 400
+
+    -- Review m1: an exact default reaches the evaluator exactly on both paths.
+    it "keeps a decimal default exact on the direct and the wrapper path" do
+      withServiceFromSources "ty-exact" [("exact.l4", exactDecimalJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-exact" "is exact" (args ["u" Aeson..= True])
+        expectAnswer direct (FnLitBool True) ["r"]
+        wrapped <- evalFunction baseUrl mgr "ty-exact" "is exact" (args ["u" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["r"]
+
+    -- Review m2 and code #7: the schema publishes an enum default as the
+    -- constructor's own name, NOTHING as null, and a rule GIVEN's default;
+    -- and the direct path accepts the published enum value.
+    it "publishes enum, NOTHING and rule GIVEN defaults a request can send back" do
+      withServiceFromSources "ty-schema-enum" [("which.l4", enumSchemaJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema-enum/functions/which")
+        resp <- httpLbs req mgr
+        let props = case lookupKey "parameters" (decodeObject (responseBody resp)) of
+              Just (Aeson.Object o) | Just (Aeson.Object ps) <- Aeson.KeyMap.lookup "properties" o -> ps
+              _ -> mempty
+            defaultOf k = case Aeson.KeyMap.lookup k props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "s" `shouldBe` Just (Aeson.String "Red")
+        defaultOf "m" `shouldBe` Just Aeson.Null
+        defaultOf "k" `shouldBe` Just (Aeson.Number 5)
+        sent <- evalFunction baseUrl mgr "ty-schema-enum" "which" (args ["s" Aeson..= ("Red" :: Text)])
+        expectAnswer sent (FnLitInt 5) ["k"]
+
+    -- Review m8 and m4, report item 5: on the wrapper path a non-BOOLEAN
+    -- input sent as null is refused by name (it used to be "Evaluation
+    -- produced unknown value"), and hard mode compiles a MAYBE default.
+    it "refuses null by name on the wrapper path, and names every input under hard" do
+      withServiceFromSources "ty-wrap-null" [("wp.l4", wrapperNullJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["k" Aeson..= Aeson.Null])
+        expectError direct "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        wrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain, "k" Aeson..= Aeson.Null])
+        expectError wrapped "Field 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        soft <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain])
+        expectAnswer soft (FnLitInt 1050) ["m", "k", "flag"]
+        hardWrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["u" Aeson..= uncertain], "presumption" Aeson..= ("hard" :: Text)])
+        expectError hardWrapped "Missing required fields 'm'"
+        expectError hardWrapped "'k' (it has a TYPICALLY default, but presumption is hard"
+
+    it "refuses null on an enum by name, and reads a MAYBE synonym as a MAYBE" do
+      withServiceFromSources "ty-enum-null" [("red.l4", enumNullJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= False])
+        expectError direct "Parameter 'shade' is null, which means the value is not known"
+        wrapped <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= uncertain])
+        expectError wrapped "Field 'shade' is null, which means the value is not known"
+        synonym <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= ("Red" :: Text), "second" Aeson..= Aeson.Null, "unused flag" Aeson..= False])
+        expectAnswer synonym (FnLitBool True) []
+        synonymAbsent <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= ("Red" :: Text), "unused flag" Aeson..= False])
+        expectAnswer synonymAbsent (FnLitBool True) ["second"]
+
+    it "fills a record field default on the wrapper path, and names it without the wrapper's suffix" do
+      withServiceFromSources "ty-rec-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        filled <- evalFunction baseUrl mgr "ty-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)], "unused flag" Aeson..= uncertain])
+        expectAnswer filled (FnLitInt 32) ["cfg.timeout"]
+        nulled <- evalFunction baseUrl mgr "ty-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= Aeson.Null], "unused flag" Aeson..= uncertain])
+        expectError nulled "Field 'cfg.timeout' is null"
+
+    -- Review M3 / code #1: a rule's own decode is not the request's.
+    it "lets a rule's own JSONDECODE fill its default under hard, and says so" do
+      withServiceFromSources "ty-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        soft <- evalFunction baseUrl mgr "ty-own" "within limit" (args ["amount" Aeson..= (5 :: Int)])
+        expectAnswer soft (FnLitBool True) []
+        hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
+        expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]
+
+    it "fills a default on the deontic wrapper path and lists it" do
+      withServiceFromSources "ty-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
+
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input or a field left out takes its default, a name that matches
+    -- nothing is refused, naming the nearest; elsewhere it is ignored.
+    it "refuses an unknown argument where a default is taken, and ignores it elsewhere" do
+      withServiceFromSources "ty-typo" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        typo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capasity" Aeson..= False])
+        expectError typo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        wrappedTypo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capasity" Aeson..= False])
+        expectError wrappedTypo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        nothingTaken <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False, "has capasity" Aeson..= True])
+        expectAnswer nothingTaken (FnLitBool False) []
+      withServiceFromSources "ty-typo-rec" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "shade" Aeson..= ("Green" :: Text)])
+        expectError direct "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+        full <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args [ "cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= (5 :: Int), "colour" Aeson..= ("Red" :: Text), "timout" Aeson..= (1 :: Int)]
+                , "shade" Aeson..= ("Green" :: Text) ])
+        expectAnswer full (FnLitInt 7) []
+      withServiceFromSources "ty-typo-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        wrapped <- evalFunction baseUrl mgr "ty-typo-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "unused flag" Aeson..= uncertain])
+        expectError wrapped "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on
+    -- a record input is null, so it is refused by name, as in l4 batch.
+    it "refuses {} on a record input by name" do
+      withServiceFromSources "ty-rec-empty" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rec-empty" "budget"
+          (args ["cfg" Aeson..= Aeson.object [], "unused flag" Aeson..= False])
+        expectError resp "Field 'cfg' is {}, which means the value is not known: supply a value"
+
+    -- Review code #3: the "took its default" registry is per evaluation, so
+    -- concurrent requests on one cached deployment cannot see each other's.
+    it "keeps presumed apart across concurrent requests" do
+      withServiceFromSources "ty-concurrent" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        let request i =
+              let adult = even (i :: Int)
+              in ( adult
+                 , args ["is adult" Aeson..= adult, "unused flag" Aeson..= (if i `mod` 3 == 0 then uncertain else Aeson.Bool False)] )
+        results <- forConcurrently [1 .. 24] \i -> do
+          let (adult, body) = request i
+          resp <- evalFunction baseUrl mgr "ty-concurrent" "may contract" body
+          pure (adult, Aeson.decode (responseBody resp) :: Maybe SimpleResponse)
+        forM_ results \(adult, r) -> case r of
+          Just (SimpleResponse rwr) ->
+            (Map.lookup "value" rwr.fnResult, rwr.presumed) `shouldBe`
+              (Just (FnLitBool adult), [ "has capacity" | adult ])
+          other -> expectationFailure ("Expected an answer, got: " <> show other)
+
+    it "carries presumed on each case of the batch endpoint" do
+      withServiceFromSources "ty-batch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+          Just batch -> map (\c -> c.presumed) batch.cases `shouldBe` [["has capacity"], []]
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
@@ -988,6 +1351,246 @@ spec = describe "integration" do
             ])
         statusCode' bound `shouldBe` 200
         lookupKey "determined" (decodeObject (responseBody bound)) `shouldBe` Just (Aeson.Bool False)
+
+  describe "a TYPICALLY default in the reasoning tree (W8 of TYPICALLY-ONE-BEHAVIOUR-SPEC)" do
+    let uncertain = Aeson.object []
+        args kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs]
+        traced deployId fnName body = \baseUrl mgr -> do
+          req <- buildJsonPost
+            (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/evaluation?trace=full")
+            body
+          httpLbs req mgr
+        -- every node of the tree
+        nodes :: Reasoning -> [Reasoning]
+        nodes r = r : concatMap nodes r.children
+        -- the nodes that say a default took effect, as (code, what it says, its value)
+        events :: ResponseWithReason -> [(Text, Text, Text)]
+        events r =
+          [ (code, said, result)
+          | n <- nodes r.reasoning
+          , said : result : _ <- [n.explanation]
+          , "took its default" `Text.isInfixOf` said
+          , code <- take 1 n.exampleCode
+          ]
+        -- what the tree and the presumed list each say, which must be the same
+        -- defaults: the trace has an event for exactly those the answer rests on
+        agrees r = List.sort [code | (code, _, _) <- events r] `shouldBe` List.sort r.presumed
+        whenTraced check resp = assertSuccess resp \r -> check r >> agrees r
+        -- every (parent, child) pair of the tree
+        edges :: Reasoning -> [(Reasoning, Reasoning)]
+        edges r = [(r, k) | k <- r.children] <> concatMap edges r.children
+        -- where the author wrote a default, as the response must say it:
+        -- @file:line:from-to@, the line of the fixture that holds the needle
+        -- and the columns of the value after its TYPICALLY (the end is the
+        -- column after the value)
+        declaredAt :: Text -> Text -> Text -> Text -> Text
+        declaredAt file source needle value =
+          case [ (n, l) | (n, l) <- zip [1 :: Int ..] (Text.lines source), needle `Text.isInfixOf` l ] of
+            (n, l) : _ ->
+              let start = Text.length (fst (Text.breakOn ("TYPICALLY " <> value) l)) + Text.length "TYPICALLY " + 1
+              in file <> ":" <> Text.pack (show n) <> ":" <> Text.pack (show start) <> "-" <> Text.pack (show (start + Text.length value))
+            [] -> error ("no line of the fixture has " <> Text.unpack needle)
+        saidBy r = [said | (_, said, _) <- events r]
+        -- a deontic function's request: a driver, from the start, no events
+        deonticBody = Aeson.object
+          [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+          , "startTime" Aeson..= (0 :: Int)
+          , "events" Aeson..= ([] :: [Aeson.Value])
+          ]
+
+    it "shows a section default on the direct path, with its value and where it was declared" do
+      withServiceFromSources "w8-sec" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-sec" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced
+          (\r -> case events r of
+              [(code, said, result)] -> do
+                code `shouldBe` "has capacity"
+                said `shouldSatisfy` Text.isPrefixOf "has capacity took its default (declared at "
+                result `shouldBe` "Result: TRUE"
+              other -> expectationFailure ("expected one event, got " <> show other))
+          resp
+
+    it "shows it on the wrapper path too, under the input's own name" do
+      withServiceFromSources "w8-sec-wrap" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-sec-wrap" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced
+          (\r -> map (\(code, _, _) -> code) (events r) `shouldBe` ["has capacity"])
+          resp
+
+    it "shows a rule GIVEN's default, which the service filled at the root, on both paths" do
+      withServiceFromSources "w8-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- traced "w8-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> map (\(code, _, _) -> code) (events r) `shouldBe` ["has capacity"]) direct
+        wrapped <- traced "w8-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> map (\(code, _, _) -> code) (events r) `shouldBe` ["has capacity"]) wrapped
+
+    it "shows the fields of a record the request left out, by their path" do
+      withServiceFromSources "w8-record" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-record" "budget" (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]]) baseUrl mgr
+        whenTraced
+          (\r -> List.sort [code | (code, _, _) <- events r] `shouldBe` ["cfg.colour", "cfg.timeout", "shade"])
+          resp
+
+    -- the positive controls: no default taken, none read, none shown
+    it "shows nothing for a default the rule never read, or one the request supplied" do
+      -- `is adult AND has capacity`: FALSE settles it before the default is read
+      withServiceFromSources "w8-none" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        unread <- traced "w8-none" "may contract" (args ["is adult" Aeson..= False, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> events r `shouldBe` []) unread
+        unreadWrapped <- traced "w8-none" "may contract" (args ["is adult" Aeson..= False, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> events r `shouldBe` []) unreadWrapped
+        -- and the same rule does show it, when it is read
+        read' <- traced "w8-none" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> length (events r) `shouldBe` 1) read'
+        supplied <- traced "w8-none" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> events r `shouldBe` []) supplied
+
+    -- Read only when the answer is written out, a default has no frame open
+    -- to hang from; it hangs on the expression that built the result.
+    it "shows a default that is read only when the result is written out" do
+      withServiceFromSources "w8-late" [("config.l4", echoRecordJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-late" "same config" (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]]) baseUrl mgr
+        whenTraced
+          (\r -> [code | (code, _, _) <- events r] `shouldBe` ["cfg.timeout"])
+          resp
+
+    -- The trace must survive a default wherever the default is read: a trace
+    -- that fails to post-process is replaced by one node saying so, which no
+    -- other assertion here would notice for these shapes.
+    it "keeps the trace when a default is read on the other paths, and shows it" do
+      let intact r = [n | n <- nodes r.reasoning, any (Text.isInfixOf "trace unavailable") n.explanation] `shouldBe` []
+          codes r = [code | (code, _, _) <- events r]
+      withServiceFromSources "w8-rec-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)], "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> intact r >> (codes r `shouldBe` ["cfg.timeout"])) resp
+      -- T6b: the trace shows every event, a rule's own decode included, where
+      -- presumed names only those of the request
+      withServiceFromSources "w8-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-own" "within limit" (args ["amount" Aeson..= (5 :: Int)]) baseUrl mgr
+        assertSuccess resp \r -> do
+          intact r
+          -- named as presumed names it under hard, with the type the rules decoded
+          codes r `shouldBe` ["JSONDECODE Settings: limit"]
+          r.presumed `shouldBe` []
+      -- D7.3's NOTHING for a MAYBE left out has no TYPICALLY behind it, and says so
+      withServiceFromSources "w8-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-maybe" "premium due" (args ["unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced
+          (\r -> do
+              intact r
+              [said | (_, said, _) <- events r] `shouldBe` ["premium took its default (a MAYBE left out is NOTHING)"])
+          resp
+      withServiceFromSources "w8-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-two" "may contract" (args ["is adult" Aeson..= True]) baseUrl mgr
+        -- in the order they were read
+        whenTraced (\r -> intact r >> (codes r `shouldBe` ["has capacity", "of sound mind"])) resp
+      withServiceFromSources "w8-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ]) baseUrl mgr
+        assertSuccess resp \r -> do
+          intact r
+          r.presumed `shouldBe` ["is motorway"]
+          codes r `shouldBe` ["is motorway"]
+
+    -- R8's "with the declaration line" must be the author's, on every path: the
+    -- wrapper is evaluated as the author's source followed by generated code,
+    -- and its range was the generated text's (review F2)
+    it "says where the default was declared, in the author's file and line, on every path" do
+      let capacity = declaredAt "capacity.l4" sectionBooleanJL4 "`has capacity`" "TRUE"
+          sentence what at = what <> " took its default (declared at " <> at <> ")"
+      withServiceFromSources "w8-at-sec" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        direct <- traced "w8-at-sec" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" capacity]) direct
+        wrapped <- traced "w8-at-sec" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" capacity]) wrapped
+      -- a rule GIVEN's default: the wrapper's InputArgs record copies it
+      let rule = declaredAt "capacity.l4" ruleDefaultJL4 "`has capacity`" "TRUE"
+      withServiceFromSources "w8-at-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- traced "w8-at-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= False]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" rule]) direct
+        wrapped <- traced "w8-at-rule" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" rule]) wrapped
+      -- a deontic function always takes the wrapper path, and its evaluation
+      -- is named for the function, not the file
+      withServiceFromSources "w8-at-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-at-deontic" "seatbelt requirement" deonticBody baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "is motorway" (declaredAt "seatbelt.l4" deonticDefaultJL4 "`is motorway`" "FALSE")]) resp
+      withServiceFromSources "w8-at-deontic-sec" [("belt.l4", deonticSectionDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-at-deontic-sec" "belt rule" deonticBody baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "is motorway" (declaredAt "belt.l4" deonticSectionDefaultJL4 "`is motorway`" "FALSE")]) resp
+      -- directives above the default are not part of the wrapper's source, and
+      -- must not move the lines below them
+      withServiceFromSources "w8-at-lines" [("capacity.l4", directivesAboveDefaultJL4)] \baseUrl mgr -> do
+        wrapped <- traced "w8-at-lines" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced (\r -> saidBy r `shouldBe` [sentence "has capacity" (declaredAt "capacity.l4" directivesAboveDefaultJL4 "`has capacity`" "TRUE")]) wrapped
+
+    -- Review F1: a rule that runs while the answer is written out (the wrapper
+    -- returns JUST of it, and so does every deontic function) shows the
+    -- default under the step that read it, in the trace of that run, and not
+    -- as a sibling of the call that follows it.
+    it "hangs the event under the step that read the default on the wrapper path, not under its JUST" do
+      withServiceFromSources "w8-place" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        wrapped <- traced "w8-place" "may contract" (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain]) baseUrl mgr
+        whenTraced
+          (\r -> do
+              [ (parent.exampleCode, kid.exampleCode)
+                | (parent, kid) <- edges r.reasoning, kid.exampleCode == ["has capacity"] ]
+                `shouldSatisfy` all (\(parentCode, _) -> not (any (Text.isPrefixOf "JUST OF") parentCode))
+              length (events r) `shouldBe` 1)
+          wrapped
+      withServiceFromSources "w8-place-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-place-deontic" "seatbelt requirement" deonticBody baseUrl mgr
+        whenTraced
+          (\r -> do
+              let parents = [parent.exampleCode | (parent, kid) <- edges r.reasoning, kid.exampleCode == ["is motorway"]]
+              length parents `shouldBe` 1
+              -- the step that read it is the field of the decoded input, which
+              -- is where the rule's own input is read
+              parents `shouldSatisfy` all (any (Text.isInfixOf "is motorway (input)"))
+              parents `shouldSatisfy` all (not . any (Text.isPrefixOf "JUST OF")))
+          resp
+
+    -- Review N2: a trace is cut off at its display limit (10000 nodes), and the
+    -- step that read the default can be past the cut. The tree must still have
+    -- the node for every default that presumed lists.
+    it "shows a default that a truncated trace did not reach" do
+      withServiceFromSources "w8-truncated" [("rates.l4", truncatedTraceJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-truncated" "big then rate" (args ["k" Aeson..= (16 :: Int)]) baseUrl mgr
+        whenTraced
+          (\r -> do
+              -- the guard: the tree really was cut off
+              [n | n <- nodes r.reasoning, any (Text.isInfixOf "trace truncated") n.explanation]
+                `shouldSatisfy` (not . null)
+              r.presumed `shouldBe` ["the rate"]
+              [(code, result) | (code, _, result) <- events r] `shouldBe` [("the rate", "Result: 3")])
+          resp
+
+    -- Review F6: a node and an entry of presumed name the same default by the
+    -- same string, also for a field a rule's own decode filled
+    it "names a node as presumed does, for a default the rule's own decode filled" do
+      withServiceFromSources "w8-own-hard" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        resp <- traced "w8-own-hard" "within limit"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
+          baseUrl mgr
+        whenTraced
+          (\r -> do
+              r.presumed `shouldBe` ["JSONDECODE Settings: limit"]
+              [code | (code, _, _) <- events r] `shouldBe` r.presumed)
+          resp
+
+    it "leaves the reasoning empty when no trace was asked for, and says presumed all the same" do
+      withServiceFromSources "w8-quiet" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w8-quiet" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        assertSuccess resp \r -> do
+          isEmptyReasoning r.reasoning `shouldBe` True
+          r.presumed `shouldBe` ["has capacity"]
 
   describe "evaluation with trace" do
     it "includes reasoning when trace=full" do

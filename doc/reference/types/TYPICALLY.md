@@ -4,9 +4,11 @@ Attaches a default value to a name. The default is a _rebuttable presumption_:
 it records what should be presumed when nobody supplies a value.
 
 **On a section `GIVEN` the default is used when nobody supplies a value.**
-Everywhere else it records what should be presumed without changing what the
-rules work out. That split is new, and the two halves are described separately
-below.
+**At the boundary — `l4 batch` and the decision service — it is also used for a
+rule's own `GIVEN` and for a record field, when a case leaves the fact out.**
+Inside a file, everywhere else, it records what should be presumed without
+changing what the rules work out. That split is new, and the parts are
+described separately below.
 
 ## Syntax
 
@@ -86,20 +88,144 @@ b)` is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
 - **On a section `GIVEN` it changes what a rule works out**: a rule that reads
-  the name, and is given no value for it, uses the default. Everywhere else it
-  does not. Nothing is substituted when such a rule is run; whatever reads the
-  file afterwards (a form generator, a decision service, a question-ordering
-  policy) decides how to use the stored default. The list of facts a published
-  rule asks for carries it as the JavaScript Object Notation (JSON) Schema
-  `default` keyword, and the defaulted name is still listed under `required`:
-  whoever asks the question must still send a value for it.
+  the name, and is given no value for it, uses the default. Inside a file,
+  everywhere else, it does not: a rule's own defaulted `GIVEN` still cannot be
+  left out at a call, and a record cannot be built with a defaulted field left
+  out.
 
-_Partly landed (2026-09-05). Of the four things proposed on 2026-09-04, one has
+## At the boundary: `l4 batch` and the decision service
+
+A case sent to `l4 batch`, or a request sent to the decision service, may leave
+out any fact that has a default, whether the `TYPICALLY` is on a section
+`GIVEN`, on the exported rule's own `GIVEN`, or on a field of a record the rule
+takes as an input. The default is filled in where the case arrives, and the
+answer lists it under **`presumed`**, by name (or, for a field, by its path, such
+as `config.timeout`) — but only if the answer actually used it. These rules
+govern what counts as leaving a fact out:
+
+- **Leaving the name out** is leaving it out. So is an empty cell in a CSV file
+  given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
+  and is listed under `presumed` like a default.
+- **`null` is not.** `null` means _not known_, and a fact that is not known never
+  takes its default: the case is refused, naming the fact. `{}` means the same,
+  for a record too.
+- **A name that matches nothing is refused where a default is taken.** In a
+  case that leaves out a fact with a default, a name that is not a fact is
+  refused, naming the nearest one, since it may misspell the fact left out.
+  Where no default is taken, it is ignored.
+- **The presumption can be switched off.** `l4 batch --presumption hard`, or
+  `"presumption": "hard"` in a service request, uses no defaults: a fact left
+  out is missing, and the case is refused, naming it. The default is `soft`.
+  The switch reaches only the facts a case can supply. A record the rules
+  decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
+  under `hard` the answer lists them under `presumed` as
+  `JSONDECODE <type>: <field>`, because nothing the case says could replace
+  them.
+
+The list of facts a published rule asks for carries each default as the
+JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
+is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
+either, and is not published, in the service's schema or in the query plan's.
+
+_Partly landed (2026-10-02). Of the four things proposed on 2026-09-04, two have
 landed: a **section** `GIVEN` may be left out, and a rule that reads it then uses
-the default. The other three have not. A rule's own `GIVEN` still cannot be left
-out at a call. The default still must be a fixed value written out, so it cannot
-name another `GIVEN`. And the published list of facts still asks for it as
-required rather than optional._
+the default; and the published list of facts asks for a defaulted fact as
+optional, which the boundary then honours. The other two have not. A rule's own
+`GIVEN` still cannot be left out at a call inside a file. The default still must
+be a fixed value written out, so it cannot name another `GIVEN`._
+
+## In a trace
+
+A trace shows how an answer was worked out: `#EVALTRACE` in the editor, `l4 trace`, and `trace=full` on the decision service.
+When a rule reads a name that took its default, the trace says so, at the place the rule needed it, with where the default was written and the value it gave:
+
+```l4
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+#EVALTRACE doubled
+#EVALTRACE doubled WITH `the rate` IS 5
+```
+
+```text
+6
+─────
+┌ doubled OF `the rate`
+│┌ doubled
+│└ <function>
+├ `the rate` TIMES 2
+│┌ the rate took its default (declared at rates.l4:2:44-45)
+│└ 3
+└ 6
+
+10
+─────
+┌ doubled OF 5
+│┌ doubled
+│└ <function>
+├ `the rate` TIMES 2
+└ 10
+```
+
+The second trace has no such line, because nothing was presumed: the value was given.
+It shows as the argument it is, `doubled OF 5`.
+
+The two lines have the shape of any step the rule took, what was worked out over the value it gave, and the words `took its default` are what tell them apart.
+
+- **A default that nothing read is not shown.**
+  The rule `FALSE AND` _the defaulted name_ is settled before the name is read, so its trace says nothing about it.
+  This is the same test `presumed` applies at the boundary, and a trace has a line for each default that `presumed` lists.
+- **A default is shown once**, where it was first read.
+  A rule that reads the same name afterwards shows only its value, with no line of its own.
+  To see every default an answer rests on, take the first line of each, or on the decision service read the answer's `presumed` list.
+- **The place is a line and a column.**
+  `rates.l4:2:44-45` is where the value `3` is written, on line 2, columns 44 to 45: the value itself, which is narrower than the whole line.
+  A `MAYBE` field left out of a record takes `NOTHING` with no `TYPICALLY` behind it, and its line says so: `premium took its default (a MAYBE left out is NOTHING)`.
+- **On the decision service**, the `reasoning` of a `trace=full` answer has a node for it, with the same sentence, then the value, as its `explanation`, and the name as its `exampleCode`.
+  Its `explanation` has two entries, the sentence and then `Result: 3`, where the other nodes have only the result: the result is the last entry of every node's `explanation`.
+  The name is the string the answer's `presumed` list uses for the same default, so the nodes can be matched to the list by comparing the two strings.
+  The nodes come in the order of the tree, which is the order of the steps, and not always the order the defaults were read or the order of `presumed`, so match by name and not by position.
+  The place is the author's own file and line, also when the request went through the service's wrapper.
+  The graph from `l4 trace`, and the service's `graphviz` output, draws it as a pale yellow node.
+- **A rule that runs only when the answer is written out** shows the default under the step that read it, as any rule does.
+  Handing back `JUST` the rule, a list of what rules gave, or a deontic function's answer are the usual cases.
+- **A default that no step of the trace can show** hangs under the last step of the whole expression.
+  A function that hands back a record with a defaulted field it never looked at is one: nothing computed with the field, so there is no step to put the line under.
+  A rule with no inputs of its own, which the trace does not open up, that decodes JSON and leaves a field out is the other.
+  A third is a trace that was cut off: a trace stops at 10,000 steps and says `… trace truncated` where it stopped, and a default read after that point is shown under the last step, with its value, and not left out.
+  The one exception is a trace that could not be put together at all, which is a single line saying so and has no step to hang anything under; a plain `#EVAL` says its defaults beside its answer (below), and a `#EVALTRACE` in that state says them there too.
+- **A default filled in by a rule's own `JSONDECODE`** is shown too, though `presumed` leaves it out unless the case was run under `hard` presumption: it is a default the case could not have supplied.
+- **A default written in a section of an imported file is not shown**, and `presumed` does not list it either.
+  A rule that reads one through an `IMPORT` takes the default with no line in the trace.
+  An `@export` that reaches a section input of an imported file is refused when the file is checked, so this arises in the editor and in `l4 trace` only.
+
+## Beside an answer
+
+A plain `#EVAL` or `#ASSERT` has no trace, so it says which defaults it took in a line after its answer, one line for each:
+
+```text
+6
+NOTE: the rate took its default 3 (declared at rates.l4:2:44-45)
+```
+
+The line says what the trace says: the name, what it came to, and where its default was written.
+The value is the one the default took.
+A `MAYBE` left out has no `TYPICALLY` to point to, and says `premium took its default (a MAYBE left out is NOTHING)`.
+A directive that supplies the value, such as `#EVAL doubled WITH `the rate` IS 5`, has no such line, and neither has one that never read the default.
+A `#EVALTRACE` shows the default in its trace and does not say it twice.
+
+Where you see the line:
+
+- `l4 run` prints the lines in its `Notes:` block, and in the `notes` of `l4 run --json`.
+- The editor shows them in the directive's diagnostic and in the inspector panel.
+- The REPL shows them after the value.
+  It re-prints the file before it evaluates an expression, so the place it names is in its own copy (`.repl_eval_0.l4`, with the columns of the re-printed text), and not in your file; the name and the value are the ones to read.
+- `l4 batch` and the decision service say it in the answer's `presumed` list instead.
+- The browser playground shows only the value of a directive, as it does for every other note.
+  The JSON its engine returns carries the lines in `notes`, but the page does not display them.
 
 ## Examples
 
@@ -138,8 +264,8 @@ DECIDE `contract is binding` IF
 ```
 
 Every rule in Part 3 reads those two names without re-declaring them. A
-published rule that reads them asks for both, and carries `"Singapore"` and
-`TRUE` as their JSON Schema defaults.
+published rule that reads them offers both as optional, carrying `"Singapore"`
+and `TRUE` as their JSON Schema defaults.
 
 ### In older files: `ASSUME`
 
@@ -157,7 +283,8 @@ longer carries this spelling.
 ## Behavior
 
 - TYPICALLY only adds, except on a section `GIVEN`, where it decides what a rule
-  that is given no value for the name works out.
+  that is given no value for the name works out, and at the boundary, where it
+  decides what a case that leaves the fact out works out.
 - The default must match the annotated type, or type checking fails.
 - The default must be a fixed value written out, like `18` or `"yes"`.
 - On a computed field (one with a MEANS clause), the MEANS definition governs

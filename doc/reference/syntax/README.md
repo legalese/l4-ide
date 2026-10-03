@@ -502,6 +502,7 @@ Compiler commands for testing and evaluation. Directives begin with `#` and appe
 ### #EVAL
 
 Evaluate an expression and display the result. Used for testing functions and inspecting computed values.
+A name that took its [`TYPICALLY`](../types/TYPICALLY.md#beside-an-answer) default is named in a `NOTE:` line after the result, with the value it took.
 
 **Syntax:**
 
@@ -522,6 +523,7 @@ Evaluate an expression and display the result. Used for testing functions and in
 ### #EVALTRACE
 
 Evaluate an expression and display the full execution trace, showing each step of the evaluation.
+A name that took its [`TYPICALLY`](../types/TYPICALLY.md#in-a-trace) default is shown, where it was read, with the line the default was written on.
 
 **Syntax:**
 

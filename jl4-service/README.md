@@ -165,14 +165,45 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 
 #### Missing and uncertain inputs
 
-An input left out of `arguments`, or sent as `null`, is missing.
-An input sent as `{}` ("uncertain") is treated exactly like `null`.
+An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`, whatever its type, a record's included.
+The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an absent input can take a default, and a `null` one never does.
 
-Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`.
+**Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
+The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
+Every response says which defaults the answer rests on, in `presumed`, beside `result`: the names of inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
+A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same way.
+A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
+Any other error response has no `presumed`, since it carries no answer.
+An input the rule never reached is not listed, even if it was left out.
+**A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so it is refused by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`.
+For this rule:
+
+```l4
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity`
+```
+
+```bash
+curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/evaluation \
+  -H "Content-Type: application/json" \
+  -d '{"arguments":{"is adult": true}}'
+# {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
+```
+
+**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
+
+**Absent with no default, or `null`.**
+Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
 Two kinds of request go through a generated wrapper instead: any request with a `{}` anywhere in it, or a `null` inside a record or list, and every request to a `DEONTIC` function.
-On that path a missing `BOOLEAN` input costs nothing unless the rule reads it.
-If the rule does read it, evaluation stops and names it:
+On that path a missing `BOOLEAN` input is an assumed term, which costs nothing if the rule never needs its value.
+If the rule needs it — tests it with `IF`, `AND`, `OR` or `NOT`, compares it, or returns it — evaluation stops and names it:
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -182,11 +213,14 @@ but it is an assumed term.
 
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
-Limits, measured 2026-10-01:
+Limits, measured 2026-10-02:
 
-- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE` fails the whole request with `Evaluation produced unknown value`, which does not name the input, even when the rule would never have read it.
+- **A `CONSIDER` with an `OTHERWISE` branch does not stop.** It reads an assumed term, matches none of its `WHEN` patterns, and takes the `OTHERWISE` branch, with no error: `ASSUME x IS A BOOLEAN` then `CONSIDER x WHEN TRUE THEN 1 OTHERWISE 2` gives `2`. So on the wrapper path, a missing `BOOLEAN` that the rule reads only through such a `CONSIDER` gets the catch-all answer. Build step 1 (§8) of `UNKNOWN-EVALUATION-SPEC.md`, specified in legalese/l4-ide#526 (merged as a spec) and not built yet, makes such a `CONSIDER` stop and name the input.
+- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, except for a `DATE`, `TIME` or `DATETIME`: the wrapper reads those as strings (lifted to `MAYBE STRING`) and converts them, and a missing one still fails with `Evaluation produced unknown value`, naming nothing.
+- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. This extends the early/late split above; it did not create it.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
-- Neither path fills in a `TYPICALLY` default for a missing input yet; that is W3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`.
+- A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
+- The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
 
 #### Trace Output
 
@@ -197,6 +231,20 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
   -H "Content-Type: application/json" \
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
+
+A `TYPICALLY` default that took effect is a node of the `reasoning` tree, and of the `graphviz` graph, at the place the rule first read it (W8 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
+In `reasoning` it is `{"exampleCode": ["has capacity"], "explanation": ["has capacity took its default (declared at capacity.l4:3:49-53)", "Result: TRUE"], "children": []}`.
+`exampleCode` is the string the `presumed` list uses for the same default: the input's name, a JSON path such as `cfg.timeout` for a field below it, and `JSONDECODE Settings: limit` for a field a rule's own `JSONDECODE` filled.
+So a client can mark the nodes that `presumed` lists by comparing strings, without reading the sentence.
+Its `explanation` has two entries, the sentence and then `Result: …`; every other node's `explanation` is the result alone, so the result is the last entry of every node's.
+The tree has such a node for each default `presumed` lists, and none for a default the rule never read.
+The nodes come in the order of the tree, which is the order of the steps that read them, and not always the order `presumed` lists them in (a default no step could show comes last, and a step that is set up early and run late is shown where it was set up), so match nodes to `presumed` by comparing the strings and not by position.
+A tree that was cut off at its display limit (10000 nodes, marked `… trace truncated`) has the node for a default read after the cut, with its value, under the tree's last step.
+It also has one for a default a rule's own `JSONDECODE` filled, which `presumed` leaves out unless the request asked for `"presumption": "hard"`.
+A second reader of the same default has no node of its own, so a client that collapses subtrees should rely on `presumed` for the defaults of the whole answer.
+The place named by `declared at` is the author's file and line on every path, the wrapper's and a deontic function's included.
+A default no step of the tree can show, such as a defaulted field of a record the function hands back that nothing computed with, has its node under the last step of the whole expression.
+A rule that runs while the answer is written out (the wrapper path, and every deontic function) has it under the step that read it, inside that run.
 
 #### Deontic (Contract) Evaluation
 
@@ -234,6 +282,10 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
     ]
   }'
 ```
+
+Every case comes back, under its `@id`, with its own `@presumed`.
+A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
+Neither has a result.
 
 ### Query Planning
 

@@ -416,11 +416,12 @@ You get one line of output for each case in the file. It repeats the case it
 was given, under `input`, and gives the answer it worked out, under `output`.
 `diagnostics` lists any complaints L4 has about the file, `status` says whether
 the run got through, and `trace` is always empty here: `l4 batch` does not
-carry the reasoning. The seven facts echoed back are elided here as `{…}` to
-keep the line readable:
+carry the reasoning. `presumed` would list any fact the answer took a default
+for because the case left it out; these rules have no defaults, so it is empty.
+The seven facts echoed back are elided here as `{…}` to keep the line readable:
 
 ```
-{"diagnostics":[],"input":{…},"output":[{"result":false,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{…},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
 ```
 
 `"result":false` — Blue Anchor Ltd is exempt, which is scenario 1's expected

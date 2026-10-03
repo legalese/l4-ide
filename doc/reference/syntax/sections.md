@@ -567,7 +567,7 @@ $ cat case.json
 { "the rate": 0.2 }
 
 $ l4 batch charges.l4 --inputs case.json
-{"diagnostics":[],"input":{"the rate":0.2},"output":[{"result":20,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{"the rate":0.2},"output":[{"result":20,"trace":null}],"presumed":[],"status":"success"}
 ```
 
 `"the rate"` in `case.json` is spelled exactly as the `GIVEN` line spells it, and 20 is `0.2 TIMES 100`. [The section `GIVEN`](section-given.md) gives the fuller account of what is published and how. _Proposed, not landed (2026-09-04): filling a fact in inside the file itself, so that one `#EVAL` can answer without any of this. It arrives in a later version of L4._
