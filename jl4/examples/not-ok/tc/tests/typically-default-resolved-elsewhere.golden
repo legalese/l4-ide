@@ -1,0 +1,40 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-default-resolved-elsewhere.l4
+  Hidden: no
+  Range: 15:40-15:43
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `scale` names
+      Rates.phi,
+    which is defined in a section and also at the top level of the file.
+
+    Here the name means the section's. But l4 batch and the decision service write
+    the default out as text, in a module of their own at the top level, and read
+    it again there, where the name means the file's. The same input would give two
+    answers, and neither would say so.
+
+    Write the name with its section, as above, or give the two definitions
+    different names.
+
+File: typically-default-resolved-elsewhere.l4
+  Hidden: no
+  Range: 23:35-23:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `rate` names
+      Rates.phi,
+    which is defined in a section and also at the top level of the file.
+
+    Here the name means the section's. But l4 batch and the decision service write
+    the default out as text, in a module of their own at the top level, and read
+    it again there, where the name means the file's. The same input would give two
+    answers, and neither would say so.
+
+    Write the name with its section, as above, or give the two definitions
+    different names.

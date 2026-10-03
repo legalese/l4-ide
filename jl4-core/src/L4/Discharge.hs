@@ -69,6 +69,7 @@ module L4.Discharge
   , defaultCycles
   , inputDefaultReads
   , inputDefaultCaptures
+  , defaultsMeaningElsewhere
   , defaultThunkUnique
   ) where
 
@@ -81,7 +82,7 @@ import L4.Annotation (emptyAnno)
 import L4.Export (collectExportedDecides, collectReferencedUniques, decideBodiesFromModule, transitiveReferencedUniquesWith)
 import L4.Presumption (requestRecordName)
 import L4.Syntax
-import L4.TypeCheck.Types (typeKey)
+import L4.TypeCheck.Types (Environment, SectionPaths, typeKey)
 import qualified Optics
 
 -- | A section binder, as the checker left it on the section's own 'GivenSig'.
@@ -398,21 +399,94 @@ inputDefaultCaptures mod' =
     , not (Set.member u (definedIn d))
     ]
 
-  -- The references that can reach the module's scope: a call, a bare name, or
-  -- the field of a projection.
-  namesIn d =
-    concat
-      [ case e of
-          App _ r _        -> [r]
-          AppNamed _ r _ _ -> [r]
-          Proj _ _ f       -> [f]
-          _                -> []
-      | e <- subExprsOf d
+-- | The defaults @l4 batch@ and the decision service would write out as text and
+-- read again at the top level of the file, in which a name means something other
+-- than where it was written: one entry for each such default, with the names.
+--
+-- Both surfaces generate a module of their own after the author's, and put a
+-- default into it as source text (@InputArgs@, with the default as a field's
+-- @TYPICALLY@). That module is at the top level, so a name in the text means what
+-- it means THERE. A name that is defined in a section, and again at the top level,
+-- means the section's where the author wrote it and the top level's in the
+-- generated module, so one input gives two answers with no error:
+-- @phi MEANS 1000@ at the top, @phi MEANS 8@ in @§ Rates@, and
+-- @rate TYPICALLY (phi PLUS 1)@ is 9 at @#EVAL@ and 1001 through @l4 batch@ and
+-- the service's generated-module path (W7, silent review S6 of the second review
+-- and rulings S1). A name two sections define is ambiguous there and is refused
+-- by those surfaces; this is the case that is not.
+--
+-- Examined only for a module that has an export, and only the defaults those
+-- surfaces would write out: an export's own inputs', and a section input's that an
+-- export reads. A name the author wrote with its section is exempt, and so is a
+-- written @ASSUME@ or a section input, which @l4 batch@ binds again at the top
+-- level under the same name; and a name the default binds itself.
+defaultsMeaningElsewhere :: SectionPaths -> Environment -> Module Resolved -> [(Resolved, [Resolved])]
+defaultsMeaningElsewhere paths environment mod'
+  | null exports = []
+  | otherwise =
+      [ (owner, bad)
+      | (owner, d) <- relocated
+      , let bad = [ ref | ref <- namesIn d, meansElsewhere d ref ]
+      , not (null bad)
+      ]
+ where
+  exports = collectExportedDecides mod'
+  binders = sectionBinders mod'
+  stages  = readSetStages mod' binders
+
+  -- The section inputs an export reads, and what their defaults read in turn.
+  exportBinders =
+    Map.fromList
+      [ (getUnique b.resolved, b)
+      | MkDecide _ _ (MkAppForm _ n _ _) _ <- exports
+      , b <- Map.findWithDefault [] (getUnique n) stages.closed
       ]
 
-  -- What the default binds itself. Type variables a node's annotation holds are
-  -- in here too, which cannot be the 'Unique' of a value a default names.
-  definedIn d = Set.fromList [ u | Def u _ <- Optics.toListOf (Optics.gplate @Resolved) d ]
+  relocated =
+    [ (r, d)
+    | MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ _ <- exports
+    , MkOptionallyTypedName _ r _ (Just d) <- otns
+    ]
+    <>
+    [ (b.resolved, d)
+    | b <- Map.elems exportBinders
+    , Just d <- [b.typically]
+    ]
+
+  assumed =
+    Set.fromList
+      [ getUnique n | MkAssume _ _ (MkAppForm _ n _ _) _ _ <- nodesOfType @(Assume Resolved) mod' ]
+
+  meansElsewhere d = \ case
+    Ref actual u _
+      | NormalName t <- rawName actual
+      , Map.member u paths
+      , not (Set.member u assumed)
+      , not (Set.member u (definedIn d))
+      -> or [ v /= u
+              && not (Map.member v paths)
+              && v.moduleUri == u.moduleUri
+            | v <- Map.findWithDefault [] (NormalName t) environment ]
+    _ -> False
+
+-- | The references in an expression that can reach the module's scope: a call, a
+-- bare name, or the field of a projection.
+namesIn :: Expr Resolved -> [Resolved]
+namesIn d =
+  concat
+    [ case e of
+        App _ r _        -> [r]
+        AppNamed _ r _ _ -> [r]
+        Proj _ _ f       -> [f]
+        _                -> []
+    | e <- subExprsOf d
+    ]
+
+-- | What an expression binds itself: a lambda's parameters, a @LET@ or @WHERE@
+-- binding. The type variables a node's annotation holds are in here too, which
+-- cannot be the 'Unique' of a value an expression names.
+definedIn :: Expr Resolved -> Set.Set Unique
+definedIn d = Set.fromList [ u | Def u _ <- Optics.toListOf (Optics.gplate @Resolved) d ]
 
 -- | The fields of each record the author declared, and of each enum
 -- constructor that carries data, one group per record or constructor. Not the
