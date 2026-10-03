@@ -4112,9 +4112,9 @@ export function createRuntime(opts) {
 // until later slices replace this with a real instrumented trace.
 //
 // `wrapEvaluationEnvelope({value, reasoning})` builds the
-// `{contents: {result: {value}, reasoning?}, tag}` envelope `jl4-service`
-// returns, with `tag = TraceResponse` whenever `reasoning` is non-empty
-// (matching `responseTag` in jl4-service's Api.hs).
+// `{contents: {result: {value}, reasoning?}, report, tag}` envelope
+// `jl4-service` returns, with `tag = TraceResponse` whenever `reasoning` is
+// non-empty (matching `responseTag` in jl4-service's Api.hs).
 // ---------------------------------------------------------------------------
 
 export function isEmptyReasoning(r) {
@@ -4596,9 +4596,12 @@ export function synthesizeArgEvalTree(value, schema, _opts) {
 }
 
 // Build the wire envelope matching jl4-service's `SimpleResponse` ToJSON
-// instance: `{tag, contents}` where `contents` is `ResponseWithReason` (so
-// `{result, reasoning?}`). The tag flips to "TraceResponse" whenever
-// `reasoning` is non-empty (= `responseTag` in Backend/Api.hs).
+// instance: `{tag, contents, report}` where `contents` is
+// `ResponseWithReason` (so `{result, reasoning?}`). The tag flips to
+// "TraceResponse" whenever `reasoning` is non-empty (= `responseTag` in
+// Backend/Api.hs). Every response states its report, as the service's do
+// (UNKNOWN-EVALUATION-SPEC U7b); WASM evaluates only fully supplied inputs,
+// so it is always the default one.
 export function wrapEvaluationEnvelope({ value, reasoning }) {
   const result = { value };
   const contents =
@@ -4609,5 +4612,5 @@ export function wrapEvaluationEnvelope({ value, reasoning }) {
     reasoning && !isEmptyReasoning(reasoning)
       ? "TraceResponse"
       : "SimpleResponse";
-  return { contents, tag };
+  return { contents, report: "default", tag };
 }

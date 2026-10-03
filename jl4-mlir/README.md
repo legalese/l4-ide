@@ -54,7 +54,7 @@ jl4-mlir wasm validation/test.l4 -o /tmp/test.wasm
 jl4-mlir list /tmp/test.wasm
 echo '{"arguments":{"years of service":5,"performance rating":4}}' \
   | jl4-mlir run /tmp/test.wasm --function is-eligible
-# {"tag":"SimpleResponse","contents":{"result":{"value":true}}}
+# {"contents":{"result":{"value":true}},"report":"default","tag":"SimpleResponse"}
 ```
 
 The input and output wire format is byte-identical to [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so the same client code works against either backend.
