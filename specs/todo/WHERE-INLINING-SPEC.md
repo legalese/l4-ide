@@ -2,10 +2,11 @@
 
 _Status: **implemented** for `l4 verify` — zero-arity local bindings on 2026-08-27 (branch
 `mengwong/where-inlining`), and on 2026-09-29 parameterised local bindings and calls to other
-boolean rules (branch `feat/verify-beta-reduction`, §9). The ladder default view and the
+boolean rules (branch `feat/verify-beta-reduction`, §9; it reaches `unstable` through PR #561). The ladder default view and the
 exporter's descent are scoped out and reasoned about in §7._
 
-_§10, call expansions in the ladder, is **built on branch `mengwong/ladder-call-panels`** (stacked on `feat/verify-beta-reduction`), not merged into `unstable` as of 2026-10-06.
+_§10, call expansions in the ladder, is **built on branch `mengwong/ladder-call-panels`** (PR #561), not merged into `unstable` as of 2026-10-06.
+That branch contains `feat/verify-beta-reduction` (§9); PR #520, which carried §9 alone, was closed in favour of #561 on 2026-10-06.
 Server: `afffcb6e5` (expansions on the wire) and `56e978951` (opt-in per request, mixfix labels).
 Client: `ec7cae39e` (call panels) and `ab06af184` (real fixture, the IDE's click spreading, folded answers drive current).
 §10's line citations are to that branch's tree._
