@@ -7,8 +7,8 @@
  * scene carries `panelDepth`, the panel levels of the WHOLE decision, folds ignored. Also
  * here: the NOT's inverter glyph carries the NOT's output value.
  *
- * The real-module cases read `fixtures/call-expansions.synthetic.json`, which is SYNTHETIC
- * (see `call-expansions.test.ts`); they look things up by label so a real capture can replace it.
+ * The real-module cases read `fixtures/call-expansions.json`, a real capture from this branch's
+ * jl4-lsp with expansions asked for (see `call-expansions.test.ts`); they look things up by label.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -28,15 +28,15 @@ import type {
   ViewSpec,
 } from "../src/types.js";
 
-const SYN = JSON.parse(
+const CAP = JSON.parse(
   readFileSync(
-    new URL("./fixtures/call-expansions.synthetic.json", import.meta.url),
+    new URL("./fixtures/call-expansions.json", import.meta.url),
     "utf8",
   ),
 ) as { modules: Record<string, { funDecls: VizFunDecl[] }> };
 
 const decode = (mod: string, name: string, calls: "leaf" | "expand") => {
-  const f = SYN.modules[mod]!.funDecls.find(
+  const f = CAP.modules[mod]!.funDecls.find(
     (d) => d.name.label.replace(/`/g, "") === name,
   );
   assert.ok(f, `${mod}: no FunDecl ${name}`);

@@ -36,8 +36,9 @@
  * CALLS. A call leaf (a `UBoolVar` with `canInline`, or an `App` of a rule of the module)
  * may carry `expansion`: the callee's body with the actual arguments substituted, which the
  * server must send in the caller's atomId namespace (the contract in `viz-expr`'s
- * `UBoolVar.expansion`; no jl4-lsp sends it yet as of 2026-10-05, so the tests read a
- * synthetic fixture). `opts.calls` chooses what to do with it:
+ * `UBoolVar.expansion`). jl4-lsp sends it only when a client asks: `l4.visualize`'s
+ * fourth argument `{"expandCalls": true}`; the tests read a capture made that way
+ * (`test/fixtures/call-expansions.json`). `opts.calls` chooses what to do with it:
  *  - `"leaf"` (the default) ignores it, so the output is exactly what it was before the
  *    field existed — every figure, golden and test that predates call panels is unchanged;
  *  - `"expand"` decodes the call as a group `{ $type: "And", id: <call id>, label: <call
@@ -197,15 +198,20 @@ export function fromVizExpr(
 
 /**
  * A call's label for its panel: the wire spells a call `` `is creditworthy` OF a `` or
- * `limb OF a, b`; the panel says `is creditworthy a` and `limb a b`. Backticks go, as
- * everywhere else the ladder shows a name; the ` OF ` and the commas between arguments go
- * too, but only at the top level — inside backticks, a string literal, or round or square
- * brackets they belong to an argument, and a string literal is copied untouched.
+ * `limb OF a, b`; the panel says `is creditworthy a` and `limb a b`. Backticks go, as they
+ * do in the decision heading, the sentences and mermaid; the ` OF ` and the commas between
+ * arguments go too, but only at the top level — inside backticks, a string literal, or round
+ * or square brackets they belong to an argument, and a string literal is copied untouched.
+ * Leaf mode does not use this: a call drawn as one box shows its wire label as it is, and a
+ * term inside a panel keeps its backticks, so the same call reads differently in the two
+ * modes (WHERE-INLINING-SPEC §10.3).
  *
- * The label is PREFIX-NORMALISED, not the call as the drafter wrote it: a mixfix call
- * (`` a `is older than` b ``) arrives in prefix form (`` `is older than` OF a, b ``) and is
- * shown as `is older than a b`. Restoring the surface form needs the server's mixfix
- * registry (as `L4.Print.restoreMixfixPatterns` does); the wire does not carry it.
+ * The label is PREFIX-NORMALISED, not the call as the drafter wrote it. A mixfix call
+ * arrives from jl4-lsp in its surface form (`` a `is older than` b ``), because the LSP
+ * stamps mixfix calls with their patterns before drawing (`stampMixfixCalls`), and is
+ * shown as `a is older than b`; from a server that does not stamp them (jl4-service) it
+ * arrives in prefix form (`` `is older than` OF a, b ``) and is shown as
+ * `is older than a b`.
  */
 export function callLabel(wire: string): string {
   const parts: string[] = [];

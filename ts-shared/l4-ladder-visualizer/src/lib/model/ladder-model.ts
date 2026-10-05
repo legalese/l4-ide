@@ -97,24 +97,56 @@ export class LadderModel {
 
   /* --------------------------------------------------------------- interaction */
 
-  /** Cycle a leaf's value (T→F→U→T) and return whether anything changed. The caller awaits
-   *  `recompute()` afterwards. `App` leaves have no Unique (they eval on the backend), so a
-   *  click on one is a no-op here — Step 6 routes it through `evalApp`. */
+  /**
+   * The Uniques a click on `nodeId` must bind: those of every node that is the same
+   * proposition, i.e. shares the clicked node's `atomId` (`nodesByAtomId`), the rule
+   * ladder-core's `spreadValue` applies to a node-keyed valuation in the playground.
+   *
+   * One Unique is not enough. A plain variable has one Unique wherever it is drawn, but a
+   * compound or imported leaf gets a Unique PER OCCURRENCE (WHERE-INLINING-SPEC §9.6): in
+   * `may lend jointly`, the two `` `is creditworthy` OF a `` leaves arrive as Uniques 157 and
+   * 166 with one atomId (measured 2026-10-06 on this branch's jl4-lsp). Keyed by Unique alone,
+   * answering one left its twin unknown.
+   *
+   * The clicked node's own Unique comes first. A node with no atomId binds its own Unique
+   * only; an `App` leaf has no Unique, so unless a copy of it has one the list is empty.
+   */
+  #uniquesOfProposition(nodeId: NodeId): Unique[] {
+    const own = this.decoded.uniqueByNode.get(nodeId)
+    const atom = this.decoded.atomIdByNode.get(nodeId)
+    const copies =
+      atom === undefined
+        ? [nodeId]
+        : (this.decoded.nodesByAtomId.get(atom) ?? [nodeId])
+    const out = own === undefined ? [] : [own]
+    for (const n of copies) {
+      const u = this.decoded.uniqueByNode.get(n)
+      if (u !== undefined && !out.includes(u)) out.push(u)
+    }
+    return out
+  }
+
+  /** Cycle a leaf's value (T→F→U→T) on every copy of its proposition and return whether
+   *  anything changed. The next value is read off the clicked node's own Unique (its first).
+   *  The caller awaits `recompute()` afterwards. `App` leaves have no Unique (they eval on
+   *  the backend), so a click on one is a no-op here — Step 6 routes it through `evalApp`. */
   cycleValue(nodeId: NodeId): boolean {
-    const unique = this.decoded.uniqueByNode.get(nodeId)
-    if (unique === undefined) return false
-    const current = this.#assignment.get(unique) ?? toUBoolVal('UnknownV')
-    this.#assignment.set(unique, cycle(current))
+    const uniques = this.#uniquesOfProposition(nodeId)
+    if (uniques.length === 0) return false
+    const current = this.#assignment.get(uniques[0]!) ?? toUBoolVal('UnknownV')
+    const next = cycle(current)
+    for (const u of uniques) this.#assignment.set(u, next)
     return true
   }
 
   /** Set a leaf to an explicit value, addressed POSITIONALLY — this is the direction a
-   *  click on the picture arrives in, and the node→Unique lookup is what fans one binding
-   *  out to every drawn position of a repeated atom (R2). */
+   *  click on the picture arrives in. The value goes to every Unique of the proposition
+   *  (`#uniquesOfProposition`); the evaluator then fans each binding out to every drawn
+   *  position that Unique has (R2). */
   setValue(nodeId: NodeId, value: UBoolValue): boolean {
-    const unique = this.decoded.uniqueByNode.get(nodeId)
-    if (unique === undefined) return false
-    this.#assignment.set(unique, toUBoolVal(value))
+    const uniques = this.#uniquesOfProposition(nodeId)
+    if (uniques.length === 0) return false
+    for (const u of uniques) this.#assignment.set(u, toUBoolVal(value))
     return true
   }
 

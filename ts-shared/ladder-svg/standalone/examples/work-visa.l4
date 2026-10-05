@@ -1,7 +1,7 @@
 -- Playground example: a work visa decided through seven helper rules, called from the top rule and from each other.
--- Once jl4-lsp sends call expansions (specified 2026-10-05, not yet landed), every call opens
+-- The playground asks jl4-lsp for call expansions, so every call opens
 -- in place inside a shaded panel, and the panels nest two levels deep
--- (`meets general requirements a` holds `identity is established a`). Until then each call is one box.
+-- (`meets general requirements a` holds `identity is established a`).
 -- Not a corpus file: nothing goldens it. Its job is to exercise the ladder playground.
 
 DECLARE Applicant

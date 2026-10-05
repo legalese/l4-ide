@@ -12,16 +12,17 @@
  *
  * CALL PANELS. A call to another boolean rule of the module (`is creditworthy a`,
  * `limb a b`) can carry an `expansion` on the wire: the callee's body with the call's
- * actual arguments substituted, which the SERVER must compute in the caller's context.
- * No jl4-lsp sends it yet (2026-10-05: the server half is specified, not landed); until
- * one does, this page draws every call as one box, and the panels below are exercised
- * only through the tests' synthetic fixture.
+ * actual arguments substituted, which the SERVER computes in the caller's context.
+ * jl4-lsp sends it only when asked, and `/render` asks (serve.mjs).
+ * With "draw calls in place" ticked (the call-panel examples open that way),
  * `fromVizFunDecl(…, { calls: "expand" })` decodes each one as a call panel, a
  * `call: true` group under the call leaf's own id, and the layout draws it as a shaded
  * panel named after the call. Its name folds it to one box (an ordinary `foldSet` fold),
  * and the ▸ caret on that box opens it again; "expand calls" / "collapse calls" do every
  * panel at once. A reply with no expansions (a jl4-lsp older than call panels) draws
  * every call as a single box, as it always did.
+ * Unticked, the same reply is decoded in "leaf" mode and every call is one box; the
+ * older inert examples open that way, so they look as they did before call panels.
  *
  * ONE CLICK, EVERY COPY. A click on a box sets that value on every box that is the same
  * proposition — the same `atomId`, which the server is to compute after substitution — via
@@ -62,6 +63,7 @@ import type {
   Grounding,
   Scene,
   DecodedViz,
+  CallMode,
 } from "@repo/ladder-core";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -82,8 +84,15 @@ type Diagnostic = {
   column: number;
   message: string;
 };
-/** A decoded decision: the tree with its calls expanded into panels, plus the identity
- *  index (`atomIdByNode` / `nodesByAtomId`) that `spreadValue` reads. */
+/** The wire funDecls of the last `/render`, kept so the "draw calls in place" box can
+ *  decode them again in the other mode without asking the server. */
+let replies: Parameters<typeof fromVizFunDecl>[0][] = [];
+/** "expand": a call with an expansion is a call panel; "leaf": it is one box, as before
+ *  call panels. Set from the example's own `calls` when one loads. */
+let callsMode: CallMode = "expand";
+const callsInPlace = $("calls-in-place") as HTMLInputElement;
+/** A decoded decision: the tree (its calls expanded into panels in "expand" mode), plus the
+ *  identity index (`atomIdByNode` / `nodesByAtomId`) that `spreadValue` reads. */
 let decisions: DecodedViz[] = [];
 let cur: DecodedViz | null = null;
 /** The call panels of `cur`, id → the call as written. Rebuilt when a decision loads. */
@@ -114,6 +123,28 @@ function walk(
     walk(e.scope, leaves, groups, calls);
     walk(e.requirement, leaves, groups, calls);
   } else if (e.$type !== "InertE") leaves.push(e.id);
+}
+/** Every node on the path from `e` down to each of `ids`, the ids themselves excluded:
+ *  the groups that must be unfolded for those nodes to be seen at all. */
+function ancestorsOf(
+  e: IRExpr,
+  ids: ReadonlySet<NodeId>,
+  path: NodeId[] = [],
+  out: Set<NodeId> = new Set(),
+): Set<NodeId> {
+  if (ids.has(e.id)) path.forEach((p) => out.add(p));
+  const kids =
+    e.$type === "And" || e.$type === "Or"
+      ? e.args
+      : e.$type === "Not"
+        ? [e.negand]
+        : e.$type === "Implies"
+          ? [e.scope, e.requirement]
+          : [];
+  path.push(e.id);
+  kids.forEach((k) => ancestorsOf(k, ids, path, out));
+  path.pop();
+  return out;
 }
 const leavesOf = (e: IRExpr): NodeId[] => {
   const l: NodeId[] = [];
@@ -298,7 +329,16 @@ function selectDecision(i: number) {
   render(false);
 }
 
+const decodeReplies = () =>
+  replies.map((f) => fromVizFunDecl(f, { calls: callsMode }));
+
+/** Bumped by every `/render` request. A reply is used only if no later request has been
+ *  sent since: switching examples quickly otherwise let a slower reply for the EARLIER
+ *  example land last, drawing its ladder under the later example's source and mode. */
+let renderGen = 0;
+
 async function doRender() {
+  const gen = ++renderGen;
   status.textContent = "rendering…";
   try {
     const r = await fetch("/render", {
@@ -307,12 +347,16 @@ async function doRender() {
       body: JSON.stringify({ l4: src.value }),
     });
     const data = await r.json();
+    if (gen !== renderGen) return; // superseded; the later request draws
     if (data.error) throw new Error(data.error);
-    decisions = (data.funcs ?? [])
+    replies = (data.funcs ?? [])
       .filter((f: { funDecl?: unknown }) => f.funDecl)
-      .map((f: { funDecl: Parameters<typeof fromVizFunDecl>[0] }) =>
-        fromVizFunDecl(f.funDecl, { calls: "expand" }),
-      );
+      .map((f: { funDecl: Parameters<typeof fromVizFunDecl>[0] }) => f.funDecl);
+    decisions = decodeReplies();
+    // Offer the choice only when some call came with an expansion to open.
+    $("calls-toggle").hidden = !replies.some((f) =>
+      JSON.stringify(f).includes('"expansion"'),
+    );
     picker.innerHTML = "";
     decisions.forEach((d, i) => {
       const o = document.createElement("option");
@@ -356,7 +400,7 @@ async function doRender() {
     status.textContent = `${decisions.length} decision(s)`;
     selectDecision(0);
   } catch (e) {
-    status.textContent = "error: " + String(e);
+    if (gen === renderGen) status.textContent = "error: " + String(e);
   }
 }
 
@@ -380,6 +424,15 @@ document
   respectDefaults = (e.target as HTMLInputElement).checked;
   render(true);
 });
+/* Same reply, other mode: decode again and reload the decision on screen. Node ids are the
+ * server's in both modes, but the trees differ, so values and folds start afresh. */
+callsInPlace.addEventListener("change", () => {
+  callsMode = callsInPlace.checked ? "expand" : "leaf";
+  if (!replies.length) return;
+  const i = Number(picker.value) || 0;
+  decisions = decodeReplies();
+  selectDecision(i);
+});
 $("expand-all").addEventListener("click", () => {
   foldSet.clear();
   say("Expanded all.");
@@ -394,8 +447,14 @@ $("collapse-all").addEventListener("click", () => {
   render(true);
 });
 /* The approved page's two buttons: every call panel at once, other groups untouched. */
+/* A panel inside a folded group is not on screen, so its enclosing groups open too:
+ * after "collapse all", opening the calls alone would change nothing visible. */
 $("expand-calls").addEventListener("click", () => {
+  if (!cur) return;
   panels.forEach((_, id) => foldSet.delete(id));
+  ancestorsOf(cur.fn.body, new Set(panels.keys())).forEach((id) =>
+    foldSet.delete(id),
+  );
   say("Expanded every call.");
   render(true);
 });
@@ -420,18 +479,28 @@ $("zoom-in").addEventListener("click", () => controller.zoom(1.25));
 $("zoom-out").addEventListener("click", () => controller.zoom(1 / 1.25));
 $("fit").addEventListener("click", () => controller.fit());
 
+/** How each example first draws its calls (serve.mjs `EXAMPLES[].calls`). */
+const exampleCalls = new Map<string, CallMode>();
+/** Bumped by every example load, for the same reason as `renderGen`: only the latest
+ *  example the reader chose may set the source and the mode. */
+let exampleGen = 0;
 async function loadExample(id: string) {
+  const gen = ++exampleGen;
   const t = await (await fetch("/example?id=" + encodeURIComponent(id))).text();
+  if (gen !== exampleGen) return;
   src.value = t;
+  callsMode = exampleCalls.get(id) ?? "expand";
+  callsInPlace.checked = callsMode === "expand";
   await doRender();
 }
 examples.addEventListener("change", () => loadExample(examples.value));
 
 /* ------------------------------------------------------------------- boot */
 (async () => {
-  const list: { id: string; label: string }[] = await (
+  const list: { id: string; label: string; calls?: CallMode }[] = await (
     await fetch("/examples")
   ).json();
+  list.forEach((e) => exampleCalls.set(e.id, e.calls ?? "leaf"));
   examples.innerHTML = "";
   list.forEach((e) => {
     const o = document.createElement("option");

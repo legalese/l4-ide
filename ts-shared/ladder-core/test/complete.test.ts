@@ -116,3 +116,121 @@ test("an IMPLIES body is never `complete` — it has two lamps, not a sink (§25
     false,
   );
 });
+
+// An override on a group — a value set on the group itself — makes the group conduct as a
+// leaf would (DESIGN §19: its children are not consulted). The reader's case is a FOLDED call
+// answered "as a whole" in the playground: it must drive current, not the hidden contents.
+// G(x, y) AND z, with G a call whose contents are x AND y.
+const callG = (call: boolean): IRExpr => ({
+  $type: "And",
+  id: 2,
+  args: [
+    {
+      $type: "And",
+      id: 5,
+      args: [leaf(6, "x"), leaf(7, "y")],
+      ...(call ? { call: true, label: "g x y" } : {}),
+    },
+    leaf(4, "z"),
+  ],
+});
+const overridden = (
+  body: IRExpr,
+  vals: Array<[NodeId, UBoolValue]>,
+  folded: boolean,
+) =>
+  layout(
+    fn(body),
+    defaultViewSpec({
+      valuation: new Map(vals),
+      showCurrent: true,
+      foldSet: new Set<NodeId>(folded ? [5] : []),
+    }),
+    estimateMetrics,
+  ).complete;
+
+for (const call of [true, false]) {
+  const what = call ? "a folded call" : "a folded plain group";
+  test(`${what} pinned TRUE conducts, whatever its hidden contents`, () => {
+    assert.equal(
+      overridden(
+        callG(call),
+        [
+          [5, "TrueV"],
+          [4, "TrueV"],
+        ],
+        true,
+      ),
+      true,
+    );
+  });
+  test(`${what} pinned FALSE stops the circuit, even when its contents are TRUE`, () => {
+    assert.equal(
+      overridden(
+        callG(call),
+        [
+          [5, "FalseV"],
+          [6, "TrueV"],
+          [7, "TrueV"],
+          [4, "TrueV"],
+        ],
+        true,
+      ),
+      false,
+    );
+  });
+}
+
+test("an OPEN call panel sets its override aside: the contents decide", () => {
+  assert.equal(
+    overridden(
+      callG(true),
+      [
+        [5, "TrueV"],
+        [4, "TrueV"],
+      ],
+      false,
+    ),
+    false,
+  );
+  assert.equal(
+    overridden(
+      callG(true),
+      [
+        [5, "FalseV"],
+        [6, "TrueV"],
+        [7, "TrueV"],
+        [4, "TrueV"],
+      ],
+      false,
+    ),
+    true,
+  );
+});
+
+test("an overridden OR conducts by its own value, not its branches", () => {
+  const body = and(2, [or(5, [leaf(6, "x"), leaf(7, "y")]), leaf(4, "z")]);
+  assert.equal(
+    overridden(
+      body,
+      [
+        [5, "TrueV"],
+        [4, "TrueV"],
+      ],
+      true,
+    ),
+    true,
+  );
+  assert.equal(
+    overridden(
+      body,
+      [
+        [5, "FalseV"],
+        [6, "TrueV"],
+        [4, "TrueV"],
+      ],
+      true,
+    ),
+    false,
+  );
+});

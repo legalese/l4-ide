@@ -1,5 +1,5 @@
 -- Playground example: an argument passed straight through a call.
--- Drawn with call panels (once jl4-lsp sends call expansions; specified 2026-10-05, not yet landed),
+-- Drawn with call panels (the playground asks jl4-lsp for call expansions),
 -- in `pass through` the `a` inside the `limb a b` panel IS the caller's own `a`,
 -- and in `record pass through` the inlined `a's has stable income` IS the direct one,
 -- so one click answers both boxes.

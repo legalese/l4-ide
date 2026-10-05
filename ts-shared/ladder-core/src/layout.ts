@@ -462,12 +462,19 @@ interface Energ {
 /** Current-flow propagation from the source (DESIGN §20). A node CONDUCTS when its
  *  value is TRUE (inert conducts trivially); energization (current reaches a port)
  *  flows top-down — a series stops at the first non-conducting child; an OR's output
- *  closes iff some branch conducts. Fills `em` for every node id. */
+ *  closes iff some branch conducts. Fills `em` for every node id.
+ *
+ *  `overrides` holds the ids that carry a value of their own in the valuation the layout
+ *  reads (after `dropOpenPanels`). An AND or OR among them is an override (DESIGN §19): it
+ *  conducts by its own value, as a leaf does, and its children are still energized for
+ *  their own entries but do not decide its output. Without this a folded call answered
+ *  "as a whole" turned its box green while the circuit followed the hidden contents. */
 function energize(
   e: IRExpr,
   inE: boolean,
   values: Map<NodeId, UBoolValue>,
   em: Map<NodeId, Energ>,
+  overrides: ReadonlyMap<NodeId, UBoolValue>,
 ): void {
   const conducts = (n: IRExpr) =>
     n.$type === "InertE" ? true : values.get(n.id) === "TrueV";
@@ -475,10 +482,10 @@ function energize(
   if (e.$type === "And") {
     let cur = inE;
     for (const a of e.args) {
-      energize(a, cur, values, em);
+      energize(a, cur, values, em, overrides);
       cur = em.get(a.id)!.outE; // current after this child (false past the first non-conductor)
     }
-    outE = e.args.length ? cur : inE;
+    outE = overrides.has(e.id) ? inE && conducts(e) : e.args.length ? cur : inE;
   } else if (e.$type === "Or") {
     let any = false;
     for (const a of e.args) {
@@ -486,19 +493,19 @@ function energize(
         em.set(a.id, { inE, outE: inE });
         continue;
       }
-      energize(a, inE, values, em); // every operative branch sees the OR's input
+      energize(a, inE, values, em, overrides); // every operative branch sees the OR's input
       if (em.get(a.id)!.outE) any = true;
     }
-    outE = inE && any;
+    outE = inE && (overrides.has(e.id) ? conducts(e) : any);
   } else if (e.$type === "Not") {
-    energize(e.negand, inE, values, em);
+    energize(e.negand, inE, values, em, overrides);
     outE = inE && values.get(e.id) === "TrueV";
   } else if (e.$type === "Implies") {
     // The scope sees the rule's own input. The requirement sees current ONLY IF the
     // scope conducts — which is exactly why vacuity needs no bypass: when the scope
     // is open, nothing downstream is energized and NEITHER lamp lights (§25.4).
-    energize(e.scope, inE, values, em);
-    energize(e.requirement, em.get(e.scope.id)!.outE, values, em);
+    energize(e.scope, inE, values, em, overrides);
+    energize(e.requirement, em.get(e.scope.id)!.outE, values, em, overrides);
     outE = inE && values.get(e.id) === "TrueV"; // the node's own truth (¬P ∨ Q)
   } else {
     outE = inE && conducts(e);
@@ -1600,7 +1607,7 @@ export function layout(
   const em = vs.showCurrent ? new Map<NodeId, Energ>() : null;
   // Current flows under the READING, not under the bare facts — that is what makes the
   // knob visible at all. Render state below still reads `values`.
-  if (em) energize(fn.body, true, gvalues, em);
+  if (em) energize(fn.body, true, gvalues, em, valuation);
   const ctx: Ctx = {
     vs,
     tm,

@@ -108,9 +108,10 @@ export interface LadderControllerOpts {
   readonly onAct?: (act: ClickAct) => void;
   /**
    * Called immediately after the new `<svg>` is in the host and sized, BEFORE the FLIP
-   * invert. The one hook a host needs to decorate individual nodes it cannot express as a
-   * `ViewSpec`: `standalone/playground.ts` marks `lad-ref` / `lad-hydrated` this way. Do not
-   * mutate geometry here — the FLIP baseline has already been captured.
+   * invert. The one hook a host needs for what it cannot express as a `ViewSpec`.
+   * `standalone/playground.ts` uses it to paint its pane the diagram's panel backdrop, so
+   * no white frame shows around a diagram with call panels. Do not mutate geometry here —
+   * the FLIP baseline has already been captured.
    */
   readonly onRender?: (svg: SVGSVGElement, scene: Scene) => void;
 }
@@ -257,9 +258,10 @@ export class LadderController {
    * frame. By default this invalidates the FLIP baseline and refits, because a different
    * tree has no meaningful correspondence with the old one.
    *
-   * `keepBaseline` is for the case where it does: `standalone/playground.ts` rebuilds its
-   * display tree on EVERY render (hydration splices a referenced DECIDE in place), and there
-   * the FLIP is exactly the affordance that shows what happened.
+   * `keepBaseline` is for the case where it does. `standalone/playground.ts` calls this on
+   * every render with one decoded tree that holds every call panel, passing `true` except
+   * for a newly chosen decision, so folding or opening a panel FLIPs from the scene before
+   * it, which is exactly the affordance that shows what happened.
    */
   setFunDecl(fn: FunDecl, keepBaseline = false): void {
     this.#fn = fn;

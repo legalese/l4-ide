@@ -89,8 +89,9 @@ export interface And {
   readonly label?: string;
   /**
    * This group is a CALL drawn expanded in place (a "call panel"): its one arg is the called
-   * rule's body with the call's actual arguments substituted, and `label` is the call as
-   * written (`is creditworthy a`). Its `id` is the call leaf's own id, so folding it shows the
+   * rule's body with the call's actual arguments substituted, and `label` is the call's wire
+   * label prefix-normalised by `callLabel` (`is creditworthy a`), not the call as the drafter
+   * wrote it. Its `id` is the call leaf's own id, so folding it shows the
    * call as the one box it was. Only the adapter's expand mode sets it
    * (`fromVizFunDecl(…, { calls: "expand" })` or `fromVizExpr(…, { calls: "expand" })`);
    * absent everywhere else, which is every tree that existed before it.

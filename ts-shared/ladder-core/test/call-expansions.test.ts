@@ -2,15 +2,14 @@
  * Call panels, client half, stage 1: the wire's optional `expansion` (viz-expr), the adapter's
  * `calls: "expand"` mode, and `spreadValue`.
  *
- * FIXTURE: `fixtures/call-expansions.synthetic.json` is SYNTHETIC. Its `funDecls` are PR #520's
- * jl4-lsp captures of six small modules, verbatim, with an `expansion` added BY HAND to every
- * call leaf (its `_synthetic` / `_how` fields say how). Until the server half lands, these tests
- * pin the client against the contract the server is meant to meet, not against the server.
- * Replace the fixture with a real capture when there is one; the tests look things up by label,
- * not by node id, so they should survive the swap.
+ * FIXTURE: `fixtures/call-expansions.json` is a REAL capture: this branch's jl4-lsp, asked for
+ * call expansions (`l4.visualize` with `{"expandCalls": true}`), over every "Show decision
+ * graph" lens of six small modules, verbatim (its `_captured` / `_how` fields say how). Nothing
+ * in it is edited by hand. The tests look things up by label, not by node id.
  *
- * `fixtures/call-expansions.leaf-baseline.json` is what `fromVizFunDecl` produced from those
- * same captures BEFORE the change (at 3e012727c). The leaf-mode test pins today's decoder to it.
+ * `fixtures/call-expansions.leaf-baseline.json` is what `fromVizFunDecl` made of those same
+ * captures BEFORE the change (the ladder-core sources of 3e012727c). The leaf-mode test pins
+ * today's decoder to it.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -32,8 +31,8 @@ const fixture = (name: string) =>
   JSON.parse(
     readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"),
   );
-const SYN = fixture("call-expansions.synthetic.json") as {
-  _synthetic: string;
+const CAP = fixture("call-expansions.json") as {
+  _captured: string;
   modules: Record<string, { source: string; funDecls: VizFunDecl[] }>;
 };
 const BASE = fixture("call-expansions.leaf-baseline.json") as {
@@ -42,7 +41,7 @@ const BASE = fixture("call-expansions.leaf-baseline.json") as {
 const MODULES = ["joint", "passthru", "r991", "r991pc", "visa", "loan"];
 
 const funDecl = (mod: string, name: string): VizFunDecl => {
-  const f = SYN.modules[mod]!.funDecls.find(
+  const f = CAP.modules[mod]!.funDecls.find(
     (d) => d.name.label.replace(/`/g, "") === name,
   );
   assert.ok(f, `${mod}: no FunDecl ${name}`);
@@ -132,10 +131,10 @@ function wireCalls(e: VizIRExpr): { id: number; label: string }[] {
 
 /* ------------------------------------------------------------ the fixture */
 
-test("the fixture says it is synthetic, and has calls to expand", () => {
-  assert.match(SYN._synthetic, /^hand-built from .* on 2026-10-05; replace/);
+test("the fixture says it is a capture with expansions asked for, and has calls to expand", () => {
+  assert.match(CAP._captured, /^jl4-lsp built from .*"expandCalls": true/);
   const calls = MODULES.flatMap((m) =>
-    SYN.modules[m]!.funDecls.flatMap((f) => wireCalls(f.body)),
+    CAP.modules[m]!.funDecls.flatMap((f) => wireCalls(f.body)),
   );
   assert.ok(calls.length >= 15, `only ${calls.length} expanded calls`);
 });
@@ -179,7 +178,7 @@ test("viz-expr's runtime decoder keeps a nested expansion, and still decodes a r
 
 test("default mode decodes every capture exactly as the adapter did before the change", () => {
   for (const m of MODULES) {
-    const funs = SYN.modules[m]!.funDecls;
+    const funs = CAP.modules[m]!.funDecls;
     const base = BASE.modules[m]!;
     assert.equal(funs.length, base.length, m);
     funs.forEach((f, i) => {
@@ -197,7 +196,7 @@ test("default mode decodes every capture exactly as the adapter did before the c
 
 test("expand mode: one call panel per expanded call, under the call's own id, labelled as written", () => {
   for (const m of MODULES)
-    for (const f of SYN.modules[m]!.funDecls) {
+    for (const f of CAP.modules[m]!.funDecls) {
       const calls = wireCalls(f.body);
       const d = fromVizFunDecl(f, { calls: "expand" });
       const panels = nodes(d.fn.body)
@@ -257,7 +256,7 @@ test("callLabel: drops backticks, the top-level OF and argument commas, and noth
 
 test("expand mode: node ids are unique across the decoded tree", () => {
   for (const m of MODULES)
-    for (const f of SYN.modules[m]!.funDecls) {
+    for (const f of CAP.modules[m]!.funDecls) {
       const ids = nodes(fromVizFunDecl(f, { calls: "expand" }).fn.body).map(
         (p) => p.node.id,
       );
@@ -303,7 +302,7 @@ test("expand mode: a node id repeated by an expansion is rejected loudly; leaf m
 
 test("expand mode: the identity indexes include the expansion leaves", () => {
   for (const m of MODULES)
-    for (const f of SYN.modules[m]!.funDecls) {
+    for (const f of CAP.modules[m]!.funDecls) {
       const d = fromVizFunDecl(f, { calls: "expand" });
       for (const { node } of nodes(d.fn.body)) {
         if (node.$type === "UBoolVar" || node.$type === "App") {
@@ -405,7 +404,7 @@ test("expand mode: a call leaf with no expansion stays a leaf", () => {
   for (const m of MODULES)
     BASE.modules[m]!.forEach((base, i) => {
       const f = JSON.parse(
-        JSON.stringify(SYN.modules[m]!.funDecls[i], (k, v) =>
+        JSON.stringify(CAP.modules[m]!.funDecls[i], (k, v) =>
           k === "expansion" ? undefined : v,
         ),
       );

@@ -196,11 +196,11 @@ export interface App extends IRNode {
   readonly atomId: string
   /** The called rule's body with this call's actual arguments substituted (beta reduction).
    *
-   *  This is the CONTRACT a server must meet; as of 2026-10-05 no jl4-lsp sends the field
-   *  (the server half is specified in `specs/todo/WHERE-INLINING-SPEC.md` and not landed).
-   *  The server must translate the expansion in the CALLER's context, so its atomIds are in the
-   *  caller's namespace and a leaf that IS one of the caller's own leaves carries that leaf's
-   *  atomId; it must give every node an id fresh across the whole FunDecl (ladder-core's
+   *  jl4-lsp sends the field only when the client asks: `l4.visualize`'s fourth argument
+   *  `{"expandCalls": true}` (`decodeVisualiseArgs`, jl4-lsp/src/LSP/L4/Actions.hs).
+   *  This is the CONTRACT the server meets: it must translate the expansion in the
+   *  CALLER's context, so its atomIds are in the caller's namespace and a leaf that IS one
+   *  of the caller's own leaves carries that leaf's atomId; it must give every node an id fresh across the whole FunDecl (ladder-core's
    *  adapter rejects a repeat); and it must omit the field when the callee is not a rule of
    *  this module, is already being expanded (recursion), or the decision's node budget is
    *  spent. Optional on the wire: a client that ignores it draws the call as one box, as
