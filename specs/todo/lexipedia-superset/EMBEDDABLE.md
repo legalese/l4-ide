@@ -36,6 +36,9 @@ SPEC.md §4 says E0 is:
 | FLIP               | `standalone/app.ts:92,116`, near-verbatim copy at `standalone/playground.ts:138,167` | **none**                                                                     | promote + de-duplicate (~60 dup LOC) |
 | `viewBox` pan/zoom | **zero lines anywhere in the repo**                                                  | SvelteFlow, which Step 8 deletes                                             | **write from scratch**               |
 
+Every `standalone/app.ts` and `standalone/playground.ts` line number in this table and in §3.2–§3.4 is from the 2026-07-27 grounding, before Step 4 (`e720e3da`) moved that code out of the demos.
+It now lives in `ts-shared/ladder-svg/src/controller.ts` (the one delegated click, `controller.ts:209`; the metrics default, `:182`) and `src/flip.ts` (`flipIndex`, `flip.ts:31`), and the cited demo lines no longer hold it.
+
 The logic half of the first two already shipped at ladder Step 3:
 `ts-shared/l4-ladder-visualizer/src/lib/model/ladder-model.ts:96` (`cycleValue`) and `:112`
 (`toggleFold`), in a class that is explicitly framework-free — no `LirContext`, no runes
@@ -356,11 +359,11 @@ export interface LadderControllerOpts {
   readonly onAct?: (act: ClickAct) => void;
   /**
    * ADDED in Step 4. Called once the new `<svg>` is in the host and sized, BEFORE the FLIP
-   * invert. The one hook a host needs to decorate individual nodes it cannot express as a
-   * `ViewSpec` — `standalone/playground.ts` marks its hydratable refs `lad-ref` and its
-   * hydrated headings `lad-hydrated` this way, and without the hook that behaviour would
-   * have had to move into the controller, which does not know what a "ref" is. Do not
-   * mutate geometry here: the FLIP baseline is already captured.
+   * invert. The one hook a host needs for what it cannot express as a `ViewSpec`. Step 4
+   * added it for `standalone/playground.ts`'s `lad-ref` / `lad-hydrated` node marks; since
+   * call panels (`ec7cae39e`) removed the playground's client-side splice, the playground's
+   * `onRender` paints its pane the diagram's panel backdrop instead. Do not mutate geometry
+   * here: the FLIP baseline is already captured.
    */
   readonly onRender?: (svg: SVGSVGElement, scene: Scene) => void;
 }
@@ -378,10 +381,14 @@ export declare class LadderController {
   /**
    * Swap the source tree (a live re-fetch). Invalidates the FLIP baseline and refits.
    *
-   * `keepBaseline` ADDED in Step 4: `standalone/playground.ts` rebuilds its display tree on
-   * EVERY render (hydration splices a referenced DECIDE in place), so it calls this every
-   * frame — and there the FLIP is exactly the affordance that shows what happened. A caller
-   * that is genuinely changing subject passes nothing and gets a clean refit.
+   * `keepBaseline` ADDED in Step 4, when `standalone/playground.ts` rebuilt its display
+   * tree on every render. Since call panels (`ec7cae39e`) its decoded tree holds every
+   * panel, and a fold does not change it; it still calls this on every render, passing
+   * `true` except for a newly chosen decision, so a fold keeps its FLIP. Ticking or
+   * clearing "draw calls in place" decodes the same replies again in the other mode
+   * (`"leaf"` or `"expand"`), which is a different tree, and reloads the decision without
+   * the baseline. A caller that is genuinely changing subject passes nothing and gets a
+   * clean refit.
    */
   setFunDecl(fn: FunDecl, keepBaseline?: boolean): void;
   /**
