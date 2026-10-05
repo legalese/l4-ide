@@ -11,6 +11,7 @@ module LSP.L4.Viz.Ladder (
   VizConfig (..),
   mkVizConfig,
   withCallExpansions,
+  stampMixfixCalls,
   expansionNodeBudget,
   VizState,
 
@@ -47,7 +48,7 @@ import qualified L4.TypeCheck as TC
 import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, seamLabel)
 import L4.Annotation
 import L4.Syntax
-import L4.Print (prettyLayout)
+import L4.Print (prettyLayout, mixfixCanonicalByUnique)
 import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
@@ -107,15 +108,49 @@ data VizConfig = MkVizConfig
   , shouldSimplify :: !Bool
   , expandCalls    :: !Bool
   -- ^ Attach to every call leaf the called rule's body, beta-reduced with the
-  -- call's arguments ('V.UBoolVar' / 'V.App' @expansion@). On for the IDE's
-  -- "Show decision graph"; off by default, so every other consumer of
-  -- 'doVisualize' (@l4 verify@, the service, the REPL) sees the ladder it always did.
+  -- call's arguments ('V.UBoolVar' / 'V.App' @expansion@). Off by default. On
+  -- only when an @l4.visualize@ request asks for it with @{"expandCalls": true}@
+  -- ('LSP.L4.Actions.VisualiseOptions'); the IDE's "Show decision graph" lens does
+  -- not, and @l4 verify@, the service and the REPL never do.
   }
   deriving stock (Show, Generic, Eq)
 
 -- | Turn call expansions on (WHERE-INLINING-SPEC §10).
 withCallExpansions :: VizConfig -> VizConfig
 withCallExpansions cfg = cfg { expandCalls = True }
+
+{- | Stamp every mixfix call in a module with its canonical pattern, so that the
+ladder's labels print the call's full surface form.
+
+A call leaf's label is 'prettyLayout' of the call, and its atomId is computed
+from that label ('generateAtomId', then the plan's @atomIdByUnique@). Without
+the stamp the printer can emit only a mixfix name's HEAD keyword, so two
+operators sharing one print alike: in
+@jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4@ both
+@`the will` w `is duly executed without` 3@ and @`the will` w `is revoked counting` 3@
+arrived as @`the will` OF w, 3@ with ONE atomId (measured 2026-10-06), and a
+client that links copies by atomId answered both with one click, so
+@X AND NOT Y@ could never come out TRUE.
+
+'L4.Print.restoreMixfixPatterns' does the same for printed MODULES, and stamps
+only operators defined in the module, because an imported operator's surface
+form does not re-parse standing alone (CLAUDE.md §3.2.2). A label is never
+re-parsed, so this stamps every operator the registry knows; whether that
+closes the cross-module case (smucclaw/l4-ide#968) is untested.
+
+Only call sites are stamped; the printer reads the stamp from the 'App' node's
+annotation, and nothing else changes, so Uniques, evaluation and the code
+lens's own check are unaffected.
+-}
+stampMixfixCalls :: TC.MixfixRegistry -> Module Resolved -> Module Resolved
+stampMixfixCalls reg = over (gplate @(Expr Resolved)) (transformOf (gplate @(Expr Resolved)) stamp)
+  where
+    canon = mixfixCanonicalByUnique reg
+    stamp e = case e of
+      App ann n es@(_ : _)
+        | Just c <- DataMap.lookup (getUnique n) canon ->
+            App (set annMixfixCanonical (Just c) ann) n es
+      _ -> e
 
 -- | How many IR nodes the expansions of ONE decision may add between them, all
 -- nesting levels together. Expansion nests, and a rule that calls a rule twice

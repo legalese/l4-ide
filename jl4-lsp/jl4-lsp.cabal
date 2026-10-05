@@ -166,6 +166,7 @@ test-suite jl4-lsp-test
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     StateGraphLensSpec
+    VisualiseExpansionOptInSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

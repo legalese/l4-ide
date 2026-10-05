@@ -378,8 +378,9 @@ topLevelDecides tc = foldTopLevelDecides (\d -> [d]) tc.module'
 -- That reasoning used to be given for leaving them opaque INSIDE their callers
 -- too, and there it was wrong: a rule and the same rule with one limb named are
 -- the same program, so reading them differently was the disagreement, not the
--- fix for it. Zero-arity bindings are now inlined before analysis
--- ('L4.Transform.inlineLocalBindingsInDecide'; specs/todo/WHERE-INLINING-SPEC.md).
+-- fix for it. Local bindings are now inlined before analysis, parameterised
+-- ones by beta reduction ('L4.Transform.inlineLocalBindingsInDecide';
+-- specs/todo/WHERE-INLINING-SPEC.md §5 and §9).
 -- What the ladder and the verifier must agree about is what a rule MEANS; how
 -- much of it either chooses to draw at once is a separate question, and the
 -- @l4\/inlineExprs@ gesture exists precisely so a reader can choose.

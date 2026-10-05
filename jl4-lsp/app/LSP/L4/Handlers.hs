@@ -307,14 +307,16 @@ handlers evalConfig recorder =
         logWith recorder Debug $ LogExecutingCommand cid
         runExceptT case lookup cid (map swap l4CmdNames) of
           Just CmdVisualize -> do
+            -- Arguments: [verDocId] (auto-refresh), [verDocId, srcPos, simplify],
+            -- or [verDocId, srcPos, simplify, {"expandCalls": true}]
+            -- ('decodeVisualiseArgs', 'VisualiseOptions' in LSP.L4.Actions).
             let decodeXdata
                   | Just ((Aeson.fromJSON -> Aeson.Success verTextDocId) :  args) <- xdata
-                  , msrcPos <- case args of
-                     [GFromJSON srcPos, Aeson.fromJSON -> Aeson.Success simplify] -> Just (srcPos, simplify)
-                     _ -> Nothing
-                  = do
-                    mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
-                    visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
+                  = case decodeVisualiseArgs args of
+                      Left err -> defaultResponseError err
+                      Right msrcPos -> do
+                        mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
+                        visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
                   | otherwise = defaultResponseError $ "Failed to decode request data: " <> LazyText.toStrict (Aeson.encodeToLazyText xdata)
             decodeXdata
 
@@ -1043,6 +1045,8 @@ data L4Cmd
   | CmdStateGraph
   deriving stock (Eq, Show, Enum, Bounded)
 
+-- | @l4.visualize@ takes an optional fourth argument, @{"expandCalls": true}@,
+-- for call expansions; see 'decodeVisualiseArgs' and 'VisualiseOptions'.
 l4CmdNames :: [(L4Cmd, Text)]
 l4CmdNames =
   [ (CmdVisualize, "l4.visualize")

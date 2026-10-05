@@ -183,6 +183,8 @@ decisionGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult ->
 decisionGraphCodeLenses verTextDocId typeCheck =
   foldTopLevelDecides decideToCodeLens typeCheck.module'
   where
+    -- Three arguments: the IDE's displayers do not draw call expansions, so
+    -- the lens does not ask for them ('VisualiseOptions' has the fourth).
     mkDecisionGraphCodeLens srcPos = CodeLens
       { _command = Just Command
         { _title = "Show decision graph"
@@ -246,14 +248,68 @@ stateGraphAtPos mtcRes verTextDocId srcPos = do
 -- Ladder visualisation
 -- ----------------------------------------------------------------------------
 
+{- | What a client may ask of one @l4.visualize@ render, beyond the decision and
+the simplify flag.
+
+On the wire it is an optional FOURTH argument, a JSON object:
+
+> [verDocId, srcPos, simplify]                          -- as before: no expansions
+> [verDocId, srcPos, simplify, {"expandCalls": true}]   -- every call leaf carries its expansion
+
+@expandCalls@ (default @false@) attaches to every call leaf the called rule's body
+with the call's arguments substituted (WHERE-INLINING-SPEC §10). It is opt-in
+because it is not free — on @regcf.l4@ it took a render from about 2.5 s to about
+7.1 s and 3.4x the bytes (2026-10-05) — and the IDE's own displayers ignore the
+field, so only a client that draws call panels should pay for it. Keys this
+version does not know are ignored; an absent key means @false@.
+
+The choice is remembered with the drawing: auto-refresh (@[verDocId]@ alone) and
+@l4/inlineExprs@ draw again with the config of the most recent render
+('updateVizConfig' keeps it), so a render made with expansions stays with them
+and one made without stays without.
+-}
+newtype VisualiseOptions = VisualiseOptions
+  { expandCalls :: Bool
+  }
+  deriving stock (Eq, Show)
+
+-- | What the three-argument form means: no expansions.
+defaultVisualiseOptions :: VisualiseOptions
+defaultVisualiseOptions = VisualiseOptions {expandCalls = False}
+
+instance Aeson.FromJSON VisualiseOptions where
+  parseJSON = Aeson.withObject "l4.visualize options" \o ->
+    VisualiseOptions <$> o Aeson..:? "expandCalls" Aeson..!= False
+
+{- | Decode the arguments of @l4.visualize@ after the document identifier.
+
+* @[srcPos, simplify]@: a render of the @DECIDE@ at @srcPos@, without expansions
+  (what the "Show decision graph" lens sends).
+* @[srcPos, simplify, options]@: the same, with 'VisualiseOptions'. An options
+  value that is not an object of that shape is an error, not a silent default.
+* anything else: auto-refresh of the most recent render (@Right Nothing@), as
+  it always was.
+-}
+decodeVisualiseArgs :: [Aeson.Value] -> Either Text (Maybe (SrcPos, Bool, VisualiseOptions))
+decodeVisualiseArgs args = case args of
+  [Aeson.fromJSON -> Aeson.Success (Generically srcPos), Aeson.fromJSON -> Aeson.Success simplify] ->
+    Right (Just (srcPos, simplify, defaultVisualiseOptions))
+  [Aeson.fromJSON -> Aeson.Success (Generically srcPos), Aeson.fromJSON -> Aeson.Success simplify, opts] ->
+    case Aeson.fromJSON opts of
+      Aeson.Success o -> Right (Just (srcPos, simplify, o))
+      Aeson.Error e -> Left ("l4.visualize: cannot read the options argument: " <> Text.pack e)
+  _ -> Right Nothing
+
 visualise
   :: Monad m
   => Maybe TypeCheckResult
   -> (m (Maybe RecentlyVisualised), RecentlyVisualised -> m ())
   -> VersionedTextDocumentIdentifier
   -- ^ The VersionedTextDocumentIdentifier of the document whose Decides should be visualised
-  -> Maybe (SrcPos, Bool)
-  -- ^ The location of the `Decide` to visualize and whether or not to simplify it
+  -> Maybe (SrcPos, Bool, VisualiseOptions)
+  -- ^ The location of the `Decide` to visualize, whether or not to simplify it,
+  -- and what else the client asked for ('decodeVisualiseArgs'); 'Nothing' is
+  -- auto-refresh of the most recent render, with that render's choices.
   -> ExceptT (TResponseError method) m (Aeson.Value |? Null)
 visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
   let uri = verTextDocId._uri
@@ -267,21 +323,25 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
       tcRes <- hoistMaybe mtcRes
       recentlyVisualised <- MaybeT $ lift getRecVis
       -- Since this is from autorefresh, we want to get the most up-to-date version of the Decide
-      decide <- hoistMaybe $ (.getOne) $  foldTopLevelDecides (matchOnAvailableDecides recentlyVisualised) tcRes.module'
+      decide <- hoistMaybe $ (.getOne) $  foldTopLevelDecides (matchOnAvailableDecides recentlyVisualised) (ladderModule tcRes)
       let updatedVizConfig = updateVizConfig verTextDocId tcRes recentlyVisualised
       pure (decide, updatedVizConfig)
 
     -- b. the command was issued by a code action or codelens
-    Just (srcPos, simp) -> do
+    Just (srcPos, simp, opts) -> do
       tcRes <- do
         case mtcRes of
           Nothing -> defaultResponseError $ "Could not check " <> Text.pack (show uri.getUri) <> "."
           Just tcRes -> pure tcRes
-      case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) tcRes.module' of
+      case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) (ladderModule tcRes) of
         [decide] ->
-          -- Every call leaf carries its expansion (WHERE-INLINING-SPEC §10).
-          -- Auto-refresh and l4/inlineExprs inherit this config.
-          let vizConfig = Ladder.withCallExpansions (Ladder.mkVizConfig verTextDocId tcRes.module' tcRes.substitution simp)
+          -- Call leaves carry their expansions only when the client asked
+          -- ('VisualiseOptions'). Auto-refresh and l4/inlineExprs inherit
+          -- this config, the choice included.
+          let baseConfig = Ladder.mkVizConfig verTextDocId (ladderModule tcRes) tcRes.substitution simp
+              vizConfig
+                | opts.expandCalls = Ladder.withCallExpansions baseConfig
+                | otherwise = baseConfig
           in pure $ Just (decide, vizConfig)
         -- NOTE: if this becomes a problem, we should use
         -- https://hackage.haskell.org/package/lsp-types-2.3.0.1/docs/Language-LSP-Protocol-Types.html#t:VersionedTextDocumentIdentifier
@@ -380,7 +440,20 @@ updateVizConfig verTxtDocId tcRes recentlyVisualised =
     & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
     & set #moduleUri (toNormalizedUri verTxtDocId._uri)
     & set #substitution tcRes.substitution
-    & set #module' tcRes.module'
+    & set #module' (ladderModule tcRes)
+
+{- | The module a ladder is drawn from: the checked module with every mixfix
+call stamped with its pattern ('Ladder.stampMixfixCalls'), so two operators
+sharing a head keyword get different labels, and so different atomIds. Every
+path that draws for the IDE ('visualise', auto-refresh, and through the stored
+config @l4/inlineExprs@) reads the module from here.
+
+The service draws from its compiled module without the registry, so a mixfix
+call there still prints its head keyword only: the IDE and the service give
+such a call different labels and atomIds (recorded in WHERE-INLINING-SPEC §10.6).
+-}
+ladderModule :: TypeCheckResult -> Module Resolved
+ladderModule tcRes = Ladder.stampMixfixCalls tcRes.mixfixRegistry tcRes.module'
 
 -- | the 'Monoid' 'Maybe' that returns the only occurrence of 'Just'
 newtype One a = One {getOne :: Maybe a}

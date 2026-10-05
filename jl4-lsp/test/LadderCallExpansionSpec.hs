@@ -53,8 +53,9 @@ scratch stem = do
   tmp <- getTemporaryDirectory
   pure (tmp </> "jl4-ladder-call-expansion-spec" </> (stem <> ".l4"))
 
--- | What "Show decision graph" does: expansions on, no simplification, atomIds
--- annotated.
+-- | What a client that asks for expansions gets (@l4.visualize@ with
+-- @{"expandCalls": true}@; the "Show decision graph" lens does not ask):
+-- expansions on, no simplification, atomIds annotated.
 data Rendered = MkRendered
   { funDecl :: V.FunDecl
   , decide :: Decide Resolved
