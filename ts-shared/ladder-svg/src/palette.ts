@@ -144,15 +144,17 @@ export interface Palette {
  * The default. Every value carried over from S8 is the literal that stood at its cited site,
  * verbatim. The exception is `dead`, which is no longer `inert`'s grey — see the field.
  *
- * Determinacy is what the leaf inks track: a settled fact is drawn FIRMLY (dark slate), an
- * open question FAINTLY (light grey), a don't-care fainter still (`ghost`). Red is
- * deliberately not used — it belongs to the breach lamp, and a false atom is very often the
- * good outcome (an exception that did not apply).
+ * Determinacy is what the leaf inks track: a settled fact is drawn FIRMLY, an open question
+ * FAINTLY (light grey), a don't-care fainter still (`ghost`). On screen a settled-false atom
+ * is a MILD red (Meng, 2026-10-05; it had been dark slate). The mildness is the point: the
+ * saturated reds stay with the breach lamp (`coilRed`), and a false atom is very often the
+ * good outcome (an exception that did not apply), so it must not read as an alarm. The print
+ * (`INK_PALETTE`) and dark palettes are unchanged: dark slate and bright grey respectively.
  */
 export const SCREEN_PALETTE: Palette = {
   live: "#1a7f37",
   inert: "#9aa0a6",
-  dead: "#4a5560",
+  dead: "#a8483e",
   ghost: "#b9bdc2",
   rail: "#3a3a3a",
   ink: "#222",
@@ -177,7 +179,7 @@ export const SCREEN_PALETTE: Palette = {
   typically: "#9a7b34",
   tagInk: "#555",
   liveFill: "#e8f5ec", // pale green — carries current
-  deadFill: "#e4e8ec", // pale slate — tested, did not bite
+  deadFill: "#f9e6e3", // pale rose — tested and came out false
   wireMade: "#0f5c2a", // dark green — a completed source→sink path
   wireMadeProvisional: "#5f9e77", // muted green — completed, but on presumptions
   coilGreenSoft: "#5f9e77",

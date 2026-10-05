@@ -325,7 +325,7 @@ test("a FALSE box and an UNKNOWN box do not render the same ink", () => {
     dunno,
     "known-false must not render identically to unknown",
   );
-  assert.match(no, /stroke="#4a5560"/);
+  assert.match(no, /stroke="#a8483e"/);
   assert.match(dunno, /stroke="#9aa0a6"/);
 });
 
@@ -366,7 +366,7 @@ test("a dead break is drawn firmly; an eliminable break stays a ghost", () => {
         state,
       }),
     );
-  assert.match(brk("dead"), /stroke="#4a5560" stroke-width="2"/);
+  assert.match(brk("dead"), /stroke="#a8483e" stroke-width="2"/);
   assert.match(brk("eliminable"), /stroke="#b9bdc2" stroke-width="1.6"/);
   assert.equal(
     brk(),
