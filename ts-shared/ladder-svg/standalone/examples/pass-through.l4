@@ -1,0 +1,32 @@
+-- Playground example: an argument passed straight through a call.
+-- Drawn with call panels (once jl4-lsp sends call expansions; specified 2026-10-05, not yet landed),
+-- in `pass through` the `a` inside the `limb a b` panel IS the caller's own `a`,
+-- and in `record pass through` the inlined `a's has stable income` IS the direct one,
+-- so one click answers both boxes.
+-- Not a corpus file: nothing goldens it. Its job is to exercise the ladder playground.
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+DECIDE `limb` p q IF p AND q
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+DECIDE `pass through` a b IF
+      `limb` a b
+  AND a
+
+DECLARE Person
+  HAS `has stable income`   IS A BOOLEAN
+      `has recent default`  IS A BOOLEAN
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `is creditworthy` p IF
+      p's `has stable income`
+  AND NOT p's `has recent default`
+
+GIVEN a IS A Person
+GIVETH A BOOLEAN
+DECIDE `record pass through` a IF
+      `is creditworthy` a
+  AND a's `has stable income`

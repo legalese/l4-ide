@@ -18,7 +18,7 @@
  * SCREEN_PALETTE)` are still the same string, character for character.
  */
 import type { Scene, ScenePrim, State, Theme, Flow } from "@repo/ladder-core";
-import { paletteFor } from "./palette.js";
+import { paletteFor, panelShade, panelBackdrop } from "./palette.js";
 import type { Palette } from "./palette.js";
 
 // current-flow style (DESIGN §20): closed (leader) thick+dark, streamer (local
@@ -32,6 +32,7 @@ const flowStroke = (
   p: Palette,
   complete = false,
   provisional = false,
+  panels = false,
 ) =>
   f === "closed"
     ? complete
@@ -41,7 +42,9 @@ const flowStroke = (
       : p.wireClosed
     : f === "streamer"
       ? p.wireStreamer
-      : p.wireOpen;
+      : panels
+        ? p.wireOpenPanel
+        : p.wireOpen;
 const flowWidth = (f: Flow) =>
   f === "closed" ? 3.4 : f === "streamer" ? 2.3 : 1.1;
 
@@ -76,8 +79,13 @@ function prim(
   pal: Palette,
   complete = false,
   provisional = false,
+  panelDepth = 0,
 ): string {
   switch (p.kind) {
+    case "panel":
+      // A call drawn expanded in place: a filled rounded panel, shaded by layer, darkest
+      // outside. Its name is a separate `panel` text prim, which carries the fold act.
+      return `<rect class="lad-panel" data-panel="${p.id}" x="${p.at.x.toFixed(1)}" y="${p.at.y.toFixed(1)}" width="${p.w.toFixed(1)}" height="${p.h.toFixed(1)}" rx="12" fill="${panelShade(pal, p.depth, panelDepth)}" stroke="${pal.panelEdge}" stroke-width="1"><title>${esc(p.label)}</title></rect>`;
     case "box": {
       const { x, y, w, h } = p.rect;
       const a = ` data-fnid="${p.id}"${actAttr(p.act)} class="lad-box${p.act ? " lad-clickable" : ""}"`;
@@ -101,7 +109,7 @@ function prim(
         .join(" ");
       const cls = `class="lad-wire${p.act ? " lad-clickable" : ""}"${actAttr(p.act)}`;
       if (p.flow)
-        return `<polyline ${cls} points="${d}" fill="none" stroke="${flowStroke(p.flow, pal, complete, provisional)}" stroke-width="${flowWidth(p.flow)}"/>`;
+        return `<polyline ${cls} points="${d}" fill="none" stroke="${flowStroke(p.flow, pal, complete, provisional, panelDepth > 0)}" stroke-width="${flowWidth(p.flow)}"/>`;
       const dash = p.state === "eliminable" ? ' stroke-dasharray="5 4"' : "";
       const col = p.role === "rail" ? pal.rail : strokeFor(p.state, pal);
       const op = p.state === "eliminable" ? ' opacity="0.9"' : "";
@@ -111,7 +119,7 @@ function prim(
       const d = `M ${p.from.x.toFixed(1)},${p.from.y.toFixed(1)} C ${p.c1.x.toFixed(1)},${p.c1.y.toFixed(1)} ${p.c2.x.toFixed(1)},${p.c2.y.toFixed(1)} ${p.to.x.toFixed(1)},${p.to.y.toFixed(1)}`;
       const cls = `class="lad-wire${p.act ? " lad-clickable" : ""}"${actAttr(p.act)}`;
       if (p.flow)
-        return `<path ${cls} d="${d}" fill="none" stroke="${flowStroke(p.flow, pal, complete, provisional)}" stroke-width="${flowWidth(p.flow)}"/>`;
+        return `<path ${cls} d="${d}" fill="none" stroke="${flowStroke(p.flow, pal, complete, provisional, panelDepth > 0)}" stroke-width="${flowWidth(p.flow)}"/>`;
       const dash = p.state === "eliminable" ? ' stroke-dasharray="5 4"' : "";
       const op = p.state === "eliminable" ? ' opacity="0.9"' : "";
       return `<path ${cls} d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`;
@@ -160,8 +168,11 @@ function prim(
         );
       }
       if (p.role === "inverter")
-        // the NOT bubble — sits on the output wire (DESIGN §21)
-        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="5" fill="${pal.inverterFill}" stroke="${pal.inverterStroke}" stroke-width="1.5"/>`;
+        // the NOT bubble — sits on the output wire (DESIGN §21), filled with the NOT's
+        // OUTPUT value (Meng, 2026-10-05): green when the negand is false, red when it is
+        // true, plain while unknown. Its own two fields, not `live`/`dead`, which are TEXT
+        // inks and are neither green-and-red in dark nor distinguishable in ink.
+        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="5" fill="${p.value === "TrueV" ? pal.inverterTrue : p.value === "FalseV" ? pal.inverterFalse : pal.inverterFill}" stroke="${pal.inverterStroke}" stroke-width="1.5"/>`;
       return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`;
     case "frame": {
       const { x, y, w, h } = p.rect;
@@ -172,6 +183,9 @@ function prim(
     }
     case "text": {
       const size = p.size ?? 14;
+      if (p.tag === "panel")
+        // a panel's name: small, sans, set on the panel's top band
+        return `<text data-fnid="${p.id ?? ""}"${actAttr(p.act)}${p.act ? ' class="lad-clickable lad-panel-name"' : ' class="lad-panel-name"'} x="${p.at.x.toFixed(1)}" y="${p.at.y.toFixed(1)}" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="${size}" font-weight="600" fill="${pal.panelLabel}">${esc(p.text)}</text>`;
       const isCaret = p.tag === "caret";
       const inert =
         !isCaret &&
@@ -227,12 +241,22 @@ export function sceneToSvg(
 ): string {
   const pal = paletteFor(theme);
   const { w, h } = scene.size;
-  const body = scene.prims
-    .map((p) => prim(p, pal, !!scene.complete, !!scene.provisional))
+  const levels = scene.panelDepth ?? 0;
+  // Panels go behind everything, in emit order — and the layout emits an outer panel before
+  // anything inside it, so the inner panels land on top of the outer ones.
+  const ordered = levels
+    ? [
+        ...scene.prims.filter((p) => p.kind === "panel"),
+        ...scene.prims.filter((p) => p.kind !== "panel"),
+      ]
+    : scene.prims;
+  const body = ordered
+    .map((p) => prim(p, pal, !!scene.complete, !!scene.provisional, levels))
     .join("\n");
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}">`,
-    `<rect width="${w.toFixed(0)}" height="${h.toFixed(0)}" fill="${pal.bg}"/>`,
+    // a diagram with panels sits one step below the outermost panel
+    `<rect width="${w.toFixed(0)}" height="${h.toFixed(0)}" fill="${levels ? panelBackdrop(pal, levels) : pal.bg}"/>`,
     body,
     `</svg>`,
   ].join("\n");

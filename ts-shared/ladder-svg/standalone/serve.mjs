@@ -10,6 +10,11 @@
  * No SvelteKit, no Monaco, no webview. Run from ts-shared/ladder-svg:
  *   node standalone/serve.mjs          # → http://localhost:8731
  * Env: JL4_LSP_PORT (default 5007), PORT (default 8731), REPO (auto).
+ *
+ * Call panels need a jl4-lsp whose "Show decision graph" reply carries `expansion` on its
+ * call leaves. Against an older one the page still works and draws each call as one box.
+ * To try a particular build, start it yourself on JL4_LSP_PORT before running this; the
+ * server is only spawned when nothing is listening there.
  */
 import { createServer } from "node:http";
 import { spawn, spawnSync } from "node:child_process";
@@ -217,6 +222,23 @@ async function renderL4(l4) {
 
 /* ---- curated inert-style examples (the point: inert L4 → interactive ladder) */
 const EXAMPLES = [
+  // Calls to other rules, drawn in place as call panels. These live beside the playground,
+  // not under jl4/examples, whose globs would demand goldens for them.
+  {
+    id: "work-visa",
+    label: "call panels: work visa (nested calls)",
+    path: "ts-shared/ladder-svg/standalone/examples/work-visa.l4",
+  },
+  {
+    id: "joint-loan",
+    label: "call panels: joint loan (one rule, two arguments)",
+    path: "ts-shared/ladder-svg/standalone/examples/joint-loan.l4",
+  },
+  {
+    id: "pass-through",
+    label: "call panels: pass-through (an argument is the caller's own)",
+    path: "ts-shared/ladder-svg/standalone/examples/pass-through.l4",
+  },
   {
     id: "cheating",
     label: "s415 cheating (Poh Yuan Nie)",
