@@ -78,7 +78,9 @@ From there it is the ordinary loop: draft a provision, `l4 check` it, add `#EVAL
 
 ### When the encoding exists, the pipeline picks it up
 
-Only once there is an encoding does `etc/go/go.sh` become useful, and this is the right order: the pipeline **validates and projects an encoding**, it does not produce one. Register your body of law as a subject, and every later stage is scoped to it:
+Only once there is an encoding does `etc/go/go.sh` become useful, and this is the right order: the pipeline **validates and projects an encoding**, it does not produce one.
+The pipeline is Legalese's private repository `legalese/l4-pipeline`; with access, clone it into `etc/go/` of this checkout, which ignores that directory.
+Register your body of law as a subject, and every later stage is scoped to it:
 
 ```bash
 etc/go/go.sh new-subject sg-tax \

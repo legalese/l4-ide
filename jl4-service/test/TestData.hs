@@ -21,6 +21,11 @@ module TestData (
   importedRecordMainJL4,
   dnfBlowupJL4,
   twinLeavesJL4,
+  missingBooleanJL4,
+  sectionBooleanJL4,
+  deonticBooleanJL4,
+  maybeInputsJL4,
+  timeInputsJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -429,4 +434,93 @@ GIVETH A PROVISION OF Driver, `Driver Action`
                 MAY `drive`
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | Three BOOLEAN inputs, one of which the rule never reads. A @{}@ on any of
+-- them sends the request through the generated wrapper, which read every
+-- missing BOOLEAN as FALSE until smucclaw/l4-ide#992.
+missingBooleanJL4 :: Text
+missingBooleanJL4 =
+  [i|
+@export default eligible
+GIVEN `has criminal record` IS A BOOLEAN
+      `is resident`         IS A BOOLEAN
+      `unused flag`         IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible MEANS `is resident` AND NOT `has criminal record`
+|]
+
+-- | A section GIVEN BOOLEAN with a default, beside two rule GIVEN BOOLEANs,
+-- one of them unread. On the wrapper path this used to fail with "could not
+-- find a definition for the identifier fromMaybe", which hid that the wrapper
+-- never delivered a section GIVEN's value: the rule read its default instead.
+sectionBooleanJL4 :: Text
+sectionBooleanJL4 =
+  [i|
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export default may contract
+GIVEN `is adult`    IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `has capacity` AND `is adult`
+|]
+
+-- | A deontic rule that branches on a BOOLEAN input. Deontic functions always
+-- take the wrapper path, so a missing input used to take the ELSE branch.
+deonticBooleanJL4 :: Text
+deonticBooleanJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver        IS A Driver
+      `is motorway` IS A BOOLEAN
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    IF      `is motorway`
+    THEN    PARTY driver
+            MUST `wear seatbelt`
+            WITHIN 1
+    ELSE    PARTY driver
+            MAY `drive`
+|]
+
+-- | A MAYBE DATE and a MAYBE NUMBER input, each followed by another input. On
+-- the wrapper path the generated record printed their types as `MAYBE OF …`,
+-- whose OF read the next field's line as another argument.
+maybeInputsJL4 :: Text
+maybeInputsJL4 =
+  [i|
+@export default dated
+GIVEN `start date` IS A MAYBE DATE
+      count        IS A MAYBE NUMBER
+      flag         IS A BOOLEAN
+      unused       IS A BOOLEAN
+GIVETH A BOOLEAN
+dated MEANS
+      flag
+  AND NOT `start date` EQUALS NOTHING
+  AND NOT count EQUALS NOTHING
+|]
+
+-- | A TIME and a DATETIME input. The wrapper decodes each from a JSON string and
+-- parses it with TOTIME or TODATETIME; it used to declare the record field as
+-- TIME or DATETIME, so the parse was applied to a value that was not a string.
+timeInputsJL4 :: Text
+timeInputsJL4 =
+  [i|
+@export default timed
+GIVEN flag   IS A BOOLEAN
+      unused IS A BOOLEAN
+      t      IS A TIME
+      dt     IS A DATETIME
+GIVETH A BOOLEAN
+timed MEANS flag
 |]

@@ -3,11 +3,12 @@
 // every file those skills cite, and nothing else.
 //
 // WHICH SKILLS. Every directory under `skills/`, read from disk. The pipeline
-// skill, `.claude/skills/running-the-l4-pipeline/`, is a plain directory there
-// and has no entry under `skills/`, so it is never bundled: it drives
-// `etc/go/`, which a plugin does not carry, and Meng ruled on 2026-09-26 that it
-// stays repo-local (specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md on
-// ci/skills-layout). A skill meant to travel goes under `skills/`.
+// skill, `running-the-l4-pipeline`, is not among them and is never bundled:
+// Meng ruled on 2026-09-26 that it does not ship with this plugin
+// (specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md on ci/skills-layout), and since
+// 2026-09-29 it lives with the pipeline in the private legalese/l4-pipeline,
+// which ships it as a plugin of its own. A skill meant to travel goes under
+// `skills/`.
 //
 // WHY THIS IS COMPUTED RATHER THAN A LIST. The skill teaches by example: it
 // names ~46 files it does not carry (`jl4/examples/canon/us/regcf/regcf.l4` alone

@@ -54,24 +54,25 @@ import {
 import * as nodePath from 'path'
 import * as os from 'os'
 import { promises as fsPromises } from 'fs'
-import type { AuthManager } from '../auth.js'
-import { isLocalMode } from './ai-proxy-client.js'
-import type { AiProxyClient } from './ai-proxy-client.js'
-import type { ServiceClient } from '../service-client.js'
-import type { ChatService, ChatServiceEvent } from './chat-service.js'
-import type { ConversationStore } from './conversation-store.js'
-import type { AiLogger } from './logger.js'
-import { MCP_L4_RULES_PREFIX } from './mcp-client.js'
-import type { McpToolClient } from './mcp-client.js'
-import type { VsCodeMcpTools } from './vscode-mcp.js'
 import {
+  MCP_L4_RULES_PREFIX,
   categoryForTool,
-  getPermission,
-  setPermission,
+  type AiProxyClient,
+  type AppliedEditSnapshot,
+  type ChatService,
+  type ChatServiceEvent,
+  type ConversationStore,
+  type McpToolClient,
   type PermissionCategory,
-} from './permissions.js'
-import { resolveFileUri } from './tools/fs.js'
-import type { ToolDispatcher } from './tool-dispatcher.js'
+  type PermissionPolicy,
+  type ToolDispatcher,
+} from '@repo/legalese-agent'
+import type { AuthManager } from '../auth.js'
+import type { ServiceClient } from '../service-client.js'
+import { isLocalMode } from './ai-endpoint.js'
+import type { AiLogger } from './logger.js'
+import type { VsCodeMcpTools } from './vscode-mcp.js'
+import type { WebviewUserInteraction } from './vscode-user-interaction.js'
 
 /**
  * Wire every AI-chat RPC into the sidebar messenger. Called after
@@ -98,31 +99,13 @@ export function registerAiChatHandlers(deps: {
    *  deployment "Intended use" text from the exported function schemas. */
   proxy: AiProxyClient
   logger: AiLogger
-  /** Map of pending approval promises keyed by callId. Populated by
-   * the tool dispatcher; drained by the webview's approve/deny message. */
-  approvalPending: Map<string, (decision: 'allow' | 'deny') => void>
-  /** Decisions clicked before the dispatcher registered a resolver
-   *  (the buttons appear while the stream is still running). Written
-   *  here, consumed by the dispatcher's requestApproval. */
-  earlyToolDecisions: Map<string, 'allow' | 'deny'>
-  /** Map of pending meta__ask_user promises keyed by callId. Resolves
-   * with the user's answer (empty string = skipped). */
-  askUserPending: Map<string, (answer: string) => void>
-  /** Mutable channel the dispatcher uses to emit status updates for
-   * each tool call. We fill in the `emit` function here so the
-   * dispatcher can forward to the webview via the same messenger. */
-  toolStatusChannel: {
-    emit: (
-      callId: string,
-      status: 'pending-approval' | 'running' | 'done' | 'error',
-      detail?: { result?: string; error?: string }
-    ) => void
-  }
-  /** Channel the dispatcher uses to push a meta__ask_user question to
-   *  the webview. We fill in the `ask` function here. */
-  askUserChannel: {
-    ask: (callId: string, question: string, choices?: string[]) => void
-  }
+  /** The chat service's UserInteraction port. We plug the webview
+   *  senders into its sinks, and resolve / cancel its pending
+   *  approvals and questions from webview messages. */
+  interaction: WebviewUserInteraction
+  /** Settings-backed permission policy (sidebar settings section,
+   *  "always allow"). */
+  permissions: PermissionPolicy
   /** Used to recover pre-edit snapshots for the applied-diff viewer. */
   dispatcher: ToolDispatcher
   /** Sidebar webview visibility. When the user switches activity-bar
@@ -151,11 +134,8 @@ export function registerAiChatHandlers(deps: {
     store,
     proxy,
     logger,
-    approvalPending,
-    earlyToolDecisions,
-    askUserPending,
-    toolStatusChannel,
-    askUserChannel,
+    interaction,
+    permissions,
     dispatcher,
     visibility,
     mcp,
@@ -327,7 +307,7 @@ export function registerAiChatHandlers(deps: {
     }
     sendNow(event)
   }
-  service.setEmitter(emit)
+  interaction.emitSink = emit
   // Drain on the visible-transition. Subscribing unconditionally
   // (not only on `visible=true`) is cheap and avoids a window where
   // a rapid hidden→visible→hidden sequence leaves events stuck.
@@ -345,7 +325,7 @@ export function registerAiChatHandlers(deps: {
   // can forward them to the webview as AiChatToolCall notifications
   // with matching callId. One tool call may fire multiple updates
   // (running → done) — the webview merges by callId.
-  askUserChannel.ask = (callId, question, choices) => {
+  interaction.askSink = (callId, question, choices) => {
     // Carry the conversationId so the webview can attach the question
     // card to the right conversation even if the user has flipped to a
     // different one in the history panel while the tool call was in
@@ -361,7 +341,7 @@ export function registerAiChatHandlers(deps: {
     })
   }
 
-  toolStatusChannel.emit = (callId, status, detail) => {
+  interaction.statusSink = (callId, status, detail) => {
     // Route through the same buffered emitter the chat-service uses
     // so dispatcher-side status updates (running → done / error) are
     // visibility-aware. Going direct via messenger.sendNotification
@@ -382,36 +362,20 @@ export function registerAiChatHandlers(deps: {
     })
   }
 
-  /** Drain every outstanding approval resolver as `deny`. Called on
-   *  stop/new-message: the user's implicit "no" to any tool request
-   *  still on screen. Safe to call when the map is empty. */
-  const denyAllPendingApprovals = (reason: string): void => {
-    // Also drop any not-yet-consumed early decisions: the turn they
-    // belonged to is being torn down, and a stale "allow" must not
-    // leak into a future call that happens to reuse nothing but is
-    // still keyed in this map.
-    earlyToolDecisions.clear()
-    if (approvalPending.size === 0) return
-    logger.info(
-      `denying ${approvalPending.size} pending approval(s) (${reason})`
-    )
-    for (const [callId, resolver] of approvalPending) {
-      resolver('deny')
-      approvalPending.delete(callId)
-    }
-  }
-
-  /** Resolve every pending ask-user with an empty answer (= skipped).
-   *  Mirrors denyAllPendingApprovals for the meta__ask_user path so
-   *  a stop/new-message doesn't leave the dispatcher hanging forever. */
-  const skipAllPendingQuestions = (reason: string): void => {
-    if (askUserPending.size === 0) return
-    logger.info(
-      `skipping ${askUserPending.size} pending meta__ask_user question(s) (${reason})`
-    )
-    for (const [callId, resolver] of askUserPending) {
-      resolver('')
-      askUserPending.delete(callId)
+  /** Deny outstanding approvals and skip outstanding meta__ask_user
+   *  questions in ONE conversation — the user's implicit "no" to any
+   *  tool request still on screen there when they send a new message.
+   *  Other conversations' pending interactions are left alone. */
+  const cancelPendingInConversation = (
+    conversationId: string | undefined,
+    reason: string
+  ): void => {
+    if (!conversationId) return
+    const n = interaction.pending.cancelConversation(conversationId)
+    if (n > 0) {
+      logger.info(
+        `cancelled ${n} pending approval(s)/question(s) in ${conversationId} (${reason})`
+      )
     }
   }
 
@@ -428,10 +392,9 @@ export function registerAiChatHandlers(deps: {
     } catch (logErr) {
       logger.error('chat/start log-line failed', logErr)
     }
-    // Any pending approval from a previous turn is implicitly rejected
-    // when the user starts a new one.
-    denyAllPendingApprovals('new message')
-    skipAllPendingQuestions('new message')
+    // Any pending approval from a previous turn in this conversation is
+    // implicitly rejected when the user starts a new one there.
+    cancelPendingInConversation(params?.conversationId, 'new message')
     void service.start(params).catch((err) => {
       logger.error('chat/start failed', err)
     })
@@ -439,10 +402,13 @@ export function registerAiChatHandlers(deps: {
 
   messenger.onNotification(AiChatAbort, ({ turnId }) => {
     logger.info(`chat/abort received (turn=${turnId})`)
-    // Resolve any pending approval as 'deny' so the dispatcher can
-    // unblock and the outer loop can observe the abort signal.
-    denyAllPendingApprovals('abort')
-    skipAllPendingQuestions('abort')
+    // Resolve this turn's pending approvals as 'deny' (and questions as
+    // skipped) so the dispatcher can unblock and the outer loop can
+    // observe the abort signal.
+    const n = interaction.pending.cancelTurn(turnId)
+    if (n > 0) {
+      logger.info(`cancelled ${n} pending approval(s)/question(s) (abort)`)
+    }
     service.abort(turnId)
   })
 
@@ -465,13 +431,9 @@ export function registerAiChatHandlers(deps: {
   // Empty `answer` = skip (the dispatcher treats this as "use your
   // best guess" per the tool contract).
   messenger.onNotification(AiChatAnswerUser, ({ callId, answer }) => {
-    const resolver = askUserPending.get(callId)
-    askUserPending.delete(callId)
-    if (!resolver) {
+    if (!interaction.pending.answer(callId, answer ?? '')) {
       logger.warn(`meta__ask_user: no pending question for ${callId}`)
-      return
     }
-    resolver(answer ?? '')
   })
 
   // Tool approval: resolve the pending promise the dispatcher is
@@ -489,7 +451,9 @@ export function registerAiChatHandlers(deps: {
       if (meta) {
         const category = categoryForTool(meta.name)
         if (category) {
-          void setPermission(category, 'always').catch((err) =>
+          void (
+            permissions.setPermission?.(category, 'always') ?? Promise.resolve()
+          ).catch((err) =>
             logger.warn(
               `tool/approve: failed to persist always-allow for ${category}: ${err instanceof Error ? err.message : String(err)}`
             )
@@ -500,19 +464,20 @@ export function registerAiChatHandlers(deps: {
       }
     }
     const resolved: 'allow' | 'deny' = decision === 'deny' ? 'deny' : 'allow'
-    const resolver = approvalPending.get(callId)
-    if (!resolver) {
-      // The webview shows the buttons as soon as the tool-call frame
-      // streams in, but the dispatcher registers its resolver only
-      // when it dispatches that call (after the stream ends, and
-      // sequentially per call). Stash the decision so requestApproval
-      // can consume it instead of prompting into the void.
-      earlyToolDecisions.set(callId, resolved)
+    // The webview shows the buttons as soon as the tool-call frame
+    // streams in, but the dispatcher registers its resolver only when
+    // it dispatches that call (after the stream ends, and sequentially
+    // per call). `decide` stashes such an early decision so
+    // requestApproval can consume it instead of prompting into the void.
+    if (
+      !interaction.pending.decide(
+        callId,
+        resolved,
+        callArgs.get(callId)?.conversationId
+      )
+    ) {
       logger.info(`tool/approve: stashed early decision for ${callId}`)
-      return
     }
-    approvalPending.delete(callId)
-    resolver(resolved)
   })
 
   // Plain open — for fs__read_file and fs__create_file. Shows the
@@ -522,11 +487,13 @@ export function registerAiChatHandlers(deps: {
     const meta = callArgs.get(callId)
     if (!meta) return
     try {
-      const args = JSON.parse(meta.argsJson) as { path?: string }
-      if (!args.path) return
-      const uri = resolveFileUri(args.path)
+      const uri = dispatcher.resolveFile({
+        callId,
+        name: meta.name,
+        argsJson: meta.argsJson,
+      })
       if (!uri) return
-      await vscode.commands.executeCommand('vscode.open', uri)
+      await vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(uri))
     } catch (err) {
       logger.warn(
         `file/open failed: ${err instanceof Error ? err.message : String(err)}`
@@ -550,7 +517,12 @@ export function registerAiChatHandlers(deps: {
         name: meta.name,
         argsJson: meta.argsJson,
       })
-      if (uri) await vscode.commands.executeCommand('vscode.open', uri)
+      if (uri) {
+        await vscode.commands.executeCommand(
+          'vscode.open',
+          vscode.Uri.parse(uri)
+        )
+      }
       return
     }
     try {
@@ -575,7 +547,7 @@ export function registerAiChatHandlers(deps: {
   messenger.onRequest(AiConversationDelete, async ({ id }) => {
     const localOk = await store.delete(id)
     // Server-side delete is best-effort; the UI doesn't block on it.
-    void deleteServerConversation(auth, id, logger)
+    void deleteServerConversation(proxy, id, logger)
     return { ok: localOk }
   })
 
@@ -637,16 +609,18 @@ export function registerAiChatHandlers(deps: {
       'meta.askUser': 'always',
     }
     for (const cat of ALL_PERMISSION_CATEGORIES) {
-      values[cat as AiPermissionCategory] = getPermission(
+      values[cat as AiPermissionCategory] = permissions.getPermission(
         cat
       ) as AiPermissionValue
     }
     return { values }
   })
   messenger.onNotification(AiPermissionsSet, ({ category, value }) => {
-    void setPermission(
-      category as PermissionCategory,
-      value as 'never' | 'ask' | 'always'
+    void (
+      permissions.setPermission?.(
+        category as PermissionCategory,
+        value as 'never' | 'ask' | 'always'
+      ) ?? Promise.resolve()
     ).catch((err) =>
       logger.warn(
         `permissions/set: ${category}=${value} failed: ${err instanceof Error ? err.message : String(err)}`
@@ -890,7 +864,7 @@ export function registerAiChatHandlers(deps: {
   messenger.onNotification(AiUsageSubscribe, () => {
     if (usageTimer) return
     const tick = (): void =>
-      void fetchUsage(auth, logger).then((u) => {
+      void fetchUsage(proxy, logger).then((u) => {
         if (u) {
           messenger.sendNotification(AiUsageUpdate, frontend, u)
         }
@@ -932,12 +906,7 @@ export function registerAiChatHandlers(deps: {
     proposedProvider
   )
 
-  async function openAppliedDiff(snapshot: {
-    callId: string
-    uri: vscode.Uri
-    relativePath: string
-    before: string
-  }): Promise<void> {
+  async function openAppliedDiff(snapshot: AppliedEditSnapshot): Promise<void> {
     // "Before" side: the virtual doc holds the pre-edit snapshot so
     // VSCode's diff gutter paints red/green against the now-current
     // on-disk file.
@@ -949,7 +918,7 @@ export function registerAiChatHandlers(deps: {
     await vscode.commands.executeCommand(
       'vscode.diff',
       beforeUri,
-      snapshot.uri,
+      vscode.Uri.parse(snapshot.uri),
       `Legalese AI — ${snapshot.relativePath}`
     )
   }
@@ -1395,20 +1364,19 @@ async function previewAttachment(
 }
 
 async function deleteServerConversation(
-  auth: AuthManager,
+  proxy: AiProxyClient,
   id: string,
   logger: AiLogger
 ): Promise<void> {
   try {
-    const { getAiEndpoint, isLocalMode } = await import('./ai-proxy-client.js')
-    const headers = await auth.getAiAuthHeaders()
-    if (!headers.Authorization && isLocalMode()) {
-      headers.Authorization = 'Bearer dev-local'
-    }
-    const res = await fetch(`${getAiEndpoint()}/v1/conversations/${id}`, {
-      method: 'DELETE',
-      headers,
-    })
+    const headers = await proxy.getAuthHeaders()
+    const res = await fetch(
+      `${proxy.getEndpoint().url}/v1/conversations/${id}`,
+      {
+        method: 'DELETE',
+        headers,
+      }
+    )
     if (!res.ok && res.status !== 404) {
       logger.warn(`server delete returned ${res.status}`)
     }
@@ -1459,7 +1427,7 @@ async function searchMentions(query: string): Promise<AiMentionCandidate[]> {
  * refresh.
  */
 async function fetchUsage(
-  auth: AuthManager,
+  proxy: AiProxyClient,
   logger: AiLogger
 ): Promise<{
   used: number
@@ -1467,13 +1435,9 @@ async function fetchUsage(
   blockOnOverage: boolean
 } | null> {
   try {
-    const headers = await auth.getAiAuthHeaders()
-    const { getAiEndpoint, isLocalMode } = await import('./ai-proxy-client.js')
-    if (!headers.Authorization && isLocalMode()) {
-      headers.Authorization = 'Bearer dev-local'
-    }
+    const headers = await proxy.getAuthHeaders()
     if (!headers.Authorization) return null
-    const res = await fetch(`${getAiEndpoint()}/v1/usage`, {
+    const res = await fetch(`${proxy.getEndpoint().url}/v1/usage`, {
       method: 'GET',
       headers,
       signal: AbortSignal.timeout(8000),

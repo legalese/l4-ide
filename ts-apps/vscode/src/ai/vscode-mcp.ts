@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import * as vscode from 'vscode'
 import type { AiLogger } from './logger.js'
-import type { AiProxyTool } from './ai-proxy-client.js'
+import type { AiProxyTool, ToolProvider } from '@repo/legalese-agent'
 import type { McpOAuthManager } from './mcp-oauth.js'
 
 /**
@@ -148,7 +148,9 @@ class HttpStatusError extends Error {
   }
 }
 
-export class VsCodeMcpTools {
+export class VsCodeMcpTools implements ToolProvider {
+  readonly prefix = VSCODE_MCP_PREFIX
+
   private connections = new Map<string, Connection>()
   /** wire name → (server, tool). Rebuilt on every listTools(). */
   private wireMap = new Map<string, { serverId: string; toolName: string }>()

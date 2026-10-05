@@ -1,6 +1,8 @@
 # Pattern names refer when they can — retiring `EXACTLY`
 
-**Status: BUILT `41809c4d` (2026-09-16T12:56:24+08:00); not merged.** §1's ruling is Meng's and is unchanged
+**Status: BUILT and MERGED — #407 (`cb07560d9`, 2026-09-16) and #409 (`7161f864d`, 2026-09-16). The keyword's
+removal, ruled for 2026-10-01, is DEFERRED (§10.1, 2026-09-30).** The build was verified at `41809c4d`
+(2026-09-16T12:56:24+08:00), as described below. §1's ruling is Meng's and is unchanged
 since he gave it on 2026-09-16. R1–R7, the corpus sweep, the printer change and the docs/skill
 rewrite (§4 onward) are built and committed on `lang/action-binder-reference`, verified green by
 `etc/verify-branch.sh` (full, not `--quick`) at this commit — nothing below describes a plan. Every
@@ -356,7 +358,7 @@ binder shadows a same-typed lexical local), which is a separate question this sp
 
 **RULED 2026-09-16 (Meng), superseding the deontic-only outcome above for the sunset:** _"regarding removing
 the keyword from CONSIDER: ruling: remove it everywhere and spell a pinned name as a guard, with two corpus
-sites to rewrite."_ So on 2026-10-01 the keyword leaves `CONSIDER` too. Measured the same day on this tree:
+sites to rewrite."_ So on 2026-10-01 the keyword leaves `CONSIDER` too (that date is deferred; see §10.1). Measured the same day on this tree:
 `CONSIDER` arms have **no guard production** (`Syntax.hs`: `BranchLhs = When Pattern | Otherwise`; the parser's
 `branch` reads `WHEN <pattern>` or `OTHERWISE`; `CONSIDER.md` is silent), and the two corpus sites are degenerate —
 `ok/contracts.l4:56` `WHEN EXACTLY 3` (a literal already pins) and `ok/consider-exactly-enum.l4:14`
@@ -366,7 +368,7 @@ general case, a pinned **non-constructor name** in a `WHEN`, has zero corpus use
 Meng's confirmation of the spelling:** a new production `WHEN <pattern> PROVIDED <cond> THEN …`, mirroring the
 action guard that already exists (`MUST payment price PROVIDED price >= 20`, `ok/contracts.l4:13`): a failed guard
 falls through to the later arms (a nested `IF` cannot), a guarded arm counts as non-covering for exhaustiveness,
-and the keyword is already lexed. To land before 2026-10-01, ahead of the removal PR. The removal PR then deletes
+and the keyword is already lexed. To land before 2026-10-01 (deferred; see §10.1), ahead of the removal PR. The removal PR then deletes
 the lexer/parser/printer/warning code, rewrites the two sites, deletes the eight warning fixtures, and turns the
 docs' deprecation notes into "removed 2026-10-01".
 
@@ -581,7 +583,21 @@ LSP golden covers a regulative rule at all); hover is a SHOULD if it is cheap in
 
 ## 10. Open, for Meng
 
-1. **Keyword removal.** RULED 2026-09-16 (Meng): _"sunset date for EXACTLY: 1 Oct"_ — removed on
+1. **Keyword removal.** **DEFERRED 2026-09-30 (Meng):** the removal does not happen on 2026-10-01. It
+   waits until the retiring-`EXACTLY` feature lands on `main` as its own synthetic PR, in the per-feature
+   re-carve of main..unstable (session `scalpel`, trigger word WHITTLE). Until then, measured at
+   `f9a504b77` on 2026-09-30:
+
+   - the keyword is still lexed (`jl4-core/src/L4/Lexer.hs:289`) and parsed;
+   - `EXACTLY` in a deontic action keeps its deprecation warning, and `EXACTLY` in `CONSIDER` still draws
+     none (the warning is gated to actions);
+   - the `CONSIDER` guard spelling `WHEN <pattern> PROVIDED <cond>` (§4 R6) still awaits Meng's
+     confirmation;
+   - `git grep -o -w EXACTLY -- '*.l4'` gives 81 tokens in 26 files. 4 of those files are in the canon
+     mirror, where every match is the English word in a comment (e.g. "reaches EXACTLY what this corpus
+     computes"); those can change only in canon.
+
+   The ruling it defers: RULED 2026-09-16 (Meng): _"sunset date for EXACTLY: 1 Oct"_ — removed on
    **2026-10-01**, everywhere (see §4 R6, RULED the same day). Counts at the ruling, `git grep -w EXACTLY`
    over tracked `.l4`: l4-ide `unstable` before #407: 205 tokens / 51 files (149 on code lines); after #407:
    47 / 17 (10 on code lines — 8 in fixtures whose purpose is the deprecation warning, 2 in `CONSIDER`);
