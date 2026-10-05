@@ -194,6 +194,18 @@ export interface App extends IRNode {
   readonly args: readonly IRExpr[]
   /** Stable UUIDv5 derived from function name, atom label, and input refs. */
   readonly atomId: string
+  /** The called rule's body with this call's actual arguments substituted (beta reduction).
+   *
+   *  This is the CONTRACT a server must meet; as of 2026-10-05 no jl4-lsp sends the field
+   *  (the server half is specified in `specs/todo/WHERE-INLINING-SPEC.md` and not landed).
+   *  The server must translate the expansion in the CALLER's context, so its atomIds are in the
+   *  caller's namespace and a leaf that IS one of the caller's own leaves carries that leaf's
+   *  atomId; it must give every node an id fresh across the whole FunDecl (ladder-core's
+   *  adapter rejects a repeat); and it must omit the field when the callee is not a rule of
+   *  this module, is already being expanded (recursion), or the decision's node budget is
+   *  spent. Optional on the wire: a client that ignores it draws the call as one box, as
+   *  before. See `UBoolVar.expansion`. */
+  readonly expansion?: IRExpr
 }
 
 /** For the original Viz / IRExpr (as opposed to the values that the frontend evaluator uses) */
@@ -201,7 +213,22 @@ export type UBoolValue = Schema.Schema.Type<typeof UBoolValue>
 export type BoolValue = Schema.Schema.Type<typeof BoolValue>
 export type Value = UBoolValue
 
-export type UBoolVar = Schema.Schema.Type<typeof UBoolVar>
+/** Declared by hand rather than read off the schema, because `expansion` makes it recursive
+ *  (the same reason `And`, `Or`, `Not` and `App` are). Keep it in step with the `UBoolVar` schema. */
+export interface UBoolVar extends IRNode {
+  readonly $type: 'UBoolVar'
+  readonly value: UBoolValue
+  readonly name: Name
+  readonly canInline: boolean
+  /** Stable UUIDv5 derived from function name, atom label, and input refs. */
+  readonly atomId: string
+  /** See the `UBoolVar` schema below. */
+  readonly typically?: boolean | null
+  /** For a CALL leaf (`canInline: true`, e.g. `` `is creditworthy` OF a ``): the called rule's
+   *  body with the actual arguments substituted, in the caller's context. Same contract as
+   *  `App.expansion`. Absent on every other leaf. */
+  readonly expansion?: IRExpr
+}
 
 /** Inert elements are grammatical scaffolding that always evaluate to True */
 export type InertE = Schema.Schema.Type<typeof InertE>
@@ -229,6 +256,10 @@ export const App = Schema.Struct({
   args: Schema.Array(IRExpr),
   /** Stable UUIDv5 derived from function name, atom label, and input refs. */
   atomId: Schema.String,
+  /** See `App.expansion` (the interface). Optional, so a reply without it decodes as before. */
+  expansion: Schema.optional(
+    Schema.suspend((): Schema.Schema<IRExpr> => IRExpr)
+  ),
 }).annotations({ identifier: 'App' })
 
 // // TODO: Need to look more carefully at L4's NamedExpr
@@ -286,7 +317,7 @@ export const BoolValue = Schema.Union(
 )
 export const UBoolValue = Schema.Union(BoolValue, Schema.Literal('UnknownV'))
 
-export const UBoolVar = Schema.Struct({
+export const UBoolVar: Schema.Schema<UBoolVar> = Schema.Struct({
   $type: Schema.tag('UBoolVar'),
   value: UBoolValue,
   id: IRId,
@@ -303,6 +334,10 @@ export const UBoolVar = Schema.Struct({
    * derived comparison, so it never appears here. See `typicallyBridge`.
    */
   typically: Schema.optional(Schema.NullOr(Schema.Boolean)),
+  /** See `UBoolVar.expansion` (the interface). Optional, so a reply without it decodes as before. */
+  expansion: Schema.optional(
+    Schema.suspend((): Schema.Schema<IRExpr> => IRExpr)
+  ),
 }).annotations({ identifier: 'UBoolVar' })
 
 /** We have an IRId even for bool lits b/c it's useful to be able to associate IRExprs with the Lir nodes that they get translated to */
@@ -379,7 +414,12 @@ function maxNodeId(e: IRExpr): number {
     case 'Implies':
       return Math.max(e.id.id, maxNodeId(e.scope), maxNodeId(e.requirement))
     case 'App':
-      return e.args.reduce((m, a) => Math.max(m, maxNodeId(a)), e.id.id)
+      return e.args.reduce(
+        (m, a) => Math.max(m, maxNodeId(a)),
+        e.expansion ? Math.max(e.id.id, maxNodeId(e.expansion)) : e.id.id
+      )
+    case 'UBoolVar':
+      return e.expansion ? Math.max(e.id.id, maxNodeId(e.expansion)) : e.id.id
     default:
       return e.id.id
   }
@@ -424,7 +464,11 @@ export function expandImplies(expr: IRExpr): IRExpr {
       case 'Not':
         return { ...e, negand: go(e.negand) }
       case 'App':
-        return { ...e, args: e.args.map(go) }
+        return e.expansion
+          ? { ...e, args: e.args.map(go), expansion: go(e.expansion) }
+          : { ...e, args: e.args.map(go) }
+      case 'UBoolVar':
+        return e.expansion ? { ...e, expansion: go(e.expansion) } : e
       default:
         return e
     }
@@ -508,6 +552,10 @@ export function typicallyBridge(expr: IRExpr): TypicallyMaps {
         return
       // App / TrueE / FalseE / InertE carry no atom prior; App is an opaque
       // leaf atom (its args are not decision-query variables).
+      // Nor does this walk enter a call's `expansion`: the query's variables are the
+      // atoms of the tree as drawn with calls as leaves, and an expansion's atoms are
+      // not among them. A consumer that draws expansions takes its priors from
+      // ladder-core's `fromVizFunDecl(…, { calls: 'expand' })`, which does read them.
       default:
         return
     }

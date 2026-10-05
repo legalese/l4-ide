@@ -10,37 +10,58 @@
  * A decision picker switches between the DECIDEs the module exposes. TYPICALLY
  * defaults arrive as provenance and render tentative (§22).
  *
- * HYDRATION. A leaf that references another DECIDE in the module (e.g.
- * `first limb OF s, i`) is drawn as a dotted reference; click it to splice that
- * DECIDE's whole tree in place — recursively, so a limb's own sub-conditions
- * become hydratable in turn. Click the hydrated heading to collapse it back.
- * We do this CLIENT-SIDE from the bodies /render already returned (the LSP marks
- * applied refs canInline:false — an open TODO there), so it needs no backend.
- * No framework.
+ * CALL PANELS. A call to another boolean rule of the module (`is creditworthy a`,
+ * `limb a b`) can carry an `expansion` on the wire: the callee's body with the call's
+ * actual arguments substituted, which the SERVER must compute in the caller's context.
+ * No jl4-lsp sends it yet (2026-10-05: the server half is specified, not landed); until
+ * one does, this page draws every call as one box, and the panels below are exercised
+ * only through the tests' synthetic fixture.
+ * `fromVizFunDecl(…, { calls: "expand" })` decodes each one as a call panel, a
+ * `call: true` group under the call leaf's own id, and the layout draws it as a shaded
+ * panel named after the call. Its name folds it to one box (an ordinary `foldSet` fold),
+ * and the ▸ caret on that box opens it again; "expand calls" / "collapse calls" do every
+ * panel at once. A reply with no expansions (a jl4-lsp older than call panels) draws
+ * every call as a single box, as it always did.
  *
- * E1 Step 4: the DOM half is gone from this file. Its `flipIndex` was a near-verbatim
- * copy of app.ts's (its own section header said so), and both are now the one definition
- * in `src/flip.ts`. The two behaviours that are genuinely this demo's — routing a click
- * to hydrate/collapse instead of cycle/fold, and dotting the hydratable refs after the
- * draw — survive as `onAct` and `onRender`, which is exactly the split the controller
- * exists to draw. Pan/zoom (seam S6) comes along for free.
+ * ONE CLICK, EVERY COPY. A click on a box sets that value on every box that is the same
+ * proposition — the same `atomId`, which the server is to compute after substitution — via
+ * `spreadValue`. So the `a` inside `limb a b` answers with the caller's own `a`, the two
+ * `is creditworthy a` panels in `may lend jointly` answer together, and
+ * `is creditworthy b` stays apart. A folded panel's box is the call as a whole; clicking
+ * it sets that value on every copy of the call, open or folded, but an OPEN panel sets its
+ * copy aside and conducts by what is drawn inside it (`layout`, `dropOpenPanels`): the
+ * value shows on every folded copy, and comes back on an open one when it is folded.
+ *
+ * Nothing here splices or renumbers a tree: the identity is the server's, and this page
+ * only reads it. This file used to splice a callee's body in on the client, from the
+ * bodies `/render` returned, because the LSP then marked applied calls `canInline: false`.
+ * That splice copied the callee's tree under fresh ids and substituted no arguments, so an
+ * inlined box was the callee's parameter (`p`, not `a`) and shared no identity with anything.
+ *
+ * E1 Step 4: the DOM half lives in `src/controller.ts`, shared with app.ts. What is
+ * genuinely this demo's — spreading a value over every copy, and the panel buttons —
+ * rides on `onAct`. Pan/zoom (seam S6) comes along for free.
  */
 import {
   defaultViewSpec,
   fromVizFunDecl,
   expandSentences,
+  spreadValue,
 } from "@repo/ladder-core";
-import { LadderController } from "../src/index.js";
+import {
+  LadderController,
+  SCREEN_PALETTE,
+  panelBackdrop,
+} from "../src/index.js";
 import type {
   FunDecl,
   IRExpr,
-  And,
   NodeId,
   UBoolValue,
-  Provenance,
   ConnectiveStyle,
   Grounding,
   Scene,
+  DecodedViz,
 } from "@repo/ladder-core";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -51,14 +72,9 @@ const status = $("status");
 const container = $("ladder");
 const sentList = $("sentences") as HTMLOListElement;
 const sentCount = $("sent-count");
+const msg = $("msg");
 
 /* ------------------------------------------------------------------- state */
-type Decoded = {
-  fn: FunDecl;
-  provenance: Map<NodeId, Provenance>;
-  /** §22 `Left`: the VALUES the source presumes, kept apart from user answers. */
-  defaults: Map<NodeId, UBoolValue>;
-};
 /** One LSP diagnostic, flattened by `/render` (1-based line/column). */
 type Diagnostic = {
   severity: number; // 1 Error, 2 Warning, 3 Information, 4 Hint
@@ -66,94 +82,64 @@ type Diagnostic = {
   column: number;
   message: string;
 };
-let decisions: Decoded[] = [];
-let cur: Decoded | null = null;
-const nameMap = new Map<string, Decoded>(); // cleaned DECIDE name -> its tree
+/** A decoded decision: the tree with its calls expanded into panels, plus the identity
+ *  index (`atomIdByNode` / `nodesByAtomId`) that `spreadValue` reads. */
+let decisions: DecodedViz[] = [];
+let cur: DecodedViz | null = null;
+/** The call panels of `cur`, id → the call as written. Rebuilt when a decision loads. */
+let panels = new Map<NodeId, string>();
 const foldSet = new Set<NodeId>();
-const valuation = new Map<NodeId, UBoolValue>();
+let valuation = new Map<NodeId, UBoolValue>();
 let connective: ConnectiveStyle = "straddle-wire";
 /** How to read an atom nobody answered, and whether the source's own TYPICALLY
  *  presumptions are in play. Two independent axes; see `Grounding` in ladder-core. */
 let grounding: Grounding = "none";
 let respectDefaults = true;
 
-/* hydration: display ids currently expanded, and a stable id-remap for the
- * subtrees we splice in (so ids survive re-render for FLIP + click + fold). */
-const hydrated = new Set<NodeId>();
-const remapCache = new Map<string, NodeId>();
-let remapCounter = 1_000_000;
-const rid = (key: string): NodeId => {
-  let v = remapCache.get(key);
-  if (v == null) remapCache.set(key, (v = ++remapCounter));
-  return v;
-};
-
 const clean = (s: string) => s.replace(/`/g, "").trim();
-/** The DECIDE a leaf references, if any: the name before " OF " (applied) or the
- *  whole label (nullary), matched against the module's decisions. */
-function refNameOf(e: IRExpr): string | null {
-  if (e.$type !== "UBoolVar" && e.$type !== "App") return null;
-  const label = e.$type === "App" ? e.label : e.label;
-  const head = clean(label.split(" OF ")[0]);
-  return nameMap.has(head) ? head : null;
-}
 
-/* per-render scratch, rebuilt by buildDisplay each frame */
-let activeProv = new Map<NodeId, Provenance>();
-let activeDefaults = new Map<NodeId, UBoolValue>();
-let collapsedRefs = new Set<NodeId>(); // display id -> clicking hydrates
-let wrappers = new Map<NodeId, NodeId>(); // wrapper group id -> the ref id it stands for
-
-/** Build the tree actually shown: copy `node` (remapping ids via `remap`), and
- *  where a hydratable ref is expanded, splice the referenced DECIDE's body
- *  (recursively) under a labelled group whose heading collapses it again. */
-function buildDisplay(node: IRExpr, remap: (id: NodeId) => NodeId): IRExpr {
-  const id = remap(node.id);
-  switch (node.$type) {
-    case "And":
-    case "Or":
-      return {
-        ...node,
-        id,
-        args: node.args.map((a) => buildDisplay(a, remap)),
-      };
-    case "Not":
-      return { ...node, id, negand: buildDisplay(node.negand, remap) };
-    case "InertE":
-      return { ...node, id };
-    default: {
-      const ref = refNameOf(node);
-      if (ref && hydrated.has(id)) {
-        const target = nameMap.get(ref)!;
-        const sub = (o: NodeId) => rid(`${id}:${o}`);
-        for (const [o, p] of target.provenance) activeProv.set(sub(o), p);
-        for (const [o, v] of target.defaults) activeDefaults.set(sub(o), v);
-        const inner = buildDisplay(target.fn.body, sub);
-        const wrapperId = rid(`${id}:__wrap`);
-        wrappers.set(wrapperId, id);
-        const group: And = {
-          $type: "And",
-          id: wrapperId,
-          args: [inner],
-          label: clean(target.fn.name),
-        };
-        return group;
-      }
-      if (ref) collapsedRefs.add(id);
-      return { ...node, id };
-    }
-  }
-}
-
-/* structural id walks over the DISPLAY tree (buttons operate on what's shown) */
-let lastDisplayFn: FunDecl | null = null;
-function walk(e: IRExpr, leaves: NodeId[], groups: NodeId[]): void {
+/* structural walks over the decoded tree (the buttons operate on all of it, folded or not) */
+function walk(
+  e: IRExpr,
+  leaves: NodeId[],
+  groups: NodeId[],
+  calls: Map<NodeId, string>,
+): void {
   if (e.$type === "And" || e.$type === "Or") {
     groups.push(e.id);
-    e.args.forEach((a) => walk(a, leaves, groups));
-  } else if (e.$type === "Not") walk(e.negand, leaves, groups);
-  else if (e.$type !== "InertE") leaves.push(e.id);
+    if (e.$type === "And" && e.call) calls.set(e.id, e.label ?? "");
+    e.args.forEach((a) => walk(a, leaves, groups, calls));
+  } else if (e.$type === "Not") walk(e.negand, leaves, groups, calls);
+  else if (e.$type === "Implies") {
+    walk(e.scope, leaves, groups, calls);
+    walk(e.requirement, leaves, groups, calls);
+  } else if (e.$type !== "InertE") leaves.push(e.id);
 }
+const leavesOf = (e: IRExpr): NodeId[] => {
+  const l: NodeId[] = [];
+  walk(e, l, [], new Map());
+  return l;
+};
+
+/** The words a box shows, for the status line. */
+function labelOf(e: IRExpr, id: NodeId): string | null {
+  if (e.id === id && "label" in e && typeof e.label === "string")
+    return clean(e.label);
+  const kids =
+    e.$type === "And" || e.$type === "Or"
+      ? e.args
+      : e.$type === "Not"
+        ? [e.negand]
+        : e.$type === "Implies"
+          ? [e.scope, e.requirement]
+          : [];
+  for (const k of kids) {
+    const hit = labelOf(k, id);
+    if (hit !== null) return hit;
+  }
+  return null;
+}
+const say = (t: string) => (msg.textContent = t);
 
 /* ------------------------------------------------------------------ the controller */
 /** Nothing is rendered until a module comes back from the LSP, so the controller starts on
@@ -165,58 +151,37 @@ const EMPTY_FN: FunDecl = {
   body: { $type: "InertE", id: 0, text: "", context: "InertAnd" },
 };
 
-/** Routing is conditional on this demo's own hydration state, and the controller never
- *  sees it: it reports an act, the host decides what the act MEANS. */
+/** A value act is a click on a box: spread it over every copy of that proposition.
+ *  A fold act is a panel's name, a group heading, or a ▸ caret: an ordinary fold. */
 const controller = new LadderController(container, EMPTY_FN, {
   onAct: (act) => {
-    if (act.t === "value")
-      collapsedRefs.has(act.id) ? hydrate(act.id) : cycleValue(act.id);
-    else
-      wrappers.has(act.id)
-        ? dehydrate(wrappers.get(act.id)!)
-        : toggleFold(act.id);
+    if (act.t === "value") cycleValue(act.id);
+    else toggleFold(act.id);
   },
-  /** Post-draw decoration the ViewSpec cannot express: which leaves are hydratable refs
-   *  and which headings stand for a hydrated limb. `playground.html:144-160` styles both
-   *  classes and is unchanged. This hook is why `onRender` exists. */
-  onRender: (svg) => {
-    svg.querySelectorAll<SVGElement>("[data-value]").forEach((el) => {
-      if (collapsedRefs.has(Number(el.getAttribute("data-value")))) {
-        el.classList.add("lad-ref");
-        el.setAttribute("data-ref", "1");
-      }
-    });
-    svg.querySelectorAll<SVGElement>("[data-fold]").forEach((el) => {
-      if (wrappers.has(Number(el.getAttribute("data-fold"))))
-        el.classList.add("lad-hydrated");
-    });
+  /** The diagram's backdrop is one step below its outermost panel when it has panels; the
+   *  pane's own padding around the SVG takes the same shade, so there is no white frame. */
+  onRender: (_svg, scene) => {
+    container.style.background = scene.panelDepth
+      ? panelBackdrop(SCREEN_PALETTE, scene.panelDepth)
+      : "";
   },
 });
 
 function render(animate: boolean) {
   if (!cur) return;
-  // rebuild the display tree (with hydrations spliced in) and its provenance
-  activeProv = new Map(cur.provenance);
-  activeDefaults = new Map(cur.defaults);
-  collapsedRefs = new Set();
-  wrappers = new Map();
-  const body = buildDisplay(cur.fn.body, (x) => x);
-  const fn: FunDecl = { ...cur.fn, body };
-  lastDisplayFn = fn;
-
-  // The display tree is rebuilt every frame, so the controller's `fn` is swapped every
-  // frame too — but `keepBaseline` when animating, because a hydration IS the thing the
-  // FLIP is there to show. `animate: false` (a fresh decision) drops the baseline.
+  // The decoded tree already holds every panel; folding one is a `foldSet` entry, so the
+  // tree itself never changes between frames and ids are stable for FLIP, click and fold.
+  // `animate: false` (a fresh decision) drops the FLIP baseline.
   //
   // The two epistemic knobs ride the ViewSpec, so the controller needs no knowledge of
   // them; `render` hands back the Scene, which is what the banner reads its wording off.
-  controller.setFunDecl(fn, animate);
+  controller.setFunDecl(cur.fn, animate);
   const scene = controller.render(
     defaultViewSpec({
       valuation,
       foldSet,
-      provenance: activeProv,
-      defaults: activeDefaults,
+      provenance: cur.provenance,
+      defaults: cur.defaults,
       connectiveStyle: connective,
       showCurrent: true,
       grounding,
@@ -258,11 +223,12 @@ function renderEpiNote(scene: Scene) {
     : "Showing only what is known — unanswered atoms stay unanswered.";
 }
 
-/** Combination view: enumerate every way to satisfy the rule (the hydrated
- *  display tree, so expanding a limb expands its combinations too). */
+/** Combination view: enumerate every way to satisfy the rule. A panel is a group like
+ *  any other, so opening a call opens its combinations too, and folding it keeps the
+ *  call inline as one term. */
 function renderSentences() {
-  if (!lastDisplayFn) return;
-  const ss = expandSentences(lastDisplayFn, foldSet);
+  if (!cur) return;
+  const ss = expandSentences(cur.fn, foldSet);
   sentCount.textContent = `(${ss.length})`;
   sentList.innerHTML = "";
   for (const s of ss) {
@@ -277,22 +243,40 @@ const NEXT: Record<UBoolValue, UBoolValue> = {
   TrueV: "FalseV",
   FalseV: "UnknownV",
 };
+const WORD: Record<UBoolValue, string> = {
+  TrueV: "true",
+  FalseV: "false",
+  UnknownV: "unknown",
+};
+/** Cycle the clicked box and carry the new value to every box that is the same
+ *  proposition (`spreadValue`, keyed by the server's atomId). */
 function cycleValue(id: NodeId) {
+  if (!cur) return;
   const nx = NEXT[valuation.get(id) ?? "UnknownV"];
-  if (nx === "UnknownV") valuation.delete(id);
-  else valuation.set(id, nx);
+  valuation = spreadValue(cur, id, nx, valuation);
+  // Count the boxes the reader will see change: an OPEN panel holds the value but sets it
+  // aside while open, so it is not one of them.
+  const atom = cur.atomIdByNode.get(id);
+  const copies =
+    atom === undefined ? [id] : (cur.nodesByAtomId.get(atom) ?? [id]);
+  const n = copies.filter((c) => !panels.has(c) || foldSet.has(c)).length;
+  const held = copies.length - n;
+  const what = panels.has(id)
+    ? `${panels.get(id)} as a whole`
+    : (labelOf(cur.fn.body, id) ?? `box ${id}`);
+  say(
+    `Set ${what} to ${WORD[nx]}: ${n} box${n === 1 ? "" : "es"} changed` +
+      (held
+        ? `; ${held} open cop${held === 1 ? "y holds" : "ies hold"} it until folded.`
+        : "."),
+  );
   render(true);
 }
 function toggleFold(id: NodeId) {
-  foldSet.has(id) ? foldSet.delete(id) : foldSet.add(id);
-  render(true);
-}
-function hydrate(id: NodeId) {
-  hydrated.add(id);
-  render(true);
-}
-function dehydrate(id: NodeId) {
-  hydrated.delete(id);
+  const folding = !foldSet.has(id);
+  folding ? foldSet.add(id) : foldSet.delete(id);
+  if (panels.has(id))
+    say(`${folding ? "Collapsed" : "Expanded"} ${panels.get(id)}.`);
   render(true);
 }
 
@@ -300,9 +284,15 @@ function dehydrate(id: NodeId) {
 function selectDecision(i: number) {
   cur = decisions[i] ?? null;
   foldSet.clear();
-  valuation.clear();
-  hydrated.clear();
-  remapCache.clear();
+  valuation = new Map();
+  panels = new Map();
+  if (cur) walk(cur.fn.body, [], [], panels);
+  $("panel-buttons").hidden = panels.size === 0;
+  say(
+    panels.size
+      ? `${panels.size} call${panels.size === 1 ? "" : "s"} drawn in place. Click a call's name to fold it.`
+      : "",
+  );
   // render(false) drops the FLIP baseline and refits — a different decision has no
   // correspondence with the one before it.
   render(false);
@@ -320,12 +310,9 @@ async function doRender() {
     if (data.error) throw new Error(data.error);
     decisions = (data.funcs ?? [])
       .filter((f: { funDecl?: unknown }) => f.funDecl)
-      .map((f: { funDecl: Parameters<typeof fromVizFunDecl>[0] }) => {
-        const { fn, provenance, defaults } = fromVizFunDecl(f.funDecl);
-        return { fn, provenance, defaults };
-      });
-    nameMap.clear();
-    decisions.forEach((d) => nameMap.set(clean(d.fn.name), d));
+      .map((f: { funDecl: Parameters<typeof fromVizFunDecl>[0] }) =>
+        fromVizFunDecl(f.funDecl, { calls: "expand" }),
+      );
     picker.innerHTML = "";
     decisions.forEach((d, i) => {
       const o = document.createElement("option");
@@ -339,7 +326,8 @@ async function doRender() {
       // redraws the last file that compiled, on top of the diagnostics explaining why this
       // one did not. A ladder for a program you are no longer looking at is worse than none.
       cur = null;
-      lastDisplayFn = null;
+      panels = new Map();
+      say("");
       // …and the controller's FLIP baseline with it, or the next module that DOES compile
       // animates out of a scene belonging to a program nobody is looking at.
       controller.setFunDecl(EMPTY_FN);
@@ -394,24 +382,37 @@ document
 });
 $("expand-all").addEventListener("click", () => {
   foldSet.clear();
+  say("Expanded all.");
   render(true);
 });
 $("collapse-all").addEventListener("click", () => {
-  if (!lastDisplayFn) return;
+  if (!cur) return;
   const g: NodeId[] = [];
-  walk(lastDisplayFn.body, [], g);
+  walk(cur.fn.body, [], g, new Map());
   g.forEach((id) => foldSet.add(id));
+  say("Collapsed all.");
+  render(true);
+});
+/* The approved page's two buttons: every call panel at once, other groups untouched. */
+$("expand-calls").addEventListener("click", () => {
+  panels.forEach((_, id) => foldSet.delete(id));
+  say("Expanded every call.");
+  render(true);
+});
+$("collapse-calls").addEventListener("click", () => {
+  panels.forEach((_, id) => foldSet.add(id));
+  say("Collapsed every call.");
   render(true);
 });
 $("all-true").addEventListener("click", () => {
-  if (!lastDisplayFn) return;
-  const l: NodeId[] = [];
-  walk(lastDisplayFn.body, l, []);
-  l.forEach((id) => valuation.set(id, "TrueV"));
+  if (!cur) return;
+  valuation = new Map(valuation);
+  leavesOf(cur.fn.body).forEach((id) => valuation.set(id, "TrueV"));
   render(true);
 });
 $("reset").addEventListener("click", () => {
-  valuation.clear();
+  valuation = new Map();
+  say("Values reset.");
   render(true);
 });
 /* view controls — the controller draws no chrome of its own */
