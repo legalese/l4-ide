@@ -40,6 +40,7 @@ import qualified LSP.L4.Viz.CustomProtocol as Ladder
 import           LSP.L4.Viz.CustomProtocol (EvalAppRequestParams (..),
                                             EvalAppResult (..))
 import qualified LSP.L4.Viz.QueryPlan as VizQueryPlan
+import qualified L4.Decision.QueryPlan as QP
 
 import Language.LSP.Protocol.Message
 import Language.LSP.Protocol.Types
@@ -278,7 +279,9 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
           Just tcRes -> pure tcRes
       case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) tcRes.module' of
         [decide] ->
-          let vizConfig = Ladder.mkVizConfig verTextDocId tcRes.module' tcRes.substitution simp
+          -- Every call leaf carries its expansion (WHERE-INLINING-SPEC §10).
+          -- Auto-refresh and l4/inlineExprs inherit this config.
+          let vizConfig = Ladder.withCallExpansions (Ladder.mkVizConfig verTextDocId tcRes.module' tcRes.substitution simp)
           in pure $ Just (decide, vizConfig)
         -- NOTE: if this becomes a problem, we should use
         -- https://hackage.haskell.org/package/lsp-types-2.3.0.1/docs/Language-LSP-Protocol-Types.html#t:VersionedTextDocumentIdentifier
@@ -286,22 +289,23 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
 
   -- Makes a 'RecentlyVisualised' iff the given 'Decide' has a valid range and a resolved type.
   -- Assumes the vizConfig in the given vizState is up-to-date.
-  let recentlyVisualisedDecide decide@(MkDecide Anno {range = Just range, extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} _tydec appform _expr) vizState
+  let recentlyVisualisedDecide decide@(MkDecide Anno {range = Just range, extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} _tydec appform _expr) vizState ladderInfo
         = Just RecentlyVisualised
           { pos = range.start
           , name = rawName $ getName appform
           , type' = applyFinalSubstitution (Ladder.getVizConfig vizState).substitution (Ladder.getVizConfig vizState).moduleUri ty
           , vizState = vizState
           , decide
+          , ladderInfo
           }
-      recentlyVisualisedDecide _ _ = Nothing
+      recentlyVisualisedDecide _ _ _ = Nothing
 
   case mdecide of
     Nothing -> pure (InR Null)
     Just (decide, vizConfig) ->
       case Ladder.doVisualize decide vizConfig of
         Right (vizProgramInfo, vizState) -> do
-          traverse_ (lift . setRecVis) $ recentlyVisualisedDecide decide vizState
+          traverse_ (lift . setRecVis) $ recentlyVisualisedDecide decide vizState vizProgramInfo
           pure $ InL $ Aeson.toJSON (VizQueryPlan.annotateLadderWithAtomIds vizProgramInfo vizState)
         Left vizError ->
           defaultResponseError $ Text.unlines
@@ -324,12 +328,48 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
 
       pure decide
 
+{- | The reply to @l4/inlineExprs@: unfold the calls the reader asked for in
+the decision last drawn, draw the result again, and put its atomIds into the
+SAME namespace "Show decision graph" uses ('VizQueryPlan.annotateLadderWithAtomIds').
+
+Without that last step the reply carried the visualiser's raw ids, so every
+leaf the expand did not touch changed id across it and a client's answers keyed
+by atomId were lost (WHERE-INLINING-SPEC §10). The unfold-everywhere semantics
+of 'Ladder.inlineExprs' are unchanged. Returns, besides the annotated reply, the
+unfolded decision and the unannotated ladder with its state, which the handler
+keeps for the next request ('queryPlanForRecent' plans from them).
+-}
+renderAfterInlining
+  :: Ladder.VizState -> Decide Resolved -> [Int]
+  -> Either Ladder.VizError (Decide Resolved, Ladder.RenderAsLadderInfo, Ladder.VizState, Ladder.RenderAsLadderInfo)
+renderAfterInlining vizState decide uniques = do
+  let postInliningDecide = Ladder.inlineExprs vizState decide uniques
+  (info, vizState') <- Ladder.doVisualize postInliningDecide (Ladder.getVizConfig vizState)
+  pure (postInliningDecide, VizQueryPlan.annotateLadderWithAtomIds info vizState', vizState', info)
+
+{- | The reply to @l4/queryPlan@: the plan for the decision last drawn, from the
+ladder and state that drawing produced.
+
+It used to draw the decision again first. With call expansions on, that ran every
+deepening pass and translated every expansion on each request — and the webview
+sends one on every change to the bindings — only for 'VizQueryPlan.vizExprToBoolExpr'
+to throw every expansion away (measured 2026-10-05: 7–11 ms per request on #520,
+about 600 ms with expansions, on the r0..r12 budget module). Drawing again is
+also not a no-op for the ids: the plan's compound-leaf @unique@s must be the ones
+on the wire the webview holds, and those are the ones this pair carries.
+-}
+queryPlanForRecent :: RecentlyVisualised -> Text -> [(Text, Bool)] -> QP.QueryPlanResponse
+queryPlanForRecent recentViz fnName bindings =
+  VizQueryPlan.queryPlanFromLadder fnName
+    (VizQueryPlan.buildParamsByUnique recentViz.ladderInfo)
+    recentViz.ladderInfo recentViz.vizState bindings
+
 {- | Make a new 'Ladder.VizConfig' by combining (i) old config (e.g. whether to
 simplify) from the 'RecentlyVisualised' (which itself contains a VizConfig) with
 (ii) up-to-date versions of potentially stale info (verTxtDocId, tcRes).
 
 Crucially this refreshes @module'@ from the current typecheck result too. @module'@
-is what 'Ladder.collectDefsForInlining' reads to decide @canInline@ (the +/unfold
+is what 'Ladder.defsForInliningOf' reads to decide @canInline@ (the +/unfold
 affordance); if it stayed frozen at the snapshot taken by the last *manual* Visualize,
 auto-refresh would recompute the ladder structure but keep a stale @canInline@ — so a
 newly-added DECIDE would not surface its inline affordance until a manual re-visualize.

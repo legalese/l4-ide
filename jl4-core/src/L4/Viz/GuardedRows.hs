@@ -323,8 +323,8 @@ guardedToLadder fresh go rows = do
       V.Or _ xs                 -> V.Or <$> fresh <*> traverse copyOf xs
       V.Not _ x                 -> V.Not <$> fresh <*> copyOf x
       V.Implies _ p q seam      -> (\i p' q' -> V.Implies i p' q' seam) <$> fresh <*> copyOf p <*> copyOf q
-      V.UBoolVar _ nm v ci a ty -> (\i -> V.UBoolVar i nm v ci a ty) <$> fresh
-      V.App _ nm xs a           -> (\i xs' -> V.App i nm xs' a) <$> fresh <*> traverse copyOf xs
+      V.UBoolVar _ nm v ci a ty x -> (\i x' -> V.UBoolVar i nm v ci a ty x') <$> fresh <*> traverse copyOf x
+      V.App _ nm xs a x           -> (\i xs' x' -> V.App i nm xs' a x') <$> fresh <*> traverse copyOf xs <*> traverse copyOf x
       V.TrueE _ nm              -> (`V.TrueE` nm) <$> fresh
       V.FalseE _ nm             -> (`V.FalseE` nm) <$> fresh
       V.InertE _ t c            -> (\i -> V.InertE i t c) <$> fresh

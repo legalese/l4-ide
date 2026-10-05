@@ -112,13 +112,23 @@ instance Aeson.FromJSON InertContext where
 -- compilation) are free to read it classically; consumers that draw a PICTURE are
 -- not. See 'L4.Viz.Ladder.translateExpr', which peels the seam off before handing
 -- either side to 'L4.Transform.simplify' (whose whole job is to eliminate it).
+--
+-- A call leaf — a 'UBoolVar' or 'App' that calls another boolean rule of the
+-- module — may carry an @expansion@: the called rule's body with the call's
+-- arguments put in place of its parameters, translated in the CALLER's context,
+-- so an argument inlined from the call is the very leaf the caller would draw for
+-- it, with the same @atomId@ (WHERE-INLINING-SPEC §10). It is an optional JSON
+-- field, omitted when absent, so a client that does not know it reads the leaf
+-- exactly as before.
 data IRExpr
   = And ID [IRExpr]
   | Or ID [IRExpr]
   | Not ID IRExpr
   | Implies ID IRExpr IRExpr Text          -- ^ id scope requirement seam
-  | UBoolVar ID Name UBoolValue Bool Text (Maybe Bool)  -- ^ id name value canInline atomId typically
-  | App ID Name [IRExpr] Text              -- ^ id fnName args atomId
+  | UBoolVar ID Name UBoolValue Bool Text (Maybe Bool) (Maybe IRExpr)
+    -- ^ id name value canInline atomId typically expansion
+  | App ID Name [IRExpr] Text (Maybe IRExpr)
+    -- ^ id fnName args atomId expansion
   | TrueE ID Name
   | FalseE ID Name
   | InertE ID Text InertContext            -- ^ id text context
@@ -131,10 +141,12 @@ instance Aeson.ToJSON IRExpr where
     Not uid negand -> Aeson.object ["$type" .= ("Not" :: Text), "id" .= uid, "negand" .= negand]
     Implies uid scope requirement seam -> Aeson.object
       ["$type" .= ("Implies" :: Text), "id" .= uid, "scope" .= scope, "requirement" .= requirement, "seam" .= seam]
-    UBoolVar uid name value canInline atomId typically -> Aeson.object
+    UBoolVar uid name value canInline atomId typically expansion -> Aeson.object $
       ["$type" .= ("UBoolVar" :: Text), "id" .= uid, "name" .= name, "value" .= value, "canInline" .= canInline, "atomId" .= atomId, "typically" .= typically]
-    App uid fnName args atomId -> Aeson.object
+      <> expansionField expansion
+    App uid fnName args atomId expansion -> Aeson.object $
       ["$type" .= ("App" :: Text), "id" .= uid, "fnName" .= fnName, "args" .= args, "atomId" .= atomId]
+      <> expansionField expansion
     TrueE uid name -> Aeson.object ["$type" .= ("TrueE" :: Text), "id" .= uid, "name" .= name]
     FalseE uid name -> Aeson.object ["$type" .= ("FalseE" :: Text), "id" .= uid, "name" .= name]
     InertE uid txt ctx -> Aeson.object ["$type" .= ("InertE" :: Text), "id" .= uid, "text" .= txt, "context" .= ctx]
@@ -147,12 +159,17 @@ instance Aeson.FromJSON IRExpr where
       "Or"       -> Or <$> o .: "id" <*> o .: "args"
       "Not"      -> Not <$> o .: "id" <*> o .: "negand"
       "Implies"  -> Implies <$> o .: "id" <*> o .: "scope" <*> o .: "requirement" <*> (fromMaybe "IMPLIES" <$> o .:? "seam")
-      "UBoolVar" -> UBoolVar <$> o .: "id" <*> o .: "name" <*> o .: "value" <*> o .: "canInline" <*> o .: "atomId" <*> o .:? "typically"
-      "App"      -> App <$> o .: "id" <*> o .: "fnName" <*> o .: "args" <*> o .: "atomId"
+      "UBoolVar" -> UBoolVar <$> o .: "id" <*> o .: "name" <*> o .: "value" <*> o .: "canInline" <*> o .: "atomId" <*> o .:? "typically" <*> o .:? "expansion"
+      "App"      -> App <$> o .: "id" <*> o .: "fnName" <*> o .: "args" <*> o .: "atomId" <*> o .:? "expansion"
       "TrueE"    -> TrueE <$> o .: "id" <*> o .: "name"
       "FalseE"   -> FalseE <$> o .: "id" <*> o .: "name"
       "InertE"   -> InertE <$> o .: "id" <*> o .: "text" <*> o .: "context"
       _ -> fail $ "Unknown IRExpr $type: " <> show tag
+
+-- | The @expansion@ key, present only when there is one: an old client must see
+-- exactly the object it saw before.
+expansionField :: Maybe IRExpr -> [Aeson.Pair]
+expansionField = maybe [] (\x -> ["expansion" .= x])
 
 -- | Expression ID for tracking in the visualizer.
 newtype ID = MkID { id :: Int }
@@ -198,7 +215,7 @@ boolPriorsFromBody = Map.fromList . go
  where
   go :: IRExpr -> [(Unique, Double)]
   go = \case
-    UBoolVar _ nm _ _ _ (Just b) ->
+    UBoolVar _ nm _ _ _ (Just b) _ ->
       [(nm.unique, if b then typicallyTrueWeight else typicallyFalseWeight)]
     UBoolVar{} -> []
     And _ xs   -> concatMap go xs

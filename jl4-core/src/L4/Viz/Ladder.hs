@@ -308,6 +308,12 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
   assign #functionName funName.label
   assign #defsForInlining =<< collectDefsForInlining
   mod' <- use #module'
+  -- A bare reference to a name is keyed by the name's unique; every other leaf
+  -- by a fresh id from 'getFresh'. Starting the fresh ids above every unique in
+  -- the rule keeps the two ranges apart, so a fresh id cannot equal a name's
+  -- unique and merge two different propositions into one variable
+  -- (smucclaw/l4-ide#991). Mirrors 'LSP.L4.Viz.Ladder.translateDecide'.
+  assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
   assign #typicallyDefaults (collectTypicallyDefaults givenSig mod')
   shouldSimplify <- getShouldSimplify
   vid <- getFresh
@@ -442,7 +448,7 @@ translateExpr shouldSimplify = top
             recordAtomInputRefs uniq refs
             functionName <- use #functionName
             let atomId = generateAtomId functionName label refs
-            VizExpr.App vid vname <$> traverse go args <*> pure atomId
+            VizExpr.App vid vname <$> traverse go args <*> pure atomId <*> pure Nothing
           else
             leafFromExpr e
 
@@ -513,7 +519,7 @@ varLeaf vid vname resolved = do
   let atomId = generateAtomId functionName vname.label refs
   defaults <- use #typicallyDefaults
   let mTypically = Map.lookup (getUnique resolved).unique defaults
-  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically
+  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically Nothing
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
@@ -528,7 +534,7 @@ leafFromExpr expr = do
   -- A compound leaf is not a bare boolean binder, so it carries no TYPICALLY
   -- prior (question-ordering spec §4: priors come only from boolean binders
   -- whose atom is the binder itself). Bare-var leaves go through 'varLeaf'.
-  pure $ VizExpr.UBoolVar vid (VizExpr.MkName uniq label) UnknownV False atomId Nothing
+  pure $ VizExpr.UBoolVar vid (VizExpr.MkName uniq label) UnknownV False atomId Nothing Nothing
 
 ------------------------------------------------------
 -- Name helpers

@@ -162,6 +162,7 @@ test-suite jl4-lsp-test
     ImportDiagnosticSpec
     ImportUriSpec
     LadderAtomIdSpec
+    LadderCallExpansionSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     StateGraphLensSpec
@@ -169,6 +170,7 @@ test-suite jl4-lsp-test
     hspec-discover:hspec-discover
   build-depends:
     aeson,
+    bytestring,
     directory,
     filepath,
     hspec,

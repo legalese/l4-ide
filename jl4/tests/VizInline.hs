@@ -43,7 +43,7 @@ spec = describe "expanding a call with arguments in the ladder (§9.7)" $ do
           Left e -> expectationFailure ("doVisualize failed: " <> show e)
           Right (info, vizState) ->
             case info.funDecl.body of
-              V.UBoolVar _ nm _ canInline _ _ -> do
+              V.UBoolVar _ nm _ canInline _ _ _ -> do
                 canInline `shouldBe` True
                 let expanded = Ladder.inlineExprs vizState decide [nm.unique]
                 case Ladder.doVisualize expanded cfg of
@@ -66,10 +66,10 @@ findDecide nm m =
 
 atomsOf :: V.IRExpr -> [Text]
 atomsOf = \case
-  V.UBoolVar _ nm _ _ _ _ -> [nm.label]
+  V.UBoolVar _ nm _ _ _ _ _ -> [nm.label]
   V.And _ es -> concatMap atomsOf es
   V.Or _ es -> concatMap atomsOf es
   V.Not _ e -> atomsOf e
   V.Implies _ p q _ -> atomsOf p <> atomsOf q
-  V.App _ _ es _ -> concatMap atomsOf es
+  V.App _ _ es _ _ -> concatMap atomsOf es
   _ -> []

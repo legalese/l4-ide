@@ -92,8 +92,8 @@ leaves = \case
   V.Or _ xs -> concatMap leaves xs
   V.Not _ x -> leaves x
   V.Implies _ scope requirement _ -> leaves scope <> leaves requirement
-  V.UBoolVar _ name _ _ atomId _ -> [(name.label, atomId)]
-  V.App _ fnName args atomId -> (fnName.label, atomId) : concatMap leaves args
+  V.UBoolVar _ name _ _ atomId _ _ -> [(name.label, atomId)]
+  V.App _ fnName args atomId _ -> (fnName.label, atomId) : concatMap leaves args
   V.TrueE _ _ -> []
   V.FalseE _ _ -> []
   V.InertE _ _ _ -> []

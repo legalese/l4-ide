@@ -157,6 +157,7 @@ import Base.Text (Text)
 import GHC.Generics
 import Data.Hashable (Hashable)
 import qualified LSP.L4.Viz.Ladder as Ladder
+import LSP.L4.Viz.VizExpr (RenderAsLadderInfo)
 
 data Log
   = LogCreateHieDbExportsMapStart
@@ -304,6 +305,12 @@ data RecentlyVisualised = RecentlyVisualised
   -}
   , type'     :: !(Type' Resolved)
   , vizState  :: !Ladder.VizState
+  , ladderInfo :: !RenderAsLadderInfo
+  {- ^ The ladder that 'vizState' was built with, before its atomIds were
+    annotated. @l4/queryPlan@ plans from this pair rather than drawing the
+    decision again: with call expansions on, drawing it again costs every
+    expansion, and the plan reads none of them (WHERE-INLINING-SPEC §10).
+  -}
   }
   deriving stock (Show)
 

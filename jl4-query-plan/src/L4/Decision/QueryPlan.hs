@@ -12,6 +12,7 @@ module L4.Decision.QueryPlan (
   QueryPlanResponse (..),
   BDQ.Verdict (..),
   atomIdByUnique,
+  atomIdsOfLabels,
   queryPlan,
 ) where
 
@@ -208,6 +209,31 @@ atomIdByUnique ::
   CachedDecisionQuery ->
   Map Int Text
 atomIdByUnique name paramsByUnique cached =
+  atomIdsOfLabels name paramsByUnique cached cached.varLabelByUnique
+
+-- | The atomId of each labelled leaf in the map given, computed exactly as
+-- 'atomIdByUnique' computes a plan variable's: a UUID5 over the function name,
+-- the leaf's label, and its transitive input refs.
+--
+-- The leaves need not be plan variables (an App's arguments, the leaves of a
+-- call's expansion), but the REFS are always rendered against the plan's own
+-- labels, never the extra leaves': a ref root renders the same way in every
+-- atomId of one decision, or one proposition gets two ids.
+--
+-- A ref root renders as the parameter's label, else the plan variable's label,
+-- else its unique. So a rule of the module that a callee reads, and that is not
+-- itself a plan variable, renders by its unique: never as the label of a
+-- parameter that shadows it, but not stable across an edit above it either,
+-- exactly as such a root already renders in a plan variable's atomId.
+atomIdsOfLabels ::
+  Text ->
+  -- | Parameter labels keyed by unique.
+  Map Int Text ->
+  CachedDecisionQuery ->
+  -- | The leaves to name, with their labels.
+  Map Int Text ->
+  Map Int Text
+atomIdsOfLabels name paramsByUnique cached leaves =
   let
     refsByUnique :: IntMap (Set InputRef)
     refsByUnique = inputRefsClosureByUnique cached
@@ -245,7 +271,7 @@ atomIdByUnique name paramsByUnique cached =
    in
     Map.fromList
       [ (u, stableAtomId u lbl)
-      | (u, lbl) <- Map.toList cached.varLabelByUnique
+      | (u, lbl) <- Map.toList leaves
       ]
 
 queryPlan ::
