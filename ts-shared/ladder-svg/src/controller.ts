@@ -476,11 +476,12 @@ export class LadderController {
     this.#dragged = false;
     this.#dragTravel = 0;
     this.#lastPointer = { x: e.clientX, y: e.clientY };
-    try {
-      this.#host.setPointerCapture(e.pointerId);
-    } catch {
-      /* capture is an optimisation; the gesture still works without it */
-    }
+    // NO pointer capture yet. Chromium sends the `click` that follows a captured pointer to
+    // the CAPTURING element, so capturing here retargeted every click to the host, where
+    // `closest("[data-value],[data-fold]")` finds nothing: no box or caret click did
+    // anything (measured 2026-10-05, headless Chromium via Playwright, `standalone/app.ts`).
+    // Capture starts in `#onPointerMove`, once the gesture is a pan, and a pan's click is
+    // swallowed by `#dragged` anyway.
     this.#host.style.cursor = "grabbing";
   };
 
@@ -490,7 +491,14 @@ export class LadderController {
     const dy = e.clientY - this.#lastPointer.y;
     this.#lastPointer = { x: e.clientX, y: e.clientY };
     this.#dragTravel += Math.abs(dx) + Math.abs(dy);
-    if (this.#dragTravel > DRAG_SLOP) this.#dragged = true;
+    if (this.#dragTravel > DRAG_SLOP && !this.#dragged) {
+      this.#dragged = true;
+      try {
+        this.#host.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is an optimisation; the gesture still works without it */
+      }
+    }
     this.pan(dx, dy);
   };
 
