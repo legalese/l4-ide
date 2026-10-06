@@ -1172,12 +1172,13 @@ rawTokensAnno toks =
 -- distinguishable column, compounding multiplicatively. Instead, at each
 -- non-final clause boundary we bind the remaining-clauses expression to a single
 -- fresh local (a nullary @LET ... IN@) and let 'matchOne' refer to it by name.
--- The fresh name (@__pm_fallthrough_<k>@) is hygienic in practice: the
--- double-underscore prefix keeps it clear of the names drafters write and of
--- GIVEN params, and @k@ (the nesting level) makes it unique per boundary. (A
--- drafter who spells it in backticks and refers to it from a clause gets an
--- ambiguity error, not a silent capture.) Nothing downstream reads the name:
--- the binding and every generated CONSIDER are marked with 'PmSynthetic'.
+-- The fresh name (@__pm_fallthrough_<k>@) keeps clear of the names drafters
+-- write in practice, and @k@ (the nesting level) makes it unique per
+-- boundary. It is NOT hygienic against a drafter who spells it in backticks:
+-- a clause body that names a definition @`__pm_fallthrough_0`@ can read this
+-- binding instead, or be reported ambiguous, depending on where it sits.
+-- Nothing downstream reads the name: the binding and every generated
+-- CONSIDER are marked with 'PmSynthetic'.
 matchClauses :: PmGroup -> [Name] -> [Bool] -> [PMClause] -> Expr Name
 matchClauses grp scrutinees typesDeclared = go 0
   where
