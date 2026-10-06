@@ -6,6 +6,9 @@
 > only in a scratchpad and in one session's messages. Each entry carries a **witness** you can run
 > and a **mechanism** you can read, so that acting on it needs no archaeology.
 >
+> **OF-13 onward were added later, from other work.** Each says where it came from and which tree it
+> was measured on.
+>
 > **Scope.** Findings only. The rulings themselves are in their own documents:
 > `IMPLICIT-PROPS-DESIGN.md` §11, `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §12,
 > `SET-OPERATORS-SPEC.md` §18, `TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.3.
@@ -572,9 +575,50 @@ machine-checkable. It would also catch OF-11's re-wording before it reached a pa
 
 ---
 
+## OF-13 — jl4-service cuts a list answer longer than 200 elements short, with `null`s and a 200
+
+**Severity: a silent wrong answer. Filed as smucclaw/l4-ide#1005; unowned.**
+
+Found while fixing smucclaw/l4-ide#1003 (legalese/l4-ide#562), and measured 2026-10-06 on that branch, `eba40d689`.
+A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+`l4 run` cuts the same list in the same place but prints `...`.
+
+**Witness:** `DECIDE many IS range 1 n` with `IMPORT prelude`, called with `{"n":201,"pad":1}`, returns 202 elements ending `200, null, null`.
+The issue has the six-row table.
+
+**Mechanism:** normal-form evaluation stops at depth 200 (`maximumStackSize`, `jl4-core/src/L4/EvaluateLazy/Exceptions.hs:152`) and returns `Omitted` below it; each list cell is one level deeper; the service encodes `Omitted` as `null`.
+The wrapper's `JUST` uses one level, hence 199.
+
+---
+
+## OF-14 — on jl4-service's wrapper path, a `LIST OF NUMBER` input fails with a type error
+
+**Severity: a request that cannot be served, loudly. Filed as smucclaw/l4-ide#1006; unowned.**
+
+Found and measured as OF-13 was.
+`{"xs":[1,2,3],"pad":1}` to `GIVEN xs IS A LIST OF NUMBER` answers `200 6`; `{"xs":[1,2,3],"pad":{}}` is a 422 whose message says the function's first input "is expected to be of type LIST OF NUMBER but is here of type LIST OF (MAYBE OF NUMBER)".
+A `DEONTIC` function always takes the wrapper, so, reading the code, one with such an input cannot be called at all; that part is not measured.
+
+**Mechanism:** `liftTypeText` lifts `LIST OF a` to `MAYBE (LIST OF (lift a))` (`jl4-service/src/Backend/MaybeLift.hs:90` at `eba40d689`), and the wrapper unwraps the outer `MAYBE` but not the elements.
+
+---
+
+## OF-15 — on jl4-service's direct path, a string sent for a `NUMBER` or `DATE` input reaches the rule as a `STRING`
+
+**Severity: a silent wrong answer in one shape, an unhelpful error in the other. Filed as smucclaw/l4-ide#1007; unowned.**
+
+Found and measured as OF-13 was.
+A rule that returns a `DATE` input unchanged, sent `"d":"not a date"`, answers `200 "not a date"`.
+A rule that doubles a `NUMBER` input, sent `"n":"abc"`, stops on "Internal error: I encountered a type error during evaluation", which does not name the input; main and unstable answer the same (measured 2026-10-03).
+On that branch the wrapper path refuses both: the date with `Parameter 'd': could not read "not a date" as a DATE`, and the number with JSONDECODE's `Expected JSON number but got: String "abc"`, which does not name the input either.
+
+**Mechanism:** `nonMaybeValue` (`jl4-service/src/Backend/Jl4.hs:490` at `eba40d689`) makes a `STRING` literal of any string it cannot read as an enum variant or a date or time, whatever the declared type, and nothing checks it afterwards.
+
+---
+
 ## Owed upstream
 
-Filed by whoever holds GitHub write authority; **nothing here has been posted**.
+Filed by whoever holds GitHub write authority. **Nothing here has been posted except the rows marked FILED.**
 
 | finding    | what to file                                                                                                                                                                                        |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -589,3 +633,6 @@ Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 | OF-9       | Nothing until it is reproduced. It is recorded on report and says so.                                                                                                                               |
 | OF-10      | Nothing — scheduled behind discharge.                                                                                                                                                               |
 | OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15, on `unstable` since #338.                                                                                                             |
+| OF-13      | **FILED** 2026-10-06 as smucclaw/l4-ide#1005.                                                                                                                                                       |
+| OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006.                                                                                                                                                       |
+| OF-15      | **FILED** 2026-10-06 as smucclaw/l4-ide#1007.                                                                                                                                                       |
