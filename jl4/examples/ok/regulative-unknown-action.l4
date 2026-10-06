@@ -1,0 +1,212 @@
+IMPORT prelude
+-- AN EVENT WHOSE ACTION HOLDS AN UNKNOWN (smucclaw/l4-ide#999).
+--
+-- An event is matched against the obligation's action pattern. When the
+-- event's action holds an input whose value is not known, at a place where
+-- the pattern needs a particular constructor, the match cannot be decided:
+-- moving on to the next event would assert that the party did something
+-- else, which is how this used to leave the obligation pending. Now it is
+-- Stuck, naming the unknown.
+--
+-- An action that is KNOWN not to match still moves on, as before. "Known"
+-- here means a clash in a part of the event that is already a value or is
+-- written as a literal; nothing else is evaluated to find one.
+
+DECLARE Actor IS ONE OF
+    Seller HAS name IS A STRING
+DECLARE Kind IS ONE OF Retail, Wholesale
+
+DECLARE Pair IS ONE OF
+    P HAS first IS A Kind, second IS A Kind
+DECLARE Unit IS ONE OF Only
+DECLARE Person HAS age IS A NUMBER
+
+DECLARE Action IS ONE OF
+    Deliver HAS item IS A Kind
+    Ship    HAS item IS A Kind
+    Send    HAS item IS A Kind, qty IS A NUMBER
+    Send2   HAS one IS A Kind, other IS A Kind
+    Wrap    HAS inner IS A Pair
+    Order   HAS items IS A LIST OF Kind
+    Send3   HAS one IS A Kind, qty IS A NUMBER, other IS A Kind
+    SendU   HAS unit IS A Unit, qty IS A NUMBER, other IS A Kind
+    SendP   HAS person IS A Person, qty IS A NUMBER, other IS A Kind
+
+alice       MEANS Seller OF "Alice"
+
+GIVETH A NUMBER
+tbd MEANS REFUSE "not decided"
+
+GIVEN x IS A Kind
+GIVETH A Kind
+pick x MEANS
+    CONSIDER x
+    WHEN Retail THEN Retail
+    OTHERWISE Wholesale
+
+§ `Facts`
+    GIVEN k   IS A Kind
+          ks  IS A LIST OF Kind
+          act IS AN Action
+          u   IS A Unit
+          d   IS A Person
+
+GIVETH A DEONTIC Actor Action
+`must deliver` MEANS
+    PARTY alice
+    MUST   Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 1. Alice delivers something of unknown kind. If `k` is `Retail` this is
+--    FULFILLED; otherwise it is still pending. Stuck on `k`.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
+
+-- 2. Control: the kind is known, and it matches.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Deliver Retail AT 1
+
+-- 3. Control: a different action. Whatever `k` is, shipping is not
+--    delivering, so the obligation is still pending.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Ship k AT 1
+
+GIVETH A DEONTIC Actor Action
+`must send none` MEANS
+    PARTY alice
+    MUST   Send Retail 0
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 4. Control: the kind is unknown, but the quantity is the literal 5 where 0
+--    is required, so this cannot be the act. The obligation is still pending.
+#TRACE `must send none` AT 0 WITH
+  PARTY alice DOES Send k 5 AT 1
+
+-- 5. The quantity agrees, so the kind decides it. Stuck on `k`.
+#TRACE `must send none` AT 0 WITH
+  PARTY alice DOES Send k 0 AT 1
+
+GIVETH A DEONTIC Actor Action
+`must not deliver` MEANS
+    PARTY alice
+    SHANT  Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 6. A prohibition: if `k` is `Retail` this is a breach. Stuck on `k`.
+#TRACE `must not deliver` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
+
+GIVETH A DEONTIC Actor Action
+`may deliver` MEANS
+    PARTY alice
+    MAY    Deliver Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 7. A permission: if `k` is `Retail` Alice has used it. Stuck on `k`.
+#TRACE `may deliver` AT 0 WITH
+  PARTY alice DOES Deliver k AT 1
+
+-- 8. The whole act is not known. Stuck on `act`.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES act AT 1
+
+GIVETH A DEONTIC Actor Action
+`must send two retail` MEANS
+    PARTY alice
+    MUST   Send2 Retail Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 9. Control: the first kind is unknown, but the second is `Wholesale` where
+--    `Retail` is required, so this cannot be the act. Still pending.
+#TRACE `must send two retail` AT 0 WITH
+  PARTY alice DOES Send2 k Wholesale AT 1
+
+GIVETH A DEONTIC Actor Action
+`must wrap two retail` MEANS
+    PARTY alice
+    MUST   Wrap (P Retail Retail)
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 10. Control: the same, one level further in. Still pending.
+#TRACE `must wrap two retail` AT 0 WITH
+  PARTY alice DOES Wrap (P k Wholesale) AT 1
+
+GIVETH A DEONTIC Actor Action
+`must order nothing` MEANS
+    PARTY alice
+    MUST   Order EMPTY
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 11. A list nobody has supplied: it may be empty. Stuck on `ks`.
+#TRACE `must order nothing` AT 0 WITH
+  PARTY alice DOES Order ks AT 1
+
+-- 12. Not yet fixed: the unknown is read by a rule that uses CONSIDER, here
+--     `pick`, before the act is matched. That rule still treats `k` as "not
+--     Retail", so the event is passed over and the obligation stays pending.
+--     This is being worked on, and this answer will change to Stuck on `k`.
+#TRACE `must deliver` AT 0 WITH
+  PARTY alice DOES Deliver (pick k) AT 1
+
+-- 13-16. A later clash counts only if everything the match would reach
+-- before it is already decided. The match takes the positions in order, and
+-- forcing one can refuse: `tbd` refuses whenever it is read.
+
+GIVETH A DEONTIC Actor Action
+`must send3` MEANS
+    PARTY alice
+    MUST   Send3 Retail 7 Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 13. If `k` is `Retail` the match reads `tbd` and the run refuses; if it is
+--     `Wholesale` the event is passed over. Which one depends on `k`, so this
+--     is Stuck on `k`, although the last kind clashes.
+#TRACE `must send3` AT 0 WITH
+  PARTY alice DOES Send3 k tbd Wholesale AT 1
+
+-- 14. Control: the quantity is the literal 7, which is decided and matches,
+--     so the clash after it is reached and the event is passed over.
+--     Still pending.
+#TRACE `must send3` AT 0 WITH
+  PARTY alice DOES Send3 k 7 Wholesale AT 1
+
+GIVETH A DEONTIC Actor Action
+`must sendU` MEANS
+    PARTY alice
+    MUST   SendU Only 7 Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 15. `Only` is the one value a `Unit` can have, so every value of `u` makes
+--     the match read `tbd`, and every one refuses. Stuck on `u`.
+#TRACE `must sendU` AT 0 WITH
+  PARTY alice DOES SendU u tbd Wholesale AT 1
+
+GIVETH A DEONTIC Actor Action
+`must sendP` MEANS
+    PARTY alice
+    MUST   SendP (Person a) 7 Retail
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH
+
+-- 16. The same with a record: every `Person` fits `Person a`. Stuck on `d`.
+#TRACE `must sendP` AT 0 WITH
+  PARTY alice DOES SendP d tbd Wholesale AT 1

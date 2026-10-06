@@ -1791,6 +1791,8 @@ backward val = withPoppedFrame $ \ case
     case val of
       ValNil ->
         continueBackward (ValEnvironment Map.empty)
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatCons0 p1 env p2) -> do
@@ -1798,6 +1800,8 @@ backward val = withPoppedFrame $ \ case
       ValCons rf1 rf2 -> do
         pushFrame (PatCons1 rf2 env p2)
         continuePattern rf1 env p1
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatCons1 rf2 env p2) -> do
@@ -1830,6 +1834,8 @@ backward val = withPoppedFrame $ \ case
                     continuePattern r env p
             else internalException $ RuntimeTypeError
               "pattern for constructor has the wrong number of arguments"
+      ValAssumed r ->
+        patternMetUnknown r
       _ ->
         patternMatchFailure
   Just (PatApp1 ambient envs rps) ->
@@ -2549,23 +2555,30 @@ backwardContractFrame val = \ case
   -- environment the value happened to capture ('rebindLifecycle').
   Handoff lifecycle ->
     continueBackward (rebindLifecycle lifecycle val)
-  -- EVERY, the roll call. One cons cell of the roll per step.
+  -- EVERY, the roll call. One cons cell of the roll per step. A roll, or the
+  -- rest of one, that is not known is Stuck on it: nobody can say who the
+  -- group is.
   QuantRoll QuantRollFrame {..} ->
     case val of
       ValNil -> assembleQuantified ctx (reverse acc)
       ValCons hd tl -> do
         pushCFrame (QuantCast QuantCastFrame {candidate = hd, rest = tl, ..})
         continueRef hd
+      ValAssumed r -> stuckOnAssumed r
       _ -> internalException $ RuntimeTypeError $
         "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
   -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the
-  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll.
+  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll. An
+  -- unknown entry may or may not be a @Tenant@, so the cast neither admits
+  -- nor drops it: it is Stuck, naming it (smucclaw/l4-ide#998). Dropping it
+  -- was the bug: the join then released without that member's obligation.
   QuantCast QuantCastFrame {..} -> do
-    let admitted = case ctx.cast of
-          Nothing -> True
-          Just c  -> case val of
-            ValConstructor n _ -> n `sameResolved` c
-            _                  -> False
+    admitted <- case ctx.cast of
+      Nothing -> pure True
+      Just c  -> case val of
+        ValConstructor n _ -> pure (n `sameResolved` c)
+        ValAssumed r       -> stuckOnAssumed r
+        _                  -> pure False
     if not admitted
       then quantNext QuantRollFrame {..} rest
       else case ctx.filt of
@@ -4239,6 +4252,129 @@ patternMatchFailure = withPoppedFrame $ \ case
     continueRef events
   Just _ ->
     patternMatchFailure
+
+-- | A pattern frame met an unknown where it needed a constructor or a list.
+--
+-- Under the regulative action matcher this is Stuck, naming the unknown
+-- (smucclaw/l4-ide#999): failing the match would move on to the next
+-- event, which asserts that the act was not this one, and nothing says so.
+-- The exception is a sub-pattern still to be matched that is already KNOWN
+-- to clash, with every sub-pattern the match would reach before it already
+-- known to match; then the act cannot be this one whatever the unknown is,
+-- and the matcher moves on exactly as for any mismatch. Those sub-patterns
+-- sit in the 'PatApp1' and 'PatCons1' frames between here and the handler,
+-- innermost first, which is the order the match would take them.
+--
+-- Under a @CONSIDER@ (and so a record selector) the match still fails, as it
+-- always has: 'metUnknownHandled' says which handlers raise, and the
+-- refinement ('anyKnownClash') does not depend on which handler it is.
+patternMetUnknown :: Resolved -> Machine Config
+patternMetUnknown r = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  -- the handler is the frame 'patternMatchFailure' would unwind to
+  case break isMatchHandler stack.frames of
+    (pending, handler : _) | metUnknownHandled handler -> do
+      clash <- anyKnownClash (concatMap pendingPositions pending)
+      if clash then patternMatchFailure else stuckOnAssumed r
+    _ -> patternMatchFailure
+  where
+    isMatchHandler = \ case
+      ConsiderWhen1{}              -> True
+      ContractFrame (Contract11 _) -> True
+      _                            -> False
+    pendingPositions = \ case
+      PatApp1 _ _ rps -> rps
+      PatCons1 rf _ p -> [(rf, p)]
+      _               -> []
+
+-- | The handlers under which an unknown met by a pattern is Stuck rather than
+-- a failed match: the regulative action matcher only, today.
+-- UNKNOWN-EVALUATION-SPEC §8 step 1 widens this to 'ConsiderWhen1'.
+metUnknownHandled :: Frame -> Bool
+metUnknownHandled = \ case
+  ContractFrame (Contract11 _) -> True
+  _                            -> False
+
+-- | What reading a pending position tells us, without forcing anything.
+data PendingVerdict
+  = KnownClash  -- ^ the match would fail here, whatever any unknown is
+  | KnownMatch  -- ^ the match would succeed here, forcing nothing new
+  | Undecided   -- ^ the match would have to force something to say
+
+-- | Whether the pending positions, taken in the order the match would take
+-- them, reach a KNOWN clash before anything the match would have to force.
+--
+-- Cells are read, never forced: a check made only so that a mismatch stays a
+-- mismatch must not raise or diverge where the match itself would not have.
+-- And the scan stops at the first position it cannot decide, rather than
+-- looking past it for a later clash, because the match would force that
+-- position first, and forcing it can refuse, raise or diverge. Skipping it
+-- would answer "no match" for every value of the unknown when some values
+-- would refuse: with @tbd MEANS REFUSE ...@, the event @Send3 k tbd Wholesale@
+-- against @MUST Send3 Retail 7 Retail@ refuses when @k@ is @Retail@, so it is
+-- Stuck, not passed over.
+--
+-- A position is decided when its cell is already a value, or an unevaluated
+-- literal; a variable pattern binds without looking, so it always matches.
+-- A context-dependent cache ('WHNFWhen') is not trusted, since it may not hold
+-- for this context, and a pattern expression other than a literal would be
+-- evaluated, so neither is decided.
+--
+-- So the refinement is conservative. A computed argument (@2 PLUS 3@), or a
+-- list longer than the pattern whose tail is not yet evaluated, is Stuck
+-- rather than skipped, and whether a position counts as decided can depend on
+-- whether something else has already forced its cell. Either way a clash is
+-- claimed only where the match, run in order, would reach one.
+anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
+anyKnownClash positions = pendingVerdict positions >>= \ case
+  KnownClash -> pure True
+  _          -> pure False
+
+-- | The positions in matching order: the first that is not 'KnownMatch' is
+-- the answer.
+pendingVerdict :: [(Reference, Pattern Resolved)] -> Machine PendingVerdict
+pendingVerdict = \ case
+  [] -> pure KnownMatch
+  ((rf, p) : rest) -> knownClash rf p >>= \ case
+    KnownMatch -> pendingVerdict rest
+    verdict    -> pure verdict
+
+knownClash :: Reference -> Pattern Resolved -> Machine PendingVerdict
+knownClash rf pat = case pat of
+  PatVar{} -> pure KnownMatch
+  PatExpr _ e | not (isLiteral e) -> pure Undecided
+  _ -> readThunk rf >>= \ case
+    WHNF v                      -> verdictOn v
+    Unevaluated _ (Lit _ lit) _ -> verdictOn =<< runLit lit
+    Unevaluated{}               -> pure Undecided
+    WHNFWhen{}                  -> pure Undecided
+  where
+    isLiteral = \ case
+      Lit{} -> True
+      _     -> False
+    verdictOn v = case pat of
+      PatApp _ n []
+        | getUnique n == TypeCheck.emptyUnique -> pure case v of
+            ValNil    -> KnownMatch
+            ValCons{} -> KnownClash
+            _         -> Undecided
+      PatApp _ n ps -> case v of
+        ValConstructor n' rfs
+          | sameResolved n n' -> pendingVerdict (zip rfs ps)
+          | otherwise         -> pure KnownClash
+        _ -> pure Undecided
+      PatCons _ p1 p2 -> case v of
+        ValNil        -> pure KnownClash
+        ValCons r1 r2 -> pendingVerdict [(r1, p1), (r2, p2)]
+        _             -> pure Undecided
+      PatLit _ lit          -> pure (literalVerdict lit v)
+      PatExpr _ (Lit _ lit) -> pure (literalVerdict lit v)
+      PatExpr{}             -> pure Undecided
+      PatVar{}              -> pure KnownMatch
+    literalVerdict lit v = case (lit, v) of
+      (NumericLit _ n, ValNumber m) -> if n == m then KnownMatch else KnownClash
+      (StringLit _ s, ValString t)  -> if s == t then KnownMatch else KnownClash
+      _                             -> Undecided
 
 runLit :: Lit -> Machine WHNF
 runLit (NumericLit _ann num) = pure (ValNumber num)
