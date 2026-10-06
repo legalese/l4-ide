@@ -92,6 +92,11 @@ hoverGolden evalConfig dir inputFile = do
       , (Position 36 3, "given-name-rule")
       , (Position 40 27, "declaration-call-site")
       , (Position 41 27, "head-name-call-site")
+        -- smucclaw/l4-ide#978: a herald claimed by an AKA name.
+      , (Position 49 3, "aka-rule")
+      , (Position 49 12, "aka-input")
+      , (Position 49 25, "aka-alias")
+      , (Position 53 28, "aka-call-site")
       ]
     other -> error ("Hover.positionsFor: no positions pinned for " <> other)
 

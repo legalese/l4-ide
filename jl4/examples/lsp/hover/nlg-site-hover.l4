@@ -40,3 +40,15 @@ GIVETH AN a
 -- shows a herald on hover, wherever the herald was written.
 DECIDE `large check` IS `is large` 200
 DECIDE `small check` IS `is small` 2
+
+-- Test 8: a herald on its own line under an AKA lands on the alias's name,
+-- which decideNlgSite reads as a spelling of the head (smucclaw/l4-ide#978).
+-- Nothing is promoted, so hover shows the sentence on the alias where it was
+-- written, and not on `row ten`, the head name.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row ten` amount AKA `row ten alias`
+    @nlg row ten saw %amount%
+    MEANS amount GREATER THAN 100
+
+DECIDE `alias check` IS `row ten alias` 200

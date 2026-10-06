@@ -17,3 +17,7 @@ given-name-input: ``` | a | ``` |
 given-name-rule: ``` | FOR ALL a [the kind of thing] FUNCTION FROM a TO a | ``` | 
 declaration-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
 head-name-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
+aka-rule: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
+aka-input: ``` | NUMBER | ``` | 
+aka-alias: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` |  | --- |  | ``` | row ten saw `amount` | ``` | 
+aka-call-site: ``` | FUNCTION FROM NUMBER TO BOOLEAN | ``` | 
