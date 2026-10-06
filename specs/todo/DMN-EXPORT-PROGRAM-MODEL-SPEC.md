@@ -5158,8 +5158,11 @@ further changes, measured on probes in the review's shape:
   `PatternClausesMissing` at its head, worded "This clause does not cover all cases".
 - **Unreachable clauses.** A clause after one whose every pattern matches anything used to be
   dropped before type checking (`l4 check` passed on an ill-typed one). It is now bound as a dead
-  fall-through, so it is checked, and `PmFallthrough` bindings take the group's result type before
-  their bodies are checked (`expectFallthroughResults`), so its body's type is checked too. The
+  fall-through (`PmUnreachable`), so it is checked, and fall-through bindings take the group's
+  result type before their bodies are checked (`expectFallthroughResults`), so its body's type is
+  checked too. The checker then drops the dead binding from the tree it returns, so evaluation and
+  every exporter see the group as before; a first build that kept it made Catala and docassemble
+  refuse a group they had exported. The
   parser records the first such clause in `PmMatrix.catchAll`, and the checker warns
   `PatternClauseUnreachable` at the first clause after it. The matrix analysis's redundant rows,
   computed and discarded until now, are reported the same way (a clause after a fresh-name pattern,
