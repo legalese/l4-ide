@@ -1,0 +1,88 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 15:8-15:26
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause of `shadowed clauses` is never used, and neither is the clause after it.
+    The clause above it matches every input, so `shadowed clauses` never gets this far.
+    Move these clauses above that one, or remove them.
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 15:32-15:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the type of this definition must be
+
+      STRING
+
+    but is here of type
+
+      NUMBER
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 16:32-16:47
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `no such thing`
+
+    which I have inferred to be of type: 
+
+      STRING
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 22:33-22:39
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the type of this definition must be
+
+      NUMBER
+
+    but is here of type
+
+      STRING
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 29:24-29:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first input of `wrong pattern` is of type
+
+      MAYBE OF NUMBER
+
+    but the pattern written for it here is of type
+
+      BOOLEAN
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 32:38-32:46
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first input of `wrong pattern without given` is of type
+
+      BOOLEAN
+
+    but the pattern written for it here is of type
+
+      MAYBE OF NUMBER

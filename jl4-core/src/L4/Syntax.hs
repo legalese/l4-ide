@@ -884,15 +884,46 @@ instance ToExpr PmMatrixClause where
 -- 'PmMatrixClause'.
 data PmMatrix = MkPmMatrix
   { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @_pm_arg_i@)
+  , synthesizedScrutinees :: Bool
+    -- ^ the group has no GIVEN naming its inputs, so 'scrutinees' are the
+    -- desugarer's @_pm_arg_i@, which no diagnostic may print
   , clauses    :: [PmMatrixClause]
+  , catchAll   :: Maybe Int
+    -- ^ index of the first clause every one of whose patterns matches
+    -- anything ('L4.Parser.patAlwaysMatchesAs'); the clauses after it are
+    -- never tried
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrix where
-  rnf (MkPmMatrix s cs) = rnf s `seq` rnf cs
+  rnf (MkPmMatrix s syn cs ca) = rnf s `seq` rnf syn `seq` rnf cs `seq` rnf ca
 
 instance ToExpr PmMatrix where
-  toExpr (MkPmMatrix s cs) = toExpr (s, cs)
+  toExpr (MkPmMatrix s syn cs ca) = toExpr (s, syn, cs, ca)
+
+-- | The multi-clause group a generated node belongs to, as the drafter
+-- wrote it: the name its clauses define, and how many clauses there are.
+data PmGroup = MkPmGroup
+  { groupHead   :: RawName
+  , clauseCount :: Int
+  }
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Marks a node that 'L4.Parser.matchClauses' generated while lowering a
+-- multi-clause group, as opposed to one the drafter wrote. The checker and
+-- the evaluator read it so that what they report is about the clauses the
+-- drafter wrote, not about the CONSIDERs and local definitions they were
+-- compiled to. The mark is on the node itself, never inferred from a name: a
+-- drafter can spell any name, and a CONSIDER the drafter wrote inside a
+-- clause's body sits in the same generated definition as the ones around it.
+data PmSynthetic
+  = PmConsider PmGroup Int
+    -- ^ a CONSIDER testing one input of the group (its 1-based position)
+  | PmFallthrough PmGroup
+    -- ^ the local definition holding the clauses not yet tried
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 -- NOTE on serialisation: adding 'pmMatrix' below changes the CBOR shape of
 -- 'Extension' — jl4-service's AST-cache blobs from before the change will
@@ -913,16 +944,18 @@ data Extension = Extension
   , mixfixCanonical :: Maybe RawName
     -- ^ The CANONICAL mixfix pattern of the name this node applies, e.g.
     -- @the will _ is duly executed without _@. See 'annMixfixCanonical'.
+  , pmSynthetic  :: Maybe PmSynthetic
+    -- ^ Set on the nodes a multi-clause group is compiled to. See 'PmSynthetic'.
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 mx1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 mx2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (mx1 <|> mx2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 mx2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -932,7 +965,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1024,6 +1057,12 @@ setFixity f a = a & annFixity ?~ f
 
 setPmMatrix :: PmMatrix -> Anno -> Anno
 setPmMatrix m a = a & annPmMatrix ?~ m
+
+annPmSynthetic :: Lens' Anno (Maybe PmSynthetic)
+annPmSynthetic = #extra % #pmSynthetic
+
+setPmSynthetic :: PmSynthetic -> Anno -> Anno
+setPmSynthetic m a = a & annPmSynthetic ?~ m
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
@@ -1607,8 +1646,10 @@ instance Serialise PmMatrixClause where
   encode (MkPmMatrixClause r ps) = encode (r, ps)
   decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
 instance Serialise PmMatrix where
-  encode (MkPmMatrix s cs) = encode (s, cs)
-  decode = (\ (s, cs) -> MkPmMatrix s cs) <$> decode
+  encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
+  decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode
+deriving anyclass instance Serialise PmGroup
+deriving anyclass instance Serialise PmSynthetic
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind

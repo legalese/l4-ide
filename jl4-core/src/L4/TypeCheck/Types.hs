@@ -352,16 +352,30 @@ data CheckError =
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
+-- | Why a clause of a multi-clause group is never tried.
+data UnreachableClause
+  = AfterClauseMatchingAnything Int
+    -- ^ a clause above it matches every input; carries how many further
+    -- clauses after this one are unreachable for the same reason
+  | CoveredByClausesAbove
+    -- ^ every input it matches is matched by a clause above it
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
-  | PatternClausesMissing SrcRange Name [[Pattern Resolved]]
+  | PatternClausesMissing SrcRange Name Int [[Pattern Resolved]]
     -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
     -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the
     -- clause-head ranges (the warning anchor — never @\<no location\>@), the
-    -- group's head name for display, and one row per missing clause: one
+    -- group's head name for display, how many clauses it has, and one row per missing clause: one
     -- pattern per argument column, wildcard columns pre-substituted with the
     -- column's GIVEN name so the renderer is dumb.
+  | PatternClauseUnreachable SrcRange Name UnreachableClause
+    -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
+    -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
+    -- range, the group's head name for display, and why.
   | FixityIgnoredNonBinary RawName (Maybe SrcRange)
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
@@ -510,6 +524,10 @@ data ExpectationContext =
   -- | ExpectProjectionSelectorContext
   | ExpectIfConditionContext -- condition of if-then-else
   | ExpectPatternScrutineeContext (Expr Resolved) -- pattern type must match type of scrutinee
+  | ExpectClauseInputContext RawName Int
+    -- ^ a clause pattern of a multi-clause group must match the type of the
+    -- input it stands in for: the group's name, and the input's 1-based
+    -- position. See 'L4.TypeCheck.checkConsider'.
   | ExpectNotArgumentContext -- arg of NOT
   | ExpectPercentArgumentContext -- arg of '%'
   | ExpectConsArgument2Context -- second arg of cons
@@ -773,7 +791,8 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
-  rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
+  rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
+  rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead

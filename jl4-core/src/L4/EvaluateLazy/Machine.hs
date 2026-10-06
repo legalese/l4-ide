@@ -195,7 +195,7 @@ data Frame =
   | RestoreCurrentParty (Maybe Text) Bool
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
-  | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
+  | ConsiderWhen1 (Maybe PmGroup) Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
   | PatCons1 {- -} Reference Environment (Pattern Resolved)
@@ -1302,7 +1302,9 @@ preAllocateRef r = do
 
 data Config
   = ForwardMachine Environment (Expr Resolved)
-  | MatchBranchesMachine Reference Environment [Branch Resolved]
+  | MatchBranchesMachine (Maybe PmGroup) Reference Environment [Branch Resolved]
+    -- ^ the group, when the CONSIDER was generated from a multi-clause
+    -- definition's clauses (see 'NonExhaustivePatterns')
   | MatchPatternMachine Reference Environment (Pattern Resolved)
   | BackwardMachine WHNF
   | EvalRefMachine Reference
@@ -1315,9 +1317,15 @@ continueExpr :: Environment -> Expr Resolved -> Machine Config
 continueExpr env e = pure (ForwardMachine env e)
 {-# INLINE continueExpr #-}
 
-continueBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-continueBranches r env e = pure (MatchBranchesMachine r env e)
+continueBranches :: Maybe PmGroup -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+continueBranches g r env e = pure (MatchBranchesMachine g r env e)
 {-# INLINE continueBranches #-}
+
+-- | The multi-clause group a CONSIDER was generated from, if it was.
+consideredClauses :: Anno -> Maybe PmGroup
+consideredClauses ann = case view annPmSynthetic ann of
+  Just (PmConsider g _) -> Just g
+  _ -> Nothing
 
 continuePattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
 continuePattern r env pat = pure (MatchPatternMachine r env pat)
@@ -1470,9 +1478,9 @@ forwardExpr env = \ case
     desugarMultiWayIf :: [GuardedExpr Resolved] -> Expr Resolved -> Expr Resolved
     desugarMultiWayIf [] o = o
     desugarMultiWayIf (MkGuardedExpr _ann c f : es') o = IfThenElse emptyAnno c f $ desugarMultiWayIf es' o
-  Consider _ann e branches -> do
+  Consider ann e branches -> do
     rf <- allocate_ e env
-    continueBranches rf env branches
+    continueBranches (consideredClauses ann) rf env branches
   Lit _ann lit -> do
     rval <- runLit lit
     continueBackward rval
@@ -1780,7 +1788,7 @@ backward val = withPoppedFrame $ \ case
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
-  Just (ConsiderWhen1 _scrutinee e _branches env) -> do
+  Just (ConsiderWhen1 _clauses _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
         continueExpr (Map.union env' env) e
@@ -4178,22 +4186,22 @@ matchGivens' closureEnv ns f rs = do
         internalException $
           RuntimeTypeError "given signatures' values' lengths do not match"
 
-matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-matchBranches scrutinee _env [] = do
+matchBranches :: Maybe PmGroup -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+matchBranches clauses scrutinee _env [] = do
   -- The scrutinee has been forced by the failed branch matches, so we can
   -- usually show the actual value in the error instead of a heap reference.
   thunk <- readThunk scrutinee
-  userException $ NonExhaustivePatterns case thunk of
+  userException $ NonExhaustivePatterns clauses case thunk of
     WHNF val          -> Right val
     -- A context-dependent cache still holds the value the branches were
     -- matched against, so it names the scrutinee just as well as a plain
     -- 'WHNF'; we are inside that very force, so it cannot be stale here.
     WHNFWhen _ val _ _ -> Right val
     Unevaluated{}     -> Left scrutinee
-matchBranches _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
+matchBranches _clauses _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
   continueExpr env e
-matchBranches scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
-  pushFrame (ConsiderWhen1 scrutinee e branches env)
+matchBranches clauses scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
+  pushFrame (ConsiderWhen1 clauses scrutinee e branches env)
   continuePattern scrutinee env pat
 
 matchPattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
@@ -4223,8 +4231,8 @@ patternMatchFailure :: Machine Config
 patternMatchFailure = withPoppedFrame $ \ case
   Nothing ->
     internalException UnhandledPatternMatch
-  Just (ConsiderWhen1 scrutinee _ branches env) ->
-    continueBranches scrutinee env branches
+  Just (ConsiderWhen1 clauses scrutinee _ branches env) ->
+    continueBranches clauses scrutinee env branches
   -- we have unwound the frame that would reenter when scrutinizing the event
   Just (ContractFrame (Contract11 ActionDoesn'tmatch {..})) -> do
     -- P2b: the action pattern did not match; next event.
