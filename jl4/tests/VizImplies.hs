@@ -144,12 +144,12 @@ findDecide nm m =
 -- | The atom labels under a node, in source order.
 atomsOf :: V.IRExpr -> [Text]
 atomsOf = \case
-  V.UBoolVar _ nm _ _ _ _ -> [nm.label]
+  V.UBoolVar _ nm _ _ _ _ _ -> [nm.label]
   V.And _ es -> concatMap atomsOf es
   V.Or _ es -> concatMap atomsOf es
   V.Not _ e -> atomsOf e
   V.Implies _ p q _ -> atomsOf p <> atomsOf q
-  V.App _ _ es _ -> concatMap atomsOf es
+  V.App _ _ es _ _ -> concatMap atomsOf es
   _ -> []
 
 isOr :: V.IRExpr -> Bool

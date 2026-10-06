@@ -54,6 +54,7 @@ import qualified Hover
 import qualified SemanticTokens
 import qualified VizAutoRefresh
 import qualified VizImplies
+import qualified VizInline
 import qualified VizGuardedRows
 import qualified DmnExport
 import qualified RelationalExport
@@ -167,6 +168,7 @@ main = do
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     describe "viz" VizAutoRefresh.spec
     describe "viz implies" VizImplies.spec
+    describe "viz inline" VizInline.spec
     describe "viz guarded rows" VizGuardedRows.spec
     DmnExport.spec examplesRoot
     RelationalExport.spec examplesRoot

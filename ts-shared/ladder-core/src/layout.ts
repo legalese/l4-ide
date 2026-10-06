@@ -58,6 +58,10 @@ export interface Geometry {
   NOT_LABEL: number;
   NOT_BUBBLE: number; // output room for the inverter bubble
   NOT_R: number; // bubble radius
+  // Extra room between a NOT's negand and its bubble, so a FALSE leaf's open-contact break
+  // (drawn BREAK_CLEAR past the box, bars ±7) clears the bubble instead of poking out above
+  // and below it. 0 where the target draws no such glyph.
+  NOT_BREAK_ROOM: number;
   CONNECTIVE_GAP: number; // clearance between wire and connective text
   STRADDLE_MIN_WIDTH: number; // only wrap connectives wider than this
   // §25 IMPLIES — the seam, the changeover fork, and the two sinks
@@ -66,6 +70,13 @@ export interface Geometry {
   COIL_R: number; //   lamp radius
   COIL_SEP: number; // how far each lamp sits off the axis (green up, red down)
   COIL_LABEL: number; // room to the right of a lamp for "complies" / "in breach"
+  // CALL PANELS — a call drawn expanded in place (`And.call`). The NOT scope frame is the
+  // template: padding on every side, a name band at the top mirrored at the bottom so the
+  // ports stay on the axis, and wire stubs from the panel's edge to its contents.
+  PANEL_PAD_X: number; // room left and right of the contents
+  PANEL_PAD_Y: number; // room above and below the contents, past the name band
+  PANEL_LABEL: number; // the name band at the top (and its mirror at the bottom)
+  PANEL_FONT: number; //  the name's type size
 }
 
 /** The pixel geometry the SVG target has always used. */
@@ -88,6 +99,7 @@ export const PIXEL_GEOMETRY: Geometry = {
   NOT_LABEL: 16,
   NOT_BUBBLE: 20,
   NOT_R: 5,
+  NOT_BREAK_ROOM: 9, // BREAK_CLEAR 9 + bar 7 + stroke 1 + gap 2 + NOT_R 5 + ring 1 - NOT_PAD_X 16
   CONNECTIVE_GAP: 3,
   STRADDLE_MIN_WIDTH: 160,
   SEAM_W: 66,
@@ -95,6 +107,10 @@ export const PIXEL_GEOMETRY: Geometry = {
   COIL_R: 9,
   COIL_SEP: 40,
   COIL_LABEL: 74,
+  PANEL_PAD_X: 12,
+  PANEL_PAD_Y: 8,
+  PANEL_LABEL: 16,
+  PANEL_FONT: 11,
 };
 
 /**
@@ -188,6 +204,9 @@ interface Ctx {
    *  conducting on something nobody asserted, which is what `provisional` means. */
   strict: Map<NodeId, UBoolValue>;
   em: Map<NodeId, Energ> | null; // energization per node id, when showCurrent
+  /** How many EXPANDED call panels enclose the node being measured right now. A panel
+   *  records it as its `depth`; `measurePanel` raises it around its contents. */
+  panelNest: number;
 }
 
 const isOperative = (e: IRExpr): boolean => e.$type !== "InertE";
@@ -443,12 +462,19 @@ interface Energ {
 /** Current-flow propagation from the source (DESIGN §20). A node CONDUCTS when its
  *  value is TRUE (inert conducts trivially); energization (current reaches a port)
  *  flows top-down — a series stops at the first non-conducting child; an OR's output
- *  closes iff some branch conducts. Fills `em` for every node id. */
+ *  closes iff some branch conducts. Fills `em` for every node id.
+ *
+ *  `overrides` holds the ids that carry a value of their own in the valuation the layout
+ *  reads (after `dropOpenPanels`). An AND or OR among them is an override (DESIGN §19): it
+ *  conducts by its own value, as a leaf does, and its children are still energized for
+ *  their own entries but do not decide its output. Without this a folded call answered
+ *  "as a whole" turned its box green while the circuit followed the hidden contents. */
 function energize(
   e: IRExpr,
   inE: boolean,
   values: Map<NodeId, UBoolValue>,
   em: Map<NodeId, Energ>,
+  overrides: ReadonlyMap<NodeId, UBoolValue>,
 ): void {
   const conducts = (n: IRExpr) =>
     n.$type === "InertE" ? true : values.get(n.id) === "TrueV";
@@ -456,10 +482,10 @@ function energize(
   if (e.$type === "And") {
     let cur = inE;
     for (const a of e.args) {
-      energize(a, cur, values, em);
+      energize(a, cur, values, em, overrides);
       cur = em.get(a.id)!.outE; // current after this child (false past the first non-conductor)
     }
-    outE = e.args.length ? cur : inE;
+    outE = overrides.has(e.id) ? inE && conducts(e) : e.args.length ? cur : inE;
   } else if (e.$type === "Or") {
     let any = false;
     for (const a of e.args) {
@@ -467,19 +493,19 @@ function energize(
         em.set(a.id, { inE, outE: inE });
         continue;
       }
-      energize(a, inE, values, em); // every operative branch sees the OR's input
+      energize(a, inE, values, em, overrides); // every operative branch sees the OR's input
       if (em.get(a.id)!.outE) any = true;
     }
-    outE = inE && any;
+    outE = inE && (overrides.has(e.id) ? conducts(e) : any);
   } else if (e.$type === "Not") {
-    energize(e.negand, inE, values, em);
+    energize(e.negand, inE, values, em, overrides);
     outE = inE && values.get(e.id) === "TrueV";
   } else if (e.$type === "Implies") {
     // The scope sees the rule's own input. The requirement sees current ONLY IF the
     // scope conducts — which is exactly why vacuity needs no bypass: when the scope
     // is open, nothing downstream is energized and NEITHER lamp lights (§25.4).
-    energize(e.scope, inE, values, em);
-    energize(e.requirement, em.get(e.scope.id)!.outE, values, em);
+    energize(e.scope, inE, values, em, overrides);
+    energize(e.requirement, em.get(e.scope.id)!.outE, values, em, overrides);
     outE = inE && values.get(e.id) === "TrueV"; // the node's own truth (¬P ∨ Q)
   } else {
     outE = inE && conducts(e);
@@ -779,7 +805,13 @@ function inertInline(
 /** A cubic Bézier connector with horizontal tangents (leaves the source rightward,
  *  enters the target from the left) — the Layman / box-model fan (DESIGN §17a). */
 type Curve = Extract<ScenePrim, { kind: "curve" }>;
-function hCurve(from: Pt, to: Pt, state: State, A: Axis = LR_AXIS): Curve {
+function hCurve(
+  from: Pt,
+  to: Pt,
+  state: State,
+  A: Axis = LR_AXIS,
+  reach?: number,
+): Curve {
   // Control-point reach = how far the curve stays HORIZONTAL out of each port before it
   // banks toward the bus. A stronger reach reads as a deliberate thrust off the box rather
   // than an immediate diagonal — the fan looks sprung, not slack. The vertical-spread term
@@ -790,7 +822,9 @@ function hCurve(from: Pt, to: Pt, state: State, A: Axis = LR_AXIS): Curve {
   // rotated with everything else.
   const dMain = Math.abs(A.mainOf(to) - A.mainOf(from));
   const dCross = Math.abs(A.crossOf(to) - A.crossOf(from));
-  const t = Math.min(120, Math.max(dMain * 0.75, dCross * 0.55, 30));
+  // `reach`, when given, replaces the sprung thrust: a fan that must stay inside its bus
+  // lane (an OR with a call panel among its branches) passes half the lane's width.
+  const t = reach ?? Math.min(120, Math.max(dMain * 0.75, dCross * 0.55, 30));
   return {
     kind: "curve",
     from,
@@ -830,7 +864,8 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     const BR = k.NOT_R; // bubble radius
     const BUB = k.NOT_BUBBLE; // output room for the bubble
     const band = LBL + NPY; // symmetric top/bottom so the port stays centred
-    const framW = inner.w + 2 * NPX;
+    // the frame's right padding also holds the negand's own break, clear of the bubble
+    const framW = inner.w + 2 * NPX + k.NOT_BREAK_ROOM;
     const w = framW + BUB;
     const h = inner.h + 2 * band;
     return {
@@ -878,10 +913,16 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
             trueConducts(ctx.gvalues, e.negand),
           ),
         });
+        // The bubble carries the NOT's OUTPUT value so the renderer can fill it (Meng,
+        // 2026-10-05): a false negand makes the NOT true, a true one makes it false. Honest
+        // values, as for box ink. Omitted while unknown, which keeps every unanswered
+        // scene exactly as it was.
+        const out3 = ctx.values.get(e.id);
         out.push({
           kind: "glyph",
           at: { x: bubbleX, y: cy },
           role: "inverter",
+          ...(out3 === "TrueV" || out3 === "FalseV" ? { value: out3 } : {}),
         });
         // past the bubble = INVERTED (closes iff the inside is open)
         out.push({
@@ -955,7 +996,158 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     );
   }
 
+  if (e.$type === "And" && e.call) return measurePanel(e, ctx);
   return e.$type === "And" ? measureAnd(e, ctx) : measureOr(e, ctx);
+}
+
+/** Is this node a call panel (a call drawn expanded in place)? */
+const isPanel = (e: IRExpr): e is And => e.$type === "And" && e.call === true;
+
+/** The children of a node, whatever its kind. */
+function kidsOf(e: IRExpr): readonly IRExpr[] {
+  if (e.$type === "And" || e.$type === "Or") return e.args;
+  if (e.$type === "Not") return [e.negand];
+  if (e.$type === "Implies") return [e.scope, e.requirement];
+  return [];
+}
+
+/** Does this subtree DRAW a call panel under the current folds? A folded group draws a
+ *  placeholder box and nothing inside it. */
+function drawsPanel(e: IRExpr, fold: ReadonlySet<NodeId>): boolean {
+  if (fold.has(e.id)) return false;
+  return isPanel(e) || kidsOf(e).some((k) => drawsPanel(k, fold));
+}
+
+/** Every call panel that is NOT folded — it would be drawn open if its ancestors were. */
+function openPanelIds(
+  e: IRExpr,
+  fold: ReadonlySet<NodeId>,
+  out: Set<NodeId> = new Set(),
+): Set<NodeId> {
+  if (isPanel(e) && !fold.has(e.id)) out.add(e.id);
+  kidsOf(e).forEach((k) => openPanelIds(k, fold, out));
+  return out;
+}
+
+/**
+ * A valuation without its entries on OPEN call panels. A value on a group is an override
+ * (DESIGN §19): the group takes it and its children are not consulted. On a FOLDED panel
+ * that is the point — the box is the call as a whole, and the reader can answer it as one.
+ * On an OPEN panel it would make the circuit conduct (or not) through a panel whose drawn
+ * contents say otherwise, with nothing on the panel to show why. So an override on a panel
+ * holds only while the panel is folded: opening it sets the value aside (the contents
+ * decide), and folding it again brings it back. Callers may therefore spread a value over
+ * every copy of a call, folded or not (`spreadValue`), and the picture stays honest.
+ */
+function dropOpenPanels(
+  val: ReadonlyMap<NodeId, UBoolValue>,
+  open: ReadonlySet<NodeId>,
+): ReadonlyMap<NodeId, UBoolValue> {
+  if (![...open].some((id) => val.has(id))) return val;
+  const out = new Map(val);
+  open.forEach((id) => out.delete(id));
+  return out;
+}
+
+/** Levels of call panels in a tree, folds ignored (`Scene.panelDepth`). */
+function panelLevels(e: IRExpr): number {
+  const below = Math.max(0, ...kidsOf(e).map(panelLevels));
+  return isPanel(e) ? below + 1 : below;
+}
+
+/**
+ * A CALL PANEL — a call drawn expanded in place: the called rule's body, with the call's
+ * actual arguments substituted, inside a filled rounded box named after the call as written.
+ *
+ * Measured like the NOT scope frame (DESIGN §21): padding on every side, a name band at the
+ * top, the same band mirrored at the bottom so the ports sit on the panel's own axis (a series
+ * joins its children port to port with a straight wire, so an off-centre port would draw a
+ * slant), and wire stubs carrying current from the panel's edge to its contents and back.
+ * The panel is at least as wide as its name, with the contents centred when the name is wider.
+ *
+ * Not drawn here: the shade. The panel prim carries `depth` and the scene carries
+ * `panelDepth`, and the renderer turns the pair into a colour, so a palette change never
+ * needs a re-layout.
+ */
+function measurePanel(e: And, ctx: Ctx): Measured {
+  const { tm, k } = ctx;
+  const { PANEL_PAD_X, PANEL_PAD_Y, PANEL_LABEL, PANEL_FONT } = k;
+  const depth = ctx.panelNest;
+  ctx.panelNest = depth + 1;
+  const inner = measureAnd(e, ctx);
+  ctx.panelNest = depth;
+  const label = e.label ?? foldLabel(e);
+  const name = `▾ ${label}`;
+  const band = PANEL_LABEL + PANEL_PAD_Y;
+  const w = Math.max(
+    inner.w + 2 * PANEL_PAD_X,
+    tm.width(name, PANEL_FONT) + 2 * PANEL_PAD_X,
+  );
+  const h = inner.h + 2 * band;
+  const TB = ctx.axis.orient === "TB";
+  return {
+    w,
+    h,
+    state: inner.state,
+    emit(ox, oy, out) {
+      out.push({
+        kind: "panel",
+        id: e.id,
+        at: { x: ox, y: oy },
+        w,
+        h,
+        depth,
+        label,
+      });
+      out.push({
+        kind: "text",
+        at: { x: ox + PANEL_PAD_X, y: oy + PANEL_LABEL - 1 },
+        text: name,
+        anchor: "start",
+        state: "inert",
+        tag: "panel",
+        size: PANEL_FONT,
+        id: e.id,
+        act: { t: "fold", id: e.id },
+      });
+      const ix = ox + (w - inner.w) / 2;
+      const p = inner.emit(ix, oy + band, out);
+      // The stubs leave the contents the way their ports face: sideways across the padding
+      // when a port is on the contents' left or right edge (every LR layout, and an OR in TB,
+      // which is still drawn LR), vertically only when it is on the top or bottom edge (a TB
+      // series). A vertical stub crosses the name band; TB panels are not designed yet.
+      const side = (pt: Pt) =>
+        Math.abs(pt.x - ix) < 0.5 || Math.abs(pt.x - (ix + inner.w)) < 0.5;
+      const edgeIn: Pt =
+        TB && !side(p.inPort)
+          ? { x: p.inPort.x, y: oy }
+          : { x: ox, y: p.inPort.y };
+      const edgeOut: Pt =
+        TB && !side(p.outPort)
+          ? { x: p.outPort.x, y: oy + h }
+          : { x: ox + w, y: p.outPort.y };
+      out.push({
+        kind: "wire",
+        path: [edgeIn, p.inPort],
+        role: "rung",
+        state: "inert",
+        flow: flowFor(ctx.em, !!ctx.em?.get(e.id)?.inE, false),
+      });
+      out.push({
+        kind: "wire",
+        path: [p.outPort, edgeOut],
+        role: "rung",
+        state: "inert",
+        flow: flowFor(
+          ctx.em,
+          !!ctx.em?.get(e.id)?.outE,
+          trueConducts(ctx.gvalues, e),
+          provisionalConducts(ctx, e),
+        ),
+      });
+      return { inPort: edgeIn, outPort: edgeOut };
+    },
+  };
 }
 
 /** AND: series, children centered vertically. Inert children render inline and
@@ -1075,6 +1267,13 @@ function measureOr(e: Or, ctx: Ctx): Measured {
     gapLabel.reduce((s, _, k) => s + gapH(k), 0);
   const band = head ? lineH + HEAD_PAD : 0;
   const h = stackH + 2 * band;
+  // A branch that draws a call panel fills its whole row edge to edge, so the sprung fan —
+  // which banks across the column on its way to a narrower, centred branch — cuts that
+  // panel's corner (measured 2026-10-05: 9.6px into `qualifies by self-employment a` with
+  // `has qualifying skills a` folded). Such an OR keeps its fan inside the bus lanes, which
+  // no branch enters, and runs a straight stub from the lane to each branch's port. An OR
+  // with no panel below it is drawn exactly as before.
+  const lanes = rungs.some((r) => drawsPanel(r.node, ctx.vs.foldSet));
 
   return {
     w: totalW,
@@ -1113,14 +1312,40 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         const local = trueConducts(ctx.gvalues, node); // this branch is a closed contact
         const tentative = provisionalConducts(ctx, node); // …on a rebuttable presumption (§22)
         const leaderOut = !!ctx.em?.get(node.id)?.outE;
-        const inCurve = hCurve(groupIn, p.inPort, m.state);
+        const inFlow = flowFor(ctx.em, leaderIn, local, tentative);
+        const outFlow = flowFor(ctx.em, leaderOut, local, tentative);
+        const laneIn: Pt = { x: leftX + BUS_PAD, y: p.inPort.y };
+        const laneOut: Pt = { x: rightX - BUS_PAD, y: p.outPort.y };
+        const inCurve = lanes
+          ? hCurve(groupIn, laneIn, m.state, LR_AXIS, BUS_PAD / 2)
+          : hCurve(groupIn, p.inPort, m.state);
         inCurve.act = fold;
-        inCurve.flow = flowFor(ctx.em, leaderIn, local, tentative);
+        inCurve.flow = inFlow;
         out.push(inCurve);
-        const outCurve = hCurve(p.outPort, groupOut, m.state);
+        const outCurve = lanes
+          ? hCurve(laneOut, groupOut, m.state, LR_AXIS, BUS_PAD / 2)
+          : hCurve(p.outPort, groupOut, m.state);
         outCurve.act = fold;
-        outCurve.flow = flowFor(ctx.em, leaderOut, local, tentative);
+        outCurve.flow = outFlow;
         out.push(outCurve);
+        if (lanes && p.inPort.x > laneIn.x)
+          out.push({
+            kind: "wire",
+            path: [laneIn, p.inPort],
+            role: "rung",
+            state: "inert",
+            act: fold,
+            flow: inFlow,
+          });
+        if (lanes && p.outPort.x < laneOut.x)
+          out.push({
+            kind: "wire",
+            path: [p.outPort, laneOut],
+            role: "rung",
+            state: "inert",
+            act: fold,
+            flow: outFlow,
+          });
         // Break on the fan only when the rung has not already drawn its own (a dead LEAF
         // marks itself, so a second glyph here would double-report one failure). A dead
         // GROUP still gets one: it says "this whole branch is out", and the interior break
@@ -1363,7 +1588,9 @@ export function layout(
   // Two axes, applied in order, and the order matters: dropping a TYPICALLY default
   // turns its leaf back into an open question, which GROUNDING may then answer. Run
   // them the other way and a stripped default would never be reachable by the knob.
-  const valuation = effectiveValuation(vs);
+  // An override on an OPEN call panel is set aside (see `dropOpenPanels`).
+  const open = openPanelIds(fn.body, vs.foldSet);
+  const valuation = dropOpenPanels(effectiveValuation(vs), open);
   const values = new Map<NodeId, UBoolValue>();
   nodeValue(fn.body, valuation, values);
   const { values: gvalues, assumed } = groundValues(
@@ -1376,11 +1603,11 @@ export function layout(
   // measures against. Cheap (one more three-valued walk) and it is the only formulation
   // that catches an assumption contributing through a NOT or through vacuity.
   const strict = new Map<NodeId, UBoolValue>();
-  nodeValue(fn.body, vs.valuation, strict);
+  nodeValue(fn.body, dropOpenPanels(vs.valuation, open), strict);
   const em = vs.showCurrent ? new Map<NodeId, Energ>() : null;
   // Current flows under the READING, not under the bare facts — that is what makes the
   // knob visible at all. Render state below still reads `values`.
-  if (em) energize(fn.body, true, gvalues, em);
+  if (em) energize(fn.body, true, gvalues, em, valuation);
   const ctx: Ctx = {
     vs,
     tm,
@@ -1391,6 +1618,7 @@ export function layout(
     assumed,
     strict,
     em,
+    panelNest: 0,
   };
   const m = measure(fn.body, ctx);
   const ox = MARGIN + LEAD;
@@ -1493,11 +1721,13 @@ export function layout(
   // shape that could still poke out — a body whose out-port sits at its very bottom edge
   // — and costs nothing when it does not.
   const bottom = head ? Math.max(oy + m.h, outPort.y + head.h / 2) : oy + m.h;
+  const panelDepth = panelLevels(fn.body);
   return {
     size: { w, h: bottom + MARGIN },
     prims,
     complete,
     provisional,
+    ...(panelDepth > 0 ? { panelDepth } : {}),
   };
 }
 

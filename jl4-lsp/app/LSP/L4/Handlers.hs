@@ -51,7 +51,6 @@ import LSP.Core.Types.Location
 import qualified LSP.L4.Viz.Ladder as Ladder
 import qualified LSP.L4.Viz.CustomProtocol as Ladder
 import LSP.L4.Viz.CustomProtocol (LadderRequestParams)
-import qualified LSP.L4.Viz.QueryPlan as VizQueryPlan
 import LSP.Logger
 import qualified Language.LSP.Protocol.Lens as J
 import Language.LSP.Protocol.Message
@@ -308,14 +307,16 @@ handlers evalConfig recorder =
         logWith recorder Debug $ LogExecutingCommand cid
         runExceptT case lookup cid (map swap l4CmdNames) of
           Just CmdVisualize -> do
+            -- Arguments: [verDocId] (auto-refresh), [verDocId, srcPos, simplify],
+            -- or [verDocId, srcPos, simplify, {"expandCalls": true}]
+            -- ('decodeVisualiseArgs', 'VisualiseOptions' in LSP.L4.Actions).
             let decodeXdata
                   | Just ((Aeson.fromJSON -> Aeson.Success verTextDocId) :  args) <- xdata
-                  , msrcPos <- case args of
-                     [GFromJSON srcPos, Aeson.fromJSON -> Aeson.Success simplify] -> Just (srcPos, simplify)
-                     _ -> Nothing
-                  = do
-                    mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
-                    visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
+                  = case decodeVisualiseArgs args of
+                      Left err -> defaultResponseError err
+                      Right msrcPos -> do
+                        mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
+                        visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
                   | otherwise = defaultResponseError $ "Failed to decode request data: " <> LazyText.toStrict (Aeson.encodeToLazyText xdata)
             decodeXdata
 
@@ -702,17 +703,17 @@ handlers evalConfig recorder =
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.InlineExprsMethodName)) $ \ide params ->
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.InlineExprsMethodName) params ide $
           \(ieParams :: Ladder.InlineExprsRequestParams) _tcRes recentViz ->
-            let postInliningDecide = Ladder.inlineExprs recentViz.vizState recentViz.decide ieParams.uniques
-            in MkVizHandler $
-              case Ladder.doVisualize postInliningDecide (Ladder.getVizConfig recentViz.vizState) of
-                Right (vizProgramInfo, vizState) -> do
+            MkVizHandler $
+              case renderAfterInlining recentViz.vizState recentViz.decide ieParams.uniques of
+                Right (postInliningDecide, vizProgramInfo, vizState, rawInfo) -> do
                   -- Update RecentlyVisualized's decide with the latest vizState and postInliningDecide,
                   -- so that they can be used for further l4/inlineExprs requests.
                   -- (The usecase here: think of a Decide with multiple inline-able Uniques,
                   -- and where user does the inlining in stages.)
                   -- IMPT: The state synchronization / managing of state (re the stuff in RecentlyVisualized etc) feels potentially complicated:
                   -- I definitely have NOT thought through it carefully.
-                  liftIO $ atomically $ setMostRecentVisualisation ide $ recentViz {vizState = vizState, decide = postInliningDecide}
+                  liftIO $ atomically $ setMostRecentVisualisation ide $ recentViz {vizState = vizState, decide = postInliningDecide, ladderInfo = rawInfo}
+                  -- Already in the atomId namespace of "Show decision graph".
                   pure $ Aeson.toJSON vizProgramInfo
                 Left vizError ->
                   defaultResponseError $ Text.unlines
@@ -724,24 +725,13 @@ handlers evalConfig recorder =
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.QueryPlanMethodName)) $ \ide params ->
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.QueryPlanMethodName) params ide $
           \(qpParams :: Ladder.QueryPlanRequestParams) _tcRes recentViz -> do
-            let vizConfig = Ladder.getVizConfig recentViz.vizState
-            MkVizHandler $
-              case Ladder.doVisualize recentViz.decide vizConfig of
-                Right (vizProgramInfo, vizState) ->
-                  let paramsByUnique =
-                        VizQueryPlan.buildParamsByUnique vizProgramInfo
-                      flatBindings = Map.toList qpParams.bindings
-                      result = VizQueryPlan.queryPlanFromLadder qpParams.fnName paramsByUnique vizProgramInfo vizState flatBindings
-                  in do
-                    logWith recorder Debug $
-                      LogHandlingCustomRequest qpParams.verDocId._uri
-                        ("Query plan for: " <> qpParams.fnName)
-                    pure $ Aeson.toJSON result
-                Left vizError ->
-                  defaultResponseError $ Text.unlines
-                    [ "Could not compute query plan:"
-                    , Ladder.prettyPrintVizError vizError
-                    ]
+            -- Planned from the ladder last drawn, not drawn again (see 'queryPlanForRecent').
+            let result = queryPlanForRecent recentViz qpParams.fnName (Map.toList qpParams.bindings)
+            MkVizHandler $ do
+              logWith recorder Debug $
+                LogHandlingCustomRequest qpParams.verDocId._uri
+                  ("Query plan for: " <> qpParams.fnName)
+              pure $ Aeson.toJSON result
 
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.EvalDirectiveResultMethodName)) $ \ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.EvalDirectiveResultParams
@@ -1155,6 +1145,8 @@ data L4Cmd
   | CmdStateGraph
   deriving stock (Eq, Show, Enum, Bounded)
 
+-- | @l4.visualize@ takes an optional fourth argument, @{"expandCalls": true}@,
+-- for call expansions; see 'decodeVisualiseArgs' and 'VisualiseOptions'.
 l4CmdNames :: [(L4Cmd, Text)]
 l4CmdNames =
   [ (CmdVisualize, "l4.visualize")

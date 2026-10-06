@@ -1,0 +1,17 @@
+-- Termination, not correctness: a recursive rule is never unfolded (it would
+-- not stop), so a rule that calls it must still be analysed, with the call as
+-- a leaf. A regression here hangs the suite.
+
+GIVEN xs IS A LIST OF BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `all hold` xs IS
+    CONSIDER xs
+    WHEN EMPTY THEN TRUE
+    WHEN x FOLLOWED BY rest THEN x AND `all hold` rest
+
+GIVEN xs IS A LIST OF BOOLEAN
+      b  IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `all hold and b` xs b IF
+        `all hold` xs
+    AND b

@@ -42,9 +42,12 @@
  *     that a CSS transform inside an `<svg>` resolves in user units, and seam S6's row in
  *     E1-IDE-INTEGRATION.md records that as a correction to the plan. If it overshoots, the
  *     code and that spec row are wrong TOGETHER and must be retracted together.
- *  3. `npm run playground -w @repo/ladder-svg`, paste an inert-style module: hydration still
- *     splices, `lad-ref` dotting still appears (that is `onRender` working), collapse still
- *     works, the sentence list still updates.
+ *  3. `npm run playground -w @repo/ladder-svg` against a jl4-lsp that sends call expansions,
+ *     pick a "call panels" example: each call is drawn in place inside a shaded panel on a
+ *     deep backdrop that reaches the edges of the pane (that is `onRender` working); a
+ *     panel's name folds it and the ▸ caret reopens it; a click on a box changes every box
+ *     that is the same proposition and no other; collapse still works, the sentence list
+ *     still updates.
  *  4. `npm run dev -w l4-ladder-visualizer`: `LadderSvg` renders beside `Flow`; the header
  *     shows a VERDICT word, not "evaluates to …"; the sidebar assigns T/F/? and the picture
  *     follows; reset works; a repeated atom changes in BOTH positions.
@@ -65,7 +68,7 @@ import type {
 } from "@repo/ladder-core";
 import { sceneToSvg } from "./svg.js";
 import { canvasMetrics } from "./metrics.js";
-import { paletteFor } from "./palette.js";
+import { paletteFor, panelBackdrop } from "./palette.js";
 import type { Palette } from "./palette.js";
 import {
   DEFAULT_LIMITS,
@@ -105,9 +108,10 @@ export interface LadderControllerOpts {
   readonly onAct?: (act: ClickAct) => void;
   /**
    * Called immediately after the new `<svg>` is in the host and sized, BEFORE the FLIP
-   * invert. The one hook a host needs to decorate individual nodes it cannot express as a
-   * `ViewSpec`: `standalone/playground.ts` marks `lad-ref` / `lad-hydrated` this way. Do not
-   * mutate geometry here — the FLIP baseline has already been captured.
+   * invert. The one hook a host needs for what it cannot express as a `ViewSpec`.
+   * `standalone/playground.ts` uses it to paint its pane the diagram's panel backdrop, so
+   * no white frame shows around a diagram with call panels. Do not mutate geometry here —
+   * the FLIP baseline has already been captured.
    */
   readonly onRender?: (svg: SVGSVGElement, scene: Scene) => void;
 }
@@ -254,9 +258,10 @@ export class LadderController {
    * frame. By default this invalidates the FLIP baseline and refits, because a different
    * tree has no meaningful correspondence with the old one.
    *
-   * `keepBaseline` is for the case where it does: `standalone/playground.ts` rebuilds its
-   * display tree on EVERY render (hydration splices a referenced DECIDE in place), and there
-   * the FLIP is exactly the affordance that shows what happened.
+   * `keepBaseline` is for the case where it does. `standalone/playground.ts` calls this on
+   * every render with one decoded tree that holds every call panel, passing `true` except
+   * for a newly chosen decision, so folding or opening a panel FLIPs from the scene before
+   * it, which is exactly the affordance that shows what happened.
    */
   setFunDecl(fn: FunDecl, keepBaseline = false): void {
     this.#fn = fn;
@@ -301,7 +306,7 @@ export class LadderController {
     const svg = this.#host.querySelector("svg");
     this.#svg = svg as SVGSVGElement | null;
     if (this.#svg) {
-      this.#applySizing(this.#svg);
+      this.#applySizing(this.#svg, scene);
       if (this.#panZoom) {
         const vp = this.#viewport();
         if (vp.w > 0 && vp.h > 0) {
@@ -323,7 +328,7 @@ export class LadderController {
     this.#lastScene = scene;
   }
 
-  #applySizing(svg: SVGSVGElement): void {
+  #applySizing(svg: SVGSVGElement, scene: Scene): void {
     if (this.#panZoom) {
       // `height:auto` is incompatible with a viewBox-driven zoom: the element needs a fixed
       // viewport for the viewBox to mean anything, so the host supplies the height.
@@ -337,7 +342,11 @@ export class LadderController {
       // FIT_PAD on each side and `clampBox` permits CLAMP_MARGIN of overscroll, and those
       // bands would show the host page through. Painting the live element (not the emitted
       // string, which stays byte-identical) closes them.
-      svg.style.background = this.#pal.bg;
+      // A diagram with call panels sits one step below its outermost panel, and the emitted
+      // backdrop says so (`sceneToSvg`); the overscroll bands must match it.
+      svg.style.background = scene.panelDepth
+        ? panelBackdrop(this.#pal, scene.panelDepth)
+        : this.#pal.bg;
     } else {
       svg.style.maxWidth = "100%";
       svg.style.height = "auto";
@@ -465,8 +474,9 @@ export class LadderController {
       el.getAttribute("data-value"),
       el.getAttribute("data-fold"),
     );
-    // the controller REPORTS an act; it never interprets one. `playground.ts` branches on
-    // its own hydration sets inside `onAct`, and that is the split EMBEDDABLE §3.2 draws.
+    // the controller REPORTS an act; it never interprets one. `playground.ts` spreads a
+    // value over every copy of a proposition inside `onAct`, and that is the split
+    // EMBEDDABLE §3.2 draws.
     if (act) this.#onAct?.(act);
   };
 

@@ -434,7 +434,7 @@ ladderNodeCount budget root = go 0 [root]
       VizExpr.Or _ xs -> xs
       VizExpr.Not _ x -> [x]
       VizExpr.Implies _ s r _ -> [s, r]
-      VizExpr.App _ _ args _ -> args
+      VizExpr.App _ _ args _ _ -> args
       VizExpr.UBoolVar{} -> []
       VizExpr.TrueE{} -> []
       VizExpr.FalseE{} -> []

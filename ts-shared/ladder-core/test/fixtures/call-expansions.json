@@ -1,0 +1,2703 @@
+{
+  "_captured": "jl4-lsp built from mengwong/ladder-call-panels (170f7a0c4 plus the uncommitted opt-in change to l4.visualize), 2026-10-06; every \"Show decision graph\" lens of each module, sent with the options argument {\"expandCalls\": true}",
+  "_how": "Each funDecls array is the funDecl of every reply, in lens order, verbatim from the wire (ladder/fetch-expand.mts of session ed4dacbb, sources ladder/<module>.l4 there). Nothing is edited by hand. call-expansions.leaf-baseline.json is what the decoder before the call-panels change (3e012727c) makes of these same arrays.",
+  "modules": {
+    "joint": {
+      "source": "joint.l4",
+      "funDecls": [
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "1da7638a-d568-5afc-8c7b-0208af37fb8e",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "p's `has stable income`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "Not",
+                "id": {
+                  "id": 162
+                },
+                "negand": {
+                  "$type": "UBoolVar",
+                  "atomId": "0bd23d82-3407-5c80-98df-1b482118f77f",
+                  "canInline": false,
+                  "id": {
+                    "id": 163
+                  },
+                  "name": {
+                    "label": "p's `has recent default`",
+                    "unique": 164
+                  },
+                  "typically": null,
+                  "value": "UnknownV"
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`is creditworthy`",
+            "unique": 5
+          },
+          "params": [
+            {
+              "label": "p",
+              "unique": 6
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "d1b523f8-7c1d-500c-80fb-96c9277e1e6e",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "677db0bf-bbd2-549f-a13f-713f33d61b39",
+                      "canInline": false,
+                      "id": {
+                        "id": 163
+                      },
+                      "name": {
+                        "label": "a's `has stable income`",
+                        "unique": 164
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "Not",
+                      "id": {
+                        "id": 165
+                      },
+                      "negand": {
+                        "$type": "UBoolVar",
+                        "atomId": "87c17776-824a-52ef-aa8c-5c5ef49934fa",
+                        "canInline": false,
+                        "id": {
+                          "id": 166
+                        },
+                        "name": {
+                          "label": "a's `has recent default`",
+                          "unique": 167
+                        },
+                        "typically": null,
+                        "value": "UnknownV"
+                      }
+                    }
+                  ],
+                  "id": {
+                    "id": 162
+                  }
+                },
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "`is creditworthy` OF a",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "5674d857-283f-5964-a995-b591b8579c25",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "b90be2ed-055b-59f0-8279-13161702a7f4",
+                      "canInline": false,
+                      "id": {
+                        "id": 171
+                      },
+                      "name": {
+                        "label": "b's `has stable income`",
+                        "unique": 172
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "Not",
+                      "id": {
+                        "id": 173
+                      },
+                      "negand": {
+                        "$type": "UBoolVar",
+                        "atomId": "437ca535-2f88-52cb-9f2c-e387c2bc7f45",
+                        "canInline": false,
+                        "id": {
+                          "id": 174
+                        },
+                        "name": {
+                          "label": "b's `has recent default`",
+                          "unique": 175
+                        },
+                        "typically": null,
+                        "value": "UnknownV"
+                      }
+                    }
+                  ],
+                  "id": {
+                    "id": 170
+                  }
+                },
+                "id": {
+                  "id": 168
+                },
+                "name": {
+                  "label": "`is creditworthy` OF b",
+                  "unique": 169
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "Or",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "627b865d-768e-55b8-afea-9100cc294c3a",
+                    "canInline": false,
+                    "id": {
+                      "id": 177
+                    },
+                    "name": {
+                      "label": "a's `has collateral`",
+                      "unique": 178
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "7928a2c2-832f-5c14-8c68-61e1a89aa0b0",
+                    "canInline": false,
+                    "id": {
+                      "id": 179
+                    },
+                    "name": {
+                      "label": "b's `has collateral`",
+                      "unique": 180
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "d1b523f8-7c1d-500c-80fb-96c9277e1e6e",
+                    "canInline": true,
+                    "expansion": {
+                      "$type": "And",
+                      "args": [
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "677db0bf-bbd2-549f-a13f-713f33d61b39",
+                          "canInline": false,
+                          "id": {
+                            "id": 184
+                          },
+                          "name": {
+                            "label": "a's `has stable income`",
+                            "unique": 185
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        },
+                        {
+                          "$type": "Not",
+                          "id": {
+                            "id": 186
+                          },
+                          "negand": {
+                            "$type": "UBoolVar",
+                            "atomId": "87c17776-824a-52ef-aa8c-5c5ef49934fa",
+                            "canInline": false,
+                            "id": {
+                              "id": 187
+                            },
+                            "name": {
+                              "label": "a's `has recent default`",
+                              "unique": 188
+                            },
+                            "typically": null,
+                            "value": "UnknownV"
+                          }
+                        }
+                      ],
+                      "id": {
+                        "id": 183
+                      }
+                    },
+                    "id": {
+                      "id": 181
+                    },
+                    "name": {
+                      "label": "`is creditworthy` OF a",
+                      "unique": 182
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "id": {
+                  "id": 176
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`may lend jointly`",
+            "unique": 7
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 8
+            },
+            {
+              "label": "b",
+              "unique": 9
+            }
+          ]
+        }
+      ]
+    },
+    "passthru": {
+      "source": "passthru.l4",
+      "funDecls": [
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "dea213c5-31f7-50e1-8d32-a4bc5edd61d7",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "p",
+                  "unique": 5
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8",
+                "canInline": false,
+                "id": {
+                  "id": 161
+                },
+                "name": {
+                  "label": "q",
+                  "unique": 6
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "limb",
+            "unique": 4
+          },
+          "params": [
+            {
+              "label": "p",
+              "unique": 5
+            },
+            {
+              "label": "q",
+              "unique": 6
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "App",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "0dcba61b-410b-597f-8b7f-bda14197c3f7",
+                    "canInline": false,
+                    "id": {
+                      "id": 161
+                    },
+                    "name": {
+                      "label": "a",
+                      "unique": 9
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "4c05f754-029c-5364-a4f7-748554c5769b",
+                    "canInline": false,
+                    "id": {
+                      "id": 162
+                    },
+                    "name": {
+                      "label": "b",
+                      "unique": 10
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "atomId": "c99a35cd-fae7-5145-9454-5d19123c2166",
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "0dcba61b-410b-597f-8b7f-bda14197c3f7",
+                      "canInline": false,
+                      "id": {
+                        "id": 164
+                      },
+                      "name": {
+                        "label": "a",
+                        "unique": 9
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "4c05f754-029c-5364-a4f7-748554c5769b",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "b",
+                        "unique": 10
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 163
+                  }
+                },
+                "fnName": {
+                  "label": "limb OF a, b",
+                  "unique": 160
+                },
+                "id": {
+                  "id": 160
+                }
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "0dcba61b-410b-597f-8b7f-bda14197c3f7",
+                "canInline": false,
+                "id": {
+                  "id": 166
+                },
+                "name": {
+                  "label": "a",
+                  "unique": 9
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`pass through`",
+            "unique": 8
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 9
+            },
+            {
+              "label": "b",
+              "unique": 10
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "1da7638a-d568-5afc-8c7b-0208af37fb8e",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "p's `has stable income`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "Not",
+                "id": {
+                  "id": 162
+                },
+                "negand": {
+                  "$type": "UBoolVar",
+                  "atomId": "0bd23d82-3407-5c80-98df-1b482118f77f",
+                  "canInline": false,
+                  "id": {
+                    "id": 163
+                  },
+                  "name": {
+                    "label": "p's `has recent default`",
+                    "unique": 164
+                  },
+                  "typically": null,
+                  "value": "UnknownV"
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`is creditworthy`",
+            "unique": 12
+          },
+          "params": [
+            {
+              "label": "p",
+              "unique": 13
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "6a9ccec4-dd08-548f-81ea-2fc171a82a55",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "6a55ea57-df0b-5d7d-bb40-4791fb9f3b12",
+                      "canInline": false,
+                      "id": {
+                        "id": 163
+                      },
+                      "name": {
+                        "label": "a's `has stable income`",
+                        "unique": 164
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "Not",
+                      "id": {
+                        "id": 165
+                      },
+                      "negand": {
+                        "$type": "UBoolVar",
+                        "atomId": "7a8b136c-6854-569d-91ad-8333cdbd7d77",
+                        "canInline": false,
+                        "id": {
+                          "id": 166
+                        },
+                        "name": {
+                          "label": "a's `has recent default`",
+                          "unique": 167
+                        },
+                        "typically": null,
+                        "value": "UnknownV"
+                      }
+                    }
+                  ],
+                  "id": {
+                    "id": 162
+                  }
+                },
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "`is creditworthy` OF a",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "6a55ea57-df0b-5d7d-bb40-4791fb9f3b12",
+                "canInline": false,
+                "id": {
+                  "id": 168
+                },
+                "name": {
+                  "label": "a's `has stable income`",
+                  "unique": 169
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`record pass through`",
+            "unique": 14
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 15
+            }
+          ]
+        }
+      ]
+    },
+    "r991": {
+      "source": "r991.l4",
+      "funDecls": [
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "dea213c5-31f7-50e1-8d32-a4bc5edd61d7",
+                "canInline": false,
+                "id": {
+                  "id": 154
+                },
+                "name": {
+                  "label": "p",
+                  "unique": 1
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8",
+                "canInline": false,
+                "id": {
+                  "id": 155
+                },
+                "name": {
+                  "label": "q",
+                  "unique": 2
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 153
+            }
+          },
+          "id": {
+            "id": 152
+          },
+          "name": {
+            "label": "limb",
+            "unique": 0
+          },
+          "params": [
+            {
+              "label": "p",
+              "unique": 1
+            },
+            {
+              "label": "q",
+              "unique": 2
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "App",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "ff3c20e4-e50d-5c94-8955-a353f0db3ab0",
+                    "canInline": false,
+                    "id": {
+                      "id": 155
+                    },
+                    "name": {
+                      "label": "a",
+                      "unique": 5
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "f8792eac-322b-58ec-93da-3069bfc10800",
+                    "canInline": false,
+                    "id": {
+                      "id": 156
+                    },
+                    "name": {
+                      "label": "b",
+                      "unique": 6
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "atomId": "c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f",
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "ff3c20e4-e50d-5c94-8955-a353f0db3ab0",
+                      "canInline": false,
+                      "id": {
+                        "id": 158
+                      },
+                      "name": {
+                        "label": "a",
+                        "unique": 5
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "f8792eac-322b-58ec-93da-3069bfc10800",
+                      "canInline": false,
+                      "id": {
+                        "id": 159
+                      },
+                      "name": {
+                        "label": "b",
+                        "unique": 6
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 157
+                  }
+                },
+                "fnName": {
+                  "label": "limb OF a, b",
+                  "unique": 154
+                },
+                "id": {
+                  "id": 154
+                }
+              },
+              {
+                "$type": "App",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "913a215b-58c8-560b-a756-4571f2dcba5b",
+                    "canInline": false,
+                    "id": {
+                      "id": 161
+                    },
+                    "name": {
+                      "label": "c",
+                      "unique": 7
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "8bf80e3f-f0cd-58e4-982e-4018569103da",
+                    "canInline": false,
+                    "id": {
+                      "id": 162
+                    },
+                    "name": {
+                      "label": "d",
+                      "unique": 8
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "atomId": "e35e1a09-fd39-5b2d-9827-c09feac7ad87",
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "913a215b-58c8-560b-a756-4571f2dcba5b",
+                      "canInline": false,
+                      "id": {
+                        "id": 164
+                      },
+                      "name": {
+                        "label": "c",
+                        "unique": 7
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "8bf80e3f-f0cd-58e4-982e-4018569103da",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "d",
+                        "unique": 8
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 163
+                  }
+                },
+                "fnName": {
+                  "label": "limb OF c, d",
+                  "unique": 160
+                },
+                "id": {
+                  "id": 160
+                }
+              }
+            ],
+            "id": {
+              "id": 153
+            }
+          },
+          "id": {
+            "id": 152
+          },
+          "name": {
+            "label": "`different actuals`",
+            "unique": 4
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 5
+            },
+            {
+              "label": "b",
+              "unique": 6
+            },
+            {
+              "label": "c",
+              "unique": 7
+            },
+            {
+              "label": "d",
+              "unique": 8
+            }
+          ]
+        }
+      ]
+    },
+    "r991pc": {
+      "source": "r991pc.l4",
+      "funDecls": [
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "dea213c5-31f7-50e1-8d32-a4bc5edd61d7",
+                "canInline": false,
+                "id": {
+                  "id": 154
+                },
+                "name": {
+                  "label": "p",
+                  "unique": 1
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8",
+                "canInline": false,
+                "id": {
+                  "id": 155
+                },
+                "name": {
+                  "label": "q",
+                  "unique": 2
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 153
+            }
+          },
+          "id": {
+            "id": 152
+          },
+          "name": {
+            "label": "limb",
+            "unique": 0
+          },
+          "params": [
+            {
+              "label": "p",
+              "unique": 1
+            },
+            {
+              "label": "q",
+              "unique": 2
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "App",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "ff3c20e4-e50d-5c94-8955-a353f0db3ab0",
+                    "canInline": false,
+                    "id": {
+                      "id": 155
+                    },
+                    "name": {
+                      "label": "a",
+                      "unique": 6
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "f8792eac-322b-58ec-93da-3069bfc10800",
+                    "canInline": false,
+                    "id": {
+                      "id": 156
+                    },
+                    "name": {
+                      "label": "b",
+                      "unique": 7
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "atomId": "c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f",
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "ff3c20e4-e50d-5c94-8955-a353f0db3ab0",
+                      "canInline": false,
+                      "id": {
+                        "id": 158
+                      },
+                      "name": {
+                        "label": "a",
+                        "unique": 6
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "f8792eac-322b-58ec-93da-3069bfc10800",
+                      "canInline": false,
+                      "id": {
+                        "id": 159
+                      },
+                      "name": {
+                        "label": "b",
+                        "unique": 7
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 157
+                  }
+                },
+                "fnName": {
+                  "label": "limb OF a, b",
+                  "unique": 154
+                },
+                "id": {
+                  "id": 154
+                }
+              },
+              {
+                "$type": "App",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "913a215b-58c8-560b-a756-4571f2dcba5b",
+                    "canInline": false,
+                    "id": {
+                      "id": 161
+                    },
+                    "name": {
+                      "label": "c",
+                      "unique": 8
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "8bf80e3f-f0cd-58e4-982e-4018569103da",
+                    "canInline": false,
+                    "id": {
+                      "id": 162
+                    },
+                    "name": {
+                      "label": "d",
+                      "unique": 9
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "atomId": "e35e1a09-fd39-5b2d-9827-c09feac7ad87",
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "913a215b-58c8-560b-a756-4571f2dcba5b",
+                      "canInline": false,
+                      "id": {
+                        "id": 164
+                      },
+                      "name": {
+                        "label": "c",
+                        "unique": 8
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "8bf80e3f-f0cd-58e4-982e-4018569103da",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "d",
+                        "unique": 9
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 163
+                  }
+                },
+                "fnName": {
+                  "label": "limb OF c, d",
+                  "unique": 160
+                },
+                "id": {
+                  "id": 160
+                }
+              }
+            ],
+            "id": {
+              "id": 153
+            }
+          },
+          "id": {
+            "id": 152
+          },
+          "name": {
+            "label": "`different actuals`",
+            "unique": 4
+          },
+          "params": [
+            {
+              "label": "z",
+              "unique": 5
+            },
+            {
+              "label": "a",
+              "unique": 6
+            },
+            {
+              "label": "b",
+              "unique": 7
+            },
+            {
+              "label": "c",
+              "unique": 8
+            },
+            {
+              "label": "d",
+              "unique": 9
+            }
+          ]
+        }
+      ]
+    },
+    "visa": {
+      "source": "visa.l4",
+      "funDecls": [
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "Or",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "1d191bb4-84e1-5d1c-b996-77fd25d6a502",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `has valid passport`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "f707dbf2-abd8-5e45-ab4b-b2e3684f895e",
+                "canInline": false,
+                "id": {
+                  "id": 162
+                },
+                "name": {
+                  "label": "a's `has national ID card`",
+                  "unique": 163
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`identity is established`",
+            "unique": 14
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 15
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "Not",
+                "id": {
+                  "id": 160
+                },
+                "negand": {
+                  "$type": "UBoolVar",
+                  "atomId": "c0ec604d-f68f-59be-a940-dc38e60f943e",
+                  "canInline": false,
+                  "id": {
+                    "id": 161
+                  },
+                  "name": {
+                    "label": "a's `is on a watchlist`",
+                    "unique": 162
+                  },
+                  "typically": null,
+                  "value": "UnknownV"
+                }
+              },
+              {
+                "$type": "Or",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "2cba9f8e-440e-595b-a1a6-f1cb8956bba1",
+                    "canInline": false,
+                    "id": {
+                      "id": 164
+                    },
+                    "name": {
+                      "label": "a's `has clean record`",
+                      "unique": 165
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "f2580657-b46e-526e-9ea6-7f98f3d31e29",
+                    "canInline": false,
+                    "id": {
+                      "id": 166
+                    },
+                    "name": {
+                      "label": "a's `record is spent`",
+                      "unique": 167
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "id": {
+                  "id": 163
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`character requirement is met`",
+            "unique": 16
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 17
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "eb1367c0-24ac-544c-aca0-b8fe6be57d5e",
+                "canInline": true,
+                "expansion": {
+                  "$type": "Or",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "6fe047bb-6ad6-50ee-b3c6-413614224b9c",
+                      "canInline": false,
+                      "id": {
+                        "id": 163
+                      },
+                      "name": {
+                        "label": "a's `has valid passport`",
+                        "unique": 164
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "b6234ce1-7980-5f12-998c-1b36c1761b79",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "a's `has national ID card`",
+                        "unique": 166
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 162
+                  }
+                },
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "`identity is established` OF a",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "45192f4a-c13b-5f63-9f6a-8d763fc72767",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "Not",
+                      "id": {
+                        "id": 170
+                      },
+                      "negand": {
+                        "$type": "UBoolVar",
+                        "atomId": "39441ca9-80d8-5fb7-b73c-081f415456ab",
+                        "canInline": false,
+                        "id": {
+                          "id": 171
+                        },
+                        "name": {
+                          "label": "a's `is on a watchlist`",
+                          "unique": 172
+                        },
+                        "typically": null,
+                        "value": "UnknownV"
+                      }
+                    },
+                    {
+                      "$type": "Or",
+                      "args": [
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "2067cd1b-600d-5eef-b2f8-62f0b068350d",
+                          "canInline": false,
+                          "id": {
+                            "id": 174
+                          },
+                          "name": {
+                            "label": "a's `has clean record`",
+                            "unique": 175
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        },
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "e3b4fef9-98f8-5d8a-bfa3-23259149783f",
+                          "canInline": false,
+                          "id": {
+                            "id": 176
+                          },
+                          "name": {
+                            "label": "a's `record is spent`",
+                            "unique": 177
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        }
+                      ],
+                      "id": {
+                        "id": 173
+                      }
+                    }
+                  ],
+                  "id": {
+                    "id": 169
+                  }
+                },
+                "id": {
+                  "id": 167
+                },
+                "name": {
+                  "label": "`character requirement is met` OF a",
+                  "unique": 168
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`meets general requirements`",
+            "unique": 18
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 19
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "Or",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "fedaba63-ed74-5d02-b2da-3bab97ac220e",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `has degree`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "And",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "40071810-6429-52f2-8464-eb346a35c9cb",
+                    "canInline": false,
+                    "id": {
+                      "id": 163
+                    },
+                    "name": {
+                      "label": "a's `has trade certificate`",
+                      "unique": 164
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "e3aab1da-8ea1-5565-b2e3-d7dc55c3418a",
+                    "canInline": false,
+                    "id": {
+                      "id": 165
+                    },
+                    "name": {
+                      "label": "(a's `years of experience`) AT LEAST 3",
+                      "unique": 166
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "id": {
+                  "id": 162
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`has qualifying skills`",
+            "unique": 20
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 21
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "826b9221-c0e6-5fb8-bdda-d709007fafb3",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `has job offer`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "41a5d4e9-0ea9-50e7-832e-17f28aadbdc8",
+                "canInline": true,
+                "expansion": {
+                  "$type": "Or",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "81ebb24c-3afc-5fa8-9e75-4bdacd6ac16f",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "a's `has degree`",
+                        "unique": 166
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "And",
+                      "args": [
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "ec04a918-8f85-5fd5-8500-5d459594333d",
+                          "canInline": false,
+                          "id": {
+                            "id": 168
+                          },
+                          "name": {
+                            "label": "a's `has trade certificate`",
+                            "unique": 169
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        },
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "35f83b9b-759d-52c2-ad4e-67a13c5e87cb",
+                          "canInline": false,
+                          "id": {
+                            "id": 170
+                          },
+                          "name": {
+                            "label": "(a's `years of experience`) AT LEAST 3",
+                            "unique": 171
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        }
+                      ],
+                      "id": {
+                        "id": 167
+                      }
+                    }
+                  ],
+                  "id": {
+                    "id": 164
+                  }
+                },
+                "id": {
+                  "id": 162
+                },
+                "name": {
+                  "label": "`has qualifying skills` OF a",
+                  "unique": 163
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`qualifies by employer sponsorship`",
+            "unique": 22
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 23
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "Or",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "7f3a3a1f-2573-5b59-93ef-079d51f94731",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `has own funds`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "c8b99d1e-78fd-59f6-a6db-e692f648aa13",
+                "canInline": false,
+                "id": {
+                  "id": 162
+                },
+                "name": {
+                  "label": "a's `has investor letter`",
+                  "unique": 163
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`has financial backing`",
+            "unique": 24
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 25
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "84ed33db-b564-59cd-a902-e1e07908198a",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `has business plan`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "258600c3-c3d6-5707-9bf9-8029995729ba",
+                "canInline": true,
+                "expansion": {
+                  "$type": "Or",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "d3c7a482-c5f5-50b8-b57e-3b5e30abe306",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "a's `has own funds`",
+                        "unique": 166
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "53b1d575-d646-5092-a26b-0add06bb8217",
+                      "canInline": false,
+                      "id": {
+                        "id": 167
+                      },
+                      "name": {
+                        "label": "a's `has investor letter`",
+                        "unique": 168
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 164
+                  }
+                },
+                "id": {
+                  "id": 162
+                },
+                "name": {
+                  "label": "`has financial backing` OF a",
+                  "unique": 163
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`qualifies by self-employment`",
+            "unique": 26
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 27
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "4584735e-00b0-5e5a-9fc1-92bc06c41edd",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "325205a9-5d9b-5937-8d3c-28d3a047a656",
+                      "canInline": true,
+                      "expansion": {
+                        "$type": "Or",
+                        "args": [
+                          {
+                            "$type": "UBoolVar",
+                            "atomId": "8ea7c19f-b88c-54be-a6ac-5a70d53e1878",
+                            "canInline": false,
+                            "id": {
+                              "id": 166
+                            },
+                            "name": {
+                              "label": "a's `has valid passport`",
+                              "unique": 167
+                            },
+                            "typically": null,
+                            "value": "UnknownV"
+                          },
+                          {
+                            "$type": "UBoolVar",
+                            "atomId": "95514e95-e189-58b1-935a-8b27d2c9f4dd",
+                            "canInline": false,
+                            "id": {
+                              "id": 168
+                            },
+                            "name": {
+                              "label": "a's `has national ID card`",
+                              "unique": 169
+                            },
+                            "typically": null,
+                            "value": "UnknownV"
+                          }
+                        ],
+                        "id": {
+                          "id": 165
+                        }
+                      },
+                      "id": {
+                        "id": 163
+                      },
+                      "name": {
+                        "label": "`identity is established` OF a",
+                        "unique": 164
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "349caf62-8829-5a55-b59a-38057cf19785",
+                      "canInline": true,
+                      "expansion": {
+                        "$type": "And",
+                        "args": [
+                          {
+                            "$type": "Not",
+                            "id": {
+                              "id": 173
+                            },
+                            "negand": {
+                              "$type": "UBoolVar",
+                              "atomId": "75e554dc-6e73-5732-8442-ea3fa0a2b1b3",
+                              "canInline": false,
+                              "id": {
+                                "id": 174
+                              },
+                              "name": {
+                                "label": "a's `is on a watchlist`",
+                                "unique": 175
+                              },
+                              "typically": null,
+                              "value": "UnknownV"
+                            }
+                          },
+                          {
+                            "$type": "Or",
+                            "args": [
+                              {
+                                "$type": "UBoolVar",
+                                "atomId": "488338e5-0ccc-5575-aacd-5e35619a9c7d",
+                                "canInline": false,
+                                "id": {
+                                  "id": 177
+                                },
+                                "name": {
+                                  "label": "a's `has clean record`",
+                                  "unique": 178
+                                },
+                                "typically": null,
+                                "value": "UnknownV"
+                              },
+                              {
+                                "$type": "UBoolVar",
+                                "atomId": "0bd7d125-ef05-5b40-875d-35d633a33d90",
+                                "canInline": false,
+                                "id": {
+                                  "id": 179
+                                },
+                                "name": {
+                                  "label": "a's `record is spent`",
+                                  "unique": 180
+                                },
+                                "typically": null,
+                                "value": "UnknownV"
+                              }
+                            ],
+                            "id": {
+                              "id": 176
+                            }
+                          }
+                        ],
+                        "id": {
+                          "id": 172
+                        }
+                      },
+                      "id": {
+                        "id": 170
+                      },
+                      "name": {
+                        "label": "`character requirement is met` OF a",
+                        "unique": 171
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 162
+                  }
+                },
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "`meets general requirements` OF a",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "Or",
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "df124ca0-ddbe-575d-8a08-a0991d89ac77",
+                    "canInline": true,
+                    "expansion": {
+                      "$type": "And",
+                      "args": [
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "6ee6edf8-c79b-5e46-be89-bb29039f09d9",
+                          "canInline": false,
+                          "id": {
+                            "id": 185
+                          },
+                          "name": {
+                            "label": "a's `has job offer`",
+                            "unique": 186
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        },
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "72a80ae8-20f0-5673-ad91-f0305fb825cf",
+                          "canInline": true,
+                          "expansion": {
+                            "$type": "Or",
+                            "args": [
+                              {
+                                "$type": "UBoolVar",
+                                "atomId": "8e9621bd-8d19-52aa-8e0a-45379ffafdf9",
+                                "canInline": false,
+                                "id": {
+                                  "id": 190
+                                },
+                                "name": {
+                                  "label": "a's `has degree`",
+                                  "unique": 191
+                                },
+                                "typically": null,
+                                "value": "UnknownV"
+                              },
+                              {
+                                "$type": "And",
+                                "args": [
+                                  {
+                                    "$type": "UBoolVar",
+                                    "atomId": "dca9359f-5002-5f47-b0ae-b2c1083b9628",
+                                    "canInline": false,
+                                    "id": {
+                                      "id": 193
+                                    },
+                                    "name": {
+                                      "label": "a's `has trade certificate`",
+                                      "unique": 194
+                                    },
+                                    "typically": null,
+                                    "value": "UnknownV"
+                                  },
+                                  {
+                                    "$type": "UBoolVar",
+                                    "atomId": "ece86c09-cee2-5e5e-b60e-74680f2c8030",
+                                    "canInline": false,
+                                    "id": {
+                                      "id": 195
+                                    },
+                                    "name": {
+                                      "label": "(a's `years of experience`) AT LEAST 3",
+                                      "unique": 196
+                                    },
+                                    "typically": null,
+                                    "value": "UnknownV"
+                                  }
+                                ],
+                                "id": {
+                                  "id": 192
+                                }
+                              }
+                            ],
+                            "id": {
+                              "id": 189
+                            }
+                          },
+                          "id": {
+                            "id": 187
+                          },
+                          "name": {
+                            "label": "`has qualifying skills` OF a",
+                            "unique": 188
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        }
+                      ],
+                      "id": {
+                        "id": 184
+                      }
+                    },
+                    "id": {
+                      "id": 182
+                    },
+                    "name": {
+                      "label": "`qualifies by employer sponsorship` OF a",
+                      "unique": 183
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "atomId": "15e40e95-0893-5161-a489-498150d31583",
+                    "canInline": true,
+                    "expansion": {
+                      "$type": "And",
+                      "args": [
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "e25538fc-8017-5033-8c79-a362b1f5943c",
+                          "canInline": false,
+                          "id": {
+                            "id": 200
+                          },
+                          "name": {
+                            "label": "a's `has business plan`",
+                            "unique": 201
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        },
+                        {
+                          "$type": "UBoolVar",
+                          "atomId": "8854f3a2-1c91-535b-a975-e5cfd54b9c79",
+                          "canInline": true,
+                          "expansion": {
+                            "$type": "Or",
+                            "args": [
+                              {
+                                "$type": "UBoolVar",
+                                "atomId": "b217f3fd-dc6c-5c71-a1e2-b87a32c99714",
+                                "canInline": false,
+                                "id": {
+                                  "id": 205
+                                },
+                                "name": {
+                                  "label": "a's `has own funds`",
+                                  "unique": 206
+                                },
+                                "typically": null,
+                                "value": "UnknownV"
+                              },
+                              {
+                                "$type": "UBoolVar",
+                                "atomId": "5abbd8bb-1074-5d61-948e-9b521e8c62f1",
+                                "canInline": false,
+                                "id": {
+                                  "id": 207
+                                },
+                                "name": {
+                                  "label": "a's `has investor letter`",
+                                  "unique": 208
+                                },
+                                "typically": null,
+                                "value": "UnknownV"
+                              }
+                            ],
+                            "id": {
+                              "id": 204
+                            }
+                          },
+                          "id": {
+                            "id": 202
+                          },
+                          "name": {
+                            "label": "`has financial backing` OF a",
+                            "unique": 203
+                          },
+                          "typically": null,
+                          "value": "UnknownV"
+                        }
+                      ],
+                      "id": {
+                        "id": 199
+                      }
+                    },
+                    "id": {
+                      "id": 197
+                    },
+                    "name": {
+                      "label": "`qualifies by self-employment` OF a",
+                      "unique": 198
+                    },
+                    "typically": null,
+                    "value": "UnknownV"
+                  }
+                ],
+                "id": {
+                  "id": 181
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`may be granted a work visa`",
+            "unique": 28
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 29
+            }
+          ]
+        }
+      ]
+    },
+    "loan": {
+      "source": "loan.l4",
+      "funDecls": [
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "UBoolVar",
+            "atomId": "0b0d39ac-f839-519c-8ffc-3358448a5cd3",
+            "canInline": false,
+            "id": {
+              "id": 159
+            },
+            "name": {
+              "label": "(a's age) AT LEAST 18",
+              "unique": 160
+            },
+            "typically": null,
+            "value": "UnknownV"
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`is of age`",
+            "unique": 9
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 10
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "7108f2bd-9d16-5794-a073-60b44f998940",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `is employed`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "6f245deb-3ba9-5e6d-8c70-b19f827e49ea",
+                "canInline": false,
+                "id": {
+                  "id": 162
+                },
+                "name": {
+                  "label": "a's `income is verified`",
+                  "unique": 163
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`has stable income`",
+            "unique": 11
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 12
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "Not",
+                "id": {
+                  "id": 160
+                },
+                "negand": {
+                  "$type": "UBoolVar",
+                  "atomId": "502be3ac-bfea-51d9-aa8c-6aab1c5ad65d",
+                  "canInline": false,
+                  "id": {
+                    "id": 161
+                  },
+                  "name": {
+                    "label": "a's `has recent default`",
+                    "unique": 162
+                  },
+                  "typically": null,
+                  "value": "UnknownV"
+                }
+              },
+              {
+                "$type": "Not",
+                "id": {
+                  "id": 163
+                },
+                "negand": {
+                  "$type": "UBoolVar",
+                  "atomId": "c46d1ece-c891-5b09-9852-c7f6e9034a91",
+                  "canInline": false,
+                  "id": {
+                    "id": 164
+                  },
+                  "name": {
+                    "label": "a's `is bankrupt`",
+                    "unique": 165
+                  },
+                  "typically": null,
+                  "value": "UnknownV"
+                }
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`has clean credit history`",
+            "unique": 13
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 14
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "Or",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "fb9448cd-be42-5cab-b30b-74f31c79c04c",
+                "canInline": false,
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "a's `has guarantor`",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "a81ae26a-3cac-521c-bb26-0f9900d681c0",
+                "canInline": false,
+                "id": {
+                  "id": 162
+                },
+                "name": {
+                  "label": "a's `has collateral`",
+                  "unique": 163
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`is adequately secured`",
+            "unique": 15
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 16
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "f15adb5b-2a6a-5816-984b-98518ea6de53",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "316d264e-eb9b-511b-9a7c-5d7324a17e9e",
+                      "canInline": false,
+                      "id": {
+                        "id": 163
+                      },
+                      "name": {
+                        "label": "a's `is employed`",
+                        "unique": 164
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "53c1d8fb-c602-5094-8252-8265b458a3e7",
+                      "canInline": false,
+                      "id": {
+                        "id": 165
+                      },
+                      "name": {
+                        "label": "a's `income is verified`",
+                        "unique": 166
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 162
+                  }
+                },
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "`has stable income` OF a",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "ef5ac3a5-edad-5054-88bc-a55ef36f38d7",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "Not",
+                      "id": {
+                        "id": 170
+                      },
+                      "negand": {
+                        "$type": "UBoolVar",
+                        "atomId": "3f754876-7b84-5863-a59d-fd8675653a84",
+                        "canInline": false,
+                        "id": {
+                          "id": 171
+                        },
+                        "name": {
+                          "label": "a's `has recent default`",
+                          "unique": 172
+                        },
+                        "typically": null,
+                        "value": "UnknownV"
+                      }
+                    },
+                    {
+                      "$type": "Not",
+                      "id": {
+                        "id": 173
+                      },
+                      "negand": {
+                        "$type": "UBoolVar",
+                        "atomId": "5e30a0d6-bb9e-57c0-b492-690c7d70bdd7",
+                        "canInline": false,
+                        "id": {
+                          "id": 174
+                        },
+                        "name": {
+                          "label": "a's `is bankrupt`",
+                          "unique": 175
+                        },
+                        "typically": null,
+                        "value": "UnknownV"
+                      }
+                    }
+                  ],
+                  "id": {
+                    "id": 169
+                  }
+                },
+                "id": {
+                  "id": 167
+                },
+                "name": {
+                  "label": "`has clean credit history` OF a",
+                  "unique": 168
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`is creditworthy`",
+            "unique": 17
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 18
+            }
+          ]
+        },
+        {
+          "$type": "FunDecl",
+          "body": {
+            "$type": "And",
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "atomId": "2ba2b51d-3cdd-540c-a38a-784bfe3a2724",
+                "canInline": true,
+                "expansion": {
+                  "$type": "UBoolVar",
+                  "atomId": "27cce0f0-7720-5a89-aed6-5077b35e9368",
+                  "canInline": false,
+                  "id": {
+                    "id": 162
+                  },
+                  "name": {
+                    "label": "(a's age) AT LEAST 18",
+                    "unique": 163
+                  },
+                  "typically": null,
+                  "value": "UnknownV"
+                },
+                "id": {
+                  "id": 160
+                },
+                "name": {
+                  "label": "`is of age` OF a",
+                  "unique": 161
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "e6120831-02bc-59d6-a2a3-0194da7d77d0",
+                "canInline": true,
+                "expansion": {
+                  "$type": "And",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "7fcbb91f-10c4-5312-bb60-20045a363f0d",
+                      "canInline": true,
+                      "expansion": {
+                        "$type": "And",
+                        "args": [
+                          {
+                            "$type": "UBoolVar",
+                            "atomId": "473e3e59-4fc7-5049-88ba-3955eca66dd0",
+                            "canInline": false,
+                            "id": {
+                              "id": 170
+                            },
+                            "name": {
+                              "label": "a's `is employed`",
+                              "unique": 171
+                            },
+                            "typically": null,
+                            "value": "UnknownV"
+                          },
+                          {
+                            "$type": "UBoolVar",
+                            "atomId": "251f159c-54a6-549a-b115-960568612d04",
+                            "canInline": false,
+                            "id": {
+                              "id": 172
+                            },
+                            "name": {
+                              "label": "a's `income is verified`",
+                              "unique": 173
+                            },
+                            "typically": null,
+                            "value": "UnknownV"
+                          }
+                        ],
+                        "id": {
+                          "id": 169
+                        }
+                      },
+                      "id": {
+                        "id": 167
+                      },
+                      "name": {
+                        "label": "`has stable income` OF a",
+                        "unique": 168
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "5ce18fac-e94b-571a-9595-a5530a63e194",
+                      "canInline": true,
+                      "expansion": {
+                        "$type": "And",
+                        "args": [
+                          {
+                            "$type": "Not",
+                            "id": {
+                              "id": 177
+                            },
+                            "negand": {
+                              "$type": "UBoolVar",
+                              "atomId": "c83acdaa-59a1-5ca1-9f59-6976b0c42f3e",
+                              "canInline": false,
+                              "id": {
+                                "id": 178
+                              },
+                              "name": {
+                                "label": "a's `has recent default`",
+                                "unique": 179
+                              },
+                              "typically": null,
+                              "value": "UnknownV"
+                            }
+                          },
+                          {
+                            "$type": "Not",
+                            "id": {
+                              "id": 180
+                            },
+                            "negand": {
+                              "$type": "UBoolVar",
+                              "atomId": "fc34f5ac-3442-56fe-91f5-f3d539da90cc",
+                              "canInline": false,
+                              "id": {
+                                "id": 181
+                              },
+                              "name": {
+                                "label": "a's `is bankrupt`",
+                                "unique": 182
+                              },
+                              "typically": null,
+                              "value": "UnknownV"
+                            }
+                          }
+                        ],
+                        "id": {
+                          "id": 176
+                        }
+                      },
+                      "id": {
+                        "id": 174
+                      },
+                      "name": {
+                        "label": "`has clean credit history` OF a",
+                        "unique": 175
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 166
+                  }
+                },
+                "id": {
+                  "id": 164
+                },
+                "name": {
+                  "label": "`is creditworthy` OF a",
+                  "unique": 165
+                },
+                "typically": null,
+                "value": "UnknownV"
+              },
+              {
+                "$type": "UBoolVar",
+                "atomId": "460ccb6f-aace-5b66-842d-f0e1ee4558fa",
+                "canInline": true,
+                "expansion": {
+                  "$type": "Or",
+                  "args": [
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "391242b5-64e8-59ca-a607-9d32bd31d89f",
+                      "canInline": false,
+                      "id": {
+                        "id": 186
+                      },
+                      "name": {
+                        "label": "a's `has guarantor`",
+                        "unique": 187
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    },
+                    {
+                      "$type": "UBoolVar",
+                      "atomId": "47fe1dc1-5f69-5938-a8e3-0af87d7269b9",
+                      "canInline": false,
+                      "id": {
+                        "id": 188
+                      },
+                      "name": {
+                        "label": "a's `has collateral`",
+                        "unique": 189
+                      },
+                      "typically": null,
+                      "value": "UnknownV"
+                    }
+                  ],
+                  "id": {
+                    "id": 185
+                  }
+                },
+                "id": {
+                  "id": 183
+                },
+                "name": {
+                  "label": "`is adequately secured` OF a",
+                  "unique": 184
+                },
+                "typically": null,
+                "value": "UnknownV"
+              }
+            ],
+            "id": {
+              "id": 159
+            }
+          },
+          "id": {
+            "id": 158
+          },
+          "name": {
+            "label": "`may receive a loan`",
+            "unique": 19
+          },
+          "params": [
+            {
+              "label": "a",
+              "unique": 20
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

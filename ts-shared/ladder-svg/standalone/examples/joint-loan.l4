@@ -1,0 +1,26 @@
+-- Playground example: the same rule called three times, twice with the same argument.
+-- Drawn with call panels (the playground asks jl4-lsp for call expansions),
+-- the two `is creditworthy a` panels are the same proposition, box for box,
+-- so answering a box in one answers its twin in the other; `is creditworthy b` stays apart.
+-- Not a corpus file: nothing goldens it. Its job is to exercise the ladder playground.
+
+DECLARE Person
+  HAS `has stable income`   IS A BOOLEAN
+      `has recent default`  IS A BOOLEAN
+      `has collateral`      IS A BOOLEAN
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `is creditworthy` p IF
+      p's `has stable income`
+  AND NOT p's `has recent default`
+
+GIVEN a IS A Person
+      b IS A Person
+GIVETH A BOOLEAN
+DECIDE `may lend jointly` a b IF
+      `is creditworthy` a
+  AND `is creditworthy` b
+  AND (   a's `has collateral`
+       OR b's `has collateral`
+       OR `is creditworthy` a )

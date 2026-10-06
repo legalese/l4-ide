@@ -9,7 +9,22 @@
  *
  * No SvelteKit, no Monaco, no webview. Run from ts-shared/ladder-svg:
  *   node standalone/serve.mjs          # → http://localhost:8731
- * Env: JL4_LSP_PORT (default 5007), PORT (default 8731), REPO (auto).
+ * Env: JL4_LSP_PORT (default 5007), PORT (default 8731), REPO (auto),
+ *      JL4_LSP (a jl4-lsp binary to start), JL4_LSP_SPAWN=cabal (build and start one).
+ *
+ * Which server it talks to, in order: one already listening on JL4_LSP_PORT; else the
+ * binary JL4_LSP names, started on that port; else, only with JL4_LSP_SPAWN=cabal,
+ * `cabal run exe:jl4-lsp` in REPO. With none of these it stops and says so. It used to run
+ * cabal whenever the port was closed, which a caller starting its own server a moment
+ * earlier could race: that rebuilt jl4-core in the worktree's dist-newstyle beside another
+ * build (2026-10-06), against the one-cabal-per-worktree rule (CLAUDE.md §2.1).
+ *
+ * Call panels need a jl4-lsp whose "Show decision graph" reply carries `expansion` on its
+ * call leaves, which it does only when asked: `/render` appends `{"expandCalls": true}`
+ * to the lens's arguments. Against an older one the page still works and draws each
+ * call as one box.
+ * To try a particular build, start it yourself on JL4_LSP_PORT before running this; the
+ * server is only spawned when nothing is listening there.
  */
 import { createServer } from "node:http";
 import { spawn, spawnSync } from "node:child_process";
@@ -61,27 +76,33 @@ async function ensureLsp() {
     console.log(`[playground] using existing jl4-lsp on :${LSP_PORT}`);
     return;
   }
-  console.log(`[playground] spawning jl4-lsp ws on :${LSP_PORT} …`);
-  lspChild = spawn(
-    "cabal",
-    [
-      "run",
-      "-v0",
-      "exe:jl4-lsp",
-      "--",
-      "ws",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      String(LSP_PORT),
-      "--cwd",
-      "jl4-core/libraries",
-    ],
-    {
+  const wsArgs = [
+    "ws",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    String(LSP_PORT),
+    "--cwd",
+    "jl4-core/libraries",
+  ];
+  if (process.env.JL4_LSP) {
+    console.log(
+      `[playground] starting ${process.env.JL4_LSP} ws on :${LSP_PORT} …`,
+    );
+    lspChild = spawn(process.env.JL4_LSP, wsArgs, { cwd: REPO });
+  } else if (process.env.JL4_LSP_SPAWN === "cabal") {
+    console.log(`[playground] cabal run jl4-lsp ws on :${LSP_PORT} …`);
+    lspChild = spawn("cabal", ["run", "-v0", "exe:jl4-lsp", "--", ...wsArgs], {
       cwd: REPO,
       env: { ...process.env, PATH: `${GHCUP}:${process.env.PATH}` },
-    },
-  );
+    });
+  } else {
+    throw new Error(
+      `nothing is listening on :${LSP_PORT}. Start a jl4-lsp there ` +
+        "(jl4-lsp ws --host 127.0.0.1 --port <port>), or set JL4_LSP to a binary " +
+        "to start, or JL4_LSP_SPAWN=cabal to build and start one with cabal.",
+    );
+  }
   lspChild.stderr.on("data", (d) => process.stderr.write(`[lsp] ${d}`));
   for (let i = 0; i < 120; i++) {
     if (await portOpen(LSP_PORT)) {
@@ -197,10 +218,24 @@ async function renderL4(l4) {
   const funcs = [];
   for (const l of viz) {
     try {
-      const info = await rpc("workspace/executeCommand", {
-        command: l.command.command,
-        arguments: l.command.arguments,
+      // Expansions are opt-in per request: the lens's arguments plus the options
+      // argument (`decodeVisualiseArgs`, jl4-lsp/src/LSP/L4/Actions.hs). A server
+      // older than that reads four arguments as an auto-refresh of its most recent
+      // render; clearing that first makes it answer null, and then we ask again
+      // the old way, so an older server still draws each call as one box.
+      await rpc("workspace/executeCommand", {
+        command: "l4.resetvisualization",
+        arguments: [],
       });
+      const info =
+        (await rpc("workspace/executeCommand", {
+          command: l.command.command,
+          arguments: [...l.command.arguments, { expandCalls: true }],
+        })) ??
+        (await rpc("workspace/executeCommand", {
+          command: l.command.command,
+          arguments: l.command.arguments,
+        }));
       if (info?.funDecl)
         funcs.push({
           name: info.funDecl.name?.label ?? "?",
@@ -216,7 +251,31 @@ async function renderL4(l4) {
 }
 
 /* ---- curated inert-style examples (the point: inert L4 → interactive ladder) */
+// `calls` is how the page first draws a call that came with an expansion: "expand" opens it
+// in place as a call panel; anything else ("leaf", the default) draws it as one box, which
+// is how the older examples below have always looked. The page's "draw calls in place"
+// box flips it either way, from the same reply.
 const EXAMPLES = [
+  // Calls to other rules, drawn in place as call panels. These live beside the playground,
+  // not under jl4/examples, whose globs would demand goldens for them.
+  {
+    id: "work-visa",
+    label: "call panels: work visa (nested calls)",
+    path: "ts-shared/ladder-svg/standalone/examples/work-visa.l4",
+    calls: "expand",
+  },
+  {
+    id: "joint-loan",
+    label: "call panels: joint loan (one rule, two arguments)",
+    path: "ts-shared/ladder-svg/standalone/examples/joint-loan.l4",
+    calls: "expand",
+  },
+  {
+    id: "pass-through",
+    label: "call panels: pass-through (an argument is the caller's own)",
+    path: "ts-shared/ladder-svg/standalone/examples/pass-through.l4",
+    calls: "expand",
+  },
   {
     id: "cheating",
     label: "s415 cheating (Poh Yuan Nie)",
@@ -265,7 +324,15 @@ const MIME = {
 const server = createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/examples") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify(EXAMPLES.map(({ id, label }) => ({ id, label }))));
+    res.end(
+      JSON.stringify(
+        EXAMPLES.map(({ id, label, calls }) => ({
+          id,
+          label,
+          calls: calls ?? "leaf",
+        })),
+      ),
+    );
     return;
   }
   if (req.method === "GET" && req.url?.startsWith("/example?")) {
