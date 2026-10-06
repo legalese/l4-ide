@@ -2118,6 +2118,14 @@ instance ApplySubst EntityInfo where
 instance ApplySubst CheckEntity where
   applySubst = traverseOf (gplate @(Type' Resolved)) applySubst
 
+-- | Every type an expression carries, in its annotations and in any local
+-- signatures. Needed when an expression leaves the module that checked it: an
+-- importer starts from an EMPTY substitution (see @LSP.L4.Rules@), so an imported
+-- body's inference variables can only be resolved with its own module's
+-- substitution, applied before it is moved.
+instance ApplySubst (Expr Resolved) where
+  applySubst = traverseOf (gplate @(Type' Resolved)) applySubst
+
 -- | Checks that two resolved names refer to the same unique.
 ensureSameRef :: Resolved -> Resolved -> Check Bool
 ensureSameRef r1 r2 =

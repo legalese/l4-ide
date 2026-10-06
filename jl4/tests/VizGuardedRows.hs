@@ -324,12 +324,12 @@ findDecide nm m =
 -- | The atom labels under a node, in source order.
 atomsOf :: V.IRExpr -> [Text]
 atomsOf = \case
-  V.UBoolVar _ nm _ _ _ _ -> [nm.label]
+  V.UBoolVar _ nm _ _ _ _ _ -> [nm.label]
   V.And _ es -> concatMap atomsOf es
   V.Or _ es -> concatMap atomsOf es
   V.Not _ e -> atomsOf e
   V.Implies _ p q _ -> atomsOf p <> atomsOf q
-  V.App _ _ es _ -> concatMap atomsOf es
+  V.App _ _ es _ _ -> concatMap atomsOf es
   _ -> []
 
 -- | Every atom occurrence, as (unique, label). Two occurrences of the SAME proposition
@@ -338,8 +338,8 @@ identitiesOf :: V.IRExpr -> [(Int, Text)]
 identitiesOf e = here <> concatMap identitiesOf (children e)
   where
     here = case e of
-      V.UBoolVar _ nm _ _ _ _ -> [(nm.unique, nm.label)]
-      V.App _ nm _ _ -> [(nm.unique, nm.label)]
+      V.UBoolVar _ nm _ _ _ _ _ -> [(nm.unique, nm.label)]
+      V.App _ nm _ _ _ -> [(nm.unique, nm.label)]
       _ -> []
 
 countNots :: V.IRExpr -> Int
@@ -369,5 +369,5 @@ children = \case
   V.Or _ es -> es
   V.Not _ x -> [x]
   V.Implies _ x y _ -> [x, y]
-  V.App _ _ es _ -> es
+  V.App _ _ es _ _ -> es
   _ -> []

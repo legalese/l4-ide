@@ -22,7 +22,7 @@ import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (falseUnique, maybeUnique, trueUnique)
+import L4.TypeCheck.Environment (falseUnique, maybeUnique, nothingUnique, trueUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -216,10 +216,13 @@ typeToParameter declares visited ty =
                   | MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans <- fields
                   , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
                   ]
+              -- A field with a TYPICALLY may be left out: the JSON decoders
+              -- fill it from this DECLARE (T1b of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
               requiredFields =
                 [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy _ _ <- fields
+                | MkTypedName _ fieldName fieldTy mTypically _ <- fields
                 , not (isMaybeFieldType fieldTy)
+                , Maybe.isNothing mTypically
                 ]
              in
               (emptyParam "object")
@@ -293,13 +296,18 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
 
     givenParamList = map mkOne names
     givenNames = map fst givenParamList
-    -- Track which GIVEN params have MAYBE/Optional types (these are not required)
+    -- Required as the service publishes it ('L4.Export.isRequiredInput'): an
+    -- input with a MAYBE type or a default a request may omit is not.
     requiredGivenParams =
       [ resolvedNameText resolved
-      | MkOptionallyTypedName _ resolved mType _ <- names
+      | MkOptionallyTypedName _ resolved mType mTypically <- names
       , not (isMaybeType mType)
+      , Maybe.isNothing mTypically
       ]
     assumeParamList = map mkAssumeParam assumeParams
+    -- a section GIVEN with a default ('extractAssumeParamsWithDefaults' gives
+    -- a default for no other ASSUME) may be omitted
+    defaultedAssumes = [ n | (n, _, Just _, _) <- assumeParams ]
     implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing, Nothing)) implicitParams
 
     -- Combine all params, avoiding duplicates (explicit ASSUMEs take precedence)
@@ -313,7 +321,8 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
    in
     MkParameters
       { parameterMap = Map.fromList (givenParamList <> distinctAssumeParams)
-      , required = requiredGivenParams <> map fst distinctAssumeParams
+      , required = requiredGivenParams
+          <> [ n | (n, _) <- distinctAssumeParams, n `notElem` defaultedAssumes ]
       }
  where
   emptyParam :: Text -> Parameter
@@ -333,19 +342,24 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       }
 
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
--- Only simple literals (numbers, strings) and the TRUE/FALSE constructors are
--- representable; anything else yields Nothing (no "default" key emitted).
+-- A default is a literal ('L4.TypeCheck.isTypicallyLiteral'): a number, a
+-- string, or a nullary constructor. TRUE and FALSE are JSON booleans, NOTHING
+-- is null, and any other nullary constructor is an enum value, which the wire
+-- spells as its name. Anything else yields Nothing (no "default" key emitted).
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
 typicallyToJson = \case
   Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
   Lit _ (StringLit _ t) -> Just (Aeson.String t)
-  App _ r [] -> nullaryToJson r
+  App _ r [] -> Just (nullaryToJson r)
   _ -> Nothing
  where
   nullaryToJson r
-    | getUnique r == trueUnique = Just (Aeson.Bool True)
-    | getUnique r == falseUnique = Just (Aeson.Bool False)
-    | otherwise = Nothing
+    | getUnique r == trueUnique = Aeson.Bool True
+    | getUnique r == falseUnique = Aeson.Bool False
+    | getUnique r == nothingUnique = Aeson.Null
+    -- the constructor's own name, as a request spells the value: a
+    -- section-qualified reference (`Light`.Red) is still "Red"
+    | otherwise = Aeson.String (unqualifiedRawNameToText (rawName (getActual r)))
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool

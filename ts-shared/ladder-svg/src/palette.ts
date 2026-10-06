@@ -27,10 +27,11 @@
 import type { Theme } from "@repo/ladder-core";
 
 /**
- * Every colour the SVG emit can produce — 33 fields, and `test/palette.test.ts` pins that
+ * Every colour the SVG emit can produce — 40 fields, and `test/palette.test.ts` pins that
  * count because three specs quote it. The first seven were already a `Palette` in `svg.ts`;
  * nineteen more were inline literals, and the comment on each says where it was baked. The
- * last seven arrived with the FALSE-vs-UNKNOWN fix and the state washes; they are marked.
+ * next seven arrived with the FALSE-vs-UNKNOWN fix and the state washes, and the last seven
+ * with call panels and the filled NOT bubble; both groups are marked.
  *
  * All of them are required. An optional field would let a caller hand over a half-palette
  * and silently inherit a light-theme literal into a dark diagram, which is precisely the
@@ -138,6 +139,45 @@ export interface Palette {
    * presumption with a viewer's setting is exactly the audit failure to avoid.
    */
   assumed: string;
+
+  /* --- call panels and the NOT bubble's value (new; no former site) ---
+   *
+   * A call drawn expanded in place sits in a filled rounded panel, and panels are shaded by
+   * layer, DARKEST OUTSIDE (Meng, 2026-10-05): the backdrop is one step darker than the
+   * outermost panel, each panel inside is a step lighter, the innermost are the lightest, and
+   * rule boxes keep `boxFill`. The innermost panel is `panelNear` and every layer outward is
+   * one FIXED step darker, the step being `panelNear` → `panelDeep`, as on the approved page
+   * (scratchpad `ladder/live3.ts`: `STEP = 4.5` lightness points from `LIGHTEST = 95`).
+   * `panelShade` counts the steps against `Scene.panelDepth`, so the scale is the whole
+   * decision's and folding a panel changes no one's shade. */
+  /** The innermost panels — the light end of the scale. Below `boxFill` in every built-in,
+   *  so a term stays the lightest surface on the page. */
+  panelNear: string;
+  /** ONE STEP darker than `panelNear`: the backdrop of a decision with one level of panels.
+   *  Each further level outward is another step of the same size (`panelShade`). */
+  panelDeep: string;
+  /** A panel's hairline edge. */
+  panelEdge: string;
+  /** A panel's name. */
+  panelLabel: string;
+  /**
+   * `wireOpen` in a diagram that has panels. The plain open-wire ink is chosen against a
+   * white page and all but disappears on the shaded backdrop (screen: `#d6dadd` on `#d2dbe5`,
+   * measured in the 2026-10-05 render), which is why the approved page overrode it. A field of
+   * its own keeps every diagram without panels byte-for-byte as it was.
+   */
+  wireOpenPanel: string;
+  /**
+   * The NOT bubble when the NOT's OUTPUT is TRUE — its negand is false (Meng, 2026-10-05:
+   * "filled green when the negated term is false"). Unknown keeps `inverterFill`.
+   */
+  inverterTrue: string;
+  /**
+   * The NOT bubble when the NOT's OUTPUT is FALSE — its negand is true ("filled red when the
+   * negated term is true"). A field of its own rather than `dead`, because `dead` is the ink
+   * of settled-false TEXT, and in the dark palette that is a bright grey, not a red.
+   */
+  inverterFalse: string;
 }
 
 /**
@@ -185,6 +225,17 @@ export const SCREEN_PALETTE: Palette = {
   coilGreenSoft: "#5f9e77",
   coilRedSoft: "#cd8b84",
   assumed: "#3f6d8f",
+  // Reproduces the approved page (scratchpad ladder/live3.ts): hsl(212 26% L) with the
+  // innermost panel at L 95 and each layer out 4.5 darker, so `panelDeep` is L 90.5. Stepping
+  // in RGB is exact here, because for L above 50 at fixed hue and saturation every channel is
+  // linear in L (to within the hex rounding of the two ends: one unit at two steps).
+  panelNear: "#eff2f6",
+  panelDeep: "#e0e6ed",
+  panelEdge: "#fafbfc",
+  panelLabel: "#34414d",
+  wireOpenPanel: "#98a2ac", // the approved page's override (live3.ts)
+  inverterTrue: "#1a7f37", // = live: the NOT conducts
+  inverterFalse: "#a8483e", // = dead, the mild red of a settled-false box
 };
 
 /**
@@ -211,6 +262,17 @@ export const INK_PALETTE: Palette = {
   ink: "#111",
   liveFill: "#ededed",
   deadFill: "#e0e0e0",
+  // Greyscale panels, same ordering: darkest outside, lightest in, boxes white.
+  panelNear: "#f3f3f3",
+  panelDeep: "#e7e7e7",
+  panelEdge: "#fbfbfb",
+  panelLabel: "#333",
+  wireOpenPanel: "#a0a0a0",
+  // Print has no green and red, so the bubble's three readings are three greys far apart:
+  // solid black for a NOT that holds, a mid grey for one that fails, white while unknown.
+  // `live`/`dead` (#222/#333) would have made the first two the same dot.
+  inverterTrue: "#222",
+  inverterFalse: "#a8a8a8",
 };
 
 /**
@@ -255,6 +317,16 @@ export const DARK_PALETTE: Palette = {
   coilGreenSoft: "#2f7d4e",
   coilRedSoft: "#a34f42",
   assumed: "#7fb0d4",
+  // Darkest outside here too: the innermost panel sits just below `boxFill` (#26282c) and
+  // each layer out steps darker, so the order backdrop < outer < inner < box holds as on
+  // screen, and rule boxes still read as the surface the panels are cut from.
+  panelNear: "#212327",
+  panelDeep: "#1a1c20",
+  panelEdge: "#3a4048",
+  panelLabel: "#c3c9d0",
+  wireOpenPanel: "#5a6068",
+  inverterTrue: "#4ec97a", // = live
+  inverterFalse: "#e0786a", // a mild red bright enough to read on the dark panels
 };
 
 /* ------------------------------------------------------------------------------------
@@ -262,6 +334,61 @@ export const DARK_PALETTE: Palette = {
  * `svg.ts` at all. `test/palette.test.ts` scans both files for that and fails if a colour
  * gets re-baked, which is the only durable way to keep this seam closed.
  * ---------------------------------------------------------------------------------- */
+
+/** `#rgb` or `#rrggbb` → [r, g, b]; anything else → null (a caller's palette may hold a
+ *  named colour, which this cannot mix). */
+function rgbOf(c: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+  if (!m) return null;
+  const h =
+    m[1].length === 3
+      ? m[1]
+          .split("")
+          .map((d) => d + d)
+          .join("")
+      : m[1];
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [
+    number,
+    number,
+    number,
+  ];
+}
+
+/**
+ * The fill of a call panel at `depth` (0 = outermost; -1 = the backdrop) in a decision with
+ * `levels` levels of panels (`Scene.panelDepth`). The innermost layer (`depth = levels - 1`)
+ * is `panelNear`, and each layer outward is one more fixed step (`panelNear` → `panelDeep`)
+ * darker, clamped to the channel range. So the step is the same in a one-level decision and
+ * a five-level one, as on the approved page, and only the backdrop moves with `levels`.
+ *
+ * A palette whose two ends are not hex colours cannot be stepped, and gets `panelNear` for
+ * every panel (and `panelDeep` for the backdrop) rather than an invented colour.
+ */
+export function panelShade(
+  pal: Palette,
+  depth: number,
+  levels: number,
+): string {
+  const near = rgbOf(pal.panelNear);
+  const deep = rgbOf(pal.panelDeep);
+  if (!near || !deep || levels < 1)
+    return depth < 0 ? pal.panelDeep : pal.panelNear;
+  const steps = Math.max(0, levels - 1 - depth);
+  return (
+    "#" +
+    near
+      .map((v, i) =>
+        Math.min(255, Math.max(0, Math.round(v + (deep[i]! - v) * steps)))
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
+}
+
+/** The backdrop of a diagram with `levels` levels of panels: one step below the outermost. */
+export const panelBackdrop = (pal: Palette, levels: number): string =>
+  panelShade(pal, -1, levels);
 
 /** Resolve the `theme` option: a built-in name, or a caller's own `Palette` passed through. */
 export const paletteFor = (t: Theme | Palette): Palette =>

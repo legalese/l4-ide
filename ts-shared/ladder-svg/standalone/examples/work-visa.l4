@@ -1,0 +1,70 @@
+-- Playground example: a work visa decided through seven helper rules, called from the top rule and from each other.
+-- The playground asks jl4-lsp for call expansions, so every call opens
+-- in place inside a shaded panel, and the panels nest two levels deep
+-- (`meets general requirements a` holds `identity is established a`).
+-- Not a corpus file: nothing goldens it. Its job is to exercise the ladder playground.
+
+DECLARE Applicant
+  HAS `has valid passport`        IS A BOOLEAN
+      `has national ID card`      IS A BOOLEAN
+      `is on a watchlist`         IS A BOOLEAN
+      `has clean record`          IS A BOOLEAN
+      `record is spent`           IS A BOOLEAN
+      `has job offer`             IS A BOOLEAN
+      `has degree`                IS A BOOLEAN
+      `has trade certificate`     IS A BOOLEAN
+      `years of experience`       IS A NUMBER
+      `has business plan`         IS A BOOLEAN
+      `has own funds`             IS A BOOLEAN
+      `has investor letter`       IS A BOOLEAN
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `identity is established` a IF
+      a's `has valid passport`
+   OR a's `has national ID card`
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `character requirement is met` a IF
+      NOT a's `is on a watchlist`
+  AND (   a's `has clean record`
+       OR a's `record is spent` )
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `meets general requirements` a IF
+      `identity is established` a
+  AND `character requirement is met` a
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `has qualifying skills` a IF
+      a's `has degree`
+   OR (     a's `has trade certificate`
+        AND a's `years of experience` >= 3 )
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `qualifies by employer sponsorship` a IF
+      a's `has job offer`
+  AND `has qualifying skills` a
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `has financial backing` a IF
+      a's `has own funds`
+   OR a's `has investor letter`
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `qualifies by self-employment` a IF
+      a's `has business plan`
+  AND `has financial backing` a
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `may be granted a work visa` a IF
+      `meets general requirements` a
+  AND (   `qualifies by employer sponsorship` a
+       OR `qualifies by self-employment` a )

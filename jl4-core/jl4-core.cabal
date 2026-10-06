@@ -185,8 +185,10 @@ library
     L4.Parser.ResolveAnnotation
     L4.Parser.SrcSpan
     L4.ParserCombinators
+    L4.Presumption
     L4.Print
     L4.Print.Columnar
+    L4.SmartPunctuation
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
@@ -228,6 +230,7 @@ test-suite jl4-core-test
     TemporalContextSpec
     UnifySpec
     DeprecatedAssumeSpec
+    LadderFreshIdSpec
     MixfixParserSpec
     EventExactPrintSpec
     FormatFidelitySpec
@@ -276,6 +279,7 @@ test-suite jl4-core-test
     BlawxLiftSpec
     BlawxParseSpec
     ApiStateGraphLensSpec
+    SmartPunctuationSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

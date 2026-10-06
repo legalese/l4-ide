@@ -227,3 +227,164 @@ describe('LadderModel — Unique-space bindings and labels (the sidebar surface)
     expect(m.getLabelForUnique(43)).toBe('shut') // in the requirement
   })
 })
+
+/**
+ * One click, every copy: the IDE follows the playground's rule (ladder-core `spreadValue`).
+ * Two boxes are the same proposition when they share an atomId, and a compound leaf's
+ * Unique is per occurrence (WHERE-INLINING-SPEC §9.6), so keying a click by Unique alone
+ * answered one copy and left its twin unknown.
+ *
+ * The fixture is the shape this branch's jl4-lsp sends for `may lend jointly` in
+ * `ts-shared/ladder-svg/standalone/examples/joint-loan.l4` with no expansions asked for
+ * (captured 2026-10-06): labels, Uniques and the shared atomId are as captured, and
+ * `` `is creditworthy` OF a `` is drawn twice, as Uniques 157 and 166 with one atomId.
+ */
+describe('LadderModel — a click binds every copy of the proposition (atomId)', () => {
+  const call = (
+    id: number,
+    unique: number,
+    label: string,
+    atomId: string
+  ): IRExpr => ({
+    $type: 'UBoolVar',
+    id: iid(id),
+    name: nm(label, unique),
+    value: 'UnknownV',
+    canInline: true,
+    atomId,
+  })
+  const or = (id: number, args: IRExpr[]): IRExpr => ({
+    $type: 'Or',
+    id: iid(id),
+    args,
+  })
+  const A1 = 156
+  const B = 158
+  const COLL_A = 161
+  const A2 = 165
+  const jointFn: VizFunDecl = {
+    $type: 'FunDecl',
+    id: iid(150),
+    name: nm('`may lend jointly`', 150),
+    params: [],
+    body: and(155, [
+      call(A1, 157, '`is creditworthy` OF a', 'd1b523f8'),
+      call(B, 159, '`is creditworthy` OF b', '5674d857'),
+      or(160, [
+        call(COLL_A, 162, "a's `has collateral`", '627b865d'),
+        call(163, 164, "b's `has collateral`", '7928a2c2'),
+        call(A2, 166, '`is creditworthy` OF a', 'd1b523f8'),
+      ]),
+    ]),
+  }
+  const mkJoint = () => new LadderModel(jointFn, deps)
+
+  it('the fixture has the shape: two copies, two Uniques, one atomId', () => {
+    const d = mkJoint().decoded
+    expect(d.uniqueByNode.get(A1)).not.toBe(d.uniqueByNode.get(A2))
+    expect([...(d.nodesByAtomId.get('d1b523f8') ?? [])].sort()).toEqual([
+      A1,
+      A2,
+    ])
+  })
+
+  it('setValue on one copy answers its twin, and nothing else', async () => {
+    const m = mkJoint()
+    expect(m.setValue(A2, 'TrueV')).toBe(true)
+    await m.recompute()
+    const v = m.valuation
+    expect(v.get(A1)).toBe('TrueV')
+    expect(v.get(A2)).toBe('TrueV')
+    expect(v.get(B)).toBe('UnknownV')
+    expect(v.get(COLL_A)).toBe('UnknownV')
+  })
+
+  it('cycleValue advances every copy together, from the clicked copy’s value', async () => {
+    const m = mkJoint()
+    m.cycleValue(A1) // U -> T
+    m.cycleValue(A1) // T -> F
+    await m.recompute()
+    expect(m.valuation.get(A1)).toBe('FalseV')
+    expect(m.valuation.get(A2)).toBe('FalseV')
+    // b's call is its own proposition
+    m.cycleValue(B)
+    await m.recompute()
+    expect(m.valuation.get(B)).toBe('TrueV')
+    expect(m.valuation.get(A1)).toBe('FalseV')
+  })
+
+  it('answering both copies settles the decision the way one answer should', async () => {
+    // a TRUE, b TRUE: the AND needs the OR, which a's second copy now carries.
+    const m = mkJoint()
+    m.setValue(A1, 'TrueV')
+    m.setValue(B, 'TrueV')
+    await m.recompute()
+    expect(m.valuation.get(155)).toBe('TrueV')
+    expect(m.verdict).toBe('Holds')
+  })
+})
+
+/**
+ * The spread above is safe only while an atomId names ONE proposition. Two mixfix
+ * operators sharing a head keyword used to print alike, so `gift stands` in
+ * `jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4` arrived with both calls labelled
+ * `` `the will` OF w, 3 `` under one atomId, and one click answered both: `X AND NOT Y`
+ * could never come out TRUE. jl4-lsp now prints a mixfix call's full surface form
+ * (`Ladder.stampMixfixCalls`), so the two calls carry different labels and atomIds.
+ *
+ * The fixture is that file as this branch's jl4-lsp sends it with no expansions asked for
+ * (captured 2026-10-06): ids, labels, Uniques and atomIds are as captured.
+ */
+describe('LadderModel — two mixfix calls sharing a head keyword stay two propositions', () => {
+  const call = (
+    id: number,
+    unique: number,
+    label: string,
+    atomId: string
+  ): IRExpr => ({
+    $type: 'UBoolVar',
+    id: iid(id),
+    name: nm(label, unique),
+    value: 'UnknownV',
+    canInline: true,
+    atomId,
+  })
+  const EXECUTED = 160
+  const REVOKED = 163
+  const giftFn: VizFunDecl = {
+    $type: 'FunDecl',
+    id: iid(158),
+    name: nm('`gift stands`', 6),
+    params: [nm('w', 7)],
+    body: and(159, [
+      call(
+        EXECUTED,
+        161,
+        '`the will` w `is duly executed without` 3',
+        '7b1e49f8-126c-50d2-add8-289a83454b9b'
+      ),
+      {
+        $type: 'Not',
+        id: iid(162),
+        negand: call(
+          REVOKED,
+          164,
+          '`the will` w `is revoked counting` 3',
+          'c383101c-aed0-5da6-893a-bea009a02dd1'
+        ),
+      },
+    ]),
+  }
+
+  it('answering one call leaves the other alone, so the gift can stand', async () => {
+    const m = new LadderModel(giftFn, deps)
+    m.setValue(EXECUTED, 'TrueV')
+    await m.recompute()
+    expect(m.valuation.get(REVOKED)).toBe('UnknownV')
+    m.setValue(REVOKED, 'FalseV')
+    await m.recompute()
+    expect(m.valuation.get(EXECUTED)).toBe('TrueV')
+    expect(m.valuation.get(159)).toBe('TrueV')
+    expect(m.verdict).toBe('Holds')
+  })
+})

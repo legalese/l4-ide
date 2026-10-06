@@ -13,6 +13,7 @@ import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
 import qualified L4.Lexer as Lexer
+import qualified L4.SmartPunctuation as SP
 import qualified L4.Parser as Parser
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
@@ -58,6 +59,18 @@ type instance RuleResult GetLexTokens = ([PosToken], Text)
 data GetLexTokens = GetLexTokens
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
+
+-- | The typed source ('messageOfL') attached to a no-break-space (U+00A0)
+-- lint diagnostic, carrying just enough for a code action to build its fix:
+-- the single character's own range (never the whole whitespace token's), so
+-- the fix touches exactly the offending character. Produced by 'jl4Rules'\'s
+-- @GetLexTokens@ rule (the AndOr lint at 'mkAndOrLintWarning' is the sibling
+-- plumbing this follows) from 'L4.SmartPunctuation.nbspHitsInToken'.
+data NbspLint = MkNbspLint
+  { range :: SrcRange
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
 
 type instance RuleResult GetParsedAst = Module Name
 data GetParsedAst = GetParsedAst
@@ -734,10 +747,27 @@ jl4Rules evalConfig rootDirectory recorder = do
         let contents = Rope.toText rope
         case Lexer.execLexer uri contents of
           Left errs -> do
-            let diags = toList $ fmap mkParseErrorDiagnostic errs
-            pure (fmap (mkSimpleFileDiagnostic uri) diags, Nothing)
-          Right ts ->
-            pure ([], Just (ts, contents))
+            -- Each error keeps its 'PError' as the diagnostic's typed source
+            -- (as 'checkErrorToDiagnostic' does for 'CheckErrorWithContext'
+            -- below), so 'outOfScopeAssumeQuickFix''s sibling in
+            -- "LSP.L4.Handlers" can find a confusable-character error's
+            -- structured 'Lexer.fixes' again via @messageOfL \@PError@.
+            let mk pErr = mkFileDiagnosticWithSource uri (mkParseErrorDiagnostic pErr) pErr
+            pure (toList (fmap mk errs), Nothing)
+          Right ts -> do
+            -- The NBSP lint: a warning, never blocking, for a no-break space
+            -- (U+00A0) sitting inside ordinary whitespace — the lexer accepts
+            -- it silently (`Data.Char.isSpace` is true for it) and layout
+            -- still works, so this is advisory only (CLAUDE.md task: "Swift
+            -- treats it as a warning, and so do we").
+            let nbspRanges =
+                  [ range
+                  | pt <- ts
+                  , Lexer.TSpaces (Lexer.TSpace txt) <- [Lexer.computedPayload pt]
+                  , range <- SP.nbspHitsInToken uri pt.range.start txt
+                  ]
+                mk range = mkFileDiagnosticWithSource uri (mkNbspLintDiagnostic range) (MkNbspLint range)
+            pure (map mk nbspRanges, Just (ts, contents))
 
   -- | GetMixfixRegistry collects mixfix hints from the current module AND all imports.
   -- This enables cross-module mixfix resolution.
@@ -949,7 +979,19 @@ jl4Rules evalConfig rootDirectory recorder = do
     -- put the diagnostic on that IMPORT
     deps    <- fmap catMaybes $ uses (AttachCallStack (f : cs) GetLazyEvaluationDependencies) $ map (.moduleUri) imports
     let environment = mconcat (fst <$> deps)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnv evalConfig tcRes.entityInfo environment tcRes.module')
+        -- the modules this one imports, transitively and once each (a diamond of
+        -- imports would otherwise list a module once per path): the JSON decoder
+        -- fills an absent field of a record declared in any of them from its
+        -- DECLARE (T1b)
+        importedModules = go Map.empty tcRes.dependencies
+          where
+            go seen [] = Map.elems seen
+            go seen (d : ds) =
+              let MkModule _ depUri _ = d.module'
+              in if Map.member depUri seen
+                   then go seen ds
+                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
     pure ([], Just (ownEnv <> environment, ownDirectives))
 
   define shakeRecorder $ \EvaluateLazy uri -> do
@@ -1108,8 +1150,25 @@ jl4Rules evalConfig rootDirectory recorder = do
         , _data_ = Nothing
         }
 
+    -- | The NBSP lint's diagnostic: a warning (never an error — the lexer
+    -- accepts a no-break space in whitespace today, and keeps doing so; this
+    -- is advisory only), sourced "linter" like 'mkAndOrLintWarning'.
+    mkNbspLintDiagnostic :: SrcRange -> Diagnostic
+    mkNbspLintDiagnostic range =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just range)
+        , _severity = Just LSP.DiagnosticSeverity_Warning
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just "linter"
+        , _message = "non-breaking space (U+00A0) used where a normal space was expected — this usually comes from pasted text; replace it with an ordinary space."
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
     evalLazyResultToDiagnostic :: EvaluateLazy.EvalDirectiveResult -> Diagnostic
-    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes) = do
+    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes _) = do
       Diagnostic
         { _range = srcRangeToLspRange range
         , _severity =

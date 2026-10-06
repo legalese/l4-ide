@@ -21,9 +21,11 @@ import qualified L4.StateGraph.Lens as SGLens
 import LSP.L4.SemanticTokens (srcPosToPosition)
 import Data.Either (isRight)
 import GHC.Generics (Generically (..))
-import L4.Lexer (annotations, directives, keywords)
+import L4.Lexer (LexFix (..), PError (..), annotations, directives, keywords)
+import qualified L4.Lexer as Lexer
 import L4.Parser.SrcSpan
 import L4.Print
+import qualified L4.SmartPunctuation as SP
 import L4.Syntax
 import L4.TypeCheck
 import qualified L4.Evaluate.ValueLazy   as EL
@@ -40,6 +42,7 @@ import qualified LSP.L4.Viz.CustomProtocol as Ladder
 import           LSP.L4.Viz.CustomProtocol (EvalAppRequestParams (..),
                                             EvalAppResult (..))
 import qualified LSP.L4.Viz.QueryPlan as VizQueryPlan
+import qualified L4.Decision.QueryPlan as QP
 
 import Language.LSP.Protocol.Message
 import Language.LSP.Protocol.Types
@@ -142,7 +145,7 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
         Nothing -> defaultResponseError "No eval result found"
   where
     evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
-    evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace _ledger _notes) = case res of
+    evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace _ledger _notes _) = case res of
       EL.Assertion EL.Holds   -> pure $ EvalAppResult (toUBoolValue True)
       EL.Assertion EL.Fails   -> pure $ EvalAppResult (toUBoolValue False)
       EL.Assertion a@(EL.FailsBecause _) -> defaultResponseError $ EL.prettyAssertionOutcome a
@@ -182,6 +185,8 @@ decisionGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult ->
 decisionGraphCodeLenses verTextDocId typeCheck =
   foldTopLevelDecides decideToCodeLens typeCheck.module'
   where
+    -- Three arguments: the IDE's displayers do not draw call expansions, so
+    -- the lens does not ask for them ('VisualiseOptions' has the fourth).
     mkDecisionGraphCodeLens srcPos = CodeLens
       { _command = Just Command
         { _title = "Show decision graph"
@@ -245,14 +250,68 @@ stateGraphAtPos mtcRes verTextDocId srcPos = do
 -- Ladder visualisation
 -- ----------------------------------------------------------------------------
 
+{- | What a client may ask of one @l4.visualize@ render, beyond the decision and
+the simplify flag.
+
+On the wire it is an optional FOURTH argument, a JSON object:
+
+> [verDocId, srcPos, simplify]                          -- as before: no expansions
+> [verDocId, srcPos, simplify, {"expandCalls": true}]   -- every call leaf carries its expansion
+
+@expandCalls@ (default @false@) attaches to every call leaf the called rule's body
+with the call's arguments substituted (WHERE-INLINING-SPEC §10). It is opt-in
+because it is not free — on @regcf.l4@ it took a render from about 2.5 s to about
+7.1 s and 3.4x the bytes (2026-10-05) — and the IDE's own displayers ignore the
+field, so only a client that draws call panels should pay for it. Keys this
+version does not know are ignored; an absent key means @false@.
+
+The choice is remembered with the drawing: auto-refresh (@[verDocId]@ alone) and
+@l4/inlineExprs@ draw again with the config of the most recent render
+('updateVizConfig' keeps it), so a render made with expansions stays with them
+and one made without stays without.
+-}
+newtype VisualiseOptions = VisualiseOptions
+  { expandCalls :: Bool
+  }
+  deriving stock (Eq, Show)
+
+-- | What the three-argument form means: no expansions.
+defaultVisualiseOptions :: VisualiseOptions
+defaultVisualiseOptions = VisualiseOptions {expandCalls = False}
+
+instance Aeson.FromJSON VisualiseOptions where
+  parseJSON = Aeson.withObject "l4.visualize options" \o ->
+    VisualiseOptions <$> o Aeson..:? "expandCalls" Aeson..!= False
+
+{- | Decode the arguments of @l4.visualize@ after the document identifier.
+
+* @[srcPos, simplify]@: a render of the @DECIDE@ at @srcPos@, without expansions
+  (what the "Show decision graph" lens sends).
+* @[srcPos, simplify, options]@: the same, with 'VisualiseOptions'. An options
+  value that is not an object of that shape is an error, not a silent default.
+* anything else: auto-refresh of the most recent render (@Right Nothing@), as
+  it always was.
+-}
+decodeVisualiseArgs :: [Aeson.Value] -> Either Text (Maybe (SrcPos, Bool, VisualiseOptions))
+decodeVisualiseArgs args = case args of
+  [Aeson.fromJSON -> Aeson.Success (Generically srcPos), Aeson.fromJSON -> Aeson.Success simplify] ->
+    Right (Just (srcPos, simplify, defaultVisualiseOptions))
+  [Aeson.fromJSON -> Aeson.Success (Generically srcPos), Aeson.fromJSON -> Aeson.Success simplify, opts] ->
+    case Aeson.fromJSON opts of
+      Aeson.Success o -> Right (Just (srcPos, simplify, o))
+      Aeson.Error e -> Left ("l4.visualize: cannot read the options argument: " <> Text.pack e)
+  _ -> Right Nothing
+
 visualise
   :: Monad m
   => Maybe TypeCheckResult
   -> (m (Maybe RecentlyVisualised), RecentlyVisualised -> m ())
   -> VersionedTextDocumentIdentifier
   -- ^ The VersionedTextDocumentIdentifier of the document whose Decides should be visualised
-  -> Maybe (SrcPos, Bool)
-  -- ^ The location of the `Decide` to visualize and whether or not to simplify it
+  -> Maybe (SrcPos, Bool, VisualiseOptions)
+  -- ^ The location of the `Decide` to visualize, whether or not to simplify it,
+  -- and what else the client asked for ('decodeVisualiseArgs'); 'Nothing' is
+  -- auto-refresh of the most recent render, with that render's choices.
   -> ExceptT (TResponseError method) m (Aeson.Value |? Null)
 visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
   let uri = verTextDocId._uri
@@ -266,19 +325,25 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
       tcRes <- hoistMaybe mtcRes
       recentlyVisualised <- MaybeT $ lift getRecVis
       -- Since this is from autorefresh, we want to get the most up-to-date version of the Decide
-      decide <- hoistMaybe $ (.getOne) $  foldTopLevelDecides (matchOnAvailableDecides recentlyVisualised) tcRes.module'
+      decide <- hoistMaybe $ (.getOne) $  foldTopLevelDecides (matchOnAvailableDecides recentlyVisualised) (ladderModule tcRes)
       let updatedVizConfig = updateVizConfig verTextDocId tcRes recentlyVisualised
       pure (decide, updatedVizConfig)
 
     -- b. the command was issued by a code action or codelens
-    Just (srcPos, simp) -> do
+    Just (srcPos, simp, opts) -> do
       tcRes <- do
         case mtcRes of
           Nothing -> defaultResponseError $ "Could not check " <> Text.pack (show uri.getUri) <> "."
           Just tcRes -> pure tcRes
-      case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) tcRes.module' of
+      case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) (ladderModule tcRes) of
         [decide] ->
-          let vizConfig = Ladder.mkVizConfig verTextDocId tcRes.module' tcRes.substitution simp
+          -- Call leaves carry their expansions only when the client asked
+          -- ('VisualiseOptions'). Auto-refresh and l4/inlineExprs inherit
+          -- this config, the choice included.
+          let baseConfig = Ladder.mkVizConfig verTextDocId (ladderModule tcRes) tcRes.substitution simp
+              vizConfig
+                | opts.expandCalls = Ladder.withCallExpansions baseConfig
+                | otherwise = baseConfig
           in pure $ Just (decide, vizConfig)
         -- NOTE: if this becomes a problem, we should use
         -- https://hackage.haskell.org/package/lsp-types-2.3.0.1/docs/Language-LSP-Protocol-Types.html#t:VersionedTextDocumentIdentifier
@@ -286,22 +351,23 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
 
   -- Makes a 'RecentlyVisualised' iff the given 'Decide' has a valid range and a resolved type.
   -- Assumes the vizConfig in the given vizState is up-to-date.
-  let recentlyVisualisedDecide decide@(MkDecide Anno {range = Just range, extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} _tydec appform _expr) vizState
+  let recentlyVisualisedDecide decide@(MkDecide Anno {range = Just range, extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} _tydec appform _expr) vizState ladderInfo
         = Just RecentlyVisualised
           { pos = range.start
           , name = rawName $ getName appform
           , type' = applyFinalSubstitution (Ladder.getVizConfig vizState).substitution (Ladder.getVizConfig vizState).moduleUri ty
           , vizState = vizState
           , decide
+          , ladderInfo
           }
-      recentlyVisualisedDecide _ _ = Nothing
+      recentlyVisualisedDecide _ _ _ = Nothing
 
   case mdecide of
     Nothing -> pure (InR Null)
     Just (decide, vizConfig) ->
       case Ladder.doVisualize decide vizConfig of
         Right (vizProgramInfo, vizState) -> do
-          traverse_ (lift . setRecVis) $ recentlyVisualisedDecide decide vizState
+          traverse_ (lift . setRecVis) $ recentlyVisualisedDecide decide vizState vizProgramInfo
           pure $ InL $ Aeson.toJSON (VizQueryPlan.annotateLadderWithAtomIds vizProgramInfo vizState)
         Left vizError ->
           defaultResponseError $ Text.unlines
@@ -324,12 +390,48 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
 
       pure decide
 
+{- | The reply to @l4/inlineExprs@: unfold the calls the reader asked for in
+the decision last drawn, draw the result again, and put its atomIds into the
+SAME namespace "Show decision graph" uses ('VizQueryPlan.annotateLadderWithAtomIds').
+
+Without that last step the reply carried the visualiser's raw ids, so every
+leaf the expand did not touch changed id across it and a client's answers keyed
+by atomId were lost (WHERE-INLINING-SPEC §10). The unfold-everywhere semantics
+of 'Ladder.inlineExprs' are unchanged. Returns, besides the annotated reply, the
+unfolded decision and the unannotated ladder with its state, which the handler
+keeps for the next request ('queryPlanForRecent' plans from them).
+-}
+renderAfterInlining
+  :: Ladder.VizState -> Decide Resolved -> [Int]
+  -> Either Ladder.VizError (Decide Resolved, Ladder.RenderAsLadderInfo, Ladder.VizState, Ladder.RenderAsLadderInfo)
+renderAfterInlining vizState decide uniques = do
+  let postInliningDecide = Ladder.inlineExprs vizState decide uniques
+  (info, vizState') <- Ladder.doVisualize postInliningDecide (Ladder.getVizConfig vizState)
+  pure (postInliningDecide, VizQueryPlan.annotateLadderWithAtomIds info vizState', vizState', info)
+
+{- | The reply to @l4/queryPlan@: the plan for the decision last drawn, from the
+ladder and state that drawing produced.
+
+It used to draw the decision again first. With call expansions on, that ran every
+deepening pass and translated every expansion on each request — and the webview
+sends one on every change to the bindings — only for 'VizQueryPlan.vizExprToBoolExpr'
+to throw every expansion away (measured 2026-10-05: 7–11 ms per request on #520,
+about 600 ms with expansions, on the r0..r12 budget module). Drawing again is
+also not a no-op for the ids: the plan's compound-leaf @unique@s must be the ones
+on the wire the webview holds, and those are the ones this pair carries.
+-}
+queryPlanForRecent :: RecentlyVisualised -> Text -> [(Text, Bool)] -> QP.QueryPlanResponse
+queryPlanForRecent recentViz fnName bindings =
+  VizQueryPlan.queryPlanFromLadder fnName
+    (VizQueryPlan.buildParamsByUnique recentViz.ladderInfo)
+    recentViz.ladderInfo recentViz.vizState bindings
+
 {- | Make a new 'Ladder.VizConfig' by combining (i) old config (e.g. whether to
 simplify) from the 'RecentlyVisualised' (which itself contains a VizConfig) with
 (ii) up-to-date versions of potentially stale info (verTxtDocId, tcRes).
 
 Crucially this refreshes @module'@ from the current typecheck result too. @module'@
-is what 'Ladder.collectDefsForInlining' reads to decide @canInline@ (the +/unfold
+is what 'Ladder.defsForInliningOf' reads to decide @canInline@ (the +/unfold
 affordance); if it stayed frozen at the snapshot taken by the last *manual* Visualize,
 auto-refresh would recompute the ladder structure but keep a stale @canInline@ — so a
 newly-added DECIDE would not surface its inline affordance until a manual re-visualize.
@@ -340,7 +442,20 @@ updateVizConfig verTxtDocId tcRes recentlyVisualised =
     & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
     & set #moduleUri (toNormalizedUri verTxtDocId._uri)
     & set #substitution tcRes.substitution
-    & set #module' tcRes.module'
+    & set #module' (ladderModule tcRes)
+
+{- | The module a ladder is drawn from: the checked module with every mixfix
+call stamped with its pattern ('Ladder.stampMixfixCalls'), so two operators
+sharing a head keyword get different labels, and so different atomIds. Every
+path that draws for the IDE ('visualise', auto-refresh, and through the stored
+config @l4/inlineExprs@) reads the module from here.
+
+The service draws from its compiled module without the registry, so a mixfix
+call there still prints its head keyword only: the IDE and the service give
+such a call different labels and atomIds (recorded in WHERE-INLINING-SPEC §10.6).
+-}
+ladderModule :: TypeCheckResult -> Module Resolved
+ladderModule tcRes = Ladder.stampMixfixCalls tcRes.mixfixRegistry tcRes.module'
 
 -- | the 'Monoid' 'Maybe' that returns the only occurrence of 'Just'
 newtype One a = One {getOne :: Maybe a}
@@ -657,3 +772,132 @@ hasTypeInferenceVars = \ case
 hasNamedTypeInferenceVars :: OptionallyNamedType Resolved -> Bool
 hasNamedTypeInferenceVars = \ case
   MkOptionallyNamedType _ _ ty -> hasTypeInferenceVars ty
+
+-- ----------------------------------------------------------------------------
+-- Smart punctuation: quick fixes for curly quotes, dashes and NBSP pasted in
+-- from a word processor (L4.SmartPunctuation)
+-- ----------------------------------------------------------------------------
+
+-- | A quick fix's title and the (possibly several, e.g. a paired-quote fix)
+-- edits that carry it out. The one shape every smart-punctuation code action
+-- below reduces to, so "LSP.L4.Handlers" only has to wrap it in a
+-- 'CodeAction'.
+data QuickFix = MkQuickFix
+  { title :: Text
+  , edits :: [TextEdit]
+  }
+  deriving stock (Eq, Show)
+
+-- | A lexer 'LexFix' (source-span edits) as a 'QuickFix' (LSP-range edits).
+lexFixToQuickFix :: LexFix -> QuickFix
+lexFixToQuickFix fix =
+  MkQuickFix
+    { title = fix.title
+    , edits = [ TextEdit (srcSpanToLspRange (Just span_)) repl | (span_, repl) <- fix.edits ]
+    }
+
+-- | Every quick fix a confusable-character lexer error carries, in the order
+-- 'L4.Lexer.confusableLexError' built them: a paired-quote fix first (when
+-- there is one), then the dash's two spellings — ordered by
+-- 'L4.SmartPunctuation.dashReplacementFor' so the comment-shaped spelling
+-- leads when this dash's own position calls for it — or, for every other
+-- confusable, just the single-character replacement. The handler marks the
+-- first one preferred.
+lexErrorQuickFixes :: PError -> [QuickFix]
+lexErrorQuickFixes pErr = map lexFixToQuickFix pErr.fixes
+
+-- | The NBSP lint's one fix: replace the exact offending character with an
+-- ordinary space.
+nbspQuickFix :: SrcRange -> QuickFix
+nbspQuickFix range =
+  MkQuickFix
+    { title = "Replace with an ordinary space"
+    , edits = [ TextEdit (srcRangeToLspRange (Just range)) " " ]
+    }
+
+-- | The 'Range' spanning an entire document's text, computed from its own
+-- line count and last line's length. Deliberately computed from the TEXT
+-- itself (which the caller already has, via 'Rope.toText') rather than
+-- queried off a 'Rope' API, so this is correct regardless of which
+-- 'text-rope' version is in the plan and needs no IDE to test.
+wholeDocumentRange :: Text -> Range
+wholeDocumentRange contents =
+  Range (Position 0 0) (Position endLine endCol)
+  where
+    endLine = fromIntegral (Text.count "\n" contents)
+    endCol  = fromIntegral (Text.length (Text.takeWhileEnd (/= '\n') contents))
+
+-- | The "Straighten all smart punctuation in this file" action's edit: the
+-- whole document, replaced by 'L4.Lexer.straightenDocument's repaired text.
+-- 'Nothing' below two replacements — a single confusable already has its own
+-- per-character fix, so a whole-document action earns its own menu entry
+-- only once it does more than that one fix would.
+--
+-- __Also 'Nothing' when the repaired text still would not lex.__
+-- 'Lexer.straightenDocument''s fixed-point loop can stop with the document
+-- still broken — most commonly when a curly quote's matching closer sits on
+-- a LATER line than 'SP.pairedQuoteCloser' looks ahead to, so straightening
+-- the opener alone turns the rest of the file into unterminated string
+-- content. Offering this action's title with a replacement count implies a
+-- finished repair; presenting that when the file would still fail to lex,
+-- under a diagnostic that no longer even mentions smart punctuation, is
+-- worse than not offering the action at all — the per-diagnostic quick fix
+-- on whatever error remains is still available either way. So this checks
+-- the real lexer on the candidate final text before ever promising success.
+straightenDocumentQuickFix :: NormalizedUri -> Text -> Maybe QuickFix
+straightenDocumentQuickFix uri contents
+  | n < 2                                       = Nothing
+  | Left _ <- Lexer.execLexer uri final          = Nothing
+  | otherwise = Just MkQuickFix
+      { title = "Straighten all smart punctuation in this file (" <> Text.pack (show n) <> " replacements)"
+      , edits = [ TextEdit (wholeDocumentRange contents) final ]
+      }
+  where
+    (n, final) = Lexer.straightenDocument uri contents
+
+-- | Every raw name in scope at the given position — the toplevel
+-- environment plus whatever a narrower @GIVEN@/@§@ scope adds there. Exactly
+-- 'completions''s @finalCheckInfos@ computation (same two sources, same
+-- combinator), reused here so the did-you-mean fix considers the same
+-- candidate set a completion popup at that position would offer.
+inScopeRawNamesAt :: SrcPos -> TypeCheckResult -> [Text]
+inScopeRawNamesAt pos typeCheck =
+  map rawNameToText $ Map.keys $
+    Map.unionsWith (\a b -> nub (a <> b)) $
+      map (uncurry combineEnvironmentEntityInfo) $
+        (typeCheck.environment, typeCheck.entityInfo)
+          : map snd (IV.search pos typeCheck.scopeMap)
+
+-- | For an out-of-scope name whose spelling differs from an in-scope one
+-- only in its confusable punctuation — a curly quote pasted into one
+-- spelling but not the other, __either direction__ — the exact in-scope
+-- spelling to offer as a "did you mean" quick fix. 'Nothing' when no
+-- in-scope name straightens to the same text, or the two are already
+-- spelled identically (there would be nothing to fix, and the name would not
+-- have been out of scope to begin with).
+--
+-- Direction-symmetric by construction: 'SP.straightenChars' is applied to
+-- BOTH the reference and every candidate before comparing, so it does not
+-- matter which side carries the curly character. Pure and independent of
+-- 'RawName''s internals, so it is testable on plain 'Text'.
+confusableDidYouMean :: [Text] -> Text -> Maybe Text
+confusableDidYouMean inScopeRaw refRaw =
+  listToMaybe
+    [ candRaw
+    | candRaw <- inScopeRaw
+    , candRaw /= refRaw
+    , SP.straightenChars candRaw == SP.straightenChars refRaw
+    ]
+
+-- | 'confusableDidYouMean', wrapped into the 'QuickFix' a code action needs:
+-- the out-of-scope reference's own range, replaced with the matched in-scope
+-- name's exact spelling (rendered with backticks when it needs them, via
+-- 'quoteIfNeeded' — the same renderer 'quotedName' is built on).
+confusableDidYouMeanFix :: SrcRange -> Text -> [Text] -> Maybe QuickFix
+confusableDidYouMeanFix range refRaw inScopeRaw = do
+  candRaw <- confusableDidYouMean inScopeRaw refRaw
+  let shown = quoteIfNeeded candRaw
+  pure MkQuickFix
+    { title = "Replace with " <> shown
+    , edits = [ TextEdit (srcRangeToLspRange (Just range)) shown ]
+    }

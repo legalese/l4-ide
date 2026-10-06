@@ -41,7 +41,7 @@ import qualified Data.UUID.V5 as UUIDV5
 
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.VizExpr as VizExpr
-import LSP.L4.Viz.QueryPlan (annotateLadderWithAtomIdsUsing, vizExprToBoolExpr)
+import LSP.L4.Viz.QueryPlan (annotateLadderWithAtomIdsUsing, ladderAtomIds, vizExprToBoolExpr)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import Backend.Api (FnArguments (..), FnLiteral (..))
@@ -254,7 +254,7 @@ buildDecisionQueryCacheFromCompiled nodeBudget funName compiled sourceText = do
       -- the annotation does not touch, so it stays valid afterwards.
       paramsByUnique = Map.fromList [(p.unique, p.label) | p <- ladderInfo.funDecl.params]
       joinableLadder =
-        annotateLadderWithAtomIdsUsing (QP.atomIdByUnique funName paramsByUnique core) ladderInfo
+        annotateLadderWithAtomIdsUsing (ladderAtomIds funName paramsByUnique core ladderInfo.funDecl.body) ladderInfo
 
   pure
     CachedDecisionQuery
@@ -289,7 +289,7 @@ exceedsNodeBudget budget root = go budget [root]
     VizExpr.Or _ args             -> args
     VizExpr.Not _ negand          -> [negand]
     VizExpr.Implies _ scope req _ -> [scope, req]
-    VizExpr.App _ _ args _        -> args
+    VizExpr.App _ _ args _ _      -> args
     VizExpr.UBoolVar{}            -> []
     VizExpr.TrueE{}               -> []
     VizExpr.FalseE{}              -> []

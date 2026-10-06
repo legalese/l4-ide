@@ -225,7 +225,15 @@ buildFunctionPaths vis prefix deployId fn =
                               ]
                           ]
                       ]
-                  , "responses" .= standardResponses
+                  , "responses" .= Aeson.object
+                      [ "200" .= Aeson.object
+                          [ "description" .= ("Every case, with its answer, refusal or error" :: Text)
+                          , "content" .= Aeson.object
+                              [ "application/json" .= Aeson.object
+                                  [ "schema" .= batchResponseSchema fn ]
+                              ]
+                          ]
+                      ]
                   ]
               ]
           )
@@ -322,13 +330,24 @@ buildComponents = Aeson.object
       ]
   ]
 
+-- | The optional @presumption@ field of an evaluation request (T4 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+presumptionSchema :: Aeson.Value
+presumptionSchema = Aeson.object
+  [ "type" .= ("string" :: Text)
+  , "enum" .= (["soft", "hard"] :: [Text])
+  , "description" .= ("soft (the default): an argument left out takes its default; hard: no defaults are used, so an argument left out is missing" :: Text)
+  ]
+
 -- | Build the request body schema for evaluation endpoints.
 -- Always wraps function parameters in an "arguments" key.
 -- Deontic functions additionally require "startTime" and "events".
 evalRequestSchema :: FunctionSummary -> Aeson.Value
 evalRequestSchema fn =
   let baseProps = Aeson.KeyMap.fromList
-        [ ("arguments", stripNonOpenApiFields $ Aeson.toJSON fn.fsParameters) ]
+        [ ("arguments", stripNonOpenApiFields $ Aeson.toJSON fn.fsParameters)
+        , ("presumption", presumptionSchema)
+        ]
       baseRequired = ["arguments" :: Text]
       (props, required)
         | fn.fsIsDeontic =
@@ -385,9 +404,67 @@ batchRequestSchema fn =
                 ]
             , "description" .= ("Input cases to evaluate" :: Text)
             ]
+        , "presumption" .= presumptionSchema
         ]
     , "required" .= (["outcomes", "cases"] :: [Text])
     ]
+
+-- | The 200 response of the batch endpoint, as the ToJSON of 'BatchResponse'
+-- and 'OutputCase' in "Types" writes it. Every case has @\@id@ and
+-- @\@presumed@; an answered case adds @value@, a refused one @\@refused@, an
+-- errored one @\@error@, and one a limit stopped @\@error@ and @\@limit@.
+batchResponseSchema :: FunctionSummary -> Aeson.Value
+batchResponseSchema fn =
+  Aeson.object
+    [ "type" .= ("object" :: Text)
+    , "properties" .= Aeson.object
+        [ "cases" .= Aeson.object
+            [ "type" .= ("array" :: Text)
+            , "description" .= ("One entry per case sent, in the same order" :: Text)
+            , "items" .= Aeson.object
+                [ "type" .= ("object" :: Text)
+                , "properties" .= Aeson.object
+                    [ "@id" .= typed "integer" "The case's @id, as sent"
+                    , "@presumed" .= Aeson.object
+                        [ "type" .= ("array" :: Text)
+                        , "items" .= Aeson.object ["type" .= ("string" :: Text)]
+                        , "description" .= ("Inputs the case left out whose defaults its answer or refusal used, by name (a record field by its path)" :: Text)
+                        ]
+                    , "value" .= Aeson.object
+                        [ "description" .= ("The answer, of type " <> fn.fsReturnType <> ". Only on an answered case" :: Text) ]
+                    , "@refused" .= typed "string" "The reason the rule gave for refusing to answer. A refused case counts as processed"
+                    , "@error" .= typed "string" "Why the case has no answer. Counted in casesIgnored"
+                    , "@limit" .= Aeson.object
+                        [ "type" .= ("string" :: Text)
+                        , "enum" .= (["time", "memory"] :: [Text])
+                        , "description" .= ("Beside @error when the service stopped the case at a limit: time is --eval-timeout, memory is --max-eval-memory-mb. Sending the case again may give an answer, with a higher limit, or for time when the service is less busy. Neither @limit nor its absence promises what a retry will do: values the deployment has already worked out are kept, so a case can fail where a later identical one answers. The evaluator's recursion-depth limit is a plain @error, without @limit" :: Text)
+                        ]
+                    , "@graphviz" .= Aeson.object
+                        [ "type" .= ("object" :: Text)
+                        , "properties" .= Aeson.object ["dot" .= typed "string" "GraphViz DOT source of the trace"]
+                        , "description" .= ("Only on an answered case, with ?trace=full&graphviz=true" :: Text)
+                        ]
+                    ]
+                , "required" .= (["@id", "@presumed"] :: [Text])
+                ]
+            ]
+        , "summary" .= Aeson.object
+            [ "type" .= ("object" :: Text)
+            , "properties" .= Aeson.object
+                [ "casesRead" .= typed "integer" "Cases in the request"
+                , "casesProcessed" .= typed "integer" "Cases answered or refused"
+                , "casesIgnored" .= typed "integer" "Cases with @error, including those with @limit"
+                , "processorDurationSec" .= typed "number" "Not measured: always 0"
+                , "processorCasesPerSec" .= typed "number" "Not measured: always 0"
+                , "processorQueuedSec" .= typed "number" "Not measured: always 0"
+                ]
+            ]
+        ]
+    , "required" .= (["cases", "summary"] :: [Text])
+    ]
+ where
+  typed :: Text -> Text -> Aeson.Value
+  typed t d = Aeson.object ["type" .= t, "description" .= d]
 
 -- | Recursively strip non-OpenAPI-compliant fields from parameter schemas.
 -- Removes "alias", "propertyOrder", and "x-l4-type" which are L4-specific

@@ -131,15 +131,108 @@ Result:
   20
 
 
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
 Evaluation[2] @ late-fee.l4:28:1-39
 
 Result:
   50
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, with the source range it came from. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
+
+### Seeing how an answer was reached
+
+Under every result, `l4 run` prints a `Trace:` line.
+For an ordinary `#EVAL` it says `(no trace captured; add #EVALTRACE to the directive)`.
+That is not a fault in your file: an `#EVAL` gives you the answer only, and L4 does not keep a record of the steps.
+
+To see the steps, ask with `#EVALTRACE` instead.
+Add one more line to the end of `late-fee.l4`:
+
+```l4
+#EVALTRACE `late fee` `a slightly late invoice`
+```
+
+Run the file again.
+A third block appears, and this time its `Trace:` is the working itself:
+
+```
+Evaluation[3] @ late-fee.l4:29:1-48
+
+Result:
+  20
+
+
+Trace:
+  ┌ `late fee` OF `a slightly late invoice`
+  │┌ `late fee`
+  │└ <function>
+  ├ IF ((invoice's `days overdue`) AT MOST 0) THEN 0 ELSE (IF ((invoice's `days overdue`) AT MOST 30) THEN ((invoice's amount) TIMES 0.02) ELSE ((invoice's amount) TIMES 0.05))
+  │┌ (invoice's `days overdue`) AT MOST 0
+  ││┌ invoice's `days overdue`
+  ││├ `days overdue` OF invoice
+  │││┌ `days overdue`
+  │││└ <function>
+  ││├ CONSIDER Invoice
+  │││   WHEN Invoice amount `days overdue` THEN `days overdue`
+  ││├ `days overdue`
+  ││└ 12
+  │└ FALSE
+  ├ IF ((invoice's `days overdue`) AT MOST 30) THEN ((invoice's amount) TIMES 0.02) ELSE ((invoice's amount) TIMES 0.05)
+  │┌ (invoice's `days overdue`) AT MOST 30
+  ││┌ invoice's `days overdue`
+  ││├ `days overdue` OF invoice
+  │││┌ `days overdue`
+  │││└ <function>
+  ││├ CONSIDER Invoice
+  │││   WHEN Invoice amount `days overdue` THEN `days overdue`
+  ││├ `days overdue`
+  ││└ 12
+  │└ TRUE
+  ├ (invoice's amount) TIMES 0.02
+  │┌ invoice's amount
+  │├ amount OF invoice
+  ││┌ amount
+  ││└ <function>
+  │├ CONSIDER Invoice
+  ││   WHEN Invoice amount `days overdue` THEN amount
+  │├ amount
+  │└ 1000
+  └ 20
+```
+
+Read it from the top.
+The first line is what you asked.
+Each line starting with `├` is one step toward the answer: here the rule first checks whether the invoice is 0 days overdue or fewer (`FALSE`, because it is 12), then whether it is 30 or fewer (`TRUE`), then multiplies the amount, 1000, by `0.02`.
+The indented lines beside a step are the smaller questions that step had to settle first.
+The last line, `└ 20`, is the answer.
+
+Two kinds of line in it are ones you did not write, and you can pass over both.
+A line reading `<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
+A `CONSIDER Invoice` with a `WHEN Invoice amount …` beneath it is L4 reading one field out of the invoice: it matches the invoice against its list of fields and takes the one it needs.
+
+On a terminal you will see the trace twice.
+It also appears in the messages L4 prints on the error stream, where warnings and errors go, ahead of the results.
+Add `2>/dev/null` to the command to hide that stream and see the trace once.
+
+Traces are on by default.
+If a file has many `#EVALTRACE` lines and you want only the results, add `--trace none`:
+
+```bash
+l4 run --trace none late-fee.l4
+```
+
+Only the text output shows traces: `--json` (below) carries none, whatever `--trace` says.
+To see the same working as a diagram, use `l4 trace`, described under "The Other Subcommands" further down.
 
 ### Machine-readable output
 
@@ -301,18 +394,62 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 ```
 
 ```
-{"diagnostics":[],"input":{"amount":1000,"days_overdue":12},"output":[{"result":20,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"amount":1000,"days_overdue":45},"output":[{"result":50,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"amount":2500,"days_overdue":0},"output":[{"result":0,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{"amount":1000,"days_overdue":12},"output":[{"result":20,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"amount":1000,"days_overdue":45},"output":[{"result":50,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"amount":2500,"days_overdue":0},"output":[{"result":0,"trace":null}],"presumed":[],"status":"success"}
 ```
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
 
+#### Facts a case leaves out
+
+A fact can carry a usual value, written with [`TYPICALLY`](../../reference/types/TYPICALLY.md): a rebuttable presumption that holds unless the case says otherwise. When a case leaves such a fact out, `l4 batch` uses the usual value, and the line says so under `presumed`:
+
+```l4
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Can contract
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`can contract` MEANS `is adult` AND `has capacity`
+```
+
+```
+$ cat cases.json
+[ {"is adult": true}, {"is adult": true, "has capacity": false}, {"is adult": false} ]
+
+$ l4 batch capacity.l4 --inputs cases.json
+{"diagnostics":[],"input":{"is adult":true},"output":[{"result":true,"trace":null}],"presumed":["has capacity"],"status":"success"}
+{"diagnostics":[],"input":{"has capacity":false,"is adult":true},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"is adult":false},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+```
+
+The first case took the usual value, and the answer rests on it. The second supplied the fact, so nothing was presumed. The third left the fact out too, but `presumed` is empty: someone who is not an adult cannot contract whatever their capacity, so the answer never needed it. `presumed` lists only what the answer actually used.
+
+What counts as leaving a fact out:
+
+- **The usual value works the same wherever the `TYPICALLY` is written**: on a section `GIVEN` as above, on a rule's own `GIVEN`, or on a field of a record the rule takes as an input. A field is listed by its path, such as `config.timeout`.
+- **Leaving the name out of the case is leaving the fact out.** In a CSV file, an empty cell means the same, and so does a cell holding only spaces or a quoted `""`, so one file can let one row take the usual value while the next row supplies its own. A blank line is not a case, and neither is a line holding only spaces or tabs; a quoted `"   "` is a case whose one cell is empty. A line with more or fewer cells than the header is an error that names its line number, because a cell missing from a short line would otherwise take its usual value without anyone having said so. A file saved as Excel's "CSV UTF-8", which starts with an invisible byte-order mark, reads the same as one without, and so does a file with Windows line ends.
+- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact. That holds for every fact that is not a `MAYBE`, whether or not it has a usual value. `{}` given as a fact's value means the same as `null`, a fact that is a record included, and so does `{}` as an item of a list; a whole case `{}` supplies nothing, so every usual value applies. There is not yet a way to say "this record, with every field at its usual value"; leave out each field you mean to leave to its usual value.
+- **A misspelled name is an error where a usual value is taken.** In a case that leaves out a fact with a usual value, a name that matches no fact (a JSON key, or a CSV column) is an error that names it and the nearest fact, `Unknown field 'has capasity' (did you mean 'has capacity'?)`, because it may be the fact that was left out. The same holds inside a record. In a case where nothing takes a usual value, an extra name is ignored, as it always was. `--validate-only` reports it the same way.
+- **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before, and that is listed under `presumed` too: it is a presumption that the case is silent because there is nothing to say.
+- **A `TYPICALLY` on an `ASSUME` is not used**, here or by `l4 run`, and the fact stays required; move it under its section's heading to make it count.
+- **A rule's own `GIVEN` is the one place the boundary is ahead of the file.** `l4 batch` fills a rule's own defaulted input that a case leaves out, but inside the file ``#EVAL `the rule` WITH …`` still refuses to leave one out, and names it as missing; that half is not built yet. A section `GIVEN` behaves the same in both.
+
+To see what the rules establish without any usual values, pass `--presumption hard`. Every fact must then be in the case. A line that leaves facts out is an error naming every one of them, exactly as for a fact with no usual value, and `--validate-only` reports them the same way. That includes a fact the rules would never have read for that case: `l4 batch` checks that every fact is there before it runs the rules, so with `--presumption hard`, `{"is adult": false}` is an error naming `has capacity`, although someone who is not an adult cannot contract whatever their capacity. The switch reaches only what a case can supply: a record the rules decode from JSON of their own still takes its usual values, and with `--presumption hard` the line lists them under `presumed` as `JSONDECODE <type>: <field>`. The default is `--presumption soft`.
+
+`presumed` appears in every output format, on every line that was evaluated, including one that ended in an error. With `--format csv` it is a column holding the same list as compact JSON, `[]` when nothing was presumed; a list rather than names joined by a separator, because a name may itself contain a comma or a semicolon. `--validate-only` evaluates nothing, so its lines have no `presumed`.
+
+One limit, measured 2026-10-02: a rule that overrides a section `GIVEN` for part of a calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, does not run under `l4 batch`, although `#EVAL` answers it. The line is an error that says _You are giving named inputs to `inner` … but it is not a function, so it takes none._, because `l4 batch` supplies a section `GIVEN` by replacing it with a plain value, which a `WITH` can no longer reach. This was so before `TYPICALLY` defaults reached `l4 batch`, and is not changed by them.
+
 ### `l4 trace` and `l4 state-graph` — visualization
 
-- `l4 trace myfile.l4` renders every `#EVALTRACE` in the file as GraphViz DOT (`--format dot|png|svg`, `-o DIR` for image output; PNG/SVG need GraphViz installed).
+- `l4 trace myfile.l4` draws every `#EVALTRACE` in the file as a diagram, where `l4 run` prints it as text.
+  It prints a description of the diagram in GraphViz DOT: GraphViz is a free diagram-drawing program, and DOT is its text format.
+  `--format dot|png|svg` chooses the output and `-o DIR` writes one file per `#EVALTRACE` into a directory; PNG and SVG pictures need GraphViz installed.
 - `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT. With `--dominators` it prints, instead, the acts every path to `FULFILLED` and to `BREACH` must pass through; with `--dominators --dot` it keeps the DOT and draws those acts heavy. See [State graph and `--dominators`](../../reference/regulative/STATE-GRAPH.md).
 - `l4 lts myfile.l4` reads every `#TRACE` out as a plain list: what is owed now, what would discharge it, what would put someone in breach, and the next deadline (`--steps` for the history, `--json` for a program). See [What is owed now](../../reference/regulative/lts-list.md).
 

@@ -36,6 +36,9 @@ SPEC.md §4 says E0 is:
 | FLIP               | `standalone/app.ts:92,116`, near-verbatim copy at `standalone/playground.ts:138,167` | **none**                                                                     | promote + de-duplicate (~60 dup LOC) |
 | `viewBox` pan/zoom | **zero lines anywhere in the repo**                                                  | SvelteFlow, which Step 8 deletes                                             | **write from scratch**               |
 
+Every `standalone/app.ts` and `standalone/playground.ts` line number in this table and in §3.2–§3.4 is from the 2026-07-27 grounding, before Step 4 (`e720e3da`) moved that code out of the demos.
+It now lives in `ts-shared/ladder-svg/src/controller.ts` (the one delegated click, `controller.ts:209`; the metrics default, `:182`) and `src/flip.ts` (`flipIndex`, `flip.ts:31`), and the cited demo lines no longer hold it.
+
 The logic half of the first two already shipped at ladder Step 3:
 `ts-shared/l4-ladder-visualizer/src/lib/model/ladder-model.ts:96` (`cycleValue`) and `:112`
 (`toggleFold`), in a class that is explicitly framework-free — no `LirContext`, no runes
@@ -267,7 +270,7 @@ row (now amended):
   page **unless the ladder has focus**, exactly as §3.3 words it (and note that a click
   focuses the host, since the controller makes it `tabindex="0"`).
 - **Seam S8 — baked palettes.** ⚠️ **HALF-CLOSED in ladder Step 4** (`e720e3da`). The palette is
-  a **parameter** now, not a bake: all 33 colours the emit names are fields of an exported
+  a **parameter** now, not a bake: all 40 colours the emit names are fields of an exported
   `Palette`, `sceneToSvg` takes one, `LadderController.setTheme` re-themes a live diagram
   without remounting it, and `DARK_PALETTE` is the proof — so a widget pasted into
   a host page whose colours we do not control no longer has to read as a foreign white
@@ -356,11 +359,11 @@ export interface LadderControllerOpts {
   readonly onAct?: (act: ClickAct) => void;
   /**
    * ADDED in Step 4. Called once the new `<svg>` is in the host and sized, BEFORE the FLIP
-   * invert. The one hook a host needs to decorate individual nodes it cannot express as a
-   * `ViewSpec` — `standalone/playground.ts` marks its hydratable refs `lad-ref` and its
-   * hydrated headings `lad-hydrated` this way, and without the hook that behaviour would
-   * have had to move into the controller, which does not know what a "ref" is. Do not
-   * mutate geometry here: the FLIP baseline is already captured.
+   * invert. The one hook a host needs for what it cannot express as a `ViewSpec`. Step 4
+   * added it for `standalone/playground.ts`'s `lad-ref` / `lad-hydrated` node marks; since
+   * call panels (`ec7cae39e`) removed the playground's client-side splice, the playground's
+   * `onRender` paints its pane the diagram's panel backdrop instead. Do not mutate geometry
+   * here: the FLIP baseline is already captured.
    */
   readonly onRender?: (svg: SVGSVGElement, scene: Scene) => void;
 }
@@ -378,10 +381,14 @@ export declare class LadderController {
   /**
    * Swap the source tree (a live re-fetch). Invalidates the FLIP baseline and refits.
    *
-   * `keepBaseline` ADDED in Step 4: `standalone/playground.ts` rebuilds its display tree on
-   * EVERY render (hydration splices a referenced DECIDE in place), so it calls this every
-   * frame — and there the FLIP is exactly the affordance that shows what happened. A caller
-   * that is genuinely changing subject passes nothing and gets a clean refit.
+   * `keepBaseline` ADDED in Step 4, when `standalone/playground.ts` rebuilt its display
+   * tree on every render. Since call panels (`ec7cae39e`) its decoded tree holds every
+   * panel, and a fold does not change it; it still calls this on every render, passing
+   * `true` except for a newly chosen decision, so a fold keeps its FLIP. Ticking or
+   * clearing "draw calls in place" decodes the same replies again in the other mode
+   * (`"leaf"` or `"expand"`), which is a different tree, and reloads the decision without
+   * the baseline. A caller that is genuinely changing subject passes nothing and gets a
+   * clean refit.
    */
   setFunDecl(fn: FunDecl, keepBaseline?: boolean): void;
   /**
@@ -1084,9 +1091,9 @@ Criteria 8 and 9 do **not** gate M2 or M3 (§1.3). They gate the distribution cl
   the wire for free) and not E1a/static.
 - **R8 — ANSWERED 2026-07-30 (ladder Step 4, `e720e3da`). It does not gate E1, because the half
   that mattered landed.** The palette is no longer baked: it is a **parameter**. `Palette` is
-  exported from `@repo/ladder-svg` with all 33 colours the emit names (the seven that were
-  already a `Palette`, the nineteen that were inline literals, and the seven added by the
-  FALSE-vs-UNKNOWN fix), `sceneToSvg(scene, theme
+  exported from `@repo/ladder-svg` with all 40 colours the emit names (the seven that were
+  already a `Palette`, the nineteen that were inline literals, the seven added by the
+  FALSE-vs-UNKNOWN fix, and the seven added by call panels and the filled NOT bubble), `sceneToSvg(scene, theme
 | palette)` takes one, and `DARK_PALETTE` ships as the second implementation. So a host that
   already knows its own theme — which a wiki embed does — passes a `Palette` and gets a legible
   diagram **today**, without `auto`; and `LadderController.setTheme` lets it change its mind

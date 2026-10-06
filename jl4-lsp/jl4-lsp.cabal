@@ -161,13 +161,18 @@ test-suite jl4-lsp-test
     HoverDisplaySpec
     ImportDiagnosticSpec
     ImportUriSpec
+    LadderAtomIdSpec
+    LadderCallExpansionSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
+    SmartPunctuationActionsSpec
     StateGraphLensSpec
+    VisualiseExpansionOptInSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     aeson,
+    bytestring,
     directory,
     filepath,
     hspec,

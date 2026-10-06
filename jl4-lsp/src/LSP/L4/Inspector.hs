@@ -138,7 +138,7 @@ evalDirectiveToResult
   -> SrcRange
   -> EL.EvalDirectiveResult
   -> DirectiveResult
-evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led _notes) =
+evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led _notes _) =
   DirectiveResult
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields evalRes
@@ -285,7 +285,7 @@ evalDirectiveToUpdateItem
   -> (Int -> Int -> Text)   -- ^ slice raw source lines, inclusive 1-indexed [startLine, endLine]
   -> EL.EvalDirectiveResult
   -> Maybe DirectiveUpdateItem
-evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led _notes) =
+evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led _notes _) =
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields evalRes
@@ -407,7 +407,12 @@ exportedFunctionToSummary declares ef =
           desc = case ep.paramDescription of
             Just d  -> d
             Nothing -> base.parameterDescription
-      in (ep.paramName, base { FSchema.parameterDescription = desc })
+      in ( ep.paramName
+         , base
+             { FSchema.parameterDescription = desc
+             , FSchema.parameterDefault = FSchema.typicallyToJson =<< Export.honouredDefault ep
+             }
+         )
 
     paramPairs = map mkParam ef.exportParams
     params = FSchema.MkParameters
@@ -417,7 +422,8 @@ exportedFunctionToSummary declares ef =
       -- made the deploy sidebar's breaking-change diff report optional
       -- params (e.g. MAYBE-typed object inputs) as "now required" on
       -- every redeploy, since the deployed schema correctly omits them.
-      , required = [ep.paramName | ep <- ef.exportParams, ep.paramRequired]
+      -- A defaulted input is optional there too (W2), and carries its default.
+      , required = [ep.paramName | ep <- ef.exportParams, Export.isRequiredInput ep]
       }
 
     -- Use prettyTypeForDisplay (not plain prettyLayout) so residual inference

@@ -284,18 +284,18 @@ l4 batch what-a-section-needs-to-know.l4 \
 One line of answer comes back per case:
 
 ```
-{"diagnostics":[],"input":{"annual income":40000,"net worth":20000},"output":[{"result":2500,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"annual income":300000,"net worth":900000},"output":[{"result":90000,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{"annual income":40000,"net worth":20000},"output":[{"result":2500,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"annual income":300000,"net worth":900000},"output":[{"result":90000,"trace":null}],"presumed":[],"status":"success"}
 ```
 
-Six things are written on each of those lines, and only one of them is the answer. `input` repeats the case that was asked, so that what was asked and what was decided stay on one line. `result` is the answer. `status` says whether the case ran at all, and `success` means it did. `diagnostics` is the list of things that went wrong, and the empty pair of square brackets `[]` means that list is empty — nothing went wrong. `output` sits inside square brackets because the tool always writes it as a list, even where, as here, the list holds one answer. `trace` would hold a step-by-step working of how the answer was reached, which nobody asked for here; the word beside it is the tool's way of writing _there is none_ (**"null"**). Nothing on either line is a warning, and nothing is missing.
+Seven things are written on each of those lines, and only one of them is the answer. `input` repeats the case that was asked, so that what was asked and what was decided stay on one line. `result` is the answer. `status` says whether the case ran at all, and `success` means it did. `diagnostics` is the list of things that went wrong, and the empty pair of square brackets `[]` means that list is empty — nothing went wrong. `output` sits inside square brackets because the tool always writes it as a list, even where, as here, the list holds one answer. `trace` would hold a step-by-step working of how the answer was reached, which nobody asked for here; the word beside it is the tool's way of writing _there is none_ (**"null"**). `presumed` would list any fact the answer took its usual value for, because the case left it out and the rules give it one with `TYPICALLY`; this section gives none, so the list is empty. Nothing on either line is a warning, and nothing is missing.
 
 Alex is below the cut point on both measures, so five per cent applies: five per cent of $40,000 is $2,000, under the floor, so the floor of $2,500 governs. The second investor is above it on both, so ten per cent of the larger measure applies: $90,000, below the ceiling. Each line carries the case alongside the answer, so what was asked and what was decided is one line, not two files.
 
 **Leave a fact out and you are told which one.** Send Alex's income with no net worth:
 
 ```
-{"diagnostics":["Missing required field 'net worth' in JSON object"],"input":{"annual income":40000},"output":[{"result":{"error":"Missing required field 'net worth' in JSON object\n"},"trace":null}],"status":"error"}
+{"diagnostics":["Missing required field 'net worth' in JSON object"],"input":{"annual income":40000},"output":[{"result":{"error":"Missing required field 'net worth' in JSON object\n"},"trace":null}],"presumed":[],"status":"error"}
 ```
 
 `net worth` is required because the chain of rules reaches it. Nothing else is required, because nothing else is reached, and a fact you send that the question never reaches is ignored.
@@ -324,7 +324,7 @@ which reports `NUMBER`. Checking that the rules fit together needs no facts abou
 Run the file whole, and among the tool's notes this comes back:
 
 ```
-Evaluation[1] @ what-a-section-needs-to-know.l4:40:1-35
+Evaluation[1] @ what-a-section-needs-to-know.l4:39:1-35
 
 Result:
   40000
@@ -397,13 +397,13 @@ Two boxes on one, six on the other, and no box on both. Nobody drew either form 
 
 ### Checking the list before you publish
 
-Seeing that published list set out as a list, and turning it into a form, are both part of publishing the rules; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) shows you how. Before you get that far there is a rough check you can make from the command line. Give `l4 batch` a case with nothing in it at all — a file holding `[{}]` — and it names a fact the question requires:
+Seeing that published list set out as a list, and turning it into a form, are both part of publishing the rules; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) shows you how. Before you get that far there is a rough check you can make from the command line. Give `l4 batch` a case with nothing in it at all — a file holding `[{}]` — and it names every fact the question requires:
 
 ```
-{"diagnostics":["Missing required field 'annual income' in JSON object"],"input":{},"output":[{"result":{"error":"Missing required field 'annual income' in JSON object\n"},"trace":null}],"status":"error"}
+{"diagnostics":["Missing required fields 'annual income', 'net worth' in JSON object"],"input":{},"output":[{"result":{"error":"Missing required fields 'annual income', 'net worth' in JSON object\n"},"trace":null}],"presumed":[],"status":"error"}
 ```
 
-It names one fact, not the whole list, so it confirms rather than enumerates: fill that one in, run it again, and it names the next. For a section with two facts that is a quick way to satisfy yourself both came out right. For a section with twenty, it is the published list you want.
+For a section with two facts that is a quick way to satisfy yourself both came out right. It leaves out any fact with a usual value written with `TYPICALLY`, because an empty case takes those; for the whole list, including those, it is the published list you want.
 
 ---
 

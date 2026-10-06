@@ -32,6 +32,17 @@
  * `App` (DESIGN §23 / TODO §D) maps to a ladder `App` LEAF carrying its `atomId`
  * and the `fnName` label. Rendering its interior ("drawn open") is D1's job; A1
  * only needs the leaf to exist and to be eval-addressable by `atomId`.
+ *
+ * CALLS. A call leaf (a `UBoolVar` with `canInline`, or an `App` of a rule of the module)
+ * may carry `expansion`: the callee's body with the actual arguments substituted, which the
+ * server must send in the caller's atomId namespace (the contract in `viz-expr`'s
+ * `UBoolVar.expansion`). jl4-lsp sends it only when a client asks: `l4.visualize`'s
+ * fourth argument `{"expandCalls": true}`; the tests read a capture made that way
+ * (`test/fixtures/call-expansions.json`). `opts.calls` chooses what to do with it:
+ *  - `"leaf"` (the default) ignores it, so the output is exactly what it was before the
+ *    field existed — every figure, golden and test that predates call panels is unchanged;
+ *  - `"expand"` decodes the call as a group `{ $type: "And", id: <call id>, label: <call
+ *    as written>, call: true, args: [<expansion>] }` — a call panel, foldable by its id.
  */
 import type {
   FunDecl as VizFunDecl,
@@ -60,6 +71,11 @@ import type {
  * must move when the user binds `u`. `unique`/`nodesByUnique` cover `UBoolVar` only (the
  * atoms the evaluator's `Assignment` keys on); `atomId` covers `UBoolVar` and `App` (both
  * eval-addressable, `App` via `evalApp`).
+ *
+ * In `calls: "expand"` mode `atomId` ALSO covers call panels: an `And` group with
+ * `call: true` is indexed under its call leaf's atomId, so a folded copy of a call links to
+ * every other copy. Such an entry is a GROUP, not a leaf — tell them apart by `And.call` —
+ * and must not be handed to `evalApp` as though it were one.
  */
 export interface DecodedIdentity {
   readonly uniqueByNode: Map<NodeId, Unique>;
@@ -87,19 +103,24 @@ export interface DecodedViz extends DecodedIdentity {
 /** Everything `convert` fills as it walks. Bundling the side-channels keeps the recursive
  *  signature to two args and makes adding a channel a one-line change, not a re-thread. */
 interface Sink {
+  readonly calls: CallMode;
   readonly valuation: Map<NodeId, UBoolValue>;
   readonly provenance: Map<NodeId, Provenance>;
   readonly defaults: Map<NodeId, UBoolValue>;
   readonly uniqueByNode: Map<NodeId, Unique>;
   readonly atomIdByNode: Map<NodeId, string>;
+  /** Node ids already decoded (expand mode only — see `convert`). */
+  readonly seen: Set<NodeId>;
 }
 
-const emptySink = (): Sink => ({
+const emptySink = (opts: FromVizOpts): Sink => ({
+  calls: opts.calls ?? "leaf",
   valuation: new Map(),
   provenance: new Map(),
   defaults: new Map(),
   uniqueByNode: new Map(),
   atomIdByNode: new Map(),
+  seen: new Set(),
 });
 
 /** Build the plural inverse of a per-node map (one key can land on several positions). */
@@ -120,9 +141,24 @@ const identityOf = (s: Sink): DecodedIdentity => ({
   nodesByAtomId: invert(s.atomIdByNode),
 });
 
+/**
+ * What to do with a call leaf's wire `expansion` (see the file header).
+ * `"leaf"`: ignore it — the call is one box, as before expansions existed.
+ * `"expand"`: decode it as a call panel, a `call: true` group under the call's own id.
+ */
+export type CallMode = "leaf" | "expand";
+
+export interface FromVizOpts {
+  /** Default `"leaf"`. */
+  readonly calls?: CallMode;
+}
+
 /** Decode a wire `FunDecl` into a ladder `FunDecl` + valuation/provenance/identity. */
-export function fromVizFunDecl(viz: VizFunDecl): DecodedViz {
-  const sink = emptySink();
+export function fromVizFunDecl(
+  viz: VizFunDecl,
+  opts: FromVizOpts = {},
+): DecodedViz {
+  const sink = emptySink(opts);
   const body = convert(viz.body, sink);
   const fn: FunDecl = {
     id: viz.id.id,
@@ -140,13 +176,16 @@ export function fromVizFunDecl(viz: VizFunDecl): DecodedViz {
 }
 
 /** Decode a bare wire `IRExpr` (e.g. an inlined sub-expression) the same way. */
-export function fromVizExpr(viz: VizIRExpr): DecodedIdentity & {
+export function fromVizExpr(
+  viz: VizIRExpr,
+  opts: FromVizOpts = {},
+): DecodedIdentity & {
   readonly expr: IRExpr;
   readonly valuation: Map<NodeId, UBoolValue>;
   readonly provenance: Map<NodeId, Provenance>;
   readonly defaults: Map<NodeId, UBoolValue>;
 } {
-  const sink = emptySink();
+  const sink = emptySink(opts);
   const expr = convert(viz, sink);
   return {
     expr,
@@ -157,8 +196,112 @@ export function fromVizExpr(viz: VizIRExpr): DecodedIdentity & {
   };
 }
 
+/**
+ * A call's label for its panel: the wire spells a call `` `is creditworthy` OF a `` or
+ * `limb OF a, b`; the panel says `is creditworthy a` and `limb a b`. Backticks go, as they
+ * do in the decision heading, the sentences and mermaid; the ` OF ` and the commas between
+ * arguments go too, but only at the top level — inside backticks, a string literal, or round
+ * or square brackets they belong to an argument, and a string literal is copied untouched.
+ * Leaf mode does not use this: a call drawn as one box shows its wire label as it is, and a
+ * term inside a panel keeps its backticks, so the same call reads differently in the two
+ * modes (WHERE-INLINING-SPEC §10.3).
+ *
+ * The label is PREFIX-NORMALISED, not the call as the drafter wrote it. A mixfix call
+ * arrives from jl4-lsp in its surface form (`` a `is older than` b ``), because the LSP
+ * stamps mixfix calls with their patterns before drawing (`stampMixfixCalls`), and is
+ * shown as `a is older than b`; from a server that does not stamp them (jl4-service) it
+ * arrives in prefix form (`` `is older than` OF a, b ``) and is shown as
+ * `is older than a b`.
+ */
+export function callLabel(wire: string): string {
+  const parts: string[] = [];
+  let cur = "";
+  let depth = 0;
+  let quoted = false; // inside backticks
+  let str = false; // inside a "string literal"
+  let sawOf = false;
+  for (let i = 0; i < wire.length; i++) {
+    const c = wire[i]!;
+    if (str) {
+      cur += c;
+      if (c === "\\" && i + 1 < wire.length) cur += wire[++i]!;
+      else if (c === '"') str = false;
+      continue;
+    }
+    if (!quoted && c === '"') {
+      str = true;
+      cur += c;
+      continue;
+    }
+    if (c === "`") quoted = !quoted;
+    else if (!quoted && (c === "(" || c === "[")) depth++;
+    else if (!quoted && (c === ")" || c === "]")) depth--;
+    const top = !quoted && depth === 0;
+    if (top && !sawOf && wire.startsWith(" OF ", i)) {
+      parts.push(cur);
+      cur = "";
+      sawOf = true;
+      i += 3;
+      continue;
+    }
+    if (top && sawOf && wire.startsWith(", ", i)) {
+      parts.push(cur);
+      cur = "";
+      i += 1;
+      continue;
+    }
+    cur += c;
+  }
+  parts.push(cur);
+  // backticks go everywhere except inside a string literal
+  const unquote = (s: string) =>
+    s.replace(/("(?:[^"\\]|\\.)*")|`/g, (_m, lit) => lit ?? "");
+  return parts
+    .map((s) => unquote(s).trim())
+    .filter((s) => s !== "")
+    .join(" ");
+}
+
+/**
+ * The call panel for a call leaf that carries an expansion (`calls: "expand"` only).
+ *
+ * The group takes the call leaf's id, so `foldSet.has(id)` folds the panel back to the one
+ * box the call was, and a click on that box addresses the same id. Its identity goes into
+ * the atomId index under that id — a folded `is creditworthy a` is the same proposition as
+ * every other copy of that call — but NOT into the unique index, which holds leaves only
+ * (`Leaf.unique`'s invariant), and the call leaf's own `value`/`typically` are not lifted:
+ * a valuation entry on a group is an OVERRIDE (DESIGN §19) and would pin the panel.
+ */
+function callPanel(
+  id: NodeId,
+  wireLabel: string,
+  atomId: string,
+  expansion: VizIRExpr,
+  sink: Sink,
+): And {
+  sink.atomIdByNode.set(id, atomId);
+  return {
+    $type: "And",
+    id,
+    label: callLabel(wireLabel),
+    call: true,
+    args: [convert(expansion, sink)],
+  };
+}
+
 function convert(e: VizIRExpr, sink: Sink): IRExpr {
   const { valuation, provenance } = sink;
+  // An expansion merges a second run of server ids into one tree. If the server ever broke
+  // S2's fresh-id contract, two nodes would share an id and silently swap valuation,
+  // provenance and atomId between unrelated boxes. Fail loudly instead.
+  if (sink.calls === "expand") {
+    if (sink.seen.has(e.id.id))
+      throw new Error(
+        `viz-adapter: node id ${e.id.id} occurs twice in an expanded tree — an expansion ` +
+          `must use ids fresh across the whole FunDecl`,
+      );
+    sink.seen.add(e.id.id);
+  }
   switch (e.$type) {
     case "And": {
       const node: And = {
@@ -201,6 +344,8 @@ function convert(e: VizIRExpr, sink: Sink): IRExpr {
       return node;
     }
     case "UBoolVar": {
+      if (sink.calls === "expand" && e.expansion)
+        return callPanel(e.id.id, e.name.label, e.atomId, e.expansion, sink);
       // Lift the inline value into the positional valuation side-channel; the
       // ladder leaf itself is value-free. UnknownV carries no information, so we
       // skip it (absent => unknown in the kernel) to keep the map lean.
@@ -236,6 +381,8 @@ function convert(e: VizIRExpr, sink: Sink): IRExpr {
       return leaf;
     }
     case "App": {
+      if (sink.calls === "expand" && e.expansion)
+        return callPanel(e.id.id, e.fnName.label, e.atomId, e.expansion, sink);
       // §23 membrane leaf. Args are literal/value children rendered "drawn open"
       // (D1); A1 keeps the leaf flat but preserves `atomId` for eval addressing
       // and the predicate name as the label. Addressed by `atomId` (via `evalApp`),
@@ -275,4 +422,32 @@ function convert(e: VizIRExpr, sink: Sink): IRExpr {
       );
     }
   }
+}
+
+/**
+ * One click, every copy: set `value` on the clicked node AND on every node that is the same
+ * proposition — the same `atomId` (`identity.nodesByAtomId`) — and on no other. `UnknownV`
+ * clears those entries instead of storing an unknown. A node with no atomId (a constant, a
+ * plain group) changes alone. Returns a new map; `valuation` is not touched.
+ *
+ * Sameness is the atomId the server computed in the CALLER's context after substitution, so
+ * the `a` inlined from `limb a b` IS the caller's `a` and links to it, while `limb a b` and
+ * `limb c d` share nothing. This helper only reads that identity; it never derives one.
+ */
+export function spreadValue(
+  identity: Pick<DecodedIdentity, "atomIdByNode" | "nodesByAtomId">,
+  nodeId: NodeId,
+  value: UBoolValue,
+  valuation: ReadonlyMap<NodeId, UBoolValue>,
+): Map<NodeId, UBoolValue> {
+  const atomId = identity.atomIdByNode.get(nodeId);
+  const same = (atomId !== undefined && identity.nodesByAtomId.get(atomId)) || [
+    nodeId,
+  ];
+  const out = new Map(valuation);
+  for (const n of same) {
+    if (value === "UnknownV") out.delete(n);
+    else out.set(n, value);
+  }
+  return out;
 }

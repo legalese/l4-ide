@@ -51,7 +51,6 @@ import LSP.Core.Types.Location
 import qualified LSP.L4.Viz.Ladder as Ladder
 import qualified LSP.L4.Viz.CustomProtocol as Ladder
 import LSP.L4.Viz.CustomProtocol (LadderRequestParams)
-import qualified LSP.L4.Viz.QueryPlan as VizQueryPlan
 import LSP.Logger
 import qualified Language.LSP.Protocol.Lens as J
 import Language.LSP.Protocol.Message
@@ -308,14 +307,16 @@ handlers evalConfig recorder =
         logWith recorder Debug $ LogExecutingCommand cid
         runExceptT case lookup cid (map swap l4CmdNames) of
           Just CmdVisualize -> do
+            -- Arguments: [verDocId] (auto-refresh), [verDocId, srcPos, simplify],
+            -- or [verDocId, srcPos, simplify, {"expandCalls": true}]
+            -- ('decodeVisualiseArgs', 'VisualiseOptions' in LSP.L4.Actions).
             let decodeXdata
                   | Just ((Aeson.fromJSON -> Aeson.Success verTextDocId) :  args) <- xdata
-                  , msrcPos <- case args of
-                     [GFromJSON srcPos, Aeson.fromJSON -> Aeson.Success simplify] -> Just (srcPos, simplify)
-                     _ -> Nothing
-                  = do
-                    mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
-                    visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
+                  = case decodeVisualiseArgs args of
+                      Left err -> defaultResponseError err
+                      Right msrcPos -> do
+                        mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
+                        visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
                   | otherwise = defaultResponseError $ "Failed to decode request data: " <> LazyText.toStrict (Aeson.encodeToLazyText xdata)
             decodeXdata
 
@@ -340,8 +341,13 @@ handlers evalConfig recorder =
           rng = params ^. J.range
         diags <- atomically $ do
           activeFileDiagnosticsInRange (shakeExtras ide) uri rng
-        cas <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
-        pure $ Right $ InL $ fmap InR cas
+        casAssume     <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
+        casConfusable <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
+        let casLexFix = concatMap lexErrorCodeActions diags
+            casNbsp    = Maybe.mapMaybe nbspCodeAction diags
+        casStraighten <- straightenWholeFileCodeAction ide uri diags
+        pure $ Right $ InL $ fmap InR $
+          casAssume <> casConfusable <> casLexFix <> casNbsp <> casStraighten
     , requestHandler SMethod_TextDocumentSemanticTokensFull $ \ide req -> do
         let
           SemanticTokensParams _ _ doc = req
@@ -697,17 +703,17 @@ handlers evalConfig recorder =
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.InlineExprsMethodName)) $ \ide params ->
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.InlineExprsMethodName) params ide $
           \(ieParams :: Ladder.InlineExprsRequestParams) _tcRes recentViz ->
-            let postInliningDecide = Ladder.inlineExprs recentViz.vizState recentViz.decide ieParams.uniques
-            in MkVizHandler $
-              case Ladder.doVisualize postInliningDecide (Ladder.getVizConfig recentViz.vizState) of
-                Right (vizProgramInfo, vizState) -> do
+            MkVizHandler $
+              case renderAfterInlining recentViz.vizState recentViz.decide ieParams.uniques of
+                Right (postInliningDecide, vizProgramInfo, vizState, rawInfo) -> do
                   -- Update RecentlyVisualized's decide with the latest vizState and postInliningDecide,
                   -- so that they can be used for further l4/inlineExprs requests.
                   -- (The usecase here: think of a Decide with multiple inline-able Uniques,
                   -- and where user does the inlining in stages.)
                   -- IMPT: The state synchronization / managing of state (re the stuff in RecentlyVisualized etc) feels potentially complicated:
                   -- I definitely have NOT thought through it carefully.
-                  liftIO $ atomically $ setMostRecentVisualisation ide $ recentViz {vizState = vizState, decide = postInliningDecide}
+                  liftIO $ atomically $ setMostRecentVisualisation ide $ recentViz {vizState = vizState, decide = postInliningDecide, ladderInfo = rawInfo}
+                  -- Already in the atomId namespace of "Show decision graph".
                   pure $ Aeson.toJSON vizProgramInfo
                 Left vizError ->
                   defaultResponseError $ Text.unlines
@@ -719,24 +725,13 @@ handlers evalConfig recorder =
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.QueryPlanMethodName)) $ \ide params ->
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.QueryPlanMethodName) params ide $
           \(qpParams :: Ladder.QueryPlanRequestParams) _tcRes recentViz -> do
-            let vizConfig = Ladder.getVizConfig recentViz.vizState
-            MkVizHandler $
-              case Ladder.doVisualize recentViz.decide vizConfig of
-                Right (vizProgramInfo, vizState) ->
-                  let paramsByUnique =
-                        VizQueryPlan.buildParamsByUnique vizProgramInfo
-                      flatBindings = Map.toList qpParams.bindings
-                      result = VizQueryPlan.queryPlanFromLadder qpParams.fnName paramsByUnique vizProgramInfo vizState flatBindings
-                  in do
-                    logWith recorder Debug $
-                      LogHandlingCustomRequest qpParams.verDocId._uri
-                        ("Query plan for: " <> qpParams.fnName)
-                    pure $ Aeson.toJSON result
-                Left vizError ->
-                  defaultResponseError $ Text.unlines
-                    [ "Could not compute query plan:"
-                    , Ladder.prettyPrintVizError vizError
-                    ]
+            -- Planned from the ladder last drawn, not drawn again (see 'queryPlanForRecent').
+            let result = queryPlanForRecent recentViz qpParams.fnName (Map.toList qpParams.bindings)
+            MkVizHandler $ do
+              logWith recorder Debug $
+                LogHandlingCustomRequest qpParams.verDocId._uri
+                  ("Query plan for: " <> qpParams.fnName)
+              pure $ Aeson.toJSON result
 
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.EvalDirectiveResultMethodName)) $ \ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.EvalDirectiveResultParams
@@ -767,10 +762,10 @@ handlers evalConfig recorder =
                 }
               Just results -> do
                 let conFields = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult'
-                    matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _) = fmap (.start) rng == Just targetPos
+                    matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _ _) = fmap (.start) rng == Just targetPos
                     matchingResult = List.find matchesPos results
                 case matchingResult of
-                  Just evalRes@(EL.MkEvalDirectiveResult (Just rng) _ _ _ _) ->
+                  Just evalRes@(EL.MkEvalDirectiveResult (Just rng) _ _ _ _ _) ->
                     pure $ Right $ Aeson.toJSON $
                       Inspector.evalDirectiveToResult conFields reqParams.directiveType rng evalRes
                   Just _ -> pure $ Left $ TResponseError
@@ -1049,12 +1044,109 @@ outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext o
     uri :: Uri
     uri = fromNormalizedUri nuri
 
+-- | The out-of-scope did-you-mean quick fix: when a name no definition
+-- supplies differs from one that IS in scope only in a confusable
+-- character — a curly quote pasted from Word into one spelling and not the
+-- other, either direction — offer to replace it with the in-scope spelling.
+-- The match is computed by 'Actions.confusableDidYouMeanFix', pure and
+-- testable without an IDE; this handler only gathers the candidate names in
+-- scope at the reference (the same set 'Actions.completions' would offer
+-- there) and wraps the result as a 'CodeAction'.
+outOfScopeConfusableQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
+outOfScopeConfusableQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
+  Nothing -> pure Nothing
+  Just ctx -> case ctx.kind of
+    OutOfScopeError name _ty -> do
+      mTypeCheck <- liftIO $ runAction "codeAction.outOfScopeConfusable" ide $
+        use TypeCheck nuri
+      pure $ do
+        typeCheck <- mTypeCheck
+        range <- rangeOf name
+        let refRaw = rawNameToText (rawName name)
+            inScopeRaw = inScopeRawNamesAt range.start typeCheck
+        fix <- confusableDidYouMeanFix range refRaw inScopeRaw
+        pure (quickFixToCodeAction True [fd ^. fdLspDiagnosticL] uri fix)
+    _ -> pure Nothing
+  where
+    nuri = fd ^. fdFilePathL
+
+    uri :: Uri
+    uri = fromNormalizedUri nuri
+
+-- | Every quick-fix 'CodeAction' a confusable-character lexer error's
+-- 'PError' carries (see 'Actions.lexErrorQuickFixes'): a paired-quote fix
+-- first when there is one, then — for a dash — its two spellings in the
+-- order 'L4.SmartPunctuation.dashReplacementFor' picks for that dash's own
+-- position, or, for every other confusable, just the single-character
+-- replacement. The first is preferred.
+lexErrorCodeActions :: FileDiagnostic -> [CodeAction]
+lexErrorCodeActions fd = case fd ^. messageOfL @PError of
+  Nothing -> []
+  Just pErr ->
+    [ quickFixToCodeAction (i == 0) [fd ^. fdLspDiagnosticL] (fromNormalizedUri (fd ^. fdFilePathL)) fix
+    | (i, fix) <- zip [0 :: Int ..] (lexErrorQuickFixes pErr)
+    ]
+
+-- | The NBSP lint's one code action, from 'Actions.nbspQuickFix'.
+nbspCodeAction :: FileDiagnostic -> Maybe CodeAction
+nbspCodeAction fd = do
+  nl <- fd ^. messageOfL @NbspLint
+  pure $ quickFixToCodeAction True [fd ^. fdLspDiagnosticL] (fromNormalizedUri (fd ^. fdFilePathL)) (nbspQuickFix nl.range)
+
+-- | The whole-file "Straighten all smart punctuation" action, offered once
+-- per request rather than once per diagnostic — megaparsec stops lexing at
+-- the FIRST error, so a document with several confusables shows only one
+-- lexer diagnostic even though 'straightenDocumentQuickFix' would repair
+-- more than that. Gated on there being at least one smart-punctuation
+-- diagnostic already in view (a lexer 'PError' with fixes, or an 'NbspLint'
+-- warning) in the requested range, so this does not fetch and re-lex the
+-- whole file on every unrelated code-action request.
+straightenWholeFileCodeAction :: IdeState -> NormalizedUri -> [FileDiagnostic] -> ServerM Config [CodeAction]
+straightenWholeFileCodeAction ide nuri diags
+  | not relevant = pure []
+  | otherwise = do
+      mRope <- liftIO $ runAction "codeAction.straightenWholeFile" ide $ getFileContents nuri
+      pure $ Maybe.maybeToList $ do
+        rope <- mRope
+        fix <- straightenDocumentQuickFix nuri (Rope.toText rope)
+        pure (quickFixToCodeAction False [] (fromNormalizedUri nuri) fix)
+  where
+    relevant = any isSmartPunctuationDiagnostic diags
+
+    isSmartPunctuationDiagnostic fd =
+      case fd ^. messageOfL @PError of
+        Just pErr | not (null pErr.fixes) -> True
+        _ -> case fd ^. messageOfL @NbspLint of
+          Just _  -> True
+          Nothing -> False
+
+-- | Turn a pure 'Actions.QuickFix' into an LSP 'CodeAction' over one file.
+-- The shared tail of every smart-punctuation code action above.
+quickFixToCodeAction :: Bool -> [Diagnostic] -> Uri -> QuickFix -> CodeAction
+quickFixToCodeAction preferred diagnostics uri fix =
+  CodeAction
+    { _title = fix.title
+    , _kind = Just CodeActionKind_QuickFix
+    , _diagnostics = if null diagnostics then Nothing else Just diagnostics
+    , _isPreferred = if preferred then Just True else Nothing
+    , _disabled = Nothing
+    , _edit = Just WorkspaceEdit
+      { _changeAnnotations = Nothing
+      , _documentChanges = Nothing
+      , _changes = Just $ Map.singleton uri fix.edits
+      }
+    , _command = Nothing
+    , _data_ = Nothing
+    }
+
 data L4Cmd
   = CmdVisualize
   | CmdResetVisualization
   | CmdStateGraph
   deriving stock (Eq, Show, Enum, Bounded)
 
+-- | @l4.visualize@ takes an optional fourth argument, @{"expandCalls": true}@,
+-- for call expansions; see 'decodeVisualiseArgs' and 'VisualiseOptions'.
 l4CmdNames :: [(L4Cmd, Text)]
 l4CmdNames =
   [ (CmdVisualize, "l4.visualize")

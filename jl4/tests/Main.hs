@@ -54,6 +54,7 @@ import qualified Hover
 import qualified SemanticTokens
 import qualified VizAutoRefresh
 import qualified VizImplies
+import qualified VizInline
 import qualified VizGuardedRows
 import qualified DmnExport
 import qualified RelationalExport
@@ -167,6 +168,7 @@ main = do
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     describe "viz" VizAutoRefresh.spec
     describe "viz implies" VizImplies.spec
+    describe "viz inline" VizInline.spec
     describe "viz guarded rows" VizGuardedRows.spec
     DmnExport.spec examplesRoot
     RelationalExport.spec examplesRoot
@@ -656,7 +658,7 @@ checkFile evalConfig isOk file = do
     _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
 
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
-  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _ _ _) =
+  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _ _ _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt
 

@@ -1,0 +1,13 @@
+§ RunEvalTraceFixture
+
+-- Fixture for the "Trace:" section of `l4 run`: one #EVAL and one #EVALTRACE
+-- over the same call, so the two blocks can be compared side by side.
+-- The #EVALTRACE block must show its trace; the #EVAL block must go on saying
+-- that none was captured.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE doubleNot x IS NOT NOT x
+
+#EVAL doubleNot TRUE
+#EVALTRACE doubleNot TRUE

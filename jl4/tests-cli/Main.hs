@@ -11,7 +11,8 @@
 module Main where
 
 import Control.Monad (unless, when)
-import Data.List (isInfixOf, isPrefixOf, nub, sort)
+import Data.Char (isSpace)
+import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, nub, sort)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
@@ -25,6 +26,7 @@ import System.Directory
   , createDirectoryIfMissing
   , createFileLink
   , doesFileExist
+  , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
   , removeFile
@@ -68,6 +70,12 @@ captionFixture = fixtureDir </> "state-graph-captions.l4"
 -- | Typechecks cleanly, then THROWS when its @#EVAL@ is evaluated.
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
+
+-- | One @#EVAL@ and one @#EVALTRACE@ over the same call: the "Trace:" section
+-- of @l4 run@ must show a trace under the second and say none was captured
+-- under the first.
+runEvalTraceFixture :: FilePath
+runEvalTraceFixture = fixtureDir </> "run-evaltrace.l4"
 
 -- | A @#TRACE@ whose act lands before its @AFTER@ window opens: a nullity the
 -- run REPORTS (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6) beside a live residual.
@@ -120,6 +128,67 @@ batchAssumeDirectFixture = fixtureDir </> "batch-assume-direct.l4"
 batchAssumeHelperFixture = fixtureDir </> "batch-assume-helper.l4"
 batchAssumeFullJson      = fixtureDir </> "batch-assume-full.json"
 batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
+
+-- | @TYPICALLY@ defaults in @l4 batch@ (W3 of
+-- @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@). No golden captures batch
+-- output, so these are the guard; the S-numbers in the tests are the success
+-- criteria the W2+W3 slice was given.
+batchTySection, batchTyRule, batchTyRecord, batchTyMaybe, batchTyImported, batchTyImportedTypes
+  , batchTyOneCol, batchTyTwo, batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact :: FilePath
+batchTySection = fixtureDir </> "batch-typically-section.l4"
+batchTyRule    = fixtureDir </> "batch-typically-rule.l4"
+batchTyRecord  = fixtureDir </> "batch-typically-record.l4"
+batchTyMaybe   = fixtureDir </> "batch-typically-maybe.l4"
+batchTyImported      = fixtureDir </> "batch-typically-imported.l4"
+batchTyImportedTypes = fixtureDir </> "batch-typically-config-types.l4"
+batchTyOneCol        = fixtureDir </> "batch-typically-onecol.l4"
+batchTyTwo           = fixtureDir </> "batch-typically-two.l4"
+batchTyString        = fixtureDir </> "batch-typically-string.l4"
+batchTyOwnDecode     = fixtureDir </> "batch-typically-own-decode.l4"
+batchTyEnum          = fixtureDir </> "batch-typically-enum.l4"
+batchTyExact         = fixtureDir </> "batch-typically-exact.l4"
+
+batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson
+  , batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
+  , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson :: FilePath
+batchTyOmitted    = fixtureDir </> "batch-typically-omitted.json"
+batchTySupplied   = fixtureDir </> "batch-typically-supplied.json"
+batchTyNull       = fixtureDir </> "batch-typically-null.json"
+batchTyUnread     = fixtureDir </> "batch-typically-unread.json"
+batchTyYaml       = fixtureDir </> "batch-typically-omitted.yaml"
+batchTyNoCol      = fixtureDir </> "batch-typically-nocol.csv"
+batchTyEmpty      = fixtureDir </> "batch-typically-empty.csv"
+batchTyRecordJson = fixtureDir </> "batch-typically-record.json"
+batchTyMaybeCsv   = fixtureDir </> "batch-typically-maybe.csv"
+batchTyImportedJson = fixtureDir </> "batch-typically-imported.json"
+batchTyOneColCsv    = fixtureDir </> "batch-typically-onecol.csv"
+batchTyEmptyRow     = fixtureDir </> "batch-typically-emptyrow.json"
+batchTyUncertain    = fixtureDir </> "batch-typically-uncertain.json"
+batchTyBomCsv        = fixtureDir </> "batch-typically-bom.csv"
+batchTyCrlfCsv       = fixtureDir </> "batch-typically-crlf.csv"
+batchTyStringCsv     = fixtureDir </> "batch-typically-string.csv"
+batchTyOwnDecodeJson = fixtureDir </> "batch-typically-own-decode.json"
+batchTyEnumJson      = fixtureDir </> "batch-typically-enum.json"
+batchTyExactJson     = fixtureDir </> "batch-typically-exact.json"
+batchTyRaggedCsv     = fixtureDir </> "batch-typically-ragged.csv"
+batchTyTypoCsv       = fixtureDir </> "batch-typically-typo.csv"
+batchTyTypoJson      = fixtureDir </> "batch-typically-typo.json"
+batchTyRecordTypoJson  = fixtureDir </> "batch-typically-record-typo.json"
+batchTyRecordEmptyJson = fixtureDir </> "batch-typically-record-empty.json"
+
+-- | The @output@ result and @presumed@ list of one batch envelope.
+resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
+resultAndPresumed env =
+  ( case objField env "output" of
+      Just (Array rs) | [r] <- toList rs -> objField r "result"
+      _                                  -> Nothing
+  , objField env "presumed"
+  )
+
+presumedOf :: [String] -> Maybe Value
+presumedOf = Just . Array . foldr (\ x acc -> pure (String (T.pack x)) <> acc) mempty
 
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
@@ -194,6 +263,16 @@ verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 
+-- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
+-- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
+-- carries its own control; see its header.
+verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture :: FilePath
+verifyUnfoldRecursiveFixture :: FilePath
+verifyUnfoldCallsFixture     = fixtureDir </> "verify-unfold-calls.l4"
+verifyUnfoldImportsFixture   = fixtureDir </> "verify-unfold-imports.l4"
+verifyUnfoldRulesFixture     = fixtureDir </> "verify-unfold-rules.l4"
+verifyUnfoldRecursiveFixture = fixtureDir </> "verify-unfold-recursive.l4"
+
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
 -- FOR BYTE — that equality is the whole reason the orchestrator's p7-tnr leg
@@ -205,12 +284,17 @@ nlgRegcfGolden  = "examples/canon/us/regcf/tests/regcf.nlg.golden"
 nlgWizardSource = "examples/canon/us/regcf/regcf-wizard.l4"
 nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 
--- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
--- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
--- the tree, so the tests below are the only thing pinning that the two
--- projections agree (smucclaw/l4-ide#972).
+-- The placement rows for an @nlg on a rule's head, and under a GIVEN list's
+-- last input. Its `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no
+-- golden anywhere in the tree, so the tests below are the only thing pinning
+-- that the two projections agree (smucclaw/l4-ide#972).
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
+
+-- The reference page whose placement table describes that fixture row by row.
+-- The test that reads it pins the page, not just the output.
+placementReadme :: FilePath
+placementReadme = "../doc/reference/syntax/README.md"
 
 shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
 shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
@@ -261,19 +345,29 @@ main = do
 coreFixtures :: [FilePath]
 coreFixtures =
   [ cleanFixture, evalFixture, errorFixture, garbageFixture
-  , evalCrashFixture
+  , evalCrashFixture, runEvalTraceFixture
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+  , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
+  , batchTyImported, batchTyImportedTypes, batchTyImportedJson
+  , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
+  , batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
+  , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
+  , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
+  , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
-  , nlgHeadPlacementSource
+  , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture
   ]
 
@@ -489,6 +583,82 @@ spec bin = do
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
+
+  -- The "Trace:" section of `l4 run`. `--trace full` is the default, and its
+  -- help says it is "for #EVALTRACE", yet for a long time the policy behind
+  -- `l4 run` collected no trace at all, so even an #EVALTRACE printed the
+  -- placeholder that tells you to add an #EVALTRACE.
+  describe "l4 run --trace" $ do
+    let placeholder = "(no trace captured; add #EVALTRACE to the directive)"
+        -- one Text per directive: everything from one "Evaluation[" to the next
+        directiveBlocks sout = drop 1 (T.splitOn "Evaluation[" (T.pack sout))
+        withBlocks args k = do
+          Output code sout serr <- runL4 bin args
+          unless (code == ExitSuccess) $
+            expectationFailure ("Expected success, got " ++ show code
+              ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
+          case directiveBlocks sout of
+            [evalBlock, traceBlock] -> k evalBlock traceBlock
+            other -> expectationFailure
+              ("Expected two Evaluation blocks, got " ++ show (length other)
+                ++ "\n--- stdout ---\n" ++ sout)
+
+    it "shows an #EVALTRACE directive's trace by default, and leaves a plain #EVAL's placeholder alone" $
+      withBlocks ["run", runEvalTraceFixture] \evalBlock traceBlock -> do
+        -- the #EVAL: unchanged, placeholder included
+        evalBlock `shouldSatisfy` ("Trace:" `T.isInfixOf`)
+        evalBlock `shouldSatisfy` (T.pack placeholder `T.isInfixOf`)
+        -- the #EVALTRACE: the trace itself, in the layout the goldens use
+        traceBlock `shouldSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` (T.pack placeholder `T.isInfixOf`)
+        traceBlock `shouldSatisfy` ("┌ doubleNot OF TRUE" `T.isInfixOf`)
+
+    it "`--trace full` says the same as the default" $ do
+      Output _ dflt _ <- runL4 bin ["run", runEvalTraceFixture]
+      Output _ full _ <- runL4 bin ["run", "--trace", "full", runEvalTraceFixture]
+      full `shouldBe` dflt
+
+    it "`--trace none` prints no Trace: section for either directive" $
+      withBlocks ["run", "--trace", "none", runEvalTraceFixture] \evalBlock traceBlock -> do
+        evalBlock `shouldNotSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` ("┌" `T.isInfixOf`)
+
+    it "still reports both directives in --json" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 2
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The trace does not only reach stdout. The directive's own diagnostic
+    -- carries it too ("TRUE", then a line of ─────, then the trace), and `l4 run`
+    -- writes diagnostics to stderr and puts them in the JSON "diagnostics". So
+    -- "no trace under --trace none / --json" has to be pinned in those two places
+    -- as well as in the Trace: section, or a trace collected and not shown would
+    -- leak there unseen. The first case is the positive control: it shows the
+    -- marker really does reach stderr when a trace is collected, so the two
+    -- cases after it are not vacuous.
+    it "puts the trace into stderr too, by default (the control for the next two)" $ do
+      Output _ _ serr <- runL4 bin ["run", runEvalTraceFixture]
+      serr `shouldSatisfy` ("─────" `isInfixOf`)
+
+    it "`--trace none` leaves the trace out of stderr as well" $ do
+      Output _ _ serr <- runL4 bin ["run", "--trace", "none", runEvalTraceFixture]
+      -- the diagnostics are still there; only the trace is not
+      serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
+      serr `shouldNotSatisfy` ("─────" `isInfixOf`)
+
+    it "`--json` keeps the trace out of its diagnostics" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          -- the diagnostics are still there; only the trace is not
+          length diags `shouldSatisfy` (> 0)
+          diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $
@@ -1199,21 +1369,292 @@ spec bin = do
       env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
       objField env "status" `shouldBe` Just (String "success")
 
+  describe "l4 batch: TYPICALLY defaults (W3)" $ do
+    -- Before W3 every one of these rows came back "Missing required field",
+    -- although #EVAL honours the section default (R1: batch must agree).
+    it "S1: a row that leaves a section GIVEN out takes its default and lists it in presumed" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyOmitted]
+      objField env "status" `shouldBe` Just (String "success")
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "S2: a value the row supplies wins, and nothing is presumed" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTySupplied]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    -- The positive control for `presumed`: it lists defaults the evaluation
+    -- FORCED (T6), not inputs the row left out. `is adult` FALSE short-circuits
+    -- `has capacity` away, so the same omission presumes nothing.
+    it "lists only a default the evaluation actually read" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyUnread]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    it "S3: a row that leaves a rule GIVEN out takes its default" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyOmitted]
+      objField env "status" `shouldBe` Just (String "success")
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    -- R3: a row that evaluates must also validate. Before: "invalid",
+    -- "Missing required field".
+    it "S3: --validate-only accepts the row that evaluates" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyOmitted, "--validate-only"]
+      objField env "status" `shouldBe` Just (String "valid")
+
+    it "S4: YAML with the field left out gives the same row as JSON" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyYaml]
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "S4: CSV with the column left out gives the same row as JSON, section and rule alike" $ do
+      envS <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyNoCol]
+      resultAndPresumed envS `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+      envR <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyNoCol]
+      resultAndPresumed envR `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    -- T3c: an empty cell is a left-out input, not null, so one file can let
+    -- one row take the default while the next supplies a value.
+    it "S5: an empty CSV cell takes the default while presumption is soft" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyEmpty, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"])
+        , (Just (Bool False), presumedOf [])
+        ]
+
+    -- R5: a refusal stays loud, and names the input; it must not come back as
+    -- a quiet FALSE, which is the defect W1 fixed.
+    it "S5: with --presumption hard the same empty cell is an error naming the input" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTySection, "--inputs", batchTyEmpty
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success")]
+      sout `shouldSatisfy` ("Missing required field 'has capacity'" `isInfixOf`)
+      sout `shouldSatisfy` ("presumption is hard" `isInfixOf`)
+
+    it "with --presumption hard --validate-only reports the left-out input" $ do
+      env <- jsonEnvelope bin [ "batch", batchTyRule, "--inputs", batchTyOmitted
+                              , "--validate-only", "--presumption", "hard" ]
+      objField env "status" `shouldBe` Just (String "invalid")
+      objField env "errors" `shouldBe` Just (Array (pure (String "Missing required field: 'has capacity'")))
+
+    it "S6: null never takes the default, and the error names the field (T3)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Field 'has capacity' is null" `isInfixOf`)
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull, "--validate-only"]
+      vout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+    -- The cell is the same list as compact JSON, because a name may hold the
+    -- characters a separator would need (`of sound mind; sober`).
+    it "S7: --format csv carries a presumed column, as a JSON list" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyOmitted, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      -- cassava ends each record with CRLF
+      case map (filter (/= '\r')) (lines sout) of
+        header : row : _ -> do
+          header `shouldBe` "input_is adult,output,status,presumed,diagnostics"
+          row `shouldSatisfy` (",success,\"[\"\"has capacity\"\"]\"," `isInfixOf`)
+        other -> expectationFailure ("expected a header and a row, got: " ++ show other)
+      Output _ tout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--format", "csv"]
+      tout `shouldSatisfy` ("\"[\"\"has capacity\"\",\"\"of sound mind; sober\"\"]\"" `isInfixOf`)
+
+    -- T3c: a quoted "" is a row whose one cell is empty, so absent; cassava's
+    -- own decoder drops it as if it were a blank line (two rows in, one out,
+    -- exit 0). A quoted "   " is a row too, its cell of spaces empty. A blank
+    -- line is not a row, and neither is an unquoted line of spaces, in a
+    -- one-column file too (review M4, decided overnight 2026-10-02, pending
+    -- Meng's review): the fixture's `   ` line is skipped.
+    it "evaluates a one-column CSV row whose only cell is \"\"" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyOneCol, "--inputs", batchTyOneColCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"])
+        , (Just (Bool False), presumedOf [])
+        , (Just (Bool True), presumedOf ["has capacity"])
+        ]
+
+    -- Review M4 (decided overnight 2026-10-02, pending Meng's review): a short
+    -- row used to take the defaults of its missing cells, and a long one lost
+    -- its extra cells, both with status success. A line of a tab and a space
+    -- is blank, so it is skipped and still counted.
+    it "refuses a CSV record whose cell count is not the header's, naming its line" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyRaggedCsv, "--format", "json", "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "success"), Just (String "error"), Just (String "error")]
+      sout `shouldSatisfy` ("Line 3 has 1 cell, but the header has 2" `isInfixOf`)
+      sout `shouldSatisfy` ("Line 5 has 3 cells, but the header has 2" `isInfixOf`)
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyRaggedCsv, "--validate-only", "--continue-on-error"]
+      vout `shouldSatisfy` ("Line 3 has 1 cell" `isInfixOf`)
+
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input left out takes its default, a key that matches no input is
+    -- refused, naming it and the nearest input, in a CSV header, a JSON row
+    -- and a nested record, and --validate-only agrees. Where nothing took a
+    -- default, an unknown key is still ignored (row 2 of the JSON fixture).
+    it "refuses an unknown key where a default is filled, and ignores it elsewhere" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoCsv]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Unknown field 'has capasity' (did you mean 'has capacity'?)" `isInfixOf`)
+      Output _ jout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoJson, "--format", "json", "--continue-on-error"]
+      jrows <- decodeArray jout
+      map (`objField` "status") jrows `shouldBe` [Just (String "error"), Just (String "success"), Just (String "success")]
+      map resultAndPresumed (drop 1 jrows) `shouldBe` [ (Just (Bool False), presumedOf []), (Just (Bool True), presumedOf ["has capacity"]) ]
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoJson, "--validate-only", "--format", "json", "--continue-on-error"]
+      vrows <- decodeArray vout
+      map (`objField` "status") vrows `shouldBe` [Just (String "invalid"), Just (String "valid"), Just (String "valid")]
+      Output _ rout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordTypoJson, "--format", "json", "--continue-on-error"]
+      rrows <- decodeArray rout
+      map (`objField` "status") rrows `shouldBe` [Just (String "error"), Just (String "success")]
+      rout `shouldSatisfy` ("Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)" `isInfixOf`)
+      Output _ rvout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordTypoJson, "--validate-only", "--format", "json", "--continue-on-error"]
+      rvrows <- decodeArray rvout
+      map (`objField` "status") rvrows `shouldBe` [Just (String "invalid"), Just (String "valid")]
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on a
+    -- record input is null too, so it is refused by name; it used to be a
+    -- record that supplied nothing in batch and null on the service.
+    it "reads {} on a record input as null, and refuses it by name" $ do
+      Output _ sout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordEmptyJson, "--format", "json", "--continue-on-error"]
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success")]
+      sout `shouldSatisfy` ("Field 'cfg' is {}, which means the value is not known: supply a value" `isInfixOf`)
+
+    it "takes every default for a JSON row {} that supplies nothing" $ do
+      env <- jsonEnvelope bin ["batch", batchTyOneCol, "--inputs", batchTyEmptyRow]
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "reads {} as a value like null: it never takes the default" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUncertain]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Field 'has capacity' is {}, which means the value is not known" `isInfixOf`)
+
+    -- Review B1: Excel's "CSV UTF-8" export starts with a byte-order mark,
+    -- which used to rename the first column, so its input took its default.
+    -- The first column here has one: `has capacity` FALSE must win.
+    it "reads a CSV that starts with a UTF-8 byte-order mark" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyBomCsv]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    it "reads CRLF line ends, and a quoted cell holding a newline, as one row each" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyCrlfCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"]), (Just (Bool False), presumedOf []) ]
+      Output scode sstr _ <- runL4 bin ["batch", batchTyString, "--inputs", batchTyStringCsv, "--format", "json"]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray sstr
+      map resultAndPresumed srows `shouldBe`
+        [ (Just (Number 2), presumedOf ["n"]), (Just (Number 7), presumedOf []) ]
+      sstr `shouldSatisfy` ("\"note\":\"line one\\nline two\"" `isInfixOf`)
+
+    -- Review M3 / code #1, T4b: the switch reaches the request's decode only.
+    -- A decode the rule makes of its own fills its default in both modes;
+    -- under hard the answer says it rests on it, because no row could
+    -- supply it. Soft keeps T6b's filter, so it is not listed there.
+    it "lets a rule's own JSONDECODE fill its defaults in both modes" $ do
+      soft <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson]
+      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf [])
+      hard <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson, "--presumption", "hard"]
+      resultAndPresumed hard `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
+
+    -- T3: null on an enum with no default used to decode to NOTHING and
+    -- answer FALSE, status success. A synonym for MAYBE is a MAYBE.
+    it "refuses null on an enum by name, and reads a MAYBE synonym as a MAYBE" $ do
+      Output _ sout _ <- runL4 bin ["batch", batchTyEnum, "--inputs", batchTyEnumJson, "--format", "json", "--continue-on-error"]
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success"), Just (String "success")]
+      sout `shouldSatisfy` ("Field 'shade' is null, which means the value is not known" `isInfixOf`)
+      map resultAndPresumed (drop 1 rows) `shouldBe`
+        [ (Just (Bool True), presumedOf []), (Just (Bool True), presumedOf ["second"]) ]
+
+    -- Review m1: batch re-prints its module, and printed literals and the
+    -- record's TYPICALLY went through a Double. #EVAL says TRUE.
+    it "keeps a decimal default exact through the re-print" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExact, "--inputs", batchTyExactJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["r"]), (Just (Bool True), presumedOf []), (Just (Bool False), presumedOf []) ]
+
+    -- With presumption hard every defaulted input left out is named in one
+    -- run, as --validate-only names them, and as one with no default is.
+    -- Hard refuses a left-out defaulted input before anything runs, even one
+    -- the rule would not have read: the same eager refusal as for an input
+    -- with no default. The batch page says so.
+    it "with --presumption hard refuses a left-out default the rule would not read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUnread, "--presumption", "hard"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required field 'has capacity'" `isInfixOf`)
+
+    it "with --presumption hard names every defaulted input left out" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--presumption", "hard"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required fields 'of sound mind; sober'" `isInfixOf`)
+      sout `shouldSatisfy` ("'has capacity' (it has a TYPICALLY default" `isInfixOf`)
+
+    -- T1b: the decoder fills a record field from its DECLARE, and an enum
+    -- default resolves on a field (p10, which used to fail to check) as it
+    -- does on a GIVEN. `presumed` names a field by its path, in force order.
+    it "fills record-field and enum defaults, and presumes only what was read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 32), presumedOf ["cfg.colour", "shade", "cfg.timeout"])
+        , (Just (Number 0), presumedOf [])
+        , (Just (Number 0), presumedOf ["cfg.colour"])
+        ]
+
+    -- The decoder knows the field defaults of an IMPORTed module's records too
+    -- (the evaluator is handed the importer's transitive imports).
+    it "fills a field default declared in an imported module" $ do
+      env <- jsonEnvelope bin ["batch", batchTyImported, "--inputs", batchTyImportedJson]
+      resultAndPresumed env `shouldBe` (Just (Number 32), presumedOf ["cfg.timeout"])
+
+    -- T3c's MAYBE paragraph: a left-out MAYBE input with no default is
+    -- NOTHING while soft, missing while hard. The fixture's MAYBE comes first,
+    -- which also pins the wrapper's InputArgs layout: a leading ", " after a
+    -- MAYBE field used to fail every row with "incorrect indentation".
+    it "an empty cell for a MAYBE input is NOTHING when soft and missing when hard" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyMaybe, "--inputs", batchTyMaybeCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      -- NOTHING for a left-out MAYBE is a presumption (T1b puts it under the
+      -- switch), so it is listed like a default.
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 0), presumedOf ["premium"]), (Just (Number 7), presumedOf []) ]
+      Output hcode hout _ <-
+        runL4 bin [ "batch", batchTyMaybe, "--inputs", batchTyMaybeCsv
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      hcode `shouldSatisfy` (/= ExitSuccess)
+      hrows <- decodeArray hout
+      map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
+      hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
+
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do
       -- Render into a directory whose *name* would execute `touch <sentinel>`
       -- if the path were ever handed to a shell. With a direct `proc` call it
       -- is just a literal (if unusual) directory name. The sentinel must not
       -- appear regardless of whether Graphviz's `dot` is installed.
+      -- The sentinel is relative, run from a scratch directory: an absolute
+      -- Windows path would put a drive colon into the directory name.
       tmp <- getTemporaryDirectory
-      let sentinel = tmp </> "l4-trace-injection-sentinel"
-          evilDir  = tmp </> ("l4trace$(touch " ++ sentinel ++ ").d")
-      removePathForcibly sentinel
-      removePathForcibly evilDir
-      createDirectoryIfMissing True evilDir
-      _ <- runL4 bin ["trace", evalTraceFixture, "--format", "png", "--output-dir", evilDir]
-      ranShell <- doesFileExist sentinel
-      removePathForcibly evilDir
+      let work     = tmp </> "l4-trace-injection"
+          sentinel = "l4-trace-injection-sentinel"
+          evilDir  = "l4trace$(touch " ++ sentinel ++ ").d"
+      removePathForcibly work
+      createDirectoryIfMissing True (work </> evilDir)
+      fixture <- makeAbsolute evalTraceFixture
+      _ <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> sentinel)
+      removePathForcibly work
       ranShell `shouldBe` False
 
     it "writes trace output into a directory whose path contains a space" $ do
@@ -1228,6 +1669,32 @@ spec bin = do
       wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
       removePathForcibly outDir
       wrote `shouldBe` True
+
+    it "hands dot an output dir beginning with '-' as a path, not an option" $ do
+      -- dot reads any argument starting with `-` as an option, and has no
+      -- `--` to stop that. Given `-out/evaltrace-eval1.dot` it reads
+      -- `-o ut/...`, takes the graph from stdin instead, and exits 0 having
+      -- written nothing, so `l4 trace` reported an empty SVG as generated.
+      -- Only a real `dot` shows this, so without one the test is pending.
+      mDot <- findExecutable "dot"
+      case mDot of
+        Nothing -> pendingWith "Graphviz `dot` is not on PATH"
+        Just _ -> do
+          tmp <- getTemporaryDirectory
+          let work    = tmp </> "l4-trace-dash-path"
+              svgFile = work </> "-out" </> "evaltrace-eval1.svg"
+          removePathForcibly work
+          createDirectoryIfMissing True work
+          fixture <- makeAbsolute evalTraceFixture
+          Output code _ _ <- runL4In (Just work) Nothing bin
+            ["trace", fixture, "--format", "svg", "--output-dir=-out"]
+          wrote <- doesFileExist svgFile
+          svg <- if wrote
+            then T.unpack . TE.decodeUtf8Lenient <$> BS.readFile svgFile
+            else pure ""
+          removePathForcibly work
+          code `shouldBe` ExitSuccess
+          svg `shouldSatisfy` ("<svg" `isInfixOf`)
 
   -- Regression tests for the import-cycle false-success bug: `l4 check`/`run`
   -- previously exited 0 on a 2-/3-module import ring because the engine's cycle
@@ -1688,6 +2155,57 @@ spec bin = do
       renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
       renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
 
+    it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15-19)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Ruled 2026-10-02: indented past the GIVEN keyword, it describes the
+      -- input above it, with a GIVETH next (row 15) or without (row 16), past
+      -- TYPICALLY defaults (row 18), and under a section GIVEN (row 19). Before,
+      -- row 15's was dropped, row 16's became the rule's sentence, and row 18's
+      -- first landed on the second input.
+      nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row sixteen` with 200\n`row sixteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row eighteen` where the floor is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row nineteen` where the section's floor is 100" `isInfixOf`)
+      -- Render describes each rule by its own body; only a section input's
+      -- gloss shows up in it.
+      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eighteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row nineteen holds if amount is more than the section's floor" `isInfixOf`)
+
+    -- doc/reference/syntax/README.md says of its placement table that "a
+    -- change to any cell is a test failure". So the cells are read from the
+    -- page: each row's `l4 render` cell, and both `l4 nlg` cells of rows 2 and
+    -- 3, name what the output must show. Editing a cell turns this red, and so
+    -- does a change to the output.
+    it "matches the reference table's l4 render cell for every row, read from the page" $ do
+      Output _ renOut _ <- renderOf
+      Output _ nlgOut _ <- nlgOf
+      table <- placementTable <$> readFile placementReadme
+      map fst table `shouldBe` [1 .. 19]
+      for_ table \(n, cells) -> case cells of
+        [_shape, _placement, positional, withCall, render] -> do
+          let word = numberWord n
+              line = headOr "" [ l | l <- lines renOut, ("Row " <> word <> " ") `isInfixOf` l ]
+          unless (renderCellHolds word render line) $
+            expectationFailure ("row " <> show n <> ": the table's l4 render cell is "
+              <> show render <> ", but l4 render printed " <> show line)
+          when (n `elem` [2, 3]) $ do
+            unless (positional == "sentence" && ("row " <> word <> " saw 200\n") `isInfixOf` nlgOut) $
+              expectationFailure ("row " <> show n <> ": positional cell " <> show positional)
+            unless (withCall == "sentence"
+                    && ("row " <> word <> " saw `amount` where `amount` is 200") `isInfixOf` nlgOut) $
+              expectationFailure ("row " <> show n <> ": WITH cell " <> show withCall)
+        _ -> expectationFailure ("row " <> show n <> ": expected six cells, got " <> show cells)
+
+    it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      nlgOut `shouldSatisfy` ("row seventeen saw 200\n" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
   -- checker whose green runs mean nothing either.
@@ -1822,8 +2340,11 @@ spec bin = do
 
     -- Referential transparency. Four spellings of `m AND NOT m`, three of which
     -- put a limb behind a local name; all four must report the contradiction,
-    -- because they are the same rule. `parameterised` is the control: a binding
-    -- that takes arguments is NOT inlined, so it stays two atoms and clean.
+    -- because they are the same rule. `parameterised` was the control while a
+    -- binding that takes arguments stayed opaque; it is read through now (beta
+    -- reduction, WHERE-INLINING-SPEC.md §9) and is unsat like the rest. The
+    -- control is `parameterised, consistent`, which must stay clean — it is what
+    -- a substitution that dropped its arguments would falsely report.
     it "analyses a rule the same however its limbs are named" $ do
       env <- jsonEnvelope bin ["verify", verifyWhereTransparencyFixture, "--format", "json"]
       let unsats =
@@ -1835,13 +2356,59 @@ spec bin = do
             , any (\ f -> objField f "kind" == Just (String "unsat")) (toList fs)
             ]
       sort unsats `shouldBe`
-        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`"]
+        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`", "parameterised"]
 
     -- Termination, not correctness: a cycle among local bindings must be
     -- detected rather than substituted. A regression here hangs the suite.
     it "terminates on recursive and mutually recursive local bindings" $ do
       Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
+
+    -- Reading through calls. `the arrow is broken` asks for an exception and the
+    -- offence it defeats at once; with calls as opaque leaves that was two
+    -- unrelated atoms and no finding. Its twin over an offence that forgets the
+    -- exception is the control, and must stay clean: before this change the two
+    -- could not be told apart, which is the whole defect.
+    it "finds a contradiction that only appears once calls are read through" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldCallsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`the arrow is broken`" found `shouldBe` Just ["unsat"]
+      lookup "`the arrow is broken in the bad encoding`" found `shouldBe` Just []
+      case objField env "summary" >>= (`objField` "callsReadThrough") of
+        Just (Number n) -> n `shouldSatisfy` (> 0)
+        other -> expectationFailure ("expected summary.callsReadThrough, got " ++ show other)
+
+    -- Across an import, where the rules' return types are INFERRED: the imported
+    -- bodies must be zonked with their own module's substitution before they can
+    -- be recognised as boolean. Without that this finding is silently missed.
+    it "reads through calls to rules in an imported module" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldImportsFixture, "--format", "json"]
+      lookup "`the arrow is broken across an import`" (findingsByDecision env)
+        `shouldBe` Just ["unsat"]
+
+    -- A call whose meaning is too large to draw stays an opaque leaf. The rule
+    -- is still ANALYSED, every other call is still read through, and the one
+    -- left opaque is NAMED — on its rule and in the summary. What is lost is only
+    -- what that call would have shown: here, the contradiction.
+    it "leaves a call opaque, and names it, when its meaning is too large" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldCallsFixture, "--format", "json", "--max-nodes", "5"]
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "analysed" `shouldBe` Just (Number 5)
+          objField summ "callsLeftOpaque" `shouldBe` Just (Number 1)
+        Nothing -> expectationFailure "expected a summary"
+      lookup "`the arrow is broken`" (findingsByDecision env) `shouldBe` Just []
+      Output _ sout _ <- runL4 bin ["verify", verifyUnfoldCallsFixture, "--max-nodes", "5"]
+      sout `shouldSatisfy` ("call left as a leaf: `the offence is made out`" `isInfixOf`)
+
+    -- Termination: a recursive rule is never unfolded. Also a soundness guard: a
+    -- compound leaf's variable id once collided with a bare input's unique, so
+    -- `all hold xs AND b` read as ONE atom and both conjuncts were reported as
+    -- vacuous. It must be clean.
+    it "terminates on a recursive rule, and invents no finding around it" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyUnfoldRecursiveFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
 
     -- The corpus figure the p8-verify receipt now carries.
     it "reports the Reg CF corpus's own nested count" $ do
@@ -1881,3 +2448,55 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | Each decision in an @l4 verify@ JSON envelope, with the kinds of its
+-- findings, in report order. A decision that was not analysed has none.
+findingsByDecision :: Value -> [(String, [String])]
+findingsByDecision env =
+  [ ( T.unpack nm
+    , [ T.unpack k
+      | Just (Array fs) <- [objField d "findings"]
+      , f <- toList fs
+      , Just (String k) <- [objField f "kind"]
+      ]
+    )
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  ]
+
+-- | The placement table of doc/reference/syntax/README.md: each row's number
+-- and the cells after it, trimmed.
+placementTable :: String -> [(Int, [String])]
+placementTable page =
+  [ (n, cells)
+  | l <- takeWhile ("|" `isPrefixOf`) (drop 1 (dropWhile (not . ("| head shape" `isInfixOf`)) (lines page)))
+  , numCell : cells <- [map trim (init (drop 1 (splitOnChar '|' l)))]
+  , [(n, "")] <- [reads numCell]
+  ]
+ where
+  trim = dropWhileEnd isSpace . dropWhile isSpace
+  splitOnChar c str = case break (== c) str of
+    (a, [])       -> [a]
+    (a, _ : rest) -> a : splitOnChar c rest
+
+-- | What an `l4 render` cell of that table promises about a row's line.
+renderCellHolds :: String -> String -> String -> Bool
+renderCellHolds word cell line = case cell of
+  "sentence"          -> ("row " <> word <> " saw amount") `isInfixOf` line
+  "outer sentence"    -> ("row " <> word <> " the rule saw amount") `isInfixOf` line
+  "rule's body"       -> "amount is more than" `isInfixOf` line && not (" saw " `isInfixOf` line)
+  "gloss in the body" -> "the section's floor" `isInfixOf` line
+  _                   -> False
+
+-- | The fixture names its rules `row one` to `row nineteen`.
+numberWord :: Int -> String
+numberWord n = headOr (show n) (drop (n - 1) ws)
+ where
+  ws = words "one two three four five six seven eight nine ten eleven twelve \
+             \thirteen fourteen fifteen sixteen seventeen eighteen nineteen"
+
+headOr :: a -> [a] -> a
+headOr d xs = case xs of
+  x : _ -> x
+  []    -> d

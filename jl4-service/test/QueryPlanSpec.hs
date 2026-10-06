@@ -230,6 +230,7 @@ svcQPNamed name cache bindings =
     , fnArguments = Map.fromList [(k, Just (FnLitBool v)) | (k, v) <- bindings]
     , startTime = Nothing
     , events = Nothing
+    , presumption = Nothing
     }
 
 -- | Run an LSP query plan.
@@ -247,8 +248,8 @@ ladderAtomIdsOf info = go info.funDecl.body
     VizExpr.Or _ xs -> concatMap go xs
     VizExpr.Not _ x -> go x
     VizExpr.Implies _ scope requirement _ -> go scope <> go requirement
-    VizExpr.UBoolVar _ _ _ _ aid _ -> [aid]
-    VizExpr.App _ _ args aid -> aid : concatMap go args
+    VizExpr.UBoolVar _ _ _ _ aid _ _ -> [aid]
+    VizExpr.App _ _ args aid _ -> aid : concatMap go args
     VizExpr.TrueE{} -> []
     VizExpr.FalseE{} -> []
     VizExpr.InertE{} -> []
@@ -376,6 +377,23 @@ atomIdentityTests = do
           List.sort (List.nub [a.atomId | a <- (lspQP "compute_qualifies" params info vizState []).ranked])
     svcIds `shouldBe` lspIds
     svcIds `shouldBe` lspPlanIds
+
+  it "LSP and service paths agree on atom identity for an App's arguments too" do
+    -- The arguments of an all-BOOLEAN App are ladder leaves but not plan
+    -- variables. jl4-lsp names them with 'LspQP.ladderAtomIds'; the service used
+    -- the plan-only map and left them the visualiser's numeric-ref ids, so the
+    -- IDE and the service gave `a` two different atomIds (measured 2026-10-05).
+    -- The parity test above has no App, so it could not see that.
+    -- Both under the name the service serves it by: the diagram's own label is
+    -- backticked, and the name is the first component of every atomId.
+    cache <- serviceCache "app leaf" appOfBooleansL4
+    (info, vizState, params) <- lspCache "app leaf" appOfBooleansL4
+    let lspMap = LspQP.ladderAtomIds "app leaf" params (LspQP.buildQueryPlanCache info vizState) info.funDecl.body
+        annotated = LspQP.annotateLadderWithAtomIdsUsing lspMap info
+        svcIds = List.sort (List.nub (ladderAtomIdsOf cache.ladderInfo))
+    -- the App, its two arguments, and c
+    length svcIds `shouldBe` 4
+    svcIds `shouldBe` List.sort (List.nub (ladderAtomIdsOf annotated))
 
 
 -- | The ladder is built by distributing OR over AND to reach a normal form, so
@@ -856,9 +874,10 @@ atomIdentityShapeTests = do
   -- `l4-ladder-visualizer` turns them into child nodes) but they are not BDD
   -- variables: 'vizExprToBoolExpr' compiles the whole application to one @BVar@
   -- and does not descend. So they are not in the atomId map, are not plan atoms,
-  -- and are not answerable — before this change or after it. They keep the
-  -- visualiser's UUID, which is what makes them distinguishable from an atom
-  -- rather than colliding with the decimal `unique` binding key.
+  -- and are not answerable — before this change or after it. They carry a UUID
+  -- minted the way a plan atom's is ('LspQP.ladderAtomIds'), which is what makes
+  -- them distinguishable from an atom rather than colliding with the decimal
+  -- `unique` binding key.
   it "an App's boolean arguments are ladder leaves but NOT plan atoms" do
     cache <- serviceCache "app leaf" appOfBooleansL4
     let plan = svcQPNamed "app leaf" cache []
