@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "THE PIN: which commit of legalese/canon the vendored mirror under",
+    "THE PIN: which commit of legalese/commons the vendored mirror under",
     "jl4/examples/canon/ is a copy of, and which of its directories are blessed",
     "as part of this repository's regression corpus.",
     "",
@@ -107,7 +107,7 @@
     "to move to a section-level GIVEN. Re-blessing makes the golden truthful.",
     "Migrating the encoding is a canon-side improvement and is not done."
   ],
-  "repo": "legalese/canon",
+  "repo": "legalese/commons",
   "sha": "6b6476d6d94aeaaeb6fdcbf498c89316ee95b570",
   "ref": "main",
   "pinned": "2026-09-26",

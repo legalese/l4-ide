@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Do this repository's prose citations INTO legalese/canon still resolve?
+// Do this repository's prose citations INTO legalese/commons still resolve?
 //
 // We cite canon from `skills/`, `specs/` and `doc/`: a section of a subject's
 // NOTES.md, a file:line inside an encoding, a count of its assertions. Each is a
@@ -316,6 +316,11 @@ function validCanon(dir) {
 function findCanon() {
   for (const c of [
     process.env.CANON_DIR,
+    resolve(REPO, "../commons"),
+    resolve(REPO, "../../commons"),
+    join(process.env.HOME ?? "", "src/legalese/commons"),
+    // legalese/canon was renamed legalese/commons; a clone made before that
+    // keeps its old directory name until its owner renames it.
     resolve(REPO, "../canon"),
     resolve(REPO, "../../canon"),
     join(process.env.HOME ?? "", "src/legalese/canon"),
@@ -379,7 +384,7 @@ if (skipped.length) {
   );
   for (const s of skipped) console.log(`  unchecked: ${s}`);
   console.log(
-    "  set CANON_DIR=/path/to/legalese/canon (or pass --canon DIR) to check these.",
+    "  set CANON_DIR=/path/to/legalese/commons (or pass --canon DIR) to check these.",
   );
   if (REQUIRE) {
     console.error(
@@ -397,5 +402,5 @@ if (findings.length) {
   process.exit(1);
 }
 console.log(
-  `check-canon-citations: ${checked} citation(s) into legalese/canon all resolve${skipped.length ? ` (${skipped.length} unchecked, see note above)` : ""}.`,
+  `check-canon-citations: ${checked} citation(s) into legalese/commons all resolve${skipped.length ? ` (${skipped.length} unchecked, see note above)` : ""}.`,
 );
