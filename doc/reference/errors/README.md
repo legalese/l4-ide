@@ -30,6 +30,7 @@ If you already know what error you are looking at, use the table of contents bel
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
+  - [Clause that is never used](#clause-that-is-never-used)
   - [ASSUME is being retired](#assume-is-being-retired)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
@@ -566,6 +567,25 @@ WHEN Closed THEN "stopped"
 OTHERWISE "unknown"
 ```
 
+A rule written as a list of clauses, one `DECIDE` line per case, is checked the same way:
+
+```l4
+GIVEN status IS A Status
+GIVETH A STRING
+DECIDE label Active IS "running"
+DECIDE label Closed IS "stopped"
+```
+
+Here the warning lists the clauses still needed, ready to paste:
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `label` Suspended IS
+```
+
+When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
+
 **Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
@@ -577,6 +597,38 @@ OTHERWISE "unknown"
 **What went wrong:** A WHEN branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover every value it could match.
 
 **How to fix it:** Delete the unreachable branch, or reorder branches if a more specific pattern was accidentally placed after a more general one.
+
+---
+
+### Clause that is never used
+
+**Warning message:**
+
+```
+This clause of `describe` is never used, and neither is the clause after it.
+The clause above it matches every input, so `describe` never gets this far.
+Move these clauses above that one, or remove them.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN status IS A Status
+GIVETH A STRING
+DECIDE describe status IS "some status"
+DECIDE describe Active IS "running"
+DECIDE describe Closed IS "stopped"
+```
+
+**What went wrong:** A rule written as a list of clauses tries them from the top, and the first clause that matches is the one that applies. The first clause here matches every status, because its pattern is `status`, the name of the input itself. So `describe Active` is `"some status"`, and the two clauses below it are never reached. The warning appears once, at the first clause that cannot be reached, and says how many more follow it.
+
+The same warning has a second form, "Every input it matches is already matched by a clause above it", for a clause that repeats an earlier one, or that comes after a clause whose pattern is a new name such as `other` (a new name also matches anything).
+
+A clause that is never used is still checked, so a mistake inside it is still reported.
+
+**How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
 
 ---
 
@@ -676,6 +728,17 @@ The typechecker's exhaustiveness warning lists all missing branches.
 **What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the compile-time warning was ignored, or the value escaped the analysis — in particular matches on NUMBER, STRING, or DATE scrutinees, for which exhaustiveness checking is skipped (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match) under Compiler Warnings). A directive that crashes this way makes `l4 run` exit non-zero.
 
 **How to fix it:** Add branches for the missing cases, or add an OTHERWISE branch as a catch-all. For matches on NUMBER, STRING, or DATE values, always include OTHERWISE.
+
+When the rule was written as a list of clauses rather than with a CONSIDER, the message talks about its clauses instead:
+
+```
+No clause of `label` matches these inputs.
+The value that the last clause could not match is
+  Suspended
+Add a clause for this case, or end the clauses with one that matches every input.
+```
+
+Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning described under [Non-exhaustive pattern match](#non-exhaustive-pattern-match) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
 
 ---
 

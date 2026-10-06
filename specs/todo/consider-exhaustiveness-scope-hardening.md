@@ -232,7 +232,7 @@ with pasteable `DECIDE … IS` suggestions. The **owning document for this
 mechanism and its rulings is `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §14.7**; this
 note only records that the gap named there is closed on this oracle's side.
 Residual (owned there too): a user-written CONSIDER inside clause 2..n's body
-is still suppressed.
+was still suppressed. Closed 2026-10-06; see §14.7's "What changed 2026-10-06".
 
 ---
 
