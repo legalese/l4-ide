@@ -165,6 +165,7 @@ test-suite jl4-lsp-test
     LadderCallExpansionSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
+    SmartPunctuationActionsSpec
     StateGraphLensSpec
     VisualiseExpansionOptInSpec
   build-tool-depends:

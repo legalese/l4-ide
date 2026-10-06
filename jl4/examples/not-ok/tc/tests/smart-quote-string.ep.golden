@@ -1,0 +1,13 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: smart-quote-string.l4
+  Hidden: no
+  Range: 13:18-13:19
+  Source: lexer
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This is “ (Left Double Quotation Mark, U+201C). It looks like `"`, but L4 only understands the plain one.
+
+    Word processors such as Word, Pages and Google Docs swap plain punctuation for curly lookalikes as you type, so this usually means the text was pasted in from one.
+
+    Replace it with `"`.

@@ -341,8 +341,13 @@ handlers evalConfig recorder =
           rng = params ^. J.range
         diags <- atomically $ do
           activeFileDiagnosticsInRange (shakeExtras ide) uri rng
-        cas <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
-        pure $ Right $ InL $ fmap InR cas
+        casAssume     <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
+        casConfusable <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
+        let casLexFix = concatMap lexErrorCodeActions diags
+            casNbsp    = Maybe.mapMaybe nbspCodeAction diags
+        casStraighten <- straightenWholeFileCodeAction ide uri diags
+        pure $ Right $ InL $ fmap InR $
+          casAssume <> casConfusable <> casLexFix <> casNbsp <> casStraighten
     , requestHandler SMethod_TextDocumentSemanticTokensFull $ \ide req -> do
         let
           SemanticTokensParams _ _ doc = req
@@ -1038,6 +1043,101 @@ outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext o
 
     uri :: Uri
     uri = fromNormalizedUri nuri
+
+-- | The out-of-scope did-you-mean quick fix: when a name no definition
+-- supplies differs from one that IS in scope only in a confusable
+-- character — a curly quote pasted from Word into one spelling and not the
+-- other, either direction — offer to replace it with the in-scope spelling.
+-- The match is computed by 'Actions.confusableDidYouMeanFix', pure and
+-- testable without an IDE; this handler only gathers the candidate names in
+-- scope at the reference (the same set 'Actions.completions' would offer
+-- there) and wraps the result as a 'CodeAction'.
+outOfScopeConfusableQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
+outOfScopeConfusableQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
+  Nothing -> pure Nothing
+  Just ctx -> case ctx.kind of
+    OutOfScopeError name _ty -> do
+      mTypeCheck <- liftIO $ runAction "codeAction.outOfScopeConfusable" ide $
+        use TypeCheck nuri
+      pure $ do
+        typeCheck <- mTypeCheck
+        range <- rangeOf name
+        let refRaw = rawNameToText (rawName name)
+            inScopeRaw = inScopeRawNamesAt range.start typeCheck
+        fix <- confusableDidYouMeanFix range refRaw inScopeRaw
+        pure (quickFixToCodeAction True [fd ^. fdLspDiagnosticL] uri fix)
+    _ -> pure Nothing
+  where
+    nuri = fd ^. fdFilePathL
+
+    uri :: Uri
+    uri = fromNormalizedUri nuri
+
+-- | Every quick-fix 'CodeAction' a confusable-character lexer error's
+-- 'PError' carries (see 'Actions.lexErrorQuickFixes'): a paired-quote fix
+-- first when there is one, then — for a dash — its two spellings in the
+-- order 'L4.SmartPunctuation.dashReplacementFor' picks for that dash's own
+-- position, or, for every other confusable, just the single-character
+-- replacement. The first is preferred.
+lexErrorCodeActions :: FileDiagnostic -> [CodeAction]
+lexErrorCodeActions fd = case fd ^. messageOfL @PError of
+  Nothing -> []
+  Just pErr ->
+    [ quickFixToCodeAction (i == 0) [fd ^. fdLspDiagnosticL] (fromNormalizedUri (fd ^. fdFilePathL)) fix
+    | (i, fix) <- zip [0 :: Int ..] (lexErrorQuickFixes pErr)
+    ]
+
+-- | The NBSP lint's one code action, from 'Actions.nbspQuickFix'.
+nbspCodeAction :: FileDiagnostic -> Maybe CodeAction
+nbspCodeAction fd = do
+  nl <- fd ^. messageOfL @NbspLint
+  pure $ quickFixToCodeAction True [fd ^. fdLspDiagnosticL] (fromNormalizedUri (fd ^. fdFilePathL)) (nbspQuickFix nl.range)
+
+-- | The whole-file "Straighten all smart punctuation" action, offered once
+-- per request rather than once per diagnostic — megaparsec stops lexing at
+-- the FIRST error, so a document with several confusables shows only one
+-- lexer diagnostic even though 'straightenDocumentQuickFix' would repair
+-- more than that. Gated on there being at least one smart-punctuation
+-- diagnostic already in view (a lexer 'PError' with fixes, or an 'NbspLint'
+-- warning) in the requested range, so this does not fetch and re-lex the
+-- whole file on every unrelated code-action request.
+straightenWholeFileCodeAction :: IdeState -> NormalizedUri -> [FileDiagnostic] -> ServerM Config [CodeAction]
+straightenWholeFileCodeAction ide nuri diags
+  | not relevant = pure []
+  | otherwise = do
+      mRope <- liftIO $ runAction "codeAction.straightenWholeFile" ide $ getFileContents nuri
+      pure $ Maybe.maybeToList $ do
+        rope <- mRope
+        fix <- straightenDocumentQuickFix nuri (Rope.toText rope)
+        pure (quickFixToCodeAction False [] (fromNormalizedUri nuri) fix)
+  where
+    relevant = any isSmartPunctuationDiagnostic diags
+
+    isSmartPunctuationDiagnostic fd =
+      case fd ^. messageOfL @PError of
+        Just pErr | not (null pErr.fixes) -> True
+        _ -> case fd ^. messageOfL @NbspLint of
+          Just _  -> True
+          Nothing -> False
+
+-- | Turn a pure 'Actions.QuickFix' into an LSP 'CodeAction' over one file.
+-- The shared tail of every smart-punctuation code action above.
+quickFixToCodeAction :: Bool -> [Diagnostic] -> Uri -> QuickFix -> CodeAction
+quickFixToCodeAction preferred diagnostics uri fix =
+  CodeAction
+    { _title = fix.title
+    , _kind = Just CodeActionKind_QuickFix
+    , _diagnostics = if null diagnostics then Nothing else Just diagnostics
+    , _isPreferred = if preferred then Just True else Nothing
+    , _disabled = Nothing
+    , _edit = Just WorkspaceEdit
+      { _changeAnnotations = Nothing
+      , _documentChanges = Nothing
+      , _changes = Just $ Map.singleton uri fix.edits
+      }
+    , _command = Nothing
+    , _data_ = Nothing
+    }
 
 data L4Cmd
   = CmdVisualize

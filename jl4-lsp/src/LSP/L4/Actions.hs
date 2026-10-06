@@ -21,9 +21,11 @@ import qualified L4.StateGraph.Lens as SGLens
 import LSP.L4.SemanticTokens (srcPosToPosition)
 import Data.Either (isRight)
 import GHC.Generics (Generically (..))
-import L4.Lexer (annotations, directives, keywords)
+import L4.Lexer (LexFix (..), PError (..), annotations, directives, keywords)
+import qualified L4.Lexer as Lexer
 import L4.Parser.SrcSpan
 import L4.Print
+import qualified L4.SmartPunctuation as SP
 import L4.Syntax
 import L4.TypeCheck
 import qualified L4.Evaluate.ValueLazy   as EL
@@ -770,3 +772,132 @@ hasTypeInferenceVars = \ case
 hasNamedTypeInferenceVars :: OptionallyNamedType Resolved -> Bool
 hasNamedTypeInferenceVars = \ case
   MkOptionallyNamedType _ _ ty -> hasTypeInferenceVars ty
+
+-- ----------------------------------------------------------------------------
+-- Smart punctuation: quick fixes for curly quotes, dashes and NBSP pasted in
+-- from a word processor (L4.SmartPunctuation)
+-- ----------------------------------------------------------------------------
+
+-- | A quick fix's title and the (possibly several, e.g. a paired-quote fix)
+-- edits that carry it out. The one shape every smart-punctuation code action
+-- below reduces to, so "LSP.L4.Handlers" only has to wrap it in a
+-- 'CodeAction'.
+data QuickFix = MkQuickFix
+  { title :: Text
+  , edits :: [TextEdit]
+  }
+  deriving stock (Eq, Show)
+
+-- | A lexer 'LexFix' (source-span edits) as a 'QuickFix' (LSP-range edits).
+lexFixToQuickFix :: LexFix -> QuickFix
+lexFixToQuickFix fix =
+  MkQuickFix
+    { title = fix.title
+    , edits = [ TextEdit (srcSpanToLspRange (Just span_)) repl | (span_, repl) <- fix.edits ]
+    }
+
+-- | Every quick fix a confusable-character lexer error carries, in the order
+-- 'L4.Lexer.confusableLexError' built them: a paired-quote fix first (when
+-- there is one), then the dash's two spellings — ordered by
+-- 'L4.SmartPunctuation.dashReplacementFor' so the comment-shaped spelling
+-- leads when this dash's own position calls for it — or, for every other
+-- confusable, just the single-character replacement. The handler marks the
+-- first one preferred.
+lexErrorQuickFixes :: PError -> [QuickFix]
+lexErrorQuickFixes pErr = map lexFixToQuickFix pErr.fixes
+
+-- | The NBSP lint's one fix: replace the exact offending character with an
+-- ordinary space.
+nbspQuickFix :: SrcRange -> QuickFix
+nbspQuickFix range =
+  MkQuickFix
+    { title = "Replace with an ordinary space"
+    , edits = [ TextEdit (srcRangeToLspRange (Just range)) " " ]
+    }
+
+-- | The 'Range' spanning an entire document's text, computed from its own
+-- line count and last line's length. Deliberately computed from the TEXT
+-- itself (which the caller already has, via 'Rope.toText') rather than
+-- queried off a 'Rope' API, so this is correct regardless of which
+-- 'text-rope' version is in the plan and needs no IDE to test.
+wholeDocumentRange :: Text -> Range
+wholeDocumentRange contents =
+  Range (Position 0 0) (Position endLine endCol)
+  where
+    endLine = fromIntegral (Text.count "\n" contents)
+    endCol  = fromIntegral (Text.length (Text.takeWhileEnd (/= '\n') contents))
+
+-- | The "Straighten all smart punctuation in this file" action's edit: the
+-- whole document, replaced by 'L4.Lexer.straightenDocument's repaired text.
+-- 'Nothing' below two replacements — a single confusable already has its own
+-- per-character fix, so a whole-document action earns its own menu entry
+-- only once it does more than that one fix would.
+--
+-- __Also 'Nothing' when the repaired text still would not lex.__
+-- 'Lexer.straightenDocument''s fixed-point loop can stop with the document
+-- still broken — most commonly when a curly quote's matching closer sits on
+-- a LATER line than 'SP.pairedQuoteCloser' looks ahead to, so straightening
+-- the opener alone turns the rest of the file into unterminated string
+-- content. Offering this action's title with a replacement count implies a
+-- finished repair; presenting that when the file would still fail to lex,
+-- under a diagnostic that no longer even mentions smart punctuation, is
+-- worse than not offering the action at all — the per-diagnostic quick fix
+-- on whatever error remains is still available either way. So this checks
+-- the real lexer on the candidate final text before ever promising success.
+straightenDocumentQuickFix :: NormalizedUri -> Text -> Maybe QuickFix
+straightenDocumentQuickFix uri contents
+  | n < 2                                       = Nothing
+  | Left _ <- Lexer.execLexer uri final          = Nothing
+  | otherwise = Just MkQuickFix
+      { title = "Straighten all smart punctuation in this file (" <> Text.pack (show n) <> " replacements)"
+      , edits = [ TextEdit (wholeDocumentRange contents) final ]
+      }
+  where
+    (n, final) = Lexer.straightenDocument uri contents
+
+-- | Every raw name in scope at the given position — the toplevel
+-- environment plus whatever a narrower @GIVEN@/@§@ scope adds there. Exactly
+-- 'completions''s @finalCheckInfos@ computation (same two sources, same
+-- combinator), reused here so the did-you-mean fix considers the same
+-- candidate set a completion popup at that position would offer.
+inScopeRawNamesAt :: SrcPos -> TypeCheckResult -> [Text]
+inScopeRawNamesAt pos typeCheck =
+  map rawNameToText $ Map.keys $
+    Map.unionsWith (\a b -> nub (a <> b)) $
+      map (uncurry combineEnvironmentEntityInfo) $
+        (typeCheck.environment, typeCheck.entityInfo)
+          : map snd (IV.search pos typeCheck.scopeMap)
+
+-- | For an out-of-scope name whose spelling differs from an in-scope one
+-- only in its confusable punctuation — a curly quote pasted into one
+-- spelling but not the other, __either direction__ — the exact in-scope
+-- spelling to offer as a "did you mean" quick fix. 'Nothing' when no
+-- in-scope name straightens to the same text, or the two are already
+-- spelled identically (there would be nothing to fix, and the name would not
+-- have been out of scope to begin with).
+--
+-- Direction-symmetric by construction: 'SP.straightenChars' is applied to
+-- BOTH the reference and every candidate before comparing, so it does not
+-- matter which side carries the curly character. Pure and independent of
+-- 'RawName''s internals, so it is testable on plain 'Text'.
+confusableDidYouMean :: [Text] -> Text -> Maybe Text
+confusableDidYouMean inScopeRaw refRaw =
+  listToMaybe
+    [ candRaw
+    | candRaw <- inScopeRaw
+    , candRaw /= refRaw
+    , SP.straightenChars candRaw == SP.straightenChars refRaw
+    ]
+
+-- | 'confusableDidYouMean', wrapped into the 'QuickFix' a code action needs:
+-- the out-of-scope reference's own range, replaced with the matched in-scope
+-- name's exact spelling (rendered with backticks when it needs them, via
+-- 'quoteIfNeeded' — the same renderer 'quotedName' is built on).
+confusableDidYouMeanFix :: SrcRange -> Text -> [Text] -> Maybe QuickFix
+confusableDidYouMeanFix range refRaw inScopeRaw = do
+  candRaw <- confusableDidYouMean inScopeRaw refRaw
+  let shown = quoteIfNeeded candRaw
+  pure MkQuickFix
+    { title = "Replace with " <> shown
+    , edits = [ TextEdit (srcRangeToLspRange (Just range)) shown ]
+    }

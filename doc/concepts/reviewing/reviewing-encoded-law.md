@@ -20,7 +20,7 @@ measurement, the text says so.
 
 ## 1 · Your seat: HG1, the human in the loop
 
-The pipeline runs almost entirely by machine: it ingests a regulation, encodes it, tests it, projects it into industry-standard artifacts, and writes a report on itself. But it was designed around a rule that no machine may cross: **whether an encoding faithfully says what the law says is a judgement, and only a named human expert may make it.** That judgement is called **HG1** — human gate one — and it blocks everything downstream of it: no projection ships as “reviewed” without it.
+The pipeline runs almost entirely by machine: it ingests a regulation, encodes it, tests it, projects it into industry-standard artifacts, and writes a report on itself. But it was designed around a rule that no machine may cross: **whether an encoding faithfully says what the law says is a judgement, and only a named human expert may make it.** That judgement is called **HG1** — human gate one — and no projection ships as “reviewed” without it. The machine does not wait for it: a run with no review on record carries on under a provisional grant, its outputs marked unreviewed, so the evidence your review reads is ready before you start.
 
 Concretely, HG1 is not a checkbox. It is a **detached SSH signature over a digest of the files you reviewed**. Anyone in the world can verify your signature against the published corpus; no agent, however clever, can manufacture it — the design maxim is _agents can verify signatures and cannot make them_. If anyone edits the encoding after you sign, your signature visibly stops verifying: sign-off binds to content, not to a moment.
 
@@ -362,9 +362,9 @@ Only route two above needs GHC, and on Windows a native GHC install is the least
 
 ### Where you come in, and how to get past yourself
 
-The run will stop at **HG1** and ask for your signature, because everything from P6 onward is gated on it. That is the whole design and not an obstacle to route around.
+The run does not stop at **HG1**. With no review on record it proceeds on a provisional grant: everything from P6 onward runs, and the report marks it unreviewed, because those stages produce the evidence your review will read. Your signature is what turns that output into reviewed output.
 
-But while you are still finding your feet, stopping at a gate every time is friction with no review value, so the gate is _waivable_ — on the record, never silently:
+If you want the record to say why a run went ahead unsigned, waive the gate instead — on the record, never silently:
 
 ```bash
 etc/go/go.sh run --subject regcf --encoding primary \

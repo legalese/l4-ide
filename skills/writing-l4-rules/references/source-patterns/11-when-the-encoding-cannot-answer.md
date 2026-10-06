@@ -744,8 +744,8 @@ The statutory form is common:
 
 > `(a) to pay to the other party the sum which it is agreed in the contract by which the marriage was arranged is to be paid by the party in breach of the contract`
 >
-> — Administration of Muslim Law Act 1966 (Singapore) s 94(1)(a), in the repository at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/AMLA1966.txt:4166-4168`
+> — Administration of Muslim Law Act 1966 (Singapore) s 94(1)(a), at
+> `AMLA1966.txt:4166-4168` of the `pdftotext -layout` rendering that legalese/canon's `subjects/sg/succession/encodings/cleanroom-2026-08/source/fetch-sso.py` re-creates byte for byte
 
 and the contract form — "the renewal fee shall be such amount as the parties may agree", "on terms
 to be agreed" — is the same words from the other side.

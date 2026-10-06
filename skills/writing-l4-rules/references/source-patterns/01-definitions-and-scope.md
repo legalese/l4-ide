@@ -809,8 +809,8 @@ active — quote the label, not the sentence", for the second destination.
 
 > `36.—(1) Notwithstanding any other written law, a minor who has attained the age of 18 years and who is not otherwise under any legal disability — (a) may, in his own name and without a litigation representative, bring, defend, conduct or intervene in any legal proceeding or action specified in the Schedule as if he were of full age`
 >
-> — Civil Law Act 1909 (Singapore) s 36(1)(a), in the repository at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/CLA1909.txt:1766-1772`
+> — Civil Law Act 1909 (Singapore) s 36(1)(a), at
+> `CLA1909.txt:1766-1772` of the `pdftotext -layout` rendering that legalese/canon's `subjects/sg/succession/encodings/cleanroom-2026-08/source/fetch-sso.py` re-creates byte for byte
 
 **It is doing** putting the extension of a term somewhere the operative section is not, usually
 because the list is long, or ordered, or meant to be amended without touching the section. The
