@@ -762,10 +762,10 @@ handlers evalConfig recorder =
                 }
               Just results -> do
                 let conFields = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult'
-                    matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _) = fmap (.start) rng == Just targetPos
+                    matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _ _) = fmap (.start) rng == Just targetPos
                     matchingResult = List.find matchesPos results
                 case matchingResult of
-                  Just evalRes@(EL.MkEvalDirectiveResult (Just rng) _ _ _ _) ->
+                  Just evalRes@(EL.MkEvalDirectiveResult (Just rng) _ _ _ _ _) ->
                     pure $ Right $ Aeson.toJSON $
                       Inspector.evalDirectiveToResult conFields reqParams.directiveType rng evalRes
                   Just _ -> pure $ Left $ TResponseError

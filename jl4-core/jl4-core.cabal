@@ -185,6 +185,7 @@ library
     L4.Parser.ResolveAnnotation
     L4.Parser.SrcSpan
     L4.ParserCombinators
+    L4.Presumption
     L4.Print
     L4.Print.Columnar
     L4.SmartPunctuation

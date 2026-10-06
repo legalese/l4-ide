@@ -15,7 +15,7 @@ import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
-import L4.Export (ExportedFunction (..), ExportedParam (..))
+import L4.Export (ExportedFunction (..), ExportedParam (..), honouredDefault, isRequiredInput)
 import L4.FunctionSchema (typicallyToJson)
 import L4.Syntax
 import Optics
@@ -153,14 +153,17 @@ buildParamsSchema ctx params =
  where
   addParam :: ExportedParam -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
   addParam param (acc, defs) =
-    let mdef = typicallyToJson =<< param.paramDefault
+    -- An input with a default a caller may omit is not required (R8; W2 of
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md), and its default is published.
+    let mdef = typicallyToJson =<< honouredDefault param
+        required = isRequiredInput param
     in case param.paramType of
       Nothing ->
-        ((param.paramName, SString param.paramDescription, param.paramRequired, mdef) : acc, defs)
+        ((param.paramName, SString param.paramDescription, required, mdef) : acc, defs)
       Just ty ->
         let (schema, newDefs) = typeToJsonSchema ctx{ctxCollectedDefs = defs} ty
             schemaWithDesc = addDescription schema param.paramDescription
-         in ((param.paramName, schemaWithDesc, param.paramRequired, mdef) : acc, newDefs)
+         in ((param.paramName, schemaWithDesc, required, mdef) : acc, newDefs)
 
   addDescription :: SchemaType -> Maybe Text -> SchemaType
   addDescription st Nothing = st
@@ -261,7 +264,9 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
         schemaWithDesc = addDescToSchema fieldSchema fieldDesc
-        isRequired = not (isMaybeOrOptionalType fieldTy)
+        -- A field with a TYPICALLY may be left out: the JSON decoders fill it
+        -- from this DECLARE (T1b).
+        isRequired = not (isMaybeOrOptionalType fieldTy) && isNothing mTypically
      in ((fieldNameText, schemaWithDesc, isRequired, typicallyToJson =<< mTypically) : acc, newDefs)
 
   addDescToSchema :: SchemaType -> Maybe Text -> SchemaType

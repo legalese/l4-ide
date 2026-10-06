@@ -17,10 +17,11 @@ import Logging (newLogger)
 import Options (Options (..))
 import Types
 
-import Control.Monad (guard, unless)
-import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (concurrently, forConcurrently)
+import Control.Monad (forM_, guard, unless)
+import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
-import Control.Exception (try)
+import Control.Exception (bracket, try)
 import Data.Foldable (toList)
 import qualified Data.List as List
 import qualified Codec.Archive.Zip as Zip
@@ -43,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -84,7 +85,7 @@ spec = describe "integration" do
         resp <- evalFunction baseUrl mgr "refuse-eval" "fee"
           (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= (1999 :: Int) ] ])
         case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
-          Just (SimpleError e@(EvaluatorRefused _)) ->
+          Just (SimpleError e@(EvaluatorRefused _ _)) ->
             prettyEvaluatorError e `shouldBe`
               "The model refuses to answer: this schedule is not encoded for years before 2000"
           other -> expectationFailure ("Expected a refusal error, got: " <> show other)
@@ -457,6 +458,368 @@ spec = describe "integration" do
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
 
+  describe "TYPICALLY defaults (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC)" do
+    let uncertain = Aeson.object []
+        args kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs]
+        hard kvs = Aeson.object ["arguments" Aeson..= Aeson.object kvs, "presumption" Aeson..= ("hard" :: Text)]
+        expectAnswer resp v ps = assertSuccess resp \r ->
+          (Map.lookup "value" r.fnResult, r.presumed) `shouldBe` (Just v, ps)
+        expectError resp fragment =
+          case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+            Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf fragment
+            other -> expectationFailure ("Expected an error containing " <> show fragment <> ", got: " <> show other)
+
+    -- W2: the published schema is R8's surface: optional, with its default.
+    it "publishes a section GIVEN's default and leaves it out of required (W2)" do
+      withServiceFromSources "ty-schema" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema/functions/may%20contract")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            params = case lookupKey "parameters" body of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = case Aeson.KeyMap.lookup "required" params of
+              Just (Aeson.Array xs) -> [t | Aeson.String t <- toList xs]
+              _ -> []
+            capacity = case Aeson.KeyMap.lookup "properties" params of
+              Just (Aeson.Object props) -> Aeson.KeyMap.lookup "has capacity" props
+              _ -> Nothing
+        required `shouldNotContain` ["has capacity"]
+        required `shouldContain` ["is adult"]
+        (capacity >>= \case Aeson.Object c -> Aeson.KeyMap.lookup "default" c; _ -> Nothing)
+          `shouldBe` Just (Aeson.Bool True)
+
+    it "fills a left-out section GIVEN on the direct path and lists it in presumed" do
+      withServiceFromSources "ty-sec-direct" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-direct" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    -- The positive control for presumed: a default the rule never forces is
+    -- not listed, although the request left it out just the same.
+    it "does not list a rule GIVEN's default the rule never read" do
+      withServiceFromSources "ty-rule-unread" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rule-unread" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    it "fills a left-out section GIVEN on the wrapper path too" do
+      withServiceFromSources "ty-sec-wrap" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-sec-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer resp (FnLitBool True) ["has capacity"]
+
+    it "fills a left-out rule GIVEN on the direct and the wrapper path" do
+      withServiceFromSources "ty-rule" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectAnswer direct (FnLitBool True) ["has capacity"]
+        wrapped <- evalFunction baseUrl mgr "ty-rule" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["has capacity"]
+
+    it "fills left-out record fields from their DECLARE, enum defaults included (T1b)" do
+      withServiceFromSources "ty-record" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-record" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
+        expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
+
+    it "lets a supplied value win, and presumes nothing" do
+      withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-supplied" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False])
+        expectAnswer resp (FnLitBool False) []
+
+    -- T3: null is "I don't know", never an omission.
+    it "never takes a default for null" do
+      withServiceFromSources "ty-null" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-null" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= Aeson.Null])
+        expectError resp "never takes the TYPICALLY default"
+
+    -- T4: presumption hard withdraws the default; the refusal names the input
+    -- and stays loud, on both paths.
+    it "with presumption hard, refuses a left-out input on the direct path" do
+      withServiceFromSources "ty-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= False])
+        expectError resp "'has capacity': missing required parameter"
+
+    it "with presumption hard, stops on a left-out input on the wrapper path" do
+      withServiceFromSources "ty-hard-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-wrap" "may contract"
+          (hard ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectError resp "has capacity (not supplied)"
+
+    -- T1b: presumption hard withdraws D7.3's MAYBE fallback too, the same way
+    -- on both paths.
+    it "with presumption hard, refuses a left-out MAYBE input on both paths" do
+      withServiceFromSources "ty-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        -- NOTHING for a left-out MAYBE is a presumption, listed like a default
+        soft <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False])
+        expectAnswer soft (FnLitInt 0) ["premium"]
+        softWrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= uncertain])
+        expectAnswer softWrapped (FnLitInt 0) ["premium"]
+        -- null is a value, not an omission: NOTHING, and nothing presumed
+        nulled <- evalFunction baseUrl mgr "ty-maybe" "premium due" (args ["unused flag" Aeson..= False, "premium" Aeson..= Aeson.Null])
+        expectAnswer nulled (FnLitInt 0) []
+        direct <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= False])
+        expectError direct "a MAYBE left out is NOTHING only while presumption is soft"
+        wrapped <- evalFunction baseUrl mgr "ty-maybe" "premium due" (hard ["unused flag" Aeson..= uncertain])
+        -- the wrapper's own field name (`premium (input)`) does not leak (review m6)
+        expectError wrapped "Missing required field 'premium'"
+
+    -- T6: a section default counts when the rule first READS it, not when
+    -- discharge binds it at the root. `FALSE AND <defaulted input>`.
+    it "lists a section default only when the rule reads it, on both paths" do
+      withServiceFromSources "ty-sec-read" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        unread <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer unread (FnLitBool False) []
+        unreadWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= uncertain])
+        expectAnswer unreadWrapped (FnLitBool False) []
+        readWrapped <- evalFunction baseUrl mgr "ty-sec-read" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer readWrapped (FnLitBool True) ["has capacity"]
+
+    -- T3's four cells, on the wrapper path: absent takes the default, null and
+    -- {} do not. (The direct path's null is the "never takes a default for
+    -- null" test above.)
+    it "keeps null apart from absent on the wrapper path" do
+      withServiceFromSources "ty-null-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        absent <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
+        expectAnswer absent (FnLitBool True) ["has capacity"]
+        nulled <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+        uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
+        expectError uncertainCap "has capacity (not supplied)"
+
+    it "keeps null apart from absent for a section GIVEN on the wrapper path" do
+      withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        nulled <- evalFunction baseUrl mgr "ty-null-sec" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
+        expectError nulled "has capacity (not supplied)"
+
+    it "with presumption hard, names every defaulted input left out" do
+      withServiceFromSources "ty-hard-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-hard-two" "may contract" (hard ["is adult" Aeson..= True])
+        expectError resp "Parameter 'of sound mind': missing required parameter"
+        -- a section GIVEN is a parameter, not an ASSUME (review nit 22)
+        expectError resp "Parameter 'has capacity': missing required parameter"
+
+    -- Review M5: a refusal that rests on a default says so, on both
+    -- endpoints, and a refused or errored case of the batch endpoint is
+    -- returned with its reason instead of only being counted (review m5).
+    it "carries presumed on a refusal, and on a refused batch case" do
+      withServiceFromSources "ty-refuse" [("eligible.l4", refuseDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-refuse" "eligible" (args ["age" Aeson..= (30 :: Int)])
+        case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+          Just (SimpleError (EvaluatorRefused reason ps)) -> do
+            reason `shouldBe` "cannot decide for a non-resident"
+            ps `shouldBe` ["is resident"]
+          other -> expectationFailure ("Expected a refusal, got: " <> show other)
+        supplied <- evalFunction baseUrl mgr "ty-refuse" "eligible"
+          (args ["age" Aeson..= (30 :: Int), "is resident" Aeson..= False])
+        case Aeson.decode (responseBody supplied) :: Maybe SimpleResponse of
+          Just (SimpleError (EvaluatorRefused _ ps)) -> ps `shouldBe` []
+          other -> expectationFailure ("Expected a refusal, got: " <> show other)
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "age" Aeson..= (30 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "age" Aeson..= (30 :: Int), "is resident" Aeson..= True]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-refuse/functions/eligible/evaluation/batch") body
+        batchResp <- httpLbs req mgr
+        case Aeson.decode (responseBody batchResp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody batchResp))
+          Just batch -> do
+            map (\c -> (c.outcome, c.presumed)) batch.cases `shouldBe`
+              [ (CaseRefused "cannot decide for a non-resident", ["is resident"]), (CaseAnswered, []) ]
+            batch.summary.casesProcessed `shouldBe` 2
+
+    it "returns an errored batch case with its reason, under presumption hard" do
+      withServiceFromSources "ty-batch-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "presumption" Aeson..= ("hard" :: Text)
+              , "cases" Aeson..= [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False] ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch-hard/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Just batch -> case map (.outcome) batch.cases of
+            [CaseErrored msg] -> msg `shouldSatisfy` Text.isInfixOf "Parameter 'has capacity': missing required parameter"
+            other -> expectationFailure ("Expected one errored case, got: " <> show other)
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+
+    it "refuses an unknown presumption with a 400" do
+      withServiceFromSources "ty-bad-switch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-bad-switch" "may contract"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["is adult" Aeson..= True], "presumption" Aeson..= ("medium" :: Text)])
+        statusCode' resp `shouldBe` 400
+
+    -- Review m1: an exact default reaches the evaluator exactly on both paths.
+    it "keeps a decimal default exact on the direct and the wrapper path" do
+      withServiceFromSources "ty-exact" [("exact.l4", exactDecimalJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-exact" "is exact" (args ["u" Aeson..= True])
+        expectAnswer direct (FnLitBool True) ["r"]
+        wrapped <- evalFunction baseUrl mgr "ty-exact" "is exact" (args ["u" Aeson..= uncertain])
+        expectAnswer wrapped (FnLitBool True) ["r"]
+
+    -- Review m2 and code #7: the schema publishes an enum default as the
+    -- constructor's own name, NOTHING as null, and a rule GIVEN's default;
+    -- and the direct path accepts the published enum value.
+    it "publishes enum, NOTHING and rule GIVEN defaults a request can send back" do
+      withServiceFromSources "ty-schema-enum" [("which.l4", enumSchemaJL4)] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-schema-enum/functions/which")
+        resp <- httpLbs req mgr
+        let props = case lookupKey "parameters" (decodeObject (responseBody resp)) of
+              Just (Aeson.Object o) | Just (Aeson.Object ps) <- Aeson.KeyMap.lookup "properties" o -> ps
+              _ -> mempty
+            defaultOf k = case Aeson.KeyMap.lookup k props of
+              Just (Aeson.Object p) -> Aeson.KeyMap.lookup "default" p
+              _ -> Nothing
+        defaultOf "s" `shouldBe` Just (Aeson.String "Red")
+        defaultOf "m" `shouldBe` Just Aeson.Null
+        defaultOf "k" `shouldBe` Just (Aeson.Number 5)
+        sent <- evalFunction baseUrl mgr "ty-schema-enum" "which" (args ["s" Aeson..= ("Red" :: Text)])
+        expectAnswer sent (FnLitInt 5) ["k"]
+
+    -- Review m8 and m4, report item 5: on the wrapper path a non-BOOLEAN
+    -- input sent as null is refused by name (it used to be "Evaluation
+    -- produced unknown value"), and hard mode compiles a MAYBE default.
+    it "refuses null by name on the wrapper path, and names every input under hard" do
+      withServiceFromSources "ty-wrap-null" [("wp.l4", wrapperNullJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["k" Aeson..= Aeson.Null])
+        expectError direct "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        wrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain, "k" Aeson..= Aeson.Null])
+        expectError wrapped "Field 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        soft <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain])
+        expectAnswer soft (FnLitInt 1050) ["m", "k", "flag"]
+        hardWrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["u" Aeson..= uncertain], "presumption" Aeson..= ("hard" :: Text)])
+        expectError hardWrapped "Missing required fields 'm'"
+        expectError hardWrapped "'k' (it has a TYPICALLY default, but presumption is hard"
+
+    it "refuses null on an enum by name, and reads a MAYBE synonym as a MAYBE" do
+      withServiceFromSources "ty-enum-null" [("red.l4", enumNullJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= False])
+        expectError direct "Parameter 'shade' is null, which means the value is not known"
+        wrapped <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= uncertain])
+        expectError wrapped "Field 'shade' is null, which means the value is not known"
+        synonym <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= ("Red" :: Text), "second" Aeson..= Aeson.Null, "unused flag" Aeson..= False])
+        expectAnswer synonym (FnLitBool True) []
+        synonymAbsent <- evalFunction baseUrl mgr "ty-enum-null" "is red"
+          (args ["shade" Aeson..= ("Red" :: Text), "unused flag" Aeson..= False])
+        expectAnswer synonymAbsent (FnLitBool True) ["second"]
+
+    it "fills a record field default on the wrapper path, and names it without the wrapper's suffix" do
+      withServiceFromSources "ty-rec-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        filled <- evalFunction baseUrl mgr "ty-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)], "unused flag" Aeson..= uncertain])
+        expectAnswer filled (FnLitInt 32) ["cfg.timeout"]
+        nulled <- evalFunction baseUrl mgr "ty-rec-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= Aeson.Null], "unused flag" Aeson..= uncertain])
+        expectError nulled "Field 'cfg.timeout' is null"
+
+    -- Review M3 / code #1: a rule's own decode is not the request's.
+    it "lets a rule's own JSONDECODE fill its default under hard, and says so" do
+      withServiceFromSources "ty-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
+        soft <- evalFunction baseUrl mgr "ty-own" "within limit" (args ["amount" Aeson..= (5 :: Int)])
+        expectAnswer soft (FnLitBool True) []
+        hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
+        expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]
+
+    it "fills a default on the deontic wrapper path and lists it" do
+      withServiceFromSources "ty-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
+
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input or a field left out takes its default, a name that matches
+    -- nothing is refused, naming the nearest; elsewhere it is ignored.
+    it "refuses an unknown argument where a default is taken, and ignores it elsewhere" do
+      withServiceFromSources "ty-typo" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        typo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capasity" Aeson..= False])
+        expectError typo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        wrappedTypo <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capasity" Aeson..= False])
+        expectError wrappedTypo "Unknown parameter 'has capasity' (did you mean 'has capacity'?)"
+        nothingTaken <- evalFunction baseUrl mgr "ty-typo" "may contract"
+          (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False, "has capasity" Aeson..= True])
+        expectAnswer nothingTaken (FnLitBool False) []
+      withServiceFromSources "ty-typo-rec" [("budget.l4", recordDefaultJL4)] \baseUrl mgr -> do
+        direct <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "shade" Aeson..= ("Green" :: Text)])
+        expectError direct "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+        full <- evalFunction baseUrl mgr "ty-typo-rec" "budget"
+          (args [ "cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= (5 :: Int), "colour" Aeson..= ("Red" :: Text), "timout" Aeson..= (1 :: Int)]
+                , "shade" Aeson..= ("Green" :: Text) ])
+        expectAnswer full (FnLitInt 7) []
+      withServiceFromSources "ty-typo-wrap" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        wrapped <- evalFunction baseUrl mgr "ty-typo-wrap" "budget"
+          (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timout" Aeson..= (5 :: Int)], "unused flag" Aeson..= uncertain])
+        expectError wrapped "Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)"
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on
+    -- a record input is null, so it is refused by name, as in l4 batch.
+    it "refuses {} on a record input by name" do
+      withServiceFromSources "ty-rec-empty" [("budget.l4", recordWrapJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-rec-empty" "budget"
+          (args ["cfg" Aeson..= Aeson.object [], "unused flag" Aeson..= False])
+        expectError resp "Field 'cfg' is {}, which means the value is not known: supply a value"
+
+    -- Review code #3: the "took its default" registry is per evaluation, so
+    -- concurrent requests on one cached deployment cannot see each other's.
+    it "keeps presumed apart across concurrent requests" do
+      withServiceFromSources "ty-concurrent" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
+        let request i =
+              let adult = even (i :: Int)
+              in ( adult
+                 , args ["is adult" Aeson..= adult, "unused flag" Aeson..= (if i `mod` 3 == 0 then uncertain else Aeson.Bool False)] )
+        results <- forConcurrently [1 .. 24] \i -> do
+          let (adult, body) = request i
+          resp <- evalFunction baseUrl mgr "ty-concurrent" "may contract" body
+          pure (adult, Aeson.decode (responseBody resp) :: Maybe SimpleResponse)
+        forM_ results \(adult, r) -> case r of
+          Just (SimpleResponse rwr) ->
+            (Map.lookup "value" rwr.fnResult, rwr.presumed) `shouldBe`
+              (Just (FnLitBool adult), [ "has capacity" | adult ])
+          other -> expectationFailure ("Expected an answer, got: " <> show other)
+
+    it "carries presumed on each case of the batch endpoint" do
+      withServiceFromSources "ty-batch" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= False]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/ty-batch/functions/may%20contract/evaluation/batch") body
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+          Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+          Just batch -> map (\c -> c.presumed) batch.cases `shouldBe` [["has capacity"], []]
+
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
       withServiceFromSources "hyphen-eval" [("spaced.l4", spacedFieldsJL4)] \baseUrl mgr -> do
@@ -564,6 +927,105 @@ spec = describe "integration" do
             batch.summary.casesRead `shouldBe` 10
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
+
+    -- TRAFFICJAM (2026-10-02). A case's time limit is wall-clock, and the batch
+    -- used to start every case at once. On one core each case's timer then
+    -- counted its siblings' work as well as its own, so forty cases that each
+    -- take about a fifth of a second failed the whole batch with a 500 under a
+    -- three-second limit, and one slow case took thirty-nine answers with it.
+    --
+    -- These run at one capability, set here rather than by the RTS options, so
+    -- that GHCRTS=-N10 cannot hand the forty cases ten cores and hide the bug.
+    describe "at one capability" $ around_ (withCapabilities 1) do
+      it "answers 10 fast cases under a 3-second limit" do
+        withServiceFromSourcesOpts spinOptions "spin-10" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-10" (replicate 10 spinFast)
+          expectBatchOutcomes resp (replicate 10 CaseAnswered)
+
+      it "answers 40 fast cases under a 3-second limit that no one case comes near" do
+        withServiceFromSourcesOpts spinOptions "spin-40" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-40" (replicate 40 spinFast)
+          expectBatchOutcomes resp (replicate 40 CaseAnswered)
+
+      it "answers 39 fast cases and errs on 1 slow one, without failing the batch" do
+        -- The slow case comes first, so the others wait behind it: a case's
+        -- clock starts when the case starts running, not when the batch arrives.
+        withServiceFromSourcesOpts spinOptions "spin-39-1" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-39-1" (spinSlow : replicate 39 spinFast)
+          expectBatchOutcomes resp
+            ( CaseLimited TimeLimitHit "Evaluation resource limit exceeded: this case did not finish within the time limit of 3 s (--eval-timeout)"
+                : replicate 39 CaseAnswered )
+
+      it "errs on the case that allocates too much, and answers the cases after it" do
+        let stingy = testOptions { maxEvalMemoryMb = 64 }
+        withServiceFromSourcesOpts stingy "spin-alloc" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-alloc" [1_000, spinFast, 1_000]
+          expectBatchOutcomes resp
+            [ CaseAnswered
+            , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+            , CaseAnswered ]
+          map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
+            `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
+
+      -- SPEEDTRAP (2026-10-03): only a case a limit stopped carries @limit.
+      it "puts @limit on the case a limit stopped, and on no other" do
+        withServiceFromSourcesOpts spinOptions "spin-limit-key" [("spin.l4", spinOrRefuseJL4)] \baseUrl mgr -> do
+          let body = Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object ["@id" Aeson..= (1 :: Int), "n" Aeson..= spinSlow]
+                    , Aeson.object ["@id" Aeson..= (2 :: Int)]
+                    , Aeson.object ["@id" Aeson..= (3 :: Int), "n" Aeson..= (-1 :: Int)]
+                    , Aeson.object ["@id" Aeson..= (4 :: Int), "n" Aeson..= (1_000 :: Int)]
+                    ]
+                ]
+          req <- buildJsonPost (baseUrl <> "/deployments/spin-limit-key/functions/spin/evaluation/batch") body
+          resp <- httpLbs req mgr
+          let raw = rawBatchCases resp
+          map (Aeson.KeyMap.lookup "@limit") raw
+            `shouldBe` [Just (Aeson.String "time"), Nothing, Nothing, Nothing]
+          map (Aeson.KeyMap.member "@error") raw `shouldBe` [True, True, False, False]
+          map (Aeson.KeyMap.member "@refused") raw `shouldBe` [False, False, True, False]
+
+      it "answers 10 batches sent at once, which share the core's one slot" do
+        -- The slots are the process's, not each request's. With a set per
+        -- request, ten one-case batches ran ten cases at once on the core, and
+        -- a case taking a fifth of the limit alone ran past it.
+        withServiceFromSourcesOpts spinOptions "spin-shared" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resps <- forConcurrently [1 .. 10 :: Int] \_ ->
+            postSpinBatch baseUrl mgr "spin-shared" [spinFifth]
+          mapM_ (\resp -> expectBatchOutcomes resp [CaseAnswered]) resps
+
+      it "runs a one-case batch sent just behind a big batch next, not after it" do
+        -- Each request queues at most as many cases for the shared slots as
+        -- there are slots (here one), and a freed slot goes to the oldest
+        -- waiter, so the small batch's case runs as soon as the big batch's
+        -- current case is done. With every case of the big batch queued at
+        -- once, the small batch waited behind most of them: 4 to 6 s here,
+        -- against about one case-time with the bound. The case-time is
+        -- measured, as the big batch's time over its eight cases, so that the
+        -- test does not depend on how fast the machine is.
+        withServiceFromSourcesOpts spinOptions "spin-hol" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          bigStarted <- getCurrentTime
+          (bigDone, (smallResp, smallSent, smallDone)) <- concurrently
+            (postSpinBatch baseUrl mgr "spin-hol" (replicate 8 spinFifth) >> getCurrentTime)
+            ( do
+                threadDelay 300_000
+                sent <- getCurrentTime
+                resp <- postSpinBatch baseUrl mgr "spin-hol" [1_000]
+                done <- getCurrentTime
+                pure (resp, sent, done) )
+          expectBatchOutcomes smallResp [CaseAnswered]
+          let caseTime = diffUTCTime bigDone bigStarted / 8
+          diffUTCTime smallDone smallSent `shouldSatisfy` (< 2 * caseTime)
+
+    -- Production runs one capability per core (-N), so a batch runs that many
+    -- cases at once. At two, the forty cases still each meet the limit alone.
+    describe "at two capabilities" $ around_ (withCapabilities 2) do
+      it "answers 40 fast cases, none of them past its limit" do
+        withServiceFromSourcesOpts spinOptions "spin-40-n2" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          resp <- postSpinBatch baseUrl mgr "spin-40-n2" (replicate 40 spinFast)
+          expectBatchOutcomes resp (replicate 40 CaseAnswered)
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -1252,6 +1714,52 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp)
         lookupKey "openapi" body `shouldBe` Just (Aeson.String "3.0.0")
         lookupKey "paths" body `shouldSatisfy` Maybe.isJust
+
+    -- The batch response schema names exactly the keys a batch response
+    -- carries: every case key the code emits for an answered, refused,
+    -- errored and limit-stopped case, plus @graphviz, which needs
+    -- ?trace=full&graphviz=true; and every summary key.
+    it "documents in OpenAPI exactly the keys a batch response carries" do
+      let stingy = testOptions { maxEvalMemoryMb = 64 }
+      withServiceFromSourcesOpts stingy "batch-doc" [("spin.l4", spinOrRefuseJL4)] \baseUrl mgr -> do
+        let body = Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "n" Aeson..= (1_000 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "n" Aeson..= (-1 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (3 :: Int)]
+                  , Aeson.object ["@id" Aeson..= (4 :: Int), "n" Aeson..= spinFast]
+                  ]
+              ]
+        req <- buildJsonPost (baseUrl <> "/deployments/batch-doc/functions/spin/evaluation/batch") body
+        resp <- httpLbs req mgr
+        docReq <- parseRequest (baseUrl <> "/deployments/batch-doc/openapi.json")
+        docResp <- httpLbs docReq mgr
+        let at k = \case
+              Aeson.Object o -> Aeson.KeyMap.lookup k o
+              _ -> Nothing
+            keysOf = \case
+              Just (Aeson.Object o) -> List.sort (Aeson.KeyMap.keys o)
+              _ -> []
+            emittedCases = rawBatchCases resp
+            emittedCaseKeys = List.sort (List.nub ("@graphviz" : concatMap Aeson.KeyMap.keys emittedCases))
+            emitted = Aeson.decode (responseBody resp) :: Maybe Aeson.Value
+            batchOps = case Aeson.decode (responseBody docResp) >>= at "paths" of
+              Just (Aeson.Object ps) ->
+                [ op | (k, op) <- Aeson.KeyMap.toList ps
+                     , "/evaluation/batch" `Text.isSuffixOf` Aeson.Key.toText k ]
+              _ -> []
+            schema = case batchOps of
+              [op] -> at "post" op >>= at "responses" >>= at "200" >>= at "content"
+                        >>= at "application/json" >>= at "schema"
+              _ -> Nothing
+        length batchOps `shouldBe` 1
+        map (\c -> Aeson.KeyMap.member "@limit" c) emittedCases `shouldBe` [False, False, False, True]
+        keysOf (schema >>= at "properties" >>= at "cases" >>= at "items" >>= at "properties")
+          `shouldBe` emittedCaseKeys
+        keysOf (schema >>= at "properties") `shouldBe` keysOf emitted
+        keysOf (schema >>= at "properties" >>= at "summary" >>= at "properties")
+          `shouldBe` keysOf (emitted >>= at "summary")
 
     it "returns OpenAPI 3.0 spec via org-wide /openapi.json" do
       withServiceFromSources "org-openapi" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -2055,6 +2563,60 @@ mkBatchCase n = Aeson.object
   , "drinks" Aeson..= True
   ]
 
+-- | Run with this many capabilities, then put the count back.
+withCapabilities :: Int -> IO a -> IO a
+withCapabilities n act =
+  bracket (getNumCapabilities <* setNumCapabilities n) setNumCapabilities (const act)
+
+-- | Steps of 'spinJL4' that take about a fifth of a second (0.19 s on an
+-- M-series Mac, 2026-10-02) and allocate about 1 GB.
+spinFast :: Int
+spinFast = 150_000
+
+-- | Steps that take about a fifth of 'spinOptions'' 3-second limit (about 0.65 s).
+spinFifth :: Int
+spinFifth = 500_000
+
+-- | Steps that would take some twenty minutes.
+spinSlow :: Int
+spinSlow = 1_000_000_000
+
+-- | A 3-second time limit, and an allocation limit (100 GB) that a spinning
+-- case cannot reach in three seconds, so the time limit is the one it meets.
+spinOptions :: Options
+spinOptions = testOptions { evalTimeout = 3, maxEvalMemoryMb = 100_000 }
+
+-- | Post one batch of 'spinJL4' cases, the i-th spinning for the i-th count.
+postSpinBatch :: String -> Manager -> String -> [Int] -> IO (Response LBS.ByteString)
+postSpinBatch baseUrl mgr deployId steps = do
+  let body = Aeson.object
+        [ "outcomes" Aeson..= ([] :: [Text])
+        , "cases" Aeson..=
+            [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n] | (i, n) <- zip [1 :: Int ..] steps ]
+        ]
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/spin/evaluation/batch") body
+  httpLbs req mgr
+
+-- | The case objects of a batch response, as the service wrote them.
+rawBatchCases :: Response LBS.ByteString -> [Aeson.Object]
+rawBatchCases resp = case Aeson.decode (responseBody resp) of
+  Just (Aeson.Object o) | Just (Aeson.Array cs) <- Aeson.KeyMap.lookup "cases" o ->
+    [c | Aeson.Object c <- toList cs]
+  _ -> error ("not a batch response: " <> show (responseBody resp))
+
+-- | The batch was a 200, its cases came back with these outcomes in order, and
+-- the summary counts the answered ones as processed and the rest as ignored.
+expectBatchOutcomes :: Response LBS.ByteString -> [CaseOutcome] -> Expectation
+expectBatchOutcomes resp expected = do
+  unless (statusCode' resp == 200) $
+    expectationFailure ("Expected a 200, got " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
+  case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+    Nothing -> expectationFailure ("Failed to decode batch response: " <> show (responseBody resp))
+    Just batch -> do
+      map (.outcome) batch.cases `shouldBe` expected
+      batch.summary.casesProcessed `shouldBe` length (filter (== CaseAnswered) expected)
+      batch.summary.casesIgnored `shouldBe` length (filter (/= CaseAnswered) expected)
+
 -- | Save sources to the BundleStore and register as DeploymentPending,
 -- simulating a lazy-load restart. The sources exist on disk but are not compiled.
 withPendingService :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
@@ -2092,7 +2654,8 @@ withPendingService' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentPending Nothing)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2137,7 +2700,8 @@ withFailedService' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentFailed "Test: simulated compilation failure")
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2178,7 +2742,8 @@ withServiceFromSources' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2222,7 +2787,8 @@ withServiceFromSourcesOpts' opts deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2275,7 +2841,8 @@ withServiceFromSourcesTVar' deployId sources act = do
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2361,7 +2928,8 @@ withServiceRestartedFromCbor' deployId sources act = do
 
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -2392,7 +2960,8 @@ withEmptyService' act = do
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  slots <- newBatchSlots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
