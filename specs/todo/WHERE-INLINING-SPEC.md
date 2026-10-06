@@ -2,14 +2,13 @@
 
 _Status: **implemented** for `l4 verify` — zero-arity local bindings on 2026-08-27 (branch
 `mengwong/where-inlining`), and on 2026-09-29 parameterised local bindings and calls to other
-boolean rules (branch `feat/verify-beta-reduction`, §9; it reaches `unstable` through PR #561). The ladder default view and the
+boolean rules (branch `feat/verify-beta-reduction`, §9, merged into `unstable` on 2026-10-06 by PR #561). The ladder default view and the
 exporter's descent are scoped out and reasoned about in §7._
 
-_§10, call expansions in the ladder, is **built on branch `mengwong/ladder-call-panels`** (PR #561), not merged into `unstable` as of 2026-10-06.
-That branch contains `feat/verify-beta-reduction` (§9); PR #520, which carried §9 alone, was closed in favour of #561 on 2026-10-06.
+_§10, call expansions in the ladder, is **merged into `unstable`** on 2026-10-06 by PR #561 (branch `mengwong/ladder-call-panels`, "this branch" below; merge commit `e6e037d81`), which also carried §9; PR #520, which carried §9 alone, was closed in favour of it.
 Server: `afffcb6e5` (expansions on the wire) and `56e978951` (opt-in per request, mixfix labels).
 Client: `ec7cae39e` (call panels) and `ab06af184` (real fixture, the IDE's click spreading, folded answers drive current).
-§10's line citations are to that branch's tree._
+§10's line citations are to the tree at `e6e037d81`._
 
 **One-line summary.** `x WHERE x MEANS e` and `e` mean the same thing to the evaluator and
 different things to the analyser. This spec makes them mean the same thing to the analyser too:
@@ -138,7 +137,7 @@ Positive control: adding one unused leading parameter shifts the resolver number
 This failure is **silent**: anything that addresses that leaf by `atomId` addresses the call instead, with no diagnostic.
 It sits inside the reconciliation `45ea9f94a` added for smucclaw/l4-ide#935, and is filed as smucclaw/l4-ide#991.
 Re-measured 2026-10-01 on `unstable` @ `f9a504b77`, with the probe and the control both reproducing exactly; no commit in between touched either cited file.
-_Changed:_ #520 fixed this on the LSP ladder by starting fresh ids above every unique in the rule (§9.6), measured 2026-10-05 (§10.2); the `jl4-core` mirror, which lacked that seeding, has it since `afffcb6e5` (§10.3).
+_Changed:_ `feat/verify-beta-reduction` (#520, which landed through #561) fixed this on the LSP ladder by starting fresh ids above every unique in the rule (§9.6), measured 2026-10-05 (§10.2); the `jl4-core` mirror, which lacked that seeding, has it since `afffcb6e5` (§10.3).
 
 **What this does to O2.**
 With resolved names, avoiding capture is mostly bookkeeping, not the hard part.
@@ -364,7 +363,7 @@ The whole Penal Code deposit, 36 files run one after another: 147 s → 263 s.
 
 ## 10. Expanding calls in the ladder (2026-10-05)
 
-_Built on branch `mengwong/ladder-call-panels`, not merged; see the status header._
+_Merged into `unstable` on 2026-10-06 by PR #561; see the status header._
 
 **What prompted it.** Meng saw a hand-built page on 2026-10-05 (session `ed4dacbb`'s scratchpad, `ladder/foldable-ladder.html`) in which a call to another rule opens in place, inside a box named after the call, and folds back.
 He asked for the infrastructure under it to be made real and internally consistent, stacked on #520.

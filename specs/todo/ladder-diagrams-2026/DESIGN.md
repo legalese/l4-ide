@@ -468,8 +468,8 @@ the IMPLIES seam (§25), the `ladder-svg` split, the R1 spike, and **E1 Steps 1 
 production IDE still renders Dagre, so a user still sees the bare-TRUE §25f bug — that is
 the gap between built and shipped, and it is exactly E1 Step 4→8._
 
-**◐ Call panels and the NOT output bubble (§27), as of 2026-10-06: built on branch `mengwong/ladder-call-panels`, not merged.**
-The branch is PR #561, into `unstable`; it also carries `l4 verify`'s call read-through from `feat/verify-beta-reduction`, whose PR #520 was closed in favour of #561 on 2026-10-06.
+**✅ Call panels and the NOT output bubble (§27): merged into `unstable` on 2026-10-06 by PR #561 (`e6e037d81`).**
+PR #561 also carried `l4 verify`'s call read-through from `feat/verify-beta-reduction`, whose PR #520 was closed in favour of it.
 A call can be drawn open in place, in a panel shaded by layer; one click sets every copy of a term; a NOT's bubble shows its output.
 Server half `afffcb6e5`, client half `ec7cae39e`, plus a Chromium click fix (`463a8a949`): the controller took pointer capture at `pointerdown`, so Chromium retargeted every click to the host and no box cycled or folded; capture now starts only once a gesture is a pan.
 ☐ Not built: TB panels, FLIP of a panel's rectangle, panels in the IDE (§27.3).
@@ -629,8 +629,8 @@ falls out for free. So #630's fix is **"adopt the §16 fold model"**, not anothe
 patch to `canInline` — and #630 is an _enhancement_, not a bug.
 
 The line citations in that paragraph are to the `jl4-core` mirror as it stood when it was written.
-On the LSP ladder, which is what the IDE draws, a call with arguments to a same-module rule expands on branch `feat/verify-beta-reduction` (not merged as of 2026-10-06; it reaches `unstable` through PR #561) through `l4/inlineExprs` (`WHERE-INLINING-SPEC.md` §9.7), except a call whose arguments are all `BOOLEAN`, which is drawn as a `V.App` with no `canInline` and so offers no expand.
-On `mengwong/ladder-call-panels` (PR #561), which contains it, the LSP sends every such call's expansion, the all-`BOOLEAN` call included, to a client that asks for it, and the standalone playground draws it as a call panel (§27); the IDE's displayers do not ask and draw no panels.
+On the LSP ladder, which is what the IDE draws, a call with arguments to a same-module rule expands through `l4/inlineExprs` (`WHERE-INLINING-SPEC.md` §9.7), except a call whose arguments are all `BOOLEAN`, which is drawn as a `V.App` with no `canInline` and so offers no expand.
+Since PR #561 (merged into `unstable` on 2026-10-06), the LSP sends every such call's expansion, the all-`BOOLEAN` call included, to a client that asks for it, and the standalone playground draws it as a call panel (§27); the IDE's displayers do not ask and draw no panels.
 The `jl4-core` mirror does neither.
 
 ---
@@ -1659,8 +1659,8 @@ our own fixture, and the identity test painted it full made-green while resting 
 
 ## 27. Call panels and the NOT output bubble
 
-_Built on branch `mengwong/ladder-call-panels` (`ec7cae39e`), not merged into `unstable` as of 2026-10-06.
-Line citations are to that branch._
+_Merged into `unstable` on 2026-10-06 by PR #561 (client half `ec7cae39e`, merge commit `e6e037d81`).
+Line citations are to the tree at `e6e037d81`._
 
 A call to another rule of the module can be drawn **open, in place**: the server sends the called rule's body with the call's arguments substituted, as the call leaf's `expansion`, and the client draws it inside a **panel** named after the call as written, which folds back to one box.
 What the server sends, how its `atomId`s are chosen, and what was measured are in `WHERE-INLINING-SPEC.md` §10; this section is how it is drawn.
