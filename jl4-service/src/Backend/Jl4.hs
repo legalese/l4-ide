@@ -10,7 +10,7 @@ import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
 import qualified L4.Evaluate.ValueLazy as Eval
 import qualified L4.EvaluateLazy as Eval
-import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment)
+import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, parseDateText, parseTimeText, parseDatetimeText)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import L4.EvaluateLazy.Trace
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
@@ -1325,14 +1325,15 @@ wrapperDeclined genCode params = InterpreterError $
     unparsed =
       [ (input, ty, s)
       | input <- required, Just ty <- [input.parsedAs], Just (FnLitString s) <- [valueOf input] ]
-    -- The direct path's parsers pick out the string that failed. Should they
-    -- disagree with the wrapper's TODATE, TOTIME or TODATETIME, every candidate
-    -- is listed instead.
+    -- The wrapper's own parsers, those of TODATE, TOTIME and TODATETIME, pick
+    -- out the string that failed. The direct path's ISO parsers are stricter
+    -- ("2026/01/31" is a DATE to TODATE and not to parseIsoDate), so with two
+    -- such inputs they could blame one the wrapper had read.
     failing = [ c | c@(_, ty, s) <- unparsed, not (parses ty s) ]
     parses = \case
-      "DATE"     -> isJust . parseIsoDate
-      "TIME"     -> isJust . parseIsoTime
-      "DATETIME" -> isJust . parseIsoDatetime
+      "DATE"     -> isJust . parseDateText
+      "TIME"     -> isJust . parseTimeText
+      "DATETIME" -> isJust . parseDatetimeText
       _          -> const False
     -- the direct path's labels: only an ASSUME the author wrote is called one
     label input

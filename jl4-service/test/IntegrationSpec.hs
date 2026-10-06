@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, wireProbeJL4, declineLabelsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -540,6 +540,16 @@ spec = describe "integration" do
       -- A DATE is read from a string, so it is still unwrapped by the wrapper,
       -- which declines without calling the function. Only an ASSUME the author
       -- wrote is called one; a section GIVEN is a parameter.
+      it "names the DATE TODATE could not read, not one it could" do
+        withServiceFromSources "decline-dates" [("dates.l4", twoDatesJL4)] \baseUrl mgr -> do
+          let call one two = evalFunction baseUrl mgr "decline-dates" "later" $ Aeson.object
+                [ "arguments" Aeson..= Aeson.object
+                    [ "d one" Aeson..= (one :: Text), "d two" Aeson..= (two :: Text), "pad" Aeson..= Aeson.object [] ] ]
+          readable <- call "2026/01/31" "2026-02-28"
+          readable `shouldCarry` Answers (Aeson.Number 1)
+          declined <- call "2026/01/31" "2026-02-30"
+          declined `shouldCarry` Refuses "Parameter 'd two': could not read \"2026-02-30\" as a DATE"
+
       it "labels a missing DATE as the direct path does" do
         withServiceFromSources "decline-labels" [("dated.l4", declineLabelsJL4)] \baseUrl mgr -> do
           let call path given = evalFunction baseUrl mgr "decline-labels" "dated" $ Aeson.object
