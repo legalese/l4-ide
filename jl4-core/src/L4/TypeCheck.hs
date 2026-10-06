@@ -1241,23 +1241,34 @@ isClausesBinding = \ case
 --   result type of unreachable clauses, never referenced, was compared with
 --   nothing.
 --
--- * __Unreachable clauses are dropped__ once checked: they were bound only to
---   be checked, so evaluation and every exporter see the tree as it was
---   before they were.
+-- * __Unreachable clauses__ ('PmUnreachable') are checked, but can change
+--   nothing. The current clause, which matches every input and never refers
+--   to them, is checked outside their binding, so no name in it can resolve
+--   to the binding. They are checked against the group's type as it stands,
+--   'speculatively': a type error in them is reported, but what they would
+--   have inferred (an untyped input taken to be a BOOLEAN, a result taken to
+--   be a list of text) is discarded, so a clause that never runs cannot make a
+--   caller of the group ill-typed. And they are dropped from the checked tree,
+--   so evaluation and every exporter see the group as before they were
+--   checked at all.
 --
 -- The binding has no GIVETH of its own, so its result type is a fresh
 -- variable, and unifying it with the group's type cannot fail and adds only a
 -- constraint every reference to it already implies.
 checkClausesLet :: ExpectationContext -> Anno -> [LocalDecl Name] -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
-checkClausesLet ec ann ds e t =
-  withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \ rdecides -> do
-    re <- extendKnownMany (map (.name) rdecides) do
-      re <- checkExpr ec e t
-      nlgExpr re
-    rds <- traverse (fmap fst . (firstM nlgLocalDecl <=< inferLocalDecl)) ds
-    case filter (not . isUnreachableClauses) rds of
-      []   -> pure re
-      rds' -> setAnnResolvedType t Nothing (LetIn ann rds' re)
+checkClausesLet ec ann ds e t
+  | all isUnreachableClauses ds = do
+      re <- checkExpr ec e t >>= nlgExpr
+      speculatively $ withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \ _ ->
+        traverse_ inferLocalDecl ds
+      pure re
+  | otherwise =
+      withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \ rdecides -> do
+        re <- extendKnownMany (map (.name) rdecides) do
+          re <- checkExpr ec e t
+          nlgExpr re
+        rds <- traverse (fmap fst . (firstM nlgLocalDecl <=< inferLocalDecl)) ds
+        setAnnResolvedType t Nothing (LetIn ann rds re)
   where
     preScanDecl = mapMaybeM scanTyDeclLocalDecl
     scanDecl = mapMaybeM inferTyDeclLocalDecl
@@ -1272,6 +1283,21 @@ checkClausesLet ec ann ds e t =
       LocalDecide _ (MkDecide dann _ _ _)
         | Just (PmUnreachable _) <- view annPmSynthetic dann -> True
       _ -> False
+
+-- | Run a check for its diagnostics only: keep what it reports, and throw away
+-- everything it learned (the substitution, and what it recorded for hovers),
+-- except the supply of fresh names, so that names stay unique. The opposite of
+-- 'quietly', which keeps the result and drops the diagnostics. The kept
+-- diagnostics have the discarded substitution applied first, so a type they
+-- mention prints as what was inferred, not as a bare inference variable.
+speculatively :: Check a -> Check ()
+speculatively m = MkCheck \ e s ->
+  [ (foldr With (Plain ()) diags', s { supply = s''.supply })
+  | (w, s') <- runCheck m e s
+  , let (diags, _) = runWith w
+  , (w', s'') <- take 1 (runCheck (traverse applySubst diags) e s')
+  , let (_, diags') = runWith w'
+  ]
 
 -- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
 -- run over the SOURCE clause matrix the parser attached to the fused
