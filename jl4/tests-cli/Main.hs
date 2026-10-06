@@ -11,7 +11,8 @@
 module Main where
 
 import Control.Monad (unless, when)
-import Data.List (isInfixOf, isPrefixOf, nub, sort)
+import Data.Char (isSpace)
+import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, nub, sort)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
@@ -205,12 +206,17 @@ nlgRegcfGolden  = "examples/canon/us/regcf/tests/regcf.nlg.golden"
 nlgWizardSource = "examples/canon/us/regcf/regcf-wizard.l4"
 nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 
--- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
--- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
--- the tree, so the tests below are the only thing pinning that the two
--- projections agree (smucclaw/l4-ide#972).
+-- The placement rows for an @nlg on a rule's head, and under a GIVEN list's
+-- last input. Its `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no
+-- golden anywhere in the tree, so the tests below are the only thing pinning
+-- that the two projections agree (smucclaw/l4-ide#972).
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
+
+-- The reference page whose placement table describes that fixture row by row.
+-- The test that reads it pins the page, not just the output.
+placementReadme :: FilePath
+placementReadme = "../doc/reference/syntax/README.md"
 
 shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
 shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
@@ -273,7 +279,7 @@ coreFixtures =
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
-  , nlgHeadPlacementSource
+  , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture
   ]
 
@@ -1688,6 +1694,57 @@ spec bin = do
       renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
       renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
 
+    it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15-19)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Ruled 2026-10-02: indented past the GIVEN keyword, it describes the
+      -- input above it, with a GIVETH next (row 15) or without (row 16), past
+      -- TYPICALLY defaults (row 18), and under a section GIVEN (row 19). Before,
+      -- row 15's was dropped, row 16's became the rule's sentence, and row 18's
+      -- first landed on the second input.
+      nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row sixteen` with 200\n`row sixteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row eighteen` where the floor is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row nineteen` where the section's floor is 100" `isInfixOf`)
+      -- Render describes each rule by its own body; only a section input's
+      -- gloss shows up in it.
+      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eighteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row nineteen holds if amount is more than the section's floor" `isInfixOf`)
+
+    -- doc/reference/syntax/README.md says of its placement table that "a
+    -- change to any cell is a test failure". So the cells are read from the
+    -- page: each row's `l4 render` cell, and both `l4 nlg` cells of rows 2 and
+    -- 3, name what the output must show. Editing a cell turns this red, and so
+    -- does a change to the output.
+    it "matches the reference table's l4 render cell for every row, read from the page" $ do
+      Output _ renOut _ <- renderOf
+      Output _ nlgOut _ <- nlgOf
+      table <- placementTable <$> readFile placementReadme
+      map fst table `shouldBe` [1 .. 19]
+      for_ table \(n, cells) -> case cells of
+        [_shape, _placement, positional, withCall, render] -> do
+          let word = numberWord n
+              line = headOr "" [ l | l <- lines renOut, ("Row " <> word <> " ") `isInfixOf` l ]
+          unless (renderCellHolds word render line) $
+            expectationFailure ("row " <> show n <> ": the table's l4 render cell is "
+              <> show render <> ", but l4 render printed " <> show line)
+          when (n `elem` [2, 3]) $ do
+            unless (positional == "sentence" && ("row " <> word <> " saw 200\n") `isInfixOf` nlgOut) $
+              expectationFailure ("row " <> show n <> ": positional cell " <> show positional)
+            unless (withCall == "sentence"
+                    && ("row " <> word <> " saw `amount` where `amount` is 200") `isInfixOf` nlgOut) $
+              expectationFailure ("row " <> show n <> ": WITH cell " <> show withCall)
+        _ -> expectationFailure ("row " <> show n <> ": expected six cells, got " <> show cells)
+
+    it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      nlgOut `shouldSatisfy` ("row seventeen saw 200\n" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
   -- checker whose green runs mean nothing either.
@@ -1881,3 +1938,39 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | The placement table of doc/reference/syntax/README.md: each row's number
+-- and the cells after it, trimmed.
+placementTable :: String -> [(Int, [String])]
+placementTable page =
+  [ (n, cells)
+  | l <- takeWhile ("|" `isPrefixOf`) (drop 1 (dropWhile (not . ("| head shape" `isInfixOf`)) (lines page)))
+  , numCell : cells <- [map trim (init (drop 1 (splitOnChar '|' l)))]
+  , [(n, "")] <- [reads numCell]
+  ]
+ where
+  trim = dropWhileEnd isSpace . dropWhile isSpace
+  splitOnChar c str = case break (== c) str of
+    (a, [])       -> [a]
+    (a, _ : rest) -> a : splitOnChar c rest
+
+-- | What an `l4 render` cell of that table promises about a row's line.
+renderCellHolds :: String -> String -> String -> Bool
+renderCellHolds word cell line = case cell of
+  "sentence"          -> ("row " <> word <> " saw amount") `isInfixOf` line
+  "outer sentence"    -> ("row " <> word <> " the rule saw amount") `isInfixOf` line
+  "rule's body"       -> "amount is more than" `isInfixOf` line && not (" saw " `isInfixOf` line)
+  "gloss in the body" -> "the section's floor" `isInfixOf` line
+  _                   -> False
+
+-- | The fixture names its rules `row one` to `row nineteen`.
+numberWord :: Int -> String
+numberWord n = headOr (show n) (drop (n - 1) ws)
+ where
+  ws = words "one two three four five six seven eight nine ten eleven twelve \
+             \thirteen fourteen fifteen sixteen seventeen eighteen nineteen"
+
+headOr :: a -> [a] -> a
+headOr d xs = case xs of
+  x : _ -> x
+  []    -> d

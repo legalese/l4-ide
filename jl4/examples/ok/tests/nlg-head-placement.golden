@@ -1,61 +1,79 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-nlg-head-placement.l4:87:1-20:
+nlg-head-placement.l4:107:1-20:
   TRUE
-nlg-head-placement.l4:88:1-35:
+nlg-head-placement.l4:108:1-35:
   TRUE
-nlg-head-placement.l4:96:1-20:
+nlg-head-placement.l4:116:1-20:
   TRUE
-nlg-head-placement.l4:97:1-35:
+nlg-head-placement.l4:117:1-35:
   TRUE
-nlg-head-placement.l4:105:1-22:
+nlg-head-placement.l4:125:1-22:
   TRUE
-nlg-head-placement.l4:106:1-37:
+nlg-head-placement.l4:126:1-37:
   TRUE
-nlg-head-placement.l4:114:1-21:
+nlg-head-placement.l4:134:1-21:
   TRUE
-nlg-head-placement.l4:115:1-36:
+nlg-head-placement.l4:135:1-36:
   TRUE
-nlg-head-placement.l4:124:1-21:
+nlg-head-placement.l4:144:1-21:
   TRUE
-nlg-head-placement.l4:125:1-36:
+nlg-head-placement.l4:145:1-36:
   TRUE
-nlg-head-placement.l4:135:1-20:
+nlg-head-placement.l4:155:1-20:
   TRUE
-nlg-head-placement.l4:136:1-35:
+nlg-head-placement.l4:156:1-35:
   TRUE
-nlg-head-placement.l4:147:1-22:
+nlg-head-placement.l4:167:1-22:
   TRUE
-nlg-head-placement.l4:148:1-37:
+nlg-head-placement.l4:168:1-37:
   TRUE
-nlg-head-placement.l4:157:1-22:
+nlg-head-placement.l4:177:1-22:
   20
-nlg-head-placement.l4:158:1-37:
+nlg-head-placement.l4:178:1-37:
   20
-nlg-head-placement.l4:171:1-21:
+nlg-head-placement.l4:191:1-21:
   TRUE
-nlg-head-placement.l4:172:1-36:
+nlg-head-placement.l4:192:1-36:
   TRUE
-nlg-head-placement.l4:185:1-20:
+nlg-head-placement.l4:205:1-20:
   TRUE
-nlg-head-placement.l4:186:1-35:
+nlg-head-placement.l4:206:1-35:
   TRUE
-nlg-head-placement.l4:187:1-26:
+nlg-head-placement.l4:207:1-26:
   TRUE
-nlg-head-placement.l4:199:1-23:
+nlg-head-placement.l4:219:1-23:
   TRUE
-nlg-head-placement.l4:200:1-38:
+nlg-head-placement.l4:220:1-38:
   TRUE
-nlg-head-placement.l4:213:1-27:
+nlg-head-placement.l4:233:1-27:
   TRUE
-nlg-head-placement.l4:214:1-52:
+nlg-head-placement.l4:234:1-52:
   TRUE
-nlg-head-placement.l4:227:1-25:
+nlg-head-placement.l4:247:1-25:
   TRUE
-nlg-head-placement.l4:228:1-40:
+nlg-head-placement.l4:248:1-40:
   TRUE
-nlg-head-placement.l4:242:1-25:
+nlg-head-placement.l4:262:1-25:
   TRUE
-nlg-head-placement.l4:243:1-40:
+nlg-head-placement.l4:263:1-40:
+  TRUE
+nlg-head-placement.l4:274:1-28:
+  TRUE
+nlg-head-placement.l4:275:1-53:
+  TRUE
+nlg-head-placement.l4:283:1-24:
+  TRUE
+nlg-head-placement.l4:284:1-39:
+  TRUE
+nlg-head-placement.l4:292:1-26:
+  TRUE
+nlg-head-placement.l4:293:1-41:
+  TRUE
+nlg-head-placement.l4:304:1-29:
+  TRUE
+nlg-head-placement.l4:305:1-54:
+  TRUE
+nlg-head-placement.l4:319:1-54:
   TRUE
