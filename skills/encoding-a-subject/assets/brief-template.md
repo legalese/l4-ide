@@ -55,7 +55,7 @@ Name anything deliberately left out, and why.⟩
 - **Each vintage is its own answer, not one merged answer.** Where the law has vintages, the vintage is an input. Where a vintage is silent, the answer is that it is silent — never a number borrowed from another vintage.
 - **Where the sources do not answer, `REFUSE "…"`** — never `FALSE`, never `0`, never a plausible default. A gap is a finding, not a bug.
 - **An assertion that fails is a finding.** Never edit an expected value to match what the code computed. Report it.
-- **Read the diagnostics, not the exit code.** `l4 run` exits 0 when an `#ASSERT` fails; the failure is a `DiagnosticSeverity_Error` line whose message is `assertion failed`. Never report green for a run whose output you did not read.
+- **Read the diagnostics, not the exit code.** `l4 run` exits 0 when an `#ASSERT` fails and when it refuses. A failure says `assertion failed` (at Error severity, on the `Message:` line or the line after it); a refusal says `assertion refused` (at Warning, on the line after `Message:`). Never report green for a run whose output you did not read.
 - ⟨Anything subject-specific: date arithmetic needs `IMPORT daydate`; money is in ⟨currency⟩; "day" means ⟨calendar/business⟩ day per s. ⟨n⟩ …⟩
 
 ## Toolchain
