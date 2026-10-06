@@ -678,6 +678,18 @@ severity (MkCheckErrorWithContext e _) =
     ActionPatternReference {}  -> SInfo
     _                          -> SError
 
+-- | The answers to @#CHECK@ directives among a module's diagnostics.
+-- A @#CHECK@ is answered with a 'CheckInfo'. The other diagnostics that do not
+-- block a check ('SWarn' and the other 'SInfo's, such as a @CONSIDER@ that
+-- misses a case) answer no directive, so whatever lists @#CHECK@ results, the
+-- editor's Inspector panel and its directive listing among them, must leave
+-- them out.
+checkDirectiveResults :: [CheckErrorWithContext] -> [CheckErrorWithContext]
+checkDirectiveResults = filter isCheckResult
+  where
+    isCheckResult (MkCheckErrorWithContext CheckInfo {} _) = True
+    isCheckResult _                                        = False
+
 -- | Does this diagnostic refuse an @\@export@ for a reason that belongs to the
 -- __JSON publication boundary alone__?
 --
