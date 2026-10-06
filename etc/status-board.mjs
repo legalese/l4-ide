@@ -591,12 +591,12 @@ const shelfAssets = (
 ).map((a) => ({ name: a.name, mb: +(a.size / 1048576).toFixed(1) }));
 
 // -------------------------------------------------------------------- canon
-const canonMeta = j(`gh api repos/legalese/canon`);
+const canonMeta = j(`gh api repos/legalese/commons`);
 const canonBranches = (
-  j(`gh api repos/legalese/canon/branches --paginate`) ?? []
+  j(`gh api repos/legalese/commons/branches --paginate`) ?? []
 ).map((b) => {
   const tree = j(
-    `gh api "repos/legalese/canon/git/trees/${b.commit.sha}?recursive=1"`,
+    `gh api "repos/legalese/commons/git/trees/${b.commit.sha}?recursive=1"`,
   );
   const blobs = (tree?.tree ?? []).filter((x) => x.type === "blob");
   return {
@@ -789,7 +789,7 @@ ${d.rels.map((r, i) => `<tr><td>${esc(r.tag)}${i === 0 ? ' <span class="pill ok"
 </table></div>
 <p class="lede" style="margin-top:9px">Assets on the current shelf: ${d.shelfAssets.map((a) => `${esc(a.name.replace(/^l4-|\.tar\.gz$/g, ""))} <b>${a.mb}MB</b>`).join(" · ")}</p>
 
-<h2>Canon<span class="n">legalese/canon · ${d.canonBranches.length} branches</span></h2>
+<h2>Canon<span class="n">legalese/commons · ${d.canonBranches.length} branches</span></h2>
 <p class="lede">Encoded law by branch. <span style="font-family:var(--mono)">.l4</span> count is the one that matters; bytes are mostly source PDFs and prose.</p>
 <div class="scroll"><table><tr><th>branch</th><th>head</th><th class="n">.l4</th><th class="n">.md</th><th class="n">files</th><th class="n">MB</th></tr>
 ${d.canonBranches
