@@ -19,6 +19,7 @@ module TestData (
   importedRecordMainJL4,
   wireProbeJL4,
   declineLabelsJL4,
+  twoDatesJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -471,4 +472,18 @@ GIVEN `end date` IS A DATE
       pad        IS A MAYBE NUMBER
 GIVETH A DATE
 `date first` MEANS `end date`
+|]
+
+-- | Two DATE inputs. TODATE reads "2026/01/31" although the direct path's ISO
+-- parser does not, so when the other one is not a date at all, the service
+-- must name that one.
+twoDatesJL4 :: Text
+twoDatesJL4 =
+  [i|
+@export two dates
+GIVEN `d one` IS A DATE
+      `d two` IS A DATE
+      pad     IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `later` IS 1
 |]
