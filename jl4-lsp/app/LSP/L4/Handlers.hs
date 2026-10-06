@@ -206,7 +206,7 @@ scheduleDirectiveResultsNotification ide doc nuri = do
                   , body        = getLines startLine endLine
                   }
               | Just tcResult <- [mTcResult]
-              , info <- tcResult.infos
+              , info <- checkDirectiveResults tcResult.infos
               , Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _) <- [rangeOf info]
               ]
         LSP.runLspT env $
@@ -794,7 +794,7 @@ handlers evalConfig recorder =
                         }
                       Just tcResult ->
                         let matchesCheckPos err = fmap (.start) (rangeOf err) == Just targetPos
-                            mInfo = List.find matchesCheckPos tcResult.infos
+                            mInfo = List.find matchesCheckPos (checkDirectiveResults tcResult.infos)
                         in case mInfo of
                           Nothing -> pure $ Left $ TResponseError
                             { _code = InR ErrorCodes_InvalidRequest
