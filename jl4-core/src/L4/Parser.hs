@@ -1172,13 +1172,14 @@ rawTokensAnno toks =
 -- distinguishable column, compounding multiplicatively. Instead, at each
 -- non-final clause boundary we bind the remaining-clauses expression to a single
 -- fresh local (a nullary @LET ... IN@) and let 'matchOne' refer to it by name.
--- The fresh name (@__pm_fallthrough_<k>@) keeps clear of the names drafters
--- write in practice, and @k@ (the nesting level) makes it unique per
--- boundary. It is NOT hygienic against a drafter who spells it in backticks:
--- a clause body that names a definition @`__pm_fallthrough_0`@ can read this
--- binding instead, or be reported ambiguous, depending on where it sits.
--- Nothing downstream reads the name: the binding and every generated
--- CONSIDER are marked with 'PmSynthetic'.
+-- The name (@__pm_fallthrough_<k>@, unique per boundary through @k@, the
+-- nesting level) is one a drafter is unlikely to write, but it is NOT
+-- hygienic: a backticked name can be anything. A clause body that names a
+-- definition @`__pm_fallthrough_0`@ can read this binding instead, or be
+-- reported ambiguous, depending on where it sits. (The binding of clauses
+-- that can never run is out of scope for the clause before it; see
+-- 'L4.TypeCheck.checkClausesLet'.) Nothing downstream reads the name: the
+-- binding and every generated CONSIDER are marked with 'PmSynthetic'.
 matchClauses :: PmGroup -> [Name] -> [Bool] -> [PMClause] -> Expr Name
 matchClauses grp scrutinees typesDeclared = go 0
   where
@@ -1213,7 +1214,8 @@ matchClauses grp scrutinees typesDeclared = go 0
 clauseMatchesAnything :: [Name] -> [Pattern Name] -> Bool
 clauseMatchesAnything scrutinees pats = and (zipWith patAlwaysMatchesAs scrutinees pats)
 
--- | A hygienic fresh name for the once-bound fall-through at nesting level @k@.
+-- | The name of the once-bound fall-through at nesting level @k@. Not
+-- hygienic; see 'matchClauses'.
 fallthroughName :: Int -> Name
 fallthroughName k =
   MkName emptyAnno (NormalName ("__pm_fallthrough_" <> Text.pack (show k)))

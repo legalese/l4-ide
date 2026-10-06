@@ -116,3 +116,55 @@ File: pattern-matching-clause-type-errors.l4
     but the pattern written for it here is of type
 
       BOOLEAN
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 56:27-56:47
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `__pm_fallthrough_0`
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 57:8-57:19
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause of `refs dead` is never used.
+    The clause above it matches every input, so `refs dead` never gets this far.
+    Move this clause above that one, or remove it.
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 62:28-62:48
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `__pm_fallthrough_1`
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 63:8-63:18
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause of `refs mid` is never used.
+    The clause above it matches every input, so `refs mid` never gets this far.
+    Move this clause above that one, or remove it.
