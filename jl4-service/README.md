@@ -163,6 +163,14 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+#### Answers
+
+The direct path and the wrapper path described below encode an answer the same way.
+A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
+A list is a JSON array, even when it has one element.
+An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
+A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+
 #### Missing and uncertain inputs
 
 An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`, whatever its type, a record's included.
@@ -201,7 +209,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
-Two kinds of request go through a generated wrapper instead: any request with a `{}` anywhere in it, or a `null` inside a record or list, and every request to a `DEONTIC` function.
+Two kinds of request go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list, and every request to a `DEONTIC` function.
 On that path a missing `BOOLEAN` input is an assumed term, which costs nothing if the rule never needs its value.
 If the rule needs it — tests it with `IF`, `AND`, `OR` or `NOT`, compares it, or returns it — evaluation stops and names it:
 
@@ -213,14 +221,20 @@ but it is an assumed term.
 
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
+A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
+
 Limits, measured 2026-10-02:
 
 - **A `CONSIDER` with an `OTHERWISE` branch does not stop.** It reads an assumed term, matches none of its `WHEN` patterns, and takes the `OTHERWISE` branch, with no error: `ASSUME x IS A BOOLEAN` then `CONSIDER x WHEN TRUE THEN 1 OTHERWISE 2` gives `2`. So on the wrapper path, a missing `BOOLEAN` that the rule reads only through such a `CONSIDER` gets the catch-all answer. Build step 1 (§8) of `UNKNOWN-EVALUATION-SPEC.md`, specified in legalese/l4-ide#526 (merged as a spec) and not built yet, makes such a `CONSIDER` stop and name the input.
-- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, except for a `DATE`, `TIME` or `DATETIME`: the wrapper reads those as strings (lifted to `MAYBE STRING`) and converts them, and a missing one still fails with `Evaluation produced unknown value`, naming nothing.
+- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
 - **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. This extends the early/late split above; it did not create it.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
+
+Measured 2026-10-06:
+
+- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
 
 #### Trace Output
 

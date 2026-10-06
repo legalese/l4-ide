@@ -5,11 +5,24 @@ module CodeGenSpec (spec) where
 import Test.Hspec
 
 import qualified Data.Aeson as Aeson
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String)
+import Backend.Api (TraceLevel (..))
+import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..))
 
 spec :: SpecWith ()
 spec = describe "CodeGen" $ do
+  -- A function with no inputs has nothing to decode, so its wrapper is a bare
+  -- #EVAL, and handleEvalResult must not look for a JUST around the answer.
+  describe "answerShape of a function with no inputs" $ do
+    it "is Bare for an ordinary function" $
+      fmap (.answerShape) (generateEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) TraceNone)
+        `shouldBe` Right Bare
+
+    it "is Bare for a deontic function" $
+      fmap (.answerShape) (generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 [] Nothing Nothing TraceNone)
+        `shouldBe` Right Bare
+
   describe "inputFieldName" $ do
     it "adds (input) suffix to simple names" $ do
       inputFieldName "x" `shouldBe` "x (input)"
