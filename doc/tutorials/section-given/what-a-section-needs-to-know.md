@@ -324,7 +324,7 @@ which reports `NUMBER`. Checking that the rules fit together needs no facts abou
 Run the file whole, and among the tool's notes this comes back:
 
 ```
-Evaluation[1] @ what-a-section-needs-to-know.l4:40:1-35
+Evaluation[1] @ what-a-section-needs-to-know.l4:39:1-35
 
 Result:
   40000

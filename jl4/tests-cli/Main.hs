@@ -71,6 +71,12 @@ captionFixture = fixtureDir </> "state-graph-captions.l4"
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
 
+-- | One @#EVAL@ and one @#EVALTRACE@ over the same call: the "Trace:" section
+-- of @l4 run@ must show a trace under the second and say none was captured
+-- under the first.
+runEvalTraceFixture :: FilePath
+runEvalTraceFixture = fixtureDir </> "run-evaltrace.l4"
+
 -- | A @#TRACE@ whose act lands before its @AFTER@ window opens: a nullity the
 -- run REPORTS (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6) beside a live residual.
 earlyActFixture :: FilePath
@@ -339,7 +345,7 @@ main = do
 coreFixtures :: [FilePath]
 coreFixtures =
   [ cleanFixture, evalFixture, errorFixture, garbageFixture
-  , evalCrashFixture
+  , evalCrashFixture, runEvalTraceFixture
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
@@ -577,6 +583,82 @@ spec bin = do
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
+
+  -- The "Trace:" section of `l4 run`. `--trace full` is the default, and its
+  -- help says it is "for #EVALTRACE", yet for a long time the policy behind
+  -- `l4 run` collected no trace at all, so even an #EVALTRACE printed the
+  -- placeholder that tells you to add an #EVALTRACE.
+  describe "l4 run --trace" $ do
+    let placeholder = "(no trace captured; add #EVALTRACE to the directive)"
+        -- one Text per directive: everything from one "Evaluation[" to the next
+        directiveBlocks sout = drop 1 (T.splitOn "Evaluation[" (T.pack sout))
+        withBlocks args k = do
+          Output code sout serr <- runL4 bin args
+          unless (code == ExitSuccess) $
+            expectationFailure ("Expected success, got " ++ show code
+              ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
+          case directiveBlocks sout of
+            [evalBlock, traceBlock] -> k evalBlock traceBlock
+            other -> expectationFailure
+              ("Expected two Evaluation blocks, got " ++ show (length other)
+                ++ "\n--- stdout ---\n" ++ sout)
+
+    it "shows an #EVALTRACE directive's trace by default, and leaves a plain #EVAL's placeholder alone" $
+      withBlocks ["run", runEvalTraceFixture] \evalBlock traceBlock -> do
+        -- the #EVAL: unchanged, placeholder included
+        evalBlock `shouldSatisfy` ("Trace:" `T.isInfixOf`)
+        evalBlock `shouldSatisfy` (T.pack placeholder `T.isInfixOf`)
+        -- the #EVALTRACE: the trace itself, in the layout the goldens use
+        traceBlock `shouldSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` (T.pack placeholder `T.isInfixOf`)
+        traceBlock `shouldSatisfy` ("┌ doubleNot OF TRUE" `T.isInfixOf`)
+
+    it "`--trace full` says the same as the default" $ do
+      Output _ dflt _ <- runL4 bin ["run", runEvalTraceFixture]
+      Output _ full _ <- runL4 bin ["run", "--trace", "full", runEvalTraceFixture]
+      full `shouldBe` dflt
+
+    it "`--trace none` prints no Trace: section for either directive" $
+      withBlocks ["run", "--trace", "none", runEvalTraceFixture] \evalBlock traceBlock -> do
+        evalBlock `shouldNotSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` ("┌" `T.isInfixOf`)
+
+    it "still reports both directives in --json" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 2
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The trace does not only reach stdout. The directive's own diagnostic
+    -- carries it too ("TRUE", then a line of ─────, then the trace), and `l4 run`
+    -- writes diagnostics to stderr and puts them in the JSON "diagnostics". So
+    -- "no trace under --trace none / --json" has to be pinned in those two places
+    -- as well as in the Trace: section, or a trace collected and not shown would
+    -- leak there unseen. The first case is the positive control: it shows the
+    -- marker really does reach stderr when a trace is collected, so the two
+    -- cases after it are not vacuous.
+    it "puts the trace into stderr too, by default (the control for the next two)" $ do
+      Output _ _ serr <- runL4 bin ["run", runEvalTraceFixture]
+      serr `shouldSatisfy` ("─────" `isInfixOf`)
+
+    it "`--trace none` leaves the trace out of stderr as well" $ do
+      Output _ _ serr <- runL4 bin ["run", "--trace", "none", runEvalTraceFixture]
+      -- the diagnostics are still there; only the trace is not
+      serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
+      serr `shouldNotSatisfy` ("─────" `isInfixOf`)
+
+    it "`--json` keeps the trace out of its diagnostics" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          -- the diagnostics are still there; only the trace is not
+          length diags `shouldSatisfy` (> 0)
+          diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $

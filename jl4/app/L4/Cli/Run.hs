@@ -49,7 +49,7 @@ runOptionsParser = RunOptions
         <> metavar "MODE"
         <> value TraceTextFull
         <> showDefaultWith renderTraceTextMode
-        <> help "Trace text mode for #EVALTRACE: none | full"
+        <> help "Show the trace of each #EVALTRACE directive in the text output: none | full (--json output carries no trace)"
         )
   <*> fixedNowParser
 
@@ -59,7 +59,12 @@ runOptionsParser = RunOptions
 
 runCmd :: RunOptions -> IO ()
 runCmd opts = do
-  evalConfig <- makeEvalConfig opts.runFixedNow
+  -- A trace is collected only to be printed, and only by the text output:
+  -- 'evalResultToJson' carries none, and collecting one under --json would cost
+  -- time and memory for a value that is dropped (and put its text into the
+  -- diagnostics). So --json asks for none.
+  let traceMode = if opts.runJsonOut then TraceTextNone else opts.runTrace
+  evalConfig <- makeRunEvalConfig traceMode opts.runFixedNow
   (errs, diags, (mTc, mEval)) <- runOneshotWithDiagnostics evalConfig opts.runFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
