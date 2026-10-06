@@ -621,6 +621,9 @@ function leafBox(
         anchor: "middle",
         state,
         id,
+        // The words are the box for clicking: the label is a sibling of the rect, not a child,
+        // so delegation (`closest("[data-value]")`) misses a click on it unless it carries the act.
+        act: { t: "value", id },
       });
       if (state === "eliminable")
         out.push({
