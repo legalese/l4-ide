@@ -524,10 +524,11 @@ data ExpectationContext =
   -- | ExpectProjectionSelectorContext
   | ExpectIfConditionContext -- condition of if-then-else
   | ExpectPatternScrutineeContext (Expr Resolved) -- pattern type must match type of scrutinee
-  | ExpectClauseInputContext RawName Int
+  | ExpectClauseInputContext RawName Int Bool
     -- ^ a clause pattern of a multi-clause group must match the type of the
-    -- input it stands in for: the group's name, and the input's 1-based
-    -- position. See 'L4.TypeCheck.checkConsider'.
+    -- input it stands in for: the group's name, the input's 1-based
+    -- position, and whether the GIVEN declares its type. See
+    -- 'L4.TypeCheck.checkConsider'.
   | ExpectNotArgumentContext -- arg of NOT
   | ExpectPercentArgumentContext -- arg of '%'
   | ExpectConsArgument2Context -- second arg of cons

@@ -31,3 +31,18 @@ DECIDE `wrong pattern` TRUE     IS 2
 -- ... also when there is no GIVEN to name the input.
 DECIDE `wrong pattern without given` (JUST 1) IS 1
 DECIDE `wrong pattern without given` TRUE     IS 2
+
+-- (4) With no GIVETH, the clauses are read from the top, so the first clause
+-- settles the result type and the clause that disagrees is the one reported:
+-- "three", not the 1 and 2 above it.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECIDE `no giveth` Red   IS 1
+DECIDE `no giveth` Green IS 2
+DECIDE `no giveth` Blue  IS "three"
+
+-- ... and likewise for patterns: TRUE is reported, not the two clauses that
+-- agree on a MAYBE.
+DECIDE `odd last pattern` (JUST 1) IS 1
+DECIDE `odd last pattern` NOTHING  IS 2
+DECIDE `odd last pattern` TRUE     IS 3

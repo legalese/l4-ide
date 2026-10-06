@@ -918,8 +918,9 @@ data PmGroup = MkPmGroup
 -- drafter can spell any name, and a CONSIDER the drafter wrote inside a
 -- clause's body sits in the same generated definition as the ones around it.
 data PmSynthetic
-  = PmConsider PmGroup Int
-    -- ^ a CONSIDER testing one input of the group (its 1-based position)
+  = PmConsider PmGroup Int Bool
+    -- ^ a CONSIDER testing one input of the group: its 1-based position, and
+    -- whether the group's GIVEN declares that input's type
   | PmFallthrough PmGroup
     -- ^ the local definition holding the clauses not yet tried
   | PmUnreachable PmGroup

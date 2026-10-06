@@ -19,7 +19,7 @@ File: pattern-matching-clause-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    From looking at the context, I have inferred that the type of this definition must be
+    The type of this definition must match its type signature at pattern-matching-clause-type-errors.l4:12:8-16, namely
 
       STRING
 
@@ -49,7 +49,7 @@ File: pattern-matching-clause-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    From looking at the context, I have inferred that the type of this definition must be
+    The type of this definition must match its type signature at pattern-matching-clause-type-errors.l4:20:8-16, namely
 
       NUMBER
 
@@ -64,7 +64,7 @@ File: pattern-matching-clause-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first input of `wrong pattern` is of type
+    The first input of `wrong pattern` is declared to be of type
 
       MAYBE OF NUMBER
 
@@ -74,15 +74,45 @@ File: pattern-matching-clause-type-errors.l4
 
 File: pattern-matching-clause-type-errors.l4
   Hidden: no
-  Range: 32:38-32:46
+  Range: 33:38-33:42
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first input of `wrong pattern without given` is of type
+    From looking at the context, I have inferred that the first input of `wrong pattern without given` is of type
 
-      BOOLEAN
+      MAYBE OF NUMBER
 
     but the pattern written for it here is of type
 
+      BOOLEAN
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 42:29-42:36
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the type of this definition must be
+
+      NUMBER
+
+    but is here of type
+
+      STRING
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 48:27-48:31
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the first input of `odd last pattern` is of type
+
       MAYBE OF NUMBER
+
+    but the pattern written for it here is of type
+
+      BOOLEAN

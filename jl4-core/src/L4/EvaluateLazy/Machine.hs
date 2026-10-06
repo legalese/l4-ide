@@ -1324,7 +1324,7 @@ continueBranches g r env e = pure (MatchBranchesMachine g r env e)
 -- | The multi-clause group a CONSIDER was generated from, if it was.
 consideredClauses :: Anno -> Maybe PmGroup
 consideredClauses ann = case view annPmSynthetic ann of
-  Just (PmConsider g _) -> Just g
+  Just (PmConsider g _ _) -> Just g
   _ -> Nothing
 
 continuePattern :: Reference -> Environment -> Pattern Resolved -> Machine Config

@@ -1074,8 +1074,13 @@ isDistinguishablePat = \ case
 -- | Extract the term (value) parameter names from a GIVEN signature, skipping
 -- type parameters (@x IS A TYPE@). These are used as the CONSIDER scrutinees.
 givenTermNames :: TypeSig Name -> [Name]
-givenTermNames (MkTypeSig _ (MkGivenSig _ otns) _) =
-  [ n | MkOptionallyTypedName _ n mt _ <- otns, notTypeParam mt ]
+givenTermNames = map fst . givenTermParams
+
+-- | The term parameters of a GIVEN signature, each with whether it declares
+-- a type.
+givenTermParams :: TypeSig Name -> [(Name, Bool)]
+givenTermParams (MkTypeSig _ (MkGivenSig _ otns) _) =
+  [ (n, isJust mt) | MkOptionallyTypedName _ n mt _ <- otns, notTypeParam mt ]
   where
     notTypeParam (Just (Type _)) = False
     notTypeParam _               = True
@@ -1096,6 +1101,11 @@ desugarPatternClauses sig rawToks firstC restCs =
     givenNs  = givenTermNames sig
     appFormAnno = mkHoleAnnoFor headName
     usesGivenNames = length givenNs == arity && arity > 0
+    -- Whether the GIVEN declares each column's type; a synthesized column
+    -- has none.
+    typesDeclared
+      | usesGivenNames = map snd (givenTermParams sig)
+      | otherwise      = replicate arity False
     (theAppForm, scrutinees)
       | usesGivenNames =
           (MkAppForm appFormAnno headName [] mAka, givenNs)
@@ -1104,7 +1114,7 @@ desugarPatternClauses sig rawToks firstC restCs =
                       | i <- [1 .. arity] ]
           in (MkAppForm appFormAnno headName synth mAka, synth)
     grp = MkPmGroup { groupHead = rawName headName, clauseCount = length clauses }
-    body = matchClauses grp scrutinees clauses
+    body = matchClauses grp scrutinees typesDeclared clauses
     -- The signature is exact-printed structurally (via its hole); the whole
     -- clause group is reproduced verbatim from the captured raw tokens as a
     -- single visible CSN. We deliberately emit NO holes for 'theAppForm' or the
@@ -1168,10 +1178,10 @@ rawTokensAnno toks =
 -- drafter who spells it in backticks and refers to it from a clause gets an
 -- ambiguity error, not a silent capture.) Nothing downstream reads the name:
 -- the binding and every generated CONSIDER are marked with 'PmSynthetic'.
-matchClauses :: PmGroup -> [Name] -> [PMClause] -> Expr Name
-matchClauses grp scrutinees = go 0
+matchClauses :: PmGroup -> [Name] -> [Bool] -> [PMClause] -> Expr Name
+matchClauses grp scrutinees typesDeclared = go 0
   where
-    columns = zip [1 ..] scrutinees
+    columns = zip3 [1 ..] typesDeclared scrutinees
     go :: Int -> [PMClause] -> Expr Name
     go _ []  = error "L4.Parser.matchClauses: empty clause list (impossible)"
     go _ [c] = matchLast grp columns (pmPats c) (pmBody c)
@@ -1184,7 +1194,7 @@ matchClauses grp scrutinees = go 0
       -- the binding is dead and the remaining clauses never run. It is bound
       -- anyway, marked 'PmUnreachable', so that they are still type-checked
       -- (the checker gives it the group's result type, see
-      -- 'L4.TypeCheck.expectFallthroughResults') and then dropped from the
+      -- 'L4.TypeCheck.checkClausesLet') and then dropped from the
       -- checked tree, which is therefore the one this function emitted before
       -- it bound them: evaluation and every exporter see no difference. The
       -- checker warns that they are unreachable (from 'PmMatrix' @catchAll@).
@@ -1237,15 +1247,15 @@ bindFallthrough mark ftName ftAnno ftExpr body =
     emptyTypeSig = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
 
 -- | A CONSIDER the desugarer generates to test the input in column @col@.
-generatedConsider :: PmGroup -> Int -> Name -> [Branch Name] -> Expr Name
-generatedConsider grp col s =
-  Consider (setPmSynthetic (PmConsider grp col) emptyAnno) (App emptyAnno s [])
+generatedConsider :: PmGroup -> (Int, Bool, Name) -> [Branch Name] -> Expr Name
+generatedConsider grp (col, declared, s) =
+  Consider (setPmSynthetic (PmConsider grp col declared) emptyAnno) (App emptyAnno s [])
 
 -- | Compile one non-final clause: match every column against its scrutinee; on
 -- any mismatch, fall through to @ft@ (the desugaring of the remaining clauses).
-matchOne :: PmGroup -> [(Int, Name)] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
-matchOne _   _               []       body _  = body
-matchOne grp ((col, s) : ss) (p : ps) body ft
+matchOne :: PmGroup -> [(Int, Bool, Name)] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
+matchOne _   _                  []       body _  = body
+matchOne grp (c@(_, _, s) : ss) (p : ps) body ft
   -- A variable pattern that reuses the scrutinee's name (as the spec mandates),
   -- or the anonymous wildcard, always matches and needs no (re)binding.
   | patAlwaysMatchesAs s p = matchOne grp ss ps body ft
@@ -1255,22 +1265,22 @@ matchOne grp ((col, s) : ss) (p : ps) body ft
   -- nullary constructor such as @TRUE@ / @EMPTY@ / @NOTHING@ (can fail). Emitting
   -- the fall-through is correct for both: a variable simply leaves it dead.
   | otherwise =
-      generatedConsider grp col s
+      generatedConsider grp c
         [ MkBranch emptyAnno (When emptyAnno p) (matchOne grp ss ps body ft)
         , MkBranch emptyAnno (Otherwise emptyAnno) ft
         ]
-matchOne _   []              (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
+matchOne _   []                 (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
 
 -- | Compile the final clause without an OTHERWISE branch (so a non-match is a
 -- runtime non-exhaustive error, matching Haskell semantics).
-matchLast :: PmGroup -> [(Int, Name)] -> [Pattern Name] -> Expr Name -> Expr Name
-matchLast _   _               []       body = body
-matchLast grp ((col, s) : ss) (p : ps) body
+matchLast :: PmGroup -> [(Int, Bool, Name)] -> [Pattern Name] -> Expr Name -> Expr Name
+matchLast _   _                  []       body = body
+matchLast grp (c@(_, _, s) : ss) (p : ps) body
   | patAlwaysMatchesAs s p = matchLast grp ss ps body
   | otherwise =
-      generatedConsider grp col s
+      generatedConsider grp c
         [ MkBranch emptyAnno (When emptyAnno p) (matchLast grp ss ps body) ]
-matchLast _   []              (_ : _)  body = body -- more patterns than scrutinees: ignore extras
+matchLast _   []                 (_ : _)  body = body -- more patterns than scrutinees: ignore extras
 
 -- | Does this pattern always match its scrutinee /without introducing a new
 -- binding/? True for the anonymous wildcard @_@ and for a variable pattern that
