@@ -1,0 +1,9 @@
+-- Two clauses over a three-value enumeration: `l4 check` warns that `price`
+-- has no clause for Blue, and still succeeds.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2

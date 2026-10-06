@@ -253,6 +253,14 @@ spec bin = do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
 
+    it "warns that a multi-clause DECIDE misses a case, and still succeeds" $ do
+      let fixture = fixtureDir </> "multi-clause-missing.l4"
+      Output code sout serr <- runL4 bin ["check", fixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
+      serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
+
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do
       Output code sout _ <- runL4 bin ["format", cleanFixture]

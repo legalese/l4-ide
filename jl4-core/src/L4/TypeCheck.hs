@@ -518,11 +518,17 @@ inferProgram (MkModule ann uri section) = do
 -- TODO: This is more complicated due to potential polymorphism.
 --
 inferDecide :: Decide Name -> Check (Decide Resolved, [CheckInfo])
-inferDecide (MkDecide ann _tysig appForm expr) = do
+inferDecide dec@(MkDecide ann _tysig appForm expr) = do
   errorContext (WhileCheckingDecide (getName appForm)) do
     lookupFunTypeSigByAnno ann >>= \ dHead -> do
         decide <- extendKnownMany dHead.arguments $ do
           rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
+          -- Exhaustiveness of a multi-clause pattern-matching group: runs
+          -- AFTER the body is checked, so 'applySubst' can resolve
+          -- untyped-GIVEN inference variables, and INSIDE 'extendKnownMany',
+          -- so the GIVEN binders' entityInfo entries (the column types) are
+          -- in scope.
+          checkClauseMatrix dec dHead
           -- See Note [Adding type information to all binders]
           MkDecide dHead.anno
             <$> traverse resolvedType dHead.rtysig
@@ -530,6 +536,290 @@ inferDecide (MkDecide ann _tysig appForm expr) = do
             <*> pure rexpr
             >>= nlgDecide
         pure (decide, [dHead.name])
+
+-- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
+-- run over the SOURCE clause matrix the parser attached to the fused
+-- Decide's annotation ('Extension.pmMatrix'). The desugared tree cannot be
+-- analysed instead: 'L4.Parser.matchClauses' gives every non-final clause
+-- an OTHERWISE (the fall-through reference) and buries the un-defaulted
+-- final clause inside a @__pm_fallthrough_@ binding, whose CONSIDERs
+-- 'checkConsider' does not warn about, so per-node checking never sees the
+-- missing cases.
+--
+-- Only n >= 2 groups are analysed here: for n = 1 the final clause's
+-- CONSIDER sits in the user's own Decide (not a fall-through) and already
+-- warns via the ordinary 'checkConsider' path; analysing it again here
+-- would warn twice.
+--
+-- Every bail below is FAIL-OPEN to no warning: no warning is better than a
+-- wrong one or a hang.
+checkClauseMatrix :: Decide Name -> FunTypeSig -> Check ()
+checkClauseMatrix dec dHead =
+  case getAnno dec ^. annPmMatrix of
+    Just matrix | length matrix.clauses >= 2 -> analyseMatrix matrix
+    _ -> pure ()
+  where
+    MkAppForm _ _ colScruts _ = dHead.rappForm
+
+    analyseMatrix :: PmMatrix -> Check ()
+    analyseMatrix matrix = do
+      ei <- asks (.entityInfo)
+      let clauseRows = matrix.clauses
+          -- Column-count mismatch with any clause bails (mirrors
+          -- 'L4.Parser.matchOne', which ignores extra patterns).
+          columnCountOk =
+            not (null colScruts)
+              && all (\ cl -> length cl.patterns == length colScruts) clauseRows
+          -- Any literal or expression pattern anywhere stands the whole
+          -- analysis down: a number or a string has no finite set of
+          -- values to enumerate, and an EXACTLY expression is opaque.
+          hasOpaque = any (any patternHasOpaque . (.patterns)) clauseRows
+          -- Column types, read off the GIVEN binders' entityInfo entries
+          -- (in scope: we are called inside @extendKnownMany
+          -- dHead.arguments@).
+          mColTypes =
+            traverse
+              (\ r -> case Map.lookup (getUnique r) ei of
+                  Just (_, KnownTerm ty _) -> Just ty
+                  _ -> Nothing)
+              colScruts
+      case mColTypes of
+        Just colTypes0 | columnCountOk, not hasOpaque -> do
+          colTypes <- traverse applySubst colTypes0
+          -- Re-resolve each clause's patterns against the column types,
+          -- 'quietly': the same patterns were already checked inside the
+          -- desugared tree, so all diagnostics are discarded (re-emitting
+          -- would duplicate every error), and any pattern with no error-free
+          -- candidate bails the whole analysis. EXCEPT the column-wildcard
+          -- idiom, which must be intercepted BEFORE resolution: see
+          -- 'patIsColumnWildcard'.
+          rpatssM <-
+            forM clauseRows \ cl ->
+              forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
+                if patIsColumnWildcard scrutR pat
+                  then pure (Just (PatVar (getAnno pat) scrutR))
+                  else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+          resolvedDecls <- asks (Map.elems . (.declareDeclarations))
+          let families = constructorFamilies resolvedDecls
+              missingRows =
+                traverse sequence rpatssM
+                  >>= traverse (traverse coveragePattern)
+                  >>= uncoveredRows families
+          case missingRows of
+            Just rows@(_ : _) ->
+              case hullRange matrix of
+                -- The warning must anchor at a real source range; if none
+                -- can be produced at all, do not emit.
+                Nothing -> pure ()
+                Just hull ->
+                  addWarning (PatternClausesMissing hull (getName dHead.rappForm) (map renderRow rows))
+            _ -> pure ()
+        _ -> pure ()
+
+    -- | A column wildcard at the top of a missing row renders as the
+    -- column's GIVEN name — the language's wildcard idiom (the lexer
+    -- rejects a bare @_@; a name reusing the GIVEN name desugars to no
+    -- test) — so the suggested clause is valid, pasteable L4. A column
+    -- with no GIVEN name of its own (its scrutinee is the parser's
+    -- @_pm_arg_i@, which the user never wrote) renders as @`_`@ instead,
+    -- which 'L4.Parser.patAlwaysMatchesAs' also reads as matching
+    -- anything; so do nested wildcards inside applied constructors.
+    renderRow :: [CoveragePattern] -> [Pattern Resolved]
+    renderRow =
+      zipWith
+        (\ scrutR -> \ case
+            CovWild
+              | rawName (getName scrutR) `elem` writtenGivens -> PatVar emptyAnno scrutR
+            p -> coverageToPattern p)
+        colScruts
+
+    -- | The term names the user wrote in the group's GIVEN.
+    writtenGivens :: [RawName]
+    writtenGivens =
+      let MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ _ = dec
+      in [ rawName n | MkOptionallyTypedName _ n _ <- otns ]
+
+    -- | The hull of the clause-head ranges: first head's start to last
+    -- head's end. If any head range is missing, fall back to the Decide's
+    -- own range (real: it spans sig + clause group, 'L4.Parser.decideAnno').
+    hullRange :: PmMatrix -> Maybe SrcRange
+    hullRange matrix = case traverse (.headRange) matrix.clauses of
+      Just rs@(r0 : _) ->
+        Just MkSrcRange
+          { start = r0.start
+          , end = (List.last rs).end
+          , length = sum (map (.length) rs)
+          , moduleUri = r0.moduleUri
+          }
+      _ -> rangeOf dec
+
+    -- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which the matrix analysis
+    -- MUST agree with: a bare pattern that reuses its own column's
+    -- GIVEN\/scrutinee name (or the anonymous wildcard) is compiled by the
+    -- desugarer as an unconditional match — 'L4.Parser.matchOne'\/'matchLast'
+    -- skip the column entirely, emitting no test — EVEN when that name is
+    -- also a nullary constructor of the column type. Re-resolving such a
+    -- pattern through 'checkPattern' would try constructor resolution first
+    -- ('inferPatternApp' before the variable fallback) and mis-read the row
+    -- as covering only that one constructor, producing a
+    -- 'PatternClausesMissing' warning that contradicts the run-time
+    -- behaviour of a total group. Intercept before resolution and stand in
+    -- the wildcard the desugarer actually compiled. Note the reuse test is
+    -- against THIS column's scrutinee only: a bare name matching a
+    -- DIFFERENT column's GIVEN, or no GIVEN at all, still resolves
+    -- normally — exactly as at run time.
+    patIsColumnWildcard :: Resolved -> Pattern Name -> Bool
+    patIsColumnWildcard scrutR = \ case
+      PatApp _ n [] -> nameToText n == "_" || rawName n == rawName (getName scrutR)
+      _ -> False
+
+-- | Run a sub-computation for its VALUE only: select the first candidate
+-- free of 'SError'-severity diagnostics, DISCARD every diagnostic it
+-- emitted along the way, and return 'Nothing' when no candidate is free of
+-- errors.
+--
+-- The caller's 'CheckState' is restored except for the unique 'supply',
+-- which advances to the chosen candidate's — fresh uniques minted inside
+-- (by 'def' \/ 'newUnique') may survive in the returned value and must not
+-- be re-minted. Everything else (substitution, 'infoMap' \/ 'nlgMap' \/
+-- 'scopeMap' \/ 'descMap' insertions) is dropped: 'checkClauseMatrix' uses
+-- this to RE-check patterns that were already checked inside the desugared
+-- tree, and re-emitting their diagnostics or map entries would duplicate
+-- every one of them.
+quietly :: Check a -> Check (Maybe a)
+quietly m = MkCheck $ \ e s ->
+  case filter (errorFree . fst) (runCheck m e s) of
+    ((w, s') : _) -> [(Plain (Just (snd (runWith w))), s { supply = s'.supply })]
+    [] -> [(Plain Nothing, s)]
+  where
+    errorFree w = all ((/= SError) . severity) (fst (runWith w))
+
+-- | A clause pattern as the coverage analysis sees it: a wildcard, or a
+-- constructor applied to argument patterns.
+data CoveragePattern
+  = CovWild
+  | CovCon Resolved [CoveragePattern]
+
+-- | 'Nothing' for a pattern the coverage analysis cannot enumerate: a list
+-- cons (LIST's constructors are not in 'constructorFamilies'), a literal or
+-- an expression.
+coveragePattern :: Pattern Resolved -> Maybe CoveragePattern
+coveragePattern = \ case
+  PatVar {}     -> Just CovWild
+  PatApp _ c ps -> CovCon c <$> traverse coveragePattern ps
+  PatCons {}    -> Nothing
+  PatLit {}     -> Nothing
+  PatExpr {}    -> Nothing
+
+coverageToPattern :: CoveragePattern -> Pattern Resolved
+coverageToPattern = \ case
+  CovWild     -> PatVar emptyAnno underscoreRef
+  CovCon c ps -> PatApp emptyAnno c (map coverageToPattern ps)
+
+-- | For each constructor, every constructor of its type with its arity, in
+-- declaration order. Built from the same declarations as
+-- 'buildConstructorLookup' (the DECLAREs in 'declareDeclarations') plus
+-- BOOLEAN, as in 'builtinConstructorLookup', so a clause group is checked
+-- over exactly the types a CONSIDER is. A constructor whose type is not
+-- covered (LIST, or a type declared in another module) has no entry, and
+-- 'uncoveredRows' bails on it.
+constructorFamilies :: [DeclChecked (Declare Resolved)] -> Map Unique [(Resolved, Int)]
+constructorFamilies decls =
+  Map.fromList
+    [ (getUnique c, family)
+    | family <- booleanFamily : concatMap declFamilies decls
+    , (c, _) <- family
+    ]
+  where
+    booleanFamily = [(Def trueUnique trueName, 0), (Def falseUnique falseName, 0)]
+    declFamilies decl =
+      let MkDeclare _ _ (MkAppForm _ tr _ _) td = decl.payload
+      in case td of
+        -- if the constructor name is 'Nothing', it is the type name
+        RecordDecl _ mc fields -> [[(fromMaybe tr mc, length fields)]]
+        EnumDecl _ cds -> [[ (n, length fields) | MkConDecl _ n fields <- cds ]]
+        SynonymDecl _ _ -> []
+
+-- | The values that no row of a clause matrix matches, as rows of patterns
+-- with wildcards, computed by specialisation and the default matrix
+-- (L. Maranget, "Warnings for pattern matching", JFP 17(3), 2007, §3.1 and
+-- §5). If no row names a constructor in the first column, that column is a
+-- wildcard over the rows' remaining columns. Otherwise every constructor of
+-- the column's type is tried in turn: one that some row names recurses into
+-- the rows that can match it (those naming it, with its argument patterns
+-- spliced in, and the wildcard rows, with wildcards for its arguments); one
+-- that no row names is missing for every value the wildcard rows leave
+-- uncovered. For constructor patterns the result is exact: every row it
+-- returns covers only unmatched values, and every unmatched value is an
+-- instance of exactly one returned row.
+--
+-- 'Nothing' bails to no warning: a constructor whose type's constructors are
+-- unknown, an arity that disagrees with the declaration, more than
+-- 'maxMissingClauses' rows at any level (each intermediate row yields at
+-- least one final row, so the final list would be longer still), or more
+-- than 'clauseMatrixFuel' steps.
+uncoveredRows :: Map Unique [(Resolved, Int)] -> [[CoveragePattern]] -> Maybe [[CoveragePattern]]
+uncoveredRows families rows0 =
+  case rows0 of
+    [] -> Nothing
+    (r : _) -> evalStateT (go (length r) rows0) clauseMatrixFuel
+  where
+    go :: Int -> [[CoveragePattern]] -> StateT Int Maybe [[CoveragePattern]]
+    go n rows = do
+      fuel <- get
+      lift (guard (fuel > 0))
+      put (fuel - 1)
+      result <- uncoveredStep n rows
+      lift (guard (length result <= maxMissingClauses))
+      pure result
+
+    uncoveredStep :: Int -> [[CoveragePattern]] -> StateT Int Maybe [[CoveragePattern]]
+    uncoveredStep 0 rows = pure [ [] | null rows ]
+    uncoveredStep n rows =
+      case [ (c, length ps) | (CovCon c ps : _) <- rows ] of
+        [] -> map (CovWild :) <$> go (n - 1) (mapMaybe dropWildcard rows)
+        heads@((c0, _) : _) -> do
+          family <- lift (Map.lookup (getUnique c0) families)
+          lift (guard (all (\ (c, a) -> any (\ (c', a') -> c `sameResolved` c' && a == a') family) heads))
+          let named c = any ((c `sameResolved`) . fst) heads
+          missingBelow <-
+            if all (named . fst) family
+              then pure []
+              else go (n - 1) (mapMaybe dropWildcard rows)
+          concat <$> forM family \ (c, a) ->
+            if named c
+              then map (\ w -> CovCon c (take a w) : drop a w) <$> go (a + n - 1) (mapMaybe (specialise c a) rows)
+              else pure [ CovCon c (replicate a CovWild) : w | w <- missingBelow ]
+
+    dropWildcard = \ case
+      CovWild : rest -> Just rest
+      _ -> Nothing
+
+    specialise c a = \ case
+      CovCon c' ps : rest | c `sameResolved` c' -> Just (ps <> rest)
+      CovWild : rest -> Just (replicate a CovWild <> rest)
+      _ -> Nothing
+
+-- | More missing clauses than this and the warning is suppressed rather
+-- than printing pages of clauses (the same limit, 64, as unstable's
+-- @maxMissingSuggestions@).
+maxMissingClauses :: Int
+maxMissingClauses = 64
+
+-- | Recursion steps 'uncoveredRows' may take before it gives up.
+clauseMatrixFuel :: Int
+clauseMatrixFuel = 10000
+
+-- | Does this pattern contain a literal or expression pattern anywhere?
+-- Pass-polymorphic so 'checkClauseMatrix' can apply it to the Name-pass
+-- patterns of a clause matrix before resolving them.
+patternHasOpaque :: Pattern n -> Bool
+patternHasOpaque = \ case
+  PatLit {}       -> True
+  PatExpr {}      -> True
+  PatVar {}       -> False
+  PatApp _ _ ps   -> any patternHasOpaque ps
+  PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
 
 -- | We allow the following cases:
 --
@@ -3311,6 +3601,44 @@ prettyCheckWarning = \ case
     <>
     map (("  " <>) . prettyLayout) b
     <> [ "" ]
+  PatternClausesMissing _ headName rows ->
+    [ "This multi-clause definition does not cover all cases. The following clauses are still needed:"
+    , "" ]
+    <>
+    map (("  " <>) . prettyMissingClauseLhs headName) rows
+    <> [ "" ]
+
+-- | Render a missing CLAUSE of a multi-clause pattern-matching group as
+-- valid, pasteable L4: a new DECIDE clause line ending at IS with no body.
+-- The DECIDE form is always valid to paste because a group accepts
+-- DECIDE-form and MEANS-form clauses interchangeably ('L4.Parser.pmClause').
+-- Clause argument positions parse as 'L4.Parser.atomicPattern', so applied
+-- constructors must be parenthesised: every column is rendered with
+-- @nested=True@.
+prettyMissingClauseLhs :: Name -> [Pattern Resolved] -> Text
+prettyMissingClauseLhs headName row =
+  "DECIDE " <> quotedName headName
+    <> Text.concat (map ((" " <>) . prettyMissingPattern True) row)
+    <> " IS"
+
+-- | Render a synthesized pattern as valid, pasteable L4. The generic
+-- layout printer is not suitable here: it does not parenthesize nested
+-- non-nullary constructor patterns (@wa JUST `_`@ instead of
+-- @wa (JUST `_`)@).
+prettyMissingPattern :: Bool -> Pattern Resolved -> Text
+prettyMissingPattern = go
+  where
+    go :: Bool -> Pattern Resolved -> Text
+    go _ p@PatVar {} = prettyLayout p
+    go _ p@(PatApp _ _ []) = prettyLayout p
+    go nested (PatApp a c ps) =
+      parensIf nested (prettyLayout (PatApp a c []) <> " " <> Text.unwords (map (go True) ps))
+    -- cons, literal and expression patterns are never synthesized as
+    -- missing clauses ('coverageToPattern'); fall back to the generic
+    -- printer just in case
+    go _ p = prettyLayout p
+
+    parensIf b txt = if b then "(" <> txt <> ")" else txt
 
 
 -- | Forms a plural when needed.

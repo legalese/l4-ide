@@ -25,6 +25,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [APPEND vs append](#append-vs-append)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
+  - [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
@@ -369,6 +370,45 @@ OTHERWISE "unknown"
 ```
 
 **Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+
+---
+
+### Multi-clause DECIDE does not cover all cases
+
+**Warning message:**
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `price` Blue IS
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+```
+
+**What went wrong:** The clauses of `price` match `Red` and `Green` but no clause matches `Blue`, so `price Blue` would stop evaluation with an error. This is a **compile-time warning** (not an error); an editor underlines it from the first clause's name to the last's.
+
+**How to fix it:** Add each listed clause and write its result after `IS`:
+
+```l4
+DECIDE price Blue IS 3
+```
+
+Or end the group with a clause that matches anything, written with the `GIVEN` name:
+
+```l4
+DECIDE price c IS 0
+```
+
+**Note:** Only groups of two or more clauses that match enumeration values or `TRUE`/`FALSE` are checked. Groups that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning, and neither does a group that would need more than 64 clauses listed. See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
 
 ---
 

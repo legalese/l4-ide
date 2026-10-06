@@ -103,6 +103,13 @@ data CheckError =
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
+  | PatternClausesMissing SrcRange Name [[Pattern Resolved]]
+    -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
+    -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the
+    -- clause-head ranges (the warning anchor — never @\<no location\>@), the
+    -- group's head name for display, and one row per missing clause: one
+    -- pattern per argument column, wildcard columns pre-substituted with the
+    -- column's GIVEN name so the renderer is dumb.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -197,6 +204,9 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
+  -- The clause-head hull anchors the warning; it wins over the enclosing
+  -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
+  rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)

@@ -103,13 +103,38 @@ In each argument position:
 
 Clauses after the first are reached only when the earlier ones do not match, like the `OTHERWISE` above.
 
+## Missing cases
+
+When a group of two or more clauses matches only some of the values of an enumeration, or only one of `TRUE` and `FALSE`, `l4 check` warns and lists the clauses still needed.
+For this `colour.l4`:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+```
+
+`l4 check colour.l4` succeeds, with this warning, which an editor underlines from the first clause's name to the last's:
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `price` Blue IS
+```
+
+Each line is a clause you can paste in and finish by writing its result after `IS`.
+When a function has several inputs, an input that any value would do for is written with its `GIVEN` name, which matches anything, or as `` `_` `` if the function has no `GIVEN` for it.
+
 ## Limits
 
 These were measured with the `l4` built from this version of L4.
 
-**No `_` wildcard.**
+**A bare `_` is not a wildcard.**
 `DECIDE f _ IS 2` is a syntax error, `unexpected '_'`.
-To match anything, use the `GIVEN` input's name instead, as `factorial n` does.
+To match anything, use the `GIVEN` input's name, as `factorial n` does, or write `` `_` `` in backquotes, which is how the missing-case warning writes an input that has no `GIVEN`.
 
 **Names and the `GIVEN`.**
 In a group of two or more clauses, a name in an argument position that differs from the `GIVEN` is accepted and stands for that argument.
@@ -134,8 +159,10 @@ and the corresponding name in the definition is
   b (at double.l4:3:15-16)
 ```
 
-**No warning for a missing case.**
-Nothing warns when a group of clauses does not cover every value.
+**Some groups are not checked for missing cases.**
+The warning above covers clauses that match values of an enumeration declared in the same file, and `TRUE` and `FALSE`.
+A group that matches numbers or text gets no warning, because there is no end to the numbers and texts that could be listed.
+Nor does a group that matches lists or `MAYBE` values, or values of an enumeration declared in another file, or one that would need more than 64 clauses listed.
 When no clause matches, evaluation stops with an error.
 For this `describe.l4`:
 
@@ -159,8 +186,8 @@ Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
 The typechecker's exhaustiveness warning lists all missing branches.
 ```
 
-Its last sentence does not apply here, because no such warning is shown for a group of clauses.
-To be safe, end the group with a clause that matches anything.
+Its last sentence does not apply here, because no warning is shown for this group.
+To be safe, end such a group with a clause that matches anything.
 
 **Clauses after a catch-all are not checked.**
 A clause that matches anything ends the group for checking.

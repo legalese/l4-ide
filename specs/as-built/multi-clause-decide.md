@@ -1,6 +1,6 @@
 # Multi-clause pattern-matching DECIDE (as built)
 
-As built on unstable at 73a953821. Source spec: specs/done/PATTERN-MATCHING-SPEC.md (on main at `specs/todo/PATTERN-MATCHING-SPEC.md`). Differences from the source spec: `_` and `_name` wildcards are lexer errors; inside a clause group a variable whose name differs from its `GIVEN` is accepted and binds, where the spec requires an error; the Phase 1 redundancy and overlap warnings were never built, and a clause after a total clause is dropped before type checking; the Phase 1 exhaustiveness warning is not in this PR (it came with #185); a type error in a clause pattern names the scrutinee "at <no location>".
+As built on unstable at 73a953821. Source spec: specs/done/PATTERN-MATCHING-SPEC.md (on main at `specs/todo/PATTERN-MATCHING-SPEC.md`). Differences from the source spec: `_` and `_name` wildcards are lexer errors; inside a clause group a variable whose name differs from its `GIVEN` is accepted and binds, where the spec requires an error; the Phase 1 redundancy and overlap warnings were never built, and a clause after a total clause is dropped before type checking; the Phase 1 exhaustiveness warning is in this PR, adapted from #185 (see below), and does not cover groups that match literals, lists or types declared in another module; a type error in a clause pattern names the scrutinee "at <no location>".
 
 This PR carries PR #49 (branch `tier1/pattern-matching-p1`, carried in batch #77 as `c2ea232c5a`, commits `759868632` and `f030c28c1`).
 Its 20-line edit to the spec's Phase 1 notes is not carried here.
@@ -101,7 +101,7 @@ Nothing on main alone pins this: main's golden harness prints only `SInfo` diagn
 On unstable, #183 does this job with `isSyntheticFallthrough` instead.
 The suppression also silences a user-written `CONSIDER` in the body of clauses 2..n, the residual unstable documents for #183's mechanism.
 It is narrower than #183's in one way: it stops at the innermost enclosing definition, so a WHERE or LET helper inside a fall-through still warns.
-Redundancy warnings are unaffected; an incomplete group of two or more clauses draws no compile-time warning until #185 (a one-clause group still warns through the ordinary path), and a value no clause matches still fails at run time.
+Redundancy warnings are unaffected, and a value no clause matches still fails at run time; an incomplete group of two or more clauses is reported by the group-level warning below instead (a one-clause group still warns through the ordinary path).
 
 ## In this PR: exact-print of a clause group (from #130)
 
@@ -113,10 +113,39 @@ The three `ok/pattern-matching*.ep.golden` files now equal their sources byte fo
 `PatternMatchParserSpec` checks that a group followed by comments and `@export` keeps its range to its own lines and that the file exact-prints unchanged.
 Semantic tokens walk the same annotation (the generic `Decide` instance, `jl4-lsp/src/LSP/L4/SemanticTokens.hs:212`), so each token of a group is coloured by its token kind alone (`standardTokenType`, `:30-42`): an identifier as a variable, a keyword as a keyword (read in code, not measured in an editor).
 
+## In this PR: the missing-case warning (adapted from #185)
+
+On unstable, #185 (merge `9e684f9b8`) is seven commits: `97cc781c9` (the parser records the clause matrix), `4556d4419` (the checker), `38f0f6fb7` (the column-wildcard fix), fixtures and goldens (`683b20cb0`, `51b08333f`), a DMN test (`0cc42baf6`) and spec notes (`f0e224fd0`).
+This PR carries the code of `97cc781c9` and `38f0f6fb7`, with comments adapted to main, and `4556d4419`'s outer structure; the analysis inside it is new, because #185's runs on the residual-set coverage oracle (`analyzeGuardRows` over `analyzeBranch`, `maxUncoveredNablas`, `constructorArity`, `constructorsInScopeFromEntityInfo`), which reached unstable before #185 and is not on main.
+Main's own CONSIDER analysis is not reused either: `normalizeRefinement` merges every disjunct into one constraint set (`jl4-core/src/L4/TypeCheck.hs:2167-2174` on this branch, with the union at `:2152`), which loses the row structure a group of several columns needs: traced by hand on `f TRUE TRUE` / `f FALSE FALSE`, it reports nothing missing (not run, since a `CONSIDER` has one scrutinee).
+
+Where it lives, on this branch:
+
+- `jl4-core/src/L4/Syntax.hs`: `PmMatrixClause` and `PmMatrix` (`:439`, `:461`), the `pmMatrix` field of `Extension` (`:481`), `annPmMatrix` and `setPmMatrix` (`:523-527`).
+- `jl4-core/src/L4/Parser.hs:897-908`: `desugarPatternClauses` records the scrutinees and each clause's head range and patterns.
+- `jl4-core/src/L4/TypeCheck.hs`: `inferDecide` calls `checkClauseMatrix` after checking the body (`:531`); `checkClauseMatrix` (`:556`), `quietly` (`:689`), `coveragePattern` (`:706`), `constructorFamilies` (`:726`), `uncoveredRows` (`:761`), `maxMissingClauses` (`:806`), `patternHasOpaque` (`:816`); the message (`:3604`) and `prettyMissingClauseLhs` (`:3618`).
+- `jl4-core/src/L4/TypeCheck/Types.hs:106`: the warning `PatternClausesMissing`, whose range (`:209`) is the hull of the clause heads.
+
+Behaviour:
+
+- Groups of two or more clauses are checked; a one-clause group is left to the ordinary `CONSIDER` warning, as on unstable.
+- Each clause's patterns are checked again against the `GIVEN` types with every diagnostic discarded (`quietly`); a clause naming its column's `GIVEN` is read as matching anything before that, as the desugarer reads it (`patIsColumnWildcard`, `38f0f6fb7`).
+- The missing rows are computed by specialisation and the default matrix (Maranget, "Warnings for pattern matching", JFP 2007, §3.1 and §5), over the constructors main's `CONSIDER` analysis knows: `TRUE`/`FALSE` and the enumerations and records declared in the module (`constructorFamilies` reads the same declarations as `buildConstructorLookup`).
+- In each suggested clause, an input that the missing case leaves open is written as its `GIVEN` name, or as `` `_` `` when the user wrote no `GIVEN` for it (#185's `renderColumnWildcard` writes the parser's `_pm_arg_i` there, measured on unstable at 568817a6d), and an applied constructor is parenthesised, so each suggested `DECIDE … IS` line can be pasted.
+- The warning text is unstable's: "This multi-clause definition does not cover all cases. The following clauses are still needed:".
+- Fail-open, as on unstable: a literal or `EXACTLY` pattern anywhere, a pattern that does not re-check, more than 64 missing clauses, or more than 10000 steps means no warning.
+
+Where main differs from unstable (each an absence of a warning, never a different one):
+
+- A group matching lists (`EMPTY`, `FOLLOWED BY`) or values of a type declared in another module (such as `MAYBE` from the prelude) is not checked: main's constructor lookup does not know those constructors.
+- There is no `@nonexhaustive`, so a group cannot be marked deliberately partial.
+- #185's DMN channel (`siClauseMatrixRanges`) is not carried: main has no DMN export.
+
+Tests: `jl4-core/test/PatternClausesMissingSpec.hs` (15 cases, matching warnings by severity and rendered text, including the documented silences for numbers, lists, `MAYBE`, an enumeration from another file and the 64-clause cap), and `jl4/tests-cli` "warns that a multi-clause DECIDE misses a case, and still succeeds" (fixture `tests-cli/fixtures/multi-clause-missing.l4`).
+Main's golden harness prints only infos after "Typechecking successful", so no golden shows the warning.
+
 ## Later changes
 
 - #92 (`TYPICALLY`): `givenTermNames` reads the four-field `MkOptionallyTypedName` (`:1078`).
 - #183: the checker does not warn inside `__pm_fallthrough_` locals, which are partial by construction (`jl4-core/src/L4/TypeCheck.hs:1139-1170`).
-- #185: `desugarPatternClauses` attaches the source clause matrix (`setPmMatrix`), and `checkClauseMatrix` warns on incomplete groups of two or more clauses: "This multi-clause definition does not cover all cases. The following clauses are still needed: …".
-  Groups with a literal or expression pattern are not analysed (`TypeCheck.hs:1211`).
 - #333: `PatternMatchParserSpec`'s helper matches the five-field `MkSection`.
