@@ -3532,7 +3532,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       it "accounts for every UserEvalException constructor" $ do
         let coveredBy :: UserEvalException -> Text
             coveredBy = \case
-              NonExhaustivePatterns _     -> "L1, L2, L11"   -- L1+L2 alone do NOT cover it
+              NonExhaustivePatterns _ _   -> "L1, L2, L11"   -- L1+L2 alone do NOT cover it
               EqualityOnUnsupportedType _ _ -> "L7, transitively stated"
               DivisionByZero _            -> "L3"
               NotAnInteger _ _            -> "L4"

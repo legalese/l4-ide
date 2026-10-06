@@ -1124,8 +1124,8 @@ inferProgram (MkModule ann uri section) = do
 -- TODO: This is more complicated due to potential polymorphism.
 --
 inferDecide :: Decide Name -> Check (Decide Resolved, [CheckInfo])
-inferDecide dec@(MkDecide ann _tysig appForm expr) = do
-  errorContext (WhileCheckingDecide (getName appForm)) do
+inferDecide dec@(MkDecide ann _tysig _appForm expr) = do
+  decideErrorContext dec do
     -- An @nonexhaustive-decorated definition is declared deliberately partial by
     -- its author (not defined for all inputs; evaluation fails outside the
     -- domain), so the non-exhaustive-CONSIDER warning is silenced for its
@@ -1133,13 +1133,15 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- active. See 'L4.Export.isNonexhaustiveDecide' / 'DescFlags'.
     withNonexhaustiveFlag $ lookupFunTypeSigByAnno ann >>= \ dHead -> do
         decide <- extendKnownMany dHead.arguments $ do
-          rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
-          -- Clause-matrix exhaustiveness for multi-clause pattern-matching
-          -- groups (spec §14.7): runs AFTER the body is checked, so
-          -- 'applySubst' can resolve untyped-GIVEN inference variables, and
-          -- INSIDE 'extendKnownMany', so the GIVEN binders' entityInfo
-          -- entries (the column types) are in scope.
-          checkClauseMatrix dec dHead
+          rexpr <- settleOneClause do
+            rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
+            -- Clause-matrix exhaustiveness for multi-clause pattern-matching
+            -- groups (spec §14.7): runs AFTER the body is checked, so
+            -- 'applySubst' can resolve untyped-GIVEN inference variables, and
+            -- INSIDE 'extendKnownMany', so the GIVEN binders' entityInfo
+            -- entries (the column types) are in scope.
+            answered <- checkClauseMatrix dec dHead
+            pure (rexpr, answered)
           -- See Note [Adding type information to all binders]
           MkDecide dHead.anno
             <$> traverse resolvedType dHead.rtysig
@@ -1159,74 +1161,182 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
   where
     withNonexhaustiveFlag :: Check a -> Check a
     withNonexhaustiveFlag
-      | Export.isNonexhaustiveDecide dec || isSyntheticFallthrough
+      | Export.isNonexhaustiveDecide dec
           = local (\env -> env { inNonexhaustiveDecide = True })
       | otherwise                  = id
 
-    -- The multi-clause pattern-matching desugaring (L4.Parser.matchClauses)
-    -- binds the remaining clauses of a group as a LOCAL decide named
-    -- @__pm_fallthrough_<k>@, and deliberately compiles the LAST clause
-    -- without an OTHERWISE so that a non-match is a runtime
-    -- non-exhaustive-pattern error. Each such interior binding is therefore
-    -- partial BY CONSTRUCTION, and warning on it would (a) mis-report a
-    -- total clause group as incomplete and (b) name an invisible binder at
-    -- <no location>. The double-underscore prefix is the desugarer's hygiene
-    -- marker (see 'L4.Parser.fallthroughName').
-    --
-    -- The suppression is CORRECT (not a known limitation) because the clause
-    -- group is checked as a unit at the Decide level: 'checkClauseMatrix'
-    -- analyses the parser-attached source clause matrix
-    -- ('Extension.pmMatrix'), so a genuinely incomplete group warns there,
-    -- with real clause-head ranges (see DMN-EXPORT-PROGRAM-MODEL-SPEC
-    -- §14.7's resolution). The inner CONSIDERs silenced here are compilation
-    -- artifacts; checking them per-node would only reproduce the
-    -- pre-suppression false positives (<no location>, an invisible binder,
-    -- total groups reported incomplete).
-    --
-    -- Residual, stated honestly: a USER-written CONSIDER inside the body of
-    -- clause 2..n also lives inside a fall-through Decide, so its
-    -- missing-arm warning is still silenced — a pre-existing collateral
-    -- false negative this change does not restore. (Follow-up recorded in
-    -- the spec: split the env flag into decorator-suppression vs.
-    -- fallthrough-suppression and let the fallthrough variant suppress only
-    -- RANGELESS CONSIDERs — synthetic nodes are 'emptyAnno', user nodes
-    -- carry ranges.)
-    isSyntheticFallthrough :: Bool
-    isSyntheticFallthrough = case appForm of
-      MkAppForm _ (MkName _ (NormalName t)) _ _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
+-- | Settle the missing-branch warnings of a one-clause group's generated
+-- CONSIDERs, once the clause-matrix analysis has run (@m@ returns whether it
+-- reached a verdict on the missing clauses).
+--
+-- A one-clause group's generated CONSIDERs miss exactly what the clause
+-- misses, so 'checkConsider' still reports them; but in WHEN terms, located
+-- nowhere. When the matrix reached a verdict, it has said the same thing as a
+-- clause, at the clause, so they are withdrawn. When it gave up (a literal
+-- pattern, or more missing clauses than it lists), they are the only warning
+-- the group gets, and are kept, moved to the definition's own location.
+-- A group of two clauses or more never reaches here: its generated CONSIDERs
+-- do not report at all.
+--
+-- Only warnings are dropped, so no candidate's viability changes.
+settleOneClause :: Check (a, Bool) -> Check a
+settleOneClause m = do
+  ctx <- asks (.errorContext)
+  MkCheck \ e s ->
+    [ (settle ctx w, s') | (w, s') <- runCheck m e s ]
+  where
+    settle ctx w =
+      let (diags, (a, answered)) = runWith w
+          keep d@(MkCheckErrorWithContext k _)
+            | isOneClauseMissing d = if answered then Nothing else Just (MkCheckErrorWithContext k ctx)
+            | otherwise            = Just d
+      in foldr With (Plain a) (mapMaybe keep diags)
+    -- 'checkConsider' runs under the 'WhileCheckingExpression' context of its
+    -- own CONSIDER, so the mark is on the node at the head of the context.
+    isOneClauseMissing = \ case
+      MkCheckErrorWithContext (CheckWarning (PatternMatchesMissing _)) (WhileCheckingExpression (Consider a _ _) _)
+        | Just (PmConsider g _ _) <- view annPmSynthetic a -> g.clauseCount == 1
       _ -> False
+
+-- | The error context for checking a definition.
+--
+-- The local definitions a multi-clause group is compiled to ('PmFallthrough',
+-- see 'L4.Parser.matchClauses') add none: the clauses they hold belong to the
+-- group's own definition, which is already the enclosing context, and their
+-- names are ones the drafter never wrote and must never be shown.
+decideErrorContext :: Decide Name -> Check a -> Check a
+decideErrorContext (MkDecide ann _ appForm _) = case view annPmSynthetic ann of
+  Just (PmFallthrough _) -> id
+  Just (PmUnreachable _) -> id
+  _ -> errorContext (WhileCheckingDecide (getName appForm))
+
+-- | Is this local definition one a multi-clause group is compiled to (see
+-- 'L4.Parser.matchClauses')?
+isClausesBinding :: LocalDecl n -> Bool
+isClausesBinding = \ case
+  LocalDecide _ (MkDecide ann _ _ _) -> case view annPmSynthetic ann of
+    Just (PmFallthrough _) -> True
+    Just (PmUnreachable _) -> True
+    _ -> False
+  LocalAssume {} -> False
+
+-- | Check the @LET@ a multi-clause group is compiled to: a binding of the
+-- clauses not yet tried ('PmFallthrough', or 'PmUnreachable' after a clause
+-- that matches every input), and the current clause, which refers to it.
+--
+-- Three things differ from an ordinary @LET@, so that what is reported is about
+-- the clauses as the drafter wrote them:
+--
+-- * __Source order.__ The current clause is checked BEFORE the binding of the
+--   clauses after it, so the first clause, not the last, settles anything the
+--   signature left open: with no GIVETH, a body of the wrong type in a later
+--   clause is the one reported, not the earlier clauses that agree.
+--
+-- * __The group's result type.__ The binding's result IS the group's result,
+--   so it is given the type this @LET@ is checked against before its body is
+--   checked. A wrong body is then reported at that body, against the declared
+--   GIVETH when there is one ("must match its type signature at …"), as in the
+--   first clause. Left to inference, the mismatch surfaced where the binding is
+--   referenced, a node the drafter never wrote, at no location; and the
+--   result type of unreachable clauses, never referenced, was compared with
+--   nothing.
+--
+-- * __Unreachable clauses__ ('PmUnreachable') are checked, but can change
+--   nothing. The current clause, which matches every input and never refers
+--   to them, is checked outside their binding, so no name in it can resolve
+--   to the binding. They are checked against the group's type as it stands,
+--   'speculatively': a type error in them is reported, but what they would
+--   have inferred (an untyped input taken to be a BOOLEAN, a result taken to
+--   be a list of text) is discarded, so a clause that never runs cannot make a
+--   caller of the group ill-typed. And they are dropped from the checked tree,
+--   so evaluation and every exporter see the group as before they were
+--   checked at all.
+--
+-- The binding has no GIVETH of its own, so its result type is a fresh
+-- variable, and unifying it with the group's type cannot fail and adds only a
+-- constraint every reference to it already implies.
+checkClausesLet :: ExpectationContext -> Anno -> [LocalDecl Name] -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
+checkClausesLet ec ann ds e t
+  | all isUnreachableClauses ds = do
+      re <- checkExpr ec e t >>= nlgExpr
+      speculatively $ withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \ _ ->
+        traverse_ inferLocalDecl ds
+      pure re
+  | otherwise =
+      withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \ rdecides -> do
+        re <- extendKnownMany (map (.name) rdecides) do
+          re <- checkExpr ec e t
+          nlgExpr re
+        rds <- traverse (fmap fst . (firstM nlgLocalDecl <=< inferLocalDecl)) ds
+        setAnnResolvedType t Nothing (LetIn ann rds re)
+  where
+    preScanDecl = mapMaybeM scanTyDeclLocalDecl
+    scanDecl = mapMaybeM inferTyDeclLocalDecl
+    scanFuns = mapMaybeM scanFunSigLocalDecl >=> traverse giveGroupResult
+    giveGroupResult :: FunTypeSig -> Check FunTypeSig
+    giveGroupResult sig
+      | isJust (view annPmSynthetic sig.anno) = do
+          void (unify sig.resultType t)
+          pure sig { resultType = t }
+      | otherwise = pure sig
+    isUnreachableClauses = \ case
+      LocalDecide _ (MkDecide dann _ _ _)
+        | Just (PmUnreachable _) <- view annPmSynthetic dann -> True
+      _ -> False
+
+-- | Run a check for its diagnostics only: keep what it reports, and throw away
+-- everything it learned (the substitution, and what it recorded for hovers),
+-- except the supply of fresh names, so that names stay unique. The opposite of
+-- 'quietly', which keeps the result and drops the diagnostics. The kept
+-- diagnostics have the discarded substitution applied first, so a type they
+-- mention prints as what was inferred, not as a bare inference variable.
+speculatively :: Check a -> Check ()
+speculatively m = MkCheck \ e s ->
+  [ (foldr With (Plain ()) diags', s { supply = s''.supply })
+  | (w, s') <- runCheck m e s
+  , let (diags, _) = runWith w
+  , (w', s'') <- take 1 (runCheck (traverse applySubst diags) e s')
+  , let (_, diags') = runWith w'
+  ]
 
 -- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
 -- run over the SOURCE clause matrix the parser attached to the fused
 -- Decide's annotation ('Extension.pmMatrix') — the desugared tree cannot be
 -- analysed instead: 'L4.Parser.matchClauses' gives every non-final clause
--- an OTHERWISE (the fall-through reference) and buries the un-defaulted
--- final clause inside a suppressed @__pm_fallthrough_@ binding, so per-node
--- CONSIDER checking never sees the missing arms (spec §14.7).
+-- an OTHERWISE (the fall-through reference), so only the final clause's
+-- CONSIDERs can be missing anything, and what they miss is a WHEN branch
+-- nobody wrote, not a clause (spec §14.7).
 --
--- Only n >= 2 groups are analysed here: for n = 1 the final clause's
--- CONSIDER sits in the USER's own Decide (not a fall-through), is
--- un-suppressed, and already warns via the ordinary 'checkConsider' path
--- anchored at the head name — analysing it again at matrix level would
--- double-warn.
+-- Every group is analysed here, one clause or many; the CONSIDERs the group is
+-- compiled to never warn about missing branches themselves (see
+-- 'checkConsider'), so nothing is reported twice.
+--
+-- The same analysis finds the clauses that can never be tried, which are
+-- reported with the clauses after a clause that matches anything (see
+-- 'warnUnreachableClauses').
 --
 -- Every bail below is FAIL-OPEN to no-warning, the same contract as
 -- 'analyzePatternMatch': no warning is better than a wrong one or a hang.
-checkClauseMatrix :: Decide Name -> FunTypeSig -> Check ()
+checkClauseMatrix :: Decide Name -> FunTypeSig -> Check Bool
 checkClauseMatrix dec dHead =
   case view annPmMatrix (getAnno dec) of
-    Just matrix
-      | length matrix.clauses >= 2
-        -- @nonexhaustive: the author declares the group deliberately
-        -- partial; the missing-clause warning is silenced (redundancy is
-        -- not analysed on this path at all).
-      , not (Export.isNonexhaustiveDecide dec)
-      -> analyseMatrix matrix
-    _ -> pure ()
+    Just matrix -> do
+      (answered, redundant) <- analyseMatrix matrix
+      warnUnreachableClauses matrix (getName dHead.rappForm) redundant
+      pure answered
+    Nothing -> pure False
   where
     MkAppForm _ _ colScruts _ = dHead.rappForm
 
-    analyseMatrix :: PmMatrix -> Check ()
+    -- @nonexhaustive: the author declares the group deliberately partial, so
+    -- the missing-clause warning is silenced. Unreachable clauses are a bug
+    -- regardless, as a redundant branch is in 'checkConsider'.
+    warnMissing = not (Export.isNonexhaustiveDecide dec)
+
+    -- | Warns about missing clauses. Returns whether it reached a verdict on
+    -- them (not when it bails, nor when there are more than it lists), and
+    -- the indices of the clauses it found redundant (none when it bails).
+    analyseMatrix :: PmMatrix -> Check (Bool, [Int])
     analyseMatrix matrix = do
       ei <- asks (.entityInfo)
       let clauseRows = matrix.clauses
@@ -1270,10 +1380,10 @@ checkClauseMatrix dec dHead =
             Just rpatss
               | all (all patternInfoComplete) rpatss ->
                   analyseResolvedRows matrix ei rpatss
-            _ -> pure ()
-        _ -> pure ()
+            _ -> pure (False, [])
+        _ -> pure (False, [])
 
-    analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check ()
+    analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check (Bool, [Int])
     analyseResolvedRows matrix ei rpatss = do
       -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
       -- (scrutinee, constructor), so cross-clause payload variables are
@@ -1290,8 +1400,8 @@ checkClauseMatrix dec dHead =
         -- bail to no-warning — fail-open, same contract as
         -- 'analyzePatternMatch': no warning is better than a wrong one or a
         -- hang (the 'maxUncoveredNablas' cap).
-        Nothing -> pure ()
-        Just (uncovered, _redundant) -> do
+        Nothing -> pure (False, [])
+        Just (uncovered, redundant) -> do
           let arity = constructorArity ei
               missingRows =
                 nubOrdOn (map (fmap getUnique)) $
@@ -1308,13 +1418,23 @@ checkClauseMatrix dec dHead =
                 length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
           -- cap overflow suppresses the warning entirely, the existing
           -- capped-to-suppress convention of 'analyzePatternMatch'
-          unless (capped || null missingRows) do
+          unless (capped || null missingRows || not warnMissing) do
             case hullRange matrix of
               -- R2: the warning must anchor at a real source range; if none
               -- can be produced at all, do not emit.
               Nothing -> pure ()
               Just hull ->
-                addWarning (PatternClausesMissing hull (getName dHead.rappForm) missingRows)
+                addWarning (PatternClausesMissing hull (getName dHead.rappForm) (length matrix.clauses) missingRows)
+          -- A redundant leaf is identified by its anno, which is its
+          -- clause's head range ('rowLeaf').
+          pure
+            ( not capped
+            , [ i
+              | (i, cl) <- zip [0 ..] matrix.clauses
+              , isJust cl.headRange
+              , any (\ b -> rangeOf b == cl.headRange) redundant
+              ]
+            )
 
     -- | A synthesized leaf whose only consumed parts are its identity and
     -- its anno (the clause-head range).
@@ -1343,9 +1463,17 @@ checkClauseMatrix dec dHead =
     -- (the lexer rejects a bare @_@; a variable reusing the GIVEN name
     -- desugars to nothing) — so the suggested clause is valid, pasteable
     -- L4. Nested wildcards inside applied constructors stay @`_`@.
+    --
+    -- A group with no GIVEN has no such name: its columns are the
+    -- desugarer's @_pm_arg_i@, which is not the drafter's and must not be
+    -- printed, so the column stays @`_`@ like a nested wildcard.
     renderColumnWildcard :: Resolved -> Pattern Resolved -> Pattern Resolved
     renderColumnWildcard scrutR = \ case
-      PatVar a v | v `sameResolved` underscoreRef -> PatVar a scrutR
+      PatVar a v
+        | v `sameResolved` underscoreRef
+        , Just matrix <- view annPmMatrix (getAnno dec)
+        , not matrix.synthesizedScrutinees
+        -> PatVar a scrutR
       p -> p
 
     -- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which the matrix analysis
@@ -1381,6 +1509,41 @@ checkClauseMatrix dec dHead =
       PatVar {}       -> True
       PatExpr {}      -> True -- unreachable: the opaque bail stood down first
       PatLit {}       -> True
+
+-- | Warns about the clauses of a multi-clause group that can never be tried.
+--
+-- Two sources, each clause reported once:
+--
+-- * the clauses after one whose every pattern matches anything
+--   ('PmMatrix' @catchAll@). The parser knows these for certain, literal
+--   patterns or not; they get ONE warning, at the first of them, which says
+--   how many follow;
+--
+-- * the clauses the matrix analysis found redundant ('checkClauseMatrix'):
+--   every input they match is matched by a clause above. Found only when the
+--   analysis runs (no literal patterns, every pattern resolves); one warning
+--   each.
+--
+-- A redundant clause is unreachable because the group tries its clauses in
+-- order and the first match wins, so this is the same finding as a redundant
+-- WHEN branch, in the terms the drafter wrote.
+warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Check ()
+warnUnreachableClauses matrix headName redundant = do
+  let n = length matrix.clauses
+      headRangeAt i = case drop i matrix.clauses of
+        cl : _ -> cl.headRange
+        [] -> Nothing
+      afterCatchAll = case matrix.catchAll of
+        Just i | i + 1 < n -> [i + 1 .. n - 1]
+        _ -> []
+  case afterCatchAll of
+    firstDead : rest | Just r <- headRangeAt firstDead ->
+      addWarning (PatternClauseUnreachable r headName (AfterClauseMatchingAnything (length rest)))
+    _ -> pure ()
+  for_ redundant \ i ->
+    unless (i `elem` afterCatchAll) $
+      for_ (headRangeAt i) \ r ->
+        addWarning (PatternClauseUnreachable r headName CoveredByClausesAbove)
 
 -- | We allow the following cases:
 --
@@ -2034,6 +2197,8 @@ checkExpr ec (Where ann e ds) t = softprune $ do
       nlgExpr re
     pure re
   setAnnResolvedType t Nothing (Where ann re rds)
+checkExpr ec (LetIn ann ds e) t
+  | any isClausesBinding ds = softprune $ checkClausesLet ec ann ds e t
 checkExpr ec (LetIn ann ds e) t = softprune $ do
   let
     preScanDecl = mapMaybeM scanTyDeclLocalDecl
@@ -3108,10 +3273,34 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 --   that crashes at eval). Until the guard model learns opaque refutable
 --   guards (see the design doc's deferred items), such CONSIDERs carry no
 --   exhaustiveness or redundancy guarantee.
+--
+-- A CONSIDER that 'L4.Parser.matchClauses' generated from the clauses of a
+-- multi-clause group ('PmConsider') is reported in the drafter's terms. A
+-- pattern of the wrong type is about an input of the group, not about "the
+-- expression being matched", which is a name the drafter may never have
+-- written. And its missing-branch warning is left to 'checkClauseMatrix',
+-- which reads the clauses as written: the generated CONSIDERs are partial by
+-- construction (only the last clause's has no OTHERWISE), so warning on them
+-- would name WHEN branches nobody wrote, at no location. Only the generated
+-- ones are silenced, by the mark on the node: a CONSIDER the drafter wrote
+-- inside any clause's body is checked like any other. (A one-clause group's
+-- warnings are only withdrawn once the matrix has answered; see
+-- 'settleOneClause'.)
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
-  rbranches <- traverse (checkBranch ec re te t) branches
+  let generated = view annPmSynthetic ann
+      patternEc = case generated of
+        Just (PmConsider g col declared) -> ExpectClauseInputContext g.groupHead col declared
+        _ -> ExpectPatternScrutineeContext re
+      -- A group of two clauses or more: the generated CONSIDERs are partial
+      -- by construction, so their missing branches are not missing clauses.
+      -- A one-clause group's are, and are reported here; 'settleOneClause'
+      -- withdraws them when 'checkClauseMatrix' reaches its own verdict.
+      leftToClauseMatrix = case generated of
+        Just (PmConsider g _ _) -> g.clauseCount >= 2
+        _ -> False
+  rbranches <- traverse (checkBranch ec patternEc te t) branches
   ei <- asks (.entityInfo)
   let cl = constructorsInScopeFromEntityInfo ei
   (scrutVar, pt) <- desugarBranches re rbranches
@@ -3131,7 +3320,7 @@ checkConsider ec ann e branches t = do
   -- the (lazy) analysis above is never forced when we bail out anyway.
   -- Inside an @nonexhaustive-decorated definition only the MISSING-branch warning
   -- is silenced; redundancy is a bug regardless of intended partiality.
-  unless (hasOpaquePatterns || isPrimitiveScrutinee || inNonexhaustive || null missing) do
+  unless (hasOpaquePatterns || isPrimitiveScrutinee || inNonexhaustive || leftToClauseMatrix || null missing) do
     addWarning $ PatternMatchesMissing missing
   unless (hasOpaquePatterns || isPrimitiveScrutinee || null redundant) do
     addWarning $ PatternMatchRedundant redundant
@@ -4365,9 +4554,11 @@ findOptionallyNamedType n (ont : onts) = do
     (i, rn, t, onts') <- findOptionallyNamedType n onts
     pure (i, rn, t, ont : onts')
 
-checkBranch :: ExpectationContext -> Expr Resolved -> Type' Resolved -> Type' Resolved -> Branch Name -> Check (Branch Resolved)
-checkBranch ec scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
-  (rpat', extends) <- checkPattern (ExpectPatternScrutineeContext scrutinee) pat tscrutinee
+-- | The second 'ExpectationContext' is the one a WHEN pattern is checked in
+-- against the scrutinee's type (see 'checkConsider').
+checkBranch :: ExpectationContext -> ExpectationContext -> Type' Resolved -> Type' Resolved -> Branch Name -> Check (Branch Resolved)
+checkBranch ec patternEc tscrutinee tresult (MkBranch ann' (When ann pat) e)  = do
+  (rpat', extends) <- checkPattern patternEc pat tscrutinee
   (rpat, re) <- extendKnownMany extends do
     re' <- checkExpr ec e tresult
     (,)
@@ -4375,7 +4566,7 @@ checkBranch ec scrutinee tscrutinee tresult (MkBranch ann' (When ann pat) e)  = 
       <$> (traverse resolvedType =<< nlgPattern rpat')
       <*> nlgExpr re'
   pure $ MkBranch ann' (When ann rpat) re
-checkBranch ec _scrutinee _tscrutinee tresult (MkBranch ann' (Otherwise ann) e) = do
+checkBranch ec _patternEc _tscrutinee tresult (MkBranch ann' (Otherwise ann) e) = do
   re <- checkExpr ec e tresult
   MkBranch ann' (Otherwise ann)
     -- We have to resolve NLG annotations now because
@@ -6141,7 +6332,7 @@ scanFunSigLocalDecl = \ case
 
 scanFunSigDecide :: Decide Name -> Check FunTypeSig
 scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
-  errorContext (WhileCheckingDecide (getName appForm)) do
+  decideErrorContext d do
     (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig
     -- Determine if this DECIDE is a synthetic computed field function
     cfMap <- asks (.computedFields)
@@ -7201,12 +7392,29 @@ prettyCheckWarning = \ case
     <>
     map (("  " <>) . prettyMissingBranchLhs) b
     <> [ "" ]
-  PatternClausesMissing _ headName rows ->
-    [ "This multi-clause definition does not cover all cases. The following clauses are still needed:"
+  PatternClausesMissing _ headName clauseCount rows ->
+    [ (if clauseCount == 1 then "This clause does not cover all cases." else "This multi-clause definition does not cover all cases.")
+        <> " The following clauses are still needed:"
     , "" ]
     <>
     map (("  " <>) . prettyMissingClauseLhs headName) rows
     <> [ "" ]
+  PatternClauseUnreachable _ headName (AfterClauseMatchingAnything 0) ->
+    [ "This clause of " <> quotedName headName <> " is never used."
+    , "The clause above it matches every input, so " <> quotedName headName <> " never gets this far."
+    , "Move this clause above that one, or remove it."
+    ]
+  PatternClauseUnreachable _ headName (AfterClauseMatchingAnything k) ->
+    [ "This clause of " <> quotedName headName <> " is never used, and neither "
+        <> (if k == 1 then "is the clause" else "are the " <> Text.textShow k <> " clauses") <> " after it."
+    , "The clause above it matches every input, so " <> quotedName headName <> " never gets this far."
+    , "Move these clauses above that one, or remove them."
+    ]
+  PatternClauseUnreachable _ headName CoveredByClausesAbove ->
+    [ "This clause of " <> quotedName headName <> " is never used."
+    , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
+    , "Remove it, or change its patterns."
+    ]
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
     , ""
@@ -7437,6 +7645,18 @@ prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
   ]
 prettyTypeMismatch ExpectConsArgument2Context expected given =
   standardTypeMismatch [ "The second input to FOLLOWED BY is expected to be of type" ] expected given
+prettyTypeMismatch (ExpectClauseInputContext h i declared) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
+  [ if declared
+      then "The " <> prettyOrdinal i <> " input of " <> quotedName (MkName emptyAnno h) <> " is declared to be of type"
+      else "From looking at the context, I have inferred that the " <> prettyOrdinal i <> " input of " <> quotedName (MkName emptyAnno h) <> " is of type"
+  , ""
+  , "  " <> e
+  , ""
+  , "but the pattern written for it here is of type"
+  , ""
+  , "  " <> g
+  ]
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."

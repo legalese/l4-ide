@@ -1,0 +1,170 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 15:8-15:26
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause of `shadowed clauses` is never used, and neither is the clause after it.
+    The clause above it matches every input, so `shadowed clauses` never gets this far.
+    Move these clauses above that one, or remove them.
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 15:32-15:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at pattern-matching-clause-type-errors.l4:12:8-16, namely
+
+      STRING
+
+    but is here of type
+
+      NUMBER
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 16:32-16:47
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `no such thing`
+
+    which I have inferred to be of type: 
+
+      STRING
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 22:33-22:39
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at pattern-matching-clause-type-errors.l4:20:8-16, namely
+
+      NUMBER
+
+    but is here of type
+
+      STRING
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 29:24-29:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first input of `wrong pattern` is declared to be of type
+
+      MAYBE OF NUMBER
+
+    but the pattern written for it here is of type
+
+      BOOLEAN
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 33:38-33:42
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the first input of `wrong pattern without given` is of type
+
+      MAYBE OF NUMBER
+
+    but the pattern written for it here is of type
+
+      BOOLEAN
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 42:29-42:36
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the type of this definition must be
+
+      NUMBER
+
+    but is here of type
+
+      STRING
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 48:27-48:31
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the first input of `odd last pattern` is of type
+
+      MAYBE OF NUMBER
+
+    but the pattern written for it here is of type
+
+      BOOLEAN
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 56:27-56:47
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `__pm_fallthrough_0`
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 57:8-57:19
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause of `refs dead` is never used.
+    The clause above it matches every input, so `refs dead` never gets this far.
+    Move this clause above that one, or remove it.
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 62:28-62:48
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `__pm_fallthrough_1`
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: pattern-matching-clause-type-errors.l4
+  Hidden: no
+  Range: 63:8-63:18
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause of `refs mid` is never used.
+    The clause above it matches every input, so `refs mid` never gets this far.
+    Move this clause above that one, or remove it.

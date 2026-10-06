@@ -879,10 +879,11 @@ exhaustiveness oracle inside the desugarer's `__pm_fallthrough_<k>` bindings, me
 unit (`checkClauseMatrix` over the parser-attached `Extension.pmMatrix`) and its
 `PatternClausesMissing` warning reaches L1 through a Decide-level channel (`siClauseMatrixRanges`),
 so an incomplete clause group is now refused like any other partial match. DMN-SAFE's claim no
-longer carries the single-clause-only carve-out. The remaining named gap in this family: a
-_user-written_ `CONSIDER` inside the body of clause 2..n of a group still lives inside a
-fall-through binding and its missing-arm warning is still silenced — a pre-existing collateral
-false negative, recorded with its follow-up in §14.7.
+longer carries the single-clause-only carve-out. The remaining named gap in this family — a
+_user-written_ `CONSIDER` inside the body of clause 2..n of a group, whose missing-arm warning was
+silenced with the fall-through binding around it — was **closed 2026-10-06**, by the change that
+adds this sentence (§14.7, "What changed 2026-10-06"). Such a `CONSIDER` now warns, so L1 refuses it
+through the ordinary `CONSIDER`-level channel.
 
 #### 2.4.5 The prerequisite: as it stands, this cannot ship on this branch
 
@@ -5136,11 +5137,59 @@ deliberately **not** `GHC.Generic`: a Generic instance would splice `Pattern Nam
 annotated node, making polymorphic `gplate @(Decide n)` traversals ambiguous and monomorphic ones
 descend into annotation extras; without it, optics' `GPlateInner` treats the field as a leaf.
 
-The residual named by §2.4.4 remains: a _user-written_ CONSIDER in the body of clause 2..n still
+~~The residual named by §2.4.4 remains: a _user-written_ CONSIDER in the body of clause 2..n still
 sits inside a fall-through Decide and its missing-arm warning stays silenced. Follow-up (out of
 scope of the fix, to keep golden risk contained): split the suppression flag into
 decorator-suppression vs. fallthrough-suppression, and let the fallthrough variant suppress only
-_rangeless_ CONSIDERs — synthetic nodes are `emptyAnno`, user nodes carry ranges.
+_rangeless_ CONSIDERs — synthetic nodes are `emptyAnno`, user nodes carry ranges.~~
+
+**What changed 2026-10-06** (serrynaimo's review of #545, items 2–4; fixed on `unstable` first).
+The residual above is closed, and not by the rangeless test it proposed: the desugarer now _marks_
+what it generates (`Extension.pmSynthetic`: `PmConsider` on each generated `CONSIDER`,
+`PmFallthrough` on each fall-through binding), and every consumer reads the mark. The suppression
+used to test whether the enclosing definition's name began `__pm_fallthrough_`, which silenced the
+user's own `CONSIDER`s in clauses 2..n and also any user definition that happened to be so named.
+Now `checkConsider` withholds the missing-branch warning from a `PmConsider` node only. Four
+further changes, measured on probes in the review's shape, and revised after an adversarial review
+of the first build:
+
+- **Every group goes through the matrix, n = 1 included.** The status paragraph above says n = 1
+  "already warns via the ordinary CONSIDER path"; measured 2026-10-06 that warning had no location
+  (`1:1`) and named a `WHEN` branch the drafter never wrote. A one-clause group now gets
+  `PatternClausesMissing` at its head, worded "This clause does not cover all cases". Where the
+  matrix gives up (a literal pattern, or more than 64 missing clauses), a one-clause group keeps the
+  `CONSIDER` warning it had, now at its head (`settleOneClause`): the first build dropped it, and
+  the review found one-clause groups that checked silently. A group of two clauses or more is
+  silent there, as it was.
+- **Unreachable clauses.** A clause after one whose every pattern matches anything used to be
+  dropped before type checking (`l4 check` passed on an ill-typed one). It is now bound as a dead
+  fall-through (`PmUnreachable`) and checked `speculatively`, against the group's types as the
+  live clauses left them: its errors are reported, and what it would have inferred is discarded,
+  so it cannot make a caller ill-typed. The catch-all clause is checked outside the binding, and
+  the binding is dropped from the tree the checker returns, so evaluation and every exporter see
+  the group as before. Each of those three was a defect in an earlier build: the binding left in
+  made Catala and docassemble refuse a group they had exported; an untyped input became BOOLEAN
+  through a dead `TRUE` clause; a catch-all body naming `__pm_fallthrough_0` reached the dropped
+  binding and failed at run time. The parser records the first such clause in
+  `PmMatrix.catchAll`, and the checker warns `PatternClauseUnreachable` at the first clause after
+  it. The matrix analysis's redundant rows, computed and discarded until now, are reported the same
+  way (a clause after a fresh-name pattern, a repeated clause), when the analysis runs: not when a
+  pattern is a literal. A program whose unreachable clause is ill-typed used to run and now fails
+  `l4 check`; that is the point of checking it.
+- **Clause order, locations and names.** `checkClausesLet` checks the `LET` a group is compiled to
+  in source order (each clause before the binding of the clauses after it) and gives the binding the
+  group's result type, so the first clause settles what the signature left open and a wrong type is
+  reported at the clause that has it, against the declared GIVETH when there is one. It used to be
+  reported at `1:1`, and the first build, which still checked the last clause first, blamed the
+  earlier clauses that agreed. A pattern of the wrong type is reported as one for "the first input
+  of `h`" (declared, or inferred), not against "the expression being matched" `_pm_arg_1` at
+  `<no location>`. A fall-through adds no "while checking the definition of `__pm_fallthrough_0`"
+  context. A group with no `GIVEN` suggests `` `_` ``, not `_pm_arg_2`, for a column its missing
+  clauses leave open.
+- **Run time.** `NonExhaustivePatterns` carries the group when the `CONSIDER` that ran out was a
+  `PmConsider`, and says "No clause of `k` matches these inputs" instead of naming a `CONSIDER`.
+  Hand-written `CONSIDER`s keep the old wording. `l4 batch` and the REPL re-run a _printed_ module,
+  and printing does not carry the marks, so there a group still reports in the `CONSIDER` wording.
 
 The remainder of this section is the original measurement, kept because it documents why the fix
 had to happen before desugaring.
