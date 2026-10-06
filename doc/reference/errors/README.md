@@ -584,9 +584,9 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `label` Suspended IS
 ```
 
-When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
+When the rule has only one clause, the first line reads "This clause does not cover all cases." instead. The check works out the missing clauses only when no pattern in the rule is a number, a piece of text or another fixed value, and gives up when there would be more than 64 of them to list. A rule of several clauses then gets no warning; a rule of one clause gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover.
 
-**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
 
@@ -624,7 +624,7 @@ DECIDE describe Closed IS "stopped"
 
 **What went wrong:** A rule written as a list of clauses tries them from the top, and the first clause that matches is the one that applies. The first clause here matches every status, because its pattern is `status`, the name of the input itself. So `describe Active` is `"some status"`, and the two clauses below it are never reached. The warning appears once, at the first clause that cannot be reached, and says how many more follow it.
 
-The same warning has a second form, "Every input it matches is already matched by a clause above it", for a clause that repeats an earlier one, or that comes after a clause whose pattern is a new name such as `other` (a new name also matches anything).
+The same warning has a second form, "Every input it matches is already matched by a clause above it", for a clause that repeats an earlier one, or that comes after a clause whose pattern is a new name such as `other` (a new name also matches anything). This second form is only given when no pattern in the rule is a number, a piece of text or another fixed value: in a table keyed by amounts or codes, a repeated clause, or one after `other`, draws no warning. The first form does not have that limit.
 
 A clause that is never used is still checked, so a mistake inside it is still reported.
 

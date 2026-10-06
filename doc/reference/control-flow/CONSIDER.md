@@ -112,7 +112,7 @@ describe s MEANS
 
 Adding the missing constructor branch or an OTHERWISE catch-all silences the warning.
 
-**Primitive-type caveat:** the analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE. These types have effectively infinite value sets, so exhaustiveness cannot be decided by enumerating constructors. Matches on such values are never warned about — include an OTHERWISE branch to avoid runtime failures. BOOLEAN (just TRUE/FALSE) is checked normally; the builtin container types MAYBE, EITHER, and LIST are not yet analysed.
+**Primitive-type caveat:** the analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE. These types have effectively infinite value sets, so exhaustiveness cannot be decided by enumerating constructors. Matches on such values are never warned about — include an OTHERWISE branch to avoid runtime failures. BOOLEAN (just TRUE/FALSE) is checked normally, and so are the builtin container types MAYBE, EITHER, and LIST.
 
 The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
 

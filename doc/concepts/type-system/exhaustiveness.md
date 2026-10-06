@@ -88,7 +88,7 @@ GIVETH A STRING
     OTHERWISE "some"    -- no warning either way; supply OTHERWISE yourself
 ```
 
-`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. Other builtin container types (`MAYBE`, `EITHER`, `LIST`) are not yet analysed.
+`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. So are the builtin container types `MAYBE`, `EITHER` and `LIST`: a `CONSIDER` over a `MAYBE` with no `WHEN NOTHING` branch is warned about, and so is one over a `LIST` with no `WHEN EMPTY`.
 
 The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the safety property is silently lost. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
 

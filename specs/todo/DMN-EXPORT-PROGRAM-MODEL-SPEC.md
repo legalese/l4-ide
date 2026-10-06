@@ -5150,26 +5150,34 @@ what it generates (`Extension.pmSynthetic`: `PmConsider` on each generated `CONS
 used to test whether the enclosing definition's name began `__pm_fallthrough_`, which silenced the
 user's own `CONSIDER`s in clauses 2..n and also any user definition that happened to be so named.
 Now `checkConsider` withholds the missing-branch warning from a `PmConsider` node only. Four
-further changes, measured on probes in the review's shape:
+further changes, measured on probes in the review's shape, and revised after an adversarial review
+of the first build:
 
 - **Every group goes through the matrix, n = 1 included.** The status paragraph above says n = 1
   "already warns via the ordinary CONSIDER path"; measured 2026-10-06 that warning had no location
   (`1:1`) and named a `WHEN` branch the drafter never wrote. A one-clause group now gets
-  `PatternClausesMissing` at its head, worded "This clause does not cover all cases".
+  `PatternClausesMissing` at its head, worded "This clause does not cover all cases". Where the
+  matrix gives up (a literal pattern, or more than 64 missing clauses), a one-clause group keeps the
+  `CONSIDER` warning it had, now at its head (`settleOneClause`): the first build dropped it, and
+  the review found one-clause groups that checked silently. A group of two clauses or more is
+  silent there, as it was.
 - **Unreachable clauses.** A clause after one whose every pattern matches anything used to be
   dropped before type checking (`l4 check` passed on an ill-typed one). It is now bound as a dead
-  fall-through (`PmUnreachable`), so it is checked, and fall-through bindings take the group's
-  result type before their bodies are checked (`expectFallthroughResults`), so its body's type is
-  checked too. The checker then drops the dead binding from the tree it returns, so evaluation and
-  every exporter see the group as before; a first build that kept it made Catala and docassemble
-  refuse a group they had exported. The
-  parser records the first such clause in `PmMatrix.catchAll`, and the checker warns
-  `PatternClauseUnreachable` at the first clause after it. The matrix analysis's redundant rows,
-  computed and discarded until now, are reported the same way (a clause after a fresh-name pattern,
-  a repeated clause).
-- **Locations and names.** The same pre-unification puts a wrong body type in clause 2..n at that
-  body; it used to be reported at `1:1`. A pattern of the wrong type is reported as one for "the
-  first input of `h`", not against "the expression being matched" `_pm_arg_1` at
+  fall-through (`PmUnreachable`), so it is checked, then dropped from the tree the checker returns,
+  so evaluation and every exporter see the group as before; a first build that kept it made Catala
+  and docassemble refuse a group they had exported. The parser records the first such clause in
+  `PmMatrix.catchAll`, and the checker warns `PatternClauseUnreachable` at the first clause after
+  it. The matrix analysis's redundant rows, computed and discarded until now, are reported the same
+  way (a clause after a fresh-name pattern, a repeated clause), when the analysis runs: not when a
+  pattern is a literal. A program whose unreachable clause is ill-typed used to run and now fails
+  `l4 check`; that is the point of checking it.
+- **Clause order, locations and names.** `checkClausesLet` checks the `LET` a group is compiled to
+  in source order (each clause before the binding of the clauses after it) and gives the binding the
+  group's result type, so the first clause settles what the signature left open and a wrong type is
+  reported at the clause that has it, against the declared GIVETH when there is one. It used to be
+  reported at `1:1`, and the first build, which still checked the last clause first, blamed the
+  earlier clauses that agreed. A pattern of the wrong type is reported as one for "the first input
+  of `h`" (declared, or inferred), not against "the expression being matched" `_pm_arg_1` at
   `<no location>`. A fall-through adds no "while checking the definition of `__pm_fallthrough_0`"
   context. A group with no `GIVEN` suggests `` `_` ``, not `_pm_arg_2`, for a column its missing
   clauses leave open.
