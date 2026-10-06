@@ -716,7 +716,7 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
   unknown / ghost dead", which was **wrong in two directions at once** and is corrected
   in §26: `dead` had no colour of its own at all (it fell through to the unknown grey),
   and it is not a ghost either — ghost belongs to `eliminable` (§15.1). Four states,
-  four inks: green live / light-grey unknown / **firm slate dead** / ghost eliminable.
+  four inks: green live / light-grey unknown / **dead** (mild red on screen; see §26.1) / ghost eliminable.
 
 ---
 
@@ -1571,11 +1571,14 @@ that is `?` is grey"). With one grey and no break, the two-lamp form had lost it
 say which of those a reader was looking at. The ASCII carrier had honoured the design all
 along (`✓ / ✗ / ?`, §24.3); the SVG had not.
 
-Now: four states, four inks — green `live` / light-grey `inert` / **firm slate `dead`** /
-ghost `eliminable`. Determinacy is what the ink tracks: a settled fact is drawn firmly, an
-open question faintly, a don't-care fainter still. Red is deliberately unused (it belongs to
-the breach lamp, and a false atom is very often the _good_ outcome — an exception that did
-not apply). And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
+Now: four states, four inks — green `live` / light-grey `inert` / **`dead`** / ghost
+`eliminable`. Determinacy is what the ink tracks: a settled fact is drawn firmly, an open
+question faintly, a don't-care fainter still. **On screen `dead` is a mild red** (stroke
+`#a8483e`, wash `#f9e6e3`), ruled by Meng 2026-10-05 after seeing it live; it had been dark
+slate, with red withheld because red belongs to the breach lamp and a false atom is very often
+the _good_ outcome — an exception that did not apply. The mild red keeps that distinction: it
+is paler and browner than `coilRed`, so a false box does not read as a breach. Print
+(`INK_PALETTE`) and dark (`DARK_PALETTE`) are unchanged. And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
 the box, so the break sits where the current actually stopped rather than on some enclosing
 group. `Measured.ownBreak` stops the OR fan double-reporting the same failure.
 
