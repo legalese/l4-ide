@@ -1182,15 +1182,19 @@ matchClauses grp scrutinees = go 0
       -- When every column of @c@ matches unconditionally, @c@ always fires and
       -- 'matchOne' returns its body without referencing the fall-through, so
       -- the binding is dead and the remaining clauses never run. It is bound
-      -- anyway, so that they are still type-checked (the checker gives a dead
-      -- fall-through the group's result type, see
-      -- 'L4.TypeCheck.expectFallthroughResults'), and the checker warns that
-      -- they are unreachable (from 'PmMatrix' @catchAll@). A @LET@ binding is
-      -- not evaluated unless referenced, so this changes no answer.
+      -- anyway, marked 'PmUnreachable', so that they are still type-checked
+      -- (the checker gives it the group's result type, see
+      -- 'L4.TypeCheck.expectFallthroughResults') and then dropped from the
+      -- checked tree, which is therefore the one this function emitted before
+      -- it bound them: evaluation and every exporter see no difference. The
+      -- checker warns that they are unreachable (from 'PmMatrix' @catchAll@).
       let ftName = fallthroughName k
           ftExpr = go (k + 1) cs
           tree   = matchOne grp columns (pmPats c) (pmBody c) (Var emptyAnno ftName)
-      in bindFallthrough grp ftName (clausesSrcAnno cs) ftExpr tree
+          mark
+            | clauseMatchesAnything scrutinees (pmPats c) = PmUnreachable grp
+            | otherwise                                   = PmFallthrough grp
+      in bindFallthrough mark ftName (clausesSrcAnno cs) ftExpr tree
 
 -- | Does every column of this clause match unconditionally? Then the clause
 -- always fires, and no clause after it is ever tried. This must mirror
@@ -1222,11 +1226,11 @@ clausesSrcAnno (c : cs) =
 -- identically to inlining @ftExpr@ at each reference (it is a pure, argument-less
 -- binding), but keeps the emitted AST linear. @ftAnno@ supplies the Decide's
 -- source range (see 'clausesSrcAnno').
-bindFallthrough :: PmGroup -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
-bindFallthrough grp ftName ftAnno ftExpr body =
+bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
+bindFallthrough mark ftName ftAnno ftExpr body =
   LetIn emptyAnno
     [ LocalDecide emptyAnno
-        (MkDecide (setPmSynthetic (PmFallthrough grp) ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
+        (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
     ]
     body
   where

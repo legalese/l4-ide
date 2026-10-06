@@ -1172,6 +1172,7 @@ inferDecide dec@(MkDecide ann _tysig _appForm expr) = do
 decideErrorContext :: Decide Name -> Check a -> Check a
 decideErrorContext (MkDecide ann _ appForm _) = case view annPmSynthetic ann of
   Just (PmFallthrough _) -> id
+  Just (PmUnreachable _) -> id
   _ -> errorContext (WhileCheckingDecide (getName appForm))
 
 -- | Give each fall-through of a multi-clause group the type its enclosing
@@ -1187,8 +1188,8 @@ decideErrorContext (MkDecide ann _ appForm _) = case view annPmSynthetic ann of
 -- clause body that has it.
 --
 -- It also covers the fall-through that is never referenced, because a clause
--- before it matches every input: without this, the result type of those
--- unreachable clauses was never compared with anything.
+-- before it matches every input ('PmUnreachable'): without this, the result
+-- type of those unreachable clauses was never compared with anything.
 --
 -- Each fall-through has no GIVETH, so its result type is a fresh variable here
 -- and the unification cannot fail; it only adds a constraint every reference
@@ -1197,7 +1198,17 @@ expectFallthroughResults :: [FunTypeSig] -> Type' Resolved -> Check ()
 expectFallthroughResults sigs t =
   for_ sigs \ s -> case view annPmSynthetic s.anno of
     Just (PmFallthrough _) -> void (unify s.resultType t)
+    Just (PmUnreachable _) -> void (unify s.resultType t)
     _ -> pure ()
+
+-- | Is this checked local definition the binding of clauses that can never be
+-- tried ('PmUnreachable')? It was bound only to be checked, and is dropped from
+-- the checked tree, so that evaluation and every exporter see the group exactly
+-- as they did before such clauses were checked at all.
+isUnreachableClauses :: LocalDecl Resolved -> Bool
+isUnreachableClauses = \ case
+  LocalDecide _ (MkDecide ann _ _ _) | Just (PmUnreachable _) <- view annPmSynthetic ann -> True
+  _ -> False
 
 -- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
 -- run over the SOURCE clause matrix the parser attached to the fused
@@ -2107,7 +2118,9 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
     extendKnownMany (dedupCheckInfos (concat extends)) do
       re <- checkExpr ec e t
       nlgExpr re
-  setAnnResolvedType t Nothing (LetIn ann rds re)
+  case filter (not . isUnreachableClauses) rds of
+    []   -> pure re
+    rds' -> setAnnResolvedType t Nothing (LetIn ann rds' re)
 -- A BREACH checked against a KNOWN deontic type unifies with it FIRST, so
 -- that its BY expression is read against the rule's party type (see
 -- 'checkBreachParty'): inferring it with a fresh party type and unifying

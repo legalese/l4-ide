@@ -922,6 +922,10 @@ data PmSynthetic
     -- ^ a CONSIDER testing one input of the group (its 1-based position)
   | PmFallthrough PmGroup
     -- ^ the local definition holding the clauses not yet tried
+  | PmUnreachable PmGroup
+    -- ^ the same, after a clause that matches every input, so never used.
+    -- Bound only so that its clauses are type-checked; the checker drops it
+    -- from what it returns, so nothing downstream ever sees it.
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
