@@ -317,6 +317,26 @@ spec = describe "integration" do
           declined <- call "2026/01/31" "2026-02-30"
           declined `shouldCarry` Refuses "Parameter 'd two': could not read \"2026-02-30\" as a DATE"
 
+      -- On batch a null takes the wrapper, which refuses "garbage" as a DATE.
+      -- The direct path would answer it as text, so a dropped case shows the
+      -- wrapper ran.
+      it "drops a batch case the wrapper declines, and counts it" do
+        withServiceFromSources "decline-batch" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
+          req <- buildJsonPost (baseUrl <> "/deployments/decline-batch/functions/date%20first/evaluation/batch")
+            (Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "end date" Aeson..= ("garbage" :: Text), "pad" Aeson..= Aeson.Null]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "end date" Aeson..= ("2026-01-31" :: Text), "pad" Aeson..= Aeson.Null]
+                  ]
+              ])
+          resp <- httpLbs req mgr
+          statusCode' resp `shouldBe` 200
+          wireAt resp ["summary", "casesIgnored"] `shouldBe` Right (Aeson.Number 1)
+          wireAt resp ["cases"] `shouldSatisfy` \case
+            Right (Aeson.Array cs) -> [ Aeson.KeyMap.lookup "value" c | Aeson.Object c <- toList cs ] == [Just (Aeson.String "2026-01-31")]
+            _ -> False
+
       it "names a missing ASSUME as the direct path does" do
         withServiceFromSources "decline-assume" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
           let call rate = evalFunction baseUrl mgr "decline-assume" "plus%20rate" $

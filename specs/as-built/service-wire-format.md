@@ -16,12 +16,14 @@ This change keeps main's request handling and carries #562's handling of the wra
 - When the wrapper cannot call the function, the request is refused with a message that names the input: a required input that is absent gets the direct path's message (`Parameter 'n': missing required parameter`, or `ASSUME 'n': …`), and a required `DATE`, `TIME` or `DATETIME` string that does not parse is quoted (`Parameter 'end date': could not read "garbage" as a DATE`).
   Before, main answered such a request 200 with the string `"NOTHING"`, as if the rule had.
 - Deploying a bundle whose sources equal an existing deployment's, under a different id, now creates that deployment; before, the service answered "ready" naming the other deployment and created nothing.
+  An upload with no id gets a fresh UUID, so it is never matched either: each one creates a new deployment, where main answered "ready" with the existing one whose sources matched.
 
 ## Where it lives
 
-- `jl4-service/src/Backend/Jl4.hs`, with this change: `valueToFnLiteral` (`:1085`) recognises `NOTHING` (`:1149`) and `JUST` (`:1162`) by unique, and uses `constructorText` for nullary and applied constructors (`:1152`, `:1165`); `constructorText = rawNameToText . rawName . getActual` (`:1195-1196`).
+- `jl4-service/src/Backend/Jl4.hs`, with this change: `valueToFnLiteral` (`:1086`) recognises `NOTHING` (`:1150`) and `JUST` (`:1163`) by unique, and uses `constructorText` for nullary and applied constructors (`:1153`, `:1166`); `constructorText = rawNameToText . rawName . getActual` (`:1196-1197`).
 - `jl4-service/src/Backend/Jl4.hs`, with this change: `handleEvalResult` (`:862`) opens the wrapper's envelope by unique (`openEnvelope`, `:879`) and hands the answer to `handleEvalResultDirect` (`:689`); `wrapperDeclined` (`:894`) builds the refusal.
 - `jl4-service/src/Backend/CodeGen.hs`, with this change: `GeneratedCode` carries `answerShape` (`AnswerShape`, `:96`) and `requiredInputs` (`RequiredInput`, `:105`), computed by `isRequiredInput` and `requiredInputsOf` (`:116`, `:120`); they replace `decodeFailedSentinel`, which nothing read.
+- `jl4-core/src/L4/EvaluateLazy/Machine.hs:25-29`, with this change: exports `parseDateText`, `parseTimeText` and `parseDatetimeText`, the parsers of `TODATE`, `TOTIME` and `TODATETIME`, for `wrapperDeclined` (from #570, `a982e3060`, on unstable).
 - `jl4-service/src/ControlPlane.hs:175`, with this change: `postDeploymentHandler`'s shortcut for already-deployed sources also requires `did == deployId`.
 
 ## Behaviour and rules
@@ -33,24 +35,34 @@ This change keeps main's request handling and carries #562's handling of the wra
 - The wrapper answers `JUST answer`, or `NOTHING` without calling the function when a required input (one that is neither a `BOOLEAN` nor a `MAYBE`) is absent or is a temporal string its `TODATE`, `TOTIME` or `TODATETIME` rejects.
   A function with no inputs gets a bare `#EVAL` with no envelope (`Bare`).
 - Absent means left out, `null` or `{}`. When an input is absent, the first absent required input in the wrapper's unwrapping order (rule `GIVEN`s, then `ASSUME`s) is named, even if the wrapper stopped earlier at a string it could not parse.
+- Otherwise the required temporal string the wrapper's own parser rejects is quoted; when several are rejected, the message names them all, without quoting.
+  The check uses the parsers `TODATE`, `TOTIME` and `TODATETIME` use, so a string the wrapper read is never blamed: with `"2026/01/31"` and `"2026-02-30"`, the second is named.
+  #562 checked with the service's own ISO parsers (`parseIsoDate` and its siblings), which accept `2026-02-30` and reject `2026/01/31`; #570 (`a982e3060`) fixed that on unstable, and this change carries it.
 - A value of the wrong JSON type is not a decline: JSONDECODE stops with its own error (`Expected JSON number but got: String "abc"`), as on main.
+  JSONDECODE answers `LEFT`, which the wrapper also turns into `NOTHING`, only when the JSON text does not parse (`decodeJsonToValueTyped`, `jl4-core/src/L4/EvaluateLazy/Machine.hs:1365-1369`); the service writes that text itself.
+- A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`. Main answered `"NOTHING"` and `{"JUST": ["NOTHING"]}`.
 - The dedup shortcut is keyed on content hash AND requested id.
+  Unstable at 9c56c0ead has the same condition (`jl4-service/src/ControlPlane.hs:178 @ 9c56c0ead`) and also gives an id-less upload a fresh UUID, so it behaves the same; its README line on duplicate detection still describes the content-only match.
 
 ## Tests and fixtures that pin it
 
-- `jl4-service/test/IntegrationSpec.hs`, "answers on the direct and wrapper paths (smucclaw/l4-ide#1003)": `wireCases`, 34 requests against `wireProbeJL4` (`TestData.hs`), each answer shape on both paths; `trace=full` and batch on the wrapper path.
-- The same block, "when the wrapper cannot call the function": an unreadable and a missing `DATE`, a missing `ASSUME` on both paths (`declineLabelsJL4`), and a missing input of a deontic rule (`deonticRecordPartyJL4`).
-- `jl4-service/test/CodeGenSpec.hs`: a function with no inputs gets `Bare`, ordinary and deontic.
-- With `Jl4.hs`, `CodeGen.hs` and `CodeGenSpec.hs` reverted to the encoding-only change, 14 of these fail; reverted to main's, 17 fail.
+- `jl4-service/test/IntegrationSpec.hs`, "answers on the direct and wrapper paths (smucclaw/l4-ide#1003)": `wireCases`, 35 requests against `wireProbeJL4` (`TestData.hs`), each answer shape on both paths; `trace=full` and batch on the wrapper path.
+- The same block, "when the wrapper cannot call the function": an unreadable and a missing `DATE`; two `DATE`s where only the second is unreadable to `TODATE` (`twoDatesJL4`, from #570); a batch case the wrapper declines, dropped and counted, which the direct path would have answered; a missing `ASSUME` on both paths (`declineLabelsJL4`); and a missing input of a deontic rule (`deonticRecordPartyJL4`).
+- `jl4-service/test/CodeGenSpec.hs`: a function with no inputs gets `Bare`, ordinary and deontic; `requiredInputs` leaves out `BOOLEAN` and `MAYBE` inputs, lists `GIVEN`s before `ASSUME`s, and marks a `DATE`.
+- With `Jl4.hs`, `CodeGen.hs` and `CodeGenSpec.hs` as they are with the encoding change alone, 15 of these fail; as on main, 19 fail; with `Jl4.hs` checking dates with the service's ISO parsers instead of `TODATE`'s, only the two-`DATE` test fails.
 - No test pins the dedup change.
 - The jl4-mlir differential harness compares the WASM backend's results with these encodings; jl4-mlir's commit `598f60d28` (inside #190, on unstable) moved the WASM runtime to them.
   On main jl4-mlir still emits the old encodings, so with this change `jl4-mlir/scripts/parity-harness.mjs` reports those cells as differences.
 
 ## Limits on main with this change
 
-Measured 2026-10-07 against jl4-service built from main 838c92ed4, and unchanged by this change, which touches only the answer side:
+Measured 2026-10-07 against jl4-service built from main 838c92ed4, run with `XDG_DATA_HOME` pointed at an empty directory (on a machine whose `~/.local/share/jl4/libraries` holds a newer prelude, the wrapper's `IMPORT prelude` resolves to it instead and fails to parse it). None of these is changed by this change, which touches only the answer side:
 
-- On the wrapper path, a function with a `BOOLEAN` input fails with a type error (`fromMaybe` is not in scope in the generated wrapper), and so does one with a required `TIME` or `DATETIME` input (`TOTIME` and `TODATETIME` are applied to an already-typed value).
+- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`'s `range`), so every function in a module that uses one fails with "I could not find a definition"; a function with a `BOOLEAN` input fails the same way, on the `fromMaybe` the generated wrapper uses to read it.
+- On the wrapper path, a required `LIST OF NUMBER` input fails with a type error (the wrapper reads it as `LIST OF MAYBE OF NUMBER`), and so does a required `TIME` or `DATETIME` input (`TOTIME` and `TODATETIME` are applied to an already-typed value).
   So the `TIME` and `DATETIME` refusals above are not reached on main; the `DATE` one is.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails with a parser error in the generated input record (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+- On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text (`date first` with `"garbage"` answers `"garbage"`).
+- A list answer of more than 200 elements comes back as its first 200 elements followed by two `null`s (measured with 201, on the direct path, identically on main).
+- The published `returnSchema` gives a record's fields at the top level, without the constructor key the answer has, and a `MAYBE` as its inner type, without `null`.
 - On unstable, jl4-service-test answers such requests on the wrapper path ("MAYBE inputs on the wrapper path" in `jl4-service/test/IntegrationSpec.hs @ 9c56c0ead`); the fixes are in unstable's request handling, which this change does not carry.

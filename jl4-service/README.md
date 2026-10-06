@@ -116,7 +116,7 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 - Deployment IDs: max 36 characters, `[a-zA-Z0-9_-]` only, no `..` sequences
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
-- Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned instead of recompiling
+- Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned instead of recompiling. An upload without an `id` always creates a new deployment
 
 ### Data Plane
 
@@ -169,6 +169,9 @@ A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
 A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
+
+The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null`.
 
 #### Missing inputs
 
@@ -177,13 +180,17 @@ Most requests are evaluated directly, and a missing input that is not a `MAYBE` 
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
-A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`.
+A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
 A batch leaves such a case out of `cases` and counts it in `summary.casesIgnored`.
 
-Limits of the wrapper path, measured 2026-10-07:
+Limits, measured 2026-10-07:
 
-- A function with a `BOOLEAN` input, or a required `TIME` or `DATETIME` input, fails the request with a type error.
-- A function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
+  A function with a `BOOLEAN` input fails the same way, because the wrapper reads it with `prelude`'s `fromMaybe`.
+- On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
+- On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+- On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
+- A list answer of more than 200 elements comes back as its first 200 elements followed by two `null`s, with status 200 (measured on the direct path, with 201).
 
 #### Trace Output
 
