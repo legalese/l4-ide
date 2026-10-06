@@ -369,9 +369,18 @@ if $JL4_AVAILABLE && ! $SKIP_L4; then
         set -e  # Re-enable
         
         if [[ $run_exit_code -eq 0 ]]; then
-            # Check if there are actual errors (not just #EVAL output containing "error" text)
-            # Real errors have "Severity: DiagnosticSeverity_Error" while #EVAL output has "Information"
-            if echo "$output" | grep -qi "DiagnosticSeverity_Error"; then
+            # `l4 run` exits 0 even when an #ASSERT fails, so read the diagnostics.
+            # Real errors, a failed or unevaluable #ASSERT among them, have
+            # "Severity: DiagnosticSeverity_Error"; #EVAL output has "Information"
+            # and may itself contain the word "error".
+            # A refused #ASSERT is only a Warning (a refusal is a designed outcome,
+            # so the editor does not squiggle it red), and matching on severity
+            # alone passed it as [OK]: an example whose assertion the rules
+            # decline to answer has not shown what its page says it shows. So
+            # match its message too. A refusing #EVAL, and a satisfied
+            # `#ASSERT REFUSED ... BECAUSE`, print other text and still pass.
+            if echo "$output" | grep -qi "DiagnosticSeverity_Error" \
+                || echo "$output" | grep -qE '^[[:space:]]*assertion refused:'; then
                 log_error "Validation failed: $relative_path"
                 echo "$output" | head -20 | sed 's/^/       /'
                 ((L4_ERRORS+=1))
