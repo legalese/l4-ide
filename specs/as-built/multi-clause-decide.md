@@ -103,10 +103,19 @@ The suppression also silences a user-written `CONSIDER` in the body of clauses 2
 It is narrower than #183's in one way: it stops at the innermost enclosing definition, so a WHERE or LET helper inside a fall-through still warns.
 Redundancy warnings are unaffected; an incomplete group of two or more clauses draws no compile-time warning until #185 (a one-clause group still warns through the ordinary path), and a value no clause matches still fails at run time.
 
+## In this PR: exact-print of a clause group (from #130)
+
+The multi-clause part of #130 is carried here; the rest of #130 (`TIMEZONE IS`, `UNLESS`, non-ASCII string literals) is not.
+`decidePatternMatch` captures the group's raw tokens with `match`, and `desugarPatternClauses` stores them as one visible node built by `rawTokensAnno`, with a hole for the signature and none for the head or the fused body.
+`rawTokensAnno` keeps the whitespace, comments and annotations after the last clause as trailing tokens, so they print but stay outside the group's range, which stops at the last clause (an ordinary single-clause definition's range does run over a following `@desc` or `@export`, measured with `jl4-lsp`); #130's version keeps them visible (read in code); with that version on this branch, a group on lines 3-7 had the range 3-12, up to the next definition's first token, and hovering on the next rule's comment or `@export` in an editor showed the group's type (measured with `jl4-lsp`).
+Exact-print, and so `l4 format`, reproduces the clauses as written, comments included; before this, it printed only the signature and the head name.
+The three `ok/pattern-matching*.ep.golden` files now equal their sources byte for byte, as they do on unstable, and `jl4/tests-cli` has a case (`l4 format` "reproduces multi-clause DECIDE and MEANS groups byte-for-byte", fixture `tests-cli/fixtures/multi-clause-format.l4`).
+`PatternMatchParserSpec` checks that a group followed by comments and `@export` keeps its range to its own lines and that the file exact-prints unchanged.
+Semantic tokens walk the same annotation (the generic `Decide` instance, `jl4-lsp/src/LSP/L4/SemanticTokens.hs:212`), so each token of a group is coloured by its token kind alone (`standardTokenType`, `:30-42`): an identifier as a variable, a keyword as a keyword (read in code, not measured in an editor).
+
 ## Later changes
 
 - #92 (`TYPICALLY`): `givenTermNames` reads the four-field `MkOptionallyTypedName` (`:1078`).
-- #130: the group's raw tokens are captured with `match` (`:988-993`) and stored as one visible node by `rawTokensAnno`, with no holes into the fused body, so exact-print and `l4 format` reproduce the multi-clause source.
 - #183: the checker does not warn inside `__pm_fallthrough_` locals, which are partial by construction (`jl4-core/src/L4/TypeCheck.hs:1139-1170`).
 - #185: `desugarPatternClauses` attaches the source clause matrix (`setPmMatrix`), and `checkClauseMatrix` warns on incomplete groups of two or more clauses: "This multi-clause definition does not cover all cases. The following clauses are still needed: …".
   Groups with a literal or expression pattern are not analysed (`TypeCheck.hs:1211`).

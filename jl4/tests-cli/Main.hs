@@ -265,6 +265,16 @@ spec bin = do
       Output code _ _ <- runL4 bin ["format", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
 
+    it "reproduces multi-clause DECIDE and MEANS groups byte-for-byte" $ do
+      -- The parser fuses a clause group into one definition; formatting must
+      -- still print every clause as written. Carriage returns are dropped on
+      -- both sides so a CRLF checkout on Windows compares equal.
+      let fixture = fixtureDir </> "multi-clause-format.l4"
+      src <- readFile fixture
+      Output code sout _ <- runL4 bin ["format", fixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do
       Output code sout _ <- runL4 bin ["ast", cleanFixture]

@@ -167,18 +167,6 @@ A clause that matches anything ends the group for checking.
 In `DECIDE f n IS 7` followed by `DECIDE f 0 IS "oops" PLUS TRUE`, the second clause is never type-checked: `l4 check` succeeds, and `f 0` gives `7`.
 Put the catch-all clause last.
 
-**`l4 format` drops the clauses.**
-For a file holding only the factorial above, `l4 format` prints:
-
-```
-GIVEN n IS A NUMBER
-GIVETH A NUMBER
-factorial
-```
-
-The clauses are gone, and a single clause such as `DECIDE f 0 IS 1` is cut down to `f` the same way.
-Do not run `l4 format` on a file that uses multi-clause `DECIDE`.
-
 ## Related Keywords
 
 - **[DECIDE](DECIDE.md)** - Defines a named value or function

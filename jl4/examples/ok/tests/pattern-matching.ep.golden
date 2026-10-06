@@ -11,18 +11,28 @@ IMPORT prelude
 -- Literal patterns + a trailing variable (catch-all) clause.
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
-factorial #EVAL factorial 0    -- 1
+DECIDE factorial 0 IS 1
+DECIDE factorial n IS n * factorial (n - 1)
+
+#EVAL factorial 0    -- 1
 #EVAL factorial 5    -- 120
 
 -- Fibonacci: two literal clauses then a recursive catch-all.
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
-fib #EVAL fib 10   -- 55
+DECIDE fib 0 IS 0
+DECIDE fib 1 IS 1
+DECIDE fib n IS fib (n - 1) + fib (n - 2)
+
+#EVAL fib 10   -- 55
 
 -- Constructor patterns over an algebraic data type (lists).
 GIVEN list IS A LIST OF NUMBER
 GIVETH A NUMBER
-`list length` #EVAL `list length` EMPTY               -- 0
+DECIDE `list length` EMPTY IS 0
+DECIDE `list length` (x FOLLOWED BY xs) IS 1 + `list length` xs
+
+#EVAL `list length` EMPTY               -- 0
 #EVAL `list length` (LIST 10, 20, 30)   -- 3
 
 -- MAYBE matching. In the JUST clause the fallback is unused; per the spec we
@@ -32,7 +42,10 @@ GIVETH A NUMBER
 GIVEN fallback IS A NUMBER
       opt IS A MAYBE NUMBER
 GIVETH A NUMBER
-`from maybe` #EVAL `from maybe` 99 NOTHING     -- 99
+DECIDE `from maybe` fallback NOTHING  IS fallback
+DECIDE `from maybe` fallback (JUST v) IS v
+
+#EVAL `from maybe` 99 NOTHING     -- 99
 #EVAL `from maybe` 99 (JUST 42)   -- 42
 
 -- Decision table: multiple columns mixing constructor, literal and variable
@@ -40,7 +53,12 @@ GIVETH A NUMBER
 GIVEN is_public_holiday IS A BOOLEAN
       day_of_week IS A STRING
 GIVETH A NUMBER
-`parking cost` #EVAL `parking cost` TRUE  "Monday"    -- 0
+DECIDE `parking cost` TRUE  day_of_week IS 0
+DECIDE `parking cost` FALSE "Saturday"  IS 5
+DECIDE `parking cost` FALSE "Sunday"    IS 5
+DECIDE `parking cost` FALSE day_of_week IS 10
+
+#EVAL `parking cost` TRUE  "Monday"    -- 0
 #EVAL `parking cost` FALSE "Saturday"  -- 5
 #EVAL `parking cost` FALSE "Sunday"    -- 5
 #EVAL `parking cost` FALSE "Monday"    -- 10
@@ -48,6 +66,10 @@ GIVETH A NUMBER
 -- Nested constructor patterns (parenthesised applied constructors).
 GIVEN mmn IS A MAYBE (MAYBE NUMBER)
 GIVETH A NUMBER
-`deep unwrap` #EVAL `deep unwrap` NOTHING              -- 0
+DECIDE `deep unwrap` NOTHING        IS 0
+DECIDE `deep unwrap` (JUST NOTHING) IS 0
+DECIDE `deep unwrap` (JUST (JUST k)) IS k
+
+#EVAL `deep unwrap` NOTHING              -- 0
 #EVAL `deep unwrap` (JUST NOTHING)       -- 0
 #EVAL `deep unwrap` (JUST (JUST 7))      -- 7

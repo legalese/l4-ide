@@ -750,10 +750,18 @@ pmBody (PMClause _ _ _ b) = b
 decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
 decidePatternMatch sig = do
   clauseCol <- Lexer.indentLevel
-  firstClause <- pmClause clauseCol
-  let firstHead  = pmHead firstClause
-      firstArity = length (pmPats firstClause)
-  rest <- many (try (withIndent EQ clauseCol (\ _ -> sameHeadClause clauseCol firstHead firstArity)))
+  -- Capture the raw token span of the whole clause group. The clauses are
+  -- fused into a single CONSIDER tree below (whose synthetic nodes carry no
+  -- source tokens), so exactprint cannot reproduce the multi-clause source
+  -- structurally. Instead we store these verbatim tokens as one visible CSN on
+  -- the resulting Decide's annotation, and drop the hole for the fused body, so
+  -- @l4 format@ round-trips the source (see 'desugarPatternClauses').
+  (rawToks, (firstClause, rest)) <- match $ do
+    firstClause <- pmClause clauseCol
+    let firstHead  = pmHead firstClause
+        firstArity = length (pmPats firstClause)
+    rest <- many (try (withIndent EQ clauseCol (\ _ -> sameHeadClause clauseCol firstHead firstArity)))
+    pure (firstClause, rest)
   let clauses = firstClause : rest
   -- Treat this as pattern matching when either:
   --
@@ -774,7 +782,7 @@ decidePatternMatch sig = do
   -- here already shares the one signature threaded in as @sig@. A lone bare-name
   -- clause still falls through to the ordinary 'decide' path.
   guard (any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses)
-  pure (desugarPatternClauses sig firstClause rest)
+  pure (desugarPatternClauses sig rawToks firstClause rest)
   where
     sameHeadClause clauseCol h ar = do
       c <- pmClause clauseCol
@@ -848,8 +856,8 @@ givenTermNames (MkTypeSig _ (MkGivenSig _ otns) _) =
 -- first match wins (Haskell semantics). If no clause matches at runtime, the
 -- generated CONSIDER falls through with no OTHERWISE, which the evaluator turns
 -- into a 'NonExhaustivePatterns' error (Haskell's non-exhaustive-match error).
-desugarPatternClauses :: TypeSig Name -> PMClause -> [PMClause] -> Decide Name
-desugarPatternClauses sig firstC restCs =
+desugarPatternClauses :: TypeSig Name -> [PosToken] -> PMClause -> [PMClause] -> Decide Name
+desugarPatternClauses sig rawToks firstC restCs =
   MkDecide decideAnno sig theAppForm body
   where
     clauses  = firstC : restCs
@@ -866,8 +874,38 @@ desugarPatternClauses sig firstC restCs =
                       | i <- [1 .. arity] ]
           in (MkAppForm appFormAnno headName synth mAka, synth)
     body = matchClauses scrutinees clauses
+    -- The signature is exact-printed structurally (via its hole); the whole
+    -- clause group is reproduced verbatim from the captured raw tokens as a
+    -- single visible CSN. We deliberately emit NO holes for 'theAppForm' or the
+    -- fused 'body', so exactprint never descends into the synthetic CONSIDER
+    -- tree (whose nodes carry no source tokens) — it would otherwise emit
+    -- nothing and drop the clause bodies. The resulting annotation still spans
+    -- the sig + all clauses, giving the Decide a real, distinct SrcRange for the
+    -- type checker's per-function 'FunTypeSig' keying.
     decideAnno =
-      fixAnnoSrcRange (mkHoleAnnoFor sig <> mkHoleAnnoFor theAppForm <> mkHoleAnnoFor body)
+      fixAnnoSrcRange (mkHoleAnnoFor sig <> rawTokensAnno rawToks)
+
+-- | Build an annotation whose single visible concrete-syntax node holds the
+-- given tokens verbatim (no holes). Used to make a fused pattern-matching
+-- 'Decide' exact-print back to its original multi-clause source.
+--
+-- The last clause's final lexeme also consumed the whitespace, comments and
+-- annotations after the group (up to the next definition's first token).
+-- They are kept as trailing tokens (a hidden node): exactprint still
+-- reproduces them, but they are outside the node's range, so the group's
+-- range stops at its last clause and does not run over the next
+-- definition's comments, @\@desc@ or @\@export@.
+rawTokensAnno :: [PosToken] -> Anno
+rawTokensAnno toks =
+  mkSimpleEpaAnno Epa
+    { original       = reverse revBody
+    , trailingTokens = reverse revTrailing
+    , payload        = ()
+    , hiddenClusters = []
+    }
+  where
+    (revTrailing, revBody) = span isTrailingTrivia (reverse toks)
+    isTrailingTrivia t = isSpaceToken t || isAnnotationToken t
 
 -- | Build a decision list from the clauses. The last clause is compiled without
 -- an OTHERWISE fallthrough so that a non-match becomes a runtime

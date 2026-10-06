@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | Unit tests for Phase 1 pattern matching in function definitions: multiple
 -- DECIDE/MEANS clauses sharing a head name are grouped into a single 'MkDecide'
@@ -10,7 +11,10 @@ module PatternMatchParserSpec (spec) where
 import Base
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
+import L4.Annotation (HasSrcRange (..))
+import L4.ExactPrint (exactprint)
 import L4.Parser (execProgramParser)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
 import Test.Hspec
 
@@ -75,9 +79,42 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
     decides <- parseDecides src
     map decideHeadText decides `shouldBe` ["inc", "dec"]
 
+  it "keeps a clause group's range to its own lines, and exact-prints the whole file" $ do
+    -- The last clause's final lexeme also consumes the blank lines, comments
+    -- and @export that follow; they must print, but stay out of the range.
+    let src = T.unlines
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+          , ""
+          , "GIVEN c IS A Colour"
+          , "GIVETH A NUMBER"
+          , "DECIDE price Red   IS 1"
+          , "DECIDE price Green IS 2"
+          , "DECIDE price Blue  IS 3"
+          , ""
+          , "-- This comment documents helper, below."
+          , ""
+          , "@export"
+          , "GIVEN x IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE helper x IS x TIMES 10"
+          ]
+    m <- parseModule src
+    let ranges = [ (r.start.line, r.end.line) | Decide _ d <- topDecls m, Just r <- [rangeOf d] ]
+    ranges `shouldBe` [(3, 7), (12, 14)]
+    either (Left . show) Right (exactprint m) `shouldBe` Right src
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
+
+parseModule :: T.Text -> IO (Module Name)
+parseModule src =
+  case execProgramParser (toNormalizedUri (Uri "file:///pattern-match-spec")) src of
+    Left errs -> fail ("Parser failed with: " <> show (NE.toList errs))
+    Right (m, _warnings) -> pure m
+
+topDecls :: Module Name -> [TopDecl Name]
+topDecls (MkModule _ _ (MkSection _ _ _ decls)) = decls
 
 parseDecides :: T.Text -> IO [Decide Name]
 parseDecides src =

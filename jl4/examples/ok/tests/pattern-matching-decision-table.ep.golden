@@ -18,7 +18,16 @@ GIVEN a IS A NUMBER
       d IS A NUMBER
       e IS A NUMBER
 GIVETH A NUMBER
-tariff #EVAL tariff 0 1 2 3 4   -- 10 (first match wins, not 999)
+DECIDE tariff 0 1 2 3 4 IS 10
+DECIDE tariff 1 2 3 4 5 IS 20
+DECIDE tariff 2 3 4 5 6 IS 30
+DECIDE tariff 3 4 5 6 7 IS 40
+DECIDE tariff 4 5 6 7 8 IS 50
+DECIDE tariff 5 6 7 8 9 IS 60
+DECIDE tariff 0 1 2 3 4 IS 999   -- shadowed by the first clause (first match wins)
+DECIDE tariff a b c d e IS 0     -- catch-all
+
+#EVAL tariff 0 1 2 3 4   -- 10 (first match wins, not 999)
 #EVAL tariff 3 4 5 6 7   -- 40
 #EVAL tariff 5 6 7 8 9   -- 60
 #EVAL tariff 9 9 9 9 9   -- 0 (catch-all)
