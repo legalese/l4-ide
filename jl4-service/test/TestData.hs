@@ -17,6 +17,8 @@ module TestData (
   assumeParamJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
+  wireProbeJL4,
+  declineLabelsJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -344,4 +346,129 @@ GIVETH A PROVISION OF Driver, `Driver Action`
                 MAY `drive`
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | One function per shape of answer. Every one but @pass@ has a spare MAYBE
+-- input, pad, that the rule never reads: sending pad as 1 keeps a request on
+-- the direct path, and sending it as {} sends the request through the
+-- generated wrapper, which answers @JUST (f args)@. A superset of the repro in
+-- smucclaw/l4-ide#1003, covering the 28 requests measured for it, and two
+-- constructors a rule may call Nothing and Just.
+wireProbeJL4 :: Text
+wireProbeJL4 =
+  [i|
+DECLARE Outcome IS ONE OF `fully covered`, `not covered`
+
+DECLARE Pair HAS
+  left  IS A NUMBER
+  right IS A NUMBER
+
+DECLARE Solo HAS
+  only IS A NUMBER
+
+DECLARE Penalty IS ONE OF Nothing, Fine
+
+DECLARE Verdict IS ONE OF
+  Just HAS reason IS A STRING
+  Unjust
+
+@export cap at ten
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A MAYBE NUMBER
+DECIDE `cap` IS IF n > 10 THEN JUST n ELSE NOTHING
+
+@export pass through
+GIVEN x IS A MAYBE NUMBER
+GIVETH A MAYBE NUMBER
+DECIDE `pass` IS x
+
+@export one element list
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+DECIDE `single` IS LIST n
+
+@export two element list
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+DECIDE `double list` IS LIST n, n
+
+@export empty list
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+DECIDE `none` IS EMPTY
+
+@export maybe a one element list
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A MAYBE (LIST OF NUMBER)
+DECIDE `maybe single` IS JUST (LIST n)
+
+@export enum with spaces
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH AN Outcome
+DECIDE `outcome` IS IF n > 10 THEN `fully covered` ELSE `not covered`
+
+@export two-field record
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A Pair
+DECIDE `pair` IS Pair WITH left IS n, right IS n PLUS 1
+
+@export one-field record
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A Solo
+DECIDE `solo` IS Solo WITH only IS n
+
+@export boolean
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE `big` IF n > 10
+
+@export plain number
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `twice` IS n TIMES 2
+
+@export an enum with a constructor called Nothing
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A Penalty
+DECIDE `penalty` IS IF n > 10 THEN Fine ELSE Nothing
+
+@export a constructor called Just
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A Verdict
+DECIDE `verdict` IS IF n > 10 THEN Unjust ELSE Just "lawful"
+|]
+
+-- | Inputs the wrapper must unwrap, so a missing one makes it answer NOTHING
+-- and the service names the input: an ASSUME, and a DATE, which the wrapper
+-- reads from a string. The optional input comes last: the wrapper's generated
+-- input record does not parse when an optional input is followed by another
+-- (`GIVEN pad IS A MAYBE NUMBER, n IS A NUMBER` answers 422 with a parser
+-- error on that path).
+declineLabelsJL4 :: Text
+declineLabelsJL4 =
+  [i|
+ASSUME rate IS A NUMBER
+
+@export a number plus an assumed rate
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`plus rate` MEANS n PLUS rate
+
+@export a date read from a string
+GIVEN `end date` IS A DATE
+      pad        IS A MAYBE NUMBER
+GIVETH A DATE
+`date first` MEANS `end date`
 |]

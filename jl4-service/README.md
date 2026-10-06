@@ -162,6 +162,29 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+#### Answers
+
+The direct path and the wrapper path described below encode an answer the same way.
+A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
+A list is a JSON array, even when it has one element.
+An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
+A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+
+#### Missing inputs
+
+An input left out of `arguments`, or sent as `null`, is missing.
+Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
+
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
+On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
+A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`.
+A batch leaves such a case out of `cases` and counts it in `summary.casesIgnored`.
+
+Limits of the wrapper path, measured 2026-10-07:
+
+- A function with a `BOOLEAN` input, or a required `TIME` or `DATETIME` input, fails the request with a type error.
+- A function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+
 #### Trace Output
 
 Include execution traces with `?trace=full` or the `X-L4-Trace: full` header. Add `?graphviz=true` to include DOT source in the response (requires `trace=full`).
