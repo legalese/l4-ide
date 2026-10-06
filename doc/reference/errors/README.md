@@ -626,7 +626,7 @@ DECIDE describe Closed IS "stopped"
 
 The same warning has a second form, "Every input it matches is already matched by a clause above it", for a clause that repeats an earlier one, or that comes after a clause whose pattern is a new name such as `other` (a new name also matches anything). This second form is only given when no pattern in the rule is a number, a piece of text or another fixed value: in a table keyed by amounts or codes, a repeated clause, or one after `other`, draws no warning. The first form does not have that limit.
 
-A clause that is never used is still checked, so a mistake inside it is still reported.
+A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
 **How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
 
