@@ -17,7 +17,7 @@ import Logging (newLogger)
 import Options (Options (..))
 import Types
 
-import Control.Monad (guard, unless)
+import Control.Monad (forM_, guard, unless)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (try)
@@ -43,7 +43,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, wireProbeJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -456,6 +456,83 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+  describe "answers on the direct and wrapper paths (smucclaw/l4-ide#1003)" do
+    -- The wrapper answers JUST (f args). Its JUST used to be dissolved with
+    -- every other JUST before anything looked at it, so a NOTHING answer came
+    -- back as an error and a one-element list as its element.
+    aroundAll (\k -> withServiceFromSources "wire" [("probe.l4", wireProbeJL4)] (curry k)) do
+      forM_ wireCases \(caseId, fn, args, expected) ->
+        it (Text.unpack (caseId <> " " <> fn <> " " <> Text.Encoding.decodeUtf8 (LBS.toStrict (Aeson.encode args)))) \(baseUrl, mgr) -> do
+          resp <- evalFunction baseUrl mgr "wire" (Text.replace " " "%20" fn) (Aeson.object ["arguments" Aeson..= args])
+          resp `shouldCarry` expected
+
+      -- Under trace=full the wrapper's directive is #EVALTRACE rather than #EVAL.
+      it "trace=full, wrapper path: cap and single" \(baseUrl, mgr) -> do
+        let traced fn = do
+              req <- buildJsonPost (baseUrl <> "/deployments/wire/functions/" <> fn <> "/evaluation?trace=full")
+                (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (5 :: Int), "pad" Aeson..= Aeson.object []]])
+              httpLbs req mgr
+        cap <- traced "cap"
+        cap `shouldCarry` Answers Aeson.Null
+        wireAt cap ["contents", "reasoning"] `shouldSatisfy` \case
+          Right (Aeson.Object o) -> not (Aeson.KeyMap.null o)
+          _ -> False
+        single <- traced "single"
+        single `shouldCarry` Answers (Aeson.toJSON [5 :: Int])
+
+      -- A batch case's null is an unknown value, not a missing one, so it takes
+      -- the wrapper; and batch drops a case that errors, still answering 200.
+      it "batch, where null takes the wrapper: cap and single" \(baseUrl, mgr) -> do
+        let batch fn cases = do
+              req <- buildJsonPost (baseUrl <> "/deployments/wire/functions/" <> fn <> "/evaluation/batch")
+                (Aeson.object ["outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= cases])
+              httpLbs req mgr
+            input :: Int -> Int -> Aeson.Value
+            input caseId v = Aeson.object ["@id" Aeson..= caseId, "n" Aeson..= v, "pad" Aeson..= Aeson.Null]
+            answers resp = do
+              Aeson.Array cs <- either (const Nothing) Just (wireAt resp ["cases"])
+              Aeson.Number ignored <- either (const Nothing) Just (wireAt resp ["summary", "casesIgnored"])
+              pure ([ Aeson.KeyMap.lookup "value" c | Aeson.Object c <- toList cs ], ignored)
+        cap <- batch "cap" [input 1 5, input 2 15]
+        answers cap `shouldBe` Just ([Just Aeson.Null, Just (Aeson.Number 15)], 0)
+        single <- batch "single" [input 1 5]
+        answers single `shouldBe` Just ([Just (Aeson.toJSON [5 :: Int])], 0)
+
+    describe "when the wrapper cannot call the function" do
+      it "quotes a TIME it could not read, and names a missing one" do
+        withServiceFromSources "decline-time" [("timed.l4", timeInputsJL4)] \baseUrl mgr -> do
+          let call t = evalFunction baseUrl mgr "decline-time" "timed" $ Aeson.object
+                [ "arguments" Aeson..= Aeson.object
+                    ([ "flag" Aeson..= True
+                     , "unused" Aeson..= Aeson.object []
+                     , "dt" Aeson..= ("2020-01-01T10:00:00Z" :: Text)
+                     ] <> t)
+                ]
+          unread <- call ["t" Aeson..= ("not a time" :: Text)]
+          unread `shouldCarry` Refuses "Parameter 't': could not read \"not a time\" as a TIME"
+          missing <- call []
+          missing `shouldCarry` Refuses "Parameter 't': missing required parameter"
+
+      it "names a missing ASSUME as the direct path does" do
+        withServiceFromSources "decline-assume" [("drive.l4", assumeHelperJL4)] \baseUrl mgr -> do
+          let call licensed = evalFunction baseUrl mgr "decline-assume" "may_drive" $
+                Aeson.object ["arguments" Aeson..= Aeson.object ["licensed" Aeson..= licensed]]
+          wrapped <- call (Aeson.object [])
+          wrapped `shouldCarry` Refuses "ASSUME 'age': missing required parameter"
+          direct <- call (Aeson.Bool True)
+          direct `shouldCarry` Refuses "ASSUME 'age': missing required parameter"
+
+      it "names a missing input of a deontic rule" do
+        withServiceFromSources "decline-deontic" [("seatbelt.l4", deonticRecordPartyJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "decline-deontic" "Seatbelt Requirement"
+            (Aeson.object
+              [ "arguments" Aeson..= Aeson.object
+                  [ "car" Aeson..= Aeson.object ["number of wheels" Aeson..= (4 :: Int)] ]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= ([] :: [Aeson.Value])
+              ])
+          resp `shouldCarry` Refuses "Parameter 'driver': missing required parameter"
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
@@ -2046,6 +2123,98 @@ spec = describe "integration" do
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
+
+-- | What a client is meant to get back from an evaluation request.
+data WireOutcome
+  = Answers Aeson.Value
+    -- ^ 200, with this JSON as the answer
+  | Refuses Text
+    -- ^ 422, with an error message that contains this text
+
+shouldCarry :: Response LBS.ByteString -> WireOutcome -> Expectation
+shouldCarry resp = \case
+  Answers v -> (statusCode' resp, wireAt resp ["contents", "result", "value"]) `shouldBe` (200, Right v)
+  Refuses t -> do
+    statusCode' resp `shouldBe` 422
+    wireAt resp ["contents", "contents"] `shouldSatisfy` \case
+      Right (Aeson.String msg) -> t `Text.isInfixOf` msg
+      _ -> False
+
+-- | The value at a path in a response body, or the whole body when there is none.
+wireAt :: Response LBS.ByteString -> [Aeson.Key] -> Either LBS.ByteString Aeson.Value
+wireAt resp path =
+  maybe (Left (responseBody resp)) Right $
+    foldl (\mv k -> mv >>= \case Aeson.Object o -> Aeson.KeyMap.lookup k o; _ -> Nothing)
+      (Aeson.decode (responseBody resp)) path
+
+-- | Requests against 'wireProbeJL4': the 28 measured for smucclaw/l4-ide#1003,
+-- then B7, B8, D3d and E1-E4. A pad of 1 keeps a request on the direct path
+-- and a pad of {} sends it through the wrapper; on this endpoint a JSON null
+-- is a missing input, and stays direct. Every 200 answer on the wrapper path
+-- is the direct path's. Against main, A1-A7, B7, B8, C1 and C2 differ only by
+-- legalese/l4-ide#162's encoding (null for NOTHING, a bare JUST, an enum name
+-- without backticks), and D3 because main answered "NOTHING".
+wireCases :: [(Text, Text, Aeson.Value, WireOutcome)]
+wireCases =
+  [ ("A1", "cap", args [n 5, direct], Answers Aeson.Null)
+  , ("A2", "cap", args [n 5, wrapper], Answers Aeson.Null)
+  , ("A3", "cap", args [n 15, direct], Answers (num 15))
+  , ("A4", "cap", args [n 15, wrapper], Answers (num 15))
+  , ("A5", "pass", args ["x" Aeson..= (5 :: Int)], Answers (num 5))
+  , ("A6", "pass", args ["x" Aeson..= uncertain], Answers Aeson.Null)
+  , ("A7", "pass", args ["x" Aeson..= Aeson.Null], Answers Aeson.Null)
+  , ("B1", "single", args [n 5, direct], Answers (nums [5]))
+  , ("B2", "single", args [n 5, wrapper], Answers (nums [5]))
+  , ("B3", "double list", args [n 5, direct], Answers (nums [5, 5]))
+  , ("B4", "double list", args [n 5, wrapper], Answers (nums [5, 5]))
+  , ("B5", "none", args [n 5, direct], Answers (nums []))
+  , ("B6", "none", args [n 5, wrapper], Answers (nums []))
+  , ("B7", "maybe single", args [n 5, direct], Answers (nums [5]))
+  , ("B8", "maybe single", args [n 5, wrapper], Answers (nums [5]))
+  , ("C1", "outcome", args [n 15, direct], Answers (Aeson.String "fully covered"))
+  , ("C2", "outcome", args [n 15, wrapper], Answers (Aeson.String "fully covered"))
+  , ("C3", "pair", args [n 5, direct], Answers pair)
+  , ("C4", "pair", args [n 5, wrapper], Answers pair)
+  , ("C5", "solo", args [n 5, direct], Answers solo)
+  , ("C6", "solo", args [n 5, wrapper], Answers solo)
+  , ("C7", "big", args [n 15, direct], Answers (Aeson.Bool True))
+  , ("C8", "big", args [n 15, wrapper], Answers (Aeson.Bool True))
+  , ("C9", "twice", args [n 5, direct], Answers (num 10))
+  , ("C10", "twice", args [n 5, wrapper], Answers (num 10))
+    -- D1, D4 and D5 show that a pad of {} really takes the wrapper: their
+    -- "Expected JSON number" comes from its JSONDECODE, which the direct path
+    -- never runs. Should they stop saying so, the routing has changed, and the
+    -- other wrapper rows may be testing the direct path twice.
+  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses "Expected JSON number but got: String")
+    -- The direct path does not check that a scalar matches its parameter's
+    -- type, so this stops on an internal type error, as it did on main. That
+    -- is main's answer, pinned as such, not a good one.
+  , ("D2", "twice", args ["n" Aeson..= ("abc" :: Text), direct], Refuses "type error")
+    -- main answered "NOTHING" here, as if the rule had.
+  , ("D3", "twice", args [wrapper], Refuses "Parameter 'n': missing required parameter")
+  , ("D3d", "twice", args [direct], Refuses "Parameter 'n': missing required parameter")
+  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses "Expected JSON number but got: Array")
+  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses "Expected JSON number but got: Object")
+    -- A rule's own Nothing and Just are answers, not L4's MAYBE.
+  , ("E1", "penalty", args [n 5, direct], Answers (Aeson.String "Nothing"))
+  , ("E2", "penalty", args [n 5, wrapper], Answers (Aeson.String "Nothing"))
+  , ("E3", "verdict", args [n 5, direct], Answers verdict)
+  , ("E4", "verdict", args [n 5, wrapper], Answers verdict)
+  ]
+ where
+  args = Aeson.object
+  n :: Int -> (Aeson.Key, Aeson.Value)
+  n v = "n" Aeson..= v
+  direct = "pad" Aeson..= (1 :: Int)
+  wrapper = "pad" Aeson..= uncertain
+  uncertain = Aeson.object []
+  num :: Int -> Aeson.Value
+  num = Aeson.toJSON
+  nums :: [Int] -> Aeson.Value
+  nums = Aeson.toJSON
+  pair = Aeson.object ["Pair" Aeson..= Aeson.object ["left" Aeson..= (5 :: Int), "right" Aeson..= (6 :: Int)]]
+  solo = Aeson.object ["Solo" Aeson..= Aeson.object ["only" Aeson..= (5 :: Int)]]
+  verdict = Aeson.object ["Just" Aeson..= Aeson.object ["reason" Aeson..= ("lawful" :: Text)]]
 
 mkBatchCase :: Int -> Aeson.Value
 mkBatchCase n = Aeson.object

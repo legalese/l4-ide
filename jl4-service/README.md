@@ -163,6 +163,14 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+#### Answers
+
+The direct path and the wrapper path described below encode an answer the same way.
+A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
+A list is a JSON array, even when it has one element.
+An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
+A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+
 #### Missing and uncertain inputs
 
 An input left out of `arguments`, or sent as `null`, is missing.
@@ -170,7 +178,7 @@ An input sent as `{}` ("uncertain") is treated exactly like `null`.
 
 Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`.
 
-Two kinds of request go through a generated wrapper instead: any request with a `{}` anywhere in it, or a `null` inside a record or list, and every request to a `DEONTIC` function.
+Two kinds of request go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list, and every request to a `DEONTIC` function.
 On that path a missing `BOOLEAN` input costs nothing unless the rule reads it.
 If the rule does read it, evaluation stops and names it:
 
@@ -182,11 +190,19 @@ but it is an assumed term.
 
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
+A missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused on this path too, with the direct path's message.
+A required `DATE`, `TIME` or `DATETIME` string that does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
+
 Limits, measured 2026-10-01:
 
-- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE` fails the whole request with `Evaluation produced unknown value`, which does not name the input, even when the rule would never have read it.
+- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE` fails the whole request, even when the rule would never have read it.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
 - Neither path fills in a `TYPICALLY` default for a missing input yet; that is W3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`.
+
+Measured 2026-10-06:
+
+- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+- On the wrapper path, an input declared `LIST OF NUMBER` fails the request with a type error, because the wrapper decodes it as a `LIST OF (MAYBE NUMBER)`.
 
 #### Trace Output
 
