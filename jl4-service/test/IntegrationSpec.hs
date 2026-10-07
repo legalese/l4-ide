@@ -1169,6 +1169,32 @@ spec = describe "integration" do
             map (.dsId) deploys `shouldContain` ["list-a"]
             map (.dsId) deploys `shouldContain` ["list-b"]
 
+    -- The content-hash shortcut is keyed on the id too. Keyed on content
+    -- alone, a POST for "beta" whose bytes equalled "alpha"'s answered with
+    -- alpha's id and metadata, and created nothing.
+    it "skips recompiling identical sources only under the same id" do
+      withEmptyService \baseUrl mgr -> do
+        let zipBytes = createZipBundle [("qualifies.l4", qualifiesJL4)]
+            postAs did = do
+              req <- buildMultipartRequest (baseUrl <> "/deployments") did zipBytes
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 202
+              case Aeson.decode (responseBody resp) :: Maybe DeploymentStatusResponse of
+                Just s -> pure s
+                Nothing -> fail ("Failed to decode deployment response: " <> show (responseBody resp))
+        _ <- postAs "alpha"
+        pollUntilReady baseUrl mgr "alpha" 60
+
+        beta <- postAs "beta"
+        beta.dsId `shouldBe` "beta"
+        pollUntilReady baseUrl mgr "beta" 60
+        getReq <- parseRequest (baseUrl <> "/deployments/beta")
+        getResp <- httpLbs getReq mgr
+        statusCode' getResp `shouldBe` 200
+
+        again <- postAs "beta"
+        (again.dsId, again.dsStatus, again.dsUpdateId) `shouldBe` ("beta", "ready", Nothing)
+
     it "deletes a deployment" do
       withEmptyService \baseUrl mgr -> do
         let zipBytes = createZipBundle [("qualifies.l4", qualifiesJL4)]

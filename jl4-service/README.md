@@ -116,7 +116,8 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 - Deployment IDs: max 128 characters, `[a-zA-Z0-9_-]` only, must not start with a dot, no `..` sequences, and not one of the reserved words `health` / `deployments` / `openapi.json`
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
-- Duplicate detection: if the uploaded sources match an existing deployment (by content hash), the existing deployment is returned instead of recompiling
+- Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned, as `ready` with no `updateId`, instead of recompiling
+- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and refuses every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#162 (2026-07-28), an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
 
 ### Data Plane
 
@@ -170,6 +171,10 @@ A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
 A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
+A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
+
+The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
 
 #### Missing and uncertain inputs
 
@@ -235,6 +240,7 @@ Limits, measured 2026-10-02:
 Measured 2026-10-06:
 
 - A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+  A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
 
 #### Trace Output
 
