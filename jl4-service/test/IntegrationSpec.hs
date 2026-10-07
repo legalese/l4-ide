@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, heavyLibJL4, heavyMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, heavyLibJL4, heavyMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1135,6 +1135,41 @@ spec = describe "integration" do
   -- SIEVE (2026-10-07): the three gaps the README listed under "What the
   -- limits do not cover yet".
   describe "evaluation limits that used to miss" do
+    -- smucclaw/l4-ide#1018. The wrapper path evaluates as a Shake rule on a
+    -- thread of its own, so the allocation limit set on the calling thread
+    -- never saw it. The time limit is large here so that only the memory
+    -- limit can stop the case.
+    describe "the memory limit on the wrapper path" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          wrapped n = Aeson.object
+            [ "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int), "u" Aeson..= Aeson.object []] ]
+
+      it "stops a single evaluation that allocates too much" do
+        withServiceFromSourcesOpts stingy "wrap-mem-single" [("spin.l4", spinWrapperJL4)] \baseUrl mgr -> do
+          small <- evalFunction baseUrl mgr "wrap-mem-single" "spin" (wrapped 1_000)
+          assertSuccess small \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          big <- evalFunction baseUrl mgr "wrap-mem-single" "spin" (wrapped spinFast)
+          statusCode' big `shouldBe` 500
+          LBS.toStrict (responseBody big) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+
+      it "reports the case that allocates too much, and answers the cases after it" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts stingy "wrap-mem-batch" [("spin.l4", spinWrapperJL4)] \baseUrl mgr -> do
+            let body = Aeson.object
+                  [ "outcomes" Aeson..= ([] :: [Text])
+                  , "cases" Aeson..=
+                      [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n, "u" Aeson..= Aeson.object []]
+                      | (i, n) <- zip [1 :: Int ..] [1_000, spinFast, 1_000] ]
+                  ]
+            req <- buildJsonPost (baseUrl <> "/deployments/wrap-mem-batch/functions/spin/evaluation/batch") body
+            resp <- httpLbs req mgr
+            expectBatchOutcomes resp
+              [ CaseAnswered
+              , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+              , CaseAnswered ]
+            map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
+              `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
+
     -- smucclaw/l4-ide#1020. A limit hit while forcing an imported value left
     -- the forcing thread's mark on the value's thunk, which outlives the
     -- request; the next request on the same thread then met its own mark and

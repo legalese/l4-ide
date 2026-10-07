@@ -24,6 +24,9 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo, Environment)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
+import Control.Exception (throwIO)
+import EvalLimits (currentAllocationLimit)
+import GHC.IO.Exception (AllocationLimitExceeded (..))
 import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
@@ -775,9 +778,19 @@ requestEvalConfig :: TracePolicy -> Presumption -> Bool -> IO Eval.EvalConfig
 requestEvalConfig policy presumption viaWrapper = do
   fixedNow <- Eval.readFixedNowEnv
   cfg <- Eval.resolveEvalConfig fixedNow policy
+  -- Only the wrapper path evaluates off the calling thread (a Shake rule), so
+  -- only there does the evaluator have to set the allocation limit itself;
+  -- the direct path runs under the counter 'withEvalLimits' set, and setting
+  -- it again would reset that counter (smucclaw/l4-ide#1018).
+  limit <- if viaWrapper
+    then do
+      mBytes <- currentAllocationLimit
+      for mBytes \bytes -> Eval.MkAllocationLimit bytes <$> newIORef False
+    else pure Nothing
   pure cfg
     { Eval.presumeDefaults = presumption == PresumeSoft
     , Eval.requestRecord   = if viaWrapper then Just requestRecordName else Nothing
+    , Eval.allocationLimit = limit
     }
 
 -- | Evaluate using precompiled module (fast path) - direct AST evaluation
@@ -1861,7 +1874,7 @@ typecheckModule file input moduleContext = do
 evaluateModule :: (MonadIO m) => Presumption -> FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
 evaluateModule presumption file input moduleContext = do
   evalConfig <- liftIO $ requestEvalConfig apiDefaultPolicy presumption True
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  result <- liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
@@ -1875,6 +1888,12 @@ evaluateModule presumption file input moduleContext = do
     -- Add the main file
     _ <- Shake.addVirtualFile nfp input
     Shake.use Rules.EvaluateLazy uri
+  -- The evaluator hit the allocation limit on a Shake thread, which reports
+  -- an exception as a diagnostic. Raise it again here, on the calling thread,
+  -- where 'withEvalLimits' answers it as the memory limit (smucclaw/l4-ide#1018).
+  hit <- liftIO $ maybe (pure False) (readIORef . (.exceeded)) evalConfig.allocationLimit
+  when hit $ liftIO (throwIO AllocationLimitExceeded)
+  pure result
 
 -- ----------------------------------------------------------------------------
 -- L4 syntax builders

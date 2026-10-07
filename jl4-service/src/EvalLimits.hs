@@ -1,18 +1,23 @@
 -- | The two limits an evaluation runs under, in one place: the data plane
 -- (single and batch evaluation) and the MCP server both go through
--- 'withEvalLimits'. Not yet everywhere they should be: the allocation limit
--- does not stop an evaluation on the generated-wrapper path, and arithmetic
--- the evaluator leaves unfinished is finished while the response is encoded,
--- outside both (measured 2026-10-03; the jl4-service README, "What the
--- limits do not cover yet").
+-- 'withEvalLimits'.
+--
+-- What they cover: the evaluation itself, on the direct path (the calling
+-- thread) and on the generated-wrapper path (a Shake rule on another thread,
+-- see 'currentAllocationLimit'). Arithmetic the evaluator leaves unfinished is
+-- finished while the response is encoded, outside both (measured 2026-10-03;
+-- the jl4-service README, "What the limits do not cover yet").
 module EvalLimits (
   LimitHit (..),
   withEvalLimits,
+  currentAllocationLimit,
   limitHitMessage,
 ) where
 
 import Backend.Api (LimitHit (..))
 import Control.Exception (catch, finally)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import System.IO.Unsafe (unsafePerformIO)
 import Data.Int (Int64)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -54,6 +59,7 @@ limitHitMessage cfg = \case
 withEvalLimits :: Options -> IO b -> IO (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits cfg act =
   ( do
+      writeIORef allocationLimitRef (Just memLimitBytes)
       setAllocationCounter memLimitBytes
       enableAllocationLimit
       result <- timeout timeoutMicros act
@@ -64,3 +70,25 @@ withEvalLimits cfg act =
  where
   timeoutMicros = cfg.evalTimeout * 1_000_000
   memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
+
+-- | The allocation limit, in bytes, that the service's evaluations run under;
+-- 'Nothing' until the first 'withEvalLimits'.
+--
+-- GHC's allocation counter belongs to one thread. The wrapper path evaluates
+-- as a Shake rule, which runs on a thread of its own, so the limit
+-- 'withEvalLimits' sets on the calling thread never sees it
+-- (smucclaw/l4-ide#1018). The evaluator therefore sets the limit itself, on
+-- its own thread ('L4.EvaluateLazy.allocationLimit'), and reads the number
+-- from here. It is published rather than passed because it is a property of
+-- the process (@--max-eval-memory-mb@), not of a request, and passing it would
+-- add an argument to every function between the request and the evaluator.
+--
+-- Each Shake rule thread, the module's and each import's, gets the whole
+-- limit, so a call that imports modules can allocate the limit once per
+-- module.
+currentAllocationLimit :: IO (Maybe Int64)
+currentAllocationLimit = readIORef allocationLimitRef
+
+allocationLimitRef :: IORef (Maybe Int64)
+allocationLimitRef = unsafePerformIO (newIORef Nothing)
+{-# NOINLINE allocationLimitRef #-}

@@ -44,6 +44,7 @@ module TestData (
   deonticDefaultJL4,
   spinJL4,
   spinOrRefuseJL4,
+  spinWrapperJL4,
   heavyLibJL4,
   heavyMainJL4,
 ) where
@@ -953,6 +954,25 @@ GIVETH A BOOLEAN
 DECIDE spin IF
   IF n < 0 THEN REFUSE "n is negative"
   ELSE `count down` n EQUALS 0
+|]
+
+-- | 'spinJL4' with an input that makes it take the generated-wrapper path: a
+-- MAYBE input sent as @{}@ (uncertain) is one the direct path cannot take
+-- (smucclaw/l4-ide#1018). The input is not read.
+spinWrapperJL4 :: Text
+spinWrapperJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count down` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE `count down` (n - 1)
+
+@export default spins for n steps and then answers TRUE
+GIVEN
+  n IS A NUMBER
+  u IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE spin IF `count down` n EQUALS 0
 |]
 
 -- | An imported value that costs about 33 MB to compute: more than a case has
