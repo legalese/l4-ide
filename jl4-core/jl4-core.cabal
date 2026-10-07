@@ -259,6 +259,7 @@ test-suite jl4-core-test
     SectionGivenTdnrSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
+    InterruptedForceSpec
     RecordLedgerSpec
     LedgerRenderingSpec
     M4PartyLedgerSpec

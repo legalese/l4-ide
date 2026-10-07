@@ -138,7 +138,7 @@ import L4.Utils.Ratio
 import Text.Read (readMaybe)
 import qualified Data.Scientific as Sci
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Exception (SomeException, catch)
+import Control.Exception (SomeException, catch, fromException, throwIO, uninterruptibleMask_)
 import qualified Control.Exception
 
 data Frame =
@@ -515,8 +515,24 @@ newtype Eval a = MkEval (EvalState -> IO a)
 -- written against this alias.
 type Machine = Eval
 
+-- | Run an evaluation. An exception that is not an 'EvalException' (a time or
+-- allocation limit, a cancelled thread, a Haskell crash) leaves the frame
+-- stack as it was, because only 'raiseException' unwinds it; so the frames
+-- still on it are unwound here, and a thunk whose force was interrupted gets
+-- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlive
+-- the run, and a mark left on one made the next run on the same thread report
+-- an infinite loop (smucclaw/l4-ide#1020).
 runEval :: EvalState -> Eval a -> IO a
-runEval s (MkEval f) = f s
+runEval s (MkEval f) = f s `catch` \(e :: SomeException) -> do
+  case fromException e of
+    Just (_ :: EvalException) -> pure ()
+    Nothing -> uninterruptibleMask_ (let MkEval unwind = unwindAll in unwind s)
+  throwIO e
+ where
+  unwindAll :: Eval ()
+  unwindAll = withPoppedFrame \case
+    Nothing -> pure ()
+    Just fr -> unwindFrame fr >> unwindAll
 
 -- | Catch evaluation exceptions (used at directive boundaries).
 tryEval :: Eval a -> Eval (Either EvalException a)

@@ -44,6 +44,8 @@ module TestData (
   deonticDefaultJL4,
   spinJL4,
   spinOrRefuseJL4,
+  heavyLibJL4,
+  heavyMainJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -951,4 +953,29 @@ GIVETH A BOOLEAN
 DECIDE spin IF
   IF n < 0 THEN REFUSE "n is negative"
   ELSE `count down` n EQUALS 0
+|]
+
+-- | An imported value that costs about 33 MB to compute: more than a case has
+-- left after 'heavyMainJL4' has spent 47 MB of a 64 MB limit on its own
+-- steps, and less than the whole limit (smucclaw/l4-ide#1020).
+heavyLibJL4 :: Text
+heavyLibJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count down` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE `count down` (n - 1)
+
+heavy MEANS `count down` 5000
+|]
+
+heavyMainJL4 :: Text
+heavyMainJL4 =
+  [i|
+IMPORT heavy_lib
+
+@export default spends n steps of its own, then reads the imported value
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `use heavy` IF `count down` n EQUALS 0 AND heavy EQUALS 0
 |]
