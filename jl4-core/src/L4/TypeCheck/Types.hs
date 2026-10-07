@@ -112,6 +112,11 @@ data CheckError =
   | TypeMismatch ExpectationContext (Type' Resolved) (Type' Resolved) -- expected, given
   | InconsistentNameInSignature Name (Maybe Name)
   | InconsistentNameInAppForm Name (Maybe Name)
+  | ClausePatternCountMismatch (Maybe SrcRange) Name Int Int
+    -- ^ The clauses of a multi-clause group have a different number of
+    -- patterns than its GIVEN names inputs ('L4.TypeCheck.clauseInputsAgainstGiven').
+    -- Carries the first clause's head range, the group's name, the number of
+    -- patterns in each clause, and the number of inputs the GIVEN names.
   | NonDistinctError NonDistinctContext [[Name]]
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
@@ -770,6 +775,7 @@ instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
+  rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j

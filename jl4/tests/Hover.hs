@@ -98,6 +98,18 @@ hoverGolden evalConfig dir inputFile = do
       , (Position 49 25, "aka-alias")
       , (Position 53 28, "aka-call-site")
       ]
+    -- A rule written as a list of clauses binds its inputs at the GIVEN's
+    -- own location (L4.Parser.givenInputBinding), so two nodes sit there.
+    "multi-clause-hover.l4" ->
+      [ (Position 5 6, "given")
+      , (Position 7 7, "rule")
+      , (Position 7 13, "pattern")
+      , (Position 8 20, "callee")
+      , (Position 8 25, "body-ref")
+        -- A pattern that is the input's own name compiles to no node.
+      , (Position 8 13, "input-pattern")
+      , (Position 22 11, "later-input-pattern")
+      ]
     other -> error ("Hover.positionsFor: no positions pinned for " <> other)
 
   getHoverAt tcRes nuri (pos, label) =
