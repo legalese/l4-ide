@@ -275,7 +275,8 @@ spec = describe "integration" do
         single `shouldCarry` Answers (Aeson.toJSON [5 :: Int])
 
       -- A batch case's null is an unknown value, not a missing one, so it takes
-      -- the wrapper; and batch drops a case that errors, still answering 200.
+      -- the wrapper; and a case that errors comes back with its @error, the
+      -- batch still answering 200.
       it "batch, where null takes the wrapper: cap, single and twice" \(baseUrl, mgr) -> do
         let batch fn cases = do
               req <- buildJsonPost (baseUrl <> "/deployments/wire/functions/" <> fn <> "/evaluation/batch")
@@ -293,9 +294,13 @@ spec = describe "integration" do
         answers cap `shouldBe` Just ([Just Aeson.Null, Just (Aeson.Number 15)], 0)
         single <- batch "single" [input 1 (n 5)]
         answers single `shouldBe` Just ([Just (Aeson.toJSON [5 :: Int])], 0)
-        -- Case 1 has no n. It used to come back answered "NOTHING".
+        -- Case 1 has no n. It used to come back answered "NOTHING", and then
+        -- not at all, counted only in casesIgnored.
         twice <- batch "twice" [input 1 [], input 2 (n 4)]
-        answers twice `shouldBe` Just ([Just (Aeson.Number 8)], 1)
+        answers twice `shouldBe` Just ([Nothing, Just (Aeson.Number 8)], 1)
+        caseKeys twice ["@id", "@error"] `shouldBe`
+          Just [ [Just (Aeson.Number 1), Just (Aeson.String "Parameter 'n': missing required parameter")]
+               , [Just (Aeson.Number 2), Nothing] ]
 
     describe "when the wrapper cannot call the function" do
       it "quotes a DATE it could not read, and names a missing one" do
@@ -318,9 +323,10 @@ spec = describe "integration" do
           declined `shouldCarry` Refuses "Parameter 'd two': could not read \"2026-02-30\" as a DATE"
 
       -- On batch a null takes the wrapper, which refuses "garbage" as a DATE.
-      -- The direct path would answer it as text, so a dropped case shows the
-      -- wrapper ran.
-      it "drops a batch case the wrapper declines, and counts it" do
+      -- The direct path would answer it as text, so an errored case shows the
+      -- wrapper ran. The case comes back with the single-case endpoint's
+      -- message as its @error, where it used to be dropped and only counted.
+      it "returns a batch case the wrapper declines with its @error, and counts it" do
         withServiceFromSources "decline-batch" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
           req <- buildJsonPost (baseUrl <> "/deployments/decline-batch/functions/date%20first/evaluation/batch")
             (Aeson.object
@@ -333,9 +339,12 @@ spec = describe "integration" do
           resp <- httpLbs req mgr
           statusCode' resp `shouldBe` 200
           wireAt resp ["summary", "casesIgnored"] `shouldBe` Right (Aeson.Number 1)
-          wireAt resp ["cases"] `shouldSatisfy` \case
-            Right (Aeson.Array cs) -> [ Aeson.KeyMap.lookup "value" c | Aeson.Object c <- toList cs ] == [Just (Aeson.String "2026-01-31")]
-            _ -> False
+          wireAt resp ["summary", "casesProcessed"] `shouldBe` Right (Aeson.Number 1)
+          caseKeys resp ["@id", "@error", "value"] `shouldBe`
+            Just [ [ Just (Aeson.Number 1)
+                   , Just (Aeson.String "Parameter 'end date': could not read \"garbage\" as a DATE")
+                   , Nothing ]
+                 , [Just (Aeson.Number 2), Nothing, Just (Aeson.String "2026-01-31")] ]
 
       it "names a missing ASSUME as the direct path does" do
         withServiceFromSources "decline-assume" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
@@ -1715,6 +1724,13 @@ wireAt resp path =
   maybe (Left (responseBody resp)) Right $
     foldl (\mv k -> mv >>= \case Aeson.Object o -> Aeson.KeyMap.lookup k o; _ -> Nothing)
       (Aeson.decode (responseBody resp)) path
+
+-- | Some keys of each case of a batch response, in order; 'Nothing' when the
+-- body has no @cases@ array.
+caseKeys :: Response LBS.ByteString -> [Aeson.Key] -> Maybe [[Maybe Aeson.Value]]
+caseKeys resp keys = case wireAt resp ["cases"] of
+  Right (Aeson.Array cs) -> Just [ [ Aeson.KeyMap.lookup k c | k <- keys ] | Aeson.Object c <- toList cs ]
+  _ -> Nothing
 
 -- | Requests against 'wireProbeJL4': the 28 measured for smucclaw/l4-ide#1003,
 -- then B7, B8, D3d and E1-E4. A pad of 1 keeps a request on the direct path

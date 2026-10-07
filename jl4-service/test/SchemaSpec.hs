@@ -188,6 +188,7 @@ instance Arbitrary OutputCase where
       <$> arbitrary
       <*> arbitrary
       <*> pure Nothing  -- Exclude GraphViz from QuickCheck
+      <*> Q.oneof [ pure CaseAnswered, CaseErrored <$> arbitrary ]
 
 instance Arbitrary OutputSummary where
   arbitrary =

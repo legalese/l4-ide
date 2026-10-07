@@ -183,7 +183,7 @@ Most requests are evaluated directly, and a missing input that is not a `MAYBE` 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
 A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
-A batch leaves such a case out of `cases` and counts it in `summary.casesIgnored`.
+A batch case refused this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
 
 Limits, measured 2026-10-07:
 
@@ -240,6 +240,31 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
     ]
   }'
 ```
+
+The response has one entry per case, in the order the cases were sent, each under its `@id`:
+
+```json
+{
+  "cases": [
+    { "@id": 1, "value": true },
+    { "@id": 2, "value": false },
+    { "@id": 3, "value": false }
+  ],
+  "summary": {
+    "casesIgnored": 0,
+    "casesProcessed": 3,
+    "casesRead": 3,
+    "processorCasesPerSec": 0,
+    "processorDurationSec": 0,
+    "processorQueuedSec": 0
+  }
+}
+```
+
+An answered case carries the function's result under `value`.
+A case that failed carries `@error`, the message the single-case endpoint gives for the same input, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
+Until legalese/l4-ide#571, a failed case was left out of `cases` and only counted.
+The three `processor…` fields of `summary` are not measured, and are always `0`.
 
 ### Query Planning
 

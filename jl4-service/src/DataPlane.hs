@@ -306,26 +306,23 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case comes back. An answer carries its result; an error carries
+    -- its message, so that no case vanishes into the count without a reason.
+    -- Only answers count as processed.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , outcome = CaseAnswered }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, c.outcome == CaseAnswered ]
     nIgnored = nCases - nSuccessful
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful
