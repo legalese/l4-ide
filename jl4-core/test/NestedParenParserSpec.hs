@@ -36,14 +36,16 @@
 -- Each 'depthSpec' case also exact-prints the parsed module back to its
 -- source, which fails if the deep parse dropped or reordered a token.
 -- 'errorSpec' nests only three or four brackets: it checks that a broken
--- nest reports the error the parser always reported.
+-- nest reports the error the parser always reported. 'memoSpec' parses
+-- nests like it with the parser's memo on and off, and requires the same
+-- answer.
 module NestedParenParserSpec (spec) where
 
 import Base
 import Control.Exception (evaluate)
 import qualified Data.Text as T
 import L4.ExactPrint (exactprint)
-import L4.Parser (PError (..), execProgramParserWithHintPass)
+import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
 import L4.Parser.SrcSpan (SrcPos (..), SrcSpan (..))
 import System.Timeout (timeout)
 import Test.Hspec
@@ -60,6 +62,7 @@ spec :: Spec
 spec = do
   depthSpec
   errorSpec
+  memoSpec
 
 depthSpec :: Spec
 depthSpec =
@@ -180,63 +183,138 @@ depthSpec =
 -- before MATRYOSHKA was fixed: @l4 ast@ at 21467cd84 on @unstable@.
 errorSpec :: Spec
 errorSpec =
-  describe "a nest of brackets in pattern position that fail both readings reports the error the parser always reported" $ do
-    it "MUST pay ( total ( base ( price PLUS tax 's ) TIMES rate ) PLUS fee )" $
-      failsWith
-        ( T.unlines
-            [ "DECLARE Person IS ONE OF alice, bob"
-            , "DECLARE Act IS ONE OF"
-            , "  pay HAS amount IS A NUMBER"
-            , "  Deliver HAS who IS A NUMBER, what IS A NUMBER"
-            , ""
-            , "GIVETH A DEONTIC Person Act"
-            , "probe MEANS"
-            , "  PARTY alice"
-            , "  MUST pay ( total ( base ( price PLUS tax 's ) TIMES rate ) PLUS fee )"
-            , "  WITHIN 3"
-            , ""
-            , "GIVETH A NUMBER"
-            , "other MEANS 1"
-            ]
-        )
-        (9, 44)
-        ( "unexpected 's\n"
-            <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
-        )
+  describe "a nest of brackets in pattern position that fail both readings reports the error the parser always reported" $
+    for_ brokenNests \ (name, src, at, expected) ->
+      it name $ failsWith src at expected
 
-    it "WHEN (((EXACTLY 1 PLUS) z PLUS) w PLUS)" $
-      failsWith (inWhen "(((EXACTLY 1 PLUS) z PLUS) w PLUS)") (3, 32) closeBracketExpected
-
-    it "WHEN (((x ,) z PLUS) w PLUS)" $
-      failsWith
-        (inWhen "(((x ,) z PLUS) w PLUS)")
-        (3, 24)
-        ( "unexpected ,\n"
-            <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, EXACTLY, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
-        )
-
-    it "WHEN (f ((g (1 PLUS) y PLUS)) x PLUS)" $
-      failsWith (inWhen "(f ((g (1 PLUS) y PLUS)) x PLUS)") (3, 29) closeBracketExpected
-
-    it "WHEN (f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)" $
-      failsWith (inWhen "(f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)") (3, 31) closeBracketExpected
-
-    it "a DECIDE argument whose IF ... ELSE runs onto a line indented too little" $
-      failsWith
-        ( T.unlines
-            [ "GIVEN n IS A NUMBER"
-            , "GIVETH A NUMBER"
-            , "DECIDE probe n IS 0"
-            , "DECIDE probe ((Foo OF (EXACTLY IF 3.5 THEN f ELSE "
-            , "  TRUE), \"s\") TIMES \"a(b\") IS 1"
-            ]
-        )
-        (5, 3)
-        "incorrect indentation (got 3, should be greater than 32)\n"
+-- | The cases of 'errorSpec': a name, the module, and where its one error
+-- starts and how its message ends.
+brokenNests :: [(String, Text, (Int, Int), Text)]
+brokenNests =
+  [ ( "MUST pay ( total ( base ( price PLUS tax 's ) TIMES rate ) PLUS fee )"
+    , T.unlines
+        [ "DECLARE Person IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF"
+        , "  pay HAS amount IS A NUMBER"
+        , "  Deliver HAS who IS A NUMBER, what IS A NUMBER"
+        , ""
+        , "GIVETH A DEONTIC Person Act"
+        , "probe MEANS"
+        , "  PARTY alice"
+        , "  MUST pay ( total ( base ( price PLUS tax 's ) TIMES rate ) PLUS fee )"
+        , "  WITHIN 3"
+        , ""
+        , "GIVETH A NUMBER"
+        , "other MEANS 1"
+        ]
+    , (9, 44)
+    , "unexpected 's\n"
+        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+    )
+  , ("WHEN (((EXACTLY 1 PLUS) z PLUS) w PLUS)", inWhen "(((EXACTLY 1 PLUS) z PLUS) w PLUS)", (3, 32), closeBracketExpected)
+  , ( "WHEN (((x ,) z PLUS) w PLUS)"
+    , inWhen "(((x ,) z PLUS) w PLUS)"
+    , (3, 24)
+    , "unexpected ,\n"
+        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, EXACTLY, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+    )
+  , ("WHEN (f ((g (1 PLUS) y PLUS)) x PLUS)", inWhen "(f ((g (1 PLUS) y PLUS)) x PLUS)", (3, 29), closeBracketExpected)
+  , ("WHEN (f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", inWhen "(f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", (3, 31), closeBracketExpected)
+  , ( "a DECIDE argument whose IF ... ELSE runs onto a line indented too little"
+    , T.unlines
+        [ "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "DECIDE probe n IS 0"
+        , "DECIDE probe ((Foo OF (EXACTLY IF 3.5 THEN f ELSE "
+        , "  TRUE), \"s\") TIMES \"a(b\") IS 1"
+        ]
+    , (5, 3)
+    , "incorrect indentation (got 3, should be greater than 32)\n"
+    )
+  ]
   where
     closeBracketExpected =
       "unexpected PLUS\n"
         <> "expecting %, ), FOLLOWED, WHERE, infix identifier, mixfix keyword, or space token\n"
+
+-- | The parser's memo ('L4.Parser.memoGroup') replays a bracketed group's
+-- first parse wherever the group is reached again. That is exact only while
+-- the invariants documented at 'L4.Parser.memoGroup' hold, and if one breaks,
+-- the memo replays a wrong syntax tree or a wrong error with no other
+-- symptom. So each module here is parsed with the memo on and off, which
+-- must give the same answer to the token: the same tree, hints and warnings,
+-- or the same errors, message and position.
+--
+-- jl4-test does the same on its whole corpus ("parser memo changes
+-- nothing"). The corpus has few nests and fewer broken ones, so the cases
+-- here are nests in pattern position, where a failed pattern reading leaves
+-- inner groups for the expression reading to replay: 'errorSpec''s six, and
+-- the nests of PATTERN-REFERENCE-RULE-SPEC A.7 three or four levels deep,
+-- broken and whole, with mixfix keywords and inline annotations inside the
+-- groups replayed, and with an error already pending when they are parsed.
+-- Without the memo the parser is exponential in depth, which is why these
+-- stay shallow.
+memoSpec :: Spec
+memoSpec =
+  describe "the parser's memo changes nothing: memo on and off agree" $ do
+    for_ brokenNests \ (name, src, _, _) ->
+      it name $ memoChangesNothing src
+    it "a CONSIDER in pattern position whose WHEN holds the next bracket, four deep" $
+      memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
+    it "the same nest as a deontic action's argument, four deep" $
+      memoChangesNothing
+        ( T.unlines
+            [ "DECLARE Person IS ONE OF alice, bob"
+            , "DECLARE Act IS ONE OF"
+            , "  pay HAS amount IS A NUMBER"
+            , ""
+            , "GIVETH A DEONTIC Person Act"
+            , "probe MEANS"
+            , "  PARTY alice"
+            , "  MUST pay " <> nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"
+            , "  WITHIN 3"
+            ]
+        )
+    it "a broken chain, four deep: (f (CONSIDER 1 WHEN … THEN 1, OTHERWISE 2) x PLUS) around (1 PLUS)" $
+      memoChangesNothing (inWhen (nestedTo 4 "(f (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) x PLUS)" "(1 PLUS)"))
+    it "a broken, alternating nest, three deep: (f (g (CONSIDER … ) b PLUS) a PLUS)" $
+      memoChangesNothing (inWhen (nestedTo 3 "(f (g (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) b PLUS) a PLUS)" "(1 PLUS)"))
+    it "an unclosed nest, four deep: ((CONSIDER 1 WHEN ((CONSIDER 1 WHEN …" $
+      memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " "" "1"))
+    it "brackets that ARE patterns, each holding a CONSIDER, four deep" $
+      memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) FOLLOWED BY x)" "x"))
+    -- @f 1 plus 1@ is @f@ of three arguments in the first pass, which has no
+    -- mixfix hints, and @plus@ of @f 1@ and @1@ in the second.
+    it "user-defined mixfix keywords, bare and backticked, in a nest in pattern position" $
+      memoChangesNothing
+        ( plusPrologue
+            <> inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN f 1 plus 1, OTHERWISE 2) `plus` 1)" "(1 `plus` 1)")
+        )
+    it "inline annotations inside a nest in pattern position" $
+      memoChangesNothing
+        ( T.unlines
+            [ "GIVEN walks IS A BOOLEAN, eats IS A BOOLEAN"
+            , "GIVETH A NUMBER"
+            , "probe walks eats MEANS"
+            , "  CONSIDER TRUE WHEN "
+                <> nestedTo 3 "((CONSIDER walks [it walks] WHEN " " THEN eats [it eats], OTHERWISE FALSE) AND eats [it eats])" "(walks [it walks])"
+                <> " THEN 1, OTHERWISE 2"
+            ]
+        )
+    -- The parser recovers from the broken declaration and reports its error
+    -- at the end (megaparsec's delayed errors), so the error is pending while
+    -- the nest is parsed.
+    it "a broken declaration before a nest in pattern position" $
+      memoChangesNothing
+        ( T.unlines
+            [ "GIVETH A NUMBER"
+            , "broken MEANS"
+            , ""
+            , "GIVETH A NUMBER"
+            , "probe MEANS"
+            , "  CONSIDER 3 WHEN " <> nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1" <> " THEN 1, OTHERWISE 2"
+            ]
+        )
 
 -- | Parse the module (both passes, as the tools do) and expect exactly one
 -- error, starting at @(line, column)@ (both from 1), whose message ends with
@@ -248,6 +326,14 @@ failsWith src at expected =
     Left errs -> do
       [(e.range.start.line, e.range.start.column) | e <- toList errs] `shouldBe` [at]
       [T.takeEnd (T.length expected) e.message | e <- toList errs] `shouldBe` [expected]
+  where
+    uri = toNormalizedUri (Uri "file:///nested-paren-parser-spec")
+
+-- | Parse the module (both passes, as the tools do) with the memo on and off,
+-- and expect the same answer.
+memoChangesNothing :: Text -> Expectation
+memoChangesNothing src =
+  execProgramParserWithHintPass uri src `shouldBe` execProgramParserWithHintPassUnmemoised uri src
   where
     uri = toNormalizedUri (Uri "file:///nested-paren-parser-spec")
 
@@ -281,7 +367,11 @@ rightNested op = nestedIn ("(1 " <> op <> " ") ")" "1"
 
 -- | Wrap @core@ in 'depth' copies of @open@ … @close@.
 nestedIn :: Text -> Text -> Text -> Text
-nestedIn open close core = iterate (\ e -> open <> e <> close) core !! depth
+nestedIn = nestedTo depth
+
+-- | Wrap @core@ in @n@ copies of @open@ … @close@.
+nestedTo :: Int -> Text -> Text -> Text -> Text
+nestedTo n open close core = iterate (\ e -> open <> e <> close) core !! n
 
 -- | @inWhen g@ is a rule that puts @g@ in the pattern slot of a @WHEN@.
 inWhen :: Text -> Text

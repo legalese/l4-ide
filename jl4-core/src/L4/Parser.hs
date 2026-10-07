@@ -32,6 +32,7 @@ module L4.Parser (
   execProgramParserWithHints,
   execProgramParserForTokensWithHints,
   execProgramParserWithHintPass,
+  execProgramParserWithHintPassUnmemoised,
 ) where
 
 import Base
@@ -85,6 +86,12 @@ data Env = Env
     --
     -- This is the only field any parser changes with 'local', which is why
     -- 'memoGroup' keys on it and on nothing else of the 'Env'.
+  , memoiseGroups :: Bool
+    -- ^ Does 'memoGroup' memoise? 'True' for every parse the tools run.
+    -- 'False' parses a bracketed group afresh wherever it is reached, as the
+    -- parser did before MATRYOSHKA, in time exponential in how deeply groups
+    -- nest. It exists so that a test can check that the memo changes nothing
+    -- ('execProgramParserWithHintPassUnmemoised'). Fixed for a whole run.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
@@ -1459,23 +1466,35 @@ type GroupReply a = Megaparsec.Reply Void TokenStream (a, PState)
 --     delayed errors while parsing; they are only ever added to, at the
 --     front. So @p@ runs with both empty, and what it added is put in front
 --     of what was there, which is what running it with them would have made.
+--
+-- Nothing fails loudly when one of these stops being true: the memo would
+-- replay a wrong syntax tree or a wrong error, with no other symptom. So
+-- jl4-test parses its whole corpus with the memo on and off ('memoiseGroups')
+-- and requires the same answer ("parser memo changes nothing"), and
+-- jl4-core-test does the same on nests that replay often
+-- (NestedParenParserSpec).
 memoGroup :: Lens' GroupMemo (IntMap.IntMap (GroupReply a)) -> Parser a -> Parser a
 memoGroup table p =
-  ReaderT \ env -> StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
-    let key = 2 * s.stateOffset + fromEnum env.ofIsAnchor
-    known <- gets (IntMap.lookup key . view table)
-    Megaparsec.Reply s' consumption result <- case known of
-      Just reply -> pure reply
-      Nothing -> do
-        reply <- Megaparsec.runParsecT (runStateT (runReaderT p env) mempty) s { stateParseErrors = [] }
-        modify' (over table (IntMap.insert key reply))
-        pure reply
-    let s'' = s' { stateParseErrors = s'.stateParseErrors ++ s.stateParseErrors }
-    case (consumption, result) of
-      (Megaparsec.Consumed, Megaparsec.OK hs (a, added)) -> cok (a, added <> outer) s'' hs
-      (Megaparsec.Consumed, Megaparsec.Error err) -> cerr err s''
-      (Megaparsec.NotConsumed, Megaparsec.OK hs (a, added)) -> eok (a, added <> outer) s'' hs
-      (Megaparsec.NotConsumed, Megaparsec.Error err) -> eerr err s''
+  ReaderT \ env ->
+    if env.memoiseGroups
+      then memoised env
+      else runReaderT p env
+  where
+    memoised env = StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
+      let key = 2 * s.stateOffset + fromEnum env.ofIsAnchor
+      known <- gets (IntMap.lookup key . view table)
+      Megaparsec.Reply s' consumption result <- case known of
+        Just reply -> pure reply
+        Nothing -> do
+          reply <- Megaparsec.runParsecT (runStateT (runReaderT p env) mempty) s { stateParseErrors = [] }
+          modify' (over table (IntMap.insert key reply))
+          pure reply
+      let s'' = s' { stateParseErrors = s'.stateParseErrors ++ s.stateParseErrors }
+      case (consumption, result) of
+        (Megaparsec.Consumed, Megaparsec.OK hs (a, added)) -> cok (a, added <> outer) s'' hs
+        (Megaparsec.Consumed, Megaparsec.Error err) -> cerr err s''
+        (Megaparsec.NotConsumed, Megaparsec.OK hs (a, added)) -> eok (a, added <> outer) s'' hs
+        (Megaparsec.NotConsumed, Megaparsec.Error err) -> eerr err s''
 
 -- We don't actually currently allow parsing an optional name
 optionallyNamedType :: Parser (OptionallyNamedType Name)
@@ -3587,6 +3606,7 @@ execNlgParserForTokens p uri input ts =
       { moduleUri = uri
       , mixfixHints = emptyMixfixHintRegistry
       , ofIsAnchor = False
+      , memoiseGroups = True
       }
     st = PState
       { nlgs = []
@@ -3615,7 +3635,12 @@ execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, R
 execParserForTokens = execParserForTokensWithHints mempty
 
 execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
-execParserForTokensWithHints hints p file input ts =
+execParserForTokensWithHints = execParserForTokensWith True
+
+-- | 'execParserForTokensWithHints', with 'memoGroup' on ('True') or off; see
+-- 'memoiseGroups'.
+execParserForTokensWith :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Bool -> MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWith memoise hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
@@ -3644,6 +3669,7 @@ execParserForTokensWithHints hints p file input ts =
       { moduleUri = file
       , mixfixHints = hints
       , ofIsAnchor = False
+      , memoiseGroups = memoise
       }
     st = PState
       { nlgs = []
@@ -3695,12 +3721,32 @@ execProgramParserWithHintPass ::
   NormalizedUri ->
   Text ->
   Either (NonEmpty PError) (Module Name, MixfixHintRegistry, [Resolve.Warning])
-execProgramParserWithHintPass uri input = do
+execProgramParserWithHintPass = programParserWithHintPass True
+
+-- | 'execProgramParserWithHintPass' with 'memoGroup' switched off, so that
+-- every bracketed group is parsed afresh wherever it is reached. That takes
+-- time exponential in how deeply groups nest, and the answer must be
+-- identical: it exists for the tests that check so (see 'memoGroup').
+execProgramParserWithHintPassUnmemoised ::
+  NormalizedUri ->
+  Text ->
+  Either (NonEmpty PError) (Module Name, MixfixHintRegistry, [Resolve.Warning])
+execProgramParserWithHintPassUnmemoised = programParserWithHintPass False
+
+programParserWithHintPass ::
+  Bool ->
+  NormalizedUri ->
+  Text ->
+  Either (NonEmpty PError) (Module Name, MixfixHintRegistry, [Resolve.Warning])
+programParserWithHintPass memoise uri input = do
   ts <- execLexer uri input
-  (firstModule, _) <- execProgramParserForTokens uri input ts
+  (firstModule, _) <- programParser mempty ts
   let hints = buildMixfixHintRegistry firstModule
-  (finalModule, finalWarnings) <- execProgramParserForTokensWithHints hints uri input ts
+  (finalModule, finalWarnings) <- programParser hints ts
   pure (finalModule, hints, finalWarnings)
+  where
+    programParser hints ts =
+      (\ (m, warns, _) -> (m, warns)) <$> execParserForTokensWith memoise hints (module' uri) uri input ts
 
 -- ----------------------------------------------------------------------------
 -- Debug helpers
