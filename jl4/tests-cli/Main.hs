@@ -274,6 +274,17 @@ spec bin = do
       env <- jsonEnvelope bin ["run", errorFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
 
+    it "reports an evaluation error in JSON in the drafter's terms, not as Haskell" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "multi-clause-no-match.l4", "--json"]
+      case objField env "results" of
+        Just (Array v) | [Object r] <- foldr (:) [] v -> case KeyMap.lookup (Key.fromString "value") r of
+          Just (String msg) -> do
+            T.unpack msg `shouldSatisfy` ("No clause of `price` matches" `isInfixOf`)
+            T.unpack msg `shouldSatisfy` (not . ("MkPmGroup" `isInfixOf`))
+            T.unpack msg `shouldSatisfy` (not . ("NonExhaustivePatterns" `isInfixOf`))
+          other -> expectationFailure ("Expected an error string, got " ++ show other)
+        other -> expectationFailure ("Expected one result, got " ++ show other)
+
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
 
