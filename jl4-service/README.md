@@ -174,7 +174,7 @@ A record is an object keyed by its constructor's name, holding its fields: `{"Pa
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 
-The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#ISSUE).
+The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
 
 #### Missing and uncertain inputs
 
