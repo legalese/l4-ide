@@ -160,6 +160,53 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qu
   }'
 ```
 
+### Reading the answer
+
+The answer comes back as JSON, in `value`, under `result`.
+For the applicant above, `calculate-premium` returns:
+
+```json
+{
+  "contents": { "presumed": [], "result": { "value": 1400 } },
+  "tag": "SimpleResponse"
+}
+```
+
+and `qualifies-for-discount` returns:
+
+```json
+{
+  "contents": { "presumed": [], "result": { "value": true } },
+  "tag": "SimpleResponse"
+}
+```
+
+`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; here there are none.
+
+What `value` holds depends on what the rule gives back:
+
+| The rule gives back                                   | `value` is                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `TRUE` or `FALSE`                                     | `true` or `false`                                                                                                           |
+| a number                                              | that number; one that is not whole comes back as a decimal, to about 16 significant digits: a third is `0.3333333333333333` |
+| a string                                              | that string                                                                                                                 |
+| a `DATE`                                              | the date as text, year first: `"2026-01-31"`                                                                                |
+| `NOTHING`, from a `MAYBE`                             | `null`                                                                                                                      |
+| `JUST` a value, from a `MAYBE`                        | the value itself, with nothing around it                                                                                    |
+| a list                                                | a JSON array, even when the list has only one item                                                                          |
+| one of an enum's names, such as `` `under review` ``  | the name as a string, without backticks: `"under review"`                                                                   |
+| a record, such as a `Pair` of `left` and `right side` | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
+
+Four things to know when you read an answer:
+
+- The field names inside an answer are spelled as the rule spells them, spaces included; they are not turned into hyphens.
+- A rule that gives back a `MAYBE` of a `MAYBE` answers `null` both for `NOTHING` and for `JUST NOTHING`, so the two cannot be told apart.
+- Each published rule comes with a description of its answer, its `returnSchema`.
+  That description does not yet show the record's name around a record's fields, or that a `MAYBE` answer can be `null`.
+  Go by the table above, not by the `returnSchema`, for those two.
+- A long list can come back cut short.
+  A list answer of around 200 items or more may end with two `null`s in place of the rest, still with status 200, so two `null`s at the end of a long list mean it was cut, not that items were empty.
+
 ### Interactive query plans
 
 Not sure which inputs matter? Use the query-plan endpoint to ask only the questions that affect the outcome:
