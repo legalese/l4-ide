@@ -4,7 +4,7 @@
 -- @#EVAL ((1 PLUS 1) PLUS 1)@ nested 16 levels took 15 s, nested 18 took more
 -- than a minute, and every further level doubled it.
 --
--- Two shapes did it, and both parsed the same bracketed group more than once:
+-- Three shapes did it, and each parsed the same bracketed group more than once:
 --
 --   * __a @try@ whose branch parses the whole group and then fails.__
 --     'L4.Parser.baseExpr'' tried a genitive projection (@(e)'s field@) first;
@@ -37,7 +37,8 @@ import Base
 import Control.Exception (evaluate)
 import qualified Data.Text as T
 import L4.ExactPrint (exactprint)
-import L4.Parser (execProgramParserWithHintPass)
+import L4.Parser (PError (..), execProgramParserWithHintPass)
+import L4.Parser.SrcSpan (SrcPos (..), SrcSpan (..))
 import System.Timeout (timeout)
 import Test.Hspec
 
@@ -50,7 +51,12 @@ budgetSeconds :: Int
 budgetSeconds = 30
 
 spec :: Spec
-spec =
+spec = do
+  depthSpec
+  errorSpec
+
+depthSpec :: Spec
+depthSpec =
   describe ("parsing a construct nested " <> show depth <> " levels deep finishes within " <> show budgetSeconds <> " s") $ do
     it "a left-nested arithmetic expression: ((1 PLUS 1) PLUS 1)" $
       parsesWithin ("#EVAL " <> leftNested "PLUS" <> "\n")
@@ -154,6 +160,88 @@ spec =
 
     it "brackets that ARE patterns, each holding a CONSIDER: ((CONSIDER … ) FOLLOWED BY x)" $
       parsesWithin (inWhen (nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) FOLLOWED BY x)" "x"))
+
+-- | Speeding the parser up must not move its errors. A bracket in pattern
+-- position that is neither a pattern nor an expression fails both readings,
+-- and megaparsec reports whichever got further; when such brackets nest, the
+-- error depends on both readings of every level. An earlier version of the
+-- fix (badea173a) reported the outer bracket or keyword instead in every case
+-- below, and lost the indentation diagnostic in the last one.
+--
+-- Each expected position and message is copied from what the parser reported
+-- before MATRYOSHKA was fixed: @l4 ast@ at 21467cd84 on @unstable@.
+errorSpec :: Spec
+errorSpec =
+  describe "a nest of brackets in pattern position that fail both readings reports the error the parser always reported" $ do
+    it "MUST pay ( total ( base ( price PLUS tax 's ) TIMES rate ) PLUS fee )" $
+      failsWith
+        ( T.unlines
+            [ "DECLARE Person IS ONE OF alice, bob"
+            , "DECLARE Act IS ONE OF"
+            , "  pay HAS amount IS A NUMBER"
+            , "  Deliver HAS who IS A NUMBER, what IS A NUMBER"
+            , ""
+            , "GIVETH A DEONTIC Person Act"
+            , "probe MEANS"
+            , "  PARTY alice"
+            , "  MUST pay ( total ( base ( price PLUS tax 's ) TIMES rate ) PLUS fee )"
+            , "  WITHIN 3"
+            , ""
+            , "GIVETH A NUMBER"
+            , "other MEANS 1"
+            ]
+        )
+        (9, 44)
+        ( "unexpected 's\n"
+            <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+        )
+
+    it "WHEN (((EXACTLY 1 PLUS) z PLUS) w PLUS)" $
+      failsWith (inWhen "(((EXACTLY 1 PLUS) z PLUS) w PLUS)") (3, 32) closeBracketExpected
+
+    it "WHEN (((x ,) z PLUS) w PLUS)" $
+      failsWith
+        (inWhen "(((x ,) z PLUS) w PLUS)")
+        (3, 24)
+        ( "unexpected ,\n"
+            <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, EXACTLY, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+        )
+
+    it "WHEN (f ((g (1 PLUS) y PLUS)) x PLUS)" $
+      failsWith (inWhen "(f ((g (1 PLUS) y PLUS)) x PLUS)") (3, 29) closeBracketExpected
+
+    it "WHEN (f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)" $
+      failsWith (inWhen "(f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)") (3, 31) closeBracketExpected
+
+    it "a DECIDE argument whose IF ... ELSE runs onto a line indented too little" $
+      failsWith
+        ( T.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE probe n IS 0"
+            , "DECIDE probe ((Foo OF (EXACTLY IF 3.5 THEN f ELSE "
+            , "  TRUE), \"s\") TIMES \"a(b\") IS 1"
+            ]
+        )
+        (5, 3)
+        "incorrect indentation (got 3, should be greater than 32)\n"
+  where
+    closeBracketExpected =
+      "unexpected PLUS\n"
+        <> "expecting %, ), FOLLOWED, WHERE, infix identifier, mixfix keyword, or space token\n"
+
+-- | Parse the module (both passes, as the tools do) and expect exactly one
+-- error, starting at @(line, column)@ (both from 1), whose message ends with
+-- @expected@. (The message starts with the offending source line.)
+failsWith :: Text -> (Int, Int) -> Text -> Expectation
+failsWith src at expected =
+  case execProgramParserWithHintPass uri src of
+    Right _ -> expectationFailure "parsed, but should have failed"
+    Left errs -> do
+      [(e.range.start.line, e.range.start.column) | e <- toList errs] `shouldBe` [at]
+      [T.takeEnd (T.length expected) e.message | e <- toList errs] `shouldBe` [expected]
+  where
+    uri = toNormalizedUri (Uri "file:///nested-paren-parser-spec")
 
 -- | Parse the module (both passes, as the tools do), force the whole syntax
 -- tree, and exact-print it back, all within the budget.
