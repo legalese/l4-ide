@@ -116,11 +116,17 @@ data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The typecheck results of a module's direct imports. Keyed by file alone:
+-- see 'CheckModule'.
 type instance RuleResult GetTypeCheckDependencies = [(ImportResult, TypeCheckResult)]
 data GetTypeCheckDependencies = GetTypeCheckDependencies
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The entry point callers use. Its key still carries a call stack (callers
+-- construct it as 'TypeCheck', i.e. with an empty one), but the rule ignores
+-- the stack and reads 'CheckModule', so every path to a module shares one
+-- typecheck.
 type instance RuleResult TypeCheck = TypeCheckResult
 data TypeCheck = TypeCheckNoCallstack
   deriving stock (Generic, Show, Eq)
@@ -128,6 +134,40 @@ data TypeCheck = TypeCheckNoCallstack
 
 pattern TypeCheck :: WithCallStack TypeCheck
 pattern TypeCheck = AttachCallStack [] TypeCheckNoCallstack
+
+-- | Typecheck one module, keyed by its file alone: the per-file memo behind
+-- 'TypeCheck' (smucclaw\/l4-ide#1008).
+--
+-- Imports recurse through this key, never through 'TypeCheck'. Until #1008 they
+-- recursed through 'TypeCheck' with the importer pushed onto the call stack,
+-- and since the stack is part of the key, a module was typechecked once per
+-- import PATH rather than once per file: under @l4 check@, 2^(n-2) times for
+-- the bottom module of n modules that each import every earlier one. Shake's
+-- own value store is the memo table, so a module reached a second way reuses
+-- the first result, and an edit to the file invalidates it exactly as it
+-- invalidates any other rule.
+--
+-- The name is part of the output. A file's diagnostics are stored in groups
+-- named by the 'Show' of the rule key that produced them, and printed and
+-- published in the order of those names ('setStageDiagnostics',
+-- 'getDiagnosticsFromStore'). The typechecker's group used to be named
+-- @AttachCallStack {...}@, which sorts ahead of @EvaluateLazy@ and of every
+-- @Get...@ rule. A name that sorts the same keeps a type error printed ahead
+-- of the parser's warnings and the evaluator's results, as before; named
+-- @TypeCheckFile@, it reordered the goldens of
+-- @not-ok/tc/fixity-no-leak.l4@ and @not-ok/import/unresolved-referenced.l4@.
+--
+-- Nothing is lost by dropping the stack from the recursion. Apart from passing
+-- it on, the only thing that read it was the cycle check in
+-- 'defineWithCallStack', and an import cycle never reaches that check:
+-- 'GetMixfixRegistry', keyed by file, recurses over the same imports first, and
+-- hls-graph stops it with a 'StackException'. That is still what reports a
+-- cycle, and hls-graph would stop a cycle through these per-file keys the same
+-- way.
+type instance RuleResult CheckModule = TypeCheckResult
+data CheckModule = CheckModule
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
 
 type instance RuleResult SuccessfulTypeCheck = TypeCheckResult
 data SuccessfulTypeCheck = SuccessfulTypeCheck
@@ -147,6 +187,11 @@ data TypeCheckResult = TypeCheckResult
   , infos :: [TypeCheck.CheckErrorWithContext]  -- ^ Non-fatal diagnostics ('SInfo' and 'SWarn'); don't block 'success'
   , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors ('SError' only, e.g. OutOfScopeError) for implicit ASSUME extraction
   , dependencies :: [TypeCheckResult]
+    -- ^ Every module this one reaches through IMPORT, transitively and ONCE
+    -- each: the direct imports first, in import order, then the rest in the
+    -- order the old per-path tree first met them ('closeDependencies'). Each
+    -- entry carries its own closure, so walking it recursively visits a module
+    -- once per path; use 'transitiveDependencies' for a walk.
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   , sectionPaths :: TypeCheck.SectionPaths
     -- ^ Where each binding this module can see was defined, section-wise,
@@ -162,6 +207,14 @@ data TypeCheckResult = TypeCheckResult
   deriving stock (Generic)
 
 -- | instance that doesn't force the intervalmaps because they're very large and their values are sometimes expensive
+--
+-- Nor does it force INTO 'dependencies': only the list's spine and each entry
+-- to weak head normal form. Every entry is the result of the 'CheckModule'
+-- rule for that module, which 'defineEarlyCutoff'' already forced to normal
+-- form when the rule produced it. Forcing it again only re-walks it, and since
+-- each entry carries its own closure, @rnf dependencies@ walked the import
+-- graph as a tree: about 2^k entries for the k-th module of a plain chain
+-- (smucclaw\/l4-ide#1008, where that walk was most of the CPU time).
 instance NFData TypeCheckResult where
   rnf TypeCheckResult {..} =
     rnf module'
@@ -175,18 +228,69 @@ instance NFData TypeCheckResult where
     `seq` rnf entityInfo
     `seq` rnf infos
     `seq` rnf errors
-    `seq` rnf dependencies
+    `seq` foldr seq () dependencies
     `seq` rnf mixfixRegistry
     `seq` rnf sectionPaths
     `seq` rnf implicitReaders
+
+-- | The module a result belongs to.
+moduleUriOf :: TypeCheckResult -> NormalizedUri
+moduleUriOf tc = case tc.module' of MkModule _ u _ -> u
+
+-- | The 'dependencies' of a module whose direct imports typechecked to these:
+-- the imports, then each one's own closure, keeping only the first entry for
+-- each module.
+--
+-- That is exactly the old list (@direct <> foldMap (.dependencies) direct@)
+-- with its later duplicates removed, because each import's own list was
+-- built the same way: removing later duplicates from a piece of a list never
+-- changes which entry of the whole is first. The old list held a module once
+-- per import path, and every one of them was forced and walked.
+closeDependencies :: [TypeCheckResult] -> [TypeCheckResult]
+closeDependencies direct = go Set.empty (direct <> foldMap (.dependencies) direct)
+ where
+  go _ [] = []
+  go seen (d : ds)
+    | moduleUriOf d `Set.member` seen = go seen ds
+    | otherwise = d : go (Set.insert (moduleUriOf d) seen) ds
+
+-- | Every module a result reaches through IMPORT, once each, in the order a
+-- depth-first pre-order walk of the import tree first meets it.
+--
+-- This is the order the CLI's recursive walks over 'dependencies' produced
+-- (@concatMap (\\d -> d : go d.dependencies)@) with the repeats dropped, but it
+-- visits each module once. Those walks recursed into lists that are already
+-- transitive, so they visited a module once per path; a later duplicate is
+-- always a module whose own walk has finished, so dropping it drops only
+-- repeats.
+transitiveDependencies :: TypeCheckResult -> [TypeCheckResult]
+transitiveDependencies root = snd (walk (Set.singleton (moduleUriOf root)) root.dependencies)
+ where
+  walk seen [] = (seen, [])
+  walk seen (d : ds)
+    | moduleUriOf d `Set.member` seen = walk seen ds
+    | otherwise =
+        let (seen', fromD) = walk (Set.insert (moduleUriOf d) seen) d.dependencies
+            (seen'', fromDs) = walk seen' ds
+        in  (seen'', d : fromD <> fromDs)
 
 type instance RuleResult EvaluateLazy = [EvaluateLazy.EvalDirectiveResult]
 data EvaluateLazy = EvaluateLazy
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The entry point callers use, always wrapped in 'AttachCallStack'. The rule
+-- ignores the stack and reads 'GetLazyEvaluationDependenciesFile'.
 type instance RuleResult GetLazyEvaluationDependencies = (EvaluateLazy.Environment, [EvaluateLazy.EvalDirectiveResult])
 data GetLazyEvaluationDependencies = GetLazyEvaluationDependencies
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
+-- | A module's evaluated heap on top of its imports', and its own directives'
+-- results, keyed by file alone: the per-file memo behind
+-- 'GetLazyEvaluationDependencies', as 'CheckModule' is behind 'TypeCheck'.
+type instance RuleResult GetLazyEvaluationDependenciesFile = (EvaluateLazy.Environment, [EvaluateLazy.EvalDirectiveResult])
+data GetLazyEvaluationDependenciesFile = GetLazyEvaluationDependenciesFile
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
@@ -751,7 +855,7 @@ jl4Rules evalConfig rootDirectory recorder = do
           Left errs -> do
             -- Each error keeps its 'PError' as the diagnostic's typed source
             -- (as 'checkErrorToDiagnostic' does for 'CheckErrorWithContext'
-            -- below), so 'outOfScopeAssumeQuickFix''s sibling in
+            -- below), so 'outOfScopeDeclarationQuickFix''s sibling in
             -- "LSP.L4.Handlers" can find a confusable-character error's
             -- structured 'Lexer.fixes' again via @messageOfL \@PError@.
             let mk pErr = mkFileDiagnosticWithSource uri (mkParseErrorDiagnostic pErr) pErr
@@ -876,14 +980,20 @@ jl4Rules evalConfig rootDirectory recorder = do
     (diags, imports) <- fmap unzip $ getAp $ foldTopDecls mkDiagsAndImports prog
     pure (concat diags, Just (Maybe.catMaybes imports))
 
-  defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
+  define shakeRecorder $ \GetTypeCheckDependencies uri -> do
     imports <- use_  GetImports uri
-    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) imports)
+    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses CheckModule (map (.moduleUri) imports)
     pure ([], Just ress)
 
-  defineWithCallStack shakeRecorder $ \TypeCheckNoCallstack cs uri -> do
+  -- The call stack is ignored, and nothing is reported here: the diagnostics
+  -- belong to 'CheckModule', so a module's errors are stored once, not once
+  -- per key that reads it.
+  define shakeRecorder $ \(AttachCallStack _cs TypeCheckNoCallstack) uri ->
+    ([],) <$> use CheckModule uri
+
+  define shakeRecorder $ \CheckModule uri -> do
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    (imported, dependencies) <- unzip <$> use_ GetTypeCheckDependencies uri
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 
@@ -934,7 +1044,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         , nlgMap = outputNlgMap result.program result.nlgMap
         , scopeMap = result.scopeMap
         , descMap = result.descMap
-        , dependencies = dependencies <> foldMap (.dependencies) dependencies
+        , dependencies = closeDependencies dependencies
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
         , implicitReaders = result.implicitReaders
@@ -972,14 +1082,25 @@ jl4Rules evalConfig rootDirectory recorder = do
       then pure ([], Just typeCheckResult)
       else pure ([], Nothing)
 
-  defineWithCallStack shakeRecorder $ \GetLazyEvaluationDependencies cs f -> do
+  -- Callers build this key with a call stack ('EvaluateLazy' below, @l4 lts@,
+  -- the service, the LSP's visualiser); it is ignored, and the work is done
+  -- once per file by 'GetLazyEvaluationDependenciesFile'.
+  define shakeRecorder $ \(AttachCallStack _cs GetLazyEvaluationDependencies) f ->
+    ([],) <$> use GetLazyEvaluationDependenciesFile f
+
+  -- Evaluates a module on top of its imports' heaps, keyed by file alone, for
+  -- the reason given at 'CheckModule'. Until smucclaw\/l4-ide#1008 the
+  -- imports recursed with a growing call stack in the key, so an imported
+  -- module, and every #EVAL and #ASSERT in it, was evaluated once per import
+  -- path, each time into a heap of its own. Everything above a module now
+  -- shares its one heap, as everything above a module in a chain always did; a
+  -- thunk forced from one importer is forced for all of them. Two importers
+  -- forcing one thunk at once is the case the NOTE above 'evalRef' allows for:
+  -- a thunk is blackholed per thread, so the second thread evaluates it too.
+  define shakeRecorder $ \GetLazyEvaluationDependenciesFile f -> do
     imports <- use_  GetImports f
     tcRes   <- use_  SuccessfulTypeCheck f
-    -- TODO: when checking for cycles, we should check which one is the
-    -- first element in the cycle that is, i.e. which IMPORT, then scan
-    -- for the IMPORT again and
-    -- put the diagnostic on that IMPORT
-    deps    <- fmap catMaybes $ uses (AttachCallStack (f : cs) GetLazyEvaluationDependencies) $ map (.moduleUri) imports
+    deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
     let environment = mconcat (fst <$> deps)
         -- the modules this one imports, transitively and once each (a diamond of
         -- imports would otherwise list a module once per path): the JSON decoder

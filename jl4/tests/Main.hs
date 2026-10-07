@@ -463,8 +463,7 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
           -- them in step; they now cannot diverge. The dependencies ride along:
           -- a heralded call in a directive can name a rule an imported module
           -- defines, and its sentence is read from there.
-          let deps = let go = concatMap (\d -> d.module' : go d.dependencies)
-                     in go checkResult.dependencies
+          let deps = map (.module') (Rules.transitiveDependencies checkResult)
           in Text.unlines $ Nlg.linearizeDirectives Nothing checkResult.module' deps
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
   let output = normalizeWhitespace $ stripAnsiCodes $

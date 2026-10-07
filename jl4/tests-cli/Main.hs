@@ -230,6 +230,11 @@ cycle2Entry      = fixtureDir </> "cycle2"     </> "dua.l4"
 selfImportEntry  = fixtureDir </> "selfimport" </> "solo.l4"
 cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
 
+-- Diamond whose bottom module (d.l4) has a type error: top imports a, b and d;
+-- a and b import d. Regression fixture for smucclaw/l4-ide#1008.
+dupDiagDiamondEntry :: FilePath
+dupDiagDiamondEntry = fixtureDir </> "dup-diag-diamond" </> "top.l4"
+
 -- Diamond over the embedded-library fallback (issue #906): main imports two
 -- embedded siblings that share the embedded 'daydate' bottom.
 embeddedDiamondEntry :: FilePath
@@ -359,6 +364,7 @@ coreFixtures =
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
+  , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
@@ -1721,6 +1727,17 @@ spec bin = do
       -- Guard: the broadened 'any non-eval Error diagnostic fails the run'
       -- rule must NOT over-fire on a legitimate clean import.
       expectOk bin ["check", cleanImportEntry] "Check succeeded."
+
+  -- Regression test for smucclaw/l4-ide#1008: every module used to be checked
+  -- (and evaluated) once per import PATH, so a type error in a module reached by
+  -- several paths was reported once per path (10 times under `check`, 36 under
+  -- `run` on this fixture). It must be reported exactly once.
+  describe "l4 diagnostics in a shared imported module" $
+    for_ ["check", "run"] \cmd ->
+      it ("reports a type error in a diamond's bottom module once under " <> cmd) $ do
+        Output code sout serr <- runL4 bin [cmd, dupDiagDiamondEntry]
+        code `shouldNotBe` ExitSuccess
+        countInfix "The second input of function" (sout <> serr) `shouldBe` 1
 
   -- Regression test for smucclaw/l4-ide#906: a diamond import over the
   -- embedded-library fallback used to starve the second sibling of the shared

@@ -523,6 +523,11 @@ reproduced, replace this paragraph with the file and the two outputs.
 
 **Severity: low. Already scheduled, recorded so it is not forgotten between now and then.**
 
+**DISCHARGED.** The term role was repointed on 2026-09-06 (`e7531ba72`): an out-of-scope term now gets a section `GIVEN`, or the enclosing rule's `GIVEN`.
+The type role followed on 2026-10-07 (branch `fix/lsp-unknown-type-declare`): an out-of-scope type now gets a bodiless `DECLARE T`, per `IMPLICIT-PROPS-DESIGN.md` §11.1.1.
+Neither offers an `ASSUME`, and the handler is now `outOfScopeDeclarationQuickFix`; see `IMPLICIT-PROPS-DESIGN.md` §11.1.3.
+The text below is the finding as recorded on 2026-09-05; its line numbers are no longer current.
+
 `outOfScopeAssumeQuickFix` (`jl4-lsp/app/LSP/L4/Handlers.hs:1010`, offered at `:336`) resolves an
 out-of-scope name by offering to insert an `ASSUME`. R0 (`IMPLICIT-PROPS-DESIGN.md` §11.1)
 deprecates `ASSUME`, so the editor's own quick fix will be generating the deprecated spelling for as
@@ -631,7 +636,7 @@ Filed by whoever holds GitHub write authority. **Nothing here has been posted ex
 | OF-11      | Nothing — a wording change plus a grep, not an issue.                                                                                                                                               |
 | OF-12      | Nothing until it is costed; an issue asking for an unscoped tool is not a request anyone can act on.                                                                                                |
 | OF-9       | Nothing until it is reproduced. It is recorded on report and says so.                                                                                                                               |
-| OF-10      | Nothing — scheduled behind discharge.                                                                                                                                                               |
+| OF-10      | Nothing — discharged (term role 2026-09-06, type role 2026-10-07); see OF-10.                                                                                                                       |
 | OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15, on `unstable` since #338.                                                                                                             |
 | OF-13      | **FILED** 2026-10-06 as smucclaw/l4-ide#1005.                                                                                                                                                       |
 | OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006.                                                                                                                                                       |

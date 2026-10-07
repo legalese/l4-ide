@@ -28,6 +28,7 @@ module TestData (
   timeInputsJL4,
   wireProbeJL4,
   declineLabelsJL4,
+  twoDatesJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -660,6 +661,20 @@ GIVEN flag   IS A BOOLEAN
       unused IS A BOOLEAN
 GIVETH A DATE
 dated MEANS IF flag THEN `start date` ELSE `end date`
+|]
+
+-- | Two DATE inputs. TODATE reads "2026/01/31" although the direct path's ISO
+-- parser does not, so when the other one is not a date at all, the service
+-- must name that one.
+twoDatesJL4 :: Text
+twoDatesJL4 =
+  [i|
+@export two dates
+GIVEN `d one` IS A DATE
+      `d two` IS A DATE
+      pad     IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `later` IS 1
 |]
 
 -- | A rule GIVEN with a TYPICALLY default, beside an unread input that lets a

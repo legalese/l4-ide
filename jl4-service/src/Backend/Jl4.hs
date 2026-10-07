@@ -10,7 +10,7 @@ import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
 import qualified L4.Evaluate.ValueLazy as Eval
 import qualified L4.EvaluateLazy as Eval
-import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment)
+import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, parseDateText, parseTimeText, parseDatetimeText)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import L4.EvaluateLazy.Trace
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
@@ -212,9 +212,11 @@ typecheckAndEvalBundle moduleContext evalFiles = do
 
         -- Build evaluator import environments for files that need them.
         -- Uses GetLazyEvaluationDependencies which recursively evaluates imports.
-        -- Within the same session, Shake reuses already-evaluated imports.
-        -- We use per-file `use` (not batch `uses`) because each call needs its
-        -- own AttachCallStack with the file's URI for cycle detection.
+        -- Within the same session, Shake reuses already-evaluated imports: the
+        -- rule ignores the call stack in its key and evaluates each file once
+        -- (GetLazyEvaluationDependenciesFile, smucclaw/l4-ide#1008). Before
+        -- that, the stack made each file's imports separate keys, and nothing
+        -- was shared between bundle files.
         let evalUriMap = [(path, uri) | (path, _, uri) <- fileNfps
                                       , path `elem` evalFiles]
         evalPairs <- forM evalUriMap $ \(path, uri) -> do
@@ -951,7 +953,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
+      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
         (wrapperPresumed presumption plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
@@ -1162,7 +1164,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
+      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
         (wrapperPresumed presumption plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
@@ -1274,10 +1276,26 @@ fnLiteralToJson = \case
 -- the envelope's included, so @JUST NOTHING@ arrived as no value at all and
 -- @JUST (LIST x)@ as a one-element list that was then unwrapped to @x@
 -- (smucclaw/l4-ide#1003).
+--
+-- So a top-level answer that converts to 'FnUnknown' is returned as @null@
+-- with status 200, as on the direct path. Before the fix for #1003 this
+-- path's handler refused it with "Evaluation produced unknown value";
+-- dropping that refusal is deliberate.
+-- 'FnUnknown' at the top level is now @NOTHING@ or @JUST NOTHING@, which are
+-- answers: refusing it here would refuse on this path an answer the direct
+-- path gives. "Could not compute" does not arrive as @null@ on either path:
+-- an evaluation that fails is 'Eval.ReducedErrored' and is refused. Nor can
+-- the top-level value be the evaluator's 'Eval.Omitted' truncation marker:
+-- 'Eval.nf' starts at depth 'maximumStackSize' (200) and marks 'Eval.Omitted'
+-- only below depth 0, so the direct path's answer is read at depth 200 and
+-- this path's, one level inside the envelope, at 199. 'Eval.Omitted' appears
+-- only nested, as the @null@s that end a list answer cut short at the README's
+-- limit on list answers.
 handleEvalResult
   :: EntityInfo
   -> Eval.EvalDirectiveValue
   -> Maybe EvalTrace
+  -> Text  -- ^ the function's name, for a NOTHING no input explains
   -> GeneratedCode
   -> [(Text, Maybe FnLiteral)]  -- ^ the request's inputs, to say why a NOTHING came back
   -> TraceLevel
@@ -1285,7 +1303,7 @@ handleEvalResult
   -> Module Resolved
   -> [Text]
   -> ExceptT EvaluatorError IO ResponseWithReason
-handleEvalResult ei result trace genCode params traceLevel includeGraphViz mModule presumed = do
+handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule presumed = do
   answer <- case (genCode.answerShape, result) of
     (WrappedInJust, Eval.Reduction (Eval.Reduced envelope)) ->
       Eval.Reduction . Eval.Reduced <$> openEnvelope envelope
@@ -1299,7 +1317,7 @@ handleEvalResult ei result trace genCode params traceLevel includeGraphViz mModu
       Eval.MkNF (Eval.ValConstructor con [inner])
         | getUnique con == TypeCheck.justUnique -> pure inner
       Eval.MkNF (Eval.ValConstructor con [])
-        | getUnique con == TypeCheck.nothingUnique -> throwError (wrapperDeclined genCode params)
+        | getUnique con == TypeCheck.nothingUnique -> throwError (wrapperDeclined fnName genCode params)
       _ -> throwError $ InterpreterError "L4: the generated wrapper answered neither JUST nor NOTHING."
 
 -- | Why a wrapper answered NOTHING. It does so without calling the function
@@ -1310,29 +1328,39 @@ handleEvalResult ei result trace genCode params traceLevel includeGraphViz mModu
 -- is reported with the message the direct path gives for it. When both happen,
 -- the absent input is named, though the wrapper may have stopped earlier, at
 -- a string it could not parse.
-wrapperDeclined :: GeneratedCode -> [(Text, Maybe FnLiteral)] -> EvaluatorError
-wrapperDeclined genCode params = InterpreterError $
+wrapperDeclined :: Text -> GeneratedCode -> [(Text, Maybe FnLiteral)] -> EvaluatorError
+wrapperDeclined fnName genCode params = InterpreterError $
   case (filter (absent . valueOf) required, if null failing then unparsed else failing) of
     (input : _, _) -> label input <> ": missing required parameter"
     ([], [(input, ty, s)]) -> label input <> ": could not read " <> Text.textShow s <> " as a " <> ty
     ([], candidates@(_ : _)) ->
       "One of these inputs could not be read: "
         <> Text.intercalate ", " [ label input <> " as a " <> ty | (input, ty, _) <- candidates ]
-    ([], []) -> "L4: the generated wrapper did not call the function, and no input explains why."
+    -- Defensive: no request is known to reach this. A wrapper answers NOTHING
+    -- only for a required input that is absent or a temporal string it cannot
+    -- parse, and both are caught above; a value of the wrong JSON type stops
+    -- JSONDECODE with an error of its own before the envelope is read. No
+    -- test pins this message.
+    ([], []) ->
+      "L4: the generated wrapper did not call '" <> fnName
+        <> "', and no input explains why. The inputs it checked: "
+        <> (if null required then "none" else Text.intercalate ", " (map label required))
+        <> "."
   where
     required = genCode.requiredInputs
     valueOf input = join (lookup input.inputName params)
     unparsed =
       [ (input, ty, s)
       | input <- required, Just ty <- [input.parsedAs], Just (FnLitString s) <- [valueOf input] ]
-    -- The direct path's parsers pick out the string that failed. Should they
-    -- disagree with the wrapper's TODATE, TOTIME or TODATETIME, every candidate
-    -- is listed instead.
+    -- The wrapper's own parsers, those of TODATE, TOTIME and TODATETIME, pick
+    -- out the string that failed. The direct path's ISO parsers are stricter
+    -- ("2026/01/31" is a DATE to TODATE and not to parseIsoDate), so with two
+    -- such inputs they could blame one the wrapper had read.
     failing = [ c | c@(_, ty, s) <- unparsed, not (parses ty s) ]
     parses = \case
-      "DATE"     -> isJust . parseIsoDate
-      "TIME"     -> isJust . parseIsoTime
-      "DATETIME" -> isJust . parseIsoDatetime
+      "DATE"     -> isJust . parseDateText
+      "TIME"     -> isJust . parseTimeText
+      "DATETIME" -> isJust . parseDatetimeText
       _          -> const False
     -- the direct path's labels: only an ASSUME the author wrote is called one
     label input
@@ -1407,7 +1435,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 case mEvalRes of
                   Nothing -> throwError $ InterpreterError (mconcat errs)
                   Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
-                    handleEvalResult tcRes.entityInfo result trace genCode plan.wpArguments traceLevel includeGraphViz tcRes.module'
+                    handleEvalResult tcRes.entityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz tcRes.module'
                       (wrapperPresumed presumption plan r.presumed)
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."

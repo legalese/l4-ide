@@ -482,12 +482,14 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
 
--- | Every module the checked one reaches through @IMPORT@, transitively, in
--- dependency order; a diamond appears once per path, so 'dedupModules' it.
+-- | Every module the checked one reaches through @IMPORT@, transitively, once
+-- each, in the order a depth-first walk of the imports first meets it
+-- ('Rules.transitiveDependencies'). This used to recurse into each
+-- dependency's own list, which is already transitive, so it listed a module
+-- once per import path and took time exponential in the depth of the imports
+-- (smucclaw\/l4-ide#1008). 'dedupModules' is now a no-op on it.
 transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
-transitiveDeps tc = go tc.dependencies
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
+transitiveDeps tc = map (.module') (Rules.transitiveDependencies tc)
 
 dedupModules :: [Module Resolved] -> [Module Resolved]
 dedupModules = List.nubBy (\a b -> muri a == muri b)

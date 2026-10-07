@@ -565,10 +565,15 @@ isOutOfScope OutOfScopeError{} = True
 isOutOfScope _                 = False
 
 -- | Collect all DECLARE entries from a TypeCheckResult and its transitive imports.
+--
+-- Each module is read once ('Rules.transitiveDependencies'), in the order the
+-- old recursion into @tc.dependencies@ first met it, so the left-biased union
+-- keeps the same entry for a name declared twice. That recursion read a module
+-- once per import path, exponentially many times in the depth of the imports
+-- (smucclaw\/l4-ide#1008).
 collectAllDeclares :: Rules.TypeCheckResult -> Map Text (Declare Resolved)
 collectAllDeclares tc =
-  declaresFromModule tc.module'
-    <> foldMap collectAllDeclares tc.dependencies
+  foldMap (declaresFromModule . (.module')) (tc : Rules.transitiveDependencies tc)
 
 -- | Display the return type of an exported function as a user-facing string.
 -- Delegates to 'prettyTypeForDisplay' so the rendering matches exactly what the

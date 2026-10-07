@@ -233,6 +233,7 @@ test-suite jl4-core-test
     LadderFreshIdSpec
     MixfixParserSpec
     NestedParenParserSpec
+    MixfixRegistryMergeSpec
     EventExactPrintSpec
     FormatFidelitySpec
     PatternMatchParserSpec

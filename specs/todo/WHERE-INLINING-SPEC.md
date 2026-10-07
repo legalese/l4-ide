@@ -147,7 +147,7 @@ The part that needs a ruling is **atom identity**: two expansions should share a
 Findings 3 and 4 show the new engine currently gets that wrong in both directions.
 A named same-section call meets the condition by construction (finding 1), and that is the common house-style case.
 This paragraph is argued, not built.
-_Changed:_ the substitution is built as §9.2's `unfoldOnce`, and for the ladder the identity question is answered by an assumption, not a ruling: R3 (§10.1), derived from the evaluator's ruling C1.
+_Changed:_ the substitution is built as §9.2's `unfoldOnce`, and for the ladder the identity question is answered by R3 (§10.1), ruled 2026-10-07: the same proposition is the same C1 term key.
 The callee's own local bindings are inlined before it is drawn and a call whose body still binds locally is left unexpanded, so nothing needs freshening (§10.4).
 
 ## 4. Where it lives
@@ -239,7 +239,7 @@ not table-shaped. Separate change, separate spec.
   capture.
   §3.1 (2026-09-23) had measured the open question this leaves for the ladder: atom identity across
   expansions, which the expand gesture then got wrong in both directions.
-  §10.1 answers it for the ladder with R3, which is assumed, not ruled.
+  §10.1 answers it for the ladder with R3, ruled 2026-10-07.
 
 ## 9. Reading through calls to other rules (2026-09-29)
 
@@ -372,18 +372,19 @@ How a panel and a NOT's bubble are drawn was ruled the same day and is recorded 
 
 ### 10.1 The identity rule
 
-> **R3** (assumed, not ruled: derived from C1, below). Two boxes of one diagram are the same proposition exactly when they carry the same `atomId`.
-> An expansion's `atomId`s are computed in the **caller's** context after substitution: the called rule's body, with the call's arguments in place of its parameters, is drawn under the caller's function name and in the caller's translation state.
+> **R3** (**ANSWERED 2026-10-07**, ruled by Meng). Two boxes of one diagram are the same proposition exactly when they carry the same **C1 term key**.
+> A call box's key is the called rule together with the C1 keys of its arguments.
+> An expansion's leaves are keyed in the **caller's** context after substitution: the called rule's body, with the call's arguments in place of its parameters, is keyed as if the caller had written it.
 > So the `a` inlined from `limb a b` is the caller's own `a`, `limb a b` and `limb c d` share no atom, and two copies of `limb a b` share every atom.
+> The `atomId` is that key's implementation; today's printed-label `atomId` (below) is interim, and wherever it differs from the C1 key that is a defect, not behaviour (smucclaw/l4-ide#1013).
 
-R3 has no ruling of its own.
-What prompted it is Meng's question of 2026-10-05, quoted above ("clicking in one term should toggle all instances to match"), and its authority is the evaluator's identity ruling, C1 of `UNKNOWN-EVALUATION-SPEC.md` (bench card C1, accepted by Meng 2026-10-01, recorded at `:1171`), of which R3 is the ladder's projection.
-If the projection is wrong, C1 stands and R3 changes.
+Ruling, 2026-10-07, asked inline in session `ladder-ref-trans`: option "C1's term key", over "the printed label, as built" and "no sharing across copies"; condition: the key stays stable across recompiles and the ladder and the query plan agree on it (#935); Meng's note: "seems like we should be prioritizing correctness over ease of implementation".
+What prompted the rule is Meng's question of 2026-10-05, quoted above ("clicking in one term should toggle all instances to match"), and its basis is the evaluator's identity ruling, C1 of `UNKNOWN-EVALUATION-SPEC.md` (bench card C1, accepted by Meng 2026-10-01, recorded at `:1171`), of which R3 is the ladder's projection.
 C1 keys every term by its structure: "an input, a field path, a built-in operation over terms, a join, an assumed call, and a comparison over any of these" (`UNKNOWN-EVALUATION-SPEC.md:472`).
 A call to a rule the module defines is not an atom there; it is unfolded, so `older 18` leaves no trace of `older` (`:308-309`).
 The ladder keeps the call as a box, because that is what the reader wrote, but the call's expansion is that unfolding, and R3 gives each of its leaves the key it would have if the caller had written the argument in place.
 
-The projection is not exact.
+The implementation is not yet exact.
 The ladder's `atomId` is a UUID5 over the function name, the leaf's **printed label**, and the labels of its transitive input references (`atomIdByUnique` and `atomIdsOfLabels`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:206-275`).
 That equals C1's term key only where printing is injective, and it is not everywhere (§10.6).
 
@@ -523,10 +524,10 @@ With the mixfix labels of §10.6 and the folded-call conduction fix of `ladder-d
   Unlike `restoreMixfixPatterns` it does not stop at operators defined in the module, since a label is never re-parsed; whether that reaches the cross-module case (smucclaw/l4-ide#968) is untested.
   Guarded by `VisualiseExpansionOptInSpec.hs` (the fixture above, with and without expansions; it failed with the stamping reverted) and by a `LadderModel` test on the captured shape.
   **Still open in `jl4-service`**, whose compiled module carries no registry: there a mixfix call still prints its head keyword only, so the service and the IDE give such a call different labels and `atomId`s, and two calls sharing a head keyword still share one.
-  This is the clearest case of R3's printed key falling short of C1's term key.
+  This is the clearest case of the printed key falling short of C1's term key, and under R3 it is a defect (smucclaw/l4-ide#1013).
 - **The printed label is not C1's term key.**
-  If the ladder's `atomId` is ever moved onto C1's key, the alignment point is #556 (UNKNOWN-EVALUATION step 3, stacked on #554, #553 and #541), which keys atoms by evaluated term in `jl4-core`; steps 4 to 7 of that spec are parked (MOTHBALL, #538).
-  No change here.
+  R3 requires the ladder's `atomId` to move onto C1's key (smucclaw/l4-ide#1013); the alignment point is #556 (UNKNOWN-EVALUATION step 3, stacked on #554, #553 and #541), which keys atoms by evaluated term in `jl4-core`; steps 4 to 7 of that spec are parked (MOTHBALL, #538).
+  Not done yet.
 - **`hasDefForInlining` still compares against `cfg.moduleUri`** (`Ladder.hs:338`), the URI derived from the document id a caller passes, which is the pitfall §9.6 names; the `App []` case beside it already uses the typechecker's own URI (`Ladder.hs:584-588`).
   A caller that passes a synthetic document id would get no `canInline` and no expansions.
   No caller that turns expansions on does that today; not fixed here.
