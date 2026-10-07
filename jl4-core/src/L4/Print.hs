@@ -672,6 +672,20 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
           -- (@l4 batch@ and the REPL run the printed module).
           Just clauses ->
             printWithLayout (writtenSignature tySig) : clauses
+          -- A group that will not read back as a group, whose inputs the
+          -- desugarer named: a plain definition, with each input renamed to
+          -- a name its body does not use (see 'unusedInputNames').
+          Nothing
+            | Just _ <- Optics.view annPmMatrix ann
+            , MkAppForm _ hd args maka <- appForm
+            , any (isGeneratedName . rawName . getName) args ->
+                [ printWithLayout (writtenSignature tySig)
+                , "DECIDE" <+> printWithLayout hd
+                    <> foldMap ((space <>) . pretty . quoteIfNeeded) (unusedInputNames (length args) expr)
+                    <> foldMap ((space <>) . printWithLayout) maka
+                    <+> "IS"
+                , indent 2 (printWithLayout expr)
+                ]
           Nothing ->
             [ printWithLayout tySig
             , "DECIDE" <+> printWithLayout appForm <+> "IS"
@@ -709,6 +723,19 @@ writtenClauses ann (MkAppForm _ hd _ maka) expr = do
         ]
     | (i, (pats, body)) <- zip [0 :: Int ..] clauses
     ]
+
+-- | Names for the inputs of a group whose only clause left matches anything
+-- and whose inputs the desugarer named ('writtenClauses' gives up on it: one
+-- clause with no distinguishing pattern reads back as a plain definition).
+-- That clause's body never reads its inputs, so they need only be distinct,
+-- and spelled unlike every name the body does use, so that none of those can
+-- be read as an input in the printed module. Printing the desugarer's own
+-- names here would do exactly that: @`input 1`@ in source is the drafter's.
+unusedInputNames :: HasName a => Int -> Expr a -> [Text]
+unusedInputNames n body = take n (filter (`notElem` used) candidates)
+  where
+    used = map (nameToText . getName) (toList body)
+    candidates = [ "_" <> Text.textShow i <> Text.replicate k "'" | k <- [0 :: Int ..], i <- [1 .. n] ]
 
 -- | The body of each clause of a group that its tree still holds, in order,
 -- found by the marks 'L4.Parser.matchClauses' leaves: a clause is tested by

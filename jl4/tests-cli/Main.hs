@@ -129,7 +129,8 @@ batchClausesBooleans = fixtureDir </> "batch-multi-clause-booleans.json"
 
 -- | Groups whose clauses, printed from the source text, meant something
 -- else in the printed module (review of legalese/l4-ide#545, round 2).
-batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs, batchClausesString, batchClausesB :: FilePath
+batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs, batchClausesString, batchClausesB, batchClausesCatchAll :: FilePath
+batchClausesCatchAll  = fixtureDir </> "batch-multi-clause-catch-all.l4"
 batchClausesDitto     = fixtureDir </> "batch-multi-clause-ditto.l4"
 batchClausesDittoHead = fixtureDir </> "batch-multi-clause-ditto-head.l4"
 batchClausesFixity    = fixtureDir </> "batch-multi-clause-fixity.l4"
@@ -394,7 +395,7 @@ coreFixtures =
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
-  , batchClausesString, batchClausesB
+  , batchClausesString, batchClausesB, batchClausesCatchAll
   ]
 
 spec :: FilePath -> Spec
@@ -1284,6 +1285,11 @@ spec bin = do
       it "reads a drafter's definition named like an input of a group with no GIVEN" $
         results [batchClauses, "-e", "through", "--inputs", batchClausesColours]
           >>= (`shouldBe` map ok [String "Blue", String "Red", String "Green"])
+      it "reads a drafter's `input 1` in a group whose only clause left matches anything" $ do
+        results [batchClausesCatchAll, "-e", "one", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+        results [batchClausesCatchAll, "-e", "two", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
       it "tests the input a pattern variable is named after, not the variable" $
         results [batchClausesCapture, "-e", "capture", "--inputs", batchClausesBooleans]
           >>= (`shouldBe` map ok [Number 1, Number 2, Number 1, Number 2])
