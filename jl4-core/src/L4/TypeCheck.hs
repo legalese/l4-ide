@@ -11,6 +11,7 @@ module L4.TypeCheck
   , doCheckProgramWithDependencies
   , initialCheckState
   , initialCheckEnv
+  , isClausesBinding
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
@@ -1132,7 +1133,9 @@ inferDecide dec@(MkDecide ann _tysig _appForm expr) = do
     -- whole body, WHERE-bound helpers included. Redundancy warnings stay
     -- active. See 'L4.Export.isNonexhaustiveDecide' / 'DescFlags'.
     withNonexhaustiveFlag $ lookupFunTypeSigByAnno ann >>= \ dHead -> do
-        decide <- extendKnownMany dHead.arguments $ do
+        -- The respelled inputs come first, so that each input's own name is
+        -- the one its entity is recorded under.
+        decide <- extendKnownMany (clauseInputSpellings dec dHead <> dHead.arguments) $ do
           rexpr <- settleOneClause do
             rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
             -- Clause-matrix exhaustiveness for multi-clause pattern-matching
@@ -1219,6 +1222,69 @@ isClausesBinding = \ case
     Just (PmUnreachable _) -> True
     _ -> False
   LocalAssume {} -> False
+
+-- | A multi-clause group whose clauses have a different number of patterns
+-- than its GIVEN names inputs, a GIVEN that declares only type parameters
+-- included. The desugarer then made up a name for each input
+-- ('L4.Parser.desugarPatternClauses'), so the GIVEN and the definition
+-- disagree on every name, and every message about that would be about names
+-- the drafter never wrote. Say what is wrong once, at the first clause, and
+-- check the group as if its GIVEN named the made-up inputs, untyped, after any
+-- type parameters it declares, so that nothing else is reported about them.
+--
+-- The inputs the GIVEN does name are no inputs of the group, but a clause
+-- body may still read one; each is kept in scope at the type the GIVEN
+-- declares ('givenInputsInScope'), so that such a body is checked as written
+-- and draws no error about the name.
+--
+-- Returns the signature to check the definition against, and those inputs.
+clauseInputsAgainstGiven :: Decide Name -> Check (TypeSig Name, [OptionallyTypedName Name])
+clauseInputsAgainstGiven dec@(MkDecide ann tysig@(MkTypeSig tann (MkGivenSig gann otns) mgiveth) appForm _) =
+  case view annPmMatrix ann of
+    Just matrix | givenMisnamesInputs dec -> do
+      let firstHead = listToMaybe matrix.clauses >>= (.headRange)
+          givenInputs = filter isTerm otns
+      addError (ClausePatternCountMismatch firstHead (getName appForm) (length matrix.scrutinees) (length givenInputs))
+      pure (MkTypeSig tann (MkGivenSig gann (filter (not . isTerm) otns <> map untyped matrix.scrutinees)) mgiveth, givenInputs)
+    _ -> pure (tysig, [])
+  where
+    untyped n = MkOptionallyTypedName emptyAnno n Nothing Nothing
+
+-- | The inputs a GIVEN names when they are no inputs of its multi-clause group
+-- ('clauseInputsAgainstGiven'), in scope at the type the GIVEN declares, or at
+-- one nothing constrains when it declares none. Run where the GIVEN's type
+-- parameters are in scope, so that a declared type may mention them.
+givenInputsInScope :: [OptionallyTypedName Name] -> Check [CheckInfo]
+givenInputsInScope = traverse \ (MkOptionallyTypedName _ n mty _) -> do
+  rn <- def n
+  ty <- maybe (fresh (rawName n)) inferType mty
+  pure (makeKnown rn (KnownTerm ty Local))
+
+-- | Does this multi-clause group have a GIVEN, but not one that names one
+-- input per pattern? (The desugarer made up the inputs' names when it does
+-- not; with no GIVEN at all, that is how the inputs are meant to be named.)
+givenMisnamesInputs :: Decide Name -> Bool
+givenMisnamesInputs (MkDecide ann (MkTypeSig _ (MkGivenSig _ otns) _) _ _) =
+  case view annPmMatrix ann of
+    Just matrix -> matrix.synthesizedScrutinees && not (null otns)
+    Nothing     -> False
+
+-- | The names a multi-clause group's generated CONSIDERs read its GIVEN
+-- inputs by ('L4.Parser.scrutineeRef'): each input's name respelled with
+-- 'PreDef', which no source can write, made another name of the same input.
+-- A pattern variable that a clause binds, which may have the input's name,
+-- then cannot capture the reference. A group with no GIVEN for its inputs
+-- needs none: the desugarer's names for them are spelled so already.
+clauseInputSpellings :: Decide Name -> FunTypeSig -> [CheckInfo]
+clauseInputSpellings dec dHead = case view annPmMatrix (getAnno dec) of
+  Just matrix | not matrix.synthesizedScrutinees ->
+    [ makeKnown (Def (getUnique r) (MkName (getAnno o) (PreDef (nameToText o)))) ci.checkEntity
+    | ci <- dHead.arguments
+    , r <- ci.names
+    , let o = getOriginal r
+    , rawName o `elem` map rawName matrix.scrutinees
+    ]
+  _ -> []
 
 -- | Check the @LET@ a multi-clause group is compiled to: a binding of the
 -- clauses not yet tried ('PmFallthrough', or 'PmUnreachable' after a clause
@@ -1320,13 +1386,35 @@ speculatively m = MkCheck \ e s ->
 checkClauseMatrix :: Decide Name -> FunTypeSig -> Check Bool
 checkClauseMatrix dec dHead =
   case view annPmMatrix (getAnno dec) of
+    -- The clauses do not match the GIVEN ('clauseInputsAgainstGiven'), so
+    -- which clauses are missing, or never used, is a question to ask once
+    -- they do. Saying it is settled also withdraws a one-clause group's
+    -- CONSIDER warnings ('settleOneClause').
+    Just _ | givenMisnamesInputs dec -> pure True
     Just matrix -> do
+      recordInputPatterns matrix
       (answered, redundant) <- analyseMatrix matrix
       warnUnreachableClauses matrix (getName dHead.rappForm) redundant
       pure answered
     Nothing -> pure False
   where
     MkAppForm _ _ colScruts _ = dHead.rappForm
+
+    -- | A pattern that is its input's own name compiles to nothing
+    -- ('L4.Parser.patAlwaysMatchesAs'), so no checked node sits under it.
+    -- Record the input's type there, so that hover on it answers as it does
+    -- on the input, not with whatever node encloses it.
+    recordInputPatterns :: PmMatrix -> Check ()
+    recordInputPatterns matrix = do
+      ei <- asks (.entityInfo)
+      for_ matrix.clauses \ cl ->
+        for_ (zip colScruts cl.patterns) \ (r, p) -> case p of
+          PatApp _ n []
+            | rawName n == rawName (getName r)
+            , Just range <- rangeOf n
+            , Just (_, KnownTerm ty _) <- Map.lookup (getUnique r) ei
+            -> addInfoForSrcRange range (TypeInfo ty (Just Local))
+          _ -> pure ()
 
     -- @nonexhaustive: the author declares the group deliberately partial, so
     -- the missing-clause warning is silenced. Unreachable clauses are a bug
@@ -1464,9 +1552,9 @@ checkClauseMatrix dec dHead =
     -- desugars to nothing) — so the suggested clause is valid, pasteable
     -- L4. Nested wildcards inside applied constructors stay @`_`@.
     --
-    -- A group with no GIVEN has no such name: its columns are the
-    -- desugarer's @_pm_arg_i@, which is not the drafter's and must not be
-    -- printed, so the column stays @`_`@ like a nested wildcard.
+    -- A group with no GIVEN has no such name: its columns are names the
+    -- desugarer made up (@input 1@), which no source can write, so the
+    -- column stays @`_`@ like a nested wildcard.
     renderColumnWildcard :: Resolved -> Pattern Resolved -> Pattern Resolved
     renderColumnWildcard scrutR = \ case
       PatVar a v
@@ -6333,7 +6421,9 @@ scanFunSigLocalDecl = \ case
 scanFunSigDecide :: Decide Name -> Check FunTypeSig
 scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
   decideErrorContext d do
-    (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig
+    (inputsSig, givenInputs) <- clauseInputsAgainstGiven d
+    (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm inputsSig
+    unboundInputs <- extendKnownMany extendsTySig (givenInputsInScope givenInputs)
     -- Determine if this DECIDE is a synthetic computed field function
     cfMap <- asks (.computedFields)
     let funcRawName = rawName (getName appForm)
@@ -6366,7 +6456,7 @@ scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
       , rappForm
       , resultType = result
       , name = name'
-      , arguments = extendsTySig <> extendsAppForm
+      , arguments = extendsTySig <> extendsAppForm <> unboundInputs
       , mixfixInfo = mMixfix
       }
 
@@ -6944,6 +7034,14 @@ prettyCheckError (InconsistentNameInAppForm n (Just n'))   =
   , ""
   , "  " <> prettyNameWithRange n'
   ]
+prettyCheckError (ClausePatternCountMismatch _ n patterns inputs) =
+  [ "Each clause of " <> quotedName n <> " has " <> counted patterns "pattern"
+      <> ", but its GIVEN names " <> counted inputs "input" <> "."
+  , "A clause needs one pattern for each input the GIVEN names, in the same order."
+  ]
+  where
+    counted 0 noun = "no " <> noun <> "s"
+    counted k noun = Text.textShow k <> " " <> noun <> (if k == 1 then "" else "s")
 prettyCheckError (AmbiguousTermError n rs)                 =
   [ "There are multiple definitions for the identifier"
   , ""

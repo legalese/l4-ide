@@ -1,12 +1,16 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-pattern-matching-fallthrough-name.l4:17:8-19:
+pattern-matching-fallthrough-name.l4:21:8-19:
   I found a problem while checking the definition of `refs user`:
     This clause of `refs user` is never used.
     The clause above it matches every input, so `refs user` never gets this far.
     Move this clause above that one, or remove it.
-pattern-matching-fallthrough-name.l4:19:1-24:
+pattern-matching-fallthrough-name.l4:23:1-24:
   7
-pattern-matching-fallthrough-name.l4:20:1-22:
+pattern-matching-fallthrough-name.l4:24:1-22:
   7
+pattern-matching-fallthrough-name.l4:37:1-27:
+  7
+pattern-matching-fallthrough-name.l4:38:1-29:
+  2

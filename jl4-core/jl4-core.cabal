@@ -254,6 +254,7 @@ test-suite jl4-core-test
     TracePostprocessSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    MultiClausePrintSpec
     PrettyLayoutNlgSpec
     NlgMultiplicitySpec
     NlgAttachmentSpec
