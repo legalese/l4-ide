@@ -36,6 +36,7 @@ import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.DeepSeq (NFData)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (bracket_, evaluate)
 import Control.Monad.IO.Class (liftIO)
@@ -737,14 +738,14 @@ runAppM env action = runHandler $ runReaderT action env
 -- Uses configurable eval timeout and per-evaluation allocation limits.
 -- Returns the result and the number of GHC allocation bytes consumed.
 -- Hitting either limit fails the request with a 500.
-timeoutAction :: IO b -> AppM (b, Int64)
+timeoutAction :: NFData b => IO b -> AppM (b, Int64)
 timeoutAction act = withEvalLimits act >>= either (const resourceLimitExceeded) pure
 
 resourceLimitExceeded :: AppM a
 resourceLimitExceeded = throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
 
 -- | 'EvalLimits.withEvalLimits' under the service's configured limits.
-withEvalLimits :: IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
+withEvalLimits :: NFData b => IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits act = do
   cfg <- asks (.options)
   liftIO (EvalLimits.withEvalLimits cfg act)

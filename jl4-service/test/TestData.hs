@@ -45,6 +45,7 @@ module TestData (
   spinJL4,
   spinOrRefuseJL4,
   spinWrapperJL4,
+  powerJL4,
   heavyLibJL4,
   heavyMainJL4,
 ) where
@@ -973,6 +974,24 @@ GIVEN
   u IS A MAYBE BOOLEAN
 GIVETH A BOOLEAN
 DECIDE spin IF `count down` n EQUALS 0
+|]
+
+-- | A number the evaluator leaves unfinished: @(10 TO THE POWER 40) TO THE
+-- POWER n@, built by repeated multiplication. The evaluation returns while
+-- the multiplications are still thunks, and they are done when the answer is
+-- forced (smucclaw/l4-ide#1019).
+powerJL4 :: Text
+powerJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`power of a big base` n MEANS
+  IF n AT MOST 0 THEN 1 ELSE 10000000000000000000000000000000000000000 * `power of a big base` (n - 1)
+
+@export default three to the power n
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE power IS `power of a big base` n
 |]
 
 -- | An imported value that costs about 33 MB to compute: more than a case has

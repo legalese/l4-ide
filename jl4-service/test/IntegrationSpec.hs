@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, heavyLibJL4, heavyMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1169,6 +1169,37 @@ spec = describe "integration" do
               , CaseAnswered ]
             map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
               `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
+
+    -- smucclaw/l4-ide#1019. The evaluation returns an unfinished number at
+    -- once; its digits used to be computed by the JSON encoder, after both
+    -- limits were off.
+    describe "arithmetic the evaluator leaves unfinished" do
+      let hasty = testOptions { evalTimeout = 1, maxEvalMemoryMb = 100_000 }
+          power n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+
+      it "answers a number that finishes inside the limits" do
+        withServiceFromSourcesOpts hasty "power-ok" [("power.l4", powerJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "power-ok" "power" (power 2)
+          assertSuccess resp \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt (10 ^ (80 :: Int)))
+
+      it "stops a number that does not, inside the time limit" do
+        withServiceFromSourcesOpts hasty "power-slow" [("power.l4", powerJL4)] \baseUrl mgr -> do
+          t0 <- getCurrentTime
+          resp <- evalFunction baseUrl mgr "power-slow" "power" (power powerSlow)
+          t1 <- getCurrentTime
+          statusCode' resp `shouldBe` 500
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          -- the limit is one second; finishing the number took 12 s without it
+          (realToFrac (diffUTCTime t1 t0) :: Double) `shouldSatisfy` (< 4)
+
+      it "reports a batch case whose number does not, and answers the cases around it" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts hasty "power-batch" [("power.l4", powerJL4)] \baseUrl mgr -> do
+            resp <- postBatchTo baseUrl mgr "power-batch" "power" [2, powerSlow, 2]
+            expectBatchOutcomes resp
+              [ CaseAnswered
+              , CaseLimited TimeLimitHit "Evaluation resource limit exceeded: this case did not finish within the time limit of 1 s (--eval-timeout)"
+              , CaseAnswered ]
 
     -- smucclaw/l4-ide#1020. A limit hit while forcing an imported value left
     -- the forcing thread's mark on the value's thunk, which outlives the
@@ -2895,6 +2926,12 @@ spinFast = 150_000
 -- | Steps that take about a fifth of 'spinOptions'' 3-second limit (about 0.65 s).
 spinFifth :: Int
 spinFifth = 500_000
+
+-- | The exponent at which 'powerJL4' takes 12 s to answer, nearly all of it
+-- after the evaluator has returned (an M-series Mac, 2026-10-07: 3.1 s at
+-- 20,000, with the number forced only by the JSON encoder).
+powerSlow :: Int
+powerSlow = 40_000
 
 -- | Steps that would take some twenty minutes.
 spinSlow :: Int

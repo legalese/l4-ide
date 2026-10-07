@@ -92,6 +92,7 @@ library
     vector,
     -- Concurrency / state
     async,
+    deepseq,
     stm,
     -- Serialization (CBOR)
     serialise,

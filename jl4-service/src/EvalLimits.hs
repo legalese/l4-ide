@@ -4,9 +4,11 @@
 --
 -- What they cover: the evaluation itself, on the direct path (the calling
 -- thread) and on the generated-wrapper path (a Shake rule on another thread,
--- see 'currentAllocationLimit'). Arithmetic the evaluator leaves unfinished is
--- finished while the response is encoded, outside both (measured 2026-10-03;
--- the jl4-service README, "What the limits do not cover yet").
+-- see 'currentAllocationLimit'); and the result, which is forced to normal
+-- form inside the limits, so arithmetic the evaluator left unfinished is
+-- finished under the clock and the allocation counter, not while the response
+-- is encoded. What they do not cover is in the jl4-service README, "What the
+-- limits do not cover yet".
 module EvalLimits (
   LimitHit (..),
   withEvalLimits,
@@ -15,7 +17,8 @@ module EvalLimits (
 ) where
 
 import Backend.Api (LimitHit (..))
-import Control.Exception (catch, finally)
+import Control.DeepSeq (NFData, force)
+import Control.Exception (catch, evaluate, finally)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Int (Int64)
@@ -56,13 +59,19 @@ limitHitMessage cfg = \case
 -- connection the next request runs on the same thread, so before the MCP
 -- server came through here, 5 of 40 kept-alive calls near the limit dropped
 -- their connection (measured 2026-10-02).
-withEvalLimits :: Options -> IO b -> IO (Either (LimitHit, Int64) (b, Int64))
+--
+-- The result is forced to normal form inside the limits (hence 'NFData'): a
+-- number built up lazily, a reasoning tree or a GraphViz rendering is
+-- otherwise finished by the JSON encoder after both limits are off
+-- (smucclaw/l4-ide#1019). 'NFData' is on what the response encodes, so
+-- forcing it computes nothing the response would not.
+withEvalLimits :: NFData b => Options -> IO b -> IO (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits cfg act =
   ( do
       writeIORef allocationLimitRef (Just memLimitBytes)
       setAllocationCounter memLimitBytes
       enableAllocationLimit
-      result <- timeout timeoutMicros act
+      result <- timeout timeoutMicros (act >>= evaluate . force)
       allocBytes <- (memLimitBytes -) <$> getAllocationCounter
       pure $ maybe (Left (TimeLimitHit, allocBytes)) (\r -> Right (r, allocBytes)) result
   ) `catch` (\AllocationLimitExceeded -> pure (Left (AllocationLimitHit, memLimitBytes)))
