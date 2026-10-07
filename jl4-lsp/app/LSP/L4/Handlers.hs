@@ -1008,21 +1008,25 @@ findHover ide fileUri pos = runMaybeT $ refHover <|> tyHover
 -- LSP Code Actions
 -- ----------------------------------------------------------------------------
 
--- | The one code action: for a name no definition supplies, declare it as a
--- @GIVEN@ — of the nearest @§@ heading, or of the enclosing rule. The edit is
--- computed by 'outOfScopeGivenFix' in "LSP.L4.Actions", where it is testable
--- without an IDE; this handler only fetches the checked module and wraps the
--- result as a 'CodeAction'. (Before 2026-09-06 it inserted an @ASSUME@.)
+-- | The out-of-scope quick fix: for a name no definition supplies, declare
+-- it — a term as a @GIVEN@ of the nearest @§@ heading or of the enclosing
+-- rule, a type as a bodiless @DECLARE@ above the declaration that uses it.
+-- The edit is computed by 'outOfScopeFix' in "LSP.L4.Actions", where it is
+-- testable without an IDE; this handler only fetches the checked module and
+-- its tokens and wraps the result as a 'CodeAction'. (Before 2026-09-06 it
+-- inserted an @ASSUME@; until 2026-10-07 a type got the term's @GIVEN@.)
 outOfScopeAssumeQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
 outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
   Nothing -> pure Nothing
   Just ctx -> case ctx.kind of
     OutOfScopeError name ty -> do
-      mTypeCheck <- liftIO $ runAction "codeAction.outOfScope" ide $ do
-        use TypeCheck nuri
+      mInputs <- liftIO $ runAction "codeAction.outOfScope" ide $ do
+        mTypeCheck <- use TypeCheck nuri
+        mLex       <- use GetLexTokens nuri
+        pure ((,) <$> mTypeCheck <*> mLex)
       pure $ do
-        typeCheck <- mTypeCheck
-        fix <- outOfScopeGivenFix typeCheck.module' name ty
+        (typeCheck, (tokens, _)) <- mInputs
+        fix <- outOfScopeFix tokens typeCheck.module' name ty
         Just $ CodeAction
           { _title = fix.title
           , _kind = Just CodeActionKind_QuickFix

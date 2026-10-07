@@ -161,6 +161,16 @@ looks inside an opaque value still evaluates normally.
   at all is a misspelt declaration that nothing uses. If you meant a synonym,
   check that the keyword reads `IS`.
 
+#### In the editor
+
+When you use a type name that nothing declares, the editor flags it with "I could not find a definition for the identifier".
+Click the lightbulb on that error (or run the "Quick Fix" command) and choose "Declare `Widget` as a type".
+It adds `DECLARE Widget` on its own line directly above the declaration that uses the name, which makes `Widget` an opaque type like the ones above.
+The new line goes above any `@desc`, `@nlg` or other annotation on that declaration, so each annotation stays with the declaration it describes.
+When the name is used in a section's own `GIVEN`, the line goes above the section's `§` heading instead, where the whole section can see it.
+If the use gives the type arguments, as in `Box OF NUMBER`, the declaration gets one parameter for each: `DECLARE Box a`.
+The fix declares an opaque type and nothing more; if you meant a record or a list of alternatives, add the `HAS` or `IS ONE OF` part yourself.
+
 #### The older spelling
 
 `ASSUME TypeName IS A TYPE` declares the same thing and still works. The two
