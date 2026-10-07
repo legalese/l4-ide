@@ -11,6 +11,7 @@ module L4.TypeCheck
   , doCheckProgramWithDependencies
   , initialCheckState
   , initialCheckEnv
+  , isClausesBinding
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext

@@ -530,7 +530,7 @@ handlers evalConfig recorder =
                             Just t  -> "DEONTIC" `Text.isPrefixOf` t
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) givenParams
+                        paramChildren = map (givenParamToSymbol lspRange) (filter writtenParam givenParams)
                         localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals body)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
                   Nothing -> []
@@ -632,10 +632,16 @@ handlers evalConfig recorder =
               | "FUNCTION" `Text.isPrefixOf` tyText        = SymbolKind_Field
               | otherwise                                 = SymbolKind_TypeParameter
 
+            -- The bindings a multi-clause definition is compiled to
+            -- ('PmSynthetic'), and the inputs its desugarer named, are not
+            -- things the drafter wrote, so the outline leaves them out.
             collectLocals :: Expr Resolved -> [LocalDecl Resolved]
-            collectLocals (Where _ _ locals)  = locals
-            collectLocals (LetIn _ locals _)  = locals
+            collectLocals (Where _ _ locals)  = filter (not . isClausesBinding) locals
+            collectLocals (LetIn _ locals _)  = filter (not . isClausesBinding) locals
             collectLocals _                   = []
+
+            writtenParam :: OptionallyTypedName Resolved -> Bool
+            writtenParam (MkOptionallyTypedName _ pn _ _) = not (isGeneratedName (rawName (getOriginal pn)))
 
             localDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> LSP.Range -> LocalDecl Resolved -> [DocumentSymbol]
             localDeclToSymbol moduleNuri subst entInfo parentRange = \case
