@@ -1,0 +1,40 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-multi-clause-expression.l4:23:1-31:
+  30
+typically-multi-clause-expression.l4:24:1-33:
+  18
+typically-multi-clause-expression.l4:25:1-44:
+  30
+typically-multi-clause-expression.l4:26:1-32:
+  0
+typically-multi-clause-expression.l4:37:1-25:
+  18
+typically-multi-clause-expression.l4:38:1-27:
+  101
+typically-multi-clause-expression.l4:39:1-26:
+  0
+typically-multi-clause-expression.l4:51:1-20:
+  18
+typically-multi-clause-expression.l4:52:1-22:
+  7
+typically-multi-clause-expression.l4:53:1-21:
+  10
+typically-multi-clause-expression.l4:60:8-18:
+  I found a problem while checking the definition of `no given`:
+    This clause of `no given` is never used.
+    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
+    Remove it, or change its patterns.
+typically-multi-clause-expression.l4:62:1-21:
+  18
+typically-multi-clause-expression.l4:63:1-22:
+  1
+typically-multi-clause-expression.l4:69:8-20:
+  I found a problem while checking the definition of `one clause`:
+    This clause does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `one clause` NOTHING r2 IS
+    
+typically-multi-clause-expression.l4:71:1-36:
+  5
