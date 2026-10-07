@@ -232,6 +232,7 @@ test-suite jl4-core-test
     DeprecatedAssumeSpec
     LadderFreshIdSpec
     MixfixParserSpec
+    NestedParenParserSpec
     EventExactPrintSpec
     FormatFidelitySpec
     PatternMatchParserSpec
