@@ -19,6 +19,7 @@ import qualified L4.Export.Render as Render
 import L4.JsonSchema (SchemaContext (..))
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
+import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
 import qualified L4.Parser.SrcSpan as JL4
 import L4.Syntax
 import qualified L4.TypeCheck as JL4
@@ -109,6 +110,20 @@ main = do
       forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ExactPrintIdentity evalConfig inputFile
+    -- Invariant: the parser's memo of bracketed groups changes nothing
+    -- (MATRYOSHKA, smucclaw/l4-ide#1017). 'L4.Parser.memoGroup' replays a
+    -- group's first parse wherever the group is reached again, which is exact
+    -- only while the invariants documented there hold. If one breaks, the memo
+    -- replays a wrong syntax tree or a wrong error SILENTLY: the file still
+    -- parses, or still fails, and nothing else need move. So every file the
+    -- blocks in this suite read, those that fail to parse included, is parsed
+    -- with the memo on and off, and the two answers must be equal to the
+    -- token. jl4-core-test's NestedParenParserSpec does the same on deeper
+    -- and broken nests, which the corpus has few of.
+    describe "parser memo changes nothing (memo on = memo off; #1017)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportPlacementFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4ParserMemoChangesNothing inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
@@ -203,6 +218,34 @@ jl4ExactPrintIdentity evalConfig inputFile = do
           "\n  first difference at line " <> show i
             <> "\n  source:    " <> show s
             <> "\n  exactprint:" <> show o
+
+-- | Assert that the parser answers the same on a file with its memo of
+-- bracketed groups on ('execProgramParserWithHintPass', what the tools run)
+-- and off: the same syntax tree, hints and warnings when the file parses, and
+-- the same errors, message and position, when it does not.
+jl4ParserMemoChangesNothing :: FilePath -> IO ()
+jl4ParserMemoChangesNothing inputFile = do
+  src <- Text.readFile inputFile
+  let uri = toNormalizedUri (filePathToUri inputFile)
+      memoOn = execProgramParserWithHintPass uri src
+      memoOff = execProgramParserWithHintPassUnmemoised uri src
+  when (memoOn /= memoOff) $
+    expectationFailure $
+      "the parser's memo changed its answer on " <> inputFile <> case (memoOn, memoOff) of
+        (Left on, Left off) ->
+          "\n  memo on:\n" <> errors on <> "\n  memo off:\n" <> errors off
+        _ ->
+          -- A syntax tree is too big to print whole; show where the two
+          -- first differ.
+          let shownOn = show memoOn
+              shownOff = show memoOff
+              differAt = length (takeWhile id (List.zipWith (==) shownOn shownOff))
+              excerpt shown = take 400 (drop (max 0 (differAt - 200)) shown)
+          in  "\n  first difference at character " <> show differAt <> " of the shown answers"
+                <> "\n  memo on:  " <> excerpt shownOn
+                <> "\n  memo off: " <> excerpt shownOff
+  where
+    errors errs = unlines [show e.range <> "\n" <> Text.unpack e.message | e <- toList errs]
 
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
