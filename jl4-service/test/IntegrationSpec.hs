@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1395,6 +1395,26 @@ spec = describe "integration" do
                 ]
             ])
         statusCode' waiting `shouldBe` 422
+        reportOf waiting `shouldBe` Just "default"
+
+    -- Decided by Claude 2026-10-07, pending Meng's review. @p AND TRUE@ is @p@:
+    -- a bare unknown inside the wrapper's JUST must be undetermined and name
+    -- the input, as on the direct path, and not "#EVAL produced ASSUME".
+    it "names the input when a wrapper-path answer is the bare missing input" do
+      withServiceFromSources "bare-input" [("gate.l4", bareInputJL4)] \baseUrl mgr -> do
+        let ask q = evalFunction baseUrl mgr "bare-input" "gate"
+              (Aeson.object
+                [ "arguments" Aeson..= Aeson.object [ "p" Aeson..= Aeson.object [], "q" Aeson..= q ] ])
+            textOf = Text.Encoding.decodeUtf8 . LBS.toStrict . responseBody
+        -- positive control: the same request, decided by q, answers
+        decided <- ask False
+        statusCode' decided `shouldBe` 200
+        -- the answer is p itself
+        waiting <- ask True
+        statusCode' waiting `shouldBe` 422
+        textOf waiting `shouldSatisfy` Text.isInfixOf "I could not continue evaluating"
+        textOf waiting `shouldSatisfy` Text.isInfixOf "`p (not supplied)`"
+        textOf waiting `shouldSatisfy` (not . Text.isInfixOf "produced ASSUME")
         reportOf waiting `shouldBe` Just "default"
 
     it "is \"default\" in an MCP tool's answer, and in its undetermined error" do

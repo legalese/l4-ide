@@ -1321,7 +1321,14 @@ handleEvalResult
 handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule presumed = do
   answer <- case (genCode.answerShape, result) of
     (WrappedInJust, Eval.Reduction (Eval.Reduced envelope)) ->
-      Eval.Reduction . Eval.Reduced <$> openEnvelope envelope
+      openEnvelope envelope >>= \ case
+        -- a bare unknown input inside the JUST is undetermined, as on the direct
+        -- path (UNKNOWN-EVALUATION-SPEC §2.5; decided by Claude 2026-10-07,
+        -- pending Meng's review)
+        Eval.MkNF (Eval.ValAssumed r ty) ->
+          throwError $ InterpreterError $ unInputFieldsIn $ Eval.prettyReductionOutcome $
+            Eval.ReducedUndetermined (Eval.TInput r ty :| [])
+        inner -> pure (Eval.Reduction (Eval.Reduced inner))
     -- the wrapper names an input's field @x (input)@: say @x@, as the direct path does
     (_, Eval.Reduction (Eval.ReducedErrored evalExc)) ->
       throwError $ InterpreterError $ unInputFieldsIn $ Text.unlines (Eval.prettyEvalException evalExc)
