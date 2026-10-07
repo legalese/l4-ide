@@ -21,8 +21,9 @@ DECIDE `consider in clause two` NOTHING  c IS
   WHEN Red   THEN 1
   WHEN Green THEN 2
 
--- (2) A definition whose name looks like one the compiler generates keeps
--- its warning: no Green, no Blue.
+-- (2) A definition named like the compiler's generated definitions were
+-- named until 2026-10-07 is an ordinary definition, and keeps its warning: no
+-- Green, no Blue.
 GIVEN c IS A Colour
 GIVETH A NUMBER
 `__pm_fallthrough_0` c MEANS

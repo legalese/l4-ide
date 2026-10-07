@@ -1,25 +1,25 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-pattern-matching-clause-hygiene.l4:72:1-45:
+pattern-matching-clause-hygiene.l4:73:1-45:
   2
-pattern-matching-clause-hygiene.l4:73:1-35:
+pattern-matching-clause-hygiene.l4:74:1-35:
   0
-pattern-matching-clause-hygiene.l4:74:1-39:
+pattern-matching-clause-hygiene.l4:75:1-39:
   0
-pattern-matching-clause-hygiene.l4:75:1-28:
+pattern-matching-clause-hygiene.l4:76:1-28:
   1
-pattern-matching-clause-hygiene.l4:78:1-25:
+pattern-matching-clause-hygiene.l4:79:1-25:
   No clause of `two clauses` matches these inputs.
   The value that the last clause could not match is
     Blue
   Add a clause for this case, or end the clauses with one that matches every input.
-pattern-matching-clause-hygiene.l4:79:1-26:
+pattern-matching-clause-hygiene.l4:80:1-26:
   The only clause of `one clause` does not match these inputs.
   The value it could not match is
     Square
   Add a clause for this case.
-pattern-matching-clause-hygiene.l4:82:1-32:
+pattern-matching-clause-hygiene.l4:83:1-32:
   The value
     Blue
   reached a CONSIDER that has no branch for it.

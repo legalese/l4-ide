@@ -324,9 +324,13 @@ completions rope nuri typeCheck pos@(Position ln col) = do
 
       keywordItems = map mkKeyWordCompletionItem keyWordMatches
 
-      -- NOTE: combine toplevel check info and info brought in scope
+      -- NOTE: combine toplevel check info and info brought in scope. A name
+      -- the compiler made up (the inputs and clause bindings of a multi-clause
+      -- definition, and the second spelling of a GIVEN input it reads them
+      -- by) cannot be written in source, so it is never offered.
       finalCheckInfos
-        = Map.unionsWith (\a b -> nub $ a <> b)
+        = Map.filterWithKey (\name _ -> not (isGeneratedName name))
+        $ Map.unionsWith (\a b -> nub $ a <> b)
         $ map (uncurry combineEnvironmentEntityInfo)
         $ (typeCheck.environment, typeCheck.entityInfo)
             : map snd (IV.search (lspPositionToSrcPos pos) typeCheck.scopeMap)

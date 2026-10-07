@@ -35,6 +35,8 @@ data RawName =
   -- ^ contains the actual name and a list of qualifiers, e.g.
   -- foo.bar becomes @'QualifiedName' bar [foo]@
   | PreDef Text
+  -- ^ a name the compiler made up, which no source can write: the parser
+  -- never produces it ('L4.Parser.generatedName', 'isGeneratedName')
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -90,6 +92,39 @@ rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
 
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
+
+-- | Is this pattern /distinguishable/, i.e. clearly a pattern rather than a
+-- plain parameter name? True for literals, applied constructors (@JUST x@),
+-- cons (@x FOLLOWED BY xs@) and EXACTLY expressions. False for a bare
+-- @PatApp n []@, which at parse time (before scope-checking) is ambiguous
+-- between a variable binder and a nullary constructor such as @EMPTY@ / @TRUE@.
+-- Grouping into a pattern match is only triggered when a clause carries at
+-- least one distinguishable pattern ('L4.Parser.decidePatternMatch').
+isDistinguishablePat :: Pattern Name -> Bool
+isDistinguishablePat = \ case
+  PatLit {}     -> True
+  PatCons {}    -> True
+  PatExpr {}    -> True
+  PatApp _ _ ps -> not (null ps)
+  PatVar {}     -> False
+
+-- | Does this pattern of a multi-clause group always match its scrutinee
+-- /without introducing a new binding/? True for the anonymous wildcard @_@ and
+-- for a variable pattern that reuses the scrutinee's own name (so the binding
+-- is already in scope). Named wildcards (@_foo@) and differently-named
+-- variables still bind, via a WHEN ('L4.Parser.matchClauses').
+patAlwaysMatchesAs :: Name -> Pattern Name -> Bool
+patAlwaysMatchesAs s (PatApp _ n []) =
+  nameToText n == "_" || rawName n == rawName s
+patAlwaysMatchesAs _ _ = False
+
+-- | Is this a name the compiler made up ('PreDef')? Such a name has no
+-- source of its own, so nothing that offers names to a drafter (completion,
+-- the outline) or prints source should show it.
+isGeneratedName :: RawName -> Bool
+isGeneratedName = \ case
+  PreDef _ -> True
+  _        -> False
 
 data Type' n =
     Type   Anno -- ^ the type of types
@@ -458,10 +493,11 @@ instance ToExpr PmMatrixClause where
 -- (quietly) against the GIVEN column types. Not 'GHC.Generic' — see
 -- 'PmMatrixClause'.
 data PmMatrix = MkPmMatrix
-  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @_pm_arg_i@)
+  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @input i@)
   , synthesizedScrutinees :: Bool
-    -- ^ the group has no GIVEN naming its inputs, so 'scrutinees' are the
-    -- desugarer's @_pm_arg_i@, which no diagnostic may print
+    -- ^ the group has no GIVEN naming one input per pattern, so 'scrutinees'
+    -- are names the desugarer made up ('L4.Parser.generatedName'), which no
+    -- source can write, so no suggested clause may use them
   , clauses    :: [PmMatrixClause]
   , catchAll   :: Maybe Int
     -- ^ index of the first clause every one of whose patterns matches

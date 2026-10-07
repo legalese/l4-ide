@@ -47,17 +47,19 @@ DECIDE `odd last pattern` (JUST 1) IS 1
 DECIDE `odd last pattern` NOTHING  IS 2
 DECIDE `odd last pattern` TRUE     IS 3
 
--- (3) The clauses after one that matches every input are checked, then
--- dropped, so the clause before them cannot see their binding: a body that
--- names it is reported as an unknown name here, rather than passing the check
--- and failing when it runs.
+-- (3) No clause body can read the local definitions the clauses compile to,
+-- whether the clauses they hold can run or not: those definitions have names
+-- no source can spell. A body that writes out the text of one names a
+-- definition that does not exist, and is reported as an unknown name.
+-- (Until 2026-10-07 they were `__pm_fallthrough_<k>`, which a body could
+-- read.)
 GIVEN c IS A Colour
 GIVETH A NUMBER
-DECIDE `refs dead` c   IS `__pm_fallthrough_0`
-DECIDE `refs dead` Red IS 2
+DECIDE `refs live` Red   IS `the result of clauses 2 to 3`
+DECIDE `refs live` Green IS 2
+DECIDE `refs live` c     IS 3
 
 GIVEN c IS A Colour
 GIVETH A NUMBER
-DECIDE `refs mid` Red   IS 1
-DECIDE `refs mid` c     IS `__pm_fallthrough_1`
-DECIDE `refs mid` Green IS 3
+DECIDE `refs dead` c   IS `the result of clause 2`
+DECIDE `refs dead` Red IS 2

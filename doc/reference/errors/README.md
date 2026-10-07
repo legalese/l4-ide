@@ -22,6 +22,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
   - [Function arity mismatch](#function-arity-mismatch)
+  - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
   - [APPEND vs append](#append-vs-append)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
@@ -306,6 +307,54 @@ result MEANS
 **What went wrong:** The function was defined with a certain number of GIVEN parameters, and you provided a different number of arguments.
 
 **How to fix it:** Check the function's definition to see how many arguments it expects, and provide exactly that many. If you intentionally want to supply fewer arguments (partial application), make sure the context supports it.
+
+---
+
+### Clauses with more or fewer patterns than the GIVEN names
+
+**Error message:**
+
+```
+Each clause of `g` has 2 patterns, but its GIVEN names 1 input.
+A clause needs one pattern for each input the GIVEN names, in the same order.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE g Red   Red IS 1
+DECIDE g Green c   IS 2
+```
+
+**What went wrong:** A rule written as a list of clauses takes its inputs from the `GIVEN` above the clauses, in order.
+The first pattern in each clause is matched against the first input the `GIVEN` names, the second pattern against the second input, and so on.
+Here each clause has two patterns, but the `GIVEN` names only one input, `c`, so L4 cannot tell which input each pattern is about.
+The error appears once, at the first clause.
+A clause body may still read an input the `GIVEN` names; L4 checks it against the type the `GIVEN` declares, so only a body that uses it as something else draws a second error.
+L4 says nothing about missing or unused clauses until the counts agree.
+
+A `GIVEN` that declares only a type, such as `GIVEN a IS A TYPE`, names no inputs, so clauses with patterns under it draw the same error, ending "its GIVEN names no inputs".
+
+**How to fix it:** Name one input in the `GIVEN` for each pattern, in the order the patterns appear:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+DECIDE g Red   Red IS 1
+DECIDE g Green d   IS 2
+```
+
+or give every clause one pattern for each input the `GIVEN` names.
+
+A list of clauses with no `GIVEN` at all is allowed.
+L4 then works out the type of each input from the patterns, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
 
 ---
 

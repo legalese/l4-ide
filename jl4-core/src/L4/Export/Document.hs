@@ -48,8 +48,9 @@ import Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as Map
 import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
-import Optics (gplate, (%), (^.))
+import Optics (gplate, toListOf, (%), (^.))
 
+import L4.Annotation (emptyAnno)
 import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
@@ -748,7 +749,7 @@ unitRendering u = case u.uDecl of
     -- render as an attached "where:" block.
     | otherwise ->
         let subst              = paramSubst tysig
-            (inner, locals)    = peelWhere body
+            (inner, locals)    = peelWhere (clauseLayout body)
             (conn, mainClause) = decideRendering tysig (rewriteExpr (substParams subst inner))
         in case mapMaybe (localDefClause subst) locals of
              []   -> (conn, mainClause)
@@ -788,6 +789,65 @@ decideRendering tysig body
       (connectorFor tysig body, toClause body)
  where
   fieldPair (MkNamedExpr _ f v) = (resolvedText f, leafText v)
+
+-- | Lay out a rule written as a list of clauses the way its clauses read.
+--
+-- The desugarer compiles the clauses to CONSIDERs ('PmConsider') that hand
+-- the input to a local definition holding the later clauses ('PmFallthrough',
+-- see 'L4.Parser.matchClauses') when they do not match. Read off as it stands,
+-- that tree renders each such definition as a "where" entry, and loses every
+-- one nested inside another, which is every one after the first. So:
+--
+-- * a definition of the later clauses that is read once, as it is whenever the
+--   clauses test a single input, is put in place of the reading, and a
+--   CONSIDER that then tests the same input in its OTHERWISE is merged into
+--   its parent, so that the clauses read as one list of cases;
+--
+-- * one read more than once, which happens when clauses test several inputs,
+--   is kept, and moved to the top, where 'peelWhere' renders it as a "where"
+--   entry named for the clauses it holds.
+--
+-- Only nodes carrying the desugarer's marks are touched; any other rule is
+-- returned unchanged.
+clauseLayout :: Expr Resolved -> Expr Resolved
+clauseLayout = hoist . transformOf (gplate @(Expr Resolved)) merge . transformOf (gplate @(Expr Resolved)) inline
+ where
+  inline = \case
+    LetIn _ [LocalDecide _ (MkDecide dann _ (MkAppForm _ ft [] _) later)] e
+      | isLaterClauses dann
+      , length (filter (readsName ft) (everyExpr e)) <= 1 ->
+          transformOf (gplate @(Expr Resolved)) (\x -> if readsName ft x then later else x) e
+    e -> e
+  merge = \case
+    Consider ann s brs
+      | isGenerated ann
+      , Just (front, MkBranch _ (Otherwise _) (Consider ann' s' brs')) <- List.unsnoc brs
+      , isGenerated ann'
+      , sameInput s s' -> Consider ann s (front <> brs')
+    e -> e
+  hoist e = case [ d | LetIn _ ds _ <- everyExpr e, d <- ds, laterClausesDecl d ] of
+    [] -> e
+    ds -> LetIn emptyAnno ds (transformOf (gplate @(Expr Resolved)) unwrap e)
+  unwrap = \case
+    LetIn _ ds e | all laterClausesDecl ds -> e
+    e -> e
+  laterClausesDecl = \case
+    LocalDecide _ (MkDecide dann _ _ _) -> isLaterClauses dann
+    LocalAssume{} -> False
+  isLaterClauses dann = case dann ^. annPmSynthetic of
+    Just (PmFallthrough _) -> True
+    _ -> False
+  isGenerated ann = case ann ^. annPmSynthetic of
+    Just (PmConsider{}) -> True
+    _ -> False
+  readsName n = \case
+    Var _ r      -> getUnique r == getUnique n
+    App _ r []   -> getUnique r == getUnique n
+    _            -> False
+  sameInput a b = case (a, b) of
+    (App _ r [], App _ r' []) -> getUnique r == getUnique r'
+    _ -> False
+  everyExpr x = x : concatMap everyExpr (toListOf (gplate @(Expr Resolved)) x)
 
 -- | Peel a top-level @WHERE@ / @LET … IN@ wrapper off a rule body, returning the
 -- inner body and its local definitions. Only the rule's own top-level locals are
