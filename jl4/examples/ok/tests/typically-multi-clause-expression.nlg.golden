@@ -1,0 +1,13 @@
+`price of` where `c` is `Red`, `rate` is 3 by default and `mult` is the product of `standard rate` and 2 by default
+`price of` where `c` is `Green`, `rate` is 3 by default and `mult` is the product of `standard rate` and 2 by default
+`price of` where `c` is `Green`, `rate` is 5 and `mult` is the product of `standard rate` and 2 by default
+`price of` where `c` is `Blue`, `rate` is 3 by default and `mult` is the product of `standard rate` and 2 by default
+`via consider` with `Red`
+`via consider` with `Green`
+`via consider` with `Blue`
+`grouped` with `Red`
+`grouped` with `Green`
+`grouped` with `Blue`
+`no given` with `Red`
+`no given` with `Blue`
+`one clause` where `m` is `JUST` with 1 and `r2` is 4 by default
