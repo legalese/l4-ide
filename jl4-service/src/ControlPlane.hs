@@ -163,23 +163,21 @@ postDeploymentHandler multipart = do
   -- The recompile shortcut is keyed on the CONTENT hash, so it must also be
   -- keyed on the requested id. Matching content alone meant that asking for a
   -- new deployment whose bytes happened to equal an existing one returned HTTP
-  -- 202 naming the OTHER deployment, and created nothing: a subsequent
-  -- @GET /deployments/<the id you asked for>@ 404s. Documented as "skips
-  -- recompilation", it actually skipped deployment creation. Deploying the
-  -- same bundle twice under two names is exactly what you do to compare them,
-  -- and the caller had no way to tell it had not happened.
-  let existingMatch =
-        [ (did, meta)
-        | (did, DeploymentReady _ meta) <- Map.toList registry
-        , meta.metaVersion == version
-        , did == deployId
-        ]
-
-  case existingMatch of
-    ((existingId, existingMeta):_) ->
-      -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
-      pure (mkStatus existingId.unDeploymentId "ready" (Just existingMeta) Nothing)
-    [] -> do
+  -- 202 naming the OTHER deployment, with its metadata, and created nothing: a
+  -- subsequent @GET /deployments/<the id you asked for>@ 404s. Documented as
+  -- "skips recompilation", it actually skipped deployment creation. Deploying
+  -- the same bundle twice under two names is exactly what you do to compare
+  -- them, and the caller had no way to tell it had not happened.
+  --
+  -- An upload without an id was given a fresh UUID above, so it never matches
+  -- here: it always compiles and takes a deployment slot (README, "Validation
+  -- rules").
+  case Map.lookup deployId registry of
+    Just (DeploymentReady _ existingMeta)
+      | existingMeta.metaVersion == version ->
+        -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
+        pure (mkStatus deployId.unDeploymentId "ready" (Just existingMeta) Nothing)
+    _ -> do
       let cfg = env.options
           isNew = not (Map.member deployId registry)
       when (isNew && Map.size registry >= cfg.maxDeployments) $

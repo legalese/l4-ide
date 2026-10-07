@@ -17,14 +17,16 @@ This change keeps main's request handling and carries #562's handling of the wra
   Before, main answered such a request 200 with the string `"NOTHING"`, as if the rule had.
 - Deploying a bundle whose sources equal an existing deployment's, under a different id, now creates that deployment; before, the service answered "ready" naming the other deployment and created nothing.
   An upload with no id gets a fresh UUID, so it is never matched either: each one creates a new deployment, where main answered "ready" with the existing one whose sources matched.
+  So a client that redeploys in a loop without an id now gains a deployment per upload, up to `--max-deployments` (default 1024); the README says so.
+  The answer named the other deployment and carried its metadata: its functions and their schemas, its files and their exports, and its description.
 
 ## Where it lives
 
-- `jl4-service/src/Backend/Jl4.hs`, with this change: `valueToFnLiteral` (`:1086`) recognises `NOTHING` (`:1150`) and `JUST` (`:1163`) by unique, and uses `constructorText` for nullary and applied constructors (`:1153`, `:1166`); `constructorText = rawNameToText . rawName . getActual` (`:1196-1197`).
-- `jl4-service/src/Backend/Jl4.hs`, with this change: `handleEvalResult` (`:862`) opens the wrapper's envelope by unique (`openEnvelope`, `:879`) and hands the answer to `handleEvalResultDirect` (`:689`); `wrapperDeclined` (`:894`) builds the refusal.
+- `jl4-service/src/Backend/Jl4.hs`, with this change: `valueToFnLiteral` (`:1106`) recognises `NOTHING` (`:1170`) and `JUST` (`:1183`) by unique, and uses `constructorText` for nullary and applied constructors (`:1173`, `:1186`); `constructorText = rawNameToText . rawName . getActual` (`:1216-1217`).
+- `jl4-service/src/Backend/Jl4.hs`, with this change: `handleEvalResult` (`:877`) opens the wrapper's envelope by unique (`openEnvelope`, `:895`) and hands the answer to `handleEvalResultDirect` (`:689`); `wrapperDeclined` (`:910`) builds the refusal. The comment above `handleEvalResult` says why a top-level `null` is answered with 200 rather than refused, as the old handler did.
 - `jl4-service/src/Backend/CodeGen.hs`, with this change: `GeneratedCode` carries `answerShape` (`AnswerShape`, `:96`) and `requiredInputs` (`RequiredInput`, `:105`), computed by `isRequiredInput` and `requiredInputsOf` (`:116`, `:120`); they replace `decodeFailedSentinel`, which nothing read.
 - `jl4-core/src/L4/EvaluateLazy/Machine.hs:25-29`, with this change: exports `parseDateText`, `parseTimeText` and `parseDatetimeText`, the parsers of `TODATE`, `TOTIME` and `TODATETIME`, for `wrapperDeclined` (from #570, `a982e3060`, on unstable).
-- `jl4-service/src/ControlPlane.hs:175`, with this change: `postDeploymentHandler`'s shortcut for already-deployed sources also requires `did == deployId`.
+- `jl4-service/src/ControlPlane.hs:175`, with this change: `postDeploymentHandler`'s shortcut for already-deployed sources looks up the requested id (`Map.lookup deployId`) and compares its version, where main scanned the registry for any deployment with the same version.
 
 ## Behaviour and rules
 
@@ -42,7 +44,9 @@ This change keeps main's request handling and carries #562's handling of the wra
   JSONDECODE answers `LEFT`, which the wrapper also turns into `NOTHING`, only when the JSON text does not parse (`decodeJsonToValueTyped`, `jl4-core/src/L4/EvaluateLazy/Machine.hs:1365-1369`); the service writes that text itself.
 - A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`. Main answered `"NOTHING"` and `{"JUST": ["NOTHING"]}`.
 - The dedup shortcut is keyed on content hash AND requested id.
-  Unstable at 9c56c0ead has the same condition (`jl4-service/src/ControlPlane.hs:178 @ 9c56c0ead`) and also gives an id-less upload a fresh UUID, so it behaves the same; its README line on duplicate detection still describes the content-only match.
+  Unstable at 9c56c0ead has the same condition (`jl4-service/src/ControlPlane.hs:178 @ 9c56c0ead`) and also gives an id-less upload a fresh UUID, so it behaves the same; #UNSTABLE corrects its README line on duplicate detection, which described the content-only match, and adds the same test.
+- A top-level `null` on the wrapper path is an answer (`NOTHING` or `JUST NOTHING`), answered 200 as on the direct path; main's old wrapper handler refused any top-level unknown with a 422.
+  Neither path can produce the evaluator's `Omitted` truncation marker at the top level: `nf` starts at depth `maximumStackSize` (200) and marks `Omitted` only below 0.
 
 ## Tests and fixtures that pin it
 
@@ -50,7 +54,7 @@ This change keeps main's request handling and carries #562's handling of the wra
 - The same block, "when the wrapper cannot call the function": an unreadable and a missing `DATE`; two `DATE`s where only the second is unreadable to `TODATE` (`twoDatesJL4`, from #570); a batch case the wrapper declines, dropped and counted, which the direct path would have answered; a missing `ASSUME` on both paths (`declineLabelsJL4`); and a missing input of a deontic rule (`deonticRecordPartyJL4`).
 - `jl4-service/test/CodeGenSpec.hs`: a function with no inputs gets `Bare`, ordinary and deontic; `requiredInputs` leaves out `BOOLEAN` and `MAYBE` inputs, lists `GIVEN`s before `ASSUME`s, and marks a `DATE`.
 - With `Jl4.hs`, `CodeGen.hs` and `CodeGenSpec.hs` as they are with the encoding change alone, 15 of these fail; as on main, 19 fail; with `Jl4.hs` checking dates with the service's ISO parsers instead of `TODATE`'s, only the two-`DATE` test fails.
-- No test pins the dedup change.
+- `jl4-service/test/IntegrationSpec.hs`, "skips recompiling identical sources only under the same id": a POST for `beta` with `alpha`'s bytes answers `beta`, `GET /deployments/beta` is then 200, and the same bytes posted again under `beta` answer `ready` with no `updateId`. With main's content-only match it fails at the first; with no shortcut at all, at the third.
 - The jl4-mlir differential harness compares the WASM backend's results with these encodings; jl4-mlir's commit `598f60d28` (inside #190, on unstable) moved the WASM runtime to them.
   On main jl4-mlir still emits the old encodings, so with this change `jl4-mlir/scripts/parity-harness.mjs` reports those cells as differences.
 
@@ -64,5 +68,5 @@ Measured 2026-10-07 against jl4-service built from main 838c92ed4, run with `XDG
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails with a parser error in the generated input record (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text (`date first` with `"garbage"` answers `"garbage"`).
 - A list answer of more than 200 elements comes back as its first 200 elements followed by two `null`s (measured with 201, on the direct path, identically on main).
-- The published `returnSchema` gives a record's fields at the top level, without the constructor key the answer has, and a `MAYBE` as its inner type, without `null`.
+- The published `returnSchema` gives a record's fields at the top level, without the constructor key the answer has, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#ISSUE).
 - On unstable, jl4-service-test answers such requests on the wrapper path ("MAYBE inputs on the wrapper path" in `jl4-service/test/IntegrationSpec.hs @ 9c56c0ead`); the fixes are in unstable's request handling, which this change does not carry.
