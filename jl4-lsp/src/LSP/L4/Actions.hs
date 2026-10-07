@@ -3,11 +3,13 @@ module LSP.L4.Actions where
 
 import Base
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 
 import Control.Applicative
 import Control.Monad.Trans.Maybe
 import qualified Data.Aeson as Aeson
+import qualified Optics
 import Data.Char (isAlphaNum)
 import qualified Data.List as List
 import Data.Ord (Down (..))
@@ -23,6 +25,7 @@ import Data.Either (isRight)
 import GHC.Generics (Generically (..))
 import L4.Lexer (LexFix (..), PError (..), annotations, directives, keywords)
 import qualified L4.Lexer as Lexer
+import L4.Names (isSynthesisedAnno)
 import L4.Parser.SrcSpan
 import L4.Print
 import qualified L4.SmartPunctuation as SP
@@ -636,19 +639,33 @@ typeFunction n | n > 0 = Fun emptyAnno (replicate n (MkOptionallyNamedType empty
 typeFunction _ = error "Internal error: negative arity of type constructor"
 
 -- ----------------------------------------------------------------------------
--- The out-of-scope quick fix: declare the name as a GIVEN
+-- The out-of-scope quick fix: declare the name, as a GIVEN or a DECLARE
 -- ----------------------------------------------------------------------------
 
 -- | What the out-of-scope quick fix does: a title for the editor's menu and
--- the one insertion that carries it out. See 'outOfScopeGivenFix'.
-data GivenFix = MkGivenFix
+-- the one insertion that carries it out. See 'outOfScopeFix'.
+data OutOfScopeFix = MkOutOfScopeFix
   { title :: Text
   , edit  :: TextEdit
   }
   deriving stock (Eq, Show)
 
 -- | The quick fix for a name @n@ that no definition supplies, of inferred
--- type @ty@.
+-- type @ty@, in a module whose tokens are @tokens@.
+--
+-- The checker records the role the use gave the name on the name itself: a
+-- name it tried to resolve as a type carries a 'KindInfo'
+-- ('L4.TypeCheck.resolveType'), a name it tried to resolve as a term a
+-- 'TypeInfo'. The two roles have different ruled successors to @ASSUME@
+-- (IMPLICIT-PROPS-DESIGN.md §11.1), so they get different fixes: a type gets
+-- a bodiless @DECLARE@ ('outOfScopeDeclareFix'), a term a @GIVEN@
+-- ('outOfScopeGivenFix').
+outOfScopeFix :: [Lexer.PosToken] -> Module Resolved -> Name -> Type' Resolved -> Maybe OutOfScopeFix
+outOfScopeFix tokens m name ty = case view annInfo (view annoOf name) of
+  Just KindInfo {} -> outOfScopeDeclareFix tokens m name
+  _                -> outOfScopeGivenFix m name ty
+
+-- | The quick fix for a name @n@ used as a term, of inferred type @ty@.
 --
 -- Until 2026-09-06 this inserted @ASSUME n IS A ty@ above the enclosing
 -- declaration — the spelling IMPLICIT-PROPS-DESIGN.md §11.1 deprecates and
@@ -673,7 +690,7 @@ data GivenFix = MkGivenFix
 -- 'Nothing' when the type still has an inference variable (there is no
 -- snippet support to leave a hole for the author), or when no @DECIDE@ or
 -- @MEANS@ encloses the use.
-outOfScopeGivenFix :: Module Resolved -> Name -> Type' Resolved -> Maybe GivenFix
+outOfScopeGivenFix :: Module Resolved -> Name -> Type' Resolved -> Maybe OutOfScopeFix
 outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
   guard (not (hasTypeInferenceVars ty))
   target <- rangeOf name
@@ -705,30 +722,30 @@ outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
           Section _ s                                        -> enclosingDecide pos s
           _                                                  -> Nothing
 
-    sectionGivenFix :: Section Resolved -> Text -> Maybe GivenFix
+    sectionGivenFix :: Section Resolved -> Text -> Maybe OutOfScopeFix
     sectionGivenFix sec@(MkSection _ mn maka mgiven _) param = do
       heading <- mn
       let headingShown = "§ " <> quotedName (getName heading)
       case mgiven of
         Just (MkGivenSig _ otns@(_ : _)) -> do
           ins <- appendParameter otns param
-          pure (MkGivenFix ("Add " <> shown <> " to the GIVEN of " <> headingShown) ins)
+          pure (MkOutOfScopeFix ("Add " <> shown <> " to the GIVEN of " <> headingShown) ins)
         _ -> do
           secRange     <- rangeOf sec
           headingRange <- rangeOf heading
           let lastHeadingLine = maximum (headingRange.end.line : [ r.end.line | Just aka <- [maka], Just r <- [rangeOf aka] ])
               col   = secRange.start.column + 4
               text  = Text.replicate (col - 1) " " <> "GIVEN " <> param <> "\n"
-          pure (MkGivenFix ("Start a GIVEN for " <> shown <> " under " <> headingShown)
+          pure (MkOutOfScopeFix ("Start a GIVEN for " <> shown <> " under " <> headingShown)
                            (insertAtLineStart (lastHeadingLine + 1) text))
 
-    ruleGivenFix :: Decide Resolved -> Text -> Maybe GivenFix
+    ruleGivenFix :: Decide Resolved -> Text -> Maybe OutOfScopeFix
     ruleGivenFix (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) mGiveth) appForm _) param = do
       let ruleShown = "the rule " <> quotedName (getName appForm)
       case otns of
         (_ : _) -> do
           ins <- appendParameter otns param
-          pure (MkGivenFix ("Add " <> shown <> " to the GIVEN of " <> ruleShown) ins)
+          pure (MkOutOfScopeFix ("Add " <> shown <> " to the GIVEN of " <> ruleShown) ins)
         [] -> do
           -- The line the declaration's own text starts on, and its column:
           -- the GIVETH if there is one, else the head. An annotation above
@@ -740,7 +757,7 @@ outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
                 Just _  -> anchor.column
                 Nothing -> 1
               text = Text.replicate (col - 1) " " <> "GIVEN " <> param <> "\n"
-          pure (MkGivenFix ("Start a GIVEN for " <> shown <> " on " <> ruleShown)
+          pure (MkOutOfScopeFix ("Start a GIVEN for " <> shown <> " on " <> ruleShown)
                            (insertAtLineStart anchor.line text))
 
     -- A further parameter line after the last one, aligned with the first.
@@ -752,12 +769,129 @@ outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
       let col = firstRange.start.column
       pure (insertAtLineStart (lastRange.end.line + 1) (Text.replicate (col - 1) " " <> param <> "\n"))
 
-    insertAtLineStart :: Int -> Text -> TextEdit
-    insertAtLineStart line text =
-      TextEdit
-        { _range = pointRange (srcPosToLspPosition (MkSrcPos line 1))
-        , _newText = text
-        }
+-- | The quick fix for a name @T@ used as a type: a bodiless @DECLARE T@, the
+-- opaque nominal type that IMPLICIT-PROPS-DESIGN.md §11.1.1 rules as the
+-- successor to @ASSUME T IS A TYPE@.
+--
+-- Until 2026-10-07 a type went through 'outOfScopeGivenFix' like a term and
+-- was offered @GIVEN T IS A TYPE@, which makes @T@ a type variable — an input
+-- any type can fill — rather than a type of its own; and where no rule
+-- encloses the use, as for the type of a @DECLARE@'s field, nothing was
+-- offered at all.
+--
+-- The @DECLARE@ goes on a new line directly above the top-level declaration
+-- that contains the use, in the same section and at that declaration's
+-- indentation, followed by a blank line. A use in a section's own @GIVEN@ is
+-- contained by the section, so the @DECLARE@ goes above its @§@ heading,
+-- where the section's binder can see it. It goes above the declaration's
+-- leading annotations too (@\@desc@, @\@nlg@, @\@export@ and the rest), since
+-- a leading annotation belongs to the next declaration below it
+-- ('L4.Parser.ResolveAnnotation') and a @DECLARE@ inserted under one would
+-- take it over; and above any comment lines directly above those, which read
+-- as part of the same declaration (since 2026-10-07; assumed, not ruled).
+--
+-- A type applied to arguments (@Box OF NUMBER, STRING@) is declared with one
+-- parameter per argument (@DECLARE Box a b@): the use fixes the arity, and a
+-- bodiless head with parameters declares a type of exactly that arity
+-- (§11.1.1). The parameters are the first of @a@, @b@, … @z@, @a1@, … that no
+-- name in the module spells, nor the type itself.
+--
+-- 'Nothing' when no type at the name's range applies it, or no top-level
+-- declaration contains the use.
+outOfScopeDeclareFix :: [Lexer.PosToken] -> Module Resolved -> Name -> Maybe OutOfScopeFix
+outOfScopeDeclareFix tokens m@(MkModule _ _ rootSection) name = do
+  target <- rangeOf name
+  arity  <- listToMaybe
+    [ length args
+    | TyApp _ r args <- Optics.toListOf (Optics.gplate @(Type' Resolved) Optics.% Optics.cosmosOf (Optics.gplate @(Type' Resolved))) m
+    , rangeOf (getName r) == Just target
+    ]
+  (decl, before) <- enclosingTopDecl target.start rootSection
+  declRange      <- rangeOf decl
+  let line = leadingLine before declRange.start.line
+      text = Text.replicate (declRange.start.column - 1) " "
+          <> Text.unwords ("DECLARE" : prettyLayout name : take arity params)
+          <> "\n\n"
+  pure (MkOutOfScopeFix ("Declare " <> quotedName name <> " as a type") (insertAtLineStart line text))
+  where
+    -- Every name the module spells, and the type's own, so that a parameter
+    -- can be named apart from all of them.
+    taken :: Set RawName
+    taken = Set.fromList (rawName name : map (rawName . getName) (toResolved m))
+
+    params :: [Text]
+    params =
+      [ p
+      | p <- [ Text.pack [c] | c <- ['a' .. 'z'] ] <> [ Text.pack (c : show i) | i <- [1 :: Int ..], c <- ['a' .. 'z'] ]
+      , NormalName p `Set.notMember` taken
+      ]
+
+    -- The top-level declaration that contains the position, with the last
+    -- line of whatever precedes it in its section (0 above the first
+    -- declaration of the file). A position among a subsection's declarations
+    -- is looked for there; one in the subsection's heading or its own @GIVEN@
+    -- is contained by the subsection itself. A section binder's elaboration
+    -- ('L4.Desugar.desugarSectionGivens') carries its binder's range but is not
+    -- a declaration anyone wrote, so it is passed over.
+    enclosingTopDecl :: SrcPos -> Section Resolved -> Maybe (TopDecl Resolved, Int)
+    enclosingTopDecl pos = inSection 0
+      where
+        inSection before sec@(MkSection _ _ _ _ decls) =
+          go (max before (headerEnd sec)) (filter (not . isElaboration) decls)
+        go _ [] = Nothing
+        go before (d : ds) = case rangeOf d of
+          Just r
+            | pos `inRange` r -> case d of
+                Section _ s -> inSection before s <|> Just (d, before)
+                _           -> Just (d, before)
+            | otherwise     -> go r.end.line ds
+          Nothing           -> go before ds
+        headerEnd (MkSection _ mn maka mgiven _) =
+          maximum (0 : [ r.end.line | Just r <- [mn >>= rangeOf, maka >>= rangeOf, mgiven >>= rangeOf] ])
+        isElaboration = \ case
+          Assume _ (MkAssume ann _ _ _ _) -> isSynthesisedAnno ann
+          _                               -> False
+
+    -- The line the declaration's leading block starts on. Every annotation
+    -- between whatever precedes the declaration and its own first line
+    -- belongs to it, blank lines and comments notwithstanding, so the block
+    -- reaches the first of them; and it takes in the run of comment lines
+    -- directly over the declaration, or over that first annotation, which read
+    -- as the declaration's own. A comment with a blank line under it stays
+    -- where it is. Only comments, annotations and whitespace can sit between
+    -- two declarations, so a line there that holds anything but whitespace
+    -- holds a comment or an annotation.
+    leadingLine :: Int -> Int -> Int
+    leadingLine before declLine =
+      case [ l | l <- annotationLines, l < top ] of
+        [] -> top
+        ls -> extendUp (minimum ls)
+      where
+        between l = before < l && l < declLine
+        annotationLines =
+          [ l | t <- tokens, Lexer.TAnnotations _ <- [t.payload], let l = t.range.start.line, between l ]
+        occupied = Set.fromList
+          [ l
+          | t <- tokens
+          , not (isWhitespace t.payload)
+          , l <- [t.range.start.line .. t.range.end.line]
+          , between l
+          ]
+        isWhitespace = \ case
+          Lexer.TSpaces (Lexer.TSpace _) -> True
+          _                              -> False
+        top = extendUp declLine
+        extendUp l
+          | (l - 1) `Set.member` occupied = extendUp (l - 1)
+          | otherwise                     = l
+
+-- | An insertion at the start of the given 1-based line.
+insertAtLineStart :: Int -> Text -> TextEdit
+insertAtLineStart line text =
+  TextEdit
+    { _range = pointRange (srcPosToLspPosition (MkSrcPos line 1))
+    , _newText = text
+    }
 
 -- | Does the type still carry an inference variable? A quick fix cannot
 -- spell one (LSP 3.17 has no snippet support for code actions).

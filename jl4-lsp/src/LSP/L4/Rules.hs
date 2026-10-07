@@ -855,7 +855,7 @@ jl4Rules evalConfig rootDirectory recorder = do
           Left errs -> do
             -- Each error keeps its 'PError' as the diagnostic's typed source
             -- (as 'checkErrorToDiagnostic' does for 'CheckErrorWithContext'
-            -- below), so 'outOfScopeAssumeQuickFix''s sibling in
+            -- below), so 'outOfScopeDeclarationQuickFix''s sibling in
             -- "LSP.L4.Handlers" can find a confusable-character error's
             -- structured 'Lexer.fixes' again via @messageOfL \@PError@.
             let mk pErr = mkFileDiagnosticWithSource uri (mkParseErrorDiagnostic pErr) pErr
