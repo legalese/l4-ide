@@ -50,7 +50,7 @@ This change keeps main's request handling and carries #562's handling of the wra
   JSONDECODE answers `LEFT`, which the wrapper also turns into `NOTHING`, only when the JSON text does not parse (`decodeJsonToValueTyped`, `jl4-core/src/L4/EvaluateLazy/Machine.hs:1365-1369`); the service writes that text itself.
 - A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`. Main answered `"NOTHING"` and `{"JUST": ["NOTHING"]}`.
 - The dedup shortcut is keyed on content hash AND requested id.
-  Unstable at 9c56c0ead has the same condition (`jl4-service/src/ControlPlane.hs:178 @ 9c56c0ead`) and also gives an id-less upload a fresh UUID, so it behaves the same; #UNSTABLE corrects its README line on duplicate detection, which described the content-only match, and adds the same test.
+  Unstable at 9c56c0ead has the same condition (`jl4-service/src/ControlPlane.hs:178 @ 9c56c0ead`) and also gives an id-less upload a fresh UUID, so it behaves the same; legalese/l4-ide#574 corrects its README line on duplicate detection, which described the content-only match, and adds the same test.
 - A top-level `null` on the wrapper path is an answer (`NOTHING` or `JUST NOTHING`), answered 200 as on the direct path; main's old wrapper handler refused any top-level unknown with a 422.
   Neither path can produce the evaluator's `Omitted` truncation marker at the top level: `nf` starts at depth `maximumStackSize` (200) and marks `Omitted` only below 0.
 
@@ -76,5 +76,5 @@ Measured 2026-10-07 against jl4-service built from main 838c92ed4, run with `XDG
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails with a parser error in the generated input record (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text (`date first` with `"garbage"` answers `"garbage"`).
 - A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s (measured with 201, on the direct path, identically on main; the wrapper path and a `MAYBE` list one element sooner, measured 2026-10-07 on this branch's build and unstable's).
-- The published `returnSchema` gives a record's fields at the top level, without the constructor key the answer has, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#ISSUE).
+- The published `returnSchema` gives a record's fields at the top level, without the constructor key the answer has, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
 - On unstable, jl4-service-test answers such requests on the wrapper path ("MAYBE inputs on the wrapper path" in `jl4-service/test/IntegrationSpec.hs @ 9c56c0ead`); the fixes are in unstable's request handling, which this change does not carry.
