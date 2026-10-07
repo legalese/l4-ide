@@ -283,12 +283,13 @@ memoSpec =
       memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " "" "1"))
     it "brackets that ARE patterns, each holding a CONSIDER, four deep" $
       memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) FOLLOWED BY x)" "x"))
-    -- @f 1 plus 1@ is @f@ of three arguments in the first pass, which has no
-    -- mixfix hints, and @plus@ of @f 1@ and @1@ in the second.
+    -- @f plus 1@ is @f@ of two arguments in the first pass, which has no
+    -- mixfix hints, and @plus@ of @f@ and @1@ in the second. @PLUS@ makes
+    -- each level's pattern reading fail, so its expression reading replays.
     it "user-defined mixfix keywords, bare and backticked, in a nest in pattern position" $
       memoChangesNothing
         ( plusPrologue
-            <> inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN f 1 plus 1, OTHERWISE 2) `plus` 1)" "(1 `plus` 1)")
+            <> inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN f plus 1, OTHERWISE 2) PLUS 1 `plus` 1)" "(1 `plus` 1)")
         )
     it "inline annotations inside a nest in pattern position" $
       memoChangesNothing
@@ -330,12 +331,26 @@ failsWith src at expected =
     uri = toNormalizedUri (Uri "file:///nested-paren-parser-spec")
 
 -- | Parse the module (both passes, as the tools do) with the memo on and off,
--- and expect the same answer.
+-- and expect the same answer. Not 'shouldBe': on a mismatch, hspec's diff of
+-- two shown syntax trees runs for minutes, so this shows where they part.
 memoChangesNothing :: Text -> Expectation
 memoChangesNothing src =
-  execProgramParserWithHintPass uri src `shouldBe` execProgramParserWithHintPassUnmemoised uri src
+  when (memoOn /= memoOff) $
+    expectationFailure $ case (memoOn, memoOff) of
+      (Left on, Left off) -> "memo on:\n" <> errors on <> "memo off:\n" <> errors off
+      _ ->
+        let shownOn = show memoOn
+            shownOff = show memoOff
+            differAt = length (takeWhile id (zipWith (==) shownOn shownOff))
+            excerpt shown = take 400 (drop (max 0 (differAt - 200)) shown)
+        in  "first difference at character " <> show differAt <> " of the shown answers"
+              <> "\nmemo on:  " <> excerpt shownOn
+              <> "\nmemo off: " <> excerpt shownOff
   where
     uri = toNormalizedUri (Uri "file:///nested-paren-parser-spec")
+    memoOn = execProgramParserWithHintPass uri src
+    memoOff = execProgramParserWithHintPassUnmemoised uri src
+    errors errs = unlines [show e.range <> "\n" <> T.unpack e.message | e <- toList errs]
 
 -- | Parse the module (both passes, as the tools do), force the whole syntax
 -- tree, and exact-print it back, all within the budget.
