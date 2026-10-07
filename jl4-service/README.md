@@ -319,7 +319,7 @@ The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describ
 
 #### When a case reaches a limit
 
-Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is, with the gaps listed under [What the limits do not cover yet](#what-the-limits-do-not-cover-yet).
+Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is, with what is still outside them listed under [What the limits do not cover yet](#what-the-limits-do-not-cover-yet).
 A case that reaches one fails on its own: the other cases keep their answers, and the batch is still a `200`.
 It carries `@error`, and `@limit` beside it:
 
@@ -356,6 +356,8 @@ On one core the whole batch takes as long as its cases take together, and more c
 #### What a batch can cost
 
 A batch whose cases all run to the time limit takes about ⌈cases ÷ cores⌉ × `--eval-timeout`, and longer while other batches are in flight, since the requests take turns at the same slots.
+A case's time includes finishing its answer: a number the evaluator leaves unfinished is computed inside the case's clock, while it holds its slot.
+Measured on 2026-10-07 on an M-series Mac, on single evaluations under a 1-second limit: a number that takes 3.1 s to finish (an exponent of 20,000) and one that takes 12.2 s (40,000) both came back as the limit at 1.0 s, where before they answered after 3.1 s and 12.2 s.
 The service sets no limit on the number of cases in a batch.
 It also goes on working through a batch after the client has disconnected: measured on 2026-10-02 at `+RTS -N4`, 24 cases that each ran to a 2-second limit kept more than three cores busy for about 12 s, although the client gave up after 6 s.
 
@@ -600,7 +602,7 @@ By default, error responses return generic messages (e.g., `"Deployment compilat
 The service enforces several resource limits to protect against abuse:
 
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
-- **Evaluation memory**: Each evaluation on the direct path is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`; on the wrapper path it is not yet (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
+- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`, on the thread that evaluates: the calling thread on the direct path, and on the wrapper path the thread the evaluator runs on for the module and for each module it imports (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). The limit covers finishing the answer as well as evaluating it, so a trace counts: a traced single evaluation allocates the trace as well, and a call that fits without `?trace=full` can pass the limit with it (a 1,000-step recursion allocated 6.7 MB untraced and 79 MB traced, measured on 2026-10-07). A batch does not write the reasoning tree, so its cases are not charged for building it; but a traced batch case still pays for recording the trace, and without `graphviz=true` the batch writes nothing from it (measured on 2026-10-07: a 1,000-step case was answered at 40 MB and stopped at 38 MB with `?trace=full`, and needs about 7 MB without it). That waste was there before the limits forced the response. Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
 - **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` and `"@limit": "time"` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. Batch cases, counting every batch in flight, never run more at once than there are cores, so batch cases do not slow each other down by sharing a core. A batch case's clock still counts the garbage collector's pauses, which every running evaluation shares, and any of the work that takes no slot (single evaluations, MCP calls, compiles, query plans, ladder and state-graph rendering, response encoding) that is sharing its core at the time.
 - **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
@@ -610,11 +612,13 @@ The service enforces several resource limits to protect against abuse:
 
 ### What the limits do not cover yet
 
-Three gaps, each measured on 2026-10-03, and none fixed yet:
+Three gaps listed here until 2026-10-07 are closed: the memory limit on the wrapper path (smucclaw/l4-ide#1018), arithmetic left unfinished by the evaluator (#1019), and a limit hit inside an imported value (#1020).
+What is still outside the limits:
 
-- **The memory limit does not reach the wrapper path.** A request that goes through the generated wrapper (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)), such as one with a `null` inside a record input, is stopped by the time limit only. Four such batch cases under a 64 MB limit came back as `"time"` after 2 s, where the same cases on the direct path came back as `"memory"` at once.
-- **Arithmetic the evaluator leaves unfinished is finished while the response is encoded, outside both limits.** A number built up lazily is only computed when the answer is written out, so a 1-second limit returned an 8 MB number after 1.7 s, and the review that found this saw a 64 MB one after 16.9 s. The worst-case time under [What a batch can cost](#what-a-batch-can-cost) leaves this out.
-- **A single or MCP evaluation that hits a limit inside an imported value spoils that connection.** Later calls on the same kept-alive connection answer `Infinite loop detected while trying to evaluate` instead of evaluating; a new connection evaluates again. Batch cases are not affected: the same batch case after such a call came back with `"@limit": "time"`.
+- **On the wrapper path the memory limit applies to each module separately.** The evaluator runs the module you call, and each module it imports, as separate build tasks on separate threads, and each thread gets the whole `--max-eval-memory-mb`. A call that imports modules can therefore allocate up to that limit once per module before it is stopped. The time limit is not split this way: it covers the whole call. The direct path has one thread and so one limit.
+- **`X-Eval-Alloc-Bytes` counts the calling thread only.** On the wrapper path that is not where the evaluating happens, so the header understates what the call allocated: measured on 2026-10-07, a wrapper-path call that spent 1.2 s evaluating reported 29,520 bytes.
+- **Turning the answer into JSON text is outside both limits.** The answer is fully computed inside them, but writing it out happens after. That work grows with the size of the answer, not with how it was reached; it has not been measured separately, but the largest answer tried, 400 KB of digits, came back whole in 0.76 s end to end under a 1-second limit.
+- **A limit that stops a very deep recursion answers a little late.** Before it answers, the evaluator makes the values it was part-way through usable again, and that cannot be cut short. It costs about 0.2 µs for each frame of the evaluator's own stack, and the evaluator stops at 1,000,000 frames. A frame is not a level of recursion: a non-tail recursion such as `sum to` takes about 2.2 frames a level (measured on 2026-10-07, `sum to 400000` answers and `sum to 500000` is refused for exceeding 1,000,000). So the cost is at most about a quarter of a second, and only for a recursion some 450,000 levels deep. Measured with a 1-second limit and a call of `sum to 900000`, which the limit stops before it finishes, the answer came back after 1.12 to 1.27 s, where before it came back after 1.00 to 1.09 s.
 
 ## Persistence
 

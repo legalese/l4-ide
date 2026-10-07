@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module L4.EvaluateLazy
 ( EvalConfig(..)
+, AllocationLimit(..)
 , resolveEvalConfig
 , resolveEvalConfigWithSafeMode
 , parseFixedNow
@@ -80,7 +81,10 @@ import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (throwIO, try, evaluate, ErrorCall)
+import Control.Exception (throwIO, try, evaluate, finally, catch, ErrorCall)
+import GHC.IO.Exception (AllocationLimitExceeded (..))
+import Data.Int (Int64)
+import GHC.Conc (setAllocationCounter, enableAllocationLimit, disableAllocationLimit)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -115,6 +119,23 @@ data EvalConfig = EvalConfig
     -- value (T4b): a section @GIVEN@ at the root, and a field of the request's
     -- own decode ('requestRecord'). A decode the rules make of their own
     -- always fills its defaults.
+  , allocationLimit :: !(Maybe AllocationLimit)
+    -- ^ A cap on what one evaluation may allocate, counted on the thread that
+    -- runs it. 'Nothing' (the default) sets none. A caller that evaluates
+    -- through a build system (jl4-service's wrapper path, which runs the
+    -- module as a Shake rule) must say so here, because GHC's allocation
+    -- counter belongs to a thread and the rule runs on another one than the
+    -- caller's: a limit set on the caller never sees it.
+  }
+
+-- | A cap, in bytes, on what an evaluation may allocate.
+-- Exceeding it raises 'AllocationLimitExceeded' out of the evaluation, and
+-- sets 'exceeded' first: a build system catches the exception on its own
+-- thread and reports it as a diagnostic, so the caller reads the flag to
+-- learn that it was this limit.
+data AllocationLimit = MkAllocationLimit
+  { bytes :: !Int64
+  , exceeded :: !(IORef Bool)
   }
 
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
@@ -122,7 +143,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -751,7 +772,7 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   let st = withDefaultsKnown evalConfig rootFills m0 imported st0
-  r <- try (runEval st (evalModuleAndDirectivesWith runDirective env m))
+  r <- try (withAllocationLimit evalConfig.allocationLimit (runEval st (evalModuleAndDirectivesWith runDirective env m)))
   case r of
     Left exc -> do
       hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -760,6 +781,15 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
       -- force any evaluation here, and we catch exceptions for eval directives
       pure (emptyEnvironment, [])
     Right result -> pure result
+
+-- | Run an action under an allocation cap on the current thread, and switch
+-- the cap off again however the action ends.
+withAllocationLimit :: Maybe AllocationLimit -> IO a -> IO a
+withAllocationLimit Nothing act = act
+withAllocationLimit (Just limit) act =
+  (setAllocationCounter limit.bytes >> enableAllocationLimit >> act)
+    `catch` (\AllocationLimitExceeded -> writeIORef limit.exceeded True >> throwIO AllocationLimitExceeded)
+    `finally` disableAllocationLimit
 
 mkInitialEvalState :: EvalConfig -> EntityInfo -> NormalizedUri -> IO EvalState
 mkInitialEvalState evalConfig entityInfo moduleUri = do

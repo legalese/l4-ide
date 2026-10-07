@@ -138,7 +138,8 @@ import L4.Utils.Ratio
 import Text.Read (readMaybe)
 import qualified Data.Scientific as Sci
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Exception (SomeException, catch)
+import Control.Exception (SomeException, catch, fromException, throwIO, uninterruptibleMask_)
+import GHC.Conc (getAllocationCounter, setAllocationCounter)
 import qualified Control.Exception
 
 data Frame =
@@ -515,8 +516,36 @@ newtype Eval a = MkEval (EvalState -> IO a)
 -- written against this alias.
 type Machine = Eval
 
+-- | Run an evaluation. An exception that is not an 'EvalException' (a time or
+-- allocation limit, a cancelled thread, a Haskell crash) leaves the frame
+-- stack as it was, because only 'raiseException' unwinds it; so the frames
+-- still on it are unwound here, and a thunk whose force was interrupted gets
+-- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlive
+-- the run, and a mark left on one made the next run on the same thread report
+-- an infinite loop (smucclaw/l4-ide#1020).
+--
+-- The unwinding is uninterruptible, so a second exception cannot cut it
+-- short, and it is cheap for the same reason: one walk over the frame list,
+-- touching only the frames that restore state, with no trace entry and no
+-- write to the stack per frame.
+-- It also runs with the allocation counter lifted. After an allocation limit
+-- is hit, the RTS re-arms it with a grace of about 100 KB and raises again
+-- for every further 100 KB; the unwinding allocates, those raises wait for the
+-- end of the mask, and they would land outside whatever catches the limit
+-- (a dropped connection, where the limit should have been a 500). The counter
+-- is put back as it was, so what the caller reads from it is unchanged.
 runEval :: EvalState -> Eval a -> IO a
-runEval s (MkEval f) = f s
+runEval s (MkEval f) = f s `catch` \(e :: SomeException) -> do
+  case fromException e of
+    Just (_ :: EvalException) -> pure ()
+    Nothing -> uninterruptibleMask_ do
+      counter <- getAllocationCounter
+      setAllocationCounter maxBound
+      frames <- (.frames) <$> readIORef s.stack
+      writeIORef s.stack emptyStack
+      let MkEval unwind = traverse_ unwindFrame frames in unwind s
+      setAllocationCounter counter
+  throwIO e
 
 -- | Catch evaluation exceptions (used at directive boundaries).
 tryEval :: Eval a -> Eval (Either EvalException a)
@@ -1026,6 +1055,43 @@ withPoppedFrame k = do
       liftIO (writeIORef stackRef (MkStack (s.size - 1) fs))
       k (Just f)
 {-# INLINE withPoppedFrame #-}
+
+-- | 'withPoppedFrame' for 'backward', which leaves an 'UpdateThunk' frame on
+-- the stack for its own arm to drop once the thunk has its value. With the
+-- frame popped first, an asynchronous exception between the pop and the write
+-- left the thunk's blackhole mark with no frame to undo it
+-- (smucclaw/l4-ide#1020); left on the stack, the frame restores the thunk if
+-- the exception comes before the write, and 'restoreThunkOnUnwind' keeps the
+-- value if it comes after.
+withPoppedFrameKeepingUpdate :: (Maybe Frame -> Eval a) -> Eval a
+withPoppedFrameKeepingUpdate k = do
+  traceEval Pop
+  stackRef <- asks (.stack)
+  s <- liftIO (readIORef stackRef)
+  case s.frames of
+    []       -> k Nothing
+    (f : fs) -> do
+      case f of
+        UpdateThunk {} -> pure ()
+        _              -> liftIO (writeIORef stackRef (MkStack (s.size - 1) fs))
+      k (Just f)
+{-# INLINE withPoppedFrameKeepingUpdate #-}
+
+-- | Set the displaced cache of the 'UpdateThunk' frame on top of the stack.
+setTopDisplaced :: (CtxReads, WHNF) -> Eval ()
+setTopDisplaced d = do
+  stackRef <- asks (.stack)
+  liftIO (modifyIORef' stackRef \s -> case s.frames of
+    UpdateThunk rf saved _ : fs -> MkStack s.size (UpdateThunk rf saved (Just d) : fs)
+    _                           -> s)
+
+-- | Drop the frame on top of the stack, which the caller has just read.
+dropTopFrame :: Eval ()
+dropTopFrame = do
+  stackRef <- asks (.stack)
+  liftIO (modifyIORef' stackRef \s -> case s.frames of
+    []       -> s
+    (_ : fs) -> MkStack (s.size - 1) fs)
 
 getEvalTime :: Eval UTCTime
 getEvalTime = asks (.evalTime)
@@ -1602,7 +1668,7 @@ forwardExpr env = \ case
       InertCtxNone -> continueBackward (ValBool True)  -- Default to True for compatibility
 
 backward :: WHNF -> Machine Config
-backward val = withPoppedFrame $ \ case
+backward val = withPoppedFrameKeepingUpdate $ \ case
   Nothing -> continueDone val
   Just (BinOp1 binOp e2 env) -> do
     pushFrame (BinOp2 binOp val)
@@ -2104,6 +2170,7 @@ backward val = withPoppedFrame $ \ case
         -- (smucclaw/l4-ide#914 §2B; snapshot-per-scope, see 'crLedgerRead').
         then updateThunkToWHNFWhen rf mine val
         else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
+    dropTopFrame
     continueBackward val
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 
@@ -5867,32 +5934,38 @@ evalRef rf = do
         else forceIt
     Unevaluated{} -> forceIt
   where
+    -- The UpdateThunk frame goes on BEFORE the thunk is marked, so that an
+    -- exception between the two finds a frame and no mark, and 'unwindFrame'
+    -- ('restoreThunkOnUnwind' ignores a thunk without our mark); the other
+    -- order left a mark with no frame to undo it (smucclaw/l4-ide#1020). A
+    -- thunk that turns out not to need forcing (another thread finished it
+    -- since the read above), or a blackhole, takes the frame off again.
     forceIt :: Machine Config
     forceIt = do
       -- Read the context BEFORE the atomic poke (the poke fn must stay pure).
       tc <- getTemporalContext
-      join $ pokeThunk rf \tid -> \ case
-        thunk@(WHNF val) ->
-          -- Another thread finished it between our read and the atomic poke.
-          (thunk, whnfConfig val)
-        thunk@(WHNFWhen fp val e env)
-          | validFor tc fp -> (thunk, noteCtxRead fp >> whnfConfig val)
-          | otherwise ->
-              -- Stale for the current temporal context: re-force under it.
-              -- The displaced cache travels on the UpdateThunk frame so an
-              -- aborted force can put it back ('restoreThunkOnUnwind').
-              (Unevaluated (Set.singleton tid) e env, beginForce (Just (fp, val)) e env)
-        thunk@(Unevaluated tids e env)
-          | tid `Set.member` tids ->  (thunk, userException (BlackholeForced e))
-          | otherwise -> (Unevaluated (Set.insert tid tids) e env, beginForce Nothing e env)
-    beginForce :: Maybe (CtxReads, WHNF) -> Expr Resolved -> Environment -> Machine Config
-    beginForce displaced e env = do
       -- Open a fresh read span for this force; the enclosing span's
       -- accumulator travels on the UpdateThunk frame and is merged back
       -- (together with this force's reads) in 'backward'.
       saved <- swapCtxReads noReads
-      pushFrame (UpdateThunk rf saved displaced)
-      continueExpr env e
+      pushFrame (UpdateThunk rf saved Nothing)
+      let notForced = traceEval Pop >> dropTopFrame >> void (swapCtxReads saved)
+      join $ pokeThunk rf \tid -> \ case
+        thunk@(WHNF val) ->
+          -- Another thread finished it between our read and the atomic poke.
+          (thunk, notForced >> whnfConfig val)
+        thunk@(WHNFWhen fp val e env)
+          | validFor tc fp -> (thunk, notForced >> noteCtxRead fp >> whnfConfig val)
+          | otherwise ->
+              -- Stale for the current temporal context: re-force under it.
+              -- The cache this poke displaced travels on the UpdateThunk
+              -- frame so an aborted force can put it back
+              -- ('restoreThunkOnUnwind'); it is the one the poke saw, not one
+              -- read earlier, which another thread may have replaced.
+              (Unevaluated (Set.singleton tid) e env, setTopDisplaced (fp, val) >> continueExpr env e)
+        thunk@(Unevaluated tids e env)
+          | tid `Set.member` tids ->  (thunk, notForced >> userException (BlackholeForced e))
+          | otherwise -> (Unevaluated (Set.insert tid tids) e env, continueExpr env e)
     whnfConfig :: WHNF -> Machine Config
     whnfConfig val =
       case val of

@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1131,6 +1131,198 @@ spec = describe "integration" do
         withServiceFromSourcesOpts spinOptions "spin-40-n2" [("spin.l4", spinJL4)] \baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-40-n2" (replicate 40 spinFast)
           expectBatchOutcomes resp (replicate 40 CaseAnswered)
+
+  -- SIEVE (2026-10-07): the three gaps the README listed under "What the
+  -- limits do not cover yet".
+  describe "evaluation limits that used to miss" do
+    -- smucclaw/l4-ide#1018. The wrapper path evaluates as a Shake rule on a
+    -- thread of its own, so the allocation limit set on the calling thread
+    -- never saw it. The time limit is large here so that only the memory
+    -- limit can stop the case.
+    describe "the memory limit on the wrapper path" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          wrapped n = Aeson.object
+            [ "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int), "u" Aeson..= Aeson.object []] ]
+
+      it "stops a single evaluation that allocates too much" do
+        withServiceFromSourcesOpts stingy "wrap-mem-single" [("spin.l4", spinWrapperJL4)] \baseUrl mgr -> do
+          small <- evalFunction baseUrl mgr "wrap-mem-single" "spin" (wrapped 1_000)
+          assertSuccess small \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          big <- evalFunction baseUrl mgr "wrap-mem-single" "spin" (wrapped spinFast)
+          statusCode' big `shouldBe` 500
+          LBS.toStrict (responseBody big) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+
+      it "reports the case that allocates too much, and answers the cases after it" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts stingy "wrap-mem-batch" [("spin.l4", spinWrapperJL4)] \baseUrl mgr -> do
+            let body = Aeson.object
+                  [ "outcomes" Aeson..= ([] :: [Text])
+                  , "cases" Aeson..=
+                      [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n, "u" Aeson..= Aeson.object []]
+                      | (i, n) <- zip [1 :: Int ..] [1_000, spinFast, 1_000] ]
+                  ]
+            req <- buildJsonPost (baseUrl <> "/deployments/wrap-mem-batch/functions/spin/evaluation/batch") body
+            resp <- httpLbs req mgr
+            expectBatchOutcomes resp
+              [ CaseAnswered
+              , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+              , CaseAnswered ]
+            map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
+              `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
+
+    -- Review of the first fix (2026-10-07). After the memory limit is hit, the
+    -- RTS raises again for every further 100 KB the thread allocates; the
+    -- unwinding that #1020 added allocates, and those raises used to land
+    -- outside the handler and drop the connection. A tail call (spin) has
+    -- almost no frames to unwind and hid it, so these use a recursion that is
+    -- not a tail call.
+    describe "the memory limit on the direct path, in a deep recursion" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          call n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+          tooDeep = 10_000
+          limitText = "Evaluation resource limit exceeded"
+
+      it "answers a small one, stops a deep one with a 500, and answers the next on the same connection" do
+        withServiceFromSourcesOpts stingy "deep-single" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          small <- evalFunction baseUrl mgr "deep-single" "deep" (call 10)
+          assertSuccess small \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 55)
+          hit <- evalFunction baseUrl mgr "deep-single" "deep" (call tooDeep)
+          statusCode' hit `shouldBe` 500
+          LBS.toStrict (responseBody hit) `shouldSatisfy` BS.isInfixOf limitText
+          again <- evalFunction baseUrl mgr "deep-single" "deep" (call 10)
+          assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 55)
+
+      it "reports a deep batch case as the memory limit, and answers the cases around it" do
+        withServiceFromSourcesOpts stingy "deep-batch" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          resp <- postBatchTo baseUrl mgr "deep-batch" "deep" [10, tooDeep, 10]
+          expectBatchOutcomes resp
+            [ CaseAnswered
+            , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+            , CaseAnswered ]
+
+      it "answers a deep MCP call with the limit, and the next call on the same connection" do
+        withServiceFromSourcesOpts stingy "deep-mcp" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          let callTool i n = do
+                req <- buildJsonPost (baseUrl <> "/deployments/deep-mcp/.mcp") $ Aeson.object
+                  [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (i :: Int)
+                  , "method" Aeson..= ("tools/call" :: Text)
+                  , "params" Aeson..= Aeson.object
+                      [ "name" Aeson..= ("deep" :: Text)
+                      , "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)] ] ]
+                responseBody <$> httpLbs req mgr
+          hit <- callTool 1 tooDeep
+          LBS.toStrict hit `shouldSatisfy` BS.isInfixOf limitText
+          again <- callTool 2 10
+          LBS.toStrict again `shouldSatisfy` BS.isInfixOf "55"
+
+    -- Review (2026-10-07): a batch never writes the reasoning tree, so a
+    -- traced batch must not be made to compute it. Five cases of 1,000 steps
+    -- with ?trace=full answered under 64 MB before the limits forced the
+    -- response, and all five were stopped once the tree was forced too.
+    describe "a batch with a trace" do
+      it "answers cases that fit, as it did before the response was forced" do
+        let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+        withServiceFromSourcesOpts stingy "trace-batch" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          let body = Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= (1_000 :: Int)] | i <- [1 .. 5 :: Int] ] ]
+          req <- buildJsonPost (baseUrl <> "/deployments/trace-batch/functions/spin/evaluation/batch?trace=full") body
+          resp <- httpLbs req mgr
+          expectBatchOutcomes resp (replicate 5 CaseAnswered)
+
+    -- smucclaw/l4-ide#1019. The evaluation returns an unfinished number at
+    -- once; its digits used to be computed by the JSON encoder, after both
+    -- limits were off.
+    describe "arithmetic the evaluator leaves unfinished" do
+      let hasty = testOptions { evalTimeout = 1, maxEvalMemoryMb = 100_000 }
+          power n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+
+      it "answers a number that finishes inside the limits" do
+        withServiceFromSourcesOpts hasty "power-ok" [("power.l4", powerJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "power-ok" "power" (power 2)
+          assertSuccess resp \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt (10 ^ (80 :: Int)))
+
+      it "stops a number that does not, inside the time limit" do
+        withServiceFromSourcesOpts hasty "power-slow" [("power.l4", powerJL4)] \baseUrl mgr -> do
+          t0 <- getCurrentTime
+          resp <- evalFunction baseUrl mgr "power-slow" "power" (power powerSlow)
+          t1 <- getCurrentTime
+          statusCode' resp `shouldBe` 500
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          -- the limit is one second; finishing the number took 12 s without it
+          (realToFrac (diffUTCTime t1 t0) :: Double) `shouldSatisfy` (< 4)
+
+      it "reports a batch case whose number does not, and answers the cases around it" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts hasty "power-batch" [("power.l4", powerJL4)] \baseUrl mgr -> do
+            resp <- postBatchTo baseUrl mgr "power-batch" "power" [2, powerSlow, 2]
+            expectBatchOutcomes resp
+              [ CaseAnswered
+              , CaseLimited TimeLimitHit "Evaluation resource limit exceeded: this case did not finish within the time limit of 1 s (--eval-timeout)"
+              , CaseAnswered ]
+
+    -- smucclaw/l4-ide#1020. A limit hit while forcing an imported value left
+    -- the forcing thread's mark on the value's thunk, which outlives the
+    -- request; the next request on the same thread then met its own mark and
+    -- reported "Infinite loop detected".
+    describe "a limit hit inside an imported value" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          sources = [("heavy_lib.l4", heavyLibJL4), ("heavy_main.l4", heavyMainJL4)]
+          call n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+          -- 47 MB of the case's own steps leaves too little for the value
+          tooMuch = 7_000
+          loopMessage = "Infinite loop detected"
+
+      it "does not spoil the next single evaluation on the same connection" do
+        withServiceFromSourcesOpts stingy "heavy-single" sources \baseUrl mgr -> do
+          hit <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          statusCode' hit `shouldBe` 500
+          LBS.toStrict (responseBody hit) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          again <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call 0)
+          LBS.toStrict (responseBody again) `shouldSatisfy` (not . BS.isInfixOf loopMessage)
+          assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          -- the hit above landed inside the imported value: once it is worked
+          -- out and kept, the same 47 MB of the case's own steps fit
+          cached <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          assertSuccess cached \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+      it "does not spoil the next evaluation on a new connection, or a batch case" do
+        withServiceFromSourcesOpts stingy "heavy-new" sources \baseUrl mgr -> do
+          hit <- evalFunction baseUrl mgr "heavy-new" "use-heavy" (call tooMuch)
+          statusCode' hit `shouldBe` 500
+          fresh <- newManager defaultManagerSettings
+          other <- evalFunction baseUrl fresh "heavy-new" "use-heavy" (call 0)
+          assertSuccess other \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          resp <- postBatchTo baseUrl mgr "heavy-new" "use-heavy" [0, 0]
+          expectBatchOutcomes resp [CaseAnswered, CaseAnswered]
+
+      it "does not spoil the next MCP call on the same connection" do
+        withServiceFromSourcesOpts stingy "heavy-mcp" sources \baseUrl mgr -> do
+          let rpc :: Int -> Aeson.Value -> Aeson.Value
+              rpc i params = Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= i
+                , "method" Aeson..= ("tools/call" :: Text), "params" Aeson..= params ]
+              listBody = Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (0 :: Int), "method" Aeson..= ("tools/list" :: Text) ]
+              mcp body = do
+                req <- buildJsonPost (baseUrl <> "/deployments/heavy-mcp/.mcp") body
+                responseBody <$> httpLbs req mgr
+          listed <- mcp listBody
+          let toolNames = case Aeson.decode listed of
+                Just (Aeson.Object o)
+                  | Just (Aeson.Object r) <- Aeson.KeyMap.lookup "result" o
+                  , Just (Aeson.Array ts) <- Aeson.KeyMap.lookup "tools" r ->
+                      [ n | Aeson.Object t <- toList ts, Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" t] ]
+                _ -> []
+          let tool = "use-heavy"
+          toolNames `shouldContain` [tool]
+          let callTool i n = mcp (rpc i (Aeson.object ["name" Aeson..= tool, "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]))
+          hit <- callTool 2 tooMuch
+          LBS.toStrict hit `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          again <- callTool 3 0
+          LBS.toStrict again `shouldSatisfy` (not . BS.isInfixOf loopMessage)
+          LBS.toStrict again `shouldSatisfy` BS.isInfixOf "true"
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -2800,6 +2992,12 @@ spinFast = 150_000
 spinFifth :: Int
 spinFifth = 500_000
 
+-- | The exponent at which 'powerJL4' takes 12 s to answer, nearly all of it
+-- after the evaluator has returned (an M-series Mac, 2026-10-07: 3.1 s at
+-- 20,000, with the number forced only by the JSON encoder).
+powerSlow :: Int
+powerSlow = 40_000
+
 -- | Steps that would take some twenty minutes.
 spinSlow :: Int
 spinSlow = 1_000_000_000
@@ -2811,13 +3009,18 @@ spinOptions = testOptions { evalTimeout = 3, maxEvalMemoryMb = 100_000 }
 
 -- | Post one batch of 'spinJL4' cases, the i-th spinning for the i-th count.
 postSpinBatch :: String -> Manager -> String -> [Int] -> IO (Response LBS.ByteString)
-postSpinBatch baseUrl mgr deployId steps = do
+postSpinBatch baseUrl mgr deployId = postBatchTo baseUrl mgr deployId "spin"
+
+-- | Post one batch of cases to a function that takes @n@, the i-th with the
+-- i-th value.
+postBatchTo :: String -> Manager -> String -> String -> [Int] -> IO (Response LBS.ByteString)
+postBatchTo baseUrl mgr deployId fnName steps = do
   let body = Aeson.object
         [ "outcomes" Aeson..= ([] :: [Text])
         , "cases" Aeson..=
             [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n] | (i, n) <- zip [1 :: Int ..] steps ]
         ]
-  req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/spin/evaluation/batch") body
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/" <> fnName <> "/evaluation/batch") body
   httpLbs req mgr
 
 -- | The case objects of a batch response, as the service wrote them.
