@@ -19,7 +19,14 @@ import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
-import System.Directory (doesFileExist)
+import System.Directory
+  ( createDirectoryIfMissing
+  , doesFileExist
+  , findExecutable
+  , getTemporaryDirectory
+  , makeAbsolute
+  , removePathForcibly
+  )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
@@ -99,11 +106,18 @@ data Output = Output
 -- is the @hGetContents: cannot decode byte sequence starting from 194@
 -- failure we saw on the first Windows build.
 runL4 :: FilePath -> [String] -> IO Output
-runL4 bin args = do
+runL4 = runL4In Nothing Nothing
+
+-- | Like 'runL4', but lets a test choose the child's working directory
+-- and, with @Just env@, replace its environment wholesale.
+runL4In :: Maybe FilePath -> Maybe [(String, String)] -> FilePath -> [String] -> IO Output
+runL4In mCwd mEnv bin args = do
   let cp = (proc bin args)
         { std_in  = CreatePipe
         , std_out = CreatePipe
         , std_err = CreatePipe
+        , env     = mEnv
+        , cwd     = mCwd
         }
   (Just hin, Just hout, Just herr, ph) <- createProcess cp
   hClose hin
@@ -169,6 +183,9 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+evalTraceFixture :: FilePath
+evalTraceFixture = fixtureDir </> "evaltrace.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -178,7 +195,8 @@ main = do
   bin <- locateL4Binary
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
-  for_ [cleanFixture, evalFixture, errorFixture, garbageFixture] \fp -> do
+  for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , evalTraceFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -312,3 +330,84 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  describe "l4 trace (output path safety)" $ do
+    it "never runs a shell for the output path, so metacharacters can't inject" $ do
+      -- Render into a directory whose *name* would execute `touch <sentinel>`
+      -- if the path were ever handed to a shell. With a direct `proc` call it
+      -- is just a literal (if unusual) directory name. The sentinel must not
+      -- appear regardless of whether Graphviz's `dot` is installed.
+      -- The sentinel is relative, run from a scratch directory: an absolute
+      -- Windows path would put a drive colon into the directory name.
+      tmp <- getTemporaryDirectory
+      let work     = tmp </> "l4-trace-injection"
+          sentinel = "l4-trace-injection-sentinel"
+          evilDir  = "l4trace$(touch " ++ sentinel ++ ").d"
+      removePathForcibly work
+      createDirectoryIfMissing True (work </> evilDir)
+      fixture <- makeAbsolute evalTraceFixture
+      _ <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> sentinel)
+      removePathForcibly work
+      ranShell `shouldBe` False
+
+    it "writes trace output into a directory whose path contains a space" $ do
+      -- The `.dot` branch needs no external tools; it exercises the same
+      -- outDir path-join the png/svg branches feed to `dot`, proving spaces
+      -- survive instead of being word-split.
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4 trace out"   -- note the space
+      removePathForcibly outDir
+      Output code _ _ <- runL4 bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      code `shouldBe` ExitSuccess
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      wrote `shouldBe` True
+
+    it "runs no shell for --output-dir, and renders or fails with a diagnostic" $ do
+      -- `;` ends a shell command, so this name, handed to a shell, runs
+      -- `touch PWNED` in the working directory. The marker is relative, so
+      -- unlike the case above the name has no drive colon and no separator,
+      -- and is a legal directory on Windows as well.
+      tmp <- getTemporaryDirectory
+      let work    = tmp </> "l4-trace-metachar"
+          evilDir = "o;touch PWNED;x"
+      removePathForcibly work
+      createDirectoryIfMissing True work
+      fixture <- makeAbsolute evalTraceFixture
+      Output code _ serr <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> "PWNED")
+      rendered <- doesFileExist (work </> evilDir </> "evaltrace-eval1.png")
+      removePathForcibly work
+      ranShell `shouldBe` False
+      case code of
+        ExitSuccess   -> rendered `shouldBe` True
+        ExitFailure _ -> serr `shouldSatisfy` ("Error: " `isInfixOf`)
+
+    it "hands dot an output dir beginning with '-' as a path, not an option" $ do
+      -- dot reads any argument starting with `-` as an option, and has no
+      -- `--` to stop that. Given `-out/evaltrace-eval1.dot` it reads
+      -- `-o ut/...`, takes the graph from stdin instead, and exits 0 having
+      -- written nothing, so `l4 trace` reported an empty SVG as generated.
+      -- Only a real `dot` shows this, so without one the test is pending.
+      mDot <- findExecutable "dot"
+      case mDot of
+        Nothing -> pendingWith "Graphviz `dot` is not on PATH"
+        Just _ -> do
+          tmp <- getTemporaryDirectory
+          let work    = tmp </> "l4-trace-dash-path"
+              svgFile = work </> "-out" </> "evaltrace-eval1.svg"
+          removePathForcibly work
+          createDirectoryIfMissing True work
+          fixture <- makeAbsolute evalTraceFixture
+          Output code _ _ <- runL4In (Just work) Nothing bin
+            ["trace", fixture, "--format", "svg", "--output-dir=-out"]
+          wrote <- doesFileExist svgFile
+          svg <- if wrote
+            then T.unpack . TE.decodeUtf8Lenient <$> BS.readFile svgFile
+            else pure ""
+          removePathForcibly work
+          code `shouldBe` ExitSuccess
+          svg `shouldSatisfy` ("<svg" `isInfixOf`)

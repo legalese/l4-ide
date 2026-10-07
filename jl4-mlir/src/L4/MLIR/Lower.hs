@@ -1845,12 +1845,6 @@ lowerExprCases expr expectedTy = case expr of
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
   Env{}        -> markUnsupported "ENV not supported by the WASM backend"
 
-  -- Exponent
-  Exponent _ base exp_ -> do
-    baseVal <- lowerExpr base l4NumberType
-    expVal <- lowerExpr exp_ l4NumberType
-    emitVal $ \vid -> (funcCall [vid] "__l4_pow" [baseVal, expVal] [l4NumberType, l4NumberType] [l4NumberType])
-
   -- RAnd/ROr (regulative and/or — same as boolean for compiled code)
   RAnd _ lhs rhs -> lowerBoolop arithAndi lhs rhs
   ROr _ lhs rhs -> lowerBoolop arithOri lhs rhs
@@ -1939,7 +1933,6 @@ isNumberExprShape = \case
   DividedBy{} -> True
   Modulo{}    -> True
   Percent{}   -> True
-  Exponent{}  -> True
   App _ n _ -> case resolvedName n of
     "__PLUS__"    -> True
     "__MINUS__"   -> True
@@ -2548,7 +2541,6 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Times _ a b      -> Set.union (go bound a) (go bound b)
       DividedBy _ a b  -> Set.union (go bound a) (go bound b)
       Modulo _ a b     -> Set.union (go bound a) (go bound b)
-      Exponent _ a b   -> Set.union (go bound a) (go bound b)
       Cons _ a b       -> Set.union (go bound a) (go bound b)
       Leq _ a b        -> Set.union (go bound a) (go bound b)
       Geq _ a b        -> Set.union (go bound a) (go bound b)
