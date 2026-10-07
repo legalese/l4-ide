@@ -616,18 +616,15 @@ Trace:
   ├ age AT LEAST 18 AND `is a resident`
   │┌ age AT LEAST 18
   │└ TRUE
-  ├ IF a THEN b ELSE FALSE
-  │┌ a
-  │└ TRUE
-  ├ b
+  ├ `is a resident`
   └ TRUE
 ```
 
 Read it from the top: the first line is what was asked, each line starting `├` is one step in working it out, and the last line, `└ TRUE`, is the answer.
 The indented lines beside a step are the smaller questions that step had to answer first.
 
-Two lines in it are ones you did not write.
-`IF a THEN b ELSE FALSE` is how L4 itself works out an `AND`: `a` is the left side and `b` is the right, and if `a` is not true the answer is `FALSE`.
+The `AND` line is the rule's own text, then comes its left side with the answer it gave, `age AT LEAST 18`, and then its right side, `` `is a resident` ``, which was needed because the left side was `TRUE`.
+One line in it is one you did not write.
 `<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
 
 **Seeing the trace from the command line.**
