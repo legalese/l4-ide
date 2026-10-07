@@ -212,9 +212,11 @@ typecheckAndEvalBundle moduleContext evalFiles = do
 
         -- Build evaluator import environments for files that need them.
         -- Uses GetLazyEvaluationDependencies which recursively evaluates imports.
-        -- Within the same session, Shake reuses already-evaluated imports.
-        -- We use per-file `use` (not batch `uses`) because each call needs its
-        -- own AttachCallStack with the file's URI for cycle detection.
+        -- Within the same session, Shake reuses already-evaluated imports: the
+        -- rule ignores the call stack in its key and evaluates each file once
+        -- (GetLazyEvaluationDependenciesFile, smucclaw/l4-ide#1008). Before
+        -- that, the stack made each file's imports separate keys, and nothing
+        -- was shared between bundle files.
         let evalUriMap = [(path, uri) | (path, _, uri) <- fileNfps
                                       , path `elem` evalFiles]
         evalPairs <- forM evalUriMap $ \(path, uri) -> do
