@@ -260,6 +260,19 @@
         "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
         "anchor": "### 11.0.1"
       }
+    },
+    {
+      "id": "R-NOT-2",
+      "owner": "Meng",
+      "kind": "design ruling",
+      "quick": false,
+      "raised": "2026-10-07",
+      "ask": "Python's precedence for NOT: tighter than AND/OR/IMPLIES/UNLESS, looser than comparisons, reopening the half of R-NOT-1 that §18.1 declined. Measured by parser census: legalese/commons (1009 files) has 0 layout-scoped group negations; this repository has 12 in 11 files, 7 of them real (4 patterns). Four questions: Python's or C's placement; the label idiom NOT \"(3)\" ... x (78 commons sites); a one-release transition warning; and whether main gets #356's refusal first.",
+      "unblocks": "any change to NOT's binding; the doc on main that already claims NOT binds tighter than AND and OR",
+      "source": {
+        "file": "specs/todo/SET-OPERATORS-SPEC.md",
+        "anchor": "### 18.4 R-NOT-2"
+      }
     }
   ]
 }
