@@ -82,6 +82,10 @@ runEvalTraceFixture = fixtureDir </> "run-evaltrace.l4"
 earlyActFixture :: FilePath
 earlyActFixture = fixtureDir </> "early-act.l4"
 
+-- | Two multi-clause groups, for how @l4 render@ and a trace name their parts.
+multiClauseRenderFixture :: FilePath
+multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -387,6 +391,7 @@ coreFixtures =
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture
+  , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB
@@ -680,6 +685,34 @@ spec bin = do
           diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
           diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
         other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+  -- The names a multi-clause group is compiled to are spelled so that no
+  -- source can write them ('L4.Parser.generatedName'), and say what they are.
+  describe "multi-clause groups: the names they are compiled to" $ do
+    let generatedSpellings = ["_pm_", "__pm_", "pm arg", "pm_fallthrough"]
+        mentionsOldName out = any (`isInfixOf` out) generatedSpellings
+
+    it "reads the clauses as one list of cases in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      -- the third clause, which an earlier build left out altogether
+      sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
+      sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
+      sout `shouldSatisfy` ("- otherwise: the result of clause 2" `isInfixOf`)
+      sout `shouldSatisfy` ("The result of clause 2 is determined by:" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names no generated input in the HTML rendering either" $ do
+      Output code sout _ <- runL4 bin ["render", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input 1" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names the later clauses by the clauses they hold in a trace" $ do
+      Output code sout _ <- runL4 bin ["run", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $
