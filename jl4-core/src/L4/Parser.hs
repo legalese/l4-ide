@@ -1802,14 +1802,24 @@ keywordAlignedWith allowNextLine MkExprLineInfo{..} MkSrcPos{line = tokLine, col
 -- a line-aware postfix parser. This is used for mixfix postfix operators
 -- which must be on the same line as the base expression.
 postfixPWithLine :: (HasAnno a, HasSrcRange a) => (ExprLineInfo -> Parser (a -> a)) -> Parser (a -> a) -> Parser a -> Parser a
-postfixPWithLine lineAwareOps regularOps p = do
-  a <- p
-  let exprRange = rangeOf a <|> (getAnno a).range
-      exprInfo = exprLineInfoWithFallback defaultExprLineInfo exprRange Nothing
+postfixPWithLine lineAwareOps regularOps p =
+  p >>= postfixAfter lineAwareOps regularOps
+
+-- | The postfix half of 'postfixPWithLine', on an operand that has already
+-- been parsed: at most one postfix operator.
+postfixAfter :: (HasAnno a, HasSrcRange a) => (ExprLineInfo -> Parser (a -> a)) -> Parser (a -> a) -> a -> Parser a
+postfixAfter lineAwareOps regularOps a = do
+  let exprInfo = postfixLineInfo a
   mf <- optional (try (lineAwareOps exprInfo) <|> try regularOps)
   case mf of
     Nothing -> pure a
     Just f -> pure $ f a
+
+-- | Where an operand ends, as the postfix operators see it.
+postfixLineInfo :: (HasAnno a, HasSrcRange a) => a -> ExprLineInfo
+postfixLineInfo a =
+  let exprRange = rangeOf a <|> (getAnno a).range
+  in  exprLineInfoWithFallback defaultExprLineInfo exprRange Nothing
 
 type Prio = Int
 data Assoc = AssocLeft | AssocRight
@@ -2115,7 +2125,7 @@ baseExpr' =
   <|> try bulletBlock   -- offside '•' bullet list (guarded; 0-cost on miss)
   <|> list
   <|> letInExpr
-  <|> paren expr
+  <|> parenExprOrProjection  -- (e), and (e)'s f: see 'projection'
 
 event :: Parser (Expr Name)
 event = attachAnno $ Event emptyAnno <$> annoHole parseEvent
@@ -2140,9 +2150,6 @@ parseEvent =
     parseAt =
       annoLexeme (spacedKeyword_ TKAt)
       *> annoHole expr
-
-atomicExpr :: Parser (Expr Name)
-atomicExpr = postfixPWithLine mixfixPostfixOp regularPostfixOperator atomicExpr'
 
 atomicExpr' :: Parser (Expr Name)
 atomicExpr' =
@@ -3153,24 +3160,57 @@ patApp = do
 
 -- Some manual left-factoring here to prevent left-recursion
 -- TODO: the interaction between projection and application has to be properly sorted out
+--
+-- A projection whose head is a literal or a name. A parenthesised head is
+-- 'parenExprOrProjection''s (MATRYOSHKA): 'baseExpr'' tries this first, and
+-- when it was tried over a parenthesised group with no @'s@ after it, the
+-- group was parsed here, thrown away, and parsed again by the plain
+-- parenthesis alternative -- twice per level of nesting, so
+-- @((1 PLUS 1) PLUS 1)@ nested 16 deep took 15 s.
 projection :: Parser (Expr Name)
 projection =
       -- TODO: should 'TGenitive' be part of 'Name' or 'Proj'?
       -- May affect the source span of the name.
       -- E.g. Goto definition of `name's` would be affected, as clicking on `'s` would not be part
       -- of the overall name source span. It is possible to implement this, but slightly annoying.
-      (\ ae ns ->
-        foldl'
-          (\e (gen, n') ->
-            Proj (fixAnnoSrcRange $ mkHoleAnnoFor e <> mkSimpleEpaAnno (lexToEpa gen) <> mkHoleAnnoFor n')
-              e
-              n'
-          )
-          ae -- (Var (fixAnnoSrcRange $ mkHoleAnnoFor n) n)
-          ns
-      )
-  <$> atomicExpr
-  <*> some ((,) <$> spacedToken_ (TIdentifiers TGenitive) <*> name)
+      foldl' projectField
+  <$> projectionHead
+  <*> some genitiveField
+
+-- | The head of a 'projection': a literal or a name, then at most one postfix
+-- operator.
+projectionHead :: Parser (Expr Name)
+projectionHead =
+  postfixPWithLine mixfixPostfixOp regularPostfixOperator (lit <|> nameAsApp App)
+
+-- | A parenthesised expression, with the projections that follow it if any:
+-- @(e)@, @(e)'s f@, @(e)'s f's g@. The group is parsed once, and then the
+-- projections are tried after it, exactly as 'projection' would have tried
+-- them on that head: one postfix operator, then at least one @'s@.
+--
+-- The first @'s@ is 'hidden' because 'projection''s attempt left no trace
+-- when it failed -- the plain alternative after it succeeded on the same
+-- group and discarded its error -- so a missing @'s@ must not start appearing
+-- in the "expecting" list of a parse error just after a closing bracket.
+parenExprOrProjection :: Parser (Expr Name)
+parenExprOrProjection = do
+  e <- paren expr
+  fromMaybe e <$> optional (try (projectionsAfter e))
+  where
+    projectionsAfter e = do
+      a <- postfixAfter mixfixPostfixOp regularPostfixOperator e
+      f <- (,) <$> hidden (spacedToken_ (TIdentifiers TGenitive)) <*> name
+      fs <- many genitiveField
+      pure (foldl' projectField a (f : fs))
+
+genitiveField :: Parser (Lexeme PosToken, Name)
+genitiveField = (,) <$> spacedToken_ (TIdentifiers TGenitive) <*> name
+
+projectField :: Expr Name -> (Lexeme PosToken, Name) -> Expr Name
+projectField e (gen, n') =
+  Proj (fixAnnoSrcRange $ mkHoleAnnoFor e <> mkSimpleEpaAnno (lexToEpa gen) <> mkHoleAnnoFor n')
+    e
+    n'
 
 _example1 :: Text
 _example1 =
