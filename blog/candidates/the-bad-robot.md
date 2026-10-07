@@ -3,7 +3,7 @@ title: Holmes's bad man is a robot now
 status: draft
 date: 2026-10-01
 facet: formal-methods-in-law
-words: 11397
+words: 12144
 license: CC-BY-NC-4.0
 sources_checked: 2026-10-07
 audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
@@ -40,6 +40,16 @@ Coding is where agents are given real authority first, for good reasons: most of
 Commerce is next.
 In September 2025 Google announced an open protocol for agents to make payments across platforms, and twelve days later Stripe and OpenAI released one for an agent to complete a purchase inside a chat, with sixty-odd payments and technology companies signed on to the first.[^commerce]
 After commerce comes conversation: agents that phone a clinic, negotiate a refund, or sit in a meeting and speak for someone.
+
+Some of this is on sale already, in sales itself.
+Vendors of what the trade calls AI sales development representatives offer agents that find prospects, write the outreach, send it, handle the replies and book the meetings.
+11x says its agent, Alice, will "identify your ideal buyers, and engage decision-makers 24/7 to book you meetings on autopilot"; Artisan's page reads "Email and social on autopilot, calls queued"; and Reply.io publishes a recipe in which the customer's own agent sets up the sales agent, which it calls "an agent configuring an agent."[^outreach]
+Every step of that funnel is regulated somewhere.
+The United States keeps a National Do Not Call Registry, and in February 2024 the Federal Communications Commission held that the Telephone Consumer Protection Act's restrictions on an "artificial or prerecorded voice" cover AI-generated voices, so that such calls need the prior express consent of the person called.
+Singapore keeps three do-not-call registers, for calls (including calls made over data services, such as messaging apps), text messages and faxes, and a marketer must check them before messaging a Singapore number.
+Email has no registry in either country — the Federal Trade Commission told Congress in 2004 that one "would not have any beneficial impact on the spam problem" — but it has rules on consent and on unsubscribing, and every one of these regimes has exceptions, for existing customers among others, that differ from country to country.
+11x's own menu lists "Consented Outbound Calling."
+An agent filling a sales funnel makes a great many small legal decisions a day, and none of them is about bioweapons.
 
 Every one of those actions happens inside law.
 A purchase is a contract.
@@ -311,6 +321,12 @@ An oracle the agent can consult is an oracle the agent can ignore, and an agent 
 So put the same encoding in the monitor.
 Before an agent's proposed action is executed, a separate process states the facts of the action — ideally using a different model, so that the agent is not grading its own homework — and asks the encoding whether the action is permitted.
 The check is deterministic, cheap enough to run on every action, and its answer comes with the clause that produced it, which makes it auditable afterwards by someone who has never seen the agent.
+This half has been built and measured already, though not with the law as its rules.
+AgentSpec, from Haoyu Wang, Christopher Poskitt and Jun Sun, is a small language for rules that watch an agent and intervene at run time, each rule a trigger, a predicate and an enforcement action; it stopped more than 90% of unsafe executions by a coding agent, at a cost of milliseconds.[^agentspec]
+Its driving experiments are the ones that matter here.
+With hand-written rules taken from earlier work on traffic law, its autonomous-driving agent stayed within the law in every scenario tested; with rules written zero-shot by OpenAI's o1 model, in five of eight.
+The same enforcement ran both times.
+What differed was the rules, and the rules are what an encoding of the law supplies.
 It is not a defense against an agent that misstates the facts to its monitor; O'Keefe flagged the same weakness in his Counselor, warning that an agent that wants a favorable answer "may hide certain relevant information (e.g., its true state of knowledge or its true intentions) from the Counselor."
 It does narrow the place where a model can be wrong to the facts, and it makes that place visible.
 
@@ -459,6 +475,10 @@ This post prefigures `paper/formal-methods-in-law/`, _The Bad Man Wears a White 
 
 [^theft]: The `commits-theft` tool, from the deployment `charge-sheet-demo-1` on Legalese's hosted L4 service, as it appeared in the tool list of the Claude session that revised this post, on 2026-10-07. The quoted text is the tool's description of its `out-of-the-possession-of-any-person` input; the illustration it paraphrases is Illustration (g) to section 378 of Singapore's Penal Code 1871. Two calls were made that day with identical inputs — the accused intending to take, acting dishonestly, the ring movable property, moved without consent and for the purpose of the taking — differing only in that input: with the ring in someone's possession the tool returned `{"result":{"value":true}}`, and with it in no one's possession `{"result":{"value":false}}`. The tool returns the verdict only; it did not, in these calls, return the clause-by-clause explanation.
 
+[^outreach]: Read 2026-10-07: 11x, "Alice," <https://www.11x.ai/alice>; Artisan, home page, <https://www.artisan.co/>; Reply.io, "Workflow: Build an autonomous AI SDR," <https://agents.reply.io/workflows/autonomous-ai-sdr.md>, whose outcome line reads "the AI SDR finds prospects, writes and sends outreach, handles replies, and books meetings." These are vendors' descriptions of their products, not measurements of what the agents do or how often they break the rules described here. The regulators: Federal Communications Commission, Declaratory Ruling FCC 24-17, CG Docket No. 23-362, adopted 2 February and released 8 February 2024, ¶ 2: "we confirm that the TCPA's restrictions on the use of 'artificial or prerecorded voice' encompass current AI technologies that generate human voices. As a result, calls that use such technologies fall under the TCPA and the Commission's implementing rules, and therefore require the prior express consent of the called party to initiate such calls absent an emergency purpose or exemption." Personal Data Protection Commission, _Advisory Guidelines on the Do Not Call Provisions_ (revised 27 July 2017), ¶¶ 1.8–1.9: the No Voice Call Register covers "voice or video calls sent by a telephone service, data service or any other electronic means," and the No Text Message Register "any text, sound or visual message that is not a specified call or fax"; ¶ 1.9 sets out the exemption for senders in an ongoing relationship. Later amendments to Singapore's rules were not checked. Federal Trade Commission, _National Do Not Email Registry: A Report to Congress_ (June 2004), part VI.
+
+[^agentspec]: Haoyu Wang, Christopher M. Poskitt and Jun Sun, "AgentSpec: Customizable Runtime Enforcement for Safe and Reliable LLM Agents," arXiv:2503.18666 (v3, 31 July 2025), <https://arxiv.org/abs/2503.18666>, accepted at the 48th IEEE/ACM International Conference on Software Engineering (ICSE 2026); read 2026-10-07, abstract and §§ 1 and 5. The traffic scenarios and the hand-written rules come from the FixDrive dataset and earlier work the paper cites; the paper reports that AgentSpec "prevented law violations in 100% of tested AV scenarios," and that rules generated by o1 prevented "law-breaking in 5 out of 8 AV scenarios," the latter in a zero-shot setting. Its authors are at Singapore Management University, where the research behind L4 was also done.
+
 [^convergent]: Two examples. In research, Liangming Pan, Alon Albalak, Xinyi Wang and William Yang Wang, "Logic-LM: Empowering Large Language Models with Symbolic Solvers for Faithful Logical Reasoning," Findings of EMNLP 2023, arXiv:2305.12295: "Our method first utilizes LLMs to translate a natural language problem into a symbolic formulation. Afterward, a deterministic symbolic solver performs inference on the formulated problem" (abstract, read 2026-10-07). In industry, TrustFoundry's compliance endpoint has a model extract the facts from free text and evaluates them against versioned "compliance packages," returning each check as passed, failed or unknown (`POST /public/v1/compliance/scan-text`, in `api.trustfoundry.ai/llms-full.txt`, §14, read 2026-10-01; it requires a key and beta access, we have not run it, and how a package is written is not documented).
 
 [^assumed]: See `doc/concepts/legal-modeling/non-answers.md` in the L4 repository, which describes assumed terms and the other ways an L4 evaluation can decline to give an answer.
@@ -500,5 +520,9 @@ Checked 2026-10-07 unless marked; entries marked 2026-10-01 were checked for the
 - Regulation (EU) 2024/1689, Arts 51–52 — <https://artificialintelligenceact.eu/article/51/>, <https://artificialintelligenceact.eu/article/52/> (unofficial consolidated text; not checked against the Official Journal)
 - 17 CFR 227.100(a)(2); 15 U.S.C. 77d(a)(6)(B); 86 FR 3496 — via `legalese/l4-pitch`, _Deep Dive: The Lexipedia Question_ (2026-10-01)
 - Norm Ai — norm.ai and press coverage (not otherwise checked)
+- Wang, Poskitt and Sun, "AgentSpec," arXiv:2503.18666 (ICSE 2026) — <https://arxiv.org/abs/2503.18666> (abstract, §§ 1 and 5)
+- 11x, Artisan and Reply.io product pages — vendors' own descriptions
+- FCC Declaratory Ruling 24-17 (2024) — <https://docs.fcc.gov/public/attachments/FCC-24-17A1.pdf>; PDPC, _Advisory Guidelines on the Do Not Call Provisions_ (revised 27 July 2017), Part I; FTC, _National Do Not Email Registry: A Report to Congress_ (2004)
+- C's precedence warning — `cc -Wall` (Apple clang) on a two-line probe, 2026-10-07
 
 This research is supported by the National Research Foundation (NRF), Singapore, under its Industry Alignment Fund – Pre-Positioning Programme, as the Research Programme in Computational Law. Any opinions, findings and conclusions or recommendations expressed in this material are those of the author(s) and do not reflect the views of National Research Foundation, Singapore.
