@@ -781,6 +781,7 @@ When the bracket holds a `CONSIDER` or a `MUST` whose own pattern slot holds the
 Probe: `CONSIDER 3 WHEN G THEN 1, OTHERWISE 2`, where each level of `G` is `((CONSIDER 1 WHEN G' THEN 1, OTHERWISE 2) PLUS 1)`.
 `l4 check` on `fix/parser-nested-parens` at `7f3cb6c34` took 0.50 / 1.55 / 6.03 s at depth 8 / 10 / 12, and the same nest after `MUST pay` took 0.40 / 2.00 / 5.93 s.
 On `unstable` at `21467cd84`, where the bracketed-expression doubling fixed by that branch also applied, the first probe took 0.14 / 0.84 / 6.20 s at depth 4 / 6 / 8.
+These are single runs on a loaded machine, kept as the record of what prompted the work; no binary of `7f3cb6c34` survives to re-run them.
 
 **What the parser does now.**
 Both readings go through `memoGroup` (`jl4-core/src/L4/Parser.hs`), which parses a bracketed expression, and a bracketed pattern, at most once at each position (for each value of `ofIsAnchor`) in one run of the parser.
@@ -788,11 +789,15 @@ The first parse of a group runs to completion and its whole outcome is recorded:
 A second parse at the same position replays that outcome.
 The memo sits below megaparsec in the parser's monad stack, so a group parsed inside an alternative that then fails stays parsed.
 `parenPatternOrExpr` is otherwise as it was on `unstable`: the same two readings in the same order, with megaparsec merging their errors as it always did.
-So every parse and every parse error is the same as on `unstable` by construction, not only on the cases measured below.
+So the memo cannot change a parse or a parse error, by construction, not only on the cases measured below.
+The branch's two earlier commits are a different case: `e98519803` (a bracketed expression and its genitive projection) and `939e94bac` (the operand after a mixfix keyword) rewrite code that produces errors without a memo.
+They match `unstable` by the arguments in their comments and by the measurements below, not by construction.
 The comment at `memoGroup` gives the argument: the outcome of parsing a group depends only on its position and on `ofIsAnchor`, the one `Env` field any parser changes, and the annotations and delayed errors a group adds are only ever added at the front and never read while parsing, so they can be replayed.
 
 An earlier version of this fix (`ea2d71f67`) checked a group's pattern shape before reading it and recovered the pattern reading's error by re-reading the group.
-Where two failing brackets nested, that moved the reported error outward, often onto a legitimate bracket or keyword, and in one probe it lost an indentation diagnostic.
+Where two failing brackets nested, that changed the reported error.
+Of the 46 stored fuzz cases where it differed from `21467cd84`, it reported an earlier token in 29, always a bracket or keyword that was not at fault (`EXACTLY` in 13, `FOLLOWED` in 9, `(` in 7), and in 2 of those that replaced an indentation diagnostic.
+In the other 17 it reported the same token but left one keyword out of what it expected (`EXACTLY` in 15, `FOLLOWED` in 2).
 The memo replaced it.
 
 **Evidence that errors and parses are unchanged**, each compared with `l4 ast` against a build of `21467cd84`:
@@ -816,13 +821,28 @@ Times under about 0.05 s are mostly process start-up.
 | broken, alternating: each level `(f (g (CONSIDER …) b PLUS) a PLUS)`                                | 8 / 16 / 32 / 64 | 0.025 / 0.032 / 0.051 / 0.072 | 0.068 / 0.218 / 0.784 / 3.512 | 9.03 / over 60 s wall         |
 | unclosed: `((CONSIDER 1 WHEN ((CONSIDER 1 WHEN …` and no bracket closed                             | 6 / 8 / 10 / 12  | 0.029 / 0.020 / 0.021 / 0.034 | 0.095 / 0.339 / 1.223 / 5.264 | 0.733 / 6.47 / over 60 s wall |
 
-Every shape grows linearly with depth now.
-At depth 256 / 512 / 1024 this branch takes 0.195 / 0.314 / 0.627 s on the broken chain, 0.232 / 0.466 / 0.903 s on the alternating one, 0.120 / 0.225 / 0.424 s on the unclosed nest, and 0.293 / 0.608 / 1.545 s on the valid probe.
+The parser now reads every shape in the table in time linear in depth, but `l4 format` and `l4 check` on the valid probe grow faster than that above a few hundred levels.
+At depth 256 / 512 / 1024 this branch takes 0.195 / 0.314 / 0.627 s on the broken chain, 0.232 / 0.466 / 0.903 s on the alternating one and 0.120 / 0.225 / 0.424 s on the unclosed nest, which is linear.
+On the valid probe it takes 0.293 / 0.608 / 1.545 s, which is not.
+GHC's count of bytes allocated, which load cannot change, shows where the time goes.
+With `#EVAL )` added after the valid probe, so that the whole nest is parsed and then the module fails to parse with nothing printed or checked, allocation doubles exactly with each doubling of depth: 0.71 / 1.42 / 2.82 / 5.64 GB at depth 256 / 512 / 1024 / 2048.
+Without it, `l4 format` allocates 0.95 / 2.37 / 6.70 / 21.2 GB (×2.50, ×2.83, ×3.17 per doubling) and `l4 check` 1.47 / 3.86 / 11.4 / 37.8 GB (×2.63, ×2.97, ×3.31).
+So the growth beyond linear is in work done after the parser has finished, in code this branch does not change.
+For comparison, the shape-check version's parser alone allocated 2.44 / 7.19 / 23.7 GB at depth 256 / 512 / 1024 with the same `#EVAL )` (×2.95, ×3.30).
 On the shape-check version, broken nests that took its re-reading path grew about fourfold per doubling of depth from 16 to 64 (quadratic), and an unclosed nest still doubled with every level, as the table shows.
 On the six largest files in the tree (3,600 to 6,200 lines), `l4 format` is no slower than either build: 1.12 s against 1.37 s (shape check) and 1.56 s (`21467cd84`) on the largest.
+Where nothing is read twice, the memo costs a little.
+On a broken expression nest outside pattern position, `#EVAL ((1 PLUS) PLUS)` 4096 / 8192 deep, this branch took 0.39 / 0.78 s against 0.26 / 0.58 s for the shape-check version, and on `#EVAL ((((1` with 8192 / 16384 brackets and none closed, 0.56 / 1.07 s against 0.48 / 0.91 s (best of 3, interleaved, in a later run than the table).
+Both grow linearly on both builds, and allocation is within 2% of the shape-check version's.
+The memo keeps every group's outcome until the parse ends, and the peak heap is larger: 110 MB against 63 MB on the first nest at depth 8192.
 
 **Not fixed here.**
 
+- `l4 format` and `l4 check` on a valid nest more than a few hundred levels deep: the work after parsing grows faster than linearly, as measured above.
+  The parser is not the cause, and this branch does not change the code that is.
+- A nest of brackets that are patterns, such as `(node (node … leaf))` or `(f (f … (x PLUS 1)))` in a `WHEN`, is parsed in time that grows faster than linearly, on all three builds.
+  With `#EVAL )` after the nest, allocation at depth 256 / 512 / 1024 / 2048 grows ×2.46 / ×2.83 / ×3.20 per doubling on this branch (2.13 GB at depth 2048), ×2.59 / ×2.96 / ×3.31 on `21467cd84` (4.04 GB) and ×3.35 / ×3.63 / ×3.80 on the shape-check version (27.0 GB).
+  This predates the branch.
 - A `LET`'s relaxed one-binding reading (`singleInlineLetDeclRelaxed`): when a second binding follows the first instead of `IN`, the whole binding is read again.
   Nested through right-hand sides that are not bracketed, that doubles with every level: 0.24 / 0.86 / 3.5 s at depth 8 / 10 / 12 (one run each), the same on all three builds.
   When the right-hand sides are bracketed, the memo covers it: 0.02 to 0.04 s at depth 4 to 12, against 4.96 s at depth 12 for the shape-check version.
