@@ -58,8 +58,42 @@ mainSrc = Text.unlines
   , "#EVAL heavy + 1"
   ]
 
+-- | Two hundred cheap thunks, each forced from the next: a force that starts,
+-- and so a mark that is set and a frame that is pushed, two hundred times in
+-- one run.
+chainLibSrc :: Text.Text
+chainLibSrc = Text.unlines $
+  "t0 MEANS 1" : [ "t" <> n <> " MEANS t" <> prev <> " + 1" | i <- [1 .. 200 :: Int], let n = Text.pack (show i), let prev = Text.pack (show (i - 1)) ]
+
+chainMainSrc :: Text.Text
+chainMainSrc = Text.unlines [ "IMPORT chain_lib", "", "#EVAL t200" ]
+
 spec :: Spec
 spec = describe "an interrupted force of an imported thunk" do
+  -- The allocation limit lands at a heap check, so sweeping it across a run
+  -- puts the interruption at many different points of the force: between the
+  -- mark of a thunk and its frame, between the pop and the write, and so on
+  -- (smucclaw/l4-ide#1020). After each, on a fresh environment, the next run
+  -- on the same thread must not meet a stale mark.
+  it "leaves no stale mark wherever an allocation limit lands" do
+    cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+    case checkWithImports (vfsFromList [("chain_lib.l4", chainLibSrc)]) chainMainSrc of
+      Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+      Right r -> do
+        interruptedAt <- forM [1 .. 400 :: Int] \i -> do
+          importEnv <- evaluateImports' cfg r.tcdResolvedImports
+          hitFlag <- newIORef False
+          let limited = cfg { allocationLimit = Just (MkAllocationLimit (fromIntegral i * 997) hitFlag) }
+              run c = execEvalModuleWithEnv c r.tcdEntityInfo importEnv r.tcdModule
+          _ <- try (run limited) :: IO (Either AllocationLimitExceeded (Environment, [EvalDirectiveResult]))
+          hit <- readIORef hitFlag
+          (_, results) <- run cfg
+          let rendered = map render results
+          rendered `shouldBe` ["201"]
+          pure hit
+        -- the sweep must have interrupted the run at least once, or it proves nothing
+        length (filter id interruptedAt) `shouldSatisfy` (> 20)
+
   it "can be forced again, on the same thread, by the next evaluation" do
     cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
     case checkWithImports (vfsFromList [("heavy_lib.l4", libSrc)]) mainSrc of
@@ -83,6 +117,12 @@ spec = describe "an interrupted force of an imported thunk" do
         (_, results) <- run cfg
         map render results `shouldBe` ["1"]
  where
+  evaluateImports' :: EvalConfig -> [ResolvedImport] -> IO Environment
+  evaluateImports' cfg imports = do
+    envs <- forM imports \ri ->
+      fst <$> execEvalModuleWithEnv cfg ri.riTypeChecked.entityInfo mempty ri.riTypeChecked.program
+    pure (mconcat envs)
+
   evaluateImports :: [ResolvedImport] -> IO Environment
   evaluateImports imports = do
     cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy

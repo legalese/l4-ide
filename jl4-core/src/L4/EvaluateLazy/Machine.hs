@@ -1077,6 +1077,14 @@ withPoppedFrameKeepingUpdate k = do
       k (Just f)
 {-# INLINE withPoppedFrameKeepingUpdate #-}
 
+-- | Set the displaced cache of the 'UpdateThunk' frame on top of the stack.
+setTopDisplaced :: (CtxReads, WHNF) -> Eval ()
+setTopDisplaced d = do
+  stackRef <- asks (.stack)
+  liftIO (modifyIORef' stackRef \s -> case s.frames of
+    UpdateThunk rf saved _ : fs -> MkStack s.size (UpdateThunk rf saved (Just d) : fs)
+    _                           -> s)
+
 -- | Drop the frame on top of the stack, which the caller has just read.
 dropTopFrame :: Eval ()
 dropTopFrame = do
@@ -5923,8 +5931,8 @@ evalRef rf = do
       tc <- getTemporalContext
       if validFor tc fp
         then noteCtxRead fp >> whnfConfig val
-        else forceIt (Just (fp, val))
-    Unevaluated{} -> forceIt Nothing
+        else forceIt
+    Unevaluated{} -> forceIt
   where
     -- The UpdateThunk frame goes on BEFORE the thunk is marked, so that an
     -- exception between the two finds a frame and no mark, and 'unwindFrame'
@@ -5932,17 +5940,15 @@ evalRef rf = do
     -- order left a mark with no frame to undo it (smucclaw/l4-ide#1020). A
     -- thunk that turns out not to need forcing (another thread finished it
     -- since the read above), or a blackhole, takes the frame off again.
-    forceIt :: Maybe (CtxReads, WHNF) -> Machine Config
-    forceIt displaced = do
+    forceIt :: Machine Config
+    forceIt = do
       -- Read the context BEFORE the atomic poke (the poke fn must stay pure).
       tc <- getTemporalContext
       -- Open a fresh read span for this force; the enclosing span's
       -- accumulator travels on the UpdateThunk frame and is merged back
       -- (together with this force's reads) in 'backward'.
-      -- The displaced cache travels on the frame too, so an aborted force can
-      -- put it back ('restoreThunkOnUnwind').
       saved <- swapCtxReads noReads
-      pushFrame (UpdateThunk rf saved displaced)
+      pushFrame (UpdateThunk rf saved Nothing)
       let notForced = traceEval Pop >> dropTopFrame >> void (swapCtxReads saved)
       join $ pokeThunk rf \tid -> \ case
         thunk@(WHNF val) ->
@@ -5952,7 +5958,11 @@ evalRef rf = do
           | validFor tc fp -> (thunk, notForced >> noteCtxRead fp >> whnfConfig val)
           | otherwise ->
               -- Stale for the current temporal context: re-force under it.
-              (Unevaluated (Set.singleton tid) e env, continueExpr env e)
+              -- The cache this poke displaced travels on the UpdateThunk
+              -- frame so an aborted force can put it back
+              -- ('restoreThunkOnUnwind'); it is the one the poke saw, not one
+              -- read earlier, which another thread may have replaced.
+              (Unevaluated (Set.singleton tid) e env, setTopDisplaced (fp, val) >> continueExpr env e)
         thunk@(Unevaluated tids e env)
           | tid `Set.member` tids ->  (thunk, notForced >> userException (BlackholeForced e))
           | otherwise -> (Unevaluated (Set.insert tid tids) e env, continueExpr env e)
