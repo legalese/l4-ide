@@ -69,18 +69,21 @@ import L4.Parser.Anno
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..), givenParamNames)
 import L4.Parser.MixfixRegistry
 
--- | The clause memo ('ClauseMemo') sits BELOW megaparsec, where backtracking
--- cannot roll it back: a clause parsed inside an alternative that then fails
--- stays parsed. Everything above megaparsec ('Env', 'PState') is rolled back
--- with the parser state, as before.
-type Parser = ReaderT Env (StateT PState (ParsecT Void TokenStream (StateT ClauseMemo Identity)))
+-- | The memo of bracketed groups and clause bodies ('GroupMemo') sits BELOW
+-- megaparsec, where backtracking cannot roll it back: a group parsed inside an
+-- alternative that then fails stays parsed. Everything above megaparsec
+-- ('Env', 'PState') is rolled back with the parser state, as before.
+type Parser = ReaderT Env (StateT PState (ParsecT Void TokenStream (StateT GroupMemo Identity)))
 
 data Env = Env
   { moduleUri :: NormalizedUri
   , mixfixHints :: MixfixHintRegistry
+    -- ^ No parser changes either field with 'local': both are fixed for a
+    -- whole run, which 'memoGroupAt' relies on.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
+-- | Only ever prepended to, and read only once the parse is over: 'memoGroupAt' replays a group's additions on that basis.
 data PState = PState
   { comments :: [Comment]
   , nlgs :: [Nlg]
@@ -1218,20 +1221,22 @@ pmClause clauseCol =
       pure (PMClause hd ps ak b)
 
 -- | The body of a @DECIDE@ or @MEANS@ clause that starts in column @col@,
--- parsed at most once per position ('memoClauseBody'). Every definition is
--- read first as a clause ('pmClause', for 'decidePatternMatch') and, unless it
+-- parsed at most once per position ('memoGroupAt'). Every definition is read
+-- first as a clause ('pmClause', for 'decidePatternMatch') and, unless it
 -- starts a clause group, again as an ordinary definition ('decide'); both
 -- readings parse the same body at the same position with the same column,
 -- so the second replays the first instead of parsing the body again.
 clauseBody :: Pos -> Parser (Expr Name)
-clauseBody col = memoClauseBody (unPos col) (indentedExpr col)
+clauseBody col = memoGroupAt (unPos col) #clauseBodies (indentedExpr col)
 
--- | What the clause parsers have learnt in one run of the parser, by
--- position. It lives below megaparsec in the 'Parser' stack, so backtracking
--- does not discard it.
-data ClauseMemo = MkClauseMemo
-  { clauseBodies :: !(IntMap.IntMap (ClauseReply (Expr Name)))
-    -- ^ The body of a clause ('clauseBody'), keyed by position and column.
+-- | Every outcome 'memoGroupAt' has recorded in one run of the parser, and
+-- what the clause parsers have learnt, by position. It lives below megaparsec
+-- in the 'Parser' stack, so backtracking does not discard it.
+data GroupMemo = MkGroupMemo
+  { exprGroups :: !(IntMap.IntMap (GroupReply (Expr Name)))
+    -- ^ A bracketed expression ('parenExpr').
+  , clauseBodies :: !(IntMap.IntMap (GroupReply (Expr Name)))
+    -- ^ The body of a @DECIDE@ or @MEANS@ clause ('clauseBody').
   , notClauseGroups :: !(IntMap.IntMap (ParseError TokenStream Void))
     -- ^ The positions of clauses that start no clause group, every clause of
     -- a run 'decidePatternMatch' has turned down, with the error the run
@@ -1242,37 +1247,79 @@ data ClauseMemo = MkClauseMemo
   }
   deriving stock Generic
 
-emptyClauseMemo :: ClauseMemo
-emptyClauseMemo = MkClauseMemo IntMap.empty IntMap.empty []
+emptyGroupMemo :: GroupMemo
+emptyGroupMemo = MkGroupMemo IntMap.empty IntMap.empty IntMap.empty []
 
--- | Everything one parse came to, as megaparsec reports it: the state it left
--- (offset, input, delayed errors), whether it consumed input, and either the
--- value with its hints and the annotations it collected, or the error.
-type ClauseReply a = Megaparsec.Reply Void TokenStream (a, PState)
+-- | Everything one parse of a group came to, as megaparsec reports it: the
+-- state it left (offset, input, delayed errors), whether it consumed input,
+-- and either the value with its hints and the annotations it collected, or
+-- the error. 'Megaparsec.runParsecT' produces it and 'memoGroupAt' replays it.
+type GroupReply a = Megaparsec.Reply Void TokenStream (a, PState)
 
--- | @memoClauseBody col p@ behaves exactly as @p@, but parses at most once at
--- each position (for each @col@, of which a position has only one).
+-- | A bracketed expression, @(e)@, parsed at most once per position: see
+-- 'memoGroup'.
+parenExpr :: Parser (Expr Name)
+parenExpr = memoGroup #exprGroups (paren expr)
+
+-- | @memoGroup table p@ behaves exactly as @p@, but parses at most once at
+-- each position (MATRYOSHKA, smucclaw/l4-ide#1017).
 --
--- Replaying is exact because what @p@ does depends on nothing but the
--- position and @col@: the input at a position is always the same, since the
--- stream only ever advances by dropping the tokens consumed; the source
--- position cached in the state is read from the tokens themselves; the
--- 'Env' is fixed for a whole run; and nothing reads the collected
--- annotations ('PState') or megaparsec's delayed errors while parsing, which
--- are only ever added to, at the front. So @p@ runs with both empty, and what
--- it added is put in front of what was there, which is what running it with
--- them would have made. (On unstable the same replay serves bracketed groups
--- as well, as 'memoGroup', from legalese/l4-ide#582.)
-memoClauseBody :: Int -> Parser (Expr Name) -> Parser (Expr Name)
-memoClauseBody col p =
+-- __Why.__ A bracketed group can be parsed more than once at the same
+-- position, by two alternatives that both start with it, and when the group
+-- holds the next group, that doubles with every level of nesting. Here the
+-- second parse of a group at a position replays the first.
+--
+-- __Why replaying is exact.__ The first parse runs @p@ to completion with
+-- 'Megaparsec.runParsecT', which records everything megaparsec would have
+-- handed on to what follows: the state @p@ left, whether it consumed input,
+-- and its value and hints or its error. Replaying hands exactly that on, to
+-- the same continuations. That gives the same answer as parsing again
+-- because what @p@ does depends on nothing but the position, which is the
+-- key:
+--
+--   * the input at a position is always the same, because the stream only
+--     ever advances by dropping the tokens consumed (and their text), and no
+--     parser sets the input;
+--
+--   * the source position cached in the state ('statePosState') is read
+--     from the tokens themselves by a token stream's 'reachOffset', so every
+--     position a parser asks for is the same after a replay. Two parts of
+--     it do depend on what was reached before. Its line prefix is read only
+--     when an error bundle is rendered, and the bundle is rendered from the
+--     run's initial state. Its offset must never move backwards
+--     ('reachOffset' splits the tokens at the distance from it), and a
+--     replayed state was only advanced to offsets at or below the group's
+--     end, which is where parsing resumes;
+--
+--   * no field of the 'Env' is ever changed with 'local': the module's URI
+--     and the mixfix hints are fixed for a whole run, and so is this memo,
+--     which a run starts empty ('runJl4Parser');
+--
+--   * nothing reads the collected annotations ('PState') or megaparsec's
+--     delayed errors while parsing; they are only ever added to, at the
+--     front. So @p@ runs with both empty, and what it added is put in front
+--     of what was there, which is what running it with them would have made.
+--
+-- Nothing fails loudly when one of these stops being true: the memo would
+-- replay a wrong syntax tree or a wrong error, with no other symptom.
+memoGroup :: Lens' GroupMemo (IntMap.IntMap (GroupReply a)) -> Parser a -> Parser a
+memoGroup = memoGroupAt 0
+
+-- | 'memoGroup' for a parser that also depends on one more number, which
+-- becomes part of the key: @memoGroupAt k table p@ must behave exactly as
+-- @p@ wherever it is reached at the same position with the same @k@.
+-- 'clauseBody' passes its column. (Numbers from 4095 up share one key; no
+-- column is that wide.)
+memoGroupAt :: Int -> Lens' GroupMemo (IntMap.IntMap (GroupReply a)) -> Parser a -> Parser a
+memoGroupAt extra table p =
   ReaderT \ env -> StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
-    let key = s.stateOffset * 4096 + min 4095 col
-    known <- gets (IntMap.lookup key . view #clauseBodies)
+    let key = s.stateOffset * 4096 + min 4095 extra
+    known <- gets (IntMap.lookup key . view table)
     Megaparsec.Reply s' consumption result <- case known of
       Just reply -> pure reply
       Nothing -> do
         reply <- Megaparsec.runParsecT (runStateT (runReaderT p env) mempty) s { stateParseErrors = [] }
-        modify' (over #clauseBodies (IntMap.insert key reply))
+        modify' (over table (IntMap.insert key reply))
         pure reply
     let s'' = s' { stateParseErrors = s'.stateParseErrors ++ s.stateParseErrors }
     case (consumption, result) of
@@ -2537,7 +2584,7 @@ atomicExpr' :: Parser (Expr Name)
 atomicExpr' =
       lit
   <|> nameAsApp App
-  <|> paren expr
+  <|> parenExpr
 
 nameAsApp :: (HasField "range" (AnnoToken b) SrcRange, HasAnno b, HasSrcRange a) => (Anno -> Name -> [a] -> b) -> Parser b
 nameAsApp f =
@@ -3002,7 +3049,7 @@ projectionHead =
 -- in the "expecting" list of a parse error just after a closing bracket.
 parenExprOrProjection :: Parser (Expr Name)
 parenExprOrProjection = do
-  e <- paren expr
+  e <- parenExpr
   fromMaybe e <$> optional (try (projectionsAfter e))
   where
     projectionsAfter e = do
@@ -3272,7 +3319,7 @@ runJl4Parser :: Env -> PState -> Parser a -> FilePath -> TokenStream -> Either (
 runJl4Parser env initState p input stream =
   evalState
     (runParserT (runStateT (runReaderT (p <* eof) env) initState) input stream)
-    emptyClauseMemo
+    emptyGroupMemo
 
 -- ----------------------------------------------------------------------------
 -- JL4 Program parser
