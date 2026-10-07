@@ -1,6 +1,6 @@
 # Specification: Evaluating with unknowns — connectives as an algebra, not as `IF`
 
-**Status:** proposed (2026-10-01); build step 1 of §8 is built (2026-10-02), its two regulative sites under LOUDHAILER and the rest in the change that wrote this line; build step 2 is built (2026-10-03).
+**Status:** proposed (2026-10-01); build step 1 of §8 is built (2026-10-02), its two regulative sites under LOUDHAILER and the rest in the change that wrote this line; build steps 2 and 3 are built (2026-10-03).
 On 2026-10-02 Meng authorised build steps 1 to 3 (STABILISERS), not landed, and parked steps 4 to 7 until a user asks for them (MOTHBALL, §8).
 Nothing else in this document is in the tree.
 §4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day, and §4.11 (the correspondence with the established designs) and D1 were added later that day; the seven rulings of the bench "Symbolic Evaluation Conflicts" on §4.13 were recorded in §9 and applied to §4 the same evening.
@@ -189,7 +189,7 @@ The shipped library carries only the three eliminators `holds`, `naf`, `presumed
 The spec's open question 2, whether the lift ships, is answered by U12 (§9).
 
 **Why this is not the answer for canon.**
-A rewrite of `BOOLEAN` to `DefBool` and `AND` to `kand` would turn every connective into an ordinary function call, and every consumer that recognises connectives would lose them: the ladder renders `kand` as an opaque box, and the planner's translation makes any function call one atom (`jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs:164-166`, read).
+A rewrite of `BOOLEAN` to `DefBool` and `AND` to `kand` would turn every connective into an ordinary function call, and every consumer that recognises connectives would lose them: the ladder renders `kand` as an opaque box, and the planner's translation makes any function call one atom (the `VizExpr.App` arm of `vizExprToBoolExpr` in `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs`, read).
 It is also a second copy of every encoding, which drifts.
 The pattern is the right _semantics_ in the wrong _layer_.
 
@@ -203,9 +203,9 @@ The spec sits under `specs/done/` with the status header "📋 Draft", so neithe
 ### 3.3 The planner (`jl4-query-plan`)
 
 `BoolExpr` (`BooleanDecisionQuery.hs:27-45`) is `BTrue | BFalse | BVar | BNot | BAnd | BOr | BImplies`, compiled to a hash-consed decision diagram.
-`QueryOutcome.determined :: Maybe Bool` and `Verdict = Undetermined | Holds | Fails | Complies | InBreach | NotApplicable` (`QueryPlan.hs:127-133`, `BooleanDecisionQuery.hs:210-224`).
-Its input is the ladder's static tree, so it decides `x OR NOT x` correctly, which no truth-table semantics can, but it sees only what the ladder drew: a call such as `age >= 18`, or a call to a sub-rule, is one opaque atom keyed by `nm.unique` (`QueryPlan.hs:164-166`).
-For a call whose arguments are all `BOOLEAN`, which the ladder draws as an application, that `nm.unique` is a fresh ladder node id (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs:425-432`, `uniq = vid.id`), and any other call, a comparison among them, is a leaf with a fresh id of its own (`leafFromExpr`, `:497-501`), so two calls to one function are two atoms either way.
+`QueryOutcome.determined :: Maybe Bool` and `Verdict = Undetermined | Holds | Fails | Complies | InBreach | NotApplicable` (`QueryOutcome` in `jl4-query-plan/src/L4/Decision/QueryPlan.hs`, `Verdict` in `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs`).
+Its input is the ladder's static tree, so it decides `x OR NOT x` correctly, which no truth-table semantics can, but it sees only what the ladder drew: a call such as `age >= 18`, or a call to a sub-rule, is one opaque atom keyed by `nm.unique` (the `VizExpr.UBoolVar` and `VizExpr.App` arms of `vizExprToBoolExpr`).
+For a call whose arguments are all `BOOLEAN`, which the ladder draws as an application, that `nm.unique` is a fresh ladder node id (the `App` case of `translateGo` in `jl4-lsp/src/LSP/L4/Viz/Ladder.hs`, `uniq = vid.id`), and any other call, a comparison among them, is a leaf with a fresh id of its own (`leafFromExpr`, which takes `tempUniqueTODO`), so two calls to one function are two atoms either way.
 **Package direction:** `jl4-query-plan` depends on `jl4-core` (its `.cabal` `build-depends`), so the evaluator cannot use the diagram without moving it (ruling U3).
 
 ### 3.4 The ladder's own evaluator, in TypeScript
@@ -230,7 +230,7 @@ The proposal is to give constitutive `AND`/`OR`/`NOT`/`IMPLIES` the same structu
 
 `WithDefault a = Either (Maybe a) (Maybe a)`: `Left Nothing` not asked and no default; `Left (Just v)` not asked, `TYPICALLY v`; `Right Nothing` asked, "I don't know"; `Right (Just v)` asked and answered (`RUNTIME-INPUT-STATE-SPEC.md:62-72`).
 Its status header still reads "BLOCKED (December 2025) — depends on TYPICALLY"; `TYPICALLY` has since landed for section `GIVEN`s, so the header is stale.
-The ladder adopted the model as a provenance axis (DESIGN §22) and keeps `Left` as its own map, `ViewSpec.defaults`, beneath `valuation`, with `respectDefaults` to withdraw presumptions (`ts-shared/ladder-core/src/types.ts:248-277`).
+The ladder adopted the model as a provenance axis (DESIGN §22) and keeps `Left` as its own map, `ViewSpec.defaults`, beneath `valuation`, with `respectDefaults` to withdraw presumptions (`ViewSpec.defaults` and `ViewSpec.respectDefaults` in `ts-shared/ladder-core/src/types.ts`).
 
 ### 3.7 The ladder's seam constrains the algebra (DESIGN §25f)
 
@@ -593,7 +593,7 @@ The ranking U7b asks for, against the 2026-08-01 ruling: that ruling covers only
 That a failed assertion exits 0 is not part of it; the same comment calls it a deliberate asymmetry and says "Only the crash was ruled on; widening this to assertions is a separate decision" (`:83-86`).
 So the ranking rests on the distinction `l4 run` already draws between `Fails` and `Errored`: a failed assertion is an answer the author did not want, and an undetermined directive is no answer at all.
 Every consumer of an evaluation outcome gets an explicit arm for the residual outcome and for the scope-pending outcome (C5), with no wildcard arm: the API, diagnostics, the `l4 run` exit code, the LSP inspector and rules, and Catala (U1b).
-The tree has more consumers than U1b lists, and each needs the same arms, together with arms for the guarded-leaf outcomes (U11b, U13): `l4 batch` (`Batch.hs:383-388` and `:392-396`, whose two wildcards together would score an undetermined row "success"), the service (`Backend/Jl4.hs:697-698`, `:863-864`), the REPL (`jl4-repl/app/Main.hs:656-658`, `:770-772`), the ladder's `l4/evalApp` (`jl4-lsp/src/LSP/L4/Actions.hs:145-163`), the LTS what-if and list views (`jl4-core/src/L4/Lts/WhatIf.hs:728-734`, `Lts/List.hs:181-187`), and the assertion classifier's own wildcards (`EvaluateLazy.hs:307`, `:319`), which would score a residual "assertion failed", exit 0.
+The tree has more consumers than U1b lists, and each needs the same arms, together with arms for the guarded-leaf outcomes (U11b, U13): `l4 batch` (`Batch.hs:383-388` and `:392-396`, whose two wildcards together would score an undetermined row "success"), the service (`Backend/Jl4.hs:697-698`, `:863-864`), the REPL (`jl4-repl/app/Main.hs:656-658`, `:770-772`), the ladder's `l4/evalApp` (`evalApp` in `jl4-lsp/src/LSP/L4/Actions.hs`, through `evalResultToLadderEvalAppResult`), the LTS what-if and list views (`jl4-core/src/L4/Lts/WhatIf.hs:728-734`, `Lts/List.hs:181-187`), and the assertion classifier's own wildcards (`EvaluateLazy.hs:307`, `:319`), which would score a residual "assertion failed", exit 0.
 
 ### 4.8 Provenance: what an unknown remembers
 
@@ -890,7 +890,7 @@ The caller chooses the report of §4.7.4:
 - `l4 run` and `l4 batch`: the default report, unless a flag names the K3 or the residual report; the flag names a report, not a mode.
 - The service: the report is its own route, as `/query-plan` is, or an unknown key is rejected; every response states its report.
   A residual response is `{"determined": null, "residual": "<L4 source>", "needs": [...], "verdict": "Undetermined"}`.
-  `determined` and `verdict` are the planner's vocabulary (§3.3); `needs` is new, since the planner's own field is `stillNeeded :: [QueryAtom]` (`jl4-query-plan/src/L4/Decision/QueryPlan.hs:191`).
+  `determined` and `verdict` are the planner's vocabulary (§3.3); `needs` is new, since the planner's own field is `stillNeeded :: [QueryAtom]` (`QueryPlanResponse` in `jl4-query-plan/src/L4/Decision/QueryPlan.hs`).
 - MCP: a separate tool or a listed capability, never a reserved argument.
 - No new directive.
   A `#EXPLORE` would make the module decide, and it would be a directive every exporter has to learn to ignore.
@@ -1172,17 +1172,17 @@ The decision followed a review that weighed this spec, none of whose §4 to §8 
 7. **The two TypeScript evaluators** (U10, U10b).
    The shared L4 cases run through the Haskell evaluator and the visualizer's `eval.ts` as each step makes their Haskell answer final: rows 49, 50 and 69 from step 3, rows 4 and 7 from step 4, and row 19 from step 5.
    Row 69 is U10's "`FALSE AND` a call that errors", which this list had dropped.
-   `eval.ts` is replaced by a call after step 6, which keeps U10's ruled timing, but the call goes to the language server's `l4/evalApp` (`jl4-lsp/src/LSP/L4/Actions.hs:134`), and to the browser build's WASM shim, which does not handle `l4/evalApp` today (`ts-apps/jl4-web/src/lib/wasm/wasm-message-transports.ts`), not to step 6's routes; so building it waits on the outcomes of steps 3 to 5, not on step 6.
+   `eval.ts` is replaced by a call after step 6, which keeps U10's ruled timing, but the call goes to the language server's `l4/evalApp` (`evalApp` in `jl4-lsp/src/LSP/L4/Actions.hs`), and to the browser build's WASM shim, which does not handle `l4/evalApp` today (`ts-apps/jl4-web/src/lib/wasm/wasm-message-transports.ts`), not to step 6's routes; so building it waits on the outcomes of steps 3 to 5, not on step 6.
    `ladder-core`'s `nodeValue` (`layout.ts:209-268`) is kept permanently, held to the Haskell evaluator on the connective cases with each call's engine value fed in as a pin, with the tautology case (it stays `Undetermined`) and the error case (it has no error value) listed as known divergences; the `IMPLIES` case expects value `TRUE` and verdict `Undetermined` against `verdictFor` and both `verdictOf`s, extending `verdict.test.ts`, whose existing case at `:84-90` asserts the verdict only, on a hand-built tree.
    _Assumed, not ruled:_
    - The ladder users see is `LadderFlow`, mounted by the VS Code webview and jl4-web (`ts-apps/webview/src/routes/+page.svelte:22`, `ts-apps/jl4-web/src/routes/+page.svelte:43`), whose only evaluator is `eval.ts` (`ladder.svelte.ts:460`); it replaces `Evaluator.eval` with a value function exported from `ladder-core`, `nodeValue` over the ladder's tree, with engine pins on call nodes only.
      A compound leaf stays askable, so row 5, which the translator draws as one opaque leaf, is not a connective case; `LadderSvg` and `LadderModel` are left alone.
-   - `l4/evalApp` already types its arguments and its value as `UBoolValue` on the Haskell side (`jl4-lsp/src/LSP/L4/Viz/CustomProtocol.hs:31`, `:39`); the TypeScript schema (`ts-shared/viz-expr/eval-on-backend.ts:12`, `:36`) and `toBoolExpr`'s `UnknownV -> error "impossible for now"` (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs:598`) change, and the request returns a tagged outcome.
+   - `l4/evalApp` already types its arguments and its value as `UBoolValue` on the Haskell side (`EvalAppRequestParams.args` and `EvalAppResult.value` in `jl4-lsp/src/LSP/L4/Viz/CustomProtocol.hs`); the TypeScript schema (`EvalAppRequestParams` and `EvalAppResult` in `ts-shared/viz-expr/eval-on-backend.ts`) and `toBoolExpr`'s `UnknownV -> error "impossible for now"` (in `toBoolExpr` in `jl4-lsp/src/LSP/L4/Viz/Ladder.hs`) change, and the request returns a tagged outcome.
      Children are walked left to right, and no call is sent for a call node the short circuit skips; a failed call pins `UnknownV` with the error text and never aborts the recompute; answered section `GIVEN` leaves go on the call as `WITH` bindings.
    - A `jl4-test` spec emits each shared case's ladder tree, as JSON, with its Haskell outcomes, into one committed fixture, and fails when the committed copy differs; the `node:test` and `vitest` suites read that fixture.
      From step 4, `nodeValue` is compared with the K3 report on the connective cases, with row 7's divergence recorded against the default report only.
      `charge-generator` and `regcf-wizard`, which draw the service's ladders with `ladder-core`, are left as they are; their pins are not engine values.
-     No shipped ladder, the webview's or jl4-web's, exposes `respectDefaults`, so the call carries no presumption toggle; the standalone playground does (`ts-shared/ladder-svg/standalone/playground.ts:78`, `:392`).
+     No shipped ladder, the webview's or jl4-web's, exposes `respectDefaults`, so the call carries no presumption toggle; the standalone playground does (the `respectDefaults` toggle in `ts-shared/ladder-svg/standalone/playground.ts`).
 
 ---
 
