@@ -7,29 +7,29 @@ pattern-matching-clause-hygiene.l4:15:3-17:20:
     
       WHEN Blue THEN
     
-pattern-matching-clause-hygiene.l4:24:3-25:18:
+pattern-matching-clause-hygiene.l4:25:3-26:18:
   I found a problem while checking the definition of `__pm_fallthrough_0`:
     The following branches still need to be considered:
     
       WHEN Green THEN
       WHEN Blue THEN
     
-pattern-matching-clause-hygiene.l4:32:8-32:
+pattern-matching-clause-hygiene.l4:33:8-32:
   I found a problem while checking the definition of `matches anything first`:
     This clause of `matches anything first` is never used, and neither is the clause after it.
     The clause above it matches every input, so `matches anything first` never gets this far.
     Move these clauses above that one, or remove them.
-pattern-matching-clause-hygiene.l4:40:8-34:
+pattern-matching-clause-hygiene.l4:41:8-34:
   I found a problem while checking the definition of `fresh name in the middle`:
     This clause of `fresh name in the middle` is never used.
     Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
     Remove it, or change its patterns.
-pattern-matching-clause-hygiene.l4:46:8-25:
+pattern-matching-clause-hygiene.l4:47:8-25:
   I found a problem while checking the definition of `repeated clause`:
     This clause of `repeated clause` is never used.
     Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
     Remove it, or change its patterns.
-pattern-matching-clause-hygiene.l4:52:8-53:18:
+pattern-matching-clause-hygiene.l4:53:8-54:18:
   I found a problem while checking the definition of `no given`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
@@ -37,37 +37,37 @@ pattern-matching-clause-hygiene.l4:52:8-53:18:
       DECIDE `no given` Green (JUST `_`) IS
       DECIDE `no given` Red NOTHING IS
     
-pattern-matching-clause-hygiene.l4:58:8-20:
+pattern-matching-clause-hygiene.l4:59:8-20:
   I found a problem while checking the definition of `one clause`:
     This clause does not cover all cases. The following clauses are still needed:
     
       DECIDE `one clause` NOTHING IS
     
-pattern-matching-clause-hygiene.l4:62:8-63:21:
+pattern-matching-clause-hygiene.l4:63:8-64:21:
   I found a problem while checking the definition of `two clauses`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `two clauses` Blue IS
     
-pattern-matching-clause-hygiene.l4:65:1-45:
+pattern-matching-clause-hygiene.l4:66:1-45:
   2
-pattern-matching-clause-hygiene.l4:66:1-35:
+pattern-matching-clause-hygiene.l4:67:1-35:
   0
-pattern-matching-clause-hygiene.l4:67:1-39:
+pattern-matching-clause-hygiene.l4:68:1-39:
   0
-pattern-matching-clause-hygiene.l4:68:1-28:
+pattern-matching-clause-hygiene.l4:69:1-28:
   1
-pattern-matching-clause-hygiene.l4:71:1-25:
+pattern-matching-clause-hygiene.l4:72:1-25:
   No clause of `two clauses` matches these inputs.
   The value that the last clause could not match is
     Blue
   Add a clause for this case, or end the clauses with one that matches every input.
-pattern-matching-clause-hygiene.l4:72:1-27:
+pattern-matching-clause-hygiene.l4:73:1-27:
   The only clause of `one clause` does not match these inputs.
   The value it could not match is
     NOTHING
   Add a clause for this case.
-pattern-matching-clause-hygiene.l4:75:1-32:
+pattern-matching-clause-hygiene.l4:76:1-32:
   The value
     Blue
   reached a CONSIDER that has no branch for it.
