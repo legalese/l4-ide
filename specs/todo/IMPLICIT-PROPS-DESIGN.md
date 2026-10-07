@@ -898,6 +898,7 @@ The line also goes above every annotation between that declaration and whatever 
 It also takes in the run of comment lines directly over the declaration, or over its first annotation, since a leading comment reads as the declaration's own; a comment with a blank line under it stays where it is (assumed, not ruled, and in a commit of its own).
 A type applied to arguments gets one parameter per argument, named apart from every name the module spells (`DECLARE Box b c` in a module that already uses `a`); offering nothing instead was rejected, because §11.1.1 already makes a parameterised bodiless head the declaration of a type of exactly that arity.
 The term role, and its five tests, are unchanged.
+The handler kept the name `outOfScopeAssumeQuickFix` after the 2026-09-06 repointing, though it had stopped inserting an `ASSUME`; it is now `outOfScopeDeclarationQuickFix` in `jl4-lsp/app/LSP/L4/Handlers.hs`.
 `jl4-lsp/test/OutOfScopeGivenFixSpec.hs` pins each position, and re-checks every edited module requiring no error at all.
 
 **Refuted and repaired, 2026-09-07.** Under the standing authorisation for adversarial workflows

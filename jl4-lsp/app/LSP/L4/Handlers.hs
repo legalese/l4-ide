@@ -341,13 +341,13 @@ handlers evalConfig recorder =
           rng = params ^. J.range
         diags <- atomically $ do
           activeFileDiagnosticsInRange (shakeExtras ide) uri rng
-        casAssume     <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
-        casConfusable <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
+        casDeclaration <- Extra.mapMaybeM (outOfScopeDeclarationQuickFix ide) diags
+        casConfusable  <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
         let casLexFix = concatMap lexErrorCodeActions diags
             casNbsp    = Maybe.mapMaybe nbspCodeAction diags
         casStraighten <- straightenWholeFileCodeAction ide uri diags
         pure $ Right $ InL $ fmap InR $
-          casAssume <> casConfusable <> casLexFix <> casNbsp <> casStraighten
+          casDeclaration <> casConfusable <> casLexFix <> casNbsp <> casStraighten
     , requestHandler SMethod_TextDocumentSemanticTokensFull $ \ide req -> do
         let
           SemanticTokensParams _ _ doc = req
@@ -1014,9 +1014,10 @@ findHover ide fileUri pos = runMaybeT $ refHover <|> tyHover
 -- The edit is computed by 'outOfScopeFix' in "LSP.L4.Actions", where it is
 -- testable without an IDE; this handler only fetches the checked module and
 -- its tokens and wraps the result as a 'CodeAction'. (Before 2026-09-06 it
--- inserted an @ASSUME@; until 2026-10-07 a type got the term's @GIVEN@.)
-outOfScopeAssumeQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
-outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
+-- inserted an @ASSUME@, and was named @outOfScopeAssumeQuickFix@ until
+-- 2026-10-07; until then, too, a type got the term's @GIVEN@.)
+outOfScopeDeclarationQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
+outOfScopeDeclarationQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
   Nothing -> pure Nothing
   Just ctx -> case ctx.kind of
     OutOfScopeError name ty -> do
