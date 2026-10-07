@@ -105,9 +105,8 @@ DECIDE `exempt, as the drivers read it` IF
     ..  `drying`
     ..  `marketing`
     ..  `storing`
-    ..      `packing`
-        ... "for"
-        AND     `shipment`
+    ..  `packing` ... "for"
+        ...     `shipment`
             OR  `distribution`
 
 GIVEN `canning`      IS A BOOLEAN
@@ -129,9 +128,8 @@ DECIDE `exempt, as the dairy read it` IF
     ..  `drying`
     ..  `marketing`
     ..  `storing`
-    ..          `packing`
-            ... "for"
-            AND `shipment`
+    ..  `packing` ... "for"
+        ...     `shipment`
     OR  `distribution`
 
 -- A driver who distributes but does not pack, can, process, preserve,
