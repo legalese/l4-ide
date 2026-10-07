@@ -787,7 +787,8 @@ outOfScopeGivenFix (MkModule _ _ rootSection) name ty = do
 -- leading annotations too (@\@desc@, @\@nlg@, @\@export@ and the rest), since
 -- a leading annotation belongs to the next declaration below it
 -- ('L4.Parser.ResolveAnnotation') and a @DECLARE@ inserted under one would
--- take it over.
+-- take it over; and above any comment lines directly above those, which read
+-- as part of the same declaration (since 2026-10-07; assumed, not ruled).
 --
 -- A type applied to arguments (@Box OF NUMBER, STRING@) is declared with one
 -- parameter per argument (@DECLARE Box a b@): the use fixes the arity, and a
@@ -851,12 +852,38 @@ outOfScopeDeclareFix tokens m@(MkModule _ _ rootSection) name = do
           Assume _ (MkAssume ann _ _ _ _) -> isSynthesisedAnno ann
           _                               -> False
 
-    -- The line the declaration's leading annotations start on: every
-    -- annotation between whatever precedes the declaration and its own first
-    -- line belongs to it, blank lines and comments notwithstanding.
+    -- The line the declaration's leading block starts on. Every annotation
+    -- between whatever precedes the declaration and its own first line
+    -- belongs to it, blank lines and comments notwithstanding, so the block
+    -- reaches the first of them; and it takes in the run of comment lines
+    -- directly over the declaration, or over that first annotation, which read
+    -- as the declaration's own. A comment with a blank line under it stays
+    -- where it is. Only comments, annotations and whitespace can sit between
+    -- two declarations, so a line there that holds anything but whitespace
+    -- holds a comment or an annotation.
     leadingLine :: Int -> Int -> Int
     leadingLine before declLine =
-      minimum (declLine : [ l | t <- tokens, Lexer.TAnnotations _ <- [t.payload], let l = t.range.start.line, before < l, l < declLine ])
+      case [ l | l <- annotationLines, l < top ] of
+        [] -> top
+        ls -> extendUp (minimum ls)
+      where
+        between l = before < l && l < declLine
+        annotationLines =
+          [ l | t <- tokens, Lexer.TAnnotations _ <- [t.payload], let l = t.range.start.line, between l ]
+        occupied = Set.fromList
+          [ l
+          | t <- tokens
+          , not (isWhitespace t.payload)
+          , l <- [t.range.start.line .. t.range.end.line]
+          , between l
+          ]
+        isWhitespace = \ case
+          Lexer.TSpaces (Lexer.TSpace _) -> True
+          _                              -> False
+        top = extendUp declLine
+        extendUp l
+          | (l - 1) `Set.member` occupied = extendUp (l - 1)
+          | otherwise                     = l
 
 -- | An insertion at the start of the given 1-based line.
 insertAtLineStart :: Int -> Text -> TextEdit

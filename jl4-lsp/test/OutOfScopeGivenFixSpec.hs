@@ -291,6 +291,26 @@ spec = do
       fmap (topLevelDescs . (.module') . snd) recheck `shouldBe`
         Just [("Colour", Nothing), ("Widget", Nothing), ("is shiny", Just "Is the widget shiny?")]
 
+    it "takes the comment lines directly over the declaration along, and leaves a comment with a blank line under it" $ do
+      let source = T.unlines $
+            colour <>
+            [ "-- Rules about widgets."
+            , ""
+            , "-- Whether a widget is shiny."
+            , "@desc Is the widget shiny?"
+            , ""
+            , "-- One input, a widget."
+            , "GIVEN w IS A Widget"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `is shiny` w IS TRUE"
+            ]
+      mFix <- fixFor "type-under-comment" source
+      fmap (.edit) mFix `shouldBe` Just (insertion 4 "DECLARE Widget\n\n")
+      recheck <- recheckAfterFix "type-under-comment" source
+      recheck `shouldRecheckClean` "Widget"
+      fmap (topLevelDescs . (.module') . snd) recheck `shouldBe`
+        Just [("Colour", Nothing), ("Widget", Nothing), ("is shiny", Just "Is the widget shiny?")]
+
     it "gives a type applied to arguments one parameter per argument, named apart from the module's names" $ do
       let source = T.unlines
             [ "GIVEN a IS A Box OF NUMBER, STRING"

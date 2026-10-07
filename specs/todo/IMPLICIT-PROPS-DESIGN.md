@@ -895,6 +895,7 @@ Measured by failing tests before the change: for `GIVEN w IS A Widget` with no `
 A type now gets a bodiless `DECLARE T` (`outOfScopeDeclareFix` in `jl4-lsp/src/LSP/L4/Actions.hs`), on a new line directly above the top-level declaration that contains the use, at its indentation, followed by a blank line.
 A use in a section's own `GIVEN` is contained by the section, so the line goes above its `§` heading.
 The line also goes above every annotation between that declaration and whatever precedes it, because a leading annotation attaches to the next declaration below it and a `DECLARE` inserted under one takes it over: a positive control that inserted one line lower moved the `@desc` onto the new `DECLARE`.
+It also takes in the run of comment lines directly over the declaration, or over its first annotation, since a leading comment reads as the declaration's own; a comment with a blank line under it stays where it is (assumed, not ruled, and in a commit of its own).
 A type applied to arguments gets one parameter per argument, named apart from every name the module spells (`DECLARE Box b c` in a module that already uses `a`); offering nothing instead was rejected, because §11.1.1 already makes a parameterised bodiless head the declaration of a type of exactly that arity.
 The term role, and its five tests, are unchanged.
 `jl4-lsp/test/OutOfScopeGivenFixSpec.hs` pins each position, and re-checks every edited module requiring no error at all.
