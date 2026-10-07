@@ -393,3 +393,38 @@ spec bin = do
           removePathForcibly work
           code `shouldBe` ExitSuccess
           svg `shouldSatisfy` ("<svg" `isInfixOf`)
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer's brackets as much as batch. Each operand nests inside an
+  -- AND, and each expected answer is the fixture's own #EVAL under `l4 run`.
+  -- With the printer as it was, batch answered `true` to every one of them,
+  -- with "status":"success" and no diagnostic.
+  describe "l4 batch keeps the grouping the rule wrote" $ do
+    let bracket = fixtureDir </> "batch-bracket.l4"
+        rows f  = fixtureDir </> ("batch-bracket-" ++ f ++ ".json")
+    it "brackets an OR inside an AND" $
+      batchAnswer bin bracket (rows "tff") "or under and" `shouldReturn` Bool False
+    it "brackets a NOT inside an AND" $
+      batchAnswer bin bracket (rows "tff") "not under and" `shouldReturn` Bool False
+    it "brackets an IMPLIES inside an AND" $
+      batchAnswer bin bracket (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "brackets an IF inside an AND" $
+      batchAnswer bin bracket (rows "ttf") "if under and" `shouldReturn` Bool False
+    it "brackets a function call inside an AND" $
+      batchAnswer bin bracket (rows "fff") "call under and" `shouldReturn` Bool False
+
+-- | Run one row through @l4 batch@ and return its result, failing the test
+-- unless the row's status is @success@.
+batchAnswer :: FilePath -> FilePath -> FilePath -> String -> IO Value
+batchAnswer bin file inputs entry = do
+  Output code sout serr <- runL4 bin ["batch", file, "-i", inputs, "-e", entry]
+  unless (code == ExitSuccess) $
+    expectationFailure ("l4 batch exited " ++ show code ++ "\nstdout:\n" ++ sout ++ "\nstderr:\n" ++ serr)
+  row <- case lines sout of
+    (l : _) -> either (\err -> expectationFailure ("NDJSON parse failed: " ++ err ++ "\n" ++ l) >> error "unreachable")
+                      pure (eitherDecode (BSL8.pack l))
+    []      -> expectationFailure "l4 batch printed no rows" >> error "unreachable"
+  objField row "status" `shouldBe` Just (String "success")
+  case objField row "output" of
+    Just (Array outs) | (o : _) <- foldr (:) [] outs, Just r <- objField o "result" -> pure r
+    other -> expectationFailure ("no result in batch output: " ++ show other) >> error "unreachable"
