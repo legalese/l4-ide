@@ -1215,6 +1215,22 @@ spec = describe "integration" do
           again <- callTool 2 10
           LBS.toStrict again `shouldSatisfy` BS.isInfixOf "55"
 
+    -- Review (2026-10-07): a batch never writes the reasoning tree, so a
+    -- traced batch must not be made to compute it. Five cases of 1,000 steps
+    -- with ?trace=full answered under 64 MB before the limits forced the
+    -- response, and all five were stopped once the tree was forced too.
+    describe "a batch with a trace" do
+      it "answers cases that fit, as it did before the response was forced" do
+        let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+        withServiceFromSourcesOpts stingy "trace-batch" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          let body = Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= (1_000 :: Int)] | i <- [1 .. 5 :: Int] ] ]
+          req <- buildJsonPost (baseUrl <> "/deployments/trace-batch/functions/spin/evaluation/batch?trace=full") body
+          resp <- httpLbs req mgr
+          expectBatchOutcomes resp (replicate 5 CaseAnswered)
+
     -- smucclaw/l4-ide#1019. The evaluation returns an unfinished number at
     -- once; its digits used to be computed by the JSON encoder, after both
     -- limits were off.

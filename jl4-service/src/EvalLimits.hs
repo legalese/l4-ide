@@ -63,8 +63,11 @@ limitHitMessage cfg = \case
 -- The result is forced to normal form inside the limits (hence 'NFData'): a
 -- number built up lazily, a reasoning tree or a GraphViz rendering is
 -- otherwise finished by the JSON encoder after both limits are off
--- (smucclaw/l4-ide#1019). 'NFData' is on what the response encodes, so
--- forcing it computes nothing the response would not.
+-- (smucclaw/l4-ide#1019). 'NFData' is on what the response type carries,
+-- which is more than every endpoint writes: a batch writes no reasoning tree,
+-- so it drops the tree before the force ('DataPlane'). A single evaluation
+-- with a trace writes the tree, so the trace now counts against both limits
+-- (measured 2026-10-07 at 1,000 steps: 79 MB traced against 6.7 MB without).
 withEvalLimits :: NFData b => Options -> IO b -> IO (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits cfg act =
   ( do

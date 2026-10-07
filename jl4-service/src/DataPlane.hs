@@ -332,7 +332,7 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     bracket_ (waitQSem local) (signalQSem local) $
     bracket_ (waitQSem env.batchSlots.shared) (signalQSem env.batchSlots.shared) do
       let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-      r <- runAppM env (runEvaluatorForDirectLimited vf Nothing args outputFilter traceLevel includeGraphViz
+      r <- runAppM env (runEvaluatorForDirectLimited False vf Nothing args outputFilter traceLevel includeGraphViz
                           (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
       pure (inputCase.id, either limitHitCase id <$> r)
 
@@ -648,14 +648,20 @@ runEvaluatorForDirect
   -> Presumption
   -> AppM (SimpleResponse, Int64)
 runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption =
-  runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption
+  runEvaluatorForDirectLimited True vf engine args outputFilter traceLevel includeGraphViz presumption
     >>= either (const resourceLimitExceeded) pure
 
 -- | 'runEvaluatorForDirect', returning a limit hit (and the bytes allocated up
 -- to it) instead of failing the request, so that the batch endpoint can report
 -- it on the one case that hit it.
+--
+-- The first argument says whether the caller writes the reasoning tree. A
+-- batch does not (it reads the result, the GraphViz text and what the answer
+-- presumed), so it drops the tree before the limits force the response:
+-- otherwise a traced batch would pay for a tree it never sends.
 runEvaluatorForDirectLimited
-  :: ValidatedFunction
+  :: Bool
+  -> ValidatedFunction
   -> Maybe EvalBackend
   -> [(Text, Maybe FnLiteral)]
   -> Maybe (Set.Set Text)
@@ -663,21 +669,22 @@ runEvaluatorForDirectLimited
   -> Bool
   -> Presumption
   -> AppM (Either (LimitHit, Int64) (SimpleResponse, Int64))
-runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption = do
+runEvaluatorForDirectLimited keepReasoning vf engine args outputFilter traceLevel includeGraphViz presumption = do
   let evalBackend = Maybe.fromMaybe JL4 engine
   case Map.lookup evalBackend vf.fnEvaluator of
     Nothing -> throwError err500 { errBody = jsonError "No evaluator available for backend" }
     Just runFn -> do
       limited <-
         withEvalLimits $
-          runExceptT
-            ( runFn.runFunction
-                args
-                outputFilter
-                traceLevel
-                includeGraphViz
-                presumption
-            )
+          fmap (fmap (\r -> if keepReasoning then r else r { reasoning = emptyReasoning })) $
+            runExceptT
+              ( runFn.runFunction
+                  args
+                  outputFilter
+                  traceLevel
+                  includeGraphViz
+                  presumption
+              )
       pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
         Left err -> (SimpleError err, allocBytes)
         Right r -> (SimpleResponse r, allocBytes)
