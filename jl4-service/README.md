@@ -192,7 +192,8 @@ Limits, measured 2026-10-07:
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
-- A list answer of more than 200 elements comes back as its first 200 elements followed by two `null`s, with status 200 (measured on the direct path, with 201).
+- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+  A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
 
 #### Trace Output
 
@@ -262,7 +263,9 @@ The response has one entry per case, in the order the cases were sent, each unde
 ```
 
 An answered case carries the function's result under `value`.
-A case that failed carries `@error`, the message the single-case endpoint gives for the same input, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
+A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is refused in a batch and answered as text in a single request.
+A case that reaches a resource limit, `--eval-timeout` or `--max-eval-memory-mb`, is not returned this way: it fails the whole batch with `500`.
 Until legalese/l4-ide#571, a failed case was left out of `cases` and only counted.
 The three `processor…` fields of `summary` are not measured, and are always `0`.
 

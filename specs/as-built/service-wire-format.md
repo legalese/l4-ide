@@ -1,6 +1,6 @@
 # jl4-service result encoding, wrapper answers, and per-id deployment dedup (as built)
 
-As built on unstable at 73a953821 (the encoding and the dedup) and 9c56c0ead (the wrapper answers). Source spec: none. Differences from the source spec: not applicable.
+As built on unstable at 73a953821 (the encoding and the dedup), 9c56c0ead (the wrapper answers) and 35d7b63b3 (the batch response). Source spec: none. Differences from the source spec: not applicable.
 
 Scope: the two jl4-service hunks of PR #162 (`632366e63c`, branch `feat/regcf-projections`), from its commit `a9caf2f69`; the answer side of PR #562 (`9c56c0ead`, branch `fix/service-wrapper-unbox`), from its commits `eba40d689` and `079d6a616`; and, of #549 (`35d7b63b3`), only the batch endpoint returning an errored case with its `@error`.
 The rest of #162 is Reg CF projection work (state graph, BPMN/DMN exporters, corpus, figures); its `StateGraph.hs` and `Syntax.hs` hunks are separate changes on unstable, and its backends and the Reg CF subject are not carried.
@@ -19,7 +19,9 @@ This change keeps main's request handling and carries #562's handling of the wra
   An upload with no id gets a fresh UUID, so it is never matched either: each one creates a new deployment, where main answered "ready" with the existing one whose sources matched.
   So a client that redeploys in a loop without an id now gains a deployment per upload, up to `--max-deployments` (default 1024); the README says so.
   The answer named the other deployment and carried its metadata: its functions and their schemas, its files and their exports, and its description.
-- A batch case that fails comes back in `cases` with its `@id` and, as `@error`, the message the single-case endpoint refuses it with, and is still counted in `casesIgnored`; before, it was left out of `cases` and only counted.
+- A batch case that fails comes back in `cases` with its `@id` and, as `@error`, the message its evaluation stopped with (`prettyEvaluatorError`), and is still counted in `casesIgnored`; before, it was left out of `cases` and only counted.
+  The message can differ from the single-case endpoint's for the same input, since a batch case with a `null` takes the wrapper and a single request does not.
+  A case that reaches `--eval-timeout` or `--max-eval-memory-mb` still fails the whole batch with `500`; unstable returns it with `@error` and `@limit`, from `a09544dd6`, a later commit of #549, which is not carried.
   This is the batch-response piece of #549 (`35d7b63b3`) and nothing else from it: main has no `REFUSE`, so no `@refused`, and no defaults, so no `@presumed`.
 
 ## Where it lives
@@ -29,7 +31,7 @@ This change keeps main's request handling and carries #562's handling of the wra
 - `jl4-service/src/Backend/CodeGen.hs`, with this change: `GeneratedCode` carries `answerShape` (`AnswerShape`, `:96`) and `requiredInputs` (`RequiredInput`, `:105`), computed by `isRequiredInput` and `requiredInputsOf` (`:116`, `:120`); they replace `decodeFailedSentinel`, which nothing read.
 - `jl4-core/src/L4/EvaluateLazy/Machine.hs:25-29`, with this change: exports `parseDateText`, `parseTimeText` and `parseDatetimeText`, the parsers of `TODATE`, `TOTIME` and `TODATETIME`, for `wrapperDeclined` (from #570, `a982e3060`, on unstable).
 - `jl4-service/src/ControlPlane.hs:175`, with this change: `postDeploymentHandler`'s shortcut for already-deployed sources looks up the requested id (`Map.lookup deployId`) and compares its version, where main scanned the registry for any deployment with the same version.
-- `jl4-service/src/DataPlane.hs:312`, with this change: the batch handler's `outputCase`; `CaseOutcome` and the `@error` key in `jl4-service/src/Types.hs:421` and `:524`.
+- `jl4-service/src/DataPlane.hs:316`, with this change: the batch handler's `outputCase`; `CaseOutcome` and the `@error` key in `jl4-service/src/Types.hs:421` and `:524`.
 
 ## Behaviour and rules
 
@@ -58,7 +60,7 @@ This change keeps main's request handling and carries #562's handling of the wra
 - `jl4-service/test/CodeGenSpec.hs`: a function with no inputs gets `Bare`, ordinary and deontic; `requiredInputs` leaves out `BOOLEAN` and `MAYBE` inputs, lists `GIVEN`s before `ASSUME`s, and marks a `DATE`.
 - With `Jl4.hs`, `CodeGen.hs` and `CodeGenSpec.hs` as they are with the encoding change alone, 15 of these fail; as on main, 19 fail; with `Jl4.hs` checking dates with the service's ISO parsers instead of `TODATE`'s, only the two-`DATE` test fails.
 - `jl4-service/test/IntegrationSpec.hs`, "skips recompiling identical sources only under the same id": a POST for `beta` with `alpha`'s bytes answers `beta`, `GET /deployments/beta` is then 200, and the same bytes posted again under `beta` answer `ready` with no `updateId`. With main's content-only match it fails at the first; with no shortcut at all, at the third.
-- The same file, "batch, where null takes the wrapper" and "returns a batch case the wrapper declines with its `@error`": the errored case's `@id` and `@error`. With main's batch handler both fail.
+- The same file, "batch, where null takes the wrapper" and "returns a batch case the wrapper declines with its `@error`": the errored case's `@id` and `@error`, and, in the second, the outcomes a client reads by decoding the body as a `BatchResponse`. With main's batch handler both fail; with `FromJSON OutputCase` ignoring `@error`, the second does.
 - The jl4-mlir differential harness compares the WASM backend's results with these encodings; jl4-mlir's commit `598f60d28` (inside #190, on unstable) moved the WASM runtime to them.
   On main jl4-mlir still emits the old encodings, so with this change `jl4-mlir/scripts/parity-harness.mjs` reports those cells as differences.
 
@@ -71,6 +73,6 @@ Measured 2026-10-07 against jl4-service built from main 838c92ed4, run with `XDG
   So the `TIME` and `DATETIME` refusals above are not reached on main; the `DATE` one is.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails with a parser error in the generated input record (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text (`date first` with `"garbage"` answers `"garbage"`).
-- A list answer of more than 200 elements comes back as its first 200 elements followed by two `null`s (measured with 201, on the direct path, identically on main).
+- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s (measured with 201, on the direct path, identically on main; the wrapper path and a `MAYBE` list one element sooner, measured 2026-10-07 on this branch's build and unstable's).
 - The published `returnSchema` gives a record's fields at the top level, without the constructor key the answer has, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#ISSUE).
 - On unstable, jl4-service-test answers such requests on the wrapper path ("MAYBE inputs on the wrapper path" in `jl4-service/test/IntegrationSpec.hs @ 9c56c0ead`); the fixes are in unstable's request handling, which this change does not carry.

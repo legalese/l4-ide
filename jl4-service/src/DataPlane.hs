@@ -306,9 +306,13 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    -- Every case comes back. An answer carries its result; an error carries
-    -- its message, so that no case vanishes into the count without a reason.
-    -- Only answers count as processed.
+    -- Every case that finishes comes back. An answer carries its result; an
+    -- error carries its message, so that no case vanishes into the count
+    -- without a reason. Only answers count as processed. A case that reaches
+    -- --eval-timeout or --max-eval-memory-mb does not finish: 'timeoutAction'
+    -- throws, and the check above fails the whole batch with it. Unstable
+    -- returns such a case with @error and @limit, from a09544dd6, a later
+    -- commit of #549 than the one this carries (35d7b63b3).
     outputCase (rid, simpleRes, _) = case simpleRes of
       SimpleResponse r -> OutputCase
         { id = rid, attributes = r.fnResult, graphviz = r.graphviz

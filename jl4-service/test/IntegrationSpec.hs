@@ -324,8 +324,10 @@ spec = describe "integration" do
 
       -- On batch a null takes the wrapper, which refuses "garbage" as a DATE.
       -- The direct path would answer it as text, so an errored case shows the
-      -- wrapper ran. The case comes back with the single-case endpoint's
-      -- message as its @error, where it used to be dropped and only counted.
+      -- wrapper ran. The case comes back with the wrapper's message as its
+      -- @error, where it used to be dropped and only counted. A single request
+      -- gets that message only on the wrapper path, with a {} in an input; with
+      -- this null it stays direct and answers "garbage".
       it "returns a batch case the wrapper declines with its @error, and counts it" do
         withServiceFromSources "decline-batch" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
           req <- buildJsonPost (baseUrl <> "/deployments/decline-batch/functions/date%20first/evaluation/batch")
@@ -345,6 +347,9 @@ spec = describe "integration" do
                    , Just (Aeson.String "Parameter 'end date': could not read \"garbage\" as a DATE")
                    , Nothing ]
                  , [Just (Aeson.Number 2), Nothing, Just (Aeson.String "2026-01-31")] ]
+          -- and a client decoding the body reads the same outcomes
+          fmap (map (.outcome) . (.cases)) (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+            `shouldBe` Just [CaseErrored "Parameter 'end date': could not read \"garbage\" as a DATE", CaseAnswered]
 
       it "names a missing ASSUME as the direct path does" do
         withServiceFromSources "decline-assume" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
