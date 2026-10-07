@@ -24,6 +24,11 @@ module L4.EvaluateLazy.Machine
 , getModuleUri
 , getSafeMode
 , formatUTCTimeIso
+-- * The string parsers TODATE, TOTIME and TODATETIME use, for callers that must
+-- agree with them (jl4-service names the input one of them refused).
+, parseDateText
+, parseTimeText
+, parseDatetimeText
 -- * STATE-AS-LEDGER substrate. Exposed for the test suite and the high-level
 -- driver in 'L4.EvaluateLazy'; not part of the stable public API.
 , tellEventRouted
