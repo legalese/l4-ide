@@ -3,6 +3,8 @@
 > Note (2026-08-01): static non-exhaustiveness warnings for multi-clause groups now exist. `desugarPatternClauses` attaches the source clause matrix (scrutinees + per-clause head range and patterns) to the fused Decide's annotation as `Extension.pmMatrix`, and the type checker's `checkClauseMatrix` (TypeCheck.hs) analyses n ≥ 2 groups as a unit, warning with `PatternClausesMissing` (pasteable `DECIDE … IS` clause suggestions at the clause-head hull). Literal-pattern groups still bail (opaque to the guard model), so those remain runtime-only. The owning document for the mechanism is `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §14.7.
 >
 > Note (2026-10-06): one-clause groups are analysed the same way now, clauses that can never be tried are warned about (and still type-checked), and generated nodes are marked (`Extension.pmSynthetic`) rather than recognised by the `__pm_fallthrough_` name. See §14.7's "What changed 2026-10-06".
+>
+> Note (2026-10-07): the name `__pm_fallthrough_<k>` below is historical. Generated names are now spelled so that no source can write them, and read `input 1` and `the result of clauses 2 to 3`. See §14.7's "What changed 2026-10-07".
 
 # Specification: Pattern Matching in Function Definitions
 
