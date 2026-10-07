@@ -23,14 +23,20 @@
 --     the failed pattern attempt had already parsed that inner @CONSIDER@,
 --     and the expression reading parsed it again: twice per level.
 --
--- Each case here nests one construct 40 levels deep. Once parsing is
--- polynomial in depth, that takes milliseconds; the exponential parser could
--- not finish any of them in a lifetime. The time budget is therefore
--- deliberately generous: a slow CI machine cannot make a correct parser fail
--- it, and no machine can make the exponential parser pass it.
+-- Each case in 'depthSpec' nests one construct 40 levels deep. Once parsing
+-- is polynomial in depth, that takes milliseconds. The exponential parser
+-- (21467cd84 on @unstable@) cannot finish thirteen of its fifteen cases in a
+-- lifetime. The other two, a genitive projection on a bracketed head and
+-- brackets that are patterns, did not double per level there and pass on it
+-- too; they guard against a change that would make them double. The time
+-- budget is therefore deliberately generous: a slow CI machine cannot make a
+-- correct parser fail it, and no machine can make the exponential parser
+-- pass the other thirteen.
 --
--- Each case also exact-prints the parsed module back to its source, which
--- fails if the deep parse dropped or reordered a token.
+-- Each 'depthSpec' case also exact-prints the parsed module back to its
+-- source, which fails if the deep parse dropped or reordered a token.
+-- 'errorSpec' nests only three or four brackets: it checks that a broken
+-- nest reports the error the parser always reported.
 module NestedParenParserSpec (spec) where
 
 import Base
@@ -165,8 +171,10 @@ depthSpec =
 -- position that is neither a pattern nor an expression fails both readings,
 -- and megaparsec reports whichever got further; when such brackets nest, the
 -- error depends on both readings of every level. An earlier version of the
--- fix (badea173a) reported the outer bracket or keyword instead in every case
--- below, and lost the indentation diagnostic in the last one.
+-- fix (badea173a) got all six cases below wrong. In five it reported an
+-- outer bracket or keyword instead, in the last of them in place of the
+-- indentation diagnostic. In the third it reported the same token, but left
+-- @EXACTLY@ out of what it expected.
 --
 -- Each expected position and message is copied from what the parser reported
 -- before MATRYOSHKA was fixed: @l4 ast@ at 21467cd84 on @unstable@.
