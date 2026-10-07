@@ -27,6 +27,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
+  - [Clause that is never used](#clause-that-is-never-used)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
   - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
@@ -408,7 +409,9 @@ Or end the group with a clause that matches anything, written with the `GIVEN` n
 DECIDE price c IS 0
 ```
 
-**Note:** Only groups of two or more clauses that match enumeration values or `TRUE`/`FALSE` are checked. Groups that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning, and neither does a group that would need more than 64 clauses listed. See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
+When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
+
+**Note:** Only rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked. Rules that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning, and neither does a rule that would need more than 64 clauses listed. A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER over a number or a piece of text gives none. See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
 
 ---
 
@@ -419,6 +422,38 @@ DECIDE price c IS 0
 **What went wrong:** A WHEN branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover every value it could match.
 
 **How to fix it:** Delete the unreachable branch, or reorder branches if a more specific pattern was accidentally placed after a more general one.
+
+---
+
+### Clause that is never used
+
+**Warning message:**
+
+```
+This clause of `describe` is never used, and neither is the clause after it.
+The clause above it matches every input, so `describe` never gets this far.
+Move these clauses above that one, or remove them.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN status IS A Status
+GIVETH A STRING
+DECIDE describe status IS "some status"
+DECIDE describe Active IS "running"
+DECIDE describe Closed IS "stopped"
+```
+
+**What went wrong:** A rule written as a list of clauses tries them from the top, and the first clause that matches is the one that applies. The first clause here matches every status, because its pattern is `status`, the name of the input itself. So `describe Active` is `"some status"`, and the two clauses below it are never reached. The warning appears once, at the first clause that cannot be reached, and says how many more follow it.
+
+A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
+
+A repeated clause is not flagged, and neither is a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
+
+**How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
 
 ---
 
@@ -465,6 +500,17 @@ The typechecker's exhaustiveness warning lists all missing branches.
 **What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the compile-time warning was ignored, or the value escaped the analysis — in particular matches on NUMBER, STRING, or DATE scrutinees, for which exhaustiveness checking is skipped (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match) under Compiler Warnings). A directive that crashes this way makes `l4 run` exit non-zero.
 
 **How to fix it:** Add branches for the missing cases, or add an OTHERWISE branch as a catch-all. For matches on NUMBER, STRING, or DATE values, always include OTHERWISE.
+
+When the rule was written as a list of clauses rather than with a CONSIDER, the message talks about its clauses instead:
+
+```
+No clause of `label` matches these inputs.
+The value that the last clause could not match is
+  Suspended
+Add a clause for this case, or end the clauses with one that matches every input.
+```
+
+Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning described under [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
 
 ---
 

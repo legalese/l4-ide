@@ -1,0 +1,20 @@
+-- =============================================================================
+-- A multi-clause group is compiled to local definitions named
+-- `__pm_fallthrough_<k>`, and a drafter can spell that name too. Here the
+-- clauses after the first one can never run, so their binding is checked and
+-- then dropped; the first clause's body still reads the drafter's own
+-- `__pm_fallthrough_0`, and answers 7 (review of legalese/l4-ide#545; probe
+-- h02). An earlier build let it read the dropped binding instead, and failed
+-- with an internal error when it ran.
+-- =============================================================================
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+`__pm_fallthrough_0` MEANS 7
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `refs user` c   IS `__pm_fallthrough_0`
+DECIDE `refs user` Red IS 2
+
+#EVAL `refs user` Green -- 7
+#EVAL `refs user` Red   -- 7: the first clause matches every input

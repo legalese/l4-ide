@@ -845,8 +845,13 @@ isDistinguishablePat = \ case
 -- | Extract the term (value) parameter names from a GIVEN signature, skipping
 -- type parameters (@x IS A TYPE@). These are used as the CONSIDER scrutinees.
 givenTermNames :: TypeSig Name -> [Name]
-givenTermNames (MkTypeSig _ (MkGivenSig _ otns) _) =
-  [ n | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
+givenTermNames = map fst . givenTermParams
+
+-- | The term parameters of a GIVEN signature, each with whether it declares
+-- a type.
+givenTermParams :: TypeSig Name -> [(Name, Bool)]
+givenTermParams (MkTypeSig _ (MkGivenSig _ otns) _) =
+  [ (n, isJust mt) | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
   where
     notTypeParam (Just (Type _)) = False
     notTypeParam _               = True
@@ -866,14 +871,21 @@ desugarPatternClauses sig rawToks firstC restCs =
     arity    = length (pmPats firstC)
     givenNs  = givenTermNames sig
     appFormAnno = mkHoleAnnoFor headName
+    usesGivenNames = length givenNs == arity && arity > 0
+    -- Whether the GIVEN declares each column's type; a synthesized column
+    -- has none.
+    typesDeclared
+      | usesGivenNames = map snd (givenTermParams sig)
+      | otherwise      = replicate arity False
     (theAppForm, scrutinees)
-      | length givenNs == arity && arity > 0 =
+      | usesGivenNames =
           (MkAppForm appFormAnno headName [] mAka, givenNs)
       | otherwise =
           let synth = [ MkName emptyAnno (NormalName ("_pm_arg_" <> Text.pack (show i)))
                       | i <- [1 .. arity] ]
           in (MkAppForm appFormAnno headName synth mAka, synth)
-    body = matchClauses scrutinees clauses
+    grp = MkPmGroup { groupHead = rawName headName, clauseCount = length clauses }
+    body = matchClauses grp scrutinees typesDeclared clauses
     -- The signature is exact-printed structurally (via its hole); the whole
     -- clause group is reproduced verbatim from the captured raw tokens as a
     -- single visible CSN. We deliberately emit NO holes for 'theAppForm' or the
@@ -888,16 +900,16 @@ desugarPatternClauses sig rawToks firstC restCs =
     -- exhaustiveness analysis: 'matchClauses' below destroys the per-clause
     -- structure (its synthetic CONSIDERs are rangeless and OTHERWISE-total),
     -- so the analysis must see the matrix as the drafter wrote it. We attach
-    -- it for EVERY fused group, n = 1 included — cheap and uniform; the
-    -- policy of which groups to analyse (only n >= 2: a single clause's
-    -- CONSIDER sits un-suppressed in the user's own Decide and already warns
-    -- via the ordinary path) lives in the checker, not here. Exactprint is
+    -- it for EVERY fused group, n = 1 included, and the checker analyses
+    -- every one: the synthetic CONSIDERs are marked ('PmConsider') and never
+    -- warn about missing branches themselves. Exactprint is
     -- unaffected: it reads the 'payload' CSNs, never the 'extra' field, and
     -- 'fixAnnoSrcRange' sets only the range.
     decideAnno =
       setPmMatrix matrix (fixAnnoSrcRange (mkHoleAnnoFor sig <> rawTokensAnno rawToks))
     matrix = MkPmMatrix
       { scrutinees = scrutinees
+      , synthesizedScrutinees = not usesGivenNames
       , clauses =
           [ MkPmMatrixClause
               { headRange = rangeOf (pmHead c)
@@ -905,6 +917,7 @@ desugarPatternClauses sig rawToks firstC restCs =
               }
           | c <- clauses
           ]
+      , catchAll = List.findIndex (clauseMatchesAnything scrutinees . pmPats) clauses
       }
 
 -- | Build an annotation whose single visible concrete-syntax node holds the
@@ -940,36 +953,50 @@ rawTokensAnno toks =
 -- distinguishable column, compounding multiplicatively. Instead, at each
 -- non-final clause boundary we bind the remaining-clauses expression to a single
 -- fresh local (a nullary @LET ... IN@) and let 'matchOne' refer to it by name.
--- The fresh name (@__pm_fallthrough_<k>@) is hygienic: the double-underscore
--- prefix keeps it clear of user names and GIVEN params, and @k@ (the nesting
--- level) makes it unique per boundary.
-matchClauses :: [Name] -> [PMClause] -> Expr Name
-matchClauses scrutinees = go 0
+-- The name (@__pm_fallthrough_<k>@, unique per boundary through @k@, the
+-- nesting level) is one a drafter is unlikely to write, but it is NOT
+-- hygienic: a backticked name can be anything. A clause body that names a
+-- definition @`__pm_fallthrough_0`@ can read this binding instead, or be
+-- reported ambiguous, depending on where it sits. (The binding of clauses
+-- that can never run is out of scope for the clause before it; see
+-- 'L4.TypeCheck.checkClausesLet'.) Nothing downstream reads the name: the
+-- binding and every generated CONSIDER are marked with 'PmSynthetic'.
+matchClauses :: PmGroup -> [Name] -> [Bool] -> [PMClause] -> Expr Name
+matchClauses grp scrutinees typesDeclared = go 0
   where
+    columns = zip3 [1 ..] typesDeclared scrutinees
     go :: Int -> [PMClause] -> Expr Name
     go _ []  = error "L4.Parser.matchClauses: empty clause list (impossible)"
-    go _ [c] = matchLast scrutinees (pmPats c) (pmBody c)
-    go k (c : cs)
-      | clauseUsesFallthrough (pmPats c) =
-          -- Bind the desugaring of the remaining clauses ONCE, then reference it
-          -- by name from every WHEN/OTHERWISE that 'matchOne' emits.
-          let ftName = fallthroughName k
-              ftExpr = go (k + 1) cs
-              tree   = matchOne scrutinees (pmPats c) (pmBody c) (Var emptyAnno ftName)
-          in bindFallthrough ftName (clausesSrcAnno cs) ftExpr tree
-      | otherwise =
-          -- Every column of this clause matches unconditionally, so it always
-          -- fires and the remaining clauses are unreachable. 'matchOne' returns
-          -- the body without ever referencing the fall-through, so we neither
-          -- emit a binding nor desugar @cs@ (matching the previous behaviour).
-          matchOne scrutinees (pmPats c) (pmBody c) (Var emptyAnno (fallthroughName k))
-    -- Does compiling this clause reference the fall-through? It does iff at least
-    -- one column needs a runtime WHEN test (i.e. does not always match). This
-    -- must mirror 'matchOne' / 'patAlwaysMatchesAs'.
-    clauseUsesFallthrough pats =
-      or (zipWith (\ s p -> not (patAlwaysMatchesAs s p)) scrutinees pats)
+    go _ [c] = matchLast grp columns (pmPats c) (pmBody c)
+    go k (c : cs) =
+      -- Bind the desugaring of the remaining clauses ONCE, then reference it
+      -- by name from every WHEN/OTHERWISE that 'matchOne' emits.
+      --
+      -- When every column of @c@ matches unconditionally, @c@ always fires and
+      -- 'matchOne' returns its body without referencing the fall-through, so
+      -- the binding is dead and the remaining clauses never run. It is bound
+      -- anyway, marked 'PmUnreachable', so that they are still type-checked
+      -- (the checker gives it the group's result type, see
+      -- 'L4.TypeCheck.checkClausesLet') and then dropped from the
+      -- checked tree, which is therefore the one this function emitted before
+      -- it bound them: evaluation and every exporter see no difference. The
+      -- checker warns that they are unreachable (from 'PmMatrix' @catchAll@).
+      let ftName = fallthroughName k
+          ftExpr = go (k + 1) cs
+          tree   = matchOne grp columns (pmPats c) (pmBody c) (Var emptyAnno ftName)
+          mark
+            | clauseMatchesAnything scrutinees (pmPats c) = PmUnreachable grp
+            | otherwise                                   = PmFallthrough grp
+      in bindFallthrough mark ftName (clausesSrcAnno cs) ftExpr tree
 
--- | A hygienic fresh name for the once-bound fall-through at nesting level @k@.
+-- | Does every column of this clause match unconditionally? Then the clause
+-- always fires, and no clause after it is ever tried. This must mirror
+-- 'matchOne' / 'patAlwaysMatchesAs'.
+clauseMatchesAnything :: [Name] -> [Pattern Name] -> Bool
+clauseMatchesAnything scrutinees pats = and (zipWith patAlwaysMatchesAs scrutinees pats)
+
+-- | The name of the once-bound fall-through at nesting level @k@. Not
+-- hygienic; see 'matchClauses'.
 fallthroughName :: Int -> Name
 fallthroughName k =
   MkName emptyAnno (NormalName ("__pm_fallthrough_" <> Text.pack (show k)))
@@ -993,46 +1020,51 @@ clausesSrcAnno (c : cs) =
 -- identically to inlining @ftExpr@ at each reference (it is a pure, argument-less
 -- binding), but keeps the emitted AST linear. @ftAnno@ supplies the Decide's
 -- source range (see 'clausesSrcAnno').
-bindFallthrough :: Name -> Anno -> Expr Name -> Expr Name -> Expr Name
-bindFallthrough ftName ftAnno ftExpr body =
+bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
+bindFallthrough mark ftName ftAnno ftExpr body =
   LetIn emptyAnno
     [ LocalDecide emptyAnno
-        (MkDecide ftAnno emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
+        (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
     ]
     body
   where
     emptyTypeSig = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
 
+-- | A CONSIDER the desugarer generates to test the input in column @col@.
+generatedConsider :: PmGroup -> (Int, Bool, Name) -> [Branch Name] -> Expr Name
+generatedConsider grp (col, declared, s) =
+  Consider (setPmSynthetic (PmConsider grp col declared) emptyAnno) (App emptyAnno s [])
+
 -- | Compile one non-final clause: match every column against its scrutinee; on
 -- any mismatch, fall through to @ft@ (the desugaring of the remaining clauses).
-matchOne :: [Name] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
-matchOne _        []       body _  = body
-matchOne (s : ss) (p : ps) body ft
+matchOne :: PmGroup -> [(Int, Bool, Name)] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
+matchOne _   _                  []       body _  = body
+matchOne grp (c@(_, _, s) : ss) (p : ps) body ft
   -- A variable pattern that reuses the scrutinee's name (as the spec mandates),
   -- or the anonymous wildcard, always matches and needs no (re)binding.
-  | patAlwaysMatchesAs s p = matchOne ss ps body ft
+  | patAlwaysMatchesAs s p = matchOne grp ss ps body ft
   -- Everything else gets a WHEN plus an OTHERWISE fall-through. We must emit the
   -- OTHERWISE even for a bare @PatApp n []@ because, at desugar time (pre
   -- scope-check), we cannot tell a fresh variable (always matches) from a
   -- nullary constructor such as @TRUE@ / @EMPTY@ / @NOTHING@ (can fail). Emitting
   -- the fall-through is correct for both: a variable simply leaves it dead.
   | otherwise =
-      Consider emptyAnno (App emptyAnno s [])
-        [ MkBranch emptyAnno (When emptyAnno p) (matchOne ss ps body ft)
+      generatedConsider grp c
+        [ MkBranch emptyAnno (When emptyAnno p) (matchOne grp ss ps body ft)
         , MkBranch emptyAnno (Otherwise emptyAnno) ft
         ]
-matchOne []       (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
+matchOne _   []                 (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
 
 -- | Compile the final clause without an OTHERWISE branch (so a non-match is a
 -- runtime non-exhaustive error, matching Haskell semantics).
-matchLast :: [Name] -> [Pattern Name] -> Expr Name -> Expr Name
-matchLast _        []       body = body
-matchLast (s : ss) (p : ps) body
-  | patAlwaysMatchesAs s p = matchLast ss ps body
+matchLast :: PmGroup -> [(Int, Bool, Name)] -> [Pattern Name] -> Expr Name -> Expr Name
+matchLast _   _                  []       body = body
+matchLast grp (c@(_, _, s) : ss) (p : ps) body
+  | patAlwaysMatchesAs s p = matchLast grp ss ps body
   | otherwise =
-      Consider emptyAnno (App emptyAnno s [])
-        [ MkBranch emptyAnno (When emptyAnno p) (matchLast ss ps body) ]
-matchLast []       (_ : _)  body = body -- more patterns than scrutinees: ignore extras
+      generatedConsider grp c
+        [ MkBranch emptyAnno (When emptyAnno p) (matchLast grp ss ps body) ]
+matchLast _   []                 (_ : _)  body = body -- more patterns than scrutinees: ignore extras
 
 -- | Does this pattern always match its scrutinee /without introducing a new
 -- binding/? True for the anonymous wildcard @_@ and for a variable pattern that

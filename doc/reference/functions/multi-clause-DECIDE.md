@@ -105,7 +105,7 @@ Clauses after the first are reached only when the earlier ones do not match, lik
 
 ## Missing cases
 
-When a group of two or more clauses matches only some of the values of an enumeration, or only one of `TRUE` and `FALSE`, `l4 check` warns and lists the clauses still needed.
+When the clauses match only some of the values of an enumeration, or only one of `TRUE` and `FALSE`, `l4 check` warns and lists the clauses still needed.
 For this `colour.l4`:
 
 ```l4
@@ -127,6 +127,34 @@ This multi-clause definition does not cover all cases. The following clauses are
 
 Each line is a clause you can paste in and finish by writing its result after `IS`.
 When a function has several inputs, an input that any value would do for is written with its `GIVEN` name, which matches anything, or as `` `_` `` if the function has no `GIVEN` for it.
+A group of one clause, such as `DECIDE area (Circle Red) IS 1`, is checked the same way, and its warning begins "This clause does not cover all cases." instead.
+
+## Clauses that are never used
+
+L4 tries the clauses from the top, so a clause below one that matches every input is never reached.
+`l4 check` warns at the first such clause, and says how many follow it.
+For this `never.l4`:
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN status IS A Status
+GIVETH A STRING
+DECIDE describe status IS "some status"
+DECIDE describe Active IS "running"
+DECIDE describe Closed IS "stopped"
+```
+
+`l4 check never.l4` succeeds, with this warning on the second clause:
+
+```
+This clause of `describe` is never used, and neither is the clause after it.
+The clause above it matches every input, so `describe` never gets this far.
+Move these clauses above that one, or remove them.
+```
+
+`describe Active` gives `"some status"`.
+A clause that is never used is still checked: a body of the wrong type, or a name that does not exist, is reported there as in any other clause.
 
 ## Limits
 
@@ -179,20 +207,17 @@ DECIDE describe 1 IS "one"
 `l4 check describe.l4` succeeds with no warning, and `l4 run describe.l4` reports for `describe 2`:
 
 ```
-The value
+No clause of `describe` matches these inputs.
+The value that the last clause could not match is
   2
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
-The typechecker's exhaustiveness warning lists all missing branches.
+Add a clause for this case, or end the clauses with one that matches every input.
 ```
 
-Its last sentence does not apply here, because no warning is shown for this group.
 To be safe, end such a group with a clause that matches anything.
 
-**Clauses after a catch-all are not checked.**
-A clause that matches anything ends the group for checking.
-In `DECIDE f n IS 7` followed by `DECIDE f 0 IS "oops" PLUS TRUE`, the second clause is never type-checked: `l4 check` succeeds, and `f 0` gives `7`.
-Put the catch-all clause last.
+**Only a clause after one that names its `GIVEN` is reported as never used.**
+A repeated clause is not flagged, and neither is a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
+With `DECIDE r Red IS 1`, `DECIDE r Red IS 2` and `DECIDE r other IS 3` followed by `DECIDE r Blue IS 4`, `l4 check` gives no warning, `r Red` gives `1` and `r Blue` gives `3`.
 
 ## Related Keywords
 

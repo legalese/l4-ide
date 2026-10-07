@@ -210,7 +210,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     ws `shouldBe` []
 
-  it "leaves a one-clause group to the ordinary CONSIDER warning" $ do
+  it "checks a one-clause group as a clause, and says so" $ do
     allWs <- warnings $ Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"
       , ""
@@ -222,8 +222,124 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "GIVETH A NUMBER"
       , "DECIDE area (Circle Red) IS 1"
       ]
-    length allWs `shouldBe` 1
-    filter isClauseWarning allWs `shouldBe` []
+    -- One warning, at the clause, in clause terms; the CONSIDER it is
+    -- compiled to does not warn as well.
+    map snd allWs `shouldBe`
+      [ [ "I found a problem while checking the definition of `area`:"
+        , "  This clause does not cover all cases. The following clauses are still needed:"
+        , "  "
+        , "    DECIDE `area` (Circle Green) IS"
+        , "    DECIDE `area` (Circle Blue) IS"
+        , "    DECIDE `area` Square IS"
+        , "  "
+        ]
+      ]
+    map fst allWs `shouldBe` [Just (9, 8, 9)]
+
+  it "keeps a one-clause group's CONSIDER warning, at the clause, where it cannot check the clause" $ do
+    -- The literal stops the clause analysis; the warning for the CONSIDER the
+    -- clause is compiled to is kept, moved from no location to the clause.
+    allWs <- warnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f Red 1 IS 1"
+      ]
+    allWs `shouldBe`
+      [ ( Just (6, 8, 6)
+        , [ "I found a problem while checking the definition of `f`:"
+          , "  The following branches still need to be considered:"
+          , "  "
+          , "    WHEN Green THEN"
+          , "    WHEN Blue THEN"
+          , "  "
+          ]
+        )
+      ]
+
+  it "warns once about the clauses after a clause that matches every input" $ do
+    ws <- filter (mentions "is never used") <$> warnings (Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE `matches anything first` c     IS 0"
+      , "DECIDE `matches anything first` Red   IS 1"
+      , "DECIDE `matches anything first` Green IS 2"
+      ])
+    ws `shouldBe`
+      [ ( Just (6, 8, 6)
+        , [ "I found a problem while checking the definition of `matches anything first`:"
+          , "  This clause of `matches anything first` is never used, and neither is the clause after it."
+          , "  The clause above it matches every input, so `matches anything first` never gets this far."
+          , "  Move these clauses above that one, or remove them."
+          ]
+        )
+      ]
+
+  it "type-checks the clauses after a clause that matches every input" $ do
+    ds <- diagnostics $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f n IS 7"
+      , "DECIDE f 0 IS \"oops\" PLUS TRUE"
+      ]
+    -- Before, the second clause was dropped unchecked and the module checked
+    -- clean; now its type errors are reported, at its body.
+    [ r | e <- ds, severity e == SError, Just r <- [fst (render e)] ] `shouldSatisfy` all (\ (l, _, _) -> l == 4)
+    length [ () | e <- ds, severity e == SError ] `shouldSatisfy` (> 0)
+
+  it "does not flag a repeated clause, or a clause after one that binds a new name" $ do
+    -- Unstable flags both, from redundant rows its coverage analysis computes
+    -- and main's does not; the reference page says so.
+    ws <- warnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE r Red   IS 1"
+      , "DECIDE r Red   IS 2"
+      , "DECIDE r other IS 3"
+      , "DECIDE r Blue  IS 4"
+      ]
+    ws `shouldBe` []
+
+  it "still warns about a CONSIDER written inside a later clause" $ do
+    ws <- filter (mentions "still need to be considered") <$> warnings (Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE k Red   IS 1"
+      , "DECIDE k Green IS"
+      , "  CONSIDER c"
+      , "  WHEN Red THEN 2"
+      , "DECIDE k Blue  IS 3"
+      ])
+    map fst ws `shouldBe` [Just (7, 3, 8)]
+
+  it "still warns about a CONSIDER in a definition whose name looks generated" $ do
+    ws <- filter (mentions "still need to be considered") <$> warnings (Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "`__pm_fallthrough_0` c MEANS"
+      , "  CONSIDER c"
+      , "  WHEN Red THEN 1"
+      ])
+    map fst ws `shouldBe` [Just (6, 3, 7)]
+
+  it "does not report the compiled form of a clause that binds a new name as redundant" $ do
+    ws <- warnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "DECIDE f Red   b IS 1"
+      , "DECIDE f Green b IS 2"
+      ]
+    filter (mentions "redundant") ws `shouldBe` []
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -265,6 +381,9 @@ clauseWarnings src = filter isClauseWarning <$> warnings src
 
 isClauseWarning :: (Maybe (Int, Int, Int), [Text]) -> Bool
 isClauseWarning = any ("does not cover all cases" `Text.isInfixOf`) . snd
+
+mentions :: Text -> (Maybe (Int, Int, Int), [Text]) -> Bool
+mentions t = any (t `Text.isInfixOf`) . snd
 
 -- | The suggested clauses of the clause-group warnings, trimmed.
 missingClauses :: [(Maybe (Int, Int, Int), [Text])] -> [Text]

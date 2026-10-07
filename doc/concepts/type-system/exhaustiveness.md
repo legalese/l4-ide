@@ -77,7 +77,7 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `price` Blue IS
 ```
 
-Only groups of two or more clauses that match enumeration values or `TRUE`/`FALSE` are checked; the page linked above lists the groups that are not.
+Only clauses that match enumeration values or `TRUE`/`FALSE` are checked; the page linked above lists the groups that are not. A clause below one that matches every input is never reached, and is warned about too.
 
 ### The amendment scenario
 

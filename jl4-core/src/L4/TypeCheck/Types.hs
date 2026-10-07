@@ -100,16 +100,34 @@ data CheckError =
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
+-- | Why a clause of a multi-clause group is never tried.
+--
+-- Unstable also has @CoveredByClausesAbove@ (every input the clause matches
+-- is matched by a clause above it), found from the redundant rows of its
+-- coverage analysis. Main's analysis ('L4.TypeCheck.uncoveredRows') does not
+-- compute redundant rows, so that form is not reported here; see
+-- 'L4.TypeCheck.warnUnreachableClauses'.
+data UnreachableClause
+  = AfterClauseMatchingAnything Int
+    -- ^ a clause above it matches every input; carries how many further
+    -- clauses after this one are unreachable for the same reason
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
-  | PatternClausesMissing SrcRange Name [[Pattern Resolved]]
+  | PatternClausesMissing SrcRange Name Int [[Pattern Resolved]]
     -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
     -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the
     -- clause-head ranges (the warning anchor — never @\<no location\>@), the
-    -- group's head name for display, and one row per missing clause: one
-    -- pattern per argument column, wildcard columns pre-substituted with the
-    -- column's GIVEN name so the renderer is dumb.
+    -- group's head name for display, how many clauses it has, and one row per
+    -- missing clause: one pattern per argument column, wildcard columns
+    -- pre-substituted with the column's GIVEN name so the renderer is dumb.
+  | PatternClauseUnreachable SrcRange Name UnreachableClause
+    -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
+    -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
+    -- range, the group's head name for display, and why.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -136,6 +154,11 @@ data ExpectationContext =
   -- | ExpectProjectionSelectorContext
   | ExpectIfConditionContext -- condition of if-then-else
   | ExpectPatternScrutineeContext (Expr Resolved) -- pattern type must match type of scrutinee
+  | ExpectClauseInputContext RawName Int Bool
+    -- ^ a clause pattern of a multi-clause group must match the type of the
+    -- input it stands in for: the group's name, the input's 1-based
+    -- position, and whether the GIVEN declares its type. See
+    -- 'L4.TypeCheck.checkConsider'.
   | ExpectNotArgumentContext -- arg of NOT
   | ExpectPercentArgumentContext -- arg of '%'
   | ExpectConsArgument2Context -- second arg of cons
@@ -206,7 +229,8 @@ instance HasSrcRange CheckError where
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
-  rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
+  rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
+  rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
