@@ -240,6 +240,7 @@ Limits, measured 2026-10-02:
 Measured 2026-10-06:
 
 - A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+  A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
 
 #### Trace Output
 
