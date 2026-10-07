@@ -4770,7 +4770,12 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                       let enumConstructor = listToMaybe
                             [ (unique, name)
                             | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
-                            , nameToText (TypeCheck.getName name) == enumName
+                            -- the bare name as well as the stored one: under a
+                            -- §, `Red` is stored as `Part A.Red`, and the bare
+                            -- name is what JSONENCODE writes (smucclaw/l4-ide#947)
+                            , let spelled = TypeCheck.getName name
+                            , enumName `elem` [ nameToText spelled
+                                              , unqualifiedRawNameToText (rawName spelled) ]
                             , isNullaryConstructorReturning conType tyRef
                             ]
                       case enumConstructor of

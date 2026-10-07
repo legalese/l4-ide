@@ -129,6 +129,11 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
+-- | A choice type declared under a § section (smucclaw/l4-ide#947).
+batchSectionEnumFixture, batchSectionEnumJson :: FilePath
+batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
+batchSectionEnumJson    = fixtureDir </> "batch-section-enum.json"
+
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
 batchAssumeDirectFixture, batchAssumeHelperFixture, batchAssumeFullJson, batchAssumeMissingJson :: FilePath
@@ -1357,6 +1362,18 @@ spec bin = do
         [] -> expectationFailure "l4 batch printed no rows"
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "decodes a constructor of a choice type declared under a section by its bare name" $ do
+      -- "Red" is what JSONENCODE writes for Red, and what a request sends;
+      -- the constructor is stored as `Part A.Red`. Before #947's fix every
+      -- row answered FALSE, success; after #1012 alone, every row was refused.
+      Output code sout _ <- runL4 bin ["batch", batchSectionEnumFixture, "--inputs", batchSectionEnumJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [red, blue] -> do
+          red  `shouldSatisfy` ("\"result\":true" `isInfixOf`)
+          blue `shouldSatisfy` ("\"result\":false" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
       -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
