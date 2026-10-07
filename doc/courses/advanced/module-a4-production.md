@@ -302,7 +302,7 @@ A call to `is-eligible` for a person who qualifies returns:
 }
 ```
 
-`presumed` names the inputs the call left out whose default the answer used (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`; see [Default values with TYPICALLY](#default-values-with-typically) below).
+`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; see [Default values with TYPICALLY](#default-values-with-typically) below.
 
 What `value` holds depends on what the rule gives back:
 

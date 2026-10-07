@@ -1334,6 +1334,11 @@ wrapperDeclined fnName genCode params = InterpreterError $
     ([], candidates@(_ : _)) ->
       "One of these inputs could not be read: "
         <> Text.intercalate ", " [ label input <> " as a " <> ty | (input, ty, _) <- candidates ]
+    -- Defensive: no request is known to reach this. A wrapper answers NOTHING
+    -- only for a required input that is absent or a temporal string it cannot
+    -- parse, and both are caught above; a value of the wrong JSON type stops
+    -- JSONDECODE with an error of its own before the envelope is read. No
+    -- test pins this message.
     ([], []) ->
       "L4: the generated wrapper did not call '" <> fnName
         <> "', and no input explains why. The inputs it checked: "
