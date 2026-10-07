@@ -16,6 +16,13 @@
 --     ahead to see whether an expression followed it, by parsing that
 --     expression, which the infix reading then parsed again.
 --
+--   * __a bracket in pattern position, read as a pattern first.__
+--     'L4.Parser.parenPatternOrExpr' tried @(…)@ as a pattern and, when it was
+--     not one, read it again as an expression. When the bracket holds a
+--     @CONSIDER@ (or a @MUST@) whose own pattern slot holds the next bracket,
+--     the failed pattern attempt had already parsed that inner @CONSIDER@,
+--     and the expression reading parsed it again: twice per level.
+--
 -- Each case here nests one construct 40 levels deep. Once parsing is
 -- polynomial in depth, that takes milliseconds; the exponential parser could
 -- not finish any of them in a lifetime. The time budget is therefore
@@ -111,6 +118,43 @@ spec =
             ]
         )
 
+    it "a bracket in pattern position holding a CONSIDER whose WHEN holds the next bracket" $
+      parsesWithin (inWhen (nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
+
+    it "the same nest as a deontic action's argument: MUST pay ((CONSIDER 1 WHEN … ) PLUS 1)" $
+      parsesWithin
+        ( T.unlines
+            [ "DECLARE Person IS ONE OF alice, bob"
+            , "DECLARE Act IS ONE OF"
+            , "  pay HAS amount IS A NUMBER"
+            , ""
+            , "GIVETH A DEONTIC Person Act"
+            , "probe MEANS"
+            , "  PARTY alice"
+            , "  MUST pay " <> nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"
+            , "  WITHIN 3"
+            ]
+        )
+
+    it "the same nest as a DECIDE clause's argument" $
+      parsesWithin
+        ( T.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE probe n IS 0"
+            , "DECIDE probe " <> nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1" <> " IS 1"
+            ]
+        )
+
+    it "a pattern-shaped head, then the bracket, then an operator: (f (CONSIDER … ) PLUS 1)" $
+      parsesWithin (inWhen (nestedIn "(f (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
+
+    it "a pattern operator before the bracket, then an operator: (x FOLLOWED BY (CONSIDER … ) PLUS 1)" $
+      parsesWithin (inWhen (nestedIn "(x FOLLOWED BY (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "x"))
+
+    it "brackets that ARE patterns, each holding a CONSIDER: ((CONSIDER … ) FOLLOWED BY x)" $
+      parsesWithin (inWhen (nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) FOLLOWED BY x)" "x"))
+
 -- | Parse the module (both passes, as the tools do), force the whole syntax
 -- tree, and exact-print it back, all within the budget.
 parsesWithin :: Text -> Expectation
@@ -142,6 +186,15 @@ rightNested op = nestedIn ("(1 " <> op <> " ") ")" "1"
 -- | Wrap @core@ in 'depth' copies of @open@ … @close@.
 nestedIn :: Text -> Text -> Text -> Text
 nestedIn open close core = iterate (\ e -> open <> e <> close) core !! depth
+
+-- | @inWhen g@ is a rule that puts @g@ in the pattern slot of a @WHEN@.
+inWhen :: Text -> Text
+inWhen g =
+  T.unlines
+    [ "GIVETH A NUMBER"
+    , "probe MEANS"
+    , "  CONSIDER 3 WHEN " <> g <> " THEN 1, OTHERWISE 2"
+    ]
 
 -- | Drop the outermost pair of parentheses.
 unwrap :: Text -> Text
