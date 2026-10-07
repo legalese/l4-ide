@@ -935,10 +935,23 @@ emptyMixfixRegistry :: MixfixRegistry
 emptyMixfixRegistry = MkMixfixRegistry Map.empty Map.empty Set.empty
 
 -- | Merge two registries (used when combining scopes).
+--
+-- Entries are merged with 'List.union', which keeps the first copy of an entry
+-- and drops later copies equal to it. A module's registry already holds every
+-- entry of its imports' registries, so merging with @++@ kept one copy per
+-- import PATH: when each module imports prelude and every earlier module, the
+-- k-th held 2^k copies of each of the prelude's mixfix functions, all
+-- deep-forced with the rest of its 'TypeCheckResult', and
+-- 'lookupByFirstKeyword' returned the product of two such lists
+-- (smucclaw\/l4-ide#1008). Dropping an equal later copy changes no reader:
+-- the @tryMatch...@ functions in "L4.TypeCheck" stop at the first candidate
+-- that matches (and 'L4.TypeCheck.tryMatchAnyPattern' keeps the first error),
+-- and the rest test for any candidate, 'List.nub' the declared fixities, or
+-- build a 'Map.fromList' keyed by 'Unique'.
 unionMixfixRegistry :: MixfixRegistry -> MixfixRegistry -> MixfixRegistry
 unionMixfixRegistry r1 r2 = MkMixfixRegistry
-  { byCanonicalName = Map.unionWith (++) r1.byCanonicalName r2.byCanonicalName
-  , byFirstKeyword  = Map.unionWith (++) r1.byFirstKeyword r2.byFirstKeyword
+  { byCanonicalName = Map.unionWith List.union r1.byCanonicalName r2.byCanonicalName
+  , byFirstKeyword  = Map.unionWith List.union r1.byFirstKeyword r2.byFirstKeyword
   , keywordUniverse = Set.union r1.keywordUniverse r2.keywordUniverse
   }
 
