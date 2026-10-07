@@ -793,6 +793,9 @@ So the memo cannot change a parse or a parse error, by construction, not only on
 The branch's two earlier commits are a different case: `e98519803` (a bracketed expression and its genitive projection) and `939e94bac` (the operand after a mixfix keyword) rewrite code that produces errors without a memo.
 They match `unstable` by the arguments in their comments and by the measurements below, not by construction.
 The comment at `memoGroup` gives the argument: the outcome of parsing a group depends only on its position and on `ofIsAnchor`, the one `Env` field any parser changes, and the annotations and delayed errors a group adds are only ever added at the front and never read while parsing, so they can be replayed.
+A later change that broke one of the four invariants listed there would fail silently: the memo would replay a wrong tree or a wrong error, with exit code 0 and no other test failing.
+So they are now checked, on the inputs the tests give, by parsing with the memo on and off (`execProgramParserWithHintPassUnmemoised`) and requiring the same tree, hints and warnings, or the same errors: jl4-test's `parser memo changes nothing (memo on = memo off; #1017)` does it for the 566 files the suite's other blocks read, those that fail to parse included, and `memoSpec` in `NestedParenParserSpec` for broken and whole nests three or four deep, which the corpus has few of.
+A scratch build that broke invariant 1 (the pattern reading rewrites the input ahead of it) or invariant 2 (a `local` empties the mixfix hints), or that made the memo drop the annotations or the pending errors collected before a group, failed `memoSpec` each time; the corpus test caught only the dropped annotations.
 
 An earlier version of this fix (`ea2d71f67`) checked a group's pattern shape before reading it and recovered the pattern reading's error by re-reading the group.
 Where two failing brackets nested, that changed the reported error.
@@ -835,6 +838,7 @@ Where nothing is read twice, the memo costs a little.
 On a broken expression nest outside pattern position, `#EVAL ((1 PLUS) PLUS)` 4096 / 8192 deep, this branch took 0.39 / 0.78 s against 0.26 / 0.58 s for the shape-check version, and on `#EVAL ((((1` with 8192 / 16384 brackets and none closed, 0.56 / 1.07 s against 0.48 / 0.91 s (best of 3, interleaved, in a later run than the table).
 Both grow linearly on both builds, and allocation is within 2% of the shape-check version's.
 The memo keeps every group's outcome until the parse ends, and the peak heap is larger: 110 MB against 63 MB on the first nest at depth 8192.
+The annotations and delayed errors collected inside a group are joined to the enclosing ones with `added <> outer`, and on deep nests heavy with annotations that costs more than the shape-check version: with 16 inline NLG annotations per level, review measured 5.53 against 4.54 GB allocated at depth 1024, and 54.5 against 32.6 GB at depth 4096, which were not re-measured for this section.
 
 **Not fixed here.**
 

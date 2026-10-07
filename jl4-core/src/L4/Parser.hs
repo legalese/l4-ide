@@ -95,6 +95,7 @@ data Env = Env
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
+-- | Only ever prepended to, and read only once the parse is over: 'memoGroup' replays a group's additions on that basis.
 data PState = PState
   { comments :: [Comment]
   , nlgs :: [Nlg]
@@ -3321,10 +3322,11 @@ atomicPattern =
 -- @((CONSIDER x WHEN (…) THEN …) PLUS 1)@: the failed pattern attempt had
 -- already parsed the inner bracket, and the expression reading parsed it
 -- again, so the time doubled with every level (twelve levels took six
--- seconds). Both readings now go through 'memoGroup', so a bracket nested
--- inside is parsed once, whichever reading reaches it first, and the second
--- replays the first. The two readings, their order, and so every parse and
--- every error, are what they were before the memo.
+-- seconds). Both readings now go through 'memoGroup', which keeps a separate
+-- table for each, so a bracket nested inside is parsed at most once as a
+-- pattern and at most once as an expression, and a later parse of it in the
+-- same reading replays the first. The two readings, their order, and so every
+-- parse and every error, are what they were before the memo.
 parenPatternOrExpr :: Parser (Pattern Name)
 parenPatternOrExpr =
   try parenPattern
