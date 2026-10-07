@@ -76,6 +76,18 @@ data Env = Env
     -- parenthesised. Set by 'deadline' and 'opening'; reset by 'paren' and
     -- inside the anchor itself ('inExprSlot'). Everywhere else it is
     -- 'False' — including inside a @BEFORE@, which takes no anchor.
+  , patternShapeOnly :: Bool
+    -- ^ Are we only checking whether a bracketed group has the SHAPE of a
+    -- pattern? Set by 'parenPatternOrExpr' for its look-ahead and by nothing
+    -- else. While it is set, a nested bracketed group in pattern position,
+    -- and the expression after @EXACTLY@, are stepped over by counting
+    -- brackets instead of being parsed.
+  , patternErrorRerun :: Bool
+    -- ^ Are we re-reading a bracketed group as a pattern only to recover the
+    -- error that reading would have reported? Set by 'parenPatternOrExpr'
+    -- for that re-read and by nothing else. While it is set, a nested group
+    -- does not re-read itself in turn, which is what keeps the re-reads from
+    -- compounding.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
@@ -3195,29 +3207,158 @@ atomicPattern =
 -- pattern reading is tried first, so @MUST pay (Money 1000 "USD")@ — a
 -- constructor application — keeps its existing pattern semantics exactly.
 --
--- __The cost__ is one @try@ over the bracketed group: when the group is not a
--- well-formed pattern, its tokens are scanned twice. The bound on the wasted
--- scan is the bracketed group itself, not the rule or the file, because the
--- @try@ cannot reach past the closing bracket it failed to find. Only a group
--- that /fails/ as a pattern pays it, and such a group is an outright parse
--- error today.
---
 -- An unbracketed operator expression (@MUST pay price PLUS 50@) is still not
 -- admitted, and deliberately: argument juxtaposition would make it ambiguous.
+--
+-- __The cost, and why the pattern reading is checked for shape first__
+-- (MATRYOSHKA). Trying the pattern reading and then the expression reading
+-- reads a group that is not a pattern twice. That is cheap once, but it
+-- compounds when the group holds a @CONSIDER@ or a @MUST@ whose own pattern
+-- slot holds the next bracket, as in @((CONSIDER x WHEN (…) THEN …) PLUS 1)@:
+-- the failed pattern attempt has already parsed the inner @CONSIDER@ as an
+-- expression, and the expression reading parses it again, so the time
+-- doubled with every level (twelve levels took six seconds).
+--
+-- So before the pattern reading is tried, the same pattern parser runs in a
+-- look-ahead with 'patternShapeOnly' set. That run steps over every nested
+-- bracketed group ('stepOverGroup') and everything after @EXACTLY@
+-- ('patExpr') by counting brackets, so it reads only the group's own top
+-- level and costs one pass over its tokens. A group whose shape passes goes
+-- down the original path, unchanged. A group whose shape fails is read as an
+-- expression and nothing else.
+--
+-- __Why no parse can change.__ The shape check accepts everything the pattern
+-- reading accepts. A nested group is stepped over to its matching close
+-- bracket, which is where its real parse ends whenever that succeeds, because
+-- 'paren' is the only parser that consumes a bracket token. After @EXACTLY@,
+-- the check steps to the group's own close bracket, which is where the real
+-- pattern ends whenever it succeeds, and every parser that can follow a
+-- pattern inside a group stops at a close bracket without consuming it. So
+-- when the shape fails, the pattern attempt would have failed too, and
+-- megaparsec leaves no trace of a failed @try@ when the next alternative
+-- succeeds.
+--
+-- __Error messages.__ When the expression reading fails too, the error must
+-- be what it always was: megaparsec merged the two readings' errors, keeping
+-- the one that got further, and kept the expression reading's position for
+-- 'topdeclWithRecovery' to resume from. Three cases, by where the expression
+-- reading failed relative to the shape check:
+--
+--   * __later__: the pattern reading cannot have got further than the shape
+--     check did, so the expression reading's error is the whole answer;
+--
+--   * __at the same token__: the expression reading got there only by parsing
+--     every nested group before it, so the pattern reading would have got
+--     there too, with the shape check's expectations; the two are merged;
+--
+--   * __earlier__: the pattern reading may have got further, so it is run
+--     after all, from the start of the group, purely for its error. That
+--     re-read sets 'patternErrorRerun', and a group nested inside it that
+--     lands in this case again reports its expression reading's error alone.
+--     So the merged error is exact unless such failures nest two deep, and
+--     the re-reads cannot compound. (The approximation is assumed, not
+--     ruled.)
+--
+-- When the group is not closed at all, nothing is checked and the original
+-- path runs, so a half-typed group reports exactly what it always did.
 parenPatternOrExpr :: Parser (Pattern Name)
-parenPatternOrExpr =
-  try (paren pattern')
-  <|> attachAnno (PatExpr emptyAnno <$> annoHole (paren expr))
+parenPatternOrExpr = do
+  env <- ask
+  start <- getParserState
+  if not (closedGroupAhead start.stateInput.tokens)
+    then bracketed
+    else if env.patternShapeOnly
+      then stepOverGroup
+      else do
+        shape <- observing (lookAhead (try (local (\ e -> e { patternShapeOnly = True }) (paren pattern'))))
+        case shape of
+          Right _ -> bracketed
+          Left notAPattern -> asExpression env start notAPattern
+  where
+    bracketed = try (paren pattern') <|> bracketedExpr
+
+    bracketedExpr = attachAnno (PatExpr emptyAnno <$> annoHole (paren expr))
+
+    asExpression env start notAPattern = do
+      r <- observing bracketedExpr
+      case r of
+        Right pat -> pure pat
+        Left err -> case compare (errorOffset err) (errorOffset notAPattern) of
+          GT -> parseError err
+          EQ -> parseError (err <> notAPattern)
+          LT
+            | env.patternErrorRerun -> parseError err
+            | otherwise -> do
+                failedAt <- getParserState
+                setParserState start
+                again <- observing (try (local (\ e -> e { patternErrorRerun = True }) (paren pattern')))
+                case again of
+                  -- Cannot happen: the shape check failed, so this reading
+                  -- fails. Should it ever succeed, it is what the original
+                  -- path would have returned.
+                  Right pat -> pure pat
+                  Left err' -> do
+                    setParserState failedAt
+                    parseError (err <> err')
+
+-- | The shape check's stand-in for a nested bracketed group: consume its
+-- brackets with the same parser 'paren' uses (so the expectations after the
+-- close bracket are the same) and step over what is between them.
+stepOverGroup :: Parser (Pattern Name)
+stepOverGroup =
+  shapeOnlyPattern
+    <$  spacedSymbol_ TPOpen
+    <*  stepToCloseBracket
+    <*  spacedSymbol_ TPClose
+
+-- | What a stepped-over part of a pattern stands for in the shape check. The
+-- value is never looked at: the check runs inside 'lookAhead'.
+shapeOnlyPattern :: Pattern Name
+shapeOnlyPattern = PatLit emptyAnno (NumericLit emptyAnno 0)
+
+-- | Consume, without parsing them, the tokens before the close bracket that
+-- matches the innermost open one. The shape check only runs inside a group
+-- that 'closedGroupAhead' has seen closed, so that bracket is always there.
+stepToCloseBracket :: Parser ()
+stepToCloseBracket = do
+  rest <- getInput
+  void (takeP Nothing (fromMaybe (length rest.tokens) (tokensBeforeCloseBracket rest.tokens)))
+
+-- | How many tokens come before the close bracket that matches the innermost
+-- open one, if there is such a bracket.
+tokensBeforeCloseBracket :: [PosToken] -> Maybe Int
+tokensBeforeCloseBracket = go 0 (0 :: Int)
+  where
+    go _ _ [] = Nothing
+    go n depth (t : ts) =
+      case computedPayload t of
+        TSymbols TPClose
+          | depth == 0 -> Just n
+          | otherwise  -> go (n + 1) (depth - 1) ts
+        TSymbols TPOpen -> go (n + 1) (depth + 1) ts
+        _ -> go (n + 1) depth ts
+
+-- | Does the token list start with an open bracket that is closed later on?
+closedGroupAhead :: [PosToken] -> Bool
+closedGroupAhead (t : ts)
+  | computedPayload t == TSymbols TPOpen = isJust (tokensBeforeCloseBracket ts)
+closedGroupAhead _ = False
 
 patLit :: Parser (Pattern Name)
 patLit = attachAnno $ PatLit emptyAnno <$> annoHole rawLit
 
 patExpr :: Parser (Pattern Name)
-patExpr = attachAnno $
-  PatExpr emptyAnno
-    <$> do
-      annoLexeme (spacedKeyword_ TKExact)
-        *> annoHole expr
+patExpr = do
+  shapeOnly <- asks (.patternShapeOnly)
+  if shapeOnly
+    -- In 'parenPatternOrExpr''s shape check, only ever at the top level of the
+    -- group being checked, whose close bracket the expression runs up to.
+    then shapeOnlyPattern <$ spacedKeyword_ TKExact <* stepToCloseBracket
+    else attachAnno $
+      PatExpr emptyAnno
+        <$> do
+          annoLexeme (spacedKeyword_ TKExact)
+            *> annoHole expr
 
 nameAsPatApp :: Parser (Pattern Name)
 nameAsPatApp =
@@ -3485,6 +3626,8 @@ execNlgParserForTokens p uri input ts =
       { moduleUri = uri
       , mixfixHints = emptyMixfixHintRegistry
       , ofIsAnchor = False
+      , patternShapeOnly = False
+      , patternErrorRerun = False
       }
     st = PState
       { nlgs = []
@@ -3542,6 +3685,8 @@ execParserForTokensWithHints hints p file input ts =
       { moduleUri = file
       , mixfixHints = hints
       , ofIsAnchor = False
+      , patternShapeOnly = False
+      , patternErrorRerun = False
       }
     st = PState
       { nlgs = []

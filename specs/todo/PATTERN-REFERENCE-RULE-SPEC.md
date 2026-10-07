@@ -188,7 +188,7 @@ Acceptance cases for the grammar: `MUST pay (price PLUS 50)`; `MUST Deliver (t's
 `MUST Receipt landlord t (amount MINUS 5)`. Inside a constructor application an expression argument
 is a `PatExpr` argument. The parser tries the pattern reading first and takes the expression
 reading only where the pattern reading cannot apply; the build reports where backtracking was
-needed and what it costs.
+needed and what it costs. (What it turned out to cost, and how that cost is now bounded: A.7.)
 
 ### R3. `EXACTLY` is deprecated, not removed
 
@@ -773,6 +773,24 @@ pending. The other three R2 acceptance-case probes in the same file check and ru
 `MUST payM (Money 1000 "USD")` (already a constructor pattern) is unaffected;
 `MUST Receipt landlord t (amount MINUS 5)` resolves the same way as the `pay` case;
 `MUST Deliver (p's landlord) what` checks clean.
+
+### A.7 The cost of trying the pattern reading first (MATRYOSHKA, measured 2026-10-07)
+
+Trying a bracket as a pattern and then as an expression compounds.
+When the bracket holds a `CONSIDER` or a `MUST` whose own pattern slot holds the next bracket, the failed pattern attempt has already parsed the inner `CONSIDER`, and the expression reading parses it again.
+Probe: `CONSIDER 3 WHEN G THEN 1, OTHERWISE 2`, where each level of `G` is `((CONSIDER 1 WHEN G' THEN 1, OTHERWISE 2) PLUS 1)`.
+`l4 check` on `fix/parser-nested-parens` at `7f3cb6c34` took 0.50 / 1.55 / 6.03 s at depth 8 / 10 / 12, and the same nest after `MUST pay` took 0.40 / 2.00 / 5.93 s.
+On `unstable` at `21467cd84`, where the bracketed-expression doubling fixed by that branch also applied, the first probe took 0.14 / 0.84 / 6.20 s at depth 4 / 6 / 8.
+
+`parenPatternOrExpr` (`jl4-core/src/L4/Parser.hs`) now first checks whether the group has the shape of a pattern: the same pattern parser runs in a look-ahead that steps over nested brackets and over everything after `EXACTLY`, in one pass over the group's own tokens.
+It tries the pattern reading only when the shape passes.
+After that change the probe takes 0.09 s at depth 40 and 0.15 s at depth 80.
+The shape check accepts everything the pattern reading accepts, so no parse changes; the comment at the parser site gives the argument.
+
+Error messages for a group that fails both readings stay as they were, with one approximation, which is assumed, not ruled.
+Where the expression reading fails before the point at which the shape check failed, the pattern reading is re-run for its error alone.
+A group nested inside that re-run which lands in the same case again reports only its expression reading's error.
+So messages can differ only where two such failures nest.
 
 ---
 
