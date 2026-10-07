@@ -11,6 +11,7 @@ module L4.Utils.IntervalMap (
   search,
   dominators,
   insert,
+  deleteInterval,
   union,
   intervalHigh,
   intervalLow,
@@ -53,6 +54,10 @@ singleton iv val = IntervalMap [(iv, val)]
 -- | Insert an interval into the map
 insert :: Interval v -> a -> IntervalMap v a -> IntervalMap v a
 insert iv val (IntervalMap xs) = IntervalMap ((iv, val) : xs)
+
+-- | Remove every entry stored under exactly this interval
+deleteInterval :: Eq v => Interval v -> IntervalMap v a -> IntervalMap v a
+deleteInterval iv (IntervalMap xs) = IntervalMap (filter ((/= iv) . fst) xs)
 
 -- | Union of two interval maps
 union :: IntervalMap v a -> IntervalMap v a -> IntervalMap v a
