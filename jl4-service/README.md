@@ -265,7 +265,9 @@ The response has one entry per case, in the order the cases were sent, each unde
 An answered case carries the function's result under `value`.
 A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is refused in a batch and answered as text in a single request.
-A case that reaches a resource limit, `--eval-timeout` or `--max-eval-memory-mb`, is not returned this way: it fails the whole batch with `500`.
+A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
+Every case of a batch starts at once on one core, so each case's clock also counts the other cases' work, and a large batch of quick cases can fail this way: measured 2026-10-07 with `--eval-timeout 3`, 10 cases of a rule that answers a single request in about 0.12 s all answer, and 40 fail the batch.
+Unstable returns such a case with `@error` and `@limit` and keeps the others (legalese/l4-ide#549, commits `0765fef5d` and `a09544dd6`); this version does not carry that.
 Until legalese/l4-ide#571, a failed case was left out of `cases` and only counted.
 The three `processor…` fields of `summary` are not measured, and are always `0`.
 

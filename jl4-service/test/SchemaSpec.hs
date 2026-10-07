@@ -61,6 +61,25 @@ spec = do
       Hspec.prop "round-trips through JSON" $ \p ->
         Aeson.fromJSON (Aeson.toJSON (p :: Parameter)) === Aeson.Success p
 
+    -- A batch case that failed is written with @error and no value, and read
+    -- back as failed rather than as an answer whose result is named "@error".
+    describe "OutputCase" do
+      let errored = OutputCase
+            { id = 1, attributes = Map.empty, graphviz = Nothing
+            , outcome = CaseErrored "Parameter 'n': missing required parameter" }
+          answered = OutputCase
+            { id = 2, attributes = Map.singleton "value" (FnLitInt 8), graphviz = Nothing
+            , outcome = CaseAnswered }
+      it "writes an errored case as @id and @error" do
+        Aeson.toJSON errored `shouldBe` Aeson.object
+          [ "@id" Aeson..= (1 :: Int)
+          , "@error" Aeson..= ("Parameter 'n': missing required parameter" :: Text.Text) ]
+      it "writes an answered case as @id and its result" do
+        Aeson.toJSON answered `shouldBe` Aeson.object
+          [ "@id" Aeson..= (2 :: Int), "value" Aeson..= (8 :: Int) ]
+      it "reads both back as they were written" do
+        Aeson.fromJSON (Aeson.toJSON [errored, answered]) `shouldBe` Aeson.Success [errored, answered]
+
 -- ----------------------------------------------------------------------------
 -- Arbitrary instances
 -- ----------------------------------------------------------------------------

@@ -21,7 +21,8 @@ This change keeps main's request handling and carries #562's handling of the wra
   The answer named the other deployment and carried its metadata: its functions and their schemas, its files and their exports, and its description.
 - A batch case that fails comes back in `cases` with its `@id` and, as `@error`, the message its evaluation stopped with (`prettyEvaluatorError`), and is still counted in `casesIgnored`; before, it was left out of `cases` and only counted.
   The message can differ from the single-case endpoint's for the same input, since a batch case with a `null` takes the wrapper and a single request does not.
-  A case that reaches `--eval-timeout` or `--max-eval-memory-mb` still fails the whole batch with `500`; unstable returns it with `@error` and `@limit`, from `a09544dd6`, a later commit of #549, which is not carried.
+  A case that reaches `--eval-timeout` or `--max-eval-memory-mb` still fails the whole batch with `500`; unstable returns it with `@error` and `@limit`, from `0765fef5d` and `a09544dd6`, later commits of #549 that need its `EvalLimits` module and the threaded RTS, and are not carried.
+  Because main runs every case of a batch at once on the non-threaded RTS, each case's clock counts its siblings' work: 40 cases of a rule that answers one request in about 0.12 s fail the batch at `--eval-timeout 3`, and 10 answer (measured 2026-10-07 on this branch's build).
   This is the batch-response piece of #549 (`35d7b63b3`) and nothing else from it: main has no `REFUSE`, so no `@refused`, and no defaults, so no `@presumed`.
 
 ## Where it lives
@@ -61,6 +62,7 @@ This change keeps main's request handling and carries #562's handling of the wra
 - With `Jl4.hs`, `CodeGen.hs` and `CodeGenSpec.hs` as they are with the encoding change alone, 15 of these fail; as on main, 19 fail; with `Jl4.hs` checking dates with the service's ISO parsers instead of `TODATE`'s, only the two-`DATE` test fails.
 - `jl4-service/test/IntegrationSpec.hs`, "skips recompiling identical sources only under the same id": a POST for `beta` with `alpha`'s bytes answers `beta`, `GET /deployments/beta` is then 200, and the same bytes posted again under `beta` answer `ready` with no `updateId`. With main's content-only match it fails at the first; with no shortcut at all, at the third.
 - The same file, "batch, where null takes the wrapper" and "returns a batch case the wrapper declines with its `@error`": the errored case's `@id` and `@error`, and, in the second, the outcomes a client reads by decoding the body as a `BatchResponse`. With main's batch handler both fail; with `FromJSON OutputCase` ignoring `@error`, the second does.
+- `jl4-service/test/SchemaSpec.hs`, "OutputCase": an errored case is written as `@id` and `@error`, an answered one as `@id` and its result, and both read back as written. With `@error` neither written nor read, the first and third fail.
 - The jl4-mlir differential harness compares the WASM backend's results with these encodings; jl4-mlir's commit `598f60d28` (inside #190, on unstable) moved the WASM runtime to them.
   On main jl4-mlir still emits the old encodings, so with this change `jl4-mlir/scripts/parity-harness.mjs` reports those cells as differences.
 
