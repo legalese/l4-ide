@@ -3,7 +3,7 @@ title: Holmes's bad man is a robot now
 status: draft
 date: 2026-10-01
 facet: formal-methods-in-law
-words: 10894
+words: 11072
 license: CC-BY-NC-4.0
 sources_checked: 2026-10-07
 audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
@@ -353,11 +353,15 @@ It does not need to be finished to be useful: an agent that can check the hundre
 An encoding is not the law.
 It is a reading of the law, made by someone without authority to make it, and it is exactly as good as the care that went into it.
 A published statute can be wrong and still bind; an encoding that disagrees with it is simply wrong.
-We have caught our own pipeline at it.
-An automated encoding of the US rules for crowdfunded securities offerings wrote down the regulator's 2021 choice of "the greater of" an investor's income or net worth as though the statute had required it, which it does not, and only a person reading upward from the regulation to the statute noticed.[^regcf]
+Part of the care is reading enough.
+The US rules for crowdfunded securities offerings limit what an investor may put in by reference to "the greater of" income or net worth, and an encoding of the regulation alone would state that as law.[^regcf]
+The statute the regulation was made under specifies neither; the regulator chose "the lesser of" in 2015 and reversed itself in 2021.
+The model that encoded those rules for us noticed, because it read upward from the regulation to the statute, and it recorded the regulator's two choices in the encoding as two versions of one rule.
+An encoder, human or model, that reads only the regulation writes down a policy choice as a command.
 
-The model still reads the facts, and the facts are where Oakhurst and Rogers actually went wrong.
+The model still reads the facts.
 An encoding of a contract tells an agent what follows from "the goods were delivered late"; it does not tell the agent whether they were.
+Oakhurst and Rogers are the cases for the encoding, not against it: in both, the facts were never in dispute — the drivers distributed and did not pack, and Aliant's notice was dated 31 January 2005 — and what went wrong was the logic, the precedence of "and" over "or" and the reach of a trailing modifier, which is the part an encoding settles before anyone relies on it.
 Moving the reasoning out of the model narrows the place where a model can be wrong, and makes that place visible.
 It does not close it.
 
@@ -456,7 +460,7 @@ This post prefigures `paper/formal-methods-in-law/`, _The Bad Man Wears a White 
 
 [^pipeline]: The pipeline and its human review are described in posts 6 and 9 of this blog; encodings are published in the `legalese/canon` repository with their sources, tests and review record. That a model drafts the encoding and a person reviews it is the design; how often the review catches a defect the pipeline missed has not been measured across the corpus.
 
-[^regcf]: 17 CFR 227.100(a)(2) uses "the greater of"; the empowering statute, 15 U.S.C. 77d(a)(6)(B), does not specify it, and the Securities and Exchange Commission used "the lesser of" from 2015 until it reversed itself in 2021 (86 FR 3496, n. 460). Recorded in `legalese/l4-pitch`, _Deep Dive: The Lexipedia Question_; the canon encoding, mirrored at `jl4/examples/canon/us/regcf/regcf.l4`, carries both versions.
+[^regcf]: 17 CFR 227.100(a)(2) uses "the greater of"; the empowering statute, 15 U.S.C. 77d(a)(6)(B), does not specify it, and the Securities and Exchange Commission used "the lesser of" from 2015 until it reversed itself in 2021 (86 FR 3496, n. 460). The model found it on 25 July 2026, in commit `6ddbc68c2` of the L4 repository, "corpus(regcf): pin the greater/lesser flip as a discretionary regulatory gloss," co-authored by Claude Opus 5, which quotes the Commission's own concession that "[t]he statutory language does not expressly provide that the investor use the lesser of annual income or net worth"; the two versions became a rule-version axis in legalese/l4-ide#172, merged 29 July 2026. The encoding, now mirrored at `jl4/examples/canon/us/regcf/regcf.l4`, carries both versions.
 
 [^whitehat]: `paper/formal-methods-in-law/FORMAL-PAPER.md` in the L4 repository, "The White-Hat Bad Man: Applications of Formal Methods in Law — from the serial comma to strategic logic," a draft.
 
