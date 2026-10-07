@@ -3,7 +3,7 @@ title: Holmes's bad man is a robot now
 status: draft
 date: 2026-10-01
 facet: formal-methods-in-law
-words: 11072
+words: 11166
 license: CC-BY-NC-4.0
 sources_checked: 2026-10-07
 audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
@@ -101,6 +101,38 @@ The question is what form it reaches them in.
 
 ## Reading the law is the hard part
 
+Start with a sentence from a contract about telephone poles.
+In 2002 Rogers Cable signed a support-structure agreement with Aliant Telecom, the incumbent telephone company in New Brunswick, for access to utility poles at $9.60 a pole a year.[^rogers]
+The agreement was on a standard form that the Canadian Radio-television and Telecommunications Commission (CRTC), the national telecommunications regulator, had itself approved in 2000 for the large incumbent telephone companies, in English and in French.
+Section 8.1 of the English form read:
+
+> Subject to the termination provisions of this Agreement, this Agreement shall be effective from the date it is made and shall continue in force for a period of five (5) years from the date it is made, and thereafter for successive five (5) year terms, unless and until terminated by one year prior notice in writing by either party.
+
+About 90,000 of the poles belonged to the provincial power utility, NB Power, and Aliant had been granting access to them on its behalf.
+In 2004 NB Power took back the administration of its poles and began billing Rogers directly, at $18.91 a pole, rising to $28.05 by 2006.
+In January 2005 Aliant gave Rogers a year's notice that it was ending the agreement.
+Rogers said the clause allowed termination only at the end of a five-year term, so not before 31 May 2007; Aliant said the notice could be given at any time.
+
+In July 2006 the CRTC agreed with Aliant.
+It found the clause "clear and unambiguous," and explained: "based on the rules of punctuation, the comma placed before the phrase 'unless and until terminated by one year prior notice in writing by either party' means that that phrase qualifies both" the initial five years and the renewals.
+Rogers applied for a review.
+It argued that the rule of punctuation the Commission had relied on "did not exist," with an affidavit on punctuation from Ken Adams, an authority on contract drafting, in support.[^adams]
+And it put in the French version of the same approved form:
+
+> Sous réserve des dispositions relatives à la résiliation du présent contrat, ce dernier prend effet à la date de signature. Il demeure en vigueur pour une période de cinq (5) ans, à partir de la date de la signature et il est subséquemment renouvelé pour des périodes successives de cinq (5) années, à moins d'un préavis écrit de résiliation à l'autre partie un an avant l'expiration du contrat.
+
+The last clause says the agreement renews for successive five-year periods unless written notice of termination is given to the other party one year before the contract expires.
+The French has no comma to argue about, and it names the deadline the 2006 decision had said the English would have named if that were what the parties meant.
+
+In August 2007 the CRTC reversed itself.
+It held that the question was one of its own regulatory intent, that both language versions of the form it had approved were "equally authoritative," and that the French should be preferred because it "has only one possible interpretation, and that interpretation is consistent with one of the two possible interpretations of the English language version."
+A year after calling the English clause clear, the Commission was counting its interpretations.
+It never ruled on the punctuation argument.
+Then it held that it had no jurisdiction over power poles, so it could not make Aliant honor the $9.60 rate for NB Power's poles, which were the ones the money was about.
+Rogers won the reading and, by the account Adams relayed from _The Globe and Mail_, still owed about $700,000 extra for the power poles.
+The newspapers called it the million-dollar comma; Adams wrote that its "notoriety was entirely out of proportion to the modest amount of money at stake."
+
+Eleven years later and a few hundred miles to the south-west, the comma that mattered was one that was not there.
 "For want of a comma, we have this case."
 That is the first sentence of _O'Connor v. Oakhurst Dairy_, which the federal appeals court for the First Circuit decided on 13 March 2017.[^oakhurst]
 Maine's overtime law exempted workers engaged in "the canning, processing, preserving, freezing, drying, marketing, storing, packing for shipment or distribution of" perishable foods.
@@ -110,7 +142,19 @@ Had the list put a comma after "shipment," the court said in its opening paragra
 Without one, Judge David Barron held, the exemption was ambiguous, and because Maine construes its wage laws "liberally in order to accomplish their remedial purpose," the court adopted the drivers' narrower reading and sent the case back.
 The dairy agreed to pay 127 drivers $5 million to settle.
 
-Here is the exemption written in L4, the language this post is about, three times.
+Neither document looks careless on the page.
+Each said two things at once, and nobody could tell which one it meant until there was money on the answer.
+Now put an agent on each side of the Rogers agreement, each instructed to get the best outcome for its principal.
+They will read the same clause, each will find the reading that favors its side, and each will be right, because the clause supports both.
+That is the Oakhurst dairy and its drivers again, without the years of litigation and without a judge at the end.
+
+The ambiguity is not a defect of language models.
+People failed to see it, repeatedly, in documents drafted and reviewed by professionals.[^darmstadter]
+A language model that reads the statute will inherit every ambiguity in it, and add a few of its own, and nothing in its output will tell you which.
+
+Adams's advice, in his first post on the Rogers dispute and since, is to rebuild an ambiguous sentence so that its structure, not its punctuation, carries the meaning: "If the meaning of a contract provision could be significantly altered by adding or omitting a comma, you're probably better off rephrasing it."
+A formal language can do better than advise.
+Here is the Oakhurst exemption written in L4, the language this post argues for, three times.
 Typed in flat, the way the statute is punctuated, it reads like this, where `..` is L4's spelling of a comma in a list (an "or" with no word for it), and `...` is an "and" with no word for it, which can also join a fragment of the statute's own prose, like "for," to the condition it qualifies:
 
 ```l4
@@ -170,48 +214,9 @@ Asked to list every way a worker can be exempt, the two encodings agree on eight
 Evaluated for a driver who distributes and does nothing else on the list, the first returns `FALSE`, overtime owed, and the second `TRUE`, exempt.[^forks]
 That driver is the whole lawsuit.
 
-Eleven years earlier and a few hundred miles north, a comma went the other way.
-In 2002 Rogers Cable signed a support-structure agreement with Aliant Telecom, the incumbent telephone company in New Brunswick, for access to utility poles at $9.60 a pole a year.[^rogers]
-The agreement was on a standard form that the Canadian Radio-television and Telecommunications Commission (CRTC), the national telecommunications regulator, had itself approved in 2000 for the large incumbent telephone companies, in English and in French.
-Section 8.1 of the English form read:
-
-> Subject to the termination provisions of this Agreement, this Agreement shall be effective from the date it is made and shall continue in force for a period of five (5) years from the date it is made, and thereafter for successive five (5) year terms, unless and until terminated by one year prior notice in writing by either party.
-
-About 90,000 of the poles belonged to the provincial power utility, NB Power, and Aliant had been granting access to them on its behalf.
-In 2004 NB Power took back the administration of its poles and began billing Rogers directly, at $18.91 a pole, rising to $28.05 by 2006.
-In January 2005 Aliant gave Rogers a year's notice that it was ending the agreement.
-Rogers said the clause allowed termination only at the end of a five-year term, so not before 31 May 2007; Aliant said the notice could be given at any time.
-
-In July 2006 the CRTC agreed with Aliant.
-It found the clause "clear and unambiguous," and explained: "based on the rules of punctuation, the comma placed before the phrase 'unless and until terminated by one year prior notice in writing by either party' means that that phrase qualifies both" the initial five years and the renewals.
-Rogers applied for a review.
-It argued that the rule of punctuation the Commission had relied on "did not exist," with an affidavit on punctuation from Ken Adams, an authority on contract drafting, in support.[^adams]
-And it put in the French version of the same approved form:
-
-> Sous réserve des dispositions relatives à la résiliation du présent contrat, ce dernier prend effet à la date de signature. Il demeure en vigueur pour une période de cinq (5) ans, à partir de la date de la signature et il est subséquemment renouvelé pour des périodes successives de cinq (5) années, à moins d'un préavis écrit de résiliation à l'autre partie un an avant l'expiration du contrat.
-
-The last clause says the agreement renews for successive five-year periods unless written notice of termination is given to the other party one year before the contract expires.
-The French has no comma to argue about, and it names the deadline the 2006 decision had said the English would have named if that were what the parties meant.
-
-In August 2007 the CRTC reversed itself.
-It held that the question was one of its own regulatory intent, that both language versions of the form it had approved were "equally authoritative," and that the French should be preferred because it "has only one possible interpretation, and that interpretation is consistent with one of the two possible interpretations of the English language version."
-A year after calling the English clause clear, the Commission was counting its interpretations.
-It never ruled on the punctuation argument.
-Then it held that it had no jurisdiction over power poles, so it could not make Aliant honor the $9.60 rate for NB Power's poles, which were the ones the money was about.
-Rogers won the reading and, by the account Adams relayed from _The Globe and Mail_, still owed about $700,000 extra for the power poles.
-The newspapers called it the million-dollar comma; Adams wrote that its "notoriety was entirely out of proportion to the modest amount of money at stake."
-
-Neither document looks careless on the page.
-Each said two things at once, and nobody could tell which one it meant until there was money on the answer.
-Adams's advice, in his first post on the dispute and since, is to rebuild such a sentence so that its structure, not its punctuation, carries the meaning: "If the meaning of a contract provision could be significantly altered by adding or omitting a comma, you're probably better off rephrasing it."
-An encoding comes close to making that advice mechanical: written out across lines, as a statute is, the flat transcription draws a warning, and the warning goes away only when someone has chosen an indentation.
-Now put an agent on each side of the Rogers agreement, each instructed to get the best outcome for its principal.
-They will read the same clause, each will find the reading that favors its side, and each will be right, because the clause supports both.
-That is the Oakhurst dairy and its drivers again, without the years of litigation and without a judge at the end.
-
-The ambiguity is not a defect of language models.
-People failed to see it, repeatedly, in documents drafted and reviewed by professionals.[^darmstadter]
-A language model that reads the statute will inherit every ambiguity in it, and add a few of its own, and nothing in its output will tell you which.
+The Rogers clause comes apart the same way, into two placements of its last condition, "unless and until terminated by one year prior notice": under the renewal terms alone, or under the initial term as well.
+On 1 February 2006, with the initial term still running and a year's notice served, the first says the agreement is still in force and the second that it has ended.
+That is Adams's advice built into the tool: where a condition written out across lines leaves "and" and "or" at one depth, L4 warns, and the warning goes away only when someone has chosen an indentation.
 
 ## Laws of robotics, and a law with a deadlock
 
