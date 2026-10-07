@@ -1871,8 +1871,37 @@ regularPostfixOperator =
 -- if the postfix operator is on the same line.
 -- e.g., `50 `percent`` becomes `App anno percent [50]`
 -- We use `try` because if this is actually a binary operator (followed by
-mixfixPostfixOp :: ExprLineInfo -> Parser (Expr Name -> Expr Name)
-mixfixPostfixOp exprLineInfo = hidden $ try $ do
+--
+-- @notFollowedByOperand@ answers the one question 'mixfixPostfixHead' leaves
+-- open: is the keyword followed, on the line its argument ends (which it is
+-- given), by an operand of its own, which would make it infix rather than
+-- postfix? It must succeed exactly when there is no such operand. Neither
+-- caller parses that operand to find out, because parsing it here and again
+-- as the infix operand is exponential when operands nest (MATRYOSHKA): see
+-- 'postfixOrInfix' and 'genitiveAhead'.
+mixfixPostfixOpWith :: (Int -> Parser ()) -> ExprLineInfo -> Parser (Expr Name -> Expr Name)
+mixfixPostfixOpWith notFollowedByOperand exprLineInfo = hidden $ try $ do
+  (eN, sameLine) <- mixfixPostfixHead exprLineInfo
+  unless sameLine $ do
+    nextAfterKeyword <- optional (lookAhead (spaceOrAnnotations *> anySingle))
+    let allowsPostfixNewline =
+          case (exprLineInfo.exprIndentColumn, nextAfterKeyword) of
+            (_, Nothing) -> True
+            (Just indent, Just peekTok) -> peekTok.range.start.column < indent
+            _ -> False
+    guard allowsPostfixNewline
+  -- Check that this is NOT followed by an expression ON THE SAME LINE
+  -- (which would make it infix). Expressions on subsequent lines don't count.
+  notFollowedByOperand exprLineInfo.exprEndLine
+  let funcName = eN.payload
+      op = mkSimpleEpaAnno eN
+  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
+
+-- | The guards of a mixfix postfix operator, and its keyword, with whether
+-- the keyword is on the line where its argument ends. 'mixfixPostfixOpWith'
+-- and 'infixAhead' both start here, and must agree on it.
+mixfixPostfixHead :: ExprLineInfo -> Parser (Epa Name, Bool)
+mixfixPostfixHead exprLineInfo = do
   hints <- asks (.mixfixHints)
   let allowNextLine = hasMixfixHints hints
   -- Peek at the next token to check its line number
@@ -1891,26 +1920,7 @@ mixfixPostfixOp exprLineInfo = hidden $ try $ do
   let candidateRaw = rawName eN.payload
   when (hasMixfixHints hints) $
     guard (isKnownMixfixKeyword candidateRaw hints)
-  unless sameLine $ do
-    nextAfterKeyword <- optional (lookAhead (spaceOrAnnotations *> anySingle))
-    let allowsPostfixNewline =
-          case (exprLineInfo.exprIndentColumn, nextAfterKeyword) of
-            (_, Nothing) -> True
-            (Just indent, Just peekTok) -> peekTok.range.start.column < indent
-            _ -> False
-    guard allowsPostfixNewline
-  -- Check that this is NOT followed by an expression ON THE SAME LINE
-  -- (which would make it infix). Expressions on subsequent lines don't count.
-  notFollowedBy (sameLineExpr exprLineInfo.exprEndLine)
-  let funcName = eN.payload
-      op = mkSimpleEpaAnno eN
-  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
-  where
-    -- A parser that only succeeds if there's a base expression on the same line
-    sameLineExpr line = do
-      tok <- lookAhead anySingle
-      guard (tok.range.start.line == line)
-      baseExpr'
+  pure (eN, sameLine)
 
 opToken :: TokenType -> Parser Anno
 opToken t =
@@ -1946,8 +1956,64 @@ postfix :: HasSrcRange (a n) => (Anno -> a n -> a n) -> Lexeme PosToken -> a n -
 postfix f op l =
   f (fixAnnoSrcRange $ mkHoleAnnoFor l <> mkSimpleEpaAnno (lexToEpa op)) l
 
-baseExpr :: Parser (Expr Name)
-baseExpr = postfixPWithLine mixfixPostfixOp regularPostfixOperator baseExpr'
+-- | A same-line mixfix keyword and the operand after it, found by
+-- 'postfixOrInfix' and already parsed: the keyword, the layout of the
+-- operand's first token (what 'peekNextTokenLayout' reports there), and the
+-- operand as 'baseExpr'' parsed it, before any postfix operator.
+data InfixAhead = MkInfixAhead (Epa Name) ExprLineInfo (Expr Name)
+
+-- | A base expression and at most one postfix operator; or, when a same-line
+-- mixfix keyword with an operand after it follows the base expression, the
+-- base expression and that keyword and operand ('InfixAhead').
+-- 'mixfixChainExprNextLine', the only caller, continues the chain from an
+-- 'InfixAhead' exactly as it would have from the keyword.
+baseExprStep :: Parser (Expr Name, Maybe InfixAhead)
+baseExprStep = baseExpr' >>= postfixOrInfix
+
+-- | The postfix half of 'baseExprStep', on a base expression already parsed.
+--
+-- __Why the operand is parsed here (MATRYOSHKA).__ In @a kw b@, a keyword
+-- @kw@ that passes the postfix guards is still not a postfix operator when an
+-- operand @b@ follows it on the same line: then it is infix, and the chain
+-- needs @b@. This used to be decided by parsing @b@ inside a 'notFollowedBy'
+-- and then, when that succeeded, parsing @b@ again as the chain's operand.
+-- Nested, that doubles per level: @1 `plus` (1 `plus` (1 `plus` 1))@ nested
+-- ten deep took more than a minute. 'infixAhead' parses @b@ once and keeps it.
+--
+-- When 'infixAhead' fails, the operand look-ahead of the postfix reading is
+-- certain to fail too, so the postfix reading skips it. Both start with
+-- 'mixfixPostfixHead', and after it 'infixAhead' fails only where that
+-- look-ahead fails: the keyword is not on the argument's last line, no token
+-- follows the keyword on that line, or 'baseExpr'' fails there.
+--
+-- And when 'infixAhead' succeeds, the chain is certain to take the keyword:
+-- for a keyword on the argument's last line, 'mixfixKeywordAligned' checks
+-- what 'mixfixPostfixHead' checked, against the same line (both compute it
+-- from the argument's range, and the head fails when it has none).
+postfixOrInfix :: Expr Name -> Parser (Expr Name, Maybe InfixAhead)
+postfixOrInfix a = do
+  mAhead <- optional (infixAhead (postfixLineInfo a))
+  case mAhead of
+    Just ahead -> pure (a, Just ahead)
+    Nothing -> do
+      a' <- postfixAfter (mixfixPostfixOpWith (\ _ -> pure ())) regularPostfixOperator a
+      pure (a', Nothing)
+
+-- | A mixfix keyword on the line where the argument ends, and the base
+-- expression after it on that line.
+--
+-- Like the look-ahead it replaces, it fails without consuming input or
+-- leaving hints: the keyword's guards are 'hidden', and every later failure
+-- happens past the keyword, so 'optional' discards it.
+infixAhead :: ExprLineInfo -> Parser InfixAhead
+infixAhead exprLineInfo = try $ do
+  (kw, sameLine) <- hidden (mixfixPostfixHead exprLineInfo)
+  guard sameLine
+  tok <- lookAhead anySingle
+  guard (tok.range.start.line == exprLineInfo.exprEndLine)
+  operandLayout <- peekNextTokenLayout
+  operand <- baseExpr'
+  pure (MkInfixAhead kw operandLayout operand)
 
 -- | Parse a mixfix chain expression.
 -- After parsing a base expression, if it's followed by a backticked keyword,
@@ -1991,7 +2057,7 @@ mixfixChainExprNextLine nextLineOk = do
   hints <- asks (.mixfixHints)
   let allowNextLine = nextLineOk && hasMixfixHints hints
   firstLayoutHint <- peekNextTokenLayout
-  firstExpr <- baseExpr
+  (firstExpr, firstAhead) <- baseExprStep
   -- Compute end-line + indentation info for alignment-aware keywords.
   -- Try multiple fallbacks because rangeOf can return Nothing for some expression types:
   -- 1. rangeOf firstExpr - standard approach (fails for App with empty args)
@@ -2002,7 +2068,12 @@ mixfixChainExprNextLine nextLineOk = do
         exprLineInfoWithFallback firstLayoutHint exprRange Nothing
   -- Try to parse a mixfix chain starting with a backticked keyword
   -- The keyword must be on the same line or aligned with the first expression
-  mChain <- optional $ try (mixfixChainCont allowNextLine hints firstExprInfo)
+  -- When 'baseExprStep' has already parsed a same-line keyword and its
+  -- operand, the chain starts from them; see 'postfixOrInfix' for why the
+  -- keyword is certain to be one 'mixfixChainCont' would have taken.
+  mChain <- case firstAhead of
+    Just ahead -> Just <$> mixfixChainFrom allowNextLine hints ahead
+    Nothing -> optional $ try (mixfixChainCont allowNextLine hints firstExprInfo)
   case mChain of
     Nothing -> pure firstExpr
     Just (firstKeyword, firstArg, moreKwArgs) ->
@@ -2033,23 +2104,38 @@ mixfixChainExprNextLine nextLineOk = do
     mixfixChainCont allowNextLine hints prevInfo = do
       firstKw <- mixfixKeywordAligned allowNextLine hints prevInfo
       firstArgLayout <- peekNextTokenLayout
-      firstArg <- baseExpr
+      (firstArg, ahead) <- baseExprStep
       let firstArgInfo = advanceInfo firstArgLayout firstArg
-      rest <- gatherChain allowNextLine hints firstArgInfo
+      rest <- gatherChain allowNextLine hints firstArgInfo ahead
       pure (firstKw, firstArg, rest)
 
-    gatherChain :: Bool -> MixfixHintRegistry -> ExprLineInfo -> Parser [(Epa Name, Expr Name)]
-    gatherChain allowNextLine hints info = do
+    -- 'mixfixChainCont' from a keyword and operand 'baseExprStep' has
+    -- already parsed: the operand still takes its postfix step.
+    mixfixChainFrom :: Bool -> MixfixHintRegistry -> InfixAhead -> Parser (Epa Name, Expr Name, [(Epa Name, Expr Name)])
+    mixfixChainFrom allowNextLine hints (MkInfixAhead firstKw firstArgLayout operand) = do
+      (firstArg, ahead) <- postfixOrInfix operand
+      let firstArgInfo = advanceInfo firstArgLayout firstArg
+      rest <- gatherChain allowNextLine hints firstArgInfo ahead
+      pure (firstKw, firstArg, rest)
+
+    -- The next (keyword, operand) pair: the one an operand's 'baseExprStep'
+    -- already parsed, if any, else one found here.
+    gatherChain :: Bool -> MixfixHintRegistry -> ExprLineInfo -> Maybe InfixAhead -> Parser [(Epa Name, Expr Name)]
+    gatherChain allowNextLine hints _ (Just (MkInfixAhead kw argLayout operand)) = do
+      (arg, ahead) <- postfixOrInfix operand
+      let nextInfo = advanceInfo argLayout arg
+      ((kw, arg) :) <$> gatherChain allowNextLine hints nextInfo ahead
+    gatherChain allowNextLine hints info Nothing = do
       mNext <- optional . try $ do
         kw <- mixfixKeywordAligned allowNextLine hints info
         argLayout <- peekNextTokenLayout
-        arg <- baseExpr
+        (arg, ahead) <- baseExprStep
         let nextInfo = advanceInfo argLayout arg
-        pure ((kw, arg), nextInfo)
+        pure ((kw, arg), nextInfo, ahead)
       case mNext of
         Nothing -> pure []
-        Just ((kw, arg), nextInfo) ->
-          ((kw, arg) :) <$> gatherChain allowNextLine hints nextInfo
+        Just ((kw, arg), nextInfo, ahead) ->
+          ((kw, arg) :) <$> gatherChain allowNextLine hints nextInfo ahead
 
     -- Parse a mixfix keyword only if it's aligned with the specified anchor.
     -- Accepts both backticked names (`plus`) and bare identifiers (plus)
@@ -3178,10 +3264,11 @@ projection =
   <*> some genitiveField
 
 -- | The head of a 'projection': a literal or a name, then at most one postfix
--- operator.
+-- operator. A projection must go on with @'s@, so a postfix keyword here
+-- needs 'genitiveAhead' rather than an operand look-ahead.
 projectionHead :: Parser (Expr Name)
 projectionHead =
-  postfixPWithLine mixfixPostfixOp regularPostfixOperator (lit <|> nameAsApp App)
+  postfixPWithLine (mixfixPostfixOpWith genitiveAhead) regularPostfixOperator (lit <|> nameAsApp App)
 
 -- | A parenthesised expression, with the projections that follow it if any:
 -- @(e)@, @(e)'s f@, @(e)'s f's g@. The group is parsed once, and then the
@@ -3198,7 +3285,7 @@ parenExprOrProjection = do
   fromMaybe e <$> optional (try (projectionsAfter e))
   where
     projectionsAfter e = do
-      a <- postfixAfter mixfixPostfixOp regularPostfixOperator e
+      a <- postfixAfter (mixfixPostfixOpWith genitiveAhead) regularPostfixOperator e
       f <- (,) <$> hidden (spacedToken_ (TIdentifiers TGenitive)) <*> name
       fs <- many genitiveField
       pure (foldl' projectField a (f : fs))
@@ -3211,6 +3298,15 @@ projectField e (gen, n') =
   Proj (fixAnnoSrcRange $ mkHoleAnnoFor e <> mkSimpleEpaAnno (lexToEpa gen) <> mkHoleAnnoFor n')
     e
     n'
+
+-- | The operand test of a postfix keyword in a projection's head: is it
+-- followed by @'s@? This stands in for the look-ahead that parses a whole
+-- operand ('mixfixPostfixOpWith'), and decides the projection identically:
+-- when @'s@ follows, no operand can (no expression begins with @'s@), so
+-- both accept the keyword; when it does not, the projection fails whichever
+-- way the keyword is read, because @'s@ must come next either way.
+genitiveAhead :: Int -> Parser ()
+genitiveAhead _ = void (lookAhead (plainToken (TIdentifiers TGenitive)))
 
 _example1 :: Text
 _example1 =
