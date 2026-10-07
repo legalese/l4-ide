@@ -12,16 +12,20 @@
 -- own stale mark: "Infinite loop detected", as the answer.
 module InterruptedForceSpec (spec) where
 
+import Control.Exception (try)
 import Control.Monad (forM)
+import Data.IORef (newIORef, readIORef)
+import GHC.IO.Exception (AllocationLimitExceeded (..))
 import qualified Data.Text as Text
-import System.Timeout (timeout)
 import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList)
 import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..))
 import L4.Evaluate.ValueLazy (Environment)
 import L4.EvaluateLazy
-  ( EvalDirectiveResult (..)
+  ( AllocationLimit (..)
+  , EvalConfig (..)
+  , EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
   , ReductionOutcome (..)
   , execEvalModuleWithEnv
@@ -63,11 +67,20 @@ spec = describe "an interrupted force of an imported thunk" do
       Right r -> do
         -- one environment for both runs, as the service keeps one per deployment
         importEnv <- evaluateImports r.tcdResolvedImports
-        let run = execEvalModuleWithEnv cfg r.tcdEntityInfo importEnv r.tcdModule
-        -- stopped by a clock while it is inside the imported value
-        interrupted <- timeout 50_000 run
-        interrupted `shouldSatisfy` null
-        (_, results) <- run
+        -- Interrupted by an allocation limit, not a timer, so that it happens
+        -- the same way on a loaded machine: the module does nothing but force
+        -- the imported value, which allocates some 2 GB, so the 100 MB limit
+        -- can only be hit inside that force.
+        hitFlag <- newIORef False
+        let limited = cfg { allocationLimit = Just (MkAllocationLimit (100 * 1024 * 1024) hitFlag) }
+            run c = execEvalModuleWithEnv c r.tcdEntityInfo importEnv r.tcdModule
+        interrupted <- try (run limited)
+        case interrupted of
+          Left AllocationLimitExceeded -> pure ()
+          Right _ -> expectationFailure "the first run finished: the limit was not hit"
+        readIORef hitFlag `shouldReturn` True
+        -- the same thread, the same environment, no limit
+        (_, results) <- run cfg
         map render results `shouldBe` ["1"]
  where
   evaluateImports :: [ResolvedImport] -> IO Environment

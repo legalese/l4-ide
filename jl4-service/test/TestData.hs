@@ -48,6 +48,7 @@ module TestData (
   powerJL4,
   heavyLibJL4,
   heavyMainJL4,
+  deepJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -988,7 +989,7 @@ GIVETH A NUMBER
 `power of a big base` n MEANS
   IF n AT MOST 0 THEN 1 ELSE 10000000000000000000000000000000000000000 * `power of a big base` (n - 1)
 
-@export default three to the power n
+@export default (10 to the power 40) to the power n
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 DECIDE power IS `power of a big base` n
@@ -1017,4 +1018,22 @@ IMPORT heavy_lib
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE `use heavy` IF `count down` n EQUALS 0 AND heavy EQUALS 0
+|]
+
+-- | A recursion that is not a tail call: each level waits for the next, so the
+-- frame stack grows with n and a limit hit has frames to unwind. A tail
+-- call such as 'spinJL4' has almost none, and hides what the unwinding does
+-- after an allocation limit.
+deepJL4 :: Text
+deepJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`sum to` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE n + `sum to` (n - 1)
+
+@export default sums 1 to n by non-tail recursion
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE deep IS `sum to` n
 |]

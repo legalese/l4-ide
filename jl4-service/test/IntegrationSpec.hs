@@ -44,7 +44,7 @@ import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileE
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1170,6 +1170,51 @@ spec = describe "integration" do
             map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
               `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
 
+    -- Review of the first fix (2026-10-07). After the memory limit is hit, the
+    -- RTS raises again for every further 100 KB the thread allocates; the
+    -- unwinding that #1020 added allocates, and those raises used to land
+    -- outside the handler and drop the connection. A tail call (spin) has
+    -- almost no frames to unwind and hid it, so these use a recursion that is
+    -- not a tail call.
+    describe "the memory limit on the direct path, in a deep recursion" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          call n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+          tooDeep = 10_000
+          limitText = "Evaluation resource limit exceeded"
+
+      it "answers a small one, stops a deep one with a 500, and answers the next on the same connection" do
+        withServiceFromSourcesOpts stingy "deep-single" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          small <- evalFunction baseUrl mgr "deep-single" "deep" (call 10)
+          assertSuccess small \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 55)
+          hit <- evalFunction baseUrl mgr "deep-single" "deep" (call tooDeep)
+          statusCode' hit `shouldBe` 500
+          LBS.toStrict (responseBody hit) `shouldSatisfy` BS.isInfixOf limitText
+          again <- evalFunction baseUrl mgr "deep-single" "deep" (call 10)
+          assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 55)
+
+      it "reports a deep batch case as the memory limit, and answers the cases around it" do
+        withServiceFromSourcesOpts stingy "deep-batch" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          resp <- postBatchTo baseUrl mgr "deep-batch" "deep" [10, tooDeep, 10]
+          expectBatchOutcomes resp
+            [ CaseAnswered
+            , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+            , CaseAnswered ]
+
+      it "answers a deep MCP call with the limit, and the next call on the same connection" do
+        withServiceFromSourcesOpts stingy "deep-mcp" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          let callTool i n = do
+                req <- buildJsonPost (baseUrl <> "/deployments/deep-mcp/.mcp") $ Aeson.object
+                  [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (i :: Int)
+                  , "method" Aeson..= ("tools/call" :: Text)
+                  , "params" Aeson..= Aeson.object
+                      [ "name" Aeson..= ("deep" :: Text)
+                      , "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)] ] ]
+                responseBody <$> httpLbs req mgr
+          hit <- callTool 1 tooDeep
+          LBS.toStrict hit `shouldSatisfy` BS.isInfixOf limitText
+          again <- callTool 2 10
+          LBS.toStrict again `shouldSatisfy` BS.isInfixOf "55"
+
     -- smucclaw/l4-ide#1019. The evaluation returns an unfinished number at
     -- once; its digits used to be computed by the JSON encoder, after both
     -- limits were off.
@@ -1221,6 +1266,10 @@ spec = describe "integration" do
           again <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call 0)
           LBS.toStrict (responseBody again) `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          -- the hit above landed inside the imported value: once it is worked
+          -- out and kept, the same 47 MB of the case's own steps fit
+          cached <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          assertSuccess cached \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
 
       it "does not spoil the next evaluation on a new connection, or a batch case" do
         withServiceFromSourcesOpts stingy "heavy-new" sources \baseUrl mgr -> do
