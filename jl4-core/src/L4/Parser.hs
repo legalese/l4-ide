@@ -1441,9 +1441,15 @@ type GroupReply a = Megaparsec.Reply Void TokenStream (a, PState)
 --     ever advances by dropping the tokens consumed (and their text), and no
 --     parser sets the input;
 --
---   * the cached source position in the state ('statePosState') is a cache:
---     a token stream's 'reachOffset' reads positions from the tokens
---     themselves;
+--   * the source position cached in the state ('statePosState') is read
+--     from the tokens themselves by a token stream's 'reachOffset', so every
+--     position a parser asks for is the same after a replay. Two parts of
+--     it do depend on what was reached before. Its line prefix is read only
+--     when an error bundle is rendered, and the bundle is rendered from the
+--     run's initial state. Its offset must never move backwards
+--     ('reachOffset' splits the tokens at the distance from it), and a
+--     replayed state was only advanced to offsets at or below the group's
+--     end, which is where parsing resumes;
 --
 --   * of the 'Env', only 'ofIsAnchor' is ever changed with 'local'; the
 --     module's URI and the mixfix hints are fixed for a whole run, and so is
