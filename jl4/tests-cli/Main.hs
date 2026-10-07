@@ -115,6 +115,24 @@ batchMixfixSharedHead, batchMixfixSharedHeadJson :: FilePath
 batchMixfixSharedHead     = fixtureDir </> "batch-mixfix-shared-head.l4"
 batchMixfixSharedHeadJson = fixtureDir </> "batch-mixfix-shared-head.json"
 
+-- | Multi-clause groups whose compiled form, printed, met a drafter's name
+-- (review of legalese/l4-ide#545); see the fixtures.
+batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans :: FilePath
+batchClauses         = fixtureDir </> "batch-multi-clause.l4"
+batchClausesCapture  = fixtureDir </> "batch-multi-clause-capture.l4"
+batchClausesColours  = fixtureDir </> "batch-multi-clause-colours.json"
+batchClausesBooleans = fixtureDir </> "batch-multi-clause-booleans.json"
+
+-- | Groups whose clauses, printed from the source text, meant something
+-- else in the printed module (review of legalese/l4-ide#545, round 2).
+batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs, batchClausesString, batchClausesB :: FilePath
+batchClausesDitto     = fixtureDir </> "batch-multi-clause-ditto.l4"
+batchClausesDittoHead = fixtureDir </> "batch-multi-clause-ditto-head.l4"
+batchClausesFixity    = fixtureDir </> "batch-multi-clause-fixity.l4"
+batchClausesTabs      = fixtureDir </> "batch-multi-clause-tabs.l4"
+batchClausesString    = fixtureDir </> "batch-multi-clause-string.l4"
+batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
+
 batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
 batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
@@ -369,6 +387,9 @@ coreFixtures =
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture
+  , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
+  , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
+  , batchClausesString, batchClausesB
   ]
 
 spec :: FilePath -> Spec
@@ -1204,6 +1225,57 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
       sout `shouldSatisfy` ("\"result\":true" `isInfixOf`)
       sout `shouldNotSatisfy` ("multiple definitions" `isInfixOf`)
+
+    -- A multi-clause group prints as the clauses the drafter wrote. Printed
+    -- from what they compile to, a name the compiler made up was written out
+    -- as source, and a drafter's definition of the same text captured it:
+    -- each of the first three answered differently with status "success".
+    describe "re-prints a multi-clause group as its clauses" $ do
+      let results args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args)
+            code `shouldBe` ExitSuccess
+            pure [ (objField row "status", outResult row)
+                 | l <- lines sout
+                 , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value]
+                 ]
+          outResult row = case objField row "output" of
+            Just (Array os) | [o] <- toList os -> objField o "result"
+            _ -> Nothing
+          ok v = (Just (String "success"), Just v)
+      it "reads a drafter's definition named like the binding of the later clauses" $
+        results [batchClauses, "-e", "later", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 7, Number 2, Number 3])
+      it "reads a drafter's definition named like the binding of the last clause" $
+        results [batchClauses, "-e", "fee", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 101, Number 3])
+      it "reads a drafter's definition named like an input of a group with no GIVEN" $
+        results [batchClauses, "-e", "through", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Red", String "Green"])
+      it "tests the input a pattern variable is named after, not the variable" $
+        results [batchClausesCapture, "-e", "capture", "--inputs", batchClausesBooleans]
+          >>= (`shouldBe` map ok [Number 1, Number 2, Number 1, Number 2])
+      -- Printed from the source text instead, the next four answered
+      -- differently or did not parse: a ditto resolved against the printer's
+      -- line, operators lost their precedence, tabs did not re-parse.
+      it "keeps what a ditto in a clause body copies" $
+        results [batchClausesDitto, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 0, Number 0])
+      it "keeps what a ditto in a clause head copies" $
+        results [batchClausesDittoHead, "--inputs", batchClausesB]
+          >>= (`shouldBe` map ok [Number 1, Number 2])
+      it "keeps the precedence of declared infix operators in a clause body" $
+        results [batchClausesFixity, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 7, Number 7, Number 0])
+      it "reads clauses indented with tabs" $
+        results [batchClausesTabs, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 3, Number 3])
+      -- The printer adds its indentation to the second line of any string
+      -- that spans lines, in a rule written as clauses or not; routed
+      -- separately. `l4 run` gives "a\n      b".
+      it "keeps a string that spans lines in a clause body" $ do
+        pendingWith "the printer indents the later lines of a multi-line string, in every rule"
+        results [batchClausesString, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
 
     it "serializes a #TRACE breach with correctly-labeled fields" $ do
       -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch

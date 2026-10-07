@@ -1,0 +1,25 @@
+-- Operators of declared precedence in clause bodies (probe q/fx). The
+-- source text has no brackets, and the printer prints no fixity, so
+-- printed from the source text the precedence was lost.
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p UNIONN q MEANS p + q
+
+@infixl 7
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p INTERSECTN q MEANS p * q
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default calc
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE calc Red   IS 1 UNIONN 2 INTERSECTN 3
+DECIDE calc Green IS 2 INTERSECTN 3 UNIONN 1
+DECIDE calc c     IS 0
+

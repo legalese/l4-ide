@@ -663,11 +663,85 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
         [ "@desc" <+> pretty (Text.strip (getDesc d))
         | Just d <- [Optics.view annDesc ann]
         ]
-        <>
-        [ printWithLayout tySig
-        , "DECIDE" <+> printWithLayout appForm <+> "IS"
-        , indent 2 (printWithLayout expr)
+        <> case writtenClauses ann appForm expr of
+          -- A multi-clause group prints as the clauses the drafter wrote. Its
+          -- tree is what they compile to, and that names things the desugarer
+          -- made up ('L4.Parser.generatedName'), which source cannot spell:
+          -- printed as text, a drafter's definition of the same text would
+          -- capture them, and the printed module would answer differently
+          -- (@l4 batch@ and the REPL run the printed module).
+          Just clauses ->
+            printWithLayout (writtenSignature tySig) : clauses
+          Nothing ->
+            [ printWithLayout tySig
+            , "DECIDE" <+> printWithLayout appForm <+> "IS"
+            , indent 2 (printWithLayout expr)
+            ]
+
+-- | The clauses of a multi-clause group, printed from the AST: each clause's
+-- patterns from the clause matrix the parser kept ('PmMatrix'), in which
+-- every ditto is already resolved, and its body from the tree the clauses
+-- compile to ('clauseBodies'). Nothing is copied from the source text, so
+-- nothing depends on the layout around it there.
+--
+-- A clause after one whose every pattern matches anything is never tried, and
+-- the checker drops it from the tree it returns, so it is not printed. That
+-- cannot change an answer.
+--
+-- 'Nothing' for anything that is not a group, for a group whose tree does not
+-- have the shape the desugarer builds, and for a single clause that would not
+-- be read back as a group (no pattern in it tells it from a plain
+-- definition): those print as the tree, as everything else does.
+writtenClauses :: LayoutPrinterWithName a => Anno -> AppForm a -> Expr a -> Maybe [Doc ann]
+writtenClauses ann (MkAppForm _ hd _ maka) expr = do
+  matrix <- Optics.view annPmMatrix ann
+  let patterns = map (.patterns) matrix.clauses
+  guard (all ((== length matrix.scrutinees) . length) patterns)
+  bodies <- clauseBodies matrix.scrutinees patterns expr
+  let clauses = zip patterns bodies
+  guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
+  pure
+    [ vcatHard
+        [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . parensIfNeeded) pats
+            <> (if i == 0 then foldMap ((space <>) . printWithLayout) maka else mempty)
+            <+> "IS"
+        , indent 2 (printWithLayout body)
         ]
+    | (i, (pats, body)) <- zip [0 :: Int ..] clauses
+    ]
+
+-- | The body of each clause of a group that its tree still holds, in order,
+-- found by the marks 'L4.Parser.matchClauses' leaves: a clause is tested by
+-- one generated CONSIDER per input its pattern does not match outright
+-- ('patAlwaysMatchesAs'), its body is under their first branches, and the
+-- clauses after it are under the binding of the later clauses. 'Nothing'
+-- when the tree is not shaped so.
+clauseBodies :: [Name] -> [[Pattern Name]] -> Expr a -> Maybe [Expr a]
+clauseBodies scrutinees = go
+  where
+    go [] _ = Just []
+    go (pats : rest) e = case e of
+      LetIn _ [LocalDecide _ (MkDecide dann _ _ later)] tree
+        | isLaterClauses dann -> (:) <$> bodyOf pats tree <*> go rest later
+      -- the last clause, or one that matches anything, the rest dropped
+      _ -> (: []) <$> bodyOf pats e
+    bodyOf pats = under (length (filter not (zipWith patAlwaysMatchesAs scrutinees pats)))
+    under :: Int -> Expr a -> Maybe (Expr a)
+    under 0 e = Just e
+    under n (Consider cann _ (MkBranch _ (When _ _) b : _))
+      | Just (PmConsider{}) <- Optics.view annPmSynthetic cann = under (n - 1) b
+    under _ _ = Nothing
+    isLaterClauses dann = case Optics.view annPmSynthetic dann of
+      Just (PmFallthrough _) -> True
+      Just (PmUnreachable _) -> True
+      _                      -> False
+
+-- | The signature of a multi-clause group as the drafter wrote it: without
+-- the inputs the desugarer named when the drafter's GIVEN named none
+-- ('L4.Parser.generatedName'), which only the checker added to it.
+writtenSignature :: HasName a => TypeSig a -> TypeSig a
+writtenSignature (MkTypeSig ann (MkGivenSig gann otns) giveth) =
+  MkTypeSig ann (MkGivenSig gann [ o | o@(MkOptionallyTypedName _ n _ _) <- otns, not (isGeneratedName (rawName (getName n))) ]) giveth
 
 instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
   printWithLayout = \ case
