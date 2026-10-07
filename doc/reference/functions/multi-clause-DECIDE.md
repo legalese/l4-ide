@@ -190,8 +190,16 @@ and the corresponding name in the definition is
 **Some groups are not checked for missing cases.**
 The warning above covers clauses that match values of an enumeration declared in the same file, and `TRUE` and `FALSE`.
 A group that matches numbers or text gets no warning, because there is no end to the numbers and texts that could be listed.
-Nor does a group that matches lists or `MAYBE` values, or values of an enumeration declared in another file, or one that would need more than 64 clauses listed.
-When no clause matches, evaluation stops with an error.
+That holds for the whole group: a number or a piece of text anywhere in its patterns, or an `EXACTLY` pattern, stops the check even where the other inputs are enumerations.
+With `DECIDE charge Red 0 IS 0`, `DECIDE charge Red n IS n` and `DECIDE charge Green n IS n TIMES 2`, nothing warns that `Blue` is missing; without the first clause, the warning lists ``DECIDE `charge` Blue n IS``.
+Likewise `DECIDE price (EXACTLY Red) IS 1` and `DECIDE price Green IS 2` draw no warning, where `Red` in place of `(EXACTLY Red)` draws one for `Blue`.
+Nor does a group that matches lists or `MAYBE` values, or values of an enumeration declared in another file.
+
+The check also gives up, with no warning, when it would list more than 64 clauses, or when it takes more than 10000 steps to find them.
+Five inputs over a five-day week, with one clause for each day on all five (`DECIDE same Mon Mon Mon Mon Mon IS 1`, and so on to `Fri`), would need more than 64 clauses listed, and get no warning; the same table with four inputs lists 60.
+Nine inputs, each tested for `Red` in one clause and for `Green` in another, take more than 10000 steps and get no warning; with eight inputs the warning lists the one clause still needed.
+
+In a group that is not checked, when no clause matches, evaluation stops with an error.
 For this `describe.l4`:
 
 ```l4
@@ -215,8 +223,9 @@ Add a clause for this case, or end the clauses with one that matches every input
 
 To be safe, end such a group with a clause that matches anything.
 
-**Only a clause after one that names its `GIVEN` is reported as never used.**
-A repeated clause is not flagged, and neither is a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
+**Only the clauses after one that matches every input are reported as never used.**
+That is a clause whose every pattern is its input's `GIVEN` name or `` `_` ``.
+There is no warning for a clause that repeats one above it, and none for a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
 With `DECIDE r Red IS 1`, `DECIDE r Red IS 2` and `DECIDE r other IS 3` followed by `DECIDE r Blue IS 4`, `l4 check` gives no warning, `r Red` gives `1` and `r Blue` gives `3`.
 
 ## Related Keywords

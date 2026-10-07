@@ -460,7 +460,13 @@ DECIDE price c IS 0
 
 When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
 
-**Note:** Only rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked. Rules that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning, and neither does a rule that would need more than 64 clauses listed. A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER over a number or a piece of text gives none. See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
+**Note:** Only rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked.
+Rules that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning.
+Neither does a rule with a number, a piece of text or an `EXACTLY` pattern anywhere in its clauses, even if its other inputs are enumerations.
+Neither does a rule that would need more than 64 clauses listed, or more than 10000 steps to find them.
+[Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits) gives an example of each.
+A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER over a number or a piece of text gives none.
+See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
 
 ---
 
@@ -500,7 +506,8 @@ DECIDE describe Closed IS "stopped"
 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
-A repeated clause is not flagged, and neither is a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
+Only the clauses after one that matches every input are warned about: a clause whose every pattern is its input's own name or `_`.
+There is no warning for a clause that repeats one above it, and none for a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
 
 **How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
 

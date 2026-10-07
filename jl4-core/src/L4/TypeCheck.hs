@@ -777,7 +777,7 @@ checkClauseMatrix dec dHead =
     MkAppForm _ _ colScruts _ = dHead.rappForm
 
     -- | A pattern that is its input's own name compiles to nothing
-    -- ('L4.Parser.patAlwaysMatchesAs'), so no checked node sits under it.
+    -- ('L4.Syntax.patAlwaysMatchesAs'), so no checked node sits under it.
     -- Record the input's type there, so that hover on it answers as it does
     -- on the input, not with whatever node encloses it.
     recordInputPatterns :: PmMatrix -> Check ()
@@ -857,7 +857,7 @@ checkClauseMatrix dec dHead =
     -- no GIVEN has no such name: its columns are names the desugarer made
     -- up (@input 1@), which no source can write, so the column stays @`_`@
     -- like a nested wildcard, which
-    -- 'L4.Parser.patAlwaysMatchesAs' also reads as matching anything.
+    -- 'L4.Syntax.patAlwaysMatchesAs' also reads as matching anything.
     renderRow :: PmMatrix -> [CoveragePattern] -> [Pattern Resolved]
     renderRow matrix =
       zipWith
@@ -880,7 +880,7 @@ checkClauseMatrix dec dHead =
           }
       _ -> rangeOf dec
 
-    -- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which the matrix analysis
+    -- | Mirror of 'L4.Syntax.patAlwaysMatchesAs', which the matrix analysis
     -- MUST agree with: a bare pattern that reuses its own column's
     -- GIVEN\/scrutinee name (or the anonymous wildcard) is compiled by the
     -- desugarer as an unconditional match — 'L4.Parser.matchOne'\/'matchLast'

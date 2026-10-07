@@ -210,6 +210,66 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     ws `shouldBe` []
 
+  -- The three silences below are the examples doc/reference/functions/
+  -- multi-clause-DECIDE.md gives under "Limits"; each has its control, the
+  -- same group with the warning back.
+  it "does not check a group with a number anywhere in its patterns, though its other input is an enumeration" $ do
+    let charge cls = Text.unlines $
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+          , ""
+          , "GIVEN c IS A Colour"
+          , "      n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          ] <> cls
+    unchecked <- clauseWarnings $ charge
+      [ "DECIDE charge Red   0 IS 0"
+      , "DECIDE charge Red   n IS n"
+      , "DECIDE charge Green n IS n TIMES 2"
+      ]
+    unchecked `shouldBe` []
+    checked <- clauseWarnings $ charge
+      [ "DECIDE charge Red   n IS n"
+      , "DECIDE charge Green n IS n TIMES 2"
+      ]
+    missingClauses checked `shouldBe` ["DECIDE `charge` Blue n IS"]
+
+  it "does not check a group with an EXACTLY pattern" $ do
+    let price cls = Text.unlines $
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+          , ""
+          , "GIVEN c IS A Colour"
+          , "GIVETH A NUMBER"
+          ] <> cls
+    unchecked <- clauseWarnings $ price
+      [ "DECIDE price (EXACTLY Red) IS 1"
+      , "DECIDE price Green         IS 2"
+      ]
+    unchecked `shouldBe` []
+    checked <- clauseWarnings $ price
+      [ "DECIDE price Red   IS 1"
+      , "DECIDE price Green IS 2"
+      ]
+    missingClauses checked `shouldBe` ["DECIDE `price` Blue IS"]
+
+  it "stays silent rather than take more than 10000 steps" $ do
+    -- k inputs, each tested for Red in one clause and for Green in another:
+    -- the one clause missing is all Blue, and finding it takes more steps
+    -- with each input; eight inputs stay under 10000 steps, nine do not.
+    let tshow = Text.pack . show
+        pick :: Int -> Text
+        pick k = Text.unlines $
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue", "" ]
+          <> [ (if i == 1 then "GIVEN " else "      ") <> "c" <> tshow i <> " IS A Colour" | i <- [1 .. k] ]
+          <> [ "GIVETH A NUMBER" ]
+          <> [ "DECIDE pick "
+                 <> Text.unwords [ if j == i then v else "c" <> tshow j | j <- [1 .. k] ]
+                 <> " IS " <> tshow i
+             | v <- ["Red", "Green"], i <- [1 .. k] ]
+    nine <- clauseWarnings (pick 9)
+    nine `shouldBe` []
+    eight <- clauseWarnings (pick 8)
+    missingClauses eight `shouldBe` ["DECIDE `pick` " <> Text.unwords (replicate 8 "Blue") <> " IS"]
+
   it "checks a one-clause group as a clause, and says so" $ do
     allWs <- warnings $ Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"

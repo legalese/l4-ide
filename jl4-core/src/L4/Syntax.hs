@@ -501,7 +501,7 @@ data PmMatrix = MkPmMatrix
   , clauses    :: [PmMatrixClause]
   , catchAll   :: Maybe Int
     -- ^ index of the first clause every one of whose patterns matches
-    -- anything ('L4.Parser.patAlwaysMatchesAs'); the clauses after it are
+    -- anything ('L4.Syntax.patAlwaysMatchesAs'); the clauses after it are
     -- never tried
   }
   deriving stock (Eq, Ord, Show)
