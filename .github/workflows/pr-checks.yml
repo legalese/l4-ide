@@ -839,17 +839,18 @@ jobs:
       #
       # ARTIFACTS are not ref-scoped. The push-to-unstable run of this very job
       # uploads its cabal store + dist-newstyle as `mq-warmup-haskell` (foot of
-      # this job); each queue entry downloads the newest one from a successful
-      # push and unpacks it. The cache restores below are SKIPPED outright on
+      # this job); each queue entry downloads the newest unexpired one and
+      # unpacks it. The cache restores below are SKIPPED outright on
       # merge_group — not merely expected to miss: a push to MAIN saves the
       # same pr-checks-* keys into default-branch scope, which merge_group CAN
       # read, and that restore would extract main's stale store over the warm
       # start (mixed package.db = a red queue entry, the worst outcome
       # available). Each Haskell-building landing re-warms the artifact
-      # (docs-only landings upload nothing and the locator walks back up to 15
-      # pushes; the artifact lands at the END of the push run, so under a busy
-      # queue entry N+1 is typically warmed by N-1's landing). Freshness still
-      # tracks dependency drift, which the 6-hourly cron never did. Every
+      # (docs-only landings upload nothing, so the newest artifact is simply an
+      # older landing's; the artifact lands at the END of the push run, so
+      # under a busy queue entry N+1 is typically warmed by N-1's landing).
+      # Freshness still tracks dependency drift, which the 6-hourly cron never
+      # did. Every
       # producer and consumer step is best-effort (`continue-on-error`) — any
       # failure means a cold build for a queue entry, never a red check. The
       # round-trip is deliberately unkeyed on cabal-version (`latest` above):
@@ -857,6 +858,30 @@ jobs:
       # in the same container, and a cabal release between them degrades to a
       # cold or partially-warm build, never an error. Storage is free (public
       # repo); retention 7 days does the cleanup no delete step has to.
+      #
+      # The locator lists ARTIFACTS by name; it does not search workflow runs.
+      # It used to call the run search (`listWorkflowRuns` with branch, event
+      # and status filters) and walk each run's artifacts, and that search
+      # intermittently answers from a stale index. Measured 2026-10-06: 4 of
+      # 143 identical calls returned a newest run of 2026-09-11 or 2026-09-23
+      # where the truth was that morning's, and every artifact on runs that
+      # old has expired, so the step said "No mq-warmup-haskell artifact" and
+      # the entry cold-built. 13 of the 59 queue entries that ran this job
+      # from 2026-09-21 to 2026-10-06 logged exactly that while unexpired
+      # artifacts sat on the shelf (sixteen, for the 10-06 08:27 entry), and a
+      # 2026-09-28 entry unpacked a 5-day-old store when a 6-hour-old one
+      # existed. In 143 calls over the same period, the artifacts endpoint was
+      # current every time. Its workflow_run carries no event or conclusion,
+      # and neither was ever needed: the upload steps carry GitHub's implicit
+      # success(), so an
+      # artifact exists only if that push's build, tests and doc tests went
+      # green. What `event: push` DID guarantee is kept explicitly. A fork's
+      # pull_request run executes the fork's copy of this file and can upload
+      # an artifact of any name from a branch it calls `unstable`; that store
+      # must never be unpacked into a queue build, so a candidate must come
+      # from a run whose head repository is this one. NOTE: this step reports
+      # success whatever it decides (continue-on-error, and a "not found" is
+      # not an error), so read its log, or the Download step, never its status.
       - name: Locate the newest merge-queue warm-up artifact
         id: warmup
         if: github.event_name == 'merge_group'
@@ -864,30 +889,29 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner, repo: context.repo.repo,
-              workflow_id: 'pr-checks.yml', branch: 'unstable',
-              event: 'push', status: 'success', per_page: 15,
-            });
-            for (const run of runs.data.workflow_runs) {
-              const arts = await github.rest.actions.listWorkflowRunArtifacts({
-                owner: context.repo.owner, repo: context.repo.repo, run_id: run.id,
-              });
-              const art = arts.data.artifacts.find(
-                (a) => a.name === 'mq-warmup-haskell' && !a.expired,
-              );
-              if (art) {
-                const ageDays = (Date.now() - Date.parse(art.created_at)) / 86400000;
-                core.info(`warm start: ${art.name} from run ${run.id} (${run.head_sha.slice(0, 7)}), ${Math.round(art.size_in_bytes / 1048576)} MB, ${ageDays.toFixed(1)} d old`);
-                if (ageDays > 7)
-                  core.warning(`The newest warm-up artifact is ${ageDays.toFixed(0)} days old. Pushes to unstable upload a fresh one on every green haskell job; check the recent push runs of pr-checks.yml.`);
-                core.setOutput('run-id', String(run.id));
-                core.setOutput('found', 'true');
-                return;
-              }
+            const listed = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { owner: context.repo.owner, repo: context.repo.repo, name: 'mq-warmup-haskell', per_page: 100 },
+            );
+            const usable = listed
+              .filter((a) => a.name === 'mq-warmup-haskell' && !a.expired && a.workflow_run
+                && a.workflow_run.head_branch === 'unstable'
+                && a.workflow_run.head_repository_id === a.workflow_run.repository_id)
+              .sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at));
+            core.info(`${listed.length} mq-warmup-haskell artifact(s) listed, ${usable.length} unexpired from this repository's unstable`);
+            const art = usable[0];
+            if (art) {
+              const run = art.workflow_run;
+              const ageDays = (Date.now() - Date.parse(art.created_at)) / 86400000;
+              core.info(`warm start: ${art.name} from run ${run.id} (${run.head_sha.slice(0, 7)}), ${Math.round(art.size_in_bytes / 1048576)} MB, ${ageDays.toFixed(1)} d old`);
+              if (ageDays > 7)
+                core.warning(`The newest warm-up artifact is ${ageDays.toFixed(0)} days old. Pushes to unstable upload a fresh one on every green haskell job; check the recent push runs of pr-checks.yml.`);
+              core.setOutput('run-id', String(run.id));
+              core.setOutput('found', 'true');
+              return;
             }
             core.setOutput('found', 'false');
-            core.warning('No mq-warmup-haskell artifact on any of the last 15 successful pushes to unstable; this queue entry cold-builds (~28 min). The push path of this job uploads the artifact — check whether recent pushes skipped the haskell job or failed.');
+            core.warning(`No unexpired mq-warmup-haskell artifact from a push to unstable (${listed.length} listed); this queue entry cold-builds (~28 min). The push path of this job uploads the artifact — check whether recent pushes skipped the haskell job or failed.`);
 
       - name: Download the warm-up artifact
         id: warmup-download
