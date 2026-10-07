@@ -17,7 +17,7 @@ audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
 
 **Summary.**
 
-- AI agents are starting to act for people: in software first, then in shopping, payments and conversation. Everything they do there happens inside law.
+- AI agents are starting to act for people: in software first, then in shopping, payments and conversation. Nearly everything they do there is governed by law.
 - Oliver Wendell Holmes's "bad man" of 1897, who studies the law only to find where its edges are, is a good model of a goal-directed agent, and what alignment researchers call specification gaming is what lawyers call finding a loophole.
 - Today the hard limits on what a model will do are drawn by the labs that train it, in broad strokes. The whole spectrum of regulated activity is too large for a lab to draw, and the law already draws it, with a legitimacy no lab has.
 - But law written in English is ambiguous, and sometimes contradicts itself; we have found such a defect in a statute with a model checker. An agent that reads the law in English inherits every one of those defects.
@@ -202,7 +202,7 @@ DECIDE `exempt, as the dairy read it` IF
 ```
 
 The two have the same words in the same order, and they differ in one line: how far `OR distribution` is indented.
-In L4 indentation is grammar, saying what groups with what, so that one line is the whole dispute.
+In L4 indentation is grammar, saying what groups with what, and the indentation of that line is what the two sides were arguing about.
 Under `shipment`, distribution is a second destination for packing; back at the margin, it is a ninth activity of its own.
 Drawn as circuits, in which current reaches the right-hand end when the worker is exempt, the difference is where the `distribution` contact hangs.
 
@@ -212,7 +212,7 @@ Drawn as circuits, in which current reaches the right-hand end when the worker i
 
 Asked to list every way a worker can be exempt, the two encodings agree on eight and differ on the ninth: "packing for distribution" in the first, "distribution" in the second.
 Evaluated for a driver who distributes and does nothing else on the list, the first returns `FALSE`, overtime owed, and the second `TRUE`, exempt.[^forks]
-That driver is the whole lawsuit.
+That driver is the one the case was about.
 
 The Rogers clause comes apart the same way, into two placements of its last condition, "unless and until terminated by one year prior notice": under the renewal terms alone, or under the initial term as well.
 On 1 February 2006, with the initial term still running and a year's notice served, the first says the agreement is still in force and the second that it has ended.
@@ -387,7 +387,7 @@ What precision changes is who else can read the map.
 A model checker run over an encoding finds the loopholes and contradictions too, and it can find them for the drafter, before the rule is enacted, instead of for the bad robot afterwards.
 The nearest-unblocked-strategy entry draws the relevant line itself: endless patching is the fate of domains where good outcomes cannot be identified exactly, and it does not happen in chess, because "a chess program can have an absolute identification of which endstates constitute winning."
 An encoding gives that exactness for compliance with the letter of a rule, not for the rule's purpose; the white-hat search is for states that satisfy the letter and violate a purpose the drafter has written down separately, as a property to check.
-That is the argument of a paper we are writing on what we call white-hat loophole-finding, and it is the reason we encode the law at all.[^whitehat]
+That is the argument of a paper we are writing on what we call white-hat loophole-finding.[^whitehat]
 
 And the central empirical claim has not been tested.
 I know of no measurement of whether agents that consult an encoding of the law make fewer legal errors than agents given the statute's text in their prompt, at the same cost.
