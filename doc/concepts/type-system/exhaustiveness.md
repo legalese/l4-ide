@@ -75,9 +75,9 @@ The payoff comes when a category grows. Add a fourth variant to `` `visa status`
 
 ## Caveats and Escape Hatches
 
-### Primitive types are not checked
+### Primitive types are not checked in a `CONSIDER`
 
-The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set. Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
+The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set. Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped in a hand-written `CONSIDER` — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -89,6 +89,20 @@ GIVETH A STRING
 ```
 
 `BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. So are the builtin container types `MAYBE`, `EITHER` and `LIST`: a `CONSIDER` over a `MAYBE` with no `WHEN NOTHING` branch is warned about, and so is one over a `LIST` with no `WHEN EMPTY`. Whatever the type, the analysis stands down for a `CONSIDER` in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`, `WHEN "a" FOLLOWED BY rest`), or is an `EXACTLY` pattern: such a `CONSIDER` gets no warning either way, so give it an `OTHERWISE`.
+
+A rule written as clauses, one `DECIDE` line per case, is different.
+A number or a piece of text in a clause matches one value of its input, and the input has no end of other values, so such a rule is complete only with a clause written with the input's name, and the missing-case warning suggests that clause:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `describe count` 0 IS "none"
+DECIDE `describe count` 1 IS "one"
+-- warns: DECIDE `describe count` n IS
+```
+
+The enumeration inputs of the same rule are still analysed, and a clause that repeats a number (`1` after `1.0`) is reported as never used.
+So the same determination warns when written as clauses and does not when written as a `CONSIDER` over a number or a piece of text.
 
 The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the safety property is silently lost. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
 
@@ -128,17 +142,18 @@ The intended discipline: treat the warnings as a completeness report. A finished
 
 ## Summary
 
-| Property                                          | Behaviour                                                                |
-| ------------------------------------------------- | ------------------------------------------------------------------------ |
-| Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                      |
-| Unreachable branch                                | Compile-time warning that the branch is redundant                        |
-| `NUMBER` / `STRING` / `DATE` scrutinee            | Not analysed — values can't be enumerated                                |
-| `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                           |
-| `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                         |
-| `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                  |
-| `OTHERWISE`                                       | Completes the match, disables missing-case warnings                      |
-| Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero    |
-| Severity                                          | Warning, not error — the file still evaluates and its `#EVAL`s still run |
+| Property                                          | Behaviour                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------------------- |
+| Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                        |
+| Unreachable branch                                | Compile-time warning that the branch is redundant                          |
+| `NUMBER` / `STRING` / `DATE` scrutinee            | `CONSIDER`: not analysed — values can't be enumerated                      |
+| Clauses over a `NUMBER` or `STRING` input         | Analysed; the clause with the input's name is suggested when it is missing |
+| `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
+| `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                           |
+| `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                    |
+| `OTHERWISE`                                       | Completes the match, disables missing-case warnings                        |
+| Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero      |
+| Severity                                          | Warning, not error — the file still evaluates and its `#EVAL`s still run   |
 
 ---
 

@@ -5119,8 +5119,13 @@ separate list from the CONSIDER-matched `siMissingRanges` so neither silently mi
 double-reports), so the probe below now reports `D-PARTIAL` **Blocking** and fails
 `--fail-on blocking` while still emitting its two-rule table. Only n ≥ 2 groups are analysed at
 matrix level (n = 1 already warns via the ordinary CONSIDER path); `@nonexhaustive` on the group
-silences it (R4); literal/expression patterns, column-count mismatches, un-resolvable patterns and
+silences it (R4); column-count mismatches, un-resolvable patterns and
 cap overflows all bail **fail-open to no-warning**, the same contract as `analyzePatternMatch`.
+Literal patterns no longer bail (2026-10-09, review of legalese/l4-ide#545 round 2 item 4): a number or
+a piece of text is one value of a column with no end of values, so a literal group with no catch-all
+is always incomplete, warns with the GIVEN-name clause, and therefore raises `D-PARTIAL` here. Only
+an `EXACTLY` that is neither a literal, a value of the column's type, nor the column's own name still
+bails, and only in a non-primitive column; in a primitive column that clause is left out of the analysis.
 
 **The probe is now a committed regression pair** — `jl4/examples/ok/pattern-matching-partial-matrix.l4`
 (+ goldens) for the `l4 check` half, and two `DmnExport.hs` cases (`D-PARTIAL` Blocking with `L1`,
