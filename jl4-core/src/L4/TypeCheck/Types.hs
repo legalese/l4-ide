@@ -117,6 +117,11 @@ data CheckError =
     -- patterns than its GIVEN names inputs ('L4.TypeCheck.clauseInputsAgainstGiven').
     -- Carries the first clause's head range, the group's name, the number of
     -- patterns in each clause, and the number of inputs the GIVEN names.
+  | ExportedClausesWithoutGiven (Maybe SrcRange) Name
+    -- ^ An @\@export@ed definition written as clauses with patterns, one
+    -- clause or several, with no GIVEN to name its inputs
+    -- ('L4.TypeCheck.refuseExportedClausesWithoutGiven'). Carries the range of
+    -- the @\@export@ and the definition's name.
   | NonDistinctError NonDistinctContext [[Name]]
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
@@ -776,6 +781,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
+  rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
