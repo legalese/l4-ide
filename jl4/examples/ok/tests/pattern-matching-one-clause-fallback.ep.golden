@@ -2,12 +2,16 @@
 -- A group of ONE clause is checked as a clause ("This clause does not cover all
 -- cases"), at the clause. Where that check gives up, the clause keeps the
 -- warning it had before the check existed, the one for a CONSIDER, now at the
--- clause rather than at no location. Two ways the check gives up, and a
--- control (review of legalese/l4-ide#545; probes m01, p02, p02b).
+-- clause rather than at no location. A clause with a number, one way the
+-- check gives up, and a control (review of legalese/l4-ide#545; probes m01,
+-- p02, p02b; round 2 item 4 for the number).
 -- =============================================================================
 
--- A literal pattern: the check gives up, so the CONSIDER warning (no NOTHING
--- branch for the second input) is kept.
+-- A number in a pattern is one value of its input, and the input has no end
+-- of other values: the clause for `1` with no second input, and the clause
+-- for every other number, are both still needed (and are the same two cases
+-- the CONSIDER warning used to list for the second input, and gave up on
+-- for the first).
 GIVEN n IS A NUMBER
       m IS A MAYBE NUMBER
 GIVETH A NUMBER

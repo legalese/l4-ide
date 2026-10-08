@@ -1,13 +1,14 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-pattern-matching-one-clause-fallback.l4:14:8-35:
+pattern-matching-one-clause-fallback.l4:18:8-35:
   I found a problem while checking the definition of `one clause with a literal`:
-    The following branches still need to be considered:
+    This clause does not cover all cases. The following clauses are still needed:
     
-      WHEN NOTHING THEN
+      DECIDE `one clause with a literal` 1 NOTHING IS
+      DECIDE `one clause with a literal` n m IS
     
-pattern-matching-one-clause-fallback.l4:24:8-34:
+pattern-matching-one-clause-fallback.l4:28:8-34:
   I found a problem while checking the definition of `one clause three columns`:
     The following branches still need to be considered:
     
@@ -37,7 +38,7 @@ pattern-matching-one-clause-fallback.l4:24:8-34:
       WHEN JUST B24 THEN
       WHEN JUST B25 THEN
     
-pattern-matching-one-clause-fallback.l4:24:8-34:
+pattern-matching-one-clause-fallback.l4:28:8-34:
   I found a problem while checking the definition of `one clause three columns`:
     The following branches still need to be considered:
     
@@ -67,7 +68,7 @@ pattern-matching-one-clause-fallback.l4:24:8-34:
       WHEN JUST B24 THEN
       WHEN JUST B25 THEN
     
-pattern-matching-one-clause-fallback.l4:24:8-34:
+pattern-matching-one-clause-fallback.l4:28:8-34:
   I found a problem while checking the definition of `one clause three columns`:
     The following branches still need to be considered:
     
@@ -97,7 +98,7 @@ pattern-matching-one-clause-fallback.l4:24:8-34:
       WHEN JUST B24 THEN
       WHEN JUST B25 THEN
     
-pattern-matching-one-clause-fallback.l4:30:8-32:
+pattern-matching-one-clause-fallback.l4:34:8-32:
   I found a problem while checking the definition of `one clause two columns`:
     This clause does not cover all cases. The following clauses are still needed:
     
@@ -152,9 +153,9 @@ pattern-matching-one-clause-fallback.l4:30:8-32:
       DECIDE `one clause two columns` (JUST B01) (JUST B24) IS
       DECIDE `one clause two columns` (JUST B01) (JUST B25) IS
     
-pattern-matching-one-clause-fallback.l4:32:1-45:
+pattern-matching-one-clause-fallback.l4:36:1-45:
   5
-pattern-matching-one-clause-fallback.l4:33:1-66:
+pattern-matching-one-clause-fallback.l4:37:1-66:
   1
-pattern-matching-one-clause-fallback.l4:34:1-53:
+pattern-matching-one-clause-fallback.l4:38:1-53:
   1
