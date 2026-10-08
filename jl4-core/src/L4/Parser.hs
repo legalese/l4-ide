@@ -1201,6 +1201,9 @@ desugarPatternClauses sig rawToks firstC restCs =
           [ MkPmMatrixClause
               { headRange = rangeOf (pmHead c)
               , patterns  = pmPats c
+              , clauseHead = pmHead c
+              , clauseAka = pmAka c
+              , clauseDesc = Nothing
               }
           | c <- clauses
           ]

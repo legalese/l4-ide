@@ -257,8 +257,41 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
     MkDecide ann tySig appFormAka expr -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
-      expr' <- addNlg expr
-      pure $ MkDecide ann tySig' appFormAka' expr'
+      -- Inside the body's region, which runs from the first clause's body to
+      -- the last's, so that an annotation between two clauses is in reach.
+      (expr', ann') <- hoistNlgA (\ m -> (,) <$> m <*> claimRunClauseNlgs ann) (addNlg expr)
+      pure $ MkDecide ann' tySig' appFormAka' expr'
+
+-- | In a run of clauses whose patterns are all bare names ('isRunOfBareNames'),
+-- an @\@nlg@ written above a later clause belongs to that clause's head
+-- ('PmMatrixClause' @clauseHead@): the run may be overloads, each with its
+-- own annotations ('L4.TypeCheck.separateOverloads'). Nothing else in the
+-- group's tree is a node it could attach to, so it used to be left over and
+-- reported as not attached.
+claimRunClauseNlgs :: Anno -> NlgM Anno
+claimRunClauseNlgs ann = case view annPmMatrix ann of
+  Just m | isRunOfBareNames m -> do
+    later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
+      case (prev.headRange, cl.headRange) of
+        (Just p, Just h) -> do
+          let headSpan = fromSrcRange h
+              prevLine = (fromSrcRange p).start.line
+          nlgs <- takeNlgCommentsWhere (\ w -> w.range.start.line > prevLine && aboveClauseHead headSpan w)
+          hdAnn <- attachNlgsByLanguage cl.clauseHead (getAnno cl.clauseHead) nlgs
+          pure (MkPmMatrixClause cl.headRange cl.patterns (setAnno hdAnn cl.clauseHead) cl.clauseAka cl.clauseDesc)
+        _ -> pure cl
+    pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
+  _ -> pure ann
+
+-- | Does this annotation sit above a clause head: ending before it, and
+-- starting no further right than it, so that nothing indented inside the
+-- clause above (a @WHERE@'s definitions) is taken for it?
+aboveClauseHead :: SrcSpan -> WithSpan a -> Bool
+aboveClauseHead headSpan w =
+  let hs = headSpan.start
+      we = w.range.end
+  in (we.line < hs.line || (we.line == hs.line && we.column <= hs.column))
+       && w.range.start.column <= hs.column
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
@@ -1016,11 +1049,29 @@ instance HasDesc (Decide n) where
     -- Attach leading desc to Decide FIRST, before processing children.
     -- This ensures @export annotations are claimed by Decide before
     -- parameters in the tySig can consume them.
-    ann' <- attachLeadingDesc dec ann
+    ann0 <- attachLeadingDesc dec ann
+    -- Then the descs above the later clauses of a run of bare names, before
+    -- the body, whose generated bindings would otherwise claim them.
+    ann' <- claimRunClauseDescs ann0
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     expr' <- addDesc expr
     pure $ MkDecide ann' tySig' app' expr'
+
+-- | In a run of clauses whose patterns are all bare names ('isRunOfBareNames'),
+-- an @\@desc@ or @\@export@ written above a later clause belongs to that
+-- clause ('PmMatrixClause' @clauseDesc@): the run may be overloads, each with
+-- its own annotations ('L4.TypeCheck.separateOverloads').
+claimRunClauseDescs :: Anno -> State DescS Anno
+claimRunClauseDescs ann = case view annPmMatrix ann of
+  Just m | isRunOfBareNames m -> do
+    later <- for (drop 1 m.clauses) \ cl -> case cl.headRange of
+      Just h -> do
+        matches <- takeMatchingDescs (aboveClauseHead (fromSrcRange h))
+        pure (MkPmMatrixClause cl.headRange cl.patterns cl.clauseHead cl.clauseAka ((.payload) <$> pickLeadingDesc matches))
+      Nothing -> pure cl
+    pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
+  _ -> pure ann
 
 instance HasDesc (Assume n) where
   addDesc asm@(MkAssume ann tySig appForm mType mTypically) = do

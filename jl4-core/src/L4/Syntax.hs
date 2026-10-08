@@ -884,8 +884,12 @@ moduleTopDecls = lens
 -- ----------------------------------------------------------------------------
 
 -- | One clause of a multi-clause pattern-matching group, as parsed: the
--- clause head name's source range (the warning anchor) and the argument
--- patterns, one per column.
+-- clause head name's source range (the warning anchor), the argument
+-- patterns, one per column, and what belongs to this clause alone: its head
+-- name as written, its @AKA@, and the @\@desc@ (or @\@export@) written
+-- above it. A run that the checker turns back into separate definitions
+-- ('L4.TypeCheck.separateOverloads') gives each definition its own clause's
+-- head, @AKA@ and annotations; a group keeps those of its first clause.
 --
 -- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
 -- generic traversals): the stored patterns transitively contain @Expr Name@
@@ -898,14 +902,23 @@ moduleTopDecls = lens
 data PmMatrixClause = MkPmMatrixClause
   { headRange :: Maybe SrcRange
   , patterns  :: [Pattern Name]
+  , clauseHead :: Name
+    -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
+    -- clause of a run of bare names is attached to it
+    -- ('L4.Parser.ResolveAnnotation')
+  , clauseAka :: Maybe (Aka Name)
+  , clauseDesc :: Maybe Desc
+    -- ^ the @\@desc@ or @\@export@ written above a later clause of a run of
+    -- bare names ('L4.Parser.ResolveAnnotation'); the first clause's is on
+    -- the group's own annotation
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrixClause where
-  rnf (MkPmMatrixClause r ps) = rnf r `seq` rnf ps
+  rnf (MkPmMatrixClause r ps h a d) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d
 
 instance ToExpr PmMatrixClause where
-  toExpr (MkPmMatrixClause r ps) = toExpr (r, ps)
+  toExpr (MkPmMatrixClause r ps h a d) = toExpr (r, ps, h, a, d)
 
 -- | The source clause matrix of a multi-clause pattern-matching group,
 -- attached by the parser to the fused Decide's annotation BEFORE
@@ -930,6 +943,17 @@ data PmMatrix = MkPmMatrix
     -- never tried
   }
   deriving stock (Eq, Ord, Show)
+
+-- | Is this a group of two or more clauses whose every pattern is a bare
+-- name? Such a run may turn out to be overloads rather than one rule, which
+-- only resolving the names tells ('L4.TypeCheck.separateOverloads'), so each
+-- of its clauses keeps its own annotations ('PmMatrixClause').
+isRunOfBareNames :: PmMatrix -> Bool
+isRunOfBareNames m = length m.clauses >= 2 && all (all isBare . (.patterns)) m.clauses
+  where
+    isBare = \ case
+      PatApp _ _ [] -> True
+      _ -> False
 
 instance NFData PmMatrix where
   rnf (MkPmMatrix s syn cs ca) = rnf s `seq` rnf syn `seq` rnf cs `seq` rnf ca
@@ -1684,8 +1708,8 @@ deriving anyclass instance Serialise SrcRange
 -- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
 -- definitions), so their instances are written by hand, via tuples.
 instance Serialise PmMatrixClause where
-  encode (MkPmMatrixClause r ps) = encode (r, ps)
-  decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
+  encode (MkPmMatrixClause r ps h a d) = encode (r, ps, h, a, d)
+  decode = (\ (r, ps, h, a, d) -> MkPmMatrixClause r ps h a d) <$> decode
 instance Serialise PmMatrix where
   encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
   decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode

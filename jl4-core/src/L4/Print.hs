@@ -707,7 +707,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
 -- be read back as a group (no pattern in it tells it from a plain
 -- definition): those print as the tree, as everything else does.
 writtenClauses :: LayoutPrinterWithName a => Anno -> AppForm a -> Expr a -> Maybe [Doc ann]
-writtenClauses ann (MkAppForm _ hd _ maka) expr = do
+writtenClauses ann (MkAppForm _ hd _ _) expr = do
   matrix <- Optics.view annPmMatrix ann
   let patterns = map (.patterns) matrix.clauses
   guard (all ((== length matrix.scrutinees) . length) patterns)
@@ -715,13 +715,21 @@ writtenClauses ann (MkAppForm _ hd _ maka) expr = do
   let clauses = zip patterns bodies
   guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
   pure
-    [ vcatHard
-        [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . parensIfNeeded) pats
-            <> (if i == 0 then foldMap ((space <>) . printWithLayout) maka else mempty)
+    [ vcatHard $
+        -- What was written for each clause alone ('PmMatrixClause'): its
+        -- @AKA@, and for a later clause the @\@desc@ or @\@export@ above it
+        -- and its head as written (with any @\@nlg@ on it). A run of bare
+        -- names that the checker separates into overloads gives each its
+        -- own, so a printed module must keep them with their clauses.
+        [ "@desc" <+> pretty (Text.strip (getDesc d)) | i > 0, Just d <- [cl.clauseDesc] ]
+        <>
+        [ "DECIDE" <+> (if i == 0 then printWithLayout hd else printWithLayout cl.clauseHead)
+            <> foldMap ((space <>) . parensIfNeeded) pats
+            <> foldMap ((space <>) . printWithLayout) cl.clauseAka
             <+> "IS"
         , indent 2 (printWithLayout body)
         ]
-    | (i, (pats, body)) <- zip [0 :: Int ..] clauses
+    | (i, cl, (pats, body)) <- zip3 [0 :: Int ..] matrix.clauses clauses
     ]
 
 -- | Names for the inputs of a group whose only clause left matches anything

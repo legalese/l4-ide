@@ -1,0 +1,34 @@
+-- Overloads written one after another are separated again by the checker
+-- (see pattern-matching-overloads.l4), and each keeps what was written for
+-- it: its own AKA, and the @desc, @export or @nlg above it (refutation of
+-- legalese/l4-ide#545's review, round 3).
+
+-- The second overload also goes by `g`; `g 5` is that overload's answer,
+-- TRUE, not the first's, 6.
+DECIDE f n IS n + 1
+DECIDE f m AKA g IS m > 3
+
+#EVAL g 5   -- TRUE
+
+-- Each overload with its own AKA.
+DECIDE h n AKA a IS n + 1
+DECIDE h m AKA b IS m > 3
+
+#EVAL a 5   -- 6
+#EVAL b 5   -- TRUE
+
+-- Only the second overload is published.
+DECIDE twice n IS n * 2
+@export the boolean version
+DECIDE twice b IS b AND b
+
+#EVAL twice 3      -- 6
+#EVAL twice TRUE   -- TRUE
+
+-- The annotation above the second overload is its own.
+DECIDE shown n IS n + 1
+@nlg %b% is shown
+DECIDE shown b IS b AND TRUE
+
+#EVAL shown 3      -- 4
+#EVAL shown TRUE   -- TRUE

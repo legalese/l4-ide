@@ -426,7 +426,8 @@ checkProgram written = do
 -- constructors are known: a run in which no pattern is a literal, an applied
 -- constructor or a name that resolves to a constructor is checked as the
 -- definitions it is made of, the first with the run's signature and the rest
--- with none, as the parser reads them when it does not group them. A run
+-- with none, as the parser reads them when it does not group them, and each
+-- with its own clause's head, @AKA@ and annotations ('PmMatrixClause'). A run
 -- with a name that is a constructor stays a group, misspellings included:
 -- @Red@ / @Gren@ / @Blue@ is a group whose @Gren@ binds a new name, and
 -- whose last clause is reported as never used.
@@ -447,7 +448,7 @@ separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
       other -> pure [other]
 
     overloadsOf :: Decide Name -> Check (Maybe [Decide Name])
-    overloadsOf (MkDecide ann sig (MkAppForm aann hd _ maka) body) =
+    overloadsOf (MkDecide ann sig (MkAppForm aann hd _ _) body) =
       case view annPmMatrix ann of
         Just matrix
           | let patterns = map (.patterns) matrix.clauses
@@ -460,8 +461,8 @@ separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
                 guard (length bodies == length names)
                 pure
                   [ if i == 0
-                      then MkDecide (set annPmMatrix Nothing ann) sig (MkAppForm aann hd ns maka) b
-                      else MkDecide (rangedAnno (clauseSpan cl b)) noSignature (MkAppForm emptyAnno (headAt hd cl) ns Nothing) b
+                      then MkDecide (set annPmMatrix Nothing ann) sig (MkAppForm aann hd ns cl.clauseAka) b
+                      else MkDecide (clauseAnno cl b) noSignature (MkAppForm emptyAnno cl.clauseHead ns cl.clauseAka) b
                   | (i, cl, ns, b) <- List.zip4 [0 :: Int ..] matrix.clauses names bodies
                   ]
         _ -> pure Nothing
@@ -472,9 +473,6 @@ separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
 
     noSignature = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
 
-    -- A clause's head name, at the head's own location ('L4.Parser.givenInputBinding'
-    -- keeps a location the same way).
-    headAt hd cl = MkName (mkAnno [mkHoleWithSrcRangeHint cl.headRange]) (rawName hd)
 
     -- From the clause's head to the end of its body: the key under which its
     -- signature is found ('scanFunSigDecide'), distinct for every clause.
@@ -487,6 +485,11 @@ separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
     -- ('L4.Parser.givenInputBinding'); the tokens stay with the first
     -- definition, whose annotation holds the whole run's.
     rangedAnno r = mkAnno [mkHoleWithSrcRangeHint r]
+
+    -- A later definition carries what was written for its own clause: the
+    -- @\@desc@ or @\@export@ above it ('PmMatrixClause' @clauseDesc@); its
+    -- head, with any @\@nlg@ above it, and its @AKA@ come with the clause.
+    clauseAnno cl b = maybe id setDesc cl.clauseDesc (rangedAnno (clauseSpan cl b))
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =

@@ -2888,6 +2888,21 @@ spec = describe "integration" do
             "Expected rejection, but published the inputs "
               <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
 
+    -- Overloads written one after another are gathered by the parser and
+    -- separated by the checker; the @export above the second one must stay
+    -- with it (refutation of legalese/l4-ide#545's review, round 3).
+    it "publishes the overload whose @export is written above it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "twice.l4" $ Text.unlines
+        [ "DECIDE twice n IS n * 2"
+        , "@export the boolean version"
+        , "DECIDE twice b IS b AND b"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta, _bundles) ->
+          [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions] `shouldBe` [("twice", ["b"])]
+
     it "publishes the same clause group with a GIVEN, under the names it gives" do
       logger <- newLogger False
       result <- compileBundle logger "test" $ Map.singleton "size.l4" $ exportedSizeGroup
