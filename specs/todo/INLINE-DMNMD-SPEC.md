@@ -15,7 +15,7 @@
 > What **is** verified in-tree, and cited below: the export direction
 > (`jl4-core/src/L4/Dmn/Markdown.hs`, over `L4/Dmn/IR.hs` and `L4/Dmn/Lower.hs`), the GuardedRows
 > normal form as it actually ships (`jl4-core/src/L4/Viz/GuardedRows.hs`), columnar `BRANCH`
-> (`L4/Parser.hs:2331-2342`), the DMN↔L4 mapping (`BUILD-SPEC-dmnmd-to-l4.md` §1), and the
+> (`multiWayIf` in `L4/Parser.hs`, `:2593-2603` at `73a953821`), the DMN↔L4 mapping (`BUILD-SPEC-dmnmd-to-l4.md` §1), and the
 > dependency prohibition (`CLAUDE.md` §1.2).
 >
 > **Do not read `GUARDED-ROWS.md` §3 as the tree.** Its `GuardedRows` record has four fields, a
@@ -110,7 +110,7 @@ two cases rewrites the indentation of everything below them. Reviewers and domai
 people whose sign-off the isomorphism is _for_ — read a grid diff and cannot read a ladder diff.
 
 **2.6 The strongest objection: `BRANCH` is already columnar, and it ships.** L4 has a flat
-first-match form — `BRANCH / IF g THEN r / … / OTHERWISE r₀` (`L4/Parser.hs:2331-2342`; see
+first-match form — `BRANCH / IF g THEN r / … / OTHERWISE r₀` (`multiWayIf` in `L4/Parser.hs`, `:2593-2603` at `73a953821`; see
 `jl4/examples/openfisca/scale.l4:31-36`). One row per case, no nesting, aligned `IF`/`THEN`
 columns, a clean one-line diff per changed case. That takes most of the weight out of 2.1, 2.2
 and 2.5 as stated: the ladder in §3 is a **`BRANCH` that was not written as one**, and rewriting
@@ -137,7 +137,10 @@ characters of raw L4, because a whole decision table renders as one opaque box
 Rule 201(t) of Reg CF: three tiers of financial-statement requirement by aggregate offering
 amount, with a bounded first-time-issuer carve-out inside tier 3.
 
-**As it reads today** — `jl4/examples/legal/regcf/regcf.l4:355-370`, quoted verbatim:
+**As it read on 2026-07-29** — `jl4/examples/legal/regcf/regcf.l4:354-369` at `1a9c1b67f`, quoted verbatim.
+(This line said "As it reads today" and cited `:355-370`, one line off even then.
+On 2026-09-23 the copy under `jl4/examples/legal/regcf/` was deleted because the subject now lives in canon (`8714bf42a`), as `jl4/examples/canon/us/regcf/regcf.l4`, and on `unstable` at `73a953821` the rule, at `:505-522`, reads differently: a columnar `BRANCH` whose first arm refuses inside the COVID-19 temporary-rules window.
+The quote below, and the sketch after it, follow the 2026-07-29 text.)
 
 ```l4
 @ref 17 CFR 227.201(t)(1)-(3)
