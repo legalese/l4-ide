@@ -4350,6 +4350,9 @@ data ClauseVerdict
 -- @a@) still matches one value of this column per value of theirs, so it
 -- counts for nothing, as a constant does.
 --
+-- An input declared under another name for a number, a piece of text or a
+-- date (@DECLARE Age IS A NUMBER@) is one: synonyms are expanded, read off
+-- the entity information with no diagnostic, before a type is classified.
 -- The top-level columns are classified by their types after substitution,
 -- never by the pattern's annotation; a nested position has only its
 -- annotation, resolved as far as the substitution goes ('analyseMatrix'),
@@ -4375,11 +4378,17 @@ clauseVerdict ei ctorSets colTypes colScruts pats =
         -> if isJust (view annInfo a) then ClauseCounts else BailGroup
       PatExpr _ e
         | any (sameResolved scrutR) (toList e) -> BailGroup
-        | Just ty <- mty, isPrimitiveType ty -> ClauseCoversNothing
+        | Just ty <- mty, isPrimitiveType (expandSynonyms (8 :: Int) ty) -> ClauseCoversNothing
         | otherwise -> BailGroup
     annoType p = case view annInfo (getAnno p) of
       Just (TypeInfo ty _) -> Just ty
       _ -> Nothing
+    expandSynonyms 0 ty = ty
+    expandSynonyms k ty = case ty of
+      TyApp _ r ts
+        | Just (_, KnownType _ params (Just body)) <- Map.lookup (getUnique r) ei
+        -> expandSynonyms (k - 1) (substituteType (Map.fromList (zipWith (\ p t -> (getUnique p, t)) params ts)) body)
+      _ -> ty
 
 -- | A guard that pins the scrutinee to a number or a piece of text.
 isLitGuard :: Guard i n -> Bool
