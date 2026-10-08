@@ -1077,7 +1077,9 @@ decidePatternMatch sig = do
 -- It fails there with the error the run itself failed with
 -- ('recordRunFailure'): reading the rest of the run from any of its clauses
 -- fails at the same place, the run's end, in the same way, so the error a
--- file reports is the same whether the run is read again or not.
+-- file reports is the same whether the run is read again or not. The
+-- positions wait in 'turnedDownRun' until the attempt fails, which it does at
+-- once, and are then recorded with its error.
 --
 -- Like 'memoGroup', this is off when 'memoiseGroups' is, so that jl4-test's
 -- "parser memo changes nothing" check covers it too.
@@ -1085,7 +1087,7 @@ turnDownRun :: [Int] -> Parser ()
 turnDownRun starts = do
   memo <- asks (.memoiseGroups)
   when memo $
-    lift (lift (lift (modify' (over #notClauseGroups (IntMap.union (IntMap.fromList [ (o, Nothing) | o <- starts ]))))))
+    lift (lift (lift (modify' (over #turnedDownRun (starts <>)))))
 
 -- | The error a run turned down at this position failed with
 -- ('turnDownRun'), if there is one.
@@ -1093,17 +1095,25 @@ runTurnedDown :: Int -> Parser (Maybe (ParseError TokenStream Void))
 runTurnedDown start = do
   memo <- asks (.memoiseGroups)
   if memo
-    then lift (lift (lift (gets (join . IntMap.lookup start . view #notClauseGroups))))
+    then lift (lift (lift (gets (IntMap.lookup start . view #notClauseGroups))))
     else pure Nothing
 
 -- | Run an attempt at a clause group, and when it fails having turned a run
 -- down ('turnDownRun'), record the error it failed with at every clause of
 -- that run. The error is the one handed on to what follows, hints included,
 -- so failing with it again is failing as the attempt did.
+--
+-- Every definition is tried as a clause group, and every definition that is
+-- not one fails here, so recording costs only the run just turned down, and
+-- nothing when there is none: a file of @n@ definitions with @n@ different
+-- names fails here @n@ times.
 recordRunFailure :: Parser a -> Parser a
 recordRunFailure p =
   ReaderT \ env -> StateT \ st -> Megaparsec.ParsecT \ s cok cerr eok eerr ->
-    let record e = modify' (over #notClauseGroups (fmap (<|> Just e)))
+    let record e = do
+          run <- gets (view #turnedDownRun)
+          unless (null run) $
+            modify' (over #notClauseGroups (IntMap.union (IntMap.fromList [ (o, e) | o <- run ])) . set #turnedDownRun [])
     in Megaparsec.unParser (runStateT (runReaderT p env) st) s cok
          (\ e s' -> record e >> cerr e s')
          eok
@@ -1502,15 +1512,18 @@ data GroupMemo = MkGroupMemo
   , patternGroups :: !(IntMap.IntMap (GroupReply (Pattern Name)))
   , clauseBodies :: !(IntMap.IntMap (GroupReply (Expr Name)))
     -- ^ The body of a @DECIDE@ or @MEANS@ clause ('clauseBody').
-  , notClauseGroups :: !(IntMap.IntMap (Maybe (ParseError TokenStream Void)))
+  , notClauseGroups :: !(IntMap.IntMap (ParseError TokenStream Void))
     -- ^ The positions of clauses that start no clause group, every clause of
     -- a run 'decidePatternMatch' has turned down, with the error the run
     -- failed with ('turnDownRun').
+  , turnedDownRun :: ![Int]
+    -- ^ The positions of the run just turned down, until the attempt that
+    -- turned it down fails ('recordRunFailure').
   }
   deriving stock Generic
 
 emptyGroupMemo :: GroupMemo
-emptyGroupMemo = MkGroupMemo IntMap.empty IntMap.empty IntMap.empty IntMap.empty
+emptyGroupMemo = MkGroupMemo IntMap.empty IntMap.empty IntMap.empty IntMap.empty []
 
 -- | Everything one parse of a group came to, as megaparsec reports it: the
 -- state it left (offset, input, delayed errors), whether it consumed input,
