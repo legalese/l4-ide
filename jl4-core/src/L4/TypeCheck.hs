@@ -1670,7 +1670,8 @@ checkClauseMatrix dec dHead =
     -- not an exact partition, but each is needed and pasting them completes
     -- the group. A group of literal clauses alone leaves no row to analyse,
     -- and then everything is uncovered: one row, every column open. So a
-    -- column of literals with no catch-all always warns.
+    -- column of literals with no catch-all always warns. A group with no
+    -- number or text in it has only the first tier.
     analyseResolvedRows :: PmMatrix -> EntityInfo -> [(PmMatrixClause, [Pattern Resolved])] -> Check (Bool, [Int])
     analyseResolvedRows matrix ei counted = do
       -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
@@ -1705,7 +1706,11 @@ checkClauseMatrix dec dHead =
           overCap missingRows =
             length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
           exact = analyse rows
-          coarse = analyse (filter (not . any isLitGuard . fst) rows)
+          -- Only a group with a number or a piece of text in it has a second
+          -- tier: for any other, it would re-run the same rows.
+          coarse = do
+            guard (any (any isLitGuard . fst) rows)
+            analyse (filter (not . any isLitGuard . fst) rows)
           -- The rows to report: the exact ones when they fit, else the
           -- coarse ones when they fit, else none (fail-open, the same
           -- contract as 'analyzePatternMatch': no warning is better than a
