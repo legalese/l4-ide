@@ -122,6 +122,11 @@ data UnreachableClause
   = AfterClauseMatchingAnything Int
     -- ^ a clause above it matches every input; carries how many further
     -- clauses after this one are unreachable for the same reason
+  | AfterClauseBindingNewName [Name] Int
+    -- ^ a clause above it matches every input because its patterns are
+    -- new names (the first argument, as written), such as a misspelled
+    -- value; carries how many further clauses are unreachable for the same
+    -- reason
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 

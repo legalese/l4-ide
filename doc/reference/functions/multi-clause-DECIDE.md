@@ -225,9 +225,10 @@ Add a clause for this case, or end the clauses with one that matches every input
 To be safe, end such a group with a clause that matches anything.
 
 **Only the clauses after one that matches every input are reported as never used.**
-That is a clause whose every pattern is its input's `GIVEN` name or `` `_` ``.
-There is no warning for a clause that repeats one above it, and none for a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
-With `DECIDE r Red IS 1`, `DECIDE r Red IS 2` and `DECIDE r other IS 3` followed by `DECIDE r Blue IS 4`, `l4 check` gives no warning, `r Red` gives `1` and `r Blue` gives `3`.
+That is a clause whose every pattern is its input's `GIVEN` name, `` `_` ``, or a new name: a name that is not a value of its input's type, such as `other`, or `Gren` where `Green` was meant.
+When a new name is the cause, the warning names it: "This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input."
+There is no warning for a clause that repeats one above it.
+With `DECIDE r Red IS 1`, `DECIDE r Red IS 2` and `DECIDE r other IS 3` followed by `DECIDE r Blue IS 4`, `l4 check` warns that the `Blue` clause is never used, and says nothing about the second `Red` clause; `r Red` gives `1` and `r Blue` gives `3`.
 
 ## Related Keywords
 

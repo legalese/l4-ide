@@ -554,8 +554,18 @@ DECIDE describe Closed IS "stopped"
 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
-Only the clauses after one that matches every input are warned about: a clause whose every pattern is its input's own name or `_`.
-There is no warning for a clause that repeats one above it, and none for a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
+Only the clauses after one that matches every input are warned about: a clause whose every pattern is its input's own name, `_`, or a new name.
+A pattern that is not a value of its input's type is a new name, such as `other`, or `Gren` where `Green` was meant, and a new name matches anything.
+The warning then names it:
+
+```
+This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input.
+`Gren` is not a value of its input's type, so it is a new name, and a new name matches anything.
+If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+```
+
+This holds for every rule, including one that matches numbers or text.
+There is no warning for a clause that repeats one above it.
 
 **How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
 

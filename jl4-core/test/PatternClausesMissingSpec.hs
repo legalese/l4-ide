@@ -351,8 +351,8 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     [ r | e <- ds, severity e == SError, Just r <- [fst (render e)] ] `shouldSatisfy` all (\ (l, _, _) -> l == 4)
     length [ () | e <- ds, severity e == SError ] `shouldSatisfy` (> 0)
 
-  it "does not flag a repeated clause, or a clause after one that binds a new name" $ do
-    -- Unstable flags both, from redundant rows its coverage analysis computes
+  it "does not flag a repeated clause" $ do
+    -- Unstable flags it, from redundant rows its coverage analysis computes
     -- and main's does not; the reference page says so.
     ws <- warnings $ Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"
@@ -361,10 +361,43 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "GIVETH A NUMBER"
       , "DECIDE r Red   IS 1"
       , "DECIDE r Red   IS 2"
-      , "DECIDE r other IS 3"
+      , "DECIDE r Green IS 3"
       , "DECIDE r Blue  IS 4"
       ]
     ws `shouldBe` []
+
+  -- Review of legalese/l4-ide#545, round 2, item 3: a new name, such as a
+  -- misspelt value, matches every input, so the clauses after it are never
+  -- used, and the warning says which name it is.
+  it "warns once about the clauses after a clause whose pattern is a new name, naming it" $ do
+    ws <- filter (mentions "never used") <$> warnings (Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE price Green n IS 1"
+      , "DECIDE price Gren  n IS 2"
+      , "DECIDE price Red   n IS 3"
+      , "DECIDE price Blue  n IS 4"
+      ])
+    map fst ws `shouldBe` [Just (8, 8, 8)]
+    map Text.strip (concatMap snd ws) `shouldBe`
+      [ "I found a problem while checking the definition of `price`:"
+      , "This clause of `price` is never used, and neither is the clause after it, because the clause above it with the new name `Gren` matches every input."
+      , "`Gren` is not a value of its input's type, so it is a new name, and a new name matches anything."
+      , "If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others."
+      ]
+
+  it "warns about the clauses after a new name in a group that matches numbers" $ do
+    ws <- filter (mentions "never used") <$> warnings (Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE size 0     IS 1"
+      , "DECIDE size other IS 2"
+      , "DECIDE size 1     IS 3"
+      ])
+    map fst ws `shouldBe` [Just (5, 8, 5)]
 
   it "still warns about a CONSIDER written inside a later clause" $ do
     ws <- filter (mentions "still need to be considered") <$> warnings (Text.unlines
