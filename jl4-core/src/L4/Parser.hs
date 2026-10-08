@@ -38,6 +38,8 @@ import qualified Control.Applicative as Applicative
 import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.List.Extra as List
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -46,6 +48,7 @@ import GHC.Records
 import Optics
 import Text.Megaparsec hiding (parseTest)
 import qualified Text.Megaparsec.Char.Lexer as Lexer
+import qualified Text.Megaparsec.Internal as Megaparsec
 import Text.Pretty.Simple
 
 import L4.Annotation
@@ -59,7 +62,11 @@ import qualified Generics.SOP as SOP
 import L4.Parser.Anno
 import L4.Parser.MixfixRegistry
 
-type Parser = ReaderT Env (StateT PState (Parsec Void TokenStream))
+-- | The clause memo ('ClauseMemo') sits BELOW megaparsec, where backtracking
+-- cannot roll it back: a clause parsed inside an alternative that then fails
+-- stays parsed. Everything above megaparsec ('Env', 'PState') is rolled back
+-- with the parser state, as before.
+type Parser = ReaderT Env (StateT PState (ParsecT Void TokenStream (StateT ClauseMemo Identity)))
 
 data Env = Env
   { moduleUri :: NormalizedUri
@@ -681,7 +688,7 @@ decide sig = do
           <*  annoLexeme (spacedKeyword_ TKDecide)
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKIs <|> spacedKeyword_ TKIf)
-          <*> annoHole (indentedExpr current)
+          <*> annoHole (clauseBody current)
 
     meansKW current =
       attachAnno $
@@ -689,7 +696,7 @@ decide sig = do
           <$> annoHole (pure sig)
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKMeans)
-          <*> annoHole (indentedExpr current)
+          <*> annoHole (clauseBody current)
 
 -- ----------------------------------------------------------------------------
 -- Pattern matching in function definitions (Phase 1)
@@ -750,18 +757,23 @@ pmBody (PMClause _ _ _ b) = b
 decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
 decidePatternMatch sig = do
   clauseCol <- Lexer.indentLevel
+  -- A clause of a run already turned down below starts no group either, so
+  -- fail at once (see 'turnDownRun').
+  start <- getOffset
+  turnedDown <- runTurnedDown start
+  guard (not turnedDown)
   -- Capture the raw token span of the whole clause group. The clauses are
   -- fused into a single CONSIDER tree below (whose synthetic nodes carry no
   -- source tokens), so exactprint cannot reproduce the multi-clause source
   -- structurally. Instead we store these verbatim tokens as one visible CSN on
   -- the resulting Decide's annotation, and drop the hole for the fused body, so
   -- @l4 format@ round-trips the source (see 'desugarPatternClauses').
-  (rawToks, (firstClause, rest)) <- match $ do
+  (rawToks, (firstClause, rest, restStarts)) <- match $ do
     firstClause <- pmClause clauseCol
     let firstHead  = pmHead firstClause
         firstArity = length (pmPats firstClause)
-    rest <- many (try (withIndent EQ clauseCol (\ _ -> sameHeadClause clauseCol firstHead firstArity)))
-    pure (firstClause, rest)
+    rest <- many (try (withIndent EQ clauseCol (\ _ -> (,) <$> getOffset <*> sameHeadClause clauseCol firstHead firstArity)))
+    pure (firstClause, map snd rest, map fst rest)
   let clauses = firstClause : rest
   -- Treat this as pattern matching when either:
   --
@@ -781,7 +793,9 @@ decidePatternMatch sig = do
   -- so the parser never gathers overloads into a single group. Every group we see
   -- here already shares the one signature threaded in as @sig@. A lone bare-name
   -- clause still falls through to the ordinary 'decide' path.
-  guard (any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses)
+  let isGroup = any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses
+  unless isGroup $ turnDownRun (start : restStarts)
+  guard isGroup
   pure (desugarPatternClauses sig rawToks firstClause rest)
   where
     sameHeadClause clauseCol h ar = do
@@ -817,15 +831,98 @@ pmClause clauseCol =
       ps <- pmArgs
       ak <- optional aka
       _  <- spacedKeyword_ TKIs <|> spacedKeyword_ TKIf
-      b  <- indentedExpr clauseCol
+      b  <- clauseBody clauseCol
       pure (PMClause hd ps ak b)
     pmMeansForm = do
       hd <- name
       ps <- pmArgs
       ak <- optional aka
       _  <- spacedKeyword_ TKMeans
-      b  <- indentedExpr clauseCol
+      b  <- clauseBody clauseCol
       pure (PMClause hd ps ak b)
+
+-- | The body of a @DECIDE@ or @MEANS@ clause that starts in column @col@,
+-- parsed at most once per position ('memoClauseBody'). Every definition is
+-- read first as a clause ('pmClause', for 'decidePatternMatch') and, unless it
+-- starts a clause group, again as an ordinary definition ('decide'); both
+-- readings parse the same body at the same position with the same column,
+-- so the second replays the first instead of parsing the body again.
+clauseBody :: Pos -> Parser (Expr Name)
+clauseBody col = memoClauseBody (unPos col) (indentedExpr col)
+
+-- | What the clause parsers have learnt in one run of the parser, by
+-- position. It lives below megaparsec in the 'Parser' stack, so backtracking
+-- does not discard it.
+data ClauseMemo = MkClauseMemo
+  { clauseBodies :: !(IntMap.IntMap (ClauseReply (Expr Name)))
+    -- ^ The body of a clause ('clauseBody'), keyed by position and column.
+  , notClauseGroups :: !IntSet.IntSet
+    -- ^ The positions of clauses that start no clause group: every clause of
+    -- a run 'decidePatternMatch' has turned down ('turnDownRun').
+  }
+  deriving stock Generic
+
+emptyClauseMemo :: ClauseMemo
+emptyClauseMemo = MkClauseMemo IntMap.empty IntSet.empty
+
+-- | Everything one parse came to, as megaparsec reports it: the state it left
+-- (offset, input, delayed errors), whether it consumed input, and either the
+-- value with its hints and the annotations it collected, or the error.
+type ClauseReply a = Megaparsec.Reply Void TokenStream (a, PState)
+
+-- | @memoClauseBody col p@ behaves exactly as @p@, but parses at most once at
+-- each position (for each @col@, of which a position has only one).
+--
+-- Replaying is exact because what @p@ does depends on nothing but the
+-- position and @col@: the input at a position is always the same, since the
+-- stream only ever advances by dropping the tokens consumed; the source
+-- position cached in the state is read from the tokens themselves; the
+-- 'Env' is fixed for a whole run; and nothing reads the collected
+-- annotations ('PState') or megaparsec's delayed errors while parsing, which
+-- are only ever added to, at the front. So @p@ runs with both empty, and what
+-- it added is put in front of what was there, which is what running it with
+-- them would have made. (On unstable the same replay serves bracketed groups
+-- as well, as 'memoGroup', from legalese/l4-ide#582.)
+memoClauseBody :: Int -> Parser (Expr Name) -> Parser (Expr Name)
+memoClauseBody col p =
+  ReaderT \ env -> StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
+    let key = s.stateOffset * 4096 + min 4095 col
+    known <- gets (IntMap.lookup key . view #clauseBodies)
+    Megaparsec.Reply s' consumption result <- case known of
+      Just reply -> pure reply
+      Nothing -> do
+        reply <- Megaparsec.runParsecT (runStateT (runReaderT p env) mempty) s { stateParseErrors = [] }
+        modify' (over #clauseBodies (IntMap.insert key reply))
+        pure reply
+    let s'' = s' { stateParseErrors = s'.stateParseErrors ++ s.stateParseErrors }
+    case (consumption, result) of
+      (Megaparsec.Consumed, Megaparsec.OK hs (a, added)) -> cok (a, added <> outer) s'' hs
+      (Megaparsec.Consumed, Megaparsec.Error err) -> cerr err s''
+      (Megaparsec.NotConsumed, Megaparsec.OK hs (a, added)) -> eok (a, added <> outer) s'' hs
+      (Megaparsec.NotConsumed, Megaparsec.Error err) -> eerr err s''
+
+-- | Record that the clauses starting at these positions start no clause group.
+--
+-- 'topdecl' tries 'decidePatternMatch' at every definition. When it turns a
+-- run of same-headed clauses down, it has read them all, and each of them is
+-- then parsed as a definition of its own, where 'decidePatternMatch' is tried
+-- again and would read the rest of the run again: a run of @n@ clauses was
+-- read about @n * n / 2@ times, so a file of 4,000 lines @f x MEANS i@ took
+-- minutes to check. Every suffix of a run turned down is turned down too: no
+-- clause in it has a distinguishable pattern, and either it has one clause or
+-- no column of it holds two different names, and both stay true of every
+-- suffix. So the positions of its clauses are recorded below megaparsec,
+-- where backtracking does not undo them, and 'decidePatternMatch' fails at
+-- once at any of them.
+turnDownRun :: [Int] -> Parser ()
+turnDownRun starts =
+  lift (lift (lift (modify' (over #notClauseGroups (IntSet.union (IntSet.fromList starts))))))
+
+-- | Has a run containing the clause at this position been turned down
+-- ('turnDownRun')?
+runTurnedDown :: Int -> Parser Bool
+runTurnedDown start =
+  lift (lift (lift (gets (IntSet.member start . view #notClauseGroups))))
 
 
 -- | Extract the term (value) parameter names from a GIVEN signature, skipping
@@ -2558,7 +2655,9 @@ execParserForTokensWithHints hints p file input ts =
 
 runJl4Parser :: Env -> PState -> Parser a -> FilePath -> TokenStream -> Either (ParseErrorBundle TokenStream Void) (a, PState)
 runJl4Parser env initState p input stream =
-  parse (runStateT (runReaderT (p <* eof) env) initState) input stream
+  evalState
+    (runParserT (runStateT (runReaderT (p <* eof) env) initState) input stream)
+    emptyClauseMemo
 
 -- ----------------------------------------------------------------------------
 -- JL4 Program parser

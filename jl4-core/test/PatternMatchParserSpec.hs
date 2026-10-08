@@ -9,8 +9,10 @@
 module PatternMatchParserSpec (spec) where
 
 import Base
+import Control.Exception (evaluate)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
+import GHC.Clock (getMonotonicTime)
 import L4.Annotation (HasSrcRange (..))
 import L4.ExactPrint (exactprint)
 import L4.Parser (execProgramParser)
@@ -102,6 +104,33 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
     let ranges = [ (r.start.line, r.end.line) | Decide _ d <- topDecls m, Just r <- [rangeOf d] ]
     ranges `shouldBe` [(3, 7), (12, 14)]
     either (Left . show) Right (exactprint m) `shouldBe` Right src
+
+  -- A run of clauses that starts no group is read once, not once for each of
+  -- its clauses: a file of n lines @f x MEANS i@ was read about n * n / 2
+  -- times, and 4,000 lines took minutes to check (review of
+  -- legalese/l4-ide#545, round 2). Timed by the ratio of two sizes, not by a
+  -- bound in seconds, so that a slow machine does not fail it: four times the
+  -- lines take about four times as long when parsing is linear, and sixteen
+  -- times as long when it is quadratic. The larger size is timed again when
+  -- it looks slow, so that one pause does not fail it either.
+  it "parses a run of same-headed definitions in time linear in its length" $ do
+    let file k = T.unlines [ "f x MEANS " <> T.pack (show i) | i <- [1 .. k :: Int] ]
+        timeParse k = do
+          src <- evaluate (file k)
+          _ <- evaluate (T.length src)
+          t0 <- getMonotonicTime
+          n <- length <$> parseDecides src
+          t1 <- getMonotonicTime
+          n `shouldBe` k
+          pure (t1 - t0)
+        fastest k tries = minimum <$> traverse (const (timeParse k)) [1 .. tries :: Int]
+    small <- fastest 250 3
+    let ratio large = large / max small 1.0e-3
+        settle tries = do
+          large <- timeParse 1000
+          if ratio large < 8 || tries <= (1 :: Int) then pure (ratio large) else min (ratio large) <$> settle (tries - 1)
+    r <- settle 3
+    r `shouldSatisfy` (< 8)
 
 -- ----------------------------------------------------------------------------
 -- Helpers
