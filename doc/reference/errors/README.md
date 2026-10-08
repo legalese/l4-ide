@@ -24,6 +24,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Function arity mismatch](#function-arity-mismatch)
   - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
   - [APPEND vs append](#append-vs-append)
+  - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases)
@@ -354,7 +355,8 @@ DECIDE g Green d   IS 2
 or give every clause one pattern for each input the `GIVEN` names.
 
 A list of clauses with no `GIVEN` at all is allowed.
-L4 then works out the type of each input from the patterns, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
+L4 then works out the type of each input from the patterns and the clause bodies, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
+Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
 
 ---
 
@@ -389,6 +391,52 @@ For string concatenation, you can also use `CONCAT`:
 ```l4
 CONCAT "hello", " world"
 ```
+
+---
+
+### An @export of clauses with no GIVEN
+
+**Error message:**
+
+```
+`size` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input by name, as a value of that input's type.
+A rule written as clauses with patterns and no `GIVEN`, whether one clause or several, has neither.
+L4 names its inputs itself, `input 1`, `input 2` and so on, and works out their types from the patterns and the clause bodies, so a request could not say which input a value is for, and there is no declared type to check the value against.
+So an `@export` of such a rule is an error, reported at the `@export` line, because that is where the missing `GIVEN` goes.
+The error stops the whole file from checking: `l4 run`, the REPL and `l4 batch` refuse the file, the `#EVAL`s of its other rules included, and jl4-service will not deploy it, until you add the `GIVEN` or remove the `@export`.
+`@export default` is refused the same way.
+Without `@export`, clauses with no `GIVEN` are fine.
+
+**How to fix it:** Add a `GIVEN` below `@export` that names and types each input, in the order the patterns appear, and say what the rule gives back with `GIVETH`:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+```
+
+The rule is then published with the inputs `c` and `n`.
+Or remove the `@export`, if the rule is not meant to be published.
 
 ---
 

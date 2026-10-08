@@ -22,6 +22,7 @@ The clauses of one function must:
 - use the same function name and the same number of arguments.
 
 `name pattern MEANS result` works too.
+A function published with `@export` needs that `GIVEN`, naming and typing each input, even when it has a single clause: see [An @export of clauses with no GIVEN](../errors/README.md#an-export-of-clauses-with-no-given).
 
 ## Examples
 
