@@ -29,10 +29,10 @@ import qualified Codec.Archive.Zip as Zip
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
 import System.FilePath ((</>))
 
 import TestData (qualifiesJL4)
+import TestStoreDir (withStoreDir)
 
 -- | Default options for tests.
 testOpts :: Options
@@ -328,21 +328,15 @@ statusCode' = statusCode . responseStatus
 
 -- | Create a temp BundleStore, run the test, then clean up.
 withTempStore :: (BundleStore -> IO a) -> IO a
-withTempStore action = do
-  let tmpPath = "/tmp/jl4-service-test-serialisation"
-  cleanDir tmpPath
+withTempStore action = withStoreDir "serialisation" \tmpPath -> do
   store <- initStore tmpPath
-  result <- action store
-  cleanDir tmpPath
-  pure result
+  action store
 
 -- | Compile sources, rebuild from CBOR, register, and serve via WAI.
 -- This simulates a restart: compile → serialize → deserialize → serve.
 withCborRebuiltService :: Text -> Map FilePath Text -> (String -> Manager -> IO a) -> IO a
-withCborRebuiltService deployId sources act = do
+withCborRebuiltService deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   logger <- newLogger False
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
   store <- initStore tmpPath
 
   -- Compile from source
@@ -375,15 +369,12 @@ withCborRebuiltService deployId sources act = do
   testWithApplication (pure $ app env) $ \port' -> do
     let baseUrl = "http://localhost:" <> show port'
     result' <- act baseUrl mgrLocal
-    cleanDir tmpPath
     pure result'
 
 -- | Start a service with an empty deployment registry, exposing the store.
 withEmptyService :: (String -> Manager -> BundleStore -> IO a) -> IO a
-withEmptyService act = do
+withEmptyService act = withStoreDir "cbor-empty" \tmpPath -> do
   logger <- newLogger False
-  let tmpPath = "/tmp/jl4-service-test-cbor-empty"
-  cleanDir tmpPath
   store <- initStore tmpPath
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
@@ -395,7 +386,6 @@ withEmptyService act = do
   testWithApplication (pure $ app env) $ \port' -> do
     let baseUrl = "http://localhost:" <> show port'
     result <- act baseUrl mgrLocal store
-    cleanDir tmpPath
     pure result
 
 -- | Evaluate a function via the API.
@@ -472,8 +462,3 @@ buildJsonPost url body = do
     , requestHeaders = [("Content-Type", "application/json")]
     }
 
--- | Clean/remove a directory if it exists.
-cleanDir :: FilePath -> IO ()
-cleanDir path = do
-  exists <- doesDirectoryExist path
-  if exists then removeDirectoryRecursive path else pure ()

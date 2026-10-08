@@ -147,6 +147,7 @@ test-suite jl4-service-test
     SanitizationSpec
     SerialisationSpec
     TestData
+    TestStoreDir
 
   hs-source-dirs:
     test
@@ -182,6 +183,7 @@ test-suite jl4-service-test
     servant-server >=0.20.2 && <0.21,
     stm,
     string-interpolate,
+    temporary,
     text,
     time,
     transformers,

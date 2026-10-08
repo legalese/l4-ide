@@ -37,8 +37,8 @@ import Network.HTTP.Client
 import Network.HTTP.Types.Method (Method)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (doesDirectoryExist, removeDirectoryRecursive)
 import Data.String.Interpolate (i)
+import TestStoreDir (withStoreDir)
 
 ------------------------------------------------------------------------
 -- L4 fixtures: same function name, three interface/behaviour variants.
@@ -205,10 +205,8 @@ testOpts = Options
   }
 
 withService :: (String -> Manager -> IO a) -> IO a
-withService act = do
+withService act = withStoreDir "putguard" \tmpPath -> do
   logger <- newLogger False
-  let tmpPath = "/tmp/jl4-service-test-putguard"
-  cleanDir tmpPath
   store <- initStore tmpPath
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
@@ -219,7 +217,6 @@ withService act = do
   testWithApplication (pure $ app env) $ \prt -> do
     let baseUrl = "http://localhost:" <> show prt
     res <- act baseUrl mgr
-    cleanDir tmpPath
     pure res
 
 statusCode' :: Response a -> Int
@@ -370,7 +367,3 @@ multipartReq httpMethod url textFields zipBytes = do
     , requestHeaders = [("Content-Type", "multipart/form-data; boundary=" <> boundary)]
     }
 
-cleanDir :: FilePath -> IO ()
-cleanDir path = do
-  exists <- doesDirectoryExist path
-  if exists then removeDirectoryRecursive path else pure ()
