@@ -1715,7 +1715,20 @@ checkClauseMatrix dec dHead =
           -- clauses above it, so that verdict holds too.
           fit (uncovered, redundant) =
             let missingRows = render uncovered
-            in if overCap missingRows then Nothing else Just (missingRows, redundant)
+            in if overCap missingRows then Nothing else Just (pasteOrder missingRows, redundant)
+          -- The rows in the order they can be pasted: a row that names more
+          -- numbers or texts before one that names fewer, so that no row is
+          -- covered by a row above it (a row written with the input's name
+          -- in a column covers every row keyed in that column, and a keyed
+          -- row has strictly more literals). Stable, so rows with none keep
+          -- the order the enumeration engine gives them.
+          pasteOrder = List.sortOn (negate . sum . map countLits)
+          countLits = \ case
+            PatLit {}       -> 1 :: Int
+            PatApp _ _ ps   -> sum (map countLits ps)
+            PatCons _ p1 p2 -> countLits p1 + countLits p2
+            PatVar {}       -> 0
+            PatExpr {}      -> 0
           verdict = case exact >>= fit of
             Just v -> Just v
             Nothing -> do
