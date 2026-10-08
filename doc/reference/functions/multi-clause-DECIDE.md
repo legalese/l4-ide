@@ -102,6 +102,8 @@ In each argument position:
 - the name of the `GIVEN` input for that position matches anything, and needs no test;
 - any other name matches anything and stands for that argument inside its own clause, like `x` and `rest` above.
 
+A number or a piece of text in a clause is checked for missing cases, where the same value in a `CONSIDER` written by hand is not: see [Numbers and text](#limits) below.
+
 Clauses after the first are reached only when the earlier ones do not match, like the `OTHERWISE` above.
 
 ## Missing cases
@@ -197,14 +199,17 @@ and the corresponding name in the definition is
 A number or a piece of text matches one value, and there is no end of the others, so a group that matches numbers or texts is complete only with a clause written with the `GIVEN` name, and the warning suggests that clause.
 The other inputs of the group are still checked: with `DECIDE charge Red 0 IS 0`, `DECIDE charge Red n IS n` and `DECIDE charge Green n IS n TIMES 2`, the warning lists ``DECIDE `charge` Blue n IS``, since the clause for `0` is one value of `n`, the clause below it covers the rest of `Red`, and `Blue` is still missing.
 In a table keyed by a number, the gaps under each number come first, then the clause for every other number: `DECIDE charge 1 Basic IS 10`, `DECIDE charge level Basic IS 30` and `DECIDE charge level Premium IS 40`, over a `Tier` that also has `Gold`, list ``DECIDE `charge` 1 Gold IS`` and then ``DECIDE `charge` level Gold IS``.
-A number is written in the warning as the clauses spelled it (`1.50`, `0.1234567890123456789`), by the first clause that names it.
+A number is written in the warning as the clauses spelled it (`1.50`, `0.1234567890123456789`), by the first clause that names it; a piece of text as L4 writes it, every printable character as it is (`"São Paulo"`) and `"` and `\` escaped.
+An input declared under another name for a number, a piece of text or a date (`DECLARE Age IS A NUMBER`) is one to the check.
 `EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value: `DECIDE price (EXACTLY Red) IS 1` and `DECIDE price Green IS 2` draw the warning for `Blue`, as `Red` in place of `(EXACTLY Red)` does.
 `EXACTLY` of the input's own name, as in `DECIDE f (EXACTLY n) IS 1`, matches every input, like the bare name.
 Any other `EXACTLY` (`EXACTLY someConstant`, `EXACTLY (m PLUS 1)` with `m` another input) is a clause the check cannot count: on a number or text input it counts for nothing, since only the clause with the input's name can cover the rest of the numbers, and that clause covers it too; on an enumeration input it stops the check for the group.
-An `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, stops the check for the group on any input, since such a clause may match any number of the input's values.
+An `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, stops the check for the group on any input, since such a clause may match any number of the input's values; so does an `EXACTLY` under a record's field, as in `DECIDE f (Box (EXACTLY zero)) IS 1`.
+The same values in a `CONSIDER` written by hand draw no warning: a `CONSIDER` over a number or a piece of text is not checked, so a rule warns when written as clauses and not when written as the `CONSIDER` it compiles to.
 
-**Some groups are not checked for missing cases.**
-A group that matches lists or `MAYBE` values, or values of an enumeration declared in another file, gets no warning for them, not even for a number nested inside such a value: `DECIDE show NOTHING IS "none"` and `DECIDE show (JUST 0) IS "zero"` draw none.
+**Lists, `MAYBE` values and enumerations declared in another file are not read.**
+The check cannot tell such values apart, so where a missing case could be found only by telling them apart, the group gets no warning, not even for a number nested inside such a value: `DECIDE show NOTHING IS "none"` and `DECIDE show (JUST 0) IS "zero"` draw none, and neither do `DECIDE f (JUST 0) IS "zero"` and `DECIDE f (JUST n) IS "other"`.
+Where the other inputs settle the question first, the warning still comes: `DECIDE t Red EMPTY IS 0`, `DECIDE t Red xs IS 1` and `DECIDE t Green xs IS 2` list ``DECIDE `t` Blue xs IS``, and `DECIDE f Red (JUST 0) IS 0` with `DECIDE f Green m IS 1` lists ``DECIDE `f` Red m IS`` and ``DECIDE `f` Blue m IS``, the clauses that the clauses without a number leave open.
 When every clause of such a group has a number or a piece of text in it, as `DECIDE f (JUST 0) IS "zero"` on its own does, the warning suggests the one clause with every input's name, ``DECIDE `f` m IS``, and nothing finer.
 
 The check also gives up, with no warning, when it would list more than 64 clauses, or when it takes more than 10000 steps to find them.
@@ -236,7 +241,7 @@ The value that the last clause could not match is
 Add a clause for this case, or end the clauses with one that matches every input.
 ```
 
-To be safe, end such a group with a clause that matches anything.
+To be safe, end a group over numbers or texts with a clause that matches anything.
 
 **Only the clauses after one that matches every input are reported as never used.**
 That is a clause whose every pattern is its input's `GIVEN` name, `` `_` ``, or a new name: a name that is not a value of its input's type, such as `other`, or `Gren` where `Green` was meant.

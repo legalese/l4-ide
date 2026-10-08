@@ -77,7 +77,9 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `price` Blue IS
 ```
 
-Clauses that match enumeration values or `TRUE`/`FALSE` are checked, and so are clauses that match particular numbers or texts, for which the clause written with the input's name is suggested; the page linked above lists the groups that are not. A clause below one that matches every input is never reached, and is warned about too.
+Clauses that match enumeration values or `TRUE`/`FALSE` are checked, and so are clauses that match particular numbers or texts, for which the clause written with the input's name is suggested.
+The page linked above lists the groups that are not.
+A clause below one that matches every input is never reached, and is warned about too.
 
 ### The amendment scenario
 
@@ -89,7 +91,8 @@ The payoff comes when a category grows. Add a fourth variant to `` `visa status`
 
 ### Primitive types are not checked in a `CONSIDER`
 
-The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set. Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped in a hand-written `CONSIDER` — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
+The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set.
+Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped in a hand-written `CONSIDER` — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
 
 ```l4
 GIVEN n IS A NUMBER
