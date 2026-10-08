@@ -794,6 +794,13 @@ unusedInputNames n body = take n (filter (`notElem` used) candidates)
 -- ('patAlwaysMatchesAs'), its body is under their first branches, and the
 -- clauses after it are under the binding of the later clauses. 'Nothing'
 -- when the tree is not shaped so.
+--
+-- Only two clauses may have no binding of the clauses after them: the last,
+-- and one that matches anything, after which the checker dropped the binding
+-- of clauses never tried. Any other clause without one is in a tree a pass
+-- has reshaped since, by inlining that binding, say; its body is no longer
+-- marked off from the clauses after it, and reading it as the last clause
+-- would print the group as its first clauses alone.
 clauseBodies :: [Name] -> [[Pattern Name]] -> Expr a -> Maybe [Expr a]
 clauseBodies scrutinees = go
   where
@@ -801,8 +808,9 @@ clauseBodies scrutinees = go
     go (pats : rest) e = case e of
       LetIn _ [LocalDecide _ (MkDecide dann _ _ later)] tree
         | isLaterClauses dann -> (:) <$> bodyOf pats tree <*> go rest later
-      -- the last clause, or one that matches anything, the rest dropped
-      _ -> (: []) <$> bodyOf pats e
+      _ | null rest || matchesAnything pats -> (: []) <$> bodyOf pats e
+        | otherwise -> Nothing
+    matchesAnything pats = and (zipWith patAlwaysMatchesAs scrutinees pats)
     bodyOf pats = under (length (filter not (zipWith patAlwaysMatchesAs scrutinees pats)))
     under :: Int -> Expr a -> Maybe (Expr a)
     under 0 e = Just e

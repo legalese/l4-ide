@@ -40,6 +40,7 @@ import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax (Anno, Decide (..), Module, Resolved, annPmMatrix, annPmSynthetic)
 import L4.TracePolicy (apiDefaultPolicy)
+import L4.Transform (inlineLocalBindingsInDecide)
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 
@@ -53,14 +54,18 @@ replPrint pass r = prettyLayout (filterIdeDirectives (restoreMixfixPatterns r.tc
 
 -- | Check and run a module; the module as the given printer prints it, and its answers.
 checkAndPrint :: (TypeCheckWithDepsResult -> Text.Text) -> Text.Text -> IO (Text.Text, [Text.Text])
-checkAndPrint printer src = do
+checkAndPrint = checkPassAndPrint id
+
+-- | As 'checkAndPrint', but the answers are those of the module changed by the given pass.
+checkPassAndPrint :: (Module Resolved -> Module Resolved) -> (TypeCheckWithDepsResult -> Text.Text) -> Text.Text -> IO (Text.Text, [Text.Text])
+checkPassAndPrint pass printer src = do
   cfg <- resolveEvalConfig (Just (UTCTime (fromGregorian 2025 1 1) (secondsToDiffTime 0))) apiDefaultPolicy
   case checkWithImports (vfsFromList []) src of
     Left errs -> do
       expectationFailure ("typecheck failed: " <> show errs <> "\n--- source ---\n" <> Text.unpack src)
       pure ("", [])
     Right r -> do
-      (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+      (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment (pass r.tcdModule)
       pure (printer r, map answer results)
   where
     answer (MkEvalDirectiveResult _ v _ l n p) = prettyEvalDirectiveResult (MkEvalDirectiveResult Nothing v Nothing l n p)
@@ -132,6 +137,28 @@ refusedWhenUnreadable src =
     dropMarks :: Module Resolved -> Module Resolved
     dropMarks = Optics.over (Optics.gplate @Anno) (Optics.set annPmSynthetic Nothing)
 
+-- | A group whose bindings of the clauses not yet tried a pass has inlined,
+-- as @l4 verify@ does to its own copy of each rule. The tree no longer shows
+-- where each clause's body ends ('L4.Print.clauseBodies'), so the group must
+-- print as its tree, and the marks make that fail to read back. It once
+-- printed, when the first clause was headed by a literal, as that clause
+-- alone, which read back and answered 10 and then "does not match" twice.
+refusedWhenInlined :: Text.Text -> Spec
+refusedWhenInlined src = do
+  it "means, inlined, what it means as written" $ do
+    (_, fromSource) <- checkAndRun src
+    (_, inlined) <- checkPassAndPrint inlineBindings (replPrint inlineBindings) src
+    length fromSource `shouldSatisfy` (> 0)
+    inlined `shouldBe` fromSource
+  it "prints a module that does not read back" $ do
+    (printed, _) <- checkAndPrint (replPrint inlineBindings) src
+    case checkWithImports (vfsFromList []) printed of
+      Left errs -> Text.unlines errs `shouldSatisfy` Text.isInfixOf "unexpected '⟪'"
+      Right _ -> expectationFailure ("the printed module read back:\n" <> Text.unpack printed)
+  where
+    inlineBindings :: Module Resolved -> Module Resolved
+    inlineBindings = Optics.over (Optics.gplate @(Decide Resolved)) inlineLocalBindingsInDecide
+
 -- | Clause bodies naming definitions spelled like the desugarer's names for
 -- the clauses not yet tried.
 namedLikeLaterClauses :: Text.Text
@@ -168,6 +195,16 @@ spec = describe "a multi-clause group, printed and run again" $ do
   describe "that cannot be read back as its clauses" $ do
     describe "beside a drafter's names like the desugarer's" $ refusedWhenUnreadable namedLikeLaterClauses
     describe "with no GIVEN, beside a drafter's `input 1`" $ refusedWhenUnreadable namedLikeInput
+    describe "headed by a literal, with its later clauses inlined" $ refusedWhenInlined $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 0 IS 10"
+      , "DECIDE f 1 IS 20"
+      , "DECIDE f n IS 30"
+      , "#EVAL f 0"
+      , "#EVAL f 1"
+      , "#EVAL f 5"
+      ]
   -- One clause left, matching anything: it prints as a plain definition,
   -- whose inputs must not take a name the body reads.
   describe "with no GIVEN, a first clause that matches anything, beside `input 1`" $ answersAgain $ Text.unlines
