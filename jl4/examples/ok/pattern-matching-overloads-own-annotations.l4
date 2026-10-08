@@ -10,12 +10,13 @@ DECIDE f m AKA g IS m > 3
 
 #EVAL g 5   -- TRUE
 
--- Each overload with its own AKA.
+-- Each overload with its own AKA. (Not `b`: on main, an input `b` below
+-- would then be ambiguous with this AKA.)
 DECIDE h n AKA a IS n + 1
-DECIDE h m AKA b IS m > 3
+DECIDE h m AKA c IS m > 3
 
 #EVAL a 5   -- 6
-#EVAL b 5   -- TRUE
+#EVAL c 5   -- TRUE
 
 -- Only the second overload is published.
 DECIDE twice n IS n * 2
