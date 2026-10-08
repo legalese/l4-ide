@@ -23,7 +23,7 @@ What L4 accepts and computes does not change.
 - Export-placement glob: `Main.hs:76-81`, and its block at `:96-97` (#67; the comment at `:79-80` is #82's).
 - Corpus guard: `Main.hs:83-92` (#67, with the export-placement row).
 - Sorting diagnostics: the partition at `jl4-lsp/src/LSP/L4/Rules.hs:546` and `success` at `:558`, with the field notes at `:128-129` (#82).
-- Schema golden encoding: `jl4JsonSchemaGolden`, `Main.hs:181-217`, the fix at `:197-211`, its import at `:8` (#419).
+- Schema golden encoding: `jl4JsonSchemaGolden`, `Main.hs:181-221`, the fix at `:197-211`, its import at `:8` (#419).
 - `jl4/jl4.cabal:101` adds `text` to `jl4-test`'s build-depends, which `Data.Text.Encoding` needs; on `unstable` that line came from #399.
 - Directive-results filter: `checkDirectiveResults`, `jl4-core/src/L4/TypeCheck/Types.hs:184-194` (#567).
   It is called at `jl4-lsp/app/LSP/L4/Handlers.hs:209` (the directive-results notification) and `:797` (the `#CHECK` result lookup).
@@ -38,7 +38,8 @@ It has eight rows: ok, libraries, legal, tc-fails, nlg-fails, semantic-tokens, h
 Sorting diagnostics: the type-check rule partitions diagnostics as `partition ((/= TypeCheck.SError) . TypeCheck.severity)`.
 `infos` holds `SInfo` and `SWarn`, and `errors` holds `SError` only.
 `success = all ((/= TypeCheck.SError) . TypeCheck.severity) errors` is unchanged, and with `errors` holding `SError` only it is true exactly when `errors` is empty.
-Every diagnostic is still published to the editor; the partition only decides what blocks `SuccessfulTypeCheck` (`Rules.hs:595-599`).
+Every diagnostic is still published to the editor; the partition decides which go to `infos` and which to `errors`, as the note at `Rules.hs:542-545` says.
+`SuccessfulTypeCheck` reads `success` (`Rules.hs:595-599`).
 Schema encoding: the JSON from `AP.encodePretty` is UTF-8 bytes, and is now decoded with `TE.decodeUtf8` before `writeFile`.
 Before #419, `BL.unpack` mapped each byte to a `Char` and `writeFile` re-encoded each one, so `ä` (`c3 a4`) was stored as `c3 83 c2 a4`.
 It round-tripped through `readFile`, so golden and actual agreed and the suite stayed green on mojibake.
