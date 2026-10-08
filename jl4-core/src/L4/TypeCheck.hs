@@ -1734,8 +1734,20 @@ checkClauseMatrix dec dHead =
             Nothing -> do
               (missingRows, redundant2) <- coarse >>= fit
               pure (missingRows, maybe redundant2 snd exact)
+          -- When neither tier's list fits, the missing-clause warning is
+          -- withheld, and the clauses never used are still reported, from
+          -- whichever analysis ran (the exact one when it did).
+          redundantAnyway = maybe [] snd (exact <|> coarse)
+          -- A redundant leaf is identified by its anno, which is its
+          -- clause's head range ('rowLeaf').
+          redundantIndices redundant =
+            [ i
+            | (i, cl) <- zip [0 ..] matrix.clauses
+            , isJust cl.headRange
+            , any (\ b -> rangeOf b == cl.headRange) redundant
+            ]
       case verdict of
-        Nothing -> pure (False, [])
+        Nothing -> pure (False, redundantIndices redundantAnyway)
         Just (missingRows, redundant) -> do
           unless (null missingRows || not warnMissing) do
             case hullRange matrix of
@@ -1744,16 +1756,7 @@ checkClauseMatrix dec dHead =
               Nothing -> pure ()
               Just hull ->
                 addWarning (PatternClausesMissing hull (getName dHead.rappForm) (length matrix.clauses) missingRows)
-          -- A redundant leaf is identified by its anno, which is its
-          -- clause's head range ('rowLeaf').
-          pure
-            ( True
-            , [ i
-              | (i, cl) <- zip [0 ..] matrix.clauses
-              , isJust cl.headRange
-              , any (\ b -> rangeOf b == cl.headRange) redundant
-              ]
-            )
+          pure (True, redundantIndices redundant)
 
     -- | A synthesized leaf whose only consumed parts are its identity and
     -- its anno (the clause-head range).
