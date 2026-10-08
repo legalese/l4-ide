@@ -7,8 +7,10 @@ import Test.Hspec
 import BundleStore
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist, createDirectoryIfMissing)
+import System.Directory (doesDirectoryExist, createDirectoryIfMissing)
 import System.FilePath ((</>))
+
+import TestStoreDir (withStoreDir)
 
 spec :: Spec
 spec = describe "BundleStore" do
@@ -130,12 +132,6 @@ spec = describe "BundleStore" do
 
 -- | Create a temp store, run the test, then clean up.
 withTempStore :: (BundleStore -> IO ()) -> IO ()
-withTempStore action = do
-  let tmpPath = "/tmp/jl4-service-test-store"
-  -- Clean up any previous test run
-  exists <- doesDirectoryExist tmpPath
-  if exists then removeDirectoryRecursive tmpPath else pure ()
+withTempStore action = withStoreDir "store" \tmpPath -> do
   store <- initStore tmpPath
   action store
-  -- Clean up after test
-  removeDirectoryRecursive tmpPath

@@ -40,11 +40,12 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileExist)
+import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -3058,9 +3059,7 @@ withPendingService deployId sources act = do
     Right result -> pure result
 
 withPendingService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withPendingService' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3087,7 +3086,6 @@ withPendingService' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
-    cleanDir tmpPath
     pure result
 
 -- | Save sources to disk and register as DeploymentFailed,
@@ -3105,9 +3103,7 @@ withFailedService deployId sources act = do
     Right result -> pure result
 
 withFailedService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withFailedService' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withFailedService' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3133,7 +3129,6 @@ withFailedService' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
-    cleanDir tmpPath
     pure result
 
 -- | Compile sources and register them directly in the TVar,
@@ -3151,9 +3146,7 @@ withServiceFromSources deployId sources act = do
     Right result -> pure result
 
 withServiceFromSources' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceFromSources' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withServiceFromSources' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3175,7 +3168,6 @@ withServiceFromSources' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | 'withServiceFromSources' under caller-chosen 'Options'.
@@ -3198,9 +3190,7 @@ withServiceFromSourcesOpts opts deployId sources act = do
 
 withServiceFromSourcesOpts'
   :: Options -> Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceFromSourcesOpts' opts deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withServiceFromSourcesOpts' opts deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3220,7 +3210,6 @@ withServiceFromSourcesOpts' opts deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | 'withServiceFromSources', with the deployment registry itself handed to the
@@ -3252,9 +3241,7 @@ withServiceFromSourcesTVar'
   -> [(FilePath, Text)]
   -> (TVar (Map DeploymentId DeploymentState) -> String -> Manager -> IO a)
   -> IO a
-withServiceFromSourcesTVar' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withServiceFromSourcesTVar' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3274,7 +3261,6 @@ withServiceFromSourcesTVar' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act registry baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | Whether a deployed function currently holds a built 'CachedDecisionQuery'.
@@ -3317,10 +3303,8 @@ withServiceRestartedFromCbor deployId sources act = do
     Right result -> pure result
 
 withServiceRestartedFromCbor' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceRestartedFromCbor' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-      cborPath = tmpPath </> Text.unpack deployId </> "bundle.cbor"
-  cleanDir tmpPath
+withServiceRestartedFromCbor' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
+  let cborPath = tmpPath </> Text.unpack deployId </> "bundle.cbor"
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3361,7 +3345,6 @@ withServiceRestartedFromCbor' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | Start a service with an empty deployment registry.
@@ -3378,9 +3361,7 @@ withEmptyService act = do
     Right result -> pure result
 
 withEmptyService' :: (String -> Manager -> IO a) -> IO a
-withEmptyService' act = do
-  let tmpPath = "/tmp/jl4-service-test-empty"
-  cleanDir tmpPath
+withEmptyService' act = withStoreDir "empty" \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
   registry <- newTVarIO Map.empty
@@ -3393,7 +3374,6 @@ withEmptyService' act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
-    cleanDir tmpPath
     pure result
 
 -- | Evaluate a function via the API.
@@ -3478,12 +3458,6 @@ buildJsonPost url body = do
     , requestBody = RequestBodyLBS (Aeson.encode body)
     , requestHeaders = [("Content-Type", "application/json")]
     }
-
--- | Clean/remove a directory if it exists.
-cleanDir :: FilePath -> IO ()
-cleanDir path = do
-  exists <- doesDirectoryExist path
-  if exists then removeDirectoryRecursive path else pure ()
 
 -- | Query a function's query-plan via the API.
 queryPlan' :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response LBS.ByteString)
