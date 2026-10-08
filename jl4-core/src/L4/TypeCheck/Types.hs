@@ -335,11 +335,12 @@ data CheckError =
     -- same level. Carries the chain's range and both operators with their
     -- fixities.
   | SuspiciousBinderPattern Resolved Resolved
-  | SuspiciousClausePattern Name Resolved Resolved
+  | SuspiciousClausePattern Name Bool Resolved Resolved
     -- ^ 'SuspiciousBinderPattern' for a pattern of a multi-clause group
     -- ('L4.TypeCheck.checkClauseMatrix'): a pattern that is a new name, close
     -- to a value of its input's type that no clause of the group matches.
-    -- Arguments: the group's name, the new name, the value it resembles.
+    -- Arguments: the group's name, whether a GIVEN names its inputs, the new
+    -- name, the value it resembles.
     -- ^ A CONSIDER branch pattern is a fresh binder (matching everything)
     -- whose name closely resembles a constructor of the scrutinee's type
     -- that no other branch covers — very likely a misspelled constructor.
@@ -821,7 +822,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
-  rangeOf (SuspiciousClausePattern _ b _)   = rangeOf b
+  rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r

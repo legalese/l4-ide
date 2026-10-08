@@ -1590,7 +1590,7 @@ checkClauseMatrix dec dHead =
           case traverse sequence rpatssM of
             Just rpatss
               | all (all patternInfoComplete) rpatss -> do
-                  hintSuspiciousClausePatterns ei colTypes rpatss
+                  hintSuspiciousClausePatterns matrix ei colTypes rpatss
                   (answered, redundant) <-
                     if hasOpaque then pure (False, []) else analyseResolvedRows matrix ei rpatss
                   pure (answered, redundant, newNameCatchAll matrix rpatss)
@@ -1626,8 +1626,8 @@ checkClauseMatrix dec dHead =
     -- no clause matches in that column. (The CONSIDERs the clauses compile to
     -- leave this hint to here: each sees only its own clause, so a value
     -- another clause matches would look uncovered to it.)
-    hintSuspiciousClausePatterns :: EntityInfo -> [Type' Resolved] -> [[Pattern Resolved]] -> Check ()
-    hintSuspiciousClausePatterns ei colTypes rpatss = do
+    hintSuspiciousClausePatterns :: PmMatrix -> EntityInfo -> [Type' Resolved] -> [[Pattern Resolved]] -> Check ()
+    hintSuspiciousClausePatterns matrix ei colTypes rpatss = do
       let ctorSets = constructorsInScopeFromEntityInfo ei
       for_ (List.zip3 [0 :: Int ..] colTypes colScruts) \ (j, colTy, s) -> do
         let column = mapMaybe (listToMaybe . drop j) rpatss
@@ -1640,7 +1640,7 @@ checkClauseMatrix dec dHead =
           PatVar _ binder
             | rawName (getName binder) /= rawName (getName s)
             , Just ctor <- find (resemblesConstructor (lastNameSegment (getName binder))) uncovered ->
-                addError (SuspiciousClausePattern (getName dHead.rappForm) binder ctor)
+                addError (SuspiciousClausePattern (getName dHead.rappForm) (not matrix.synthesizedScrutinees) binder ctor)
           _ -> pure ()
 
     analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check (Bool, [Int])
@@ -6994,11 +6994,12 @@ anchorWords = \ case
   AnchorAt{}       -> "…"
 
 prettyCheckError :: CheckError -> [Text]
-prettyCheckError (SuspiciousClausePattern headName binder ctor) =
+prettyCheckError (SuspiciousClausePattern headName hasGiven binder ctor) =
   [ "The pattern " <> quotedName (getName binder) <> " in this clause of " <> quotedName headName
       <> " is a new name, which matches every input."
   , "It is very close to " <> quotedName (getName ctor) <> ", a value of its input's type that no clause matches."
-  , "If you meant that value, correct the spelling; if you meant to match anything, use the input's GIVEN name."
+  , "If you meant that value, correct the spelling; if you meant to match anything, "
+      <> (if hasGiven then "use the input's GIVEN name." else "write `_` in backquotes.")
   ]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   [ "This CONSIDER branch introduces a new name"
