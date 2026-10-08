@@ -734,7 +734,7 @@ This form is given in rules that match numbers or text too.
 It is not given when a pattern of the rule does not fit its input's type, and not for a new name inside a larger pattern: after `(JUST Gren)`, a clause for `(JUST Blue)` gets the third form below instead.
 When the new name is very close to a value that no clause matches, as `Gren` is to `Green`, a hint at the pattern says so as well.
 
-A third form, "Every input it matches is already matched by a clause above it", is for a clause that repeats an earlier one, or that the clauses above it cover in another way. It is only given when no pattern in the rule contains a number or a piece of text, or is an `EXACTLY` pattern: in a table keyed by amounts or codes, a repeated clause draws no warning. (`TRUE` and `FALSE` are not numbers or text; a table keyed by them is checked.)
+A third form, "Every input it matches is already matched by a clause above it", is for a clause that repeats an earlier one, or that is covered by a larger pattern above it. It is only given when no pattern in the rule contains a number or a piece of text, or is an `EXACTLY` pattern: in a table keyed by amounts or codes, a repeated clause draws no warning. (`TRUE` and `FALSE` are not numbers or text; a table keyed by them is checked.)
 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
