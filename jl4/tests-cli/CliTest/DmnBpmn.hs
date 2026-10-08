@@ -204,6 +204,67 @@ dmnXsdOrderCases    = dmnXsdOrderDir </> "M1-itemdef.cases.json"
 dmnXsdOrderDir :: FilePath
 dmnXsdOrderDir = fixtureDir </> "dmn-xsd-order"
 
+-- The TYPICALLY exhibit (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5, W9). DMN has no
+-- default on an inputData, a BKM parameter or an itemComponent, so the exporter
+-- reports each @TYPICALLY@ as D-TYPICALLY instead of dropping it without a word.
+-- `jl4/tests/DmnExport.hs` owns the goldens; `typicallyEngineCases` supplies every
+-- input, which is all a DMN model can honestly be asked.
+typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases, typicallyOmitCases :: FilePath
+typicallySource         = "examples/dmn/defaults.l4"
+typicallyGolden         = "examples/dmn/expected/defaults.dmn"
+typicallyMarkdownGolden = "examples/dmn/expected/defaults.dmn.md"
+typicallyEngineCases    = "examples/dmn/defaults.cases.json"
+-- One case with a record's @timeout@ component left out. Its expectation is the
+-- answer the source gives, so each engine reports a mismatch, and the legs below
+-- read what each engine printed.
+typicallyOmitCases      = "examples/dmn/defaults-omit-component.cases.json"
+
+-- A default the export reads through an IMPORT. `ratelib.l4` writes the
+-- defaults; `dmn-main.l4` reads two of them (a record field and an ASSUME) and
+-- `bpmn-main.l4` reads a third. A default in an imported file is lost to the
+-- model exactly as a local one is, and used to be dropped without a note.
+typicallyImportLib, typicallyImportDmn, typicallyImportBpmn, typicallyImportBpmnField, typicallyImportBpmnHelper :: FilePath
+typicallyImportLib       = fixtureDir </> "typically-import" </> "ratelib.l4"
+typicallyImportDmn       = fixtureDir </> "typically-import" </> "dmn-main.l4"
+typicallyImportBpmn      = fixtureDir </> "typically-import" </> "bpmn-main.l4"
+typicallyImportBpmnField = fixtureDir </> "typically-import" </> "bpmn-field-main.l4"
+-- reads the imported ASSUME through an imported HELPER (`may act`), never naming it
+typicallyImportBpmnHelper = fixtureDir </> "typically-import" </> "bpmn-helper-main.l4"
+
+-- A TYPICALLY on the field of a sum type's constructor, the fifth place one can
+-- sit. See the fixture's header.
+typicallyConField :: FilePath
+typicallyConField = fixtureDir </> "typically-con-field.l4"
+
+-- The BPMN side: one regulative rule, with the default written on its own GIVEN,
+-- on a section GIVEN it reads, on an ASSUME it reads (also one read by a rule it
+-- reaches by HENCE), and on a record's field. Each must be reported as P-TYPICALLY.
+-- The GIVEN of a rule it reaches by HENCE is the one place a default is NOT
+-- reported: the HENCE supplies the argument (bpmnTypicallyHence, and the same with
+-- the opposite argument, bpmnTypicallyHenceFalse).
+bpmnTypicallyGiven, bpmnTypicallySection, bpmnTypicallyAssume, bpmnTypicallyHence, bpmnTypicallyField :: FilePath
+bpmnTypicallyHenceFalse, bpmnTypicallyHenceAssume, bpmnTypicallyFieldPattern :: FilePath
+bpmnTypicallyHenceFalse   = fixtureDir </> "bpmn-typically-hence-false.l4"
+bpmnTypicallyHenceAssume  = fixtureDir </> "bpmn-typically-hence-assume.l4"
+bpmnTypicallyFieldPattern = fixtureDir </> "bpmn-typically-field-pattern.l4"
+bpmnTypicallyField   = fixtureDir </> "bpmn-typically-field.l4"
+bpmnTypicallyGiven   = fixtureDir </> "bpmn-typically-given.l4"
+bpmnTypicallySection = fixtureDir </> "bpmn-typically-section.l4"
+bpmnTypicallyAssume  = fixtureDir </> "bpmn-typically-assume.l4"
+bpmnTypicallyHence   = fixtureDir </> "bpmn-typically-hence.l4"
+
+-- | The drawn rule's process must report its TYPICALLY as P-TYPICALLY, say which
+-- GIVEN it was, and say what BPMN lacks. Asserts on the report (stderr) and also
+-- that the document is still written: a fidelity note never replaces the artifact.
+bpmnReportsTypically :: FilePath -> FilePath -> String -> Expectation
+bpmnReportsTypically bin fixture rule = do
+  Output code sout serr <-
+    runL4 bin ["export", "bpmn", fixture, "--rule", rule, "--fidelity-report"]
+  code `shouldBe` ExitSuccess
+  serr `shouldSatisfy` ("[P-TYPICALLY] lossy" `isInfixOf`)
+  serr `shouldSatisfy` ("carries TYPICALLY TRUE, and BPMN has no default for a process variable" `isInfixOf`)
+  sout `shouldSatisfy` ("<bpmn:process" `isInfixOf`)
+
 -- The LAW-TIME date axis (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
 --
 -- `gstGolden` is EMITTED (jl4/tests/DmnExport.hs owns the golden); the two
@@ -416,6 +477,11 @@ fixtures =
   , hydrationGolden, hydrationEngineCases, sumtypeGolden
   , bkmSource, bkmDmnGolden, bkmEngineCases
   , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
+  , typicallySource, typicallyGolden, typicallyMarkdownGolden, typicallyEngineCases, typicallyOmitCases
+  , bpmnTypicallyGiven, bpmnTypicallySection, bpmnTypicallyAssume, bpmnTypicallyHence
+  , bpmnTypicallyField, bpmnTypicallyHenceFalse, bpmnTypicallyHenceAssume, bpmnTypicallyFieldPattern
+  , typicallyImportLib, typicallyImportDmn, typicallyImportBpmn, typicallyImportBpmnField
+  , typicallyImportBpmnHelper, typicallyConField
   ]
 
 spec :: FilePath -> Spec
@@ -835,7 +901,227 @@ spec bin = do
   -- plus a rule date well before commencement. F, J and K all reach the floor
   -- now; until the migration F and J handed the model -1 and expected -1 back,
   -- so only K (2026-09-05, ruling D1) reached the bottom the floor arm names.
+  -- TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5 ("map or say"), for the two backends
+  -- that cannot map: DMN has no default on an input, and BPMN does not even carry
+  -- the process variable. Both used to drop the default without a word.
+  describe "l4 export: a TYPICALLY the target cannot carry is reported" $ do
+    it "writes the TYPICALLY exhibit to its golden DMN" $
+      expectGolden bin ["export", "dmn", typicallySource] typicallyGolden
+
+    it "writes the TYPICALLY exhibit to its golden dmnmd markdown" $
+      expectGolden bin ["export", "dmn-md", typicallySource] typicallyMarkdownGolden
+
+    it "reports D-TYPICALLY once for each place a default can sit, naming the engines" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn", typicallySource, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      -- a record field, a section GIVEN, and two rules' own GIVENs
+      length (filter ("[D-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 4
+      serr `shouldSatisfy` ("the field `timeout` of `Config` carries TYPICALLY 30" `isInfixOf`)
+      serr `shouldSatisfy` ("the section GIVEN `has capacity` carries TYPICALLY TRUE" `isInfixOf`)
+      serr `shouldSatisfy` ("the GIVEN `rate` of `the fee` carries TYPICALLY 3" `isInfixOf`)
+      serr `shouldSatisfy` ("the GIVEN `income` of `the band` carries TYPICALLY 50000" `isInfixOf`)
+      serr `shouldSatisfy` ("`null` on Camunda 8, a model error on KIE" `isInfixOf`)
+      -- a record's component is not a top-level input: both engines read null
+      -- and neither complains, which is what the field's note says
+      serr `shouldSatisfy`
+        ("`null` for it on Camunda 8 and on KIE alike, and neither reports an error" `isInfixOf`)
+
+    it "reports the same notes in the dmnmd report" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn-md", typicallySource, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[D-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 4
+
+    it "counts the notes in the tally even without --fidelity-report" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn", typicallySource]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("4 lossy" `isInfixOf`)
+
+    it "trips --fail-on=lossy, which it could not before" $ do
+      Output code _ _ <- runL4 bin ["export", "dmn", typicallySource, "--fail-on=lossy"]
+      code `shouldSatisfy` (/= ExitSuccess)
+
+    -- The checker accepts a default on a constructor's field. Catala, docassemble
+    -- and DMN used to drop it with exit 0 and no word; none of the exports now
+    -- does. The ones that exit 0 say what they did, and the one that cannot carry
+    -- it refuses by name.
+    it "does not drop a constructor field's TYPICALLY in DMN, Catala or docassemble, and OpenFisca refuses it by name" $ do
+      Output cd _ ed <- runL4 bin ["export", "dmn", typicallyConField, "--fidelity-report"]
+      cd `shouldBe` ExitSuccess
+      ed `shouldSatisfy` ("[D-TYPICALLY] lossy" `isInfixOf`)
+      ed `shouldSatisfy` ("the field `radius` of the constructor `Circle` carries TYPICALLY 1" `isInfixOf`)
+      Output cc oc _ <- runL4 bin ["export", "catala", typicallyConField]
+      cc `shouldBe` ExitSuccess
+      oc `shouldSatisfy` ("field `radius` of the constructor `Circle` carries TYPICALLY 1, which is dropped" `isInfixOf`)
+      Output ca oa ea <- runL4 bin ["export", "docassemble", typicallyConField]
+      ca `shouldBe` ExitSuccess
+      oa `shouldSatisfy` ("default: 1" `isInfixOf`)
+      ea `shouldSatisfy` ("DA-TYPICALLY" `isInfixOf`)
+      Output co _ eo <- runL4 bin ["export", "openfisca", typicallyConField]
+      co `shouldBe` ExitFailure 1
+      eo `shouldSatisfy` ("the field `radius` of the constructor `Circle` carries TYPICALLY 1" `isInfixOf`)
+
+    it "says nothing about TYPICALLY on a module that writes none" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn", dmnSource, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("TYPICALLY" `isInfixOf`))
+
+    it "reports P-TYPICALLY for a default on the drawn rule's own GIVEN" $
+      bpmnReportsTypically bin bpmnTypicallyGiven "the duty"
+
+    it "reports P-TYPICALLY for a default on a section GIVEN the rule reads" $
+      bpmnReportsTypically bin bpmnTypicallySection "the duty"
+
+    it "reports P-TYPICALLY for a default on an ASSUME the rule reads" $
+      bpmnReportsTypically bin bpmnTypicallyAssume "the duty"
+
+    -- The call a HENCE makes supplies the argument, so the source never relies on
+    -- the callee's default in this process. What the process loses is the
+    -- argument, which BPMN has never drawn (not a TYPICALLY matter).
+    it "says nothing of a default on the GIVEN of a rule reached through HENCE: the HENCE supplies it" $ do
+      Output code sout serr <-
+        runL4 bin ["export", "bpmn", bpmnTypicallyHence, "--rule", "the filing", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("TYPICALLY" `isInfixOf`))
+      sout `shouldSatisfy` ("<bpmn:process" `isInfixOf`)
+
+    it "says nothing of it when the HENCE passes the opposite of the default, either" $ do
+      Output code _ serr <-
+        runL4 bin ["export", "bpmn", bpmnTypicallyHenceFalse, "--rule", "the filing", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("TYPICALLY" `isInfixOf`))
+
+    it "reports a default on an ASSUME that a rule reached through HENCE reads" $
+      bpmnReportsTypically bin bpmnTypicallyHenceAssume "the filing"
+
+    it "reports a default it reads through an IMPORT, names the module, and leaves an unread one alone" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn", typicallyImportDmn, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      let notes = filter ("[D-TYPICALLY] lossy" `isInfixOf`) (lines serr)
+      length notes `shouldBe` 2
+      serr `shouldSatisfy` ("the field `timeout` of `Config` (in the imported module `ratelib`) carries TYPICALLY 30" `isInfixOf`)
+      serr `shouldSatisfy` ("the ASSUME `allowance` (in the imported module `ratelib`) carries TYPICALLY 100" `isInfixOf`)
+      -- an ASSUME nobody reads, and a rule's own GIVEN, are not this model's loss.
+      -- (Only the note lines are searched: the library's ASSUME deprecation
+      -- warnings, also on stderr, name every ASSUME it declares.)
+      let noteLines = filter ("carries TYPICALLY" `isInfixOf`) (lines serr)
+      noteLines `shouldSatisfy` (not . any ("an unrelated fact" `isInfixOf`))
+      noteLines `shouldSatisfy` (not . any ("library rule" `isInfixOf`))
+      -- a defaulted field of the imported record that no decision reads
+      noteLines `shouldSatisfy` (not . any ("`grace`" `isInfixOf`))
+      -- The imported ASSUME gets no inputData in the model (the decision's FEEL
+      -- text names it, and nothing declares it), so its note says that, and does
+      -- not describe an inputData that is not there. The field has an
+      -- itemComponent and keeps the wording about one.
+      let assumeLine = [ l | l <- noteLines, "the ASSUME `allowance`" `isInfixOf` l ]
+          fieldLine  = [ l | l <- noteLines, "the field `timeout`" `isInfixOf` l ]
+      assumeLine `shouldSatisfy` all ("the model has no input for it at all" `isInfixOf`)
+      assumeLine `shouldSatisfy` all (not . ("DMN has no default for an inputData" `isInfixOf`))
+      fieldLine `shouldSatisfy` all ("DMN has no default for an itemComponent" `isInfixOf`)
+      fieldLine `shouldSatisfy` all ("builds a `Config` without `timeout`" `isInfixOf`)
+
+    it "reports the same imported defaults in the dmnmd report" $ do
+      Output code _ serr <- runL4 bin ["export", "dmn-md", typicallyImportDmn, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[D-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 2
+
+    it "reports P-TYPICALLY for a default on an ASSUME the rule reads through an IMPORT" $ do
+      Output code sout serr <-
+        runL4 bin ["export", "bpmn", typicallyImportBpmn, "--rule", "the duty", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[P-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 1
+      serr `shouldSatisfy`
+        ("the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE" `isInfixOf`)
+      filter ("carries TYPICALLY" `isInfixOf`) (lines serr)
+        `shouldSatisfy` (not . any ("an unrelated fact" `isInfixOf`))
+      sout `shouldSatisfy` ("<bpmn:process" `isInfixOf`)
+
+    it "reports P-TYPICALLY for a default on a record field the drawn rule's condition reads" $ do
+      Output code sout serr <-
+        runL4 bin ["export", "bpmn", bpmnTypicallyField, "--rule", "the duty", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      -- both defaulted fields of the Standing the rule handles: a condition is
+      -- opaque text, so nothing says that none reads `years a member`
+      length (filter ("[P-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 2
+      serr `shouldSatisfy` ("the field `years a member` of `Standing` carries TYPICALLY 0" `isInfixOf`)
+      serr `shouldSatisfy`
+        ("the field `in good standing` of `Standing` carries TYPICALLY TRUE, and BPMN has no default for a process variable" `isInfixOf`)
+      serr `shouldSatisfy` ("an instance that holds a `Standing` without it does not get TRUE" `isInfixOf`)
+      sout `shouldSatisfy` ("<bpmn:process" `isInfixOf`)
+
+    it "reports P-TYPICALLY for the fields of an IMPORTED record the rule handles, and for nothing else the library writes" $ do
+      Output code _ serr <-
+        runL4 bin ["export", "bpmn", typicallyImportBpmnField, "--rule", "the duty", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[P-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 2
+      serr `shouldSatisfy`
+        ("the field `timeout` of `Config` (in the imported module `ratelib`) carries TYPICALLY 30" `isInfixOf`)
+      serr `shouldSatisfy`
+        ("the field `grace` of `Config` (in the imported module `ratelib`) carries TYPICALLY 5" `isInfixOf`)
+      -- the ASSUMEs nobody reads and a library rule's own GIVEN are not this process's loss
+      let noteLines = filter ("carries TYPICALLY" `isInfixOf`) (lines serr)
+      noteLines `shouldSatisfy` (not . any ("an unrelated fact" `isInfixOf`))
+      noteLines `shouldSatisfy` (not . any ("the ASSUME `allowance`" `isInfixOf`))
+      noteLines `shouldSatisfy` (not . any ("library rule" `isInfixOf`))
+
+    -- A helper that takes the record apart names no selector, and the condition
+    -- that calls it is opaque text: the field's default is lost all the same.
+    it "reports P-TYPICALLY for a field a helper reads by taking the record apart" $ do
+      Output code _ serr <-
+        runL4 bin ["export", "bpmn", bpmnTypicallyFieldPattern, "--rule", "the duty", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[P-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 1
+      serr `shouldSatisfy` ("the field `in good standing` of `Standing` carries TYPICALLY TRUE" `isInfixOf`)
+
+    -- The same ASSUME read through a helper defined in the imported file reached
+    -- no note, while the helper defined locally did: the call graph stopped at the
+    -- import.
+    it "reports P-TYPICALLY for an ASSUME read through a helper defined in an IMPORTED file" $ do
+      Output code _ serr <-
+        runL4 bin ["export", "bpmn", typicallyImportBpmnHelper, "--rule", "the duty", "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      length (filter ("[P-TYPICALLY] lossy" `isInfixOf`) (lines serr)) `shouldBe` 1
+      serr `shouldSatisfy`
+        ("the ASSUME `is in good standing` (in the imported module `ratelib`) carries TYPICALLY TRUE" `isInfixOf`)
+
+    it "says nothing about TYPICALLY on a process that writes none" $ do
+      Output code _ serr <- runL4 bin ["export", "bpmn", bpmnOfferingSource, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("TYPICALLY" `isInfixOf`))
+
   describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE answers the TYPICALLY exhibit correctly when every input is supplied" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        typicallyGolden [typicallyGolden, "--cases", typicallyEngineCases] \out -> do
+          out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("8/8 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers the TYPICALLY exhibit correctly when every input is supplied" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        typicallyGolden [typicallyGolden, "--cases", typicallyEngineCases] \out -> do
+          out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("8/8 value(s) as expected" `isInfixOf`)
+
+    -- What the D-TYPICALLY note on a record field says, pinned on both engines. A
+    -- record component left out is NOT treated like a top-level input left out:
+    -- the second pair of legs under "FEEL null semantics" shows KIE refusing the
+    -- decision for the latter, and here it answers (null) and calls it succeeded.
+    it "KIE reads a record component that was left out as null, and calls the decision succeeded" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        typicallyGolden [typicallyGolden, "--cases", typicallyOmitCases] \out -> do
+          out `shouldSatisfy` ("the_budget" `isInfixOf`)
+          out `shouldSatisfy` ("SUCCEEDED-BUT-NULL" `isInfixOf`)
+          -- the one decision that reads the component raised nothing
+          out `shouldSatisfy` (not . ("Required dependency" `isInfixOf`))
+
+    it "Camunda reads a record component that was left out as null" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        typicallyGolden [typicallyGolden, "--cases", typicallyOmitCases] \out -> do
+          out `shouldSatisfy` ("the_budget" `isInfixOf`)
+          out `shouldSatisfy` ("EVALUATED-TO-NULL" `isInfixOf`)
+
     it "KIE answers the dated-regime exhibit correctly for eleven rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do

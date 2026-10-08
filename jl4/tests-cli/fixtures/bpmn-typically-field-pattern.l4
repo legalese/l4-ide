@@ -1,0 +1,24 @@
+-- The default is on a record's field that a helper reads by taking the record
+-- apart (CONSIDER ... WHEN Standing g y THEN g). No selector is named anywhere,
+-- but the process handles a Standing, and the condition `ok s` is opaque text, so
+-- an instance that holds a Standing without the field does not get TRUE.
+DECLARE Actor IS ONE OF Member
+DECLARE Action IS ONE OF pay
+
+DECLARE Standing HAS
+    `in good standing` IS A BOOLEAN TYPICALLY TRUE
+    `years a member`   IS A NUMBER
+
+GIVEN s IS A Standing
+GIVETH A BOOLEAN
+`ok` s MEANS
+  CONSIDER s
+  WHEN Standing g y THEN g
+
+GIVEN s IS A Standing
+GIVETH A DEONTIC Actor Action
+`the duty` s MEANS
+    PARTY Member
+    MUST pay
+    PROVIDED `ok` s
+    WITHIN 14

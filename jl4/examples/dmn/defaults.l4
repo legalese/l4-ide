@@ -1,0 +1,49 @@
+-- TYPICALLY has no counterpart in DMN, and the export says so.
+--
+-- A DMN inputData, a BKM parameter and a record's itemComponent carry no
+-- default. An evaluation that leaves a top-level input out gets `null` on
+-- Camunda 8 and a model error on KIE (jl4/tests-cli/fixtures/dmn-null-probe/
+-- null-absent.dmn measured both); one that leaves a record's component out gets
+-- `null` on both, and neither says a word (defaults-omit-component.cases.json).
+-- Rewriting every read as `if x = null then d else x` would
+-- change what each decision says (and, for a top-level input, would not help KIE: it skips the decision first), so the exporter
+-- does not map a default; it reports each one as a D-TYPICALLY note
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC ruling T5). One of each place a TYPICALLY can
+-- sit: a section GIVEN, a rule's own GIVEN, and a record field; plus a rule's
+-- GIVEN that is the input column of a decision table, the one shape dmn-md can
+-- draw.
+--
+-- The cases in defaults.cases.json supply every input, which is all a DMN
+-- evaluation can honestly be asked.
+
+DECLARE Config HAS
+    timeout IS A NUMBER TYPICALLY 30
+    retries IS A NUMBER
+
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Whether the person may contract
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `has capacity` AND `is adult`
+
+@export The fee for a rate
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+`the fee` rate base MEANS base TIMES rate
+
+@export The budget for a configuration
+GIVEN c IS A Config
+GIVETH A NUMBER
+`the budget` c MEANS (c's timeout) TIMES (c's retries)
+
+@export The band for an income
+GIVEN income IS A NUMBER TYPICALLY 50000
+GIVETH A NUMBER
+`the band` income MEANS
+    BRANCH
+      IF income AT LEAST 100000 THEN 3
+      IF income AT LEAST 50000 THEN 2
+      OTHERWISE 1

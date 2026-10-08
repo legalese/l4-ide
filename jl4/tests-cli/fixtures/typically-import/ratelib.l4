@@ -1,0 +1,25 @@
+-- A library whose TYPICALLY defaults a rule in another file reads.
+-- A record field and an ASSUME that dmn-main.l4 reads, an ASSUME that bpmn-main.l4
+-- reads, the field that bpmn-field-main.l4 reads (and `grace`, which sits on the same
+-- record, so a process that handles a Config handles it too), an ASSUME that nothing
+-- reads, a rule whose own GIVEN carries a default, and a helper, `may act`, that reads
+-- the ASSUME bpmn-helper-main.l4 never names.
+-- (A default read through an IMPORT used to be dropped by DMN, dmn-md and BPMN
+-- without a note.)
+DECLARE Config HAS
+    timeout IS A NUMBER TYPICALLY 30
+    retries IS A NUMBER
+    grace   IS A NUMBER TYPICALLY 5
+
+ASSUME allowance IS A NUMBER TYPICALLY 100
+
+ASSUME `an unrelated fact` IS A NUMBER TYPICALLY 7
+
+ASSUME `is in good standing` IS A BOOLEAN TYPICALLY TRUE
+
+GIVEN k IS A NUMBER TYPICALLY 9
+GIVETH A NUMBER
+`library rule` k MEANS k
+
+GIVETH A BOOLEAN
+`may act` MEANS `is in good standing`

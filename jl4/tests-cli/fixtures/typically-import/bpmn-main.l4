@@ -1,0 +1,11 @@
+IMPORT ratelib
+
+DECLARE Actor IS ONE OF Member
+DECLARE Action IS ONE OF pay
+
+GIVETH A DEONTIC Actor Action
+`the duty` MEANS
+    PARTY Member
+    MUST pay
+    PROVIDED `is in good standing`
+    WITHIN 14

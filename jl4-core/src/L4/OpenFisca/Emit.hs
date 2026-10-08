@@ -81,12 +81,39 @@ variableLines v =
      , ind 1 <> "value_type = " <> pyValueType v.varType
      ]
   <> enumAttrs v.varType
+  <> defaultAttr v
   <> [ ind 1 <> "entity = " <> v.varEntity
      , ind 1 <> "definition_period = " <> pyPeriod v.varPeriod
      , ind 1 <> "label = " <> pyStr v.varLabel
      ]
   <> formulaLines v
   <> [""]
+
+-- | The @default_value@ of a scalar input, from the source's @TYPICALLY@. An
+-- input with none keeps OpenFisca's own default for its type and gets no line,
+-- so a module that writes no @TYPICALLY@ is byte-identical to what it was.
+--
+-- A number is written as a float literal for a @float@ variable, because
+-- OpenFisca checks @default_value@ against @value_type@.
+defaultAttr :: OFVariable -> [Text]
+defaultAttr v = case v.varDefault of
+  Nothing -> []
+  Just d  -> [ind 1 <> "default_value = " <> lit d]
+ where
+  lit = \case
+    OFDefNum r  -> case v.varType of
+      OFFloat -> renderFloat r
+      _       -> renderNum r
+    OFDefBool b -> if b then "True" else "False"
+    OFDefStr t  -> pyStr t
+
+-- | A rational as a Python @float@ literal: integers keep a @.0@ so the literal
+-- is a float, not an int; terminating decimals print as they are; the rest as
+-- an exact division, which Python evaluates as a float.
+renderFloat :: Rational -> Text
+renderFloat r
+  | denominator r == 1 = renderNum r <> ".0"
+  | otherwise          = renderNum r
 
 enumAttrs :: OFType -> [Text]
 enumAttrs = \case

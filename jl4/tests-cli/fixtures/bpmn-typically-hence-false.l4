@@ -1,0 +1,21 @@
+-- bpmn-typically-hence.l4 with the HENCE passing FALSE, the opposite of the
+-- callee's default. The BPMN document is the same as with TRUE, and nothing
+-- is reported about the default: the source supplies the value here, so the
+-- default is not what the process lost.
+DECLARE Actor IS ONE OF Filer
+DECLARE Action IS ONE OF file, acknowledge
+
+GIVEN `is complete` IS A BOOLEAN TYPICALLY TRUE
+GIVETH A DEONTIC Actor Action
+`the acknowledgement` MEANS
+    PARTY Filer
+    MUST acknowledge
+    PROVIDED `is complete`
+    WITHIN 7
+
+GIVETH A DEONTIC Actor Action
+`the filing` MEANS
+    PARTY Filer
+    MUST file
+    WITHIN 30
+    HENCE `the acknowledgement` FALSE

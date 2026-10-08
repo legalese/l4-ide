@@ -1,0 +1,17 @@
+-- Two exported decisions read an input called `rate`. One writes TYPICALLY 3 and
+-- the other writes nothing, and OpenFisca gives an input with no TYPICALLY its
+-- own default for the type (0.0). One variable, one default: taking 3 would
+-- change what the second decision answers, so the export refuses and says so.
+-- (TYPICALLY 0 against none is NOT a disagreement: the variable is the same.)
+
+@export Scaled amount
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+scaled base rate MEANS base * rate
+
+@export Capped amount
+GIVEN base IS A NUMBER
+      rate IS A NUMBER
+GIVETH A NUMBER
+capped base rate MEANS (base * rate) - 1

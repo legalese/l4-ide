@@ -177,6 +177,35 @@ spec bin = do
       sout `shouldSatisfy`
         ("match a.class with pattern -- Domestic : 0.2" `isInfixOf`)
 
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC T5. A section GIVEN's and an ASSUME's default
+    -- lowers as a rule GIVEN's does; a record field's cannot (a Catala structure
+    -- has no field defaults), so it is dropped and said so.
+    it "lowers a section GIVEN's and an ASSUME's TYPICALLY to a context with a default" $ do
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/defaults.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("  context rate content decimal" `isInfixOf`)
+      sout `shouldSatisfy` ("  context allowance content decimal" `isInfixOf`)
+      sout `shouldSatisfy` ("  definition rate\n    equals\n      3.0" `isInfixOf`)
+      sout `shouldSatisfy` ("  definition allowance\n    equals\n      100.0" `isInfixOf`)
+
+    it "says, in the notes block, that a record field's TYPICALLY was dropped" $ do
+      Output code sout serr <- runL4 bin ["export", "catala", "examples/catala/defaults.l4"]
+      code `shouldBe` ExitSuccess
+      let note = "field `timeout` of `Config` carries TYPICALLY 30, which is dropped"
+      sout `shouldSatisfy` (note `isInfixOf`)
+      serr `shouldSatisfy` (note `isInfixOf`)
+      -- ... and the field itself is still emitted, with no default of its own
+      sout `shouldSatisfy` ("  data timeout content decimal" `isInfixOf`)
+
+    it "compiles the section GIVEN / ASSUME / field exhibit to its golden" $
+      expectGolden bin ["export", "catala", "examples/catala/defaults.l4"]
+                       "examples/catala/expected/defaults.catala_en"
+
+    it "leaves a module with no TYPICALLY on an input as it was (no TYPICALLY note)" $ do
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/flat-tax.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` (not . ("carries TYPICALLY" `isInfixOf`))
+
     -- L4 has no way to omit an argument, so every ordinary test scope supplies
     -- the cap and the emitted `definition cap equals 500.0` is dead: change it
     -- and nothing fails. The twin scope omits it, over a directive whose cap

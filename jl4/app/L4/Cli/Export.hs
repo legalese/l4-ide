@@ -77,7 +77,7 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
-import L4.Bpmn.Lower (stateGraphToBpmn)
+import L4.Bpmn.Lower (bpmnDefaultNotes, stateGraphToBpmn)
 import L4.Bpmn.Wiring (wiringFromDrg)
 import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (Drg, DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
@@ -85,7 +85,7 @@ import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMayb
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Annotation (rangeOf)
 import L4.Interchange.Fidelity
-  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
+  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), addNote, renderReport)
 import L4.StateGraph (StateGraph (..), extractStateGraphs)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
@@ -472,6 +472,9 @@ dmnDrgFor opts tcRes = do
                 , Just r <- [rangeOf e]
                 ]
             , dloExternalRefNames = externalRefs
+            -- Read by D-TYPICALLY alone: a default written in an imported file
+            -- and read by an emitted decision is lost to the model like a local one.
+            , dloImports = dedupModules (transitiveDeps tcRes)
             }
           tcRes.module'
   pure drg
@@ -511,7 +514,10 @@ exportBpmn opts tcRes = do
           (BpmnOptions {optDeadlineUnit = policy, optWiring = Just (wiringFromDrg drg)})
           sg
   emitArtifact opts (renderBpmn bx)
-  pure bx.bxFidelity
+  -- The graph has forgotten the module, so the notes that need its binders
+  -- (a TYPICALLY the process cannot carry) are added here, where both exist.
+  pure (foldl' (flip addNote) bx.bxFidelity
+    (bpmnDefaultNotes (dedupModules (transitiveDeps tcRes)) tcRes.module' sg))
 
 -- | Pick the one regulative rule to draw.
 --

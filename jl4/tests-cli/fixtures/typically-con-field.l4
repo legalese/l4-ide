@@ -1,0 +1,16 @@
+-- A TYPICALLY on the field of a sum type's constructor: a fifth place a default
+-- can sit, which the checker accepts. It is neither a record field nor a GIVEN,
+-- and no selector names it (a pattern takes the payload apart). Every export that
+-- accepts the module must say what became of the default, and the ones that
+-- cannot carry it refuse by name.
+DECLARE Shape IS ONE OF
+  Circle HAS radius IS A NUMBER TYPICALLY 1
+  Square HAS side IS A NUMBER
+
+@export default the area
+GIVEN s IS A Shape
+GIVETH A NUMBER
+DECIDE `the area` IS
+  CONSIDER s
+  WHEN Circle r THEN r TIMES r TIMES 3
+  WHEN Square x THEN x TIMES x

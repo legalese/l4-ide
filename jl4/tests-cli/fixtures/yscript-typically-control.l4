@@ -1,0 +1,7 @@
+-- The control for the two TYPICALLY refusals beside it: the same module with no
+-- TYPICALLY, which compiles. Without it the refusals could be about anything.
+ASSUME `has capacity` IS A BOOLEAN
+ASSUME `is adult` IS A BOOLEAN
+
+@export May contract
+`may contract` MEANS `has capacity` AND `is adult`

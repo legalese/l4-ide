@@ -1,0 +1,31 @@
+-- TYPICALLY on a section GIVEN, an ASSUME and a record field, in one exhibit.
+--
+-- A section GIVEN's or an ASSUME's TYPICALLY lowers exactly as a rule's own
+-- GIVEN does (R10, see tariff.l4): the scope variable becomes a Catala `context`
+-- with an in-scope `definition` of the default, so a Catala caller may leave it
+-- out. A record field cannot be mapped the same way, because a Catala structure
+-- has no field defaults: the default is dropped and the notes block says so.
+--
+-- `rate` (a section GIVEN) is 3 unless a caller says otherwise, `allowance` (an
+-- ASSUME) is 100, and `timeout` (a field) is 30 in L4 and nothing in Catala.
+--
+-- There is no directive: a decision that reads a module-level input cannot be a
+-- generated Catala `#[test]` scope (a test scope declares no inputs), and L4 does
+-- not evaluate an ASSUME's default, so no L4 oracle exists for this module. Two
+-- things pin the mapping instead: tests that read the emitted text, and the
+-- hand-written scopes in tests/defaults.catala_en, which etc/validate-catala.mjs
+-- appends to a staged copy of the golden and runs under `clerk test`.
+
+§ `Rates`
+    GIVEN rate IS A NUMBER TYPICALLY 3
+
+ASSUME allowance IS A NUMBER TYPICALLY 100
+
+DECLARE Config HAS
+    timeout IS A NUMBER TYPICALLY 30
+    retries IS A NUMBER
+
+@export Budget for a configuration
+GIVEN c IS A Config
+GIVETH A NUMBER
+`budget` c MEANS ((c's timeout) TIMES (c's retries) TIMES rate) PLUS allowance

@@ -92,6 +92,60 @@ describe the target notation's limits rather than a defect in your file — DMN 
 substantially less expressive than L4 — which is why `--fail-on` defaults to `none`. A clean exit
 means the export ran, not that everything made it across.
 
+### `TYPICALLY`: neither carries a default, and both say so
+
+[`TYPICALLY`](../reference/types/TYPICALLY.md) gives a name a default, the value to use when nothing
+supplies one. Neither notation has anywhere to put it, so each reports every default it could not
+carry, at lossy severity, instead of dropping it without a word.
+
+**DMN** (`D-TYPICALLY`, also in the `dmn-md` report). A DMN `inputData`, a business knowledge model
+parameter and a record's `itemComponent` have no default. What an evaluation that leaves one out gets
+is up to the engine. For a top-level input the two the export is checked against disagree: **Camunda 8
+reads `null`, and KIE reports a model error and skips every decision that needed it.** For a component
+of a record they agree, in the quieter direction: **both read `null`, and neither says a word**. A
+decision that multiplies the missing component answers `null`, and KIE reports that decision as
+succeeded (measured on the `defaults.l4` exhibit with the record's `timeout` left out, Camunda 8.7.6 and
+KIE 8.44.0.Final). Neither reads the default. Worse,
+a decision table over a missing input does not fail on Camunda: `null` matches no condition, so the
+table falls through to its `OTHERWISE` row, and answers confidently with a number the source never
+gave (measured on the `defaults.l4` exhibit: with `income` left out, Camunda answers band 1, where the
+default `TYPICALLY 50000` gives band 2). The export does not rewrite every read as
+`if x = null then d else x`, which would change what each decision says, and for a top-level input would not help KIE at all (it skips the decision before any expression runs).
+It reports one note per default: a rule's own `GIVEN`, a section `GIVEN`, an `ASSUME`, and every record
+field of every `DECLARE` (the model carries all of them whether a decision reads them or not), and the
+field of a sum type's constructor. For a sum type with more than one constructor DMN keeps the
+constructors' names and not their payload (`D-SUMTYPE`, blocking), so the field and its default are both
+gone, and the note says so. A default
+written in a file the module imports is reported too, when an emitted decision reads the name (an
+imported `ASSUME`, or a field of an imported record), and the note says which module it is in. An
+imported `ASSUME` is a special case: the model gets no `inputData` for it at all (the decision's FEEL
+text names it, and nothing declares it), so KIE cannot load the model, and Camunda 8 reads `null` for
+it unless the evaluation context supplies the name. Its note says that, instead of describing an input
+that is not there. Supply every input the model declares; do not rely on its omission to mean the
+default.
+
+**BPMN** (`P-TYPICALLY`). A process draws no data: a `PROVIDED` condition becomes an opaque
+`conditionExpression` (`F4`), which reads whatever the process instance holds, so an instance that never
+set the variable does not get the default. The note is raised for the drawn rule's own `GIVEN`s (they are
+the process's inputs), for the section `GIVEN`s and `ASSUME`s its body reads, and for every defaulted field
+of a record the process handles. "Reads" follows the call graph through every rule the body reaches, in
+this file or an imported one, and the note names the module when the default is written in an imported
+file. A record is "handled" when it, or the sum type whose constructor holds the field, is named in the
+signature of the drawn rule or of any rule it reaches, or in the type of an `ASSUME` it reads, or is the
+type of a field of one of those. A condition is opaque text, so nothing says that no condition reads a
+field of a record the rule handles, whether it names the field (``PROVIDED s's `in good standing` ``) or a
+helper takes the record apart; the note is raised for each defaulted field, read or not, and says what the
+process lost: an instance that holds an `s` without it does not get the default.
+
+Two things are left out on purpose. The `GIVEN` of a rule the drawn one reaches, by `HENCE` or from a
+condition, is not reported: the call supplies every argument, so the source does not rely on that
+default in this process. What the process loses there is the argument itself, which BPMN has never drawn,
+and which has no note of its own (it is older than `TYPICALLY`). And a default on an input of an unrelated
+rule is not this process's loss.
+
+Neither note is `blocking` (the notations are not at fault for lacking a default), so
+`--fail-on=lossy` is the setting that makes a default you meant to carry stop a pipeline.
+
 The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with no unit, and BPMN
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`
 emits no timer and records that instead. Neither silently invents a unit.

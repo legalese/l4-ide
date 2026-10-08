@@ -1,0 +1,10 @@
+-- A string default on a synonym of STRING. OpenFisca does not recognise the
+-- synonym `Label` and would hold the variable as a number, so the export refuses
+-- the default, and says that the type is the cause (not that "x" is not a number).
+DECLARE Label IS A STRING
+
+@export Allowance
+GIVEN l IS A Label TYPICALLY "x"
+      period IS A STRING
+GIVETH A NUMBER
+allowance l period MEANS IF l EQUALS "x" THEN 1 ELSE 0

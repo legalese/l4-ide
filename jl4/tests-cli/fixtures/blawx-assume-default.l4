@@ -1,0 +1,14 @@
+-- An ASSUMEd predicate that carries a TYPICALLY. It becomes an input predicate
+-- the Blawx interview asks about, so the default is dropped, and the export has
+-- to say so (R-TYPICALLY). The older spelling is used on purpose: a section GIVEN
+-- with a scalar default has no category subject and is refused by Blawx before
+-- it could carry anything.
+DECLARE Person IS ONE OF alice, bob
+
+GIVEN p IS A Person
+ASSUME `is authorised` p IS A BOOLEAN TYPICALLY TRUE
+
+@export May enter
+GIVEN q IS A Person
+GIVETH A BOOLEAN
+`may enter` q MEANS `is authorised` q

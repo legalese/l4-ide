@@ -1,0 +1,59 @@
+## Tests
+
+These scopes are hand-written, and `etc/validate-catala.mjs` appends them to a
+staged copy of `defaults.catala_en`; they are not part of the golden.
+A generated test scope declares no inputs, so it cannot call `Budget`, whose
+`rate` (a section GIVEN) and `allowance` (an ASSUME) are `context` variables.
+
+The expected values are worked out from the source, `defaults.l4`: with
+`timeout` 30 and `retries` 2 the decision is `(30 * 2) * rate + allowance`.
+The source's defaults are 3 and 100, so a caller that omits both gets 280.
+L4's own `#EVAL` honours the section GIVEN's default and does not yet honour the
+ASSUME's, which is what T2 and W6 of TYPICALLY-ONE-BEHAVIOUR-SPEC change, so
+the two languages agree today on `rate` only.
+
+```catala-metadata
+#[description = "Both contexts omitted: the in-scope defaults, 3 and 100, supply them."]
+#[test] declaration scope TestOmitted:
+  output result content decimal
+
+#[description = "Only rate supplied: the supplied 5 replaces the default 3, and allowance keeps its default."]
+#[test] declaration scope TestRateSupplied:
+  output result content decimal
+
+#[description = "Both supplied: neither default is used."]
+#[test] declaration scope TestBothSupplied:
+  output result content decimal
+```
+
+```catala
+scope TestOmitted:
+  definition result
+    equals
+      (output of Budget with { -- c: Config { -- timeout: 30.0 -- retries: 2.0 } }).budget
+
+scope TestRateSupplied:
+  definition result
+    equals
+      (output of Budget with { -- c: Config { -- timeout: 30.0 -- retries: 2.0 } -- rate: 5.0 }).budget
+
+scope TestBothSupplied:
+  definition result
+    equals
+      (output of Budget with { -- c: Config { -- timeout: 30.0 -- retries: 2.0 } -- rate: 5.0 -- allowance: 1.0 }).budget
+```
+
+```catala-test-cli
+$ catala test-scope TestOmitted --disable-warnings -F json
+{"result":"280"}
+```
+
+```catala-test-cli
+$ catala test-scope TestRateSupplied --disable-warnings -F json
+{"result":"400"}
+```
+
+```catala-test-cli
+$ catala test-scope TestBothSupplied --disable-warnings -F json
+{"result":"301"}
+```

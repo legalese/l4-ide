@@ -32,6 +32,14 @@ languages agree on those points — the middle tier of the OpenFisca doc's
 three-tier claim ladder (golden / executed round-trip / law-validated), never
 the third.
 
+A generated test scope declares no inputs, so it cannot call a decision that
+reads a section `GIVEN` or an `ASSUME`. For those, a hand-written file of the
+same name under `tests/` is appended to the staged copy of the golden before
+anything runs (`tests/defaults.catala_en` pins the `context` defaults of
+`defaults.l4`: omitted, one supplied, both supplied). It is never written into
+a golden, and its expected values are worked out from the source and said so,
+not computed by L4's evaluator.
+
 | file           | what it exercises                                                                                                                       |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `benefit.l4`   | spec Appendix A: `UNLESS` proviso → exception ladder, `WHERE` → `let … in`, a cross-decision call, one `#EVAL`                            |

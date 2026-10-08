@@ -58,7 +58,8 @@ wrong export is worse than no export, because it looks like it worked.
 ## Fidelity reports
 
 Three of the exports — docassemble, DMN and BPMN — emit a **fidelity report** alongside the
-document: an itemised list of everything the target notation could not carry, at three severities.
+document (Blawx prints one kind of note, for a dropped `TYPICALLY`; see
+[below](#what-each-export-does-with-typically)): an itemised list of everything the target notation could not carry, at three severities.
 
 | Severity     | Meaning                                               |
 | ------------ | ----------------------------------------------------- |
@@ -72,9 +73,54 @@ than a defect in your file**, and fires on most realistic exports. Read the repo
 a clean exit means a complete translation.
 
 OpenFisca, Catala and yscript do not emit fidelity reports. They rely on refusal — plus, in
-Catala's case, a machine-checked equivalence argument — see those pages. yscript's refusal is
+Catala's case, a machine-checked equivalence argument and a block of notes at the top of the
+emitted module — see those pages. yscript's refusal is
 whole-run rather than per-element: any offender anywhere in the exported closure means nothing is
 written at all, not a smaller document with notes about what was cut.
+
+## What each export does with `TYPICALLY`
+
+[`TYPICALLY`](../reference/types/TYPICALLY.md) gives a name a default: the value to use when nothing
+supplies one. A default is a statement about what to presume, so an export either carries it into a
+mechanism of the target that means the same thing, or says that it could not. **None of them drops
+it quietly, and none of them replaces it with a default of the target's own.**
+
+| Export                            | A rule's own `GIVEN`                                              | A section `GIVEN` or `ASSUME`                | A record field                                             |
+| --------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| **[docassemble](docassemble.md)** | pre-fills the question (`default:`), and says so (`DA-TYPICALLY`) | the same                                     | the same                                                   |
+| **[OpenFisca](openfisca.md)**     | the variable's `default_value`                                    | refused (the export reads no section inputs) | the variable's `default_value`                             |
+| **[Catala](catala.md)**           | a `context` variable with an in-scope default                     | the same                                     | dropped; the notes block says so                           |
+| **[Blawx](blawx.md)**             | dropped; `R-TYPICALLY` on stderr and in the `.pl` header          | dropped, the same way                        | dropped, the same way                                      |
+| **[DMN](dmn-bpmn.md)**            | dropped; `D-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | dropped, the same way                                      |
+| **[BPMN](dmn-bpmn.md)**           | dropped; `P-TYPICALLY` in the fidelity report (lossy)             | dropped, the same way                        | dropped, the same way, for a record the drawn rule handles |
+| **[yscript](yscript.md)**         | not exportable (a rule with `GIVEN`s is refused already)          | **refused**, naming the fact and its default | not exportable                                             |
+
+Four things the table cannot show:
+
+- **A default the checker does not yet accept still gets one of these answers.** `TYPICALLY` must
+  be a literal today. When it is allowed to be an expression, OpenFisca will turn it into a formula
+  that a supplied input overrides (and refuse an expression it cannot lower), Catala will lower it
+  as the in-scope definition, DMN, BPMN and Blawx will print it in their notes, docassemble will
+  refuse the module, and yscript will refuse it. No export is left with an arm that never saw one.
+  (docassemble already refuses the module for a default it cannot pre-fill that the checker does
+  accept: `TYPICALLY NOTHING` on a `MAYBE`. The refusal is whole-module, so it does not matter whether
+  the rule carrying it is the default export.)
+- **The field of a sum type's constructor is a fifth place.** A default written as
+  `Circle HAS radius IS A NUMBER TYPICALLY 1` inside `DECLARE Shape IS ONE OF ...` is accepted by the
+  checker, and is neither a record field nor a `GIVEN`. docassemble pre-fills the follow-up question it
+  asks when that constructor is chosen; Catala, DMN, dmn-md, BPMN and Blawx say the default is dropped
+  (DMN adds that it keeps no payload for a sum type at all); OpenFisca refuses the module, naming the
+  field. yscript has no types, and refuses a rule with a parameter before it could meet one.
+- **A default written in an imported file counts when the export reads it.** DMN, dmn-md, BPMN and
+  Catala report it, and name the imported module in the note. OpenFisca, Blawx, docassemble and
+  yscript refuse an imported `ASSUME` or an imported record field that the exported rule reads
+  (measured on the 2026-10-03 build: exit 1, nothing written), so none of them can carry one away
+  unannounced. A default on an imported rule's own `GIVEN` is not reported, because the exported
+  rule reaches that rule by calling it, and a call supplies every argument.
+- **OpenFisca is the one target that cannot be left to say nothing.** It gives every variable a
+  default whether or not you wrote one (`0.0`, `False`, the first member of an enum), so a
+  `TYPICALLY` it did not write out would be silently replaced by that. It maps every default, and
+  refuses the ones with no OpenFisca value.
 
 ## What these exports are not
 

@@ -54,7 +54,7 @@ import qualified Data.Yaml as Yaml
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath (replaceExtension, takeBaseName, takeExtension, takeFileName)
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPutStr, hPutStrLn, stderr)
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
@@ -63,13 +63,14 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 import L4.EvaluateLazy (EvalDirectiveResult (..))
 
 import L4.Blawx.Blocks (BlockTree (..), toBlockTrees)
-import L4.Blawx.Emit (blawxXmlGaps, renderBlawxYaml, renderPlDump)
+import L4.Blawx.Emit (blawxXmlGaps, renderBlawxYaml, renderPlDumpWith)
 import L4.Blawx.IR (BlawxDoc (..))
 import L4.Blawx.Lift (LiftContext (..), liftBlawx, renderLiftDiag)
 import L4.Blawx.Lower (lowerBlawx)
 import L4.Blawx.Parse
 import L4.Blawx.Xml (parseXml)
-import L4.Relational.IR (renderLowerError)
+import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
+import L4.Relational.IR (RelProgram (..), renderLowerError)
 import L4.Relational.Lower (defaultLowerOptions, lowerModule)
 import qualified L4.TypeCheck.Types as TypeCheck
 
@@ -163,7 +164,7 @@ exportCmd opts = do
           \or choose a non-.pl output path" )
       exitFailure
     _ -> pure ()
-  doc <- loadBlawxDoc opts.bxFile
+  (doc, notes) <- loadBlawxDoc opts.bxFile
   -- A workspace or test with no Blockly image ships an empty `xml_content`
   -- beside a non-empty `scasp_encoding`: the Blawx editor draws a blank
   -- canvas for it and its first Save writes that blankness back over the rule
@@ -173,8 +174,21 @@ exportCmd opts = do
   forM_ (blawxXmlGaps doc) \g ->
     hPutStrLn stderr
       ("l4 export blawx: WARNING no Blockly image, xml_content left empty — " <> Text.unpack g)
+  -- A TYPICALLY the export could not carry. Blawx has no default machinery, so
+  -- the default is dropped, and a default dropped in silence is a different
+  -- presumption in the target (TYPICALLY-ONE-BEHAVIOUR-SPEC T5/T5b). The same
+  -- notes ride in the .pl header, for a reader who only has the file.
+  unless (null notes) $ do
+    let nTypically = length [ () | n <- notes, n.code == "R-TYPICALLY" ]
+    hPutStrLn stderr $
+      if nTypically == length notes
+        then "l4 export blawx: " <> show nTypically <> " TYPICALLY default"
+               <> (if nTypically == 1 then "" else "s") <> " not carried — Blawx has no default machinery"
+        else "l4 export blawx: " <> show (length notes) <> " note" <> (if length notes == 1 then "" else "s")
+               <> " on what Blawx could not carry (" <> show nTypically <> " of them TYPICALLY defaults)"
+    hPutStr stderr (Text.unpack (renderReport (MkFidelityReport "Blawx" notes)))
   let source = Text.pack (takeFileName opts.bxFile)
-      plDump = renderPlDump source doc
+      plDump = renderPlDumpWith notes source doc
   if opts.bxScasp
     then case opts.bxOutput of
       Just f  -> Text.writeFile f plDump
@@ -209,7 +223,7 @@ exportCmd opts = do
 -- the assumed-predicate style still compiles to Blawx while backlog B — the
 -- JSON side learning to carry a predicate as an enumerated row of values —
 -- is outstanding. See @specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.21.
-loadBlawxDoc :: FilePath -> IO BlawxDoc
+loadBlawxDoc :: FilePath -> IO (BlawxDoc, [FidelityNote])
 loadBlawxDoc file = do
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
   (errs, mTc) <- runOneshot evalConfig file \nfp -> do
@@ -236,18 +250,29 @@ loadBlawxDoc file = do
                      \an assumed rule is not one. That does not apply to Blawx, where such a \
                      \rule becomes an #abducible the interview asks about, so the export \
                      \proceeds. `l4 check` will report the same diagnostics and exit 1." )
-          case lowerModule defaultLowerOptions tc.entityInfo tc.module'
-                 >>= lowerBlawx of
-            Left lerrs -> do
-              putDiagnostics
-                ( "l4 export blawx: cannot compile these decisions to Blawx:"
-                : map (("  - " <>) . renderLowerError) lerrs
-                )
-              exitFailure
-            Right doc -> pure doc
+          -- The middle end's report is read here, filtered by SEVERITY and not by
+          -- code: a loss (Blocking or Lossy) is printed, whoever raises it, and
+          -- an Advisory is not. The channel was promised for @R-TYPICALLY@, and
+          -- that is the only loss the corpus raises today, so this prints what
+          -- a filter on the code would; what it changes is that the next Lossy
+          -- note the middle end learns to raise is loud by default instead of
+          -- silent on every user channel. (@R-SORT@ at Advisory stays out.)
+          case lowerModule defaultLowerOptions tc.entityInfo tc.module' of
+            Left lerrs -> lowerFailure lerrs
+            Right prog -> case lowerBlawx prog of
+              Left lerrs -> lowerFailure lerrs
+              Right doc ->
+                pure (doc, [ n | n <- prog.rpgFidelity.notes, n.severity <= Lossy ])
     _ -> do
       putDiagnostics errs
       exitFailure
+ where
+  lowerFailure lerrs = do
+    putDiagnostics
+      ( "l4 export blawx: cannot compile these decisions to Blawx:"
+      : map (("  - " <>) . renderLowerError) lerrs
+      )
+    exitFailure
 
 -- ---------------------------------------------------------------------------
 -- Import (P5)
@@ -482,7 +507,7 @@ censusLine stem src diags nErrs nWarns =
 -- datum that survives into the IR but in a different spelling.
 roundtripCmd :: BlawxOptions -> IO ()
 roundtripCmd opts = do
-  doc <- loadBlawxDoc opts.bxFile
+  (doc, _notes) <- loadBlawxDoc opts.bxFile
   let yaml = renderBlawxYaml doc
   stream <- case Yaml.decodeEither' (TE.encodeUtf8 yaml) of
     Left e -> die ("re-reading our own YAML failed: " <> Text.pack (Yaml.prettyPrintParseException e))

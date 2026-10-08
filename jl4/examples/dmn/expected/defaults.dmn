@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_capacity" name="Capacity" namespace="https://legalese.com/l4/dmn/capacity" exporter="jl4">
+  <itemDefinition id="itemdef_config" name="Config">
+    <itemComponent id="itemdef_config_c1" name="timeout">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_config_c2" name="retries">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <inputData id="input_has_capacity" name="has_capacity" label="has capacity">
+    <variable id="input_has_capacity_var" name="has_capacity" label="has capacity" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_is_adult" name="is_adult" label="is adult">
+    <variable id="input_is_adult_var" name="is_adult" label="is adult" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_base" name="base">
+    <variable id="input_base_var" name="base" typeRef="number"/>
+  </inputData>
+  <inputData id="input_rate" name="rate">
+    <variable id="input_rate_var" name="rate" typeRef="number"/>
+  </inputData>
+  <inputData id="input_c" name="c">
+    <variable id="input_c_var" name="c" typeRef="Config"/>
+  </inputData>
+  <inputData id="input_income" name="income">
+    <variable id="input_income_var" name="income" typeRef="number"/>
+  </inputData>
+  <decision id="decision_may_contract" name="may_contract" label="may contract">
+    <variable id="decision_may_contract_var" name="may_contract" label="may contract" typeRef="boolean"/>
+    <informationRequirement id="decision_may_contract_ir1">
+      <requiredInput href="#input_has_capacity"/>
+    </informationRequirement>
+    <informationRequirement id="decision_may_contract_ir2">
+      <requiredInput href="#input_is_adult"/>
+    </informationRequirement>
+    <literalExpression id="decision_may_contract_literal">
+      <text>has_capacity and is_adult</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_fee" name="the_fee" label="the fee">
+    <variable id="decision_the_fee_var" name="the_fee" label="the fee" typeRef="number"/>
+    <informationRequirement id="decision_the_fee_ir1">
+      <requiredInput href="#input_base"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_fee_ir2">
+      <requiredInput href="#input_rate"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_fee_literal">
+      <text>base * rate</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_budget" name="the_budget" label="the budget">
+    <variable id="decision_the_budget_var" name="the_budget" label="the budget" typeRef="number"/>
+    <informationRequirement id="decision_the_budget_ir1">
+      <requiredInput href="#input_c"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_budget_literal">
+      <text>c.timeout * c.retries</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_band" name="the_band" label="the band">
+    <variable id="decision_the_band_var" name="the_band" label="the band" typeRef="number"/>
+    <informationRequirement id="decision_the_band_ir1">
+      <requiredInput href="#input_income"/>
+    </informationRequirement>
+    <decisionTable id="decision_the_band_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="the band">
+      <input id="decision_the_band_i1" label="income">
+        <inputExpression id="decision_the_band_i1_expr" typeRef="number">
+          <text>income</text>
+        </inputExpression>
+      </input>
+      <output id="decision_the_band_o1"/>
+      <rule id="decision_the_band_r1">
+        <description>income AT LEAST 100000</description>
+        <inputEntry id="decision_the_band_r1_i1">
+          <text>&gt;= 100000</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r1_o1">
+          <text>3</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_band_r2">
+        <description>income AT LEAST 50000</description>
+        <inputEntry id="decision_the_band_r2_i1">
+          <text>&gt;= 50000</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r2_o1">
+          <text>2</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_the_band_r3">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_the_band_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_the_band_r3_o1">
+          <text>1</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_capacity_diagram" name="Capacity">
+      <dmndi:DMNShape id="input_has_capacity_shape" dmnElementRef="input_has_capacity">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_is_adult_shape" dmnElementRef="input_is_adult">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_base_shape" dmnElementRef="input_base">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_rate_shape" dmnElementRef="input_rate">
+        <dc:Bounds x="720" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_c_shape" dmnElementRef="input_c">
+        <dc:Bounds x="940" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_income_shape" dmnElementRef="input_income">
+        <dc:Bounds x="1160" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_may_contract_shape" dmnElementRef="decision_may_contract">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_fee_shape" dmnElementRef="decision_the_fee">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_budget_shape" dmnElementRef="decision_the_budget">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_band_shape" dmnElementRef="decision_the_band">
+        <dc:Bounds x="720" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_may_contract_ir1_edge" dmnElementRef="decision_may_contract_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_may_contract_ir2_edge" dmnElementRef="decision_may_contract_ir2">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_fee_ir1_edge" dmnElementRef="decision_the_fee_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_fee_ir2_edge" dmnElementRef="decision_the_fee_ir2">
+        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_budget_ir1_edge" dmnElementRef="decision_the_budget_ir1">
+        <di:waypoint x="1030" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_band_ir1_edge" dmnElementRef="decision_the_band_ir1">
+        <di:waypoint x="1250" y="220"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

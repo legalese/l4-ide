@@ -1,0 +1,9 @@
+-- A nullary ASSUME BOOLEAN fact that carries a TYPICALLY, read by the exported
+-- rule. A yscript consultation asks the user for every fact, so the default would
+-- be dropped; R5 refuses the module rather than export one that asks a question
+-- the source had already answered.
+ASSUME `has capacity` IS A BOOLEAN TYPICALLY TRUE
+ASSUME `is adult` IS A BOOLEAN
+
+@export May contract
+`may contract` MEANS `has capacity` AND `is adult`
