@@ -322,8 +322,10 @@ spec bin = do
         mentionsOldName out = any (`isInfixOf` out) generatedSpellings
 
     it "reads the clauses as one list of cases in l4 render" $ do
-      Output code sout _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
+      Output code sout0 _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
       code `shouldBe` ExitSuccess
+      -- Windows ends lines with a carriage return, as in the l4 format test.
+      let sout = filter (/= '\r') sout0
       sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
       sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
       sout `shouldSatisfy` ("- otherwise: the result of clause 2" `isInfixOf`)
