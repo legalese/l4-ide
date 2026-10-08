@@ -207,7 +207,7 @@ case $? in
   *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
 esac
 
-step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6"
+step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
 # worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
