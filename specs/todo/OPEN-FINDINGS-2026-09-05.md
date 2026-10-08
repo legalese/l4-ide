@@ -639,5 +639,5 @@ Filed by whoever holds GitHub write authority. **Nothing here has been posted ex
 | OF-10      | Nothing — discharged (term role 2026-09-06, type role 2026-10-07); see OF-10.                                                                                                                       |
 | OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15, on `unstable` since #338.                                                                                                             |
 | OF-13      | **FILED** 2026-10-06 as smucclaw/l4-ide#1005.                                                                                                                                                       |
-| OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006.                                                                                                                                                       |
+| OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006. **FIXED** by legalese/l4-ide#549 (35d7b63b3) on `unstable`, re-measured 2026-10-08 (wrapper path `200 6`); #1006 closed. Not on `main`.               |
 | OF-15      | **FILED** 2026-10-06 as smucclaw/l4-ide#1007.                                                                                                                                                       |
