@@ -114,6 +114,11 @@ evalAssumedFixture = fixtureDir </> "eval-assumed.l4"
 evalUndeterminedFixture :: FilePath
 evalUndeterminedFixture = fixtureDir </> "eval-undetermined.l4"
 
+evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture :: FilePath
+evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
+evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
+evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -418,6 +423,7 @@ coreFixtures =
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB, batchClausesCatchAll
   , evalUndeterminedFixture
+  , evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture
   ]
 
 spec :: FilePath -> Spec
@@ -659,6 +665,26 @@ spec bin = do
               other -> expectationFailure ("Expected the default report's text, got " ++ show other)
           other -> expectationFailure ("Expected 1 result, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Found in review of the step-3 rebase: reading the term an unknown
+    -- stands for followed a name bound to itself (or to a cycle of names)
+    -- without spending any of its budget, so these never answered. The run is
+    -- killed after 20 s, which fails the test where an in-process test would
+    -- hang the suite.
+    describe "a name that is bound to itself, under an unknown" $
+      mapM_
+        (\(label, fixture, needed) ->
+          it ("answers, naming the unknown it is stuck on: " ++ label) $ do
+            r <- runL4Within 20 bin ["run", fixture, "--json"]
+            case r of
+              Nothing -> expectationFailure "l4 run did not answer within 20 s"
+              Just out -> do
+                out.outExit `shouldBe` ExitFailure 1
+                out.outStdout `shouldSatisfy` (("\"" ++ needed ++ "\"") `isInfixOf`))
+        [ ("a rule that is its own value", evalAliasLoopFixture, "f")
+        , ("the same inside a list", evalAliasLoopListFixture, "x")
+        , ("two names bound to each other", evalAliasCycleFixture, "f")
+        ]
 
     -- A residual: two inputs, both named, in the order evaluation reached
     -- them, and the run fails (§4.12 row 23).

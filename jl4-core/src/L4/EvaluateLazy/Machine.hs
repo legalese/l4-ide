@@ -6165,7 +6165,9 @@ refTerm r = do
   budget <- liftIO (newIORef termReadBound)
   readRefTerm budget r
 
--- | How many nodes 'valueTerm' reads before it gives up.
+-- | How many steps 'valueTerm' takes before it gives up: one for each value
+-- node it reads and one for each alias (a name bound to a name) it follows,
+-- so that a cycle of aliases, @one IS two@ and @two IS one@, ends too.
 termReadBound :: Int
 termReadBound = 1000
 
@@ -6193,12 +6195,18 @@ readValueTerm budget v = do
         _ -> pure Nothing
 
 readRefTerm :: IORef Int -> Reference -> Machine (Maybe Term)
-readRefTerm budget r = readThunk r >>= \ case
-  WHNF v -> readValueTerm budget v
-  Unevaluated _ (Lit _ lit) _ -> readValueTerm budget =<< runLit lit
-  Unevaluated _ (App _ n []) env | Just r' <- Map.lookup (getUnique n) env -> readRefTerm budget r'
-  Unevaluated _ (Var _ n) env    | Just r' <- Map.lookup (getUnique n) env -> readRefTerm budget r'
-  _ -> pure Nothing
+readRefTerm budget r = do
+  left <- liftIO (readIORef budget)
+  if left <= 0 then pure Nothing else readThunk r >>= \ case
+    WHNF v -> readValueTerm budget v
+    Unevaluated _ (Lit _ lit) _ -> readValueTerm budget =<< runLit lit
+    Unevaluated _ (App _ n []) env | Just r' <- Map.lookup (getUnique n) env -> hop r'
+    Unevaluated _ (Var _ n) env    | Just r' <- Map.lookup (getUnique n) env -> hop r'
+    _ -> pure Nothing
+  where
+    hop r' = do
+      liftIO (modifyIORef' budget (subtract 1))
+      readRefTerm budget r'
 
 -- | The value forms 'runBinOpEquals' compares, when both sides have one.
 supportsEquality :: WHNF -> Bool
