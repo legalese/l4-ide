@@ -541,10 +541,14 @@ data PmSynthetic
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
--- NOTE on serialisation: 'Anno_' serialises as @()@ ('L4.Instances.Serialise'),
--- so 'pmMatrix' never reaches jl4-service's AST cache; 'Extension' still
--- derives 'Serialise', so the field's type needs an instance (see the CPP
--- block at the bottom of this module).
+-- NOTE on serialisation: jl4-service's AST cache (@bundle.cbor@) writes an
+-- annotation through 'Serialise Anno' at the bottom of this module, which
+-- keeps 'pmSynthetic' and none of the other fields below, so 'pmMatrix'
+-- never reaches the cache. A change to 'PmSynthetic' or 'PmGroup' changes the
+-- shape of every cached bundle: one written before the change fails to decode
+-- and is recompiled from source, which is the cache's normal versioning
+-- behaviour. 'Extension' still derives 'Serialise', so every field's type
+-- needs an instance (see the CPP block at the bottom of this module).
 data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
@@ -1012,6 +1016,19 @@ instance Serialise PmMatrix where
   decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode
 deriving anyclass instance Serialise PmGroup
 deriving anyclass instance Serialise PmSynthetic
+-- | An annotation holds the concrete tokens, the source range and what the
+-- checker found, which the IDE needs and an evaluator does not, so a bundle
+-- keeps only 'pmSynthetic', the mark on the nodes a multi-clause group is
+-- compiled to. The evaluator reads that mark to say which rule has no clause
+-- for an input ("No clause of `price` matches these inputs";
+-- 'L4.EvaluateLazy.Machine.consideredClauses'). A module read back from
+-- jl4-service's @bundle.cbor@ without the mark reports a CONSIDER that the
+-- drafter never wrote. An unmarked node still costs one byte, as the @()@ that
+-- used to stand for every annotation did. A bundle written before the mark
+-- was kept does not decode, and the service then recompiles from source.
+instance Serialise Anno where
+  encode = encode . view annPmSynthetic
+  decode = (\ m -> emptyAnno & annPmSynthetic .~ m) <$> decode
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
