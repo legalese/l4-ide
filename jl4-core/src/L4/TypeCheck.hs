@@ -1752,15 +1752,15 @@ checkClauseMatrix dec dHead =
           -- numbers or texts before one that names fewer, so that no row is
           -- covered by a row above it (a row written with the input's name
           -- in a column covers every row keyed in that column, and a keyed
-          -- row has strictly more literals). Stable, so rows with none keep
-          -- the order the enumeration engine gives them.
-          pasteOrder = List.sortOn (negate . sum . map countLits)
-          countLits = \ case
-            PatLit {}       -> 1 :: Int
-            PatApp _ _ ps   -> sum (map countLits ps)
-            PatCons _ p1 p2 -> countLits p1 + countLits p2
-            PatVar {}       -> 0
-            PatExpr {}      -> 0
+          -- row has strictly more literals). Among rows that name as many,
+          -- the order in which the clauses first name those numbers or
+          -- texts (@1 Gold@ before @2 Gold@). Stable, so rows that name
+          -- none keep the order the enumeration engine gives them.
+          pasteOrder = List.sortOn \ row ->
+            let ks = map litKey (concatMap patLits row)
+            in (negate (length ks), map keyRank ks)
+          keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
+          keyRank k = fromMaybe (length keyOrder) (List.elemIndex k keyOrder)
           verdict = case exact >>= fit of
             Just v -> Just v
             Nothing -> do
