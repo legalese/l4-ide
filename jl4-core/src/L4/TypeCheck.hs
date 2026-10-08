@@ -115,7 +115,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.))
+import Optics ((%~), (^.), gplate, traverseOf)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -1588,7 +1588,14 @@ checkClauseMatrix dec dHead =
               forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
                 if patIsColumnWildcard scrutR pat
                   then pure (Just (PatVar (getAnno pat) scrutR))
-                  else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+                  else quietly do
+                    (rpat, _) <- checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty
+                    -- The substitution this check extends is dropped with
+                    -- the rest of its state, so the types the annotations
+                    -- of a nested pattern carry are resolved before it
+                    -- goes: 'clauseVerdict' reads them, and an inference
+                    -- variable left there stands the group down.
+                    traverseOf (gplate @(Type' Resolved)) applySubst rpat
           case traverse sequence rpatssM of
             Just rpatss
               | all (all patternInfoComplete) rpatss -> do
@@ -4344,9 +4351,10 @@ data ClauseVerdict
 -- counts for nothing, as a constant does.
 --
 -- The top-level columns are classified by their types after substitution,
--- never by the pattern's annotation, which 'quietly' re-resolution leaves
--- unsubstituted; a nested position has only its annotation, and an
--- inference variable there is not primitive, so it stands the group down.
+-- never by the pattern's annotation; a nested position has only its
+-- annotation, resolved as far as the substitution goes ('analyseMatrix'),
+-- and an inference variable left there is not primitive, so it stands the
+-- group down.
 clauseVerdict :: EntityInfo -> Map Unique [Resolved] -> [Type' Resolved] -> [Resolved] -> [Pattern Resolved] -> ClauseVerdict
 clauseVerdict ei ctorSets colTypes colScruts pats =
   maximum (ClauseCounts : zipWith3 top colTypes colScruts pats)
