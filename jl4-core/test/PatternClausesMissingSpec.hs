@@ -715,6 +715,29 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     missingClauses exactly `shouldBe` ["DECIDE `f` 1.50 Premium IS", "DECIDE `f` -0.10 Premium IS", "DECIDE `f` n t IS"]
 
+  it "writes a text key as L4 writes it, every printable character as it is" $ do
+    -- Not with the lexer token's Haskell-style escapes, which would write
+    -- "S\227o Paulo"; those are kept only for a character that does not
+    -- print, such as a tab. Every form pastes back.
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium"
+      , ""
+      , "GIVEN city IS A STRING"
+      , "      t IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE f \"S\227o Paulo\"  Basic IS 1"
+      , "DECIDE f \"\1513\1500\1493\1501\"        Basic IS 2"
+      , "DECIDE f \"a\\\"b\\\\c\"     Basic IS 3"
+      , "DECIDE f \"tab\\there\"    Basic IS 4"
+      ]
+    missingClauses ws `shouldBe`
+      [ "DECIDE `f` \"S\227o Paulo\" Premium IS"
+      , "DECIDE `f` \"\1513\1500\1493\1501\" Premium IS"
+      , "DECIDE `f` \"a\\\"b\\\\c\" Premium IS"
+      , "DECIDE `f` \"tab\\there\" Premium IS"
+      , "DECIDE `f` city t IS"
+      ]
+
   it "reads EXACTLY of the input's own name as matching every input" $ do
     total <- warnings $ Text.unlines
       [ "GIVEN n IS A NUMBER"

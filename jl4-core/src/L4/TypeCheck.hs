@@ -97,6 +97,7 @@ import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, can
 import qualified L4.Export as Export
 import qualified L4.ExactPrint as ExactPrint
 import qualified L4.Lexer as Lexer
+import Data.Char (isPrint)
 
 import Control.Applicative
 import Data.Monoid
@@ -4234,19 +4235,28 @@ prettyMissingPattern = go
 
     parensIf b txt = if b then "(" <> txt <> ")" else txt
 
--- | A number or a piece of text as its clause spelled it: @1.0@, @0.10@,
--- @100_000@, @"red"@ with its escapes. The token is read off the literal's
--- own annotation, so a number with more digits than a double holds prints
--- with every digit ('L4.Utils.Ratio.prettyRatio' rounds past sixteen). A
--- literal without a token (one the parser did not make) prints through the
--- generic printer.
+-- | A number as its clause spelled it: @1.0@, @0.10@, @100_000@, @-1@. The
+-- token is read off the literal's own annotation, so a number with more
+-- digits than a double holds prints with every digit
+-- ('L4.Utils.Ratio.prettyRatio' rounds past sixteen); a number without a
+-- token (one the parser did not make) prints through the generic printer.
+--
+-- A piece of text prints as L4 writes it: every printable character as it
+-- is, @"@ and @\\@ escaped ('L4.Print.escapeStringLiteral'). The lexer
+-- keeps only the decoded text, not its spelling, so there is no token to
+-- read, and the token's own display ('L4.Lexer.showStringLit') would write
+-- @"São Paulo"@ as @"S\227o Paulo"@. A text with a character that does
+-- not print (a tab, a newline) is written that way instead, with
+-- Haskell-style escapes, which L4 reads back.
 literalAsWritten :: Lit -> Text
 literalAsWritten lit =
-  case runExcept (ExactPrint.concreteNodesToTokens lit) of
-    Right toks
-      | (tok : _) <- [ t | t@(Lexer.MkPosToken _ (Lexer.TLiterals _)) <- toks ]
-      -> Lexer.displayPosToken tok
-    _ -> prettyLayout lit
+  case lit of
+    StringLit _ t | Text.all isPrint t -> prettyLayout lit
+    _ -> case runExcept (ExactPrint.concreteNodesToTokens lit) of
+      Right toks
+        | (tok : _) <- [ t | t@(Lexer.MkPosToken _ (Lexer.TLiterals _)) <- toks ]
+        -> Lexer.displayPosToken tok
+      _ -> prettyLayout lit
 
 
 -- | Forms a plural when needed.
