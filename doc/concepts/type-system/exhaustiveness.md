@@ -77,7 +77,8 @@ The payoff comes when a category grows. Add a fourth variant to `` `visa status`
 
 ### Primitive types are not checked in a `CONSIDER`
 
-The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set. Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped in a hand-written `CONSIDER` — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
+The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set.
+Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped in a hand-written `CONSIDER` — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -102,6 +103,7 @@ DECIDE `describe count` 1 IS "one"
 ```
 
 The enumeration inputs of the same rule are still analysed, and a clause that repeats a number (`1` after `1.0`) is reported as never used.
+A `DATE` input is matched through `EXACTLY` of a date, which the check cannot name, so such a clause counts for nothing and the clause with the input's name is suggested there too.
 So the same determination warns when written as clauses and does not when written as a `CONSIDER` over a number or a piece of text.
 
 The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the safety property is silently lost. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
@@ -147,7 +149,7 @@ The intended discipline: treat the warnings as a completeness report. A finished
 | Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                        |
 | Unreachable branch                                | Compile-time warning that the branch is redundant                          |
 | `NUMBER` / `STRING` / `DATE` scrutinee            | `CONSIDER`: not analysed — values can't be enumerated                      |
-| Clauses over a `NUMBER` or `STRING` input         | Analysed; the clause with the input's name is suggested when it is missing |
+| Clauses over a `NUMBER`, `STRING` or `DATE` input | Analysed; the clause with the input's name is suggested when it is missing |
 | `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
 | `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                           |
 | `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                    |

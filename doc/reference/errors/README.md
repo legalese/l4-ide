@@ -700,14 +700,19 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `describe` n IS
 ```
 
-The other inputs of the same rule are still analysed: a table keyed by a number and a `Tier` that has no clause for `Gold` is told so, for the keyed rows first and then for every other number.
+The other inputs of the same rule are still analysed: a table keyed by a number and a `Tier` that has no clause for `Gold` is told so, for the keyed rows first, in the order the clauses first name the keys, and then for every other number.
 The same goes for a number or a piece of text nested inside a pattern, as in `(JUST 1)` or `(Box 0)`: the clause for the other values is suggested with `` `_` `` in that place.
+A suggested number is written as the first clause that names it spells it (`1.50`, `1_000`, every digit of `0.1234567890123456789`), and a suggested piece of text as L4 writes it, every printable character as it is (`"São Paulo"`) and a character that does not print escaped (`"tab\there"`).
+An input declared under another name for a number, a piece of text or a date (`DECLARE Money IS A NUMBER`) is one to the check.
 `EXACTLY` of a number, a piece of text, or a value of an enumeration is read as that value, and `EXACTLY` of the input's own name matches every input, as the bare name does.
-Any other `EXACTLY`, such as `EXACTLY someConstant` or `EXACTLY (n PLUS 1)`, compares the input with a value the check cannot name: on an input that is a number or a piece of text the clause counts for nothing, and on an input of an enumeration it stops the check for the rule.
-The check gives up when there would be more than 64 clauses to list.
-It then lists only the clauses that the clauses without a number or a piece of text leave open, which for a rule with no catch-all is the clause with the input's name alone; a gap inside the table is not listed in that case.
+Any other `EXACTLY`, such as `EXACTLY someConstant`, or `EXACTLY (m PLUS 1)` with `m` another input, compares the input with a value the check cannot name.
+Where that input is a number, a piece of text or a date, at the top of the clause or inside a pattern as in `(Box (EXACTLY zero))`, the clause counts for nothing: it matches one value of the input for each value of the other inputs, and only the clause with the input's name covers the rest, which covers that one too.
+Where it is anything else, such as an enumeration or a record, it stops the check for the rule.
+So does an `EXACTLY` whose expression mentions the input it is matched against, as `EXACTLY (n PLUS 0)` does for `n`, since such a clause may match any number of that input's values.
+When there would be more than 64 clauses to list, a rule whose clauses name numbers or texts is told instead what the clauses without a number or a piece of text leave open; when every clause names one, that is the clause with every input's name alone, and a gap inside the table is not listed.
+A rule whose clauses name no number or text gets no missing-clause warning past that cap, and neither does one whose shorter list is also longer than 64 clauses; a clause that is never used is reported either way.
 A rule declared partial on purpose, with `@nonexhaustive` before its `GIVEN`, gets no missing-clause warning.
-A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down for a clause with a number, a piece of text or an `EXACTLY` in it, so `DECIDE f (EXACTLY someConstant) IS 1` on its own gets no warning at all.
+A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down for a clause with a number, a piece of text or an `EXACTLY` in it, so `DECIDE f (EXACTLY someColour) IS 1` on its own, with `c IS A Colour`, gets no warning at all.
 
 **Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions. Whatever the type, a CONSIDER in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`), or is an `EXACTLY` pattern, gets no warning either way, and neither does one with more than 64 missing branches to list. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 This applies to a `CONSIDER` written by hand.
