@@ -90,7 +90,7 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
+import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
 import L4.TypeCheck.Annotation
@@ -396,13 +396,97 @@ suppressResolutionCascade errs
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
-checkProgram module' = do
-  withScanTypeAndSigEnvironment scanTyDeclModule inferTyDeclModule scanFunSigModule module' \rdecides -> do
-    (rprog, topEnv) <- inferProgram module'
-    -- Build the mixfix registry from THIS module's function signatures
-    -- so it can be propagated to importing modules
-    let localMixfixRegistry = buildMixfixRegistry rdecides
-    pure (rprog, topEnv, localMixfixRegistry)
+checkProgram written = do
+  -- 'withScanTypeAndSigEnvironment', with one step between scanning the
+  -- types and scanning the definitions: once the module's constructors are
+  -- known, a run of clauses that the parser grouped on bare names alone is
+  -- told apart from a run of overloads ('separateOverloads').
+  rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
+  withDeclares rdeclares do
+    module' <- separateOverloads written
+    rdecides <- scanFunSigModule module'
+    withDecides rdecides do
+      (rprog, topEnv) <- inferProgram module'
+      -- Build the mixfix registry from THIS module's function signatures
+      -- so it can be propagated to importing modules
+      let localMixfixRegistry = buildMixfixRegistry rdecides
+      pure (rprog, topEnv, localMixfixRegistry)
+
+-- | Turn each run of clauses that the parser grouped only because their bare
+-- names differ ('L4.Parser.decidePatternMatch') back into the separate
+-- definitions it would have been without clause groups, when none of those
+-- names is a constructor.
+--
+-- The parser groups @DECIDE f TRUE IS 1@ / @DECIDE f FALSE IS 0@, and also
+-- @show n MEANS n + 1@ / @show b MEANS b AND TRUE@, because a bare name in a
+-- pattern could be a constructor or a new name, and only resolving it tells
+-- which. The second run is two overloads, told apart by their types; read as
+-- one group, its first clause matched every input and the second was never
+-- used, and a file that runs on @main@ did not check. So here, where
+-- constructors are known: a run in which no pattern is a literal, an applied
+-- constructor or a name that resolves to a constructor is checked as the
+-- definitions it is made of, the first with the run's signature and the rest
+-- with none, as the parser reads them when it does not group them. A run
+-- with a name that is a constructor stays a group, misspellings included:
+-- @Red@ / @Gren@ / @Blue@ is a group whose @Gren@ binds a new name, and
+-- whose last clause is reported as never used.
+--
+-- A name that is its column's own input matches anything rather than naming
+-- a constructor, as the desugarer reads it ('patAlwaysMatchesAs'), so it is
+-- not asked about. Only top-level definitions are ever grouped.
+separateOverloads :: Module Name -> Check (Module Name)
+separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
+  where
+    goSection (MkSection sann mn maka mgiven decls) =
+      MkSection sann mn maka mgiven . concat <$> traverse goDecl decls
+    goDecl = \ case
+      Decide tann d -> overloadsOf d >>= \ case
+        Just (d1 : ds) -> pure (Decide tann d1 : map (Decide emptyAnno) ds)
+        _ -> pure [Decide tann d]
+      Section sann sub -> List.singleton . Section sann <$> goSection sub
+      other -> pure [other]
+
+    overloadsOf :: Decide Name -> Check (Maybe [Decide Name])
+    overloadsOf (MkDecide ann sig (MkAppForm aann hd _ maka) body) =
+      case view annPmMatrix ann of
+        Just matrix
+          | let patterns = map (.patterns) matrix.clauses
+          , length patterns >= 2
+          , Just names <- traverse (traverse barePatternName) patterns -> do
+              let asked = [ n | ns <- names, (s, n) <- zip matrix.scrutinees ns, rawName n /= rawName s ]
+              anyConstructor <- or <$> traverse (fmap isJust . quietly . resolveConstructor) asked
+              pure if anyConstructor then Nothing else do
+                bodies <- clauseBodies matrix.scrutinees patterns body
+                guard (length bodies == length names)
+                pure
+                  [ if i == 0
+                      then MkDecide (set annPmMatrix Nothing ann) sig (MkAppForm aann hd ns maka) b
+                      else MkDecide (rangedAnno (clauseSpan cl b)) noSignature (MkAppForm emptyAnno (headAt hd cl) ns Nothing) b
+                  | (i, cl, ns, b) <- List.zip4 [0 :: Int ..] matrix.clauses names bodies
+                  ]
+        _ -> pure Nothing
+
+    barePatternName = \ case
+      PatApp _ n [] -> Just n
+      _ -> Nothing
+
+    noSignature = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
+
+    -- A clause's head name, at the head's own location ('L4.Parser.givenInputBinding'
+    -- keeps a location the same way).
+    headAt hd cl = MkName (mkAnno [mkHoleWithSrcRangeHint cl.headRange]) (rawName hd)
+
+    -- From the clause's head to the end of its body: the key under which its
+    -- signature is found ('scanFunSigDecide'), distinct for every clause.
+    clauseSpan cl b = do
+      h <- cl.headRange
+      r <- rangeOf b
+      pure MkSrcRange { start = h.start, end = r.end, length = h.length + r.length, moduleUri = h.moduleUri }
+
+    -- A location without tokens, read off a hole as a name's is
+    -- ('L4.Parser.givenInputBinding'); the tokens stay with the first
+    -- definition, whose annotation holds the whole run's.
+    rangedAnno r = mkAnno [mkHoleWithSrcRangeHint r]
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =

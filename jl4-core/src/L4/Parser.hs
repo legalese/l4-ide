@@ -990,10 +990,11 @@ pmBody (PMClause _ _ _ b) = b
 -- and arity (and the enclosing GIVEN/GIVETH signature), and lower them to a
 -- single 'MkDecide'. Fails (so the caller falls back to the ordinary 'decide'
 -- parser) unless at least one clause carries a /distinguishable/ pattern (a
--- literal, an applied constructor, a cons, or an EXACTLY expression). This keeps
--- ordinary single-clause definitions (including mixfix and @OF@ forms), as well
--- as type-overloaded definitions that share a name but only bind plain
--- variables, on the existing code path.
+-- literal, an applied constructor, a cons, or an EXACTLY expression), or the
+-- run has two clauses or more whose bare names differ in some column. This
+-- keeps ordinary single-clause definitions (including mixfix and @OF@ forms) on
+-- the existing code path; a run of the second kind that turns out to be
+-- overloads is separated again by the checker ('L4.TypeCheck.separateOverloads').
 decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
 decidePatternMatch sig = do
   clauseCol <- Lexer.indentLevel
@@ -1027,12 +1028,16 @@ decidePatternMatch sig = do
   --    we require >= 2 clauses AND at least one column whose bare names actually
   --    differ across the group before committing.
   --
-  -- This is safe against mis-grouping (type-)overloaded definitions (such as the
-  -- two @`is leap year`@ overloads in daydate.l4): overloads each carry their own
-  -- GIVEN/GIVETH signature, and an intervening GIVEN makes 'sameHeadClause' fail,
-  -- so the parser never gathers overloads into a single group. Every group we see
-  -- here already shares the one signature threaded in as @sig@. A lone bare-name
-  -- clause still falls through to the ordinary 'decide' path.
+  -- The second kind can gather overloads: @show n MEANS n + 1@ followed by
+  -- @show b MEANS b AND TRUE@ is two definitions told apart by their types,
+  -- and its bare names differ too. Which it is depends on whether any of the
+  -- names is a constructor, which only resolving them tells, so the checker
+  -- turns such a group back into the separate definitions it is made of when
+  -- none is ('L4.TypeCheck.separateOverloads'). Overloads that each carry their
+  -- own GIVEN/GIVETH signature (such as the two @`is leap year`@ overloads in
+  -- daydate.l4) are never gathered here: an intervening GIVEN makes
+  -- 'sameHeadClause' fail. A lone bare-name clause still falls through to the
+  -- ordinary 'decide' path.
   let isGroup = any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses
   unless isGroup $ turnDownRun (start : restStarts)
   guard isGroup
