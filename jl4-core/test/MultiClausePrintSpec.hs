@@ -24,10 +24,12 @@
 -- the parser reads back the same.
 module MultiClausePrintSpec (spec) where
 
+import Control.Monad (forM_)
 import Data.Char (isDigit)
 import Data.List (partition)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
+import qualified Optics
 import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList)
@@ -36,13 +38,22 @@ import L4.EvaluateLazy (EvalDirectiveResult (..), execEvalModuleWithEnv, prettyE
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Print (prettyLayout, restoreMixfixPatterns)
+import L4.Syntax (Anno, Decide (..), Module, Resolved, annPmMatrix, annPmSynthetic)
 import L4.TracePolicy (apiDefaultPolicy)
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 
 -- | Check and run a module; the module as the REPL prints it, and its answers.
 checkAndRun :: Text.Text -> IO (Text.Text, [Text.Text])
-checkAndRun src = do
+checkAndRun = checkAndPrint (replPrint id)
+
+-- | The module, changed first by the given pass, as the REPL prints it.
+replPrint :: (Module Resolved -> Module Resolved) -> TypeCheckWithDepsResult -> Text.Text
+replPrint pass r = prettyLayout (filterIdeDirectives (restoreMixfixPatterns r.tcdMixfixRegistry (pass r.tcdModule)))
+
+-- | Check and run a module; the module as the given printer prints it, and its answers.
+checkAndPrint :: (TypeCheckWithDepsResult -> Text.Text) -> Text.Text -> IO (Text.Text, [Text.Text])
+checkAndPrint printer src = do
   cfg <- resolveEvalConfig (Just (UTCTime (fromGregorian 2025 1 1) (secondsToDiffTime 0))) apiDefaultPolicy
   case checkWithImports (vfsFromList []) src of
     Left errs -> do
@@ -50,8 +61,7 @@ checkAndRun src = do
       pure ("", [])
     Right r -> do
       (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
-      let printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns r.tcdMixfixRegistry r.tcdModule))
-      pure (printed, map answer results)
+      pure (printer r, map answer results)
   where
     answer (MkEvalDirectiveResult _ v _ l n p) = prettyEvalDirectiveResult (MkEvalDirectiveResult Nothing v Nothing l n p)
 
@@ -88,29 +98,76 @@ answersAgain src = do
     (printed, _) <- checkAndRun src
     madeUpNames printed `shouldBe` madeUpNames (fst (splitEvals src))
 
+-- | A group that cannot be read back as its clauses prints as the tree it
+-- compiles to, and that tree holds names the desugarer made up. No corpus
+-- module gets there today; a pass that reshaped the tree could. So the
+-- group is made unreadable here, two ways, and printed as the REPL
+-- prints it: the printed module must fail to read back, never run
+-- ('L4.Print.markGeneratedNames').
+--
+-- The control prints the same module without the marks (and so without
+-- 'restoreMixfixPatterns', which no fixture here needs): it reads back,
+-- checks and answers differently, with no error. That is the failure the
+-- marks turn loud, and it shows that each fixture does reach the fallback.
+refusedWhenUnreadable :: Text.Text -> Spec
+refusedWhenUnreadable src =
+  forM_ [("its clause matrix lost", dropMatrix), ("its generated nodes unmarked", dropMarks)] $ \ (how, unreadable) ->
+    describe ("with " <> how) $ do
+      it "prints a module that does not read back" $ do
+        (printed, _) <- checkAndPrint (replPrint unreadable) src
+        case checkWithImports (vfsFromList []) printed of
+          Left errs -> Text.unlines errs `shouldSatisfy` Text.isInfixOf "unexpected '⟪'"
+          Right _ -> expectationFailure ("the printed module read back:\n" <> Text.unpack printed)
+      it "unmarked, would read back and answer differently" $ do
+        (printed, fromSource) <- checkAndPrint (\ r -> prettyLayout (filterIdeDirectives (unreadable r.tcdModule))) src
+        (_, fromPrinted) <- checkAndRun (printed <> "\n" <> snd (splitEvals src))
+        length fromPrinted `shouldBe` length fromSource
+        fromPrinted `shouldNotBe` fromSource
+  where
+    -- 'L4.Print.writtenClauses' reads each clause's patterns from the matrix.
+    dropMatrix :: Module Resolved -> Module Resolved
+    dropMatrix = Optics.over (Optics.gplate @(Decide Resolved)) $ \ (MkDecide ann sig app e) ->
+      MkDecide (Optics.set annPmMatrix Nothing ann) sig app e
+    -- 'L4.Print.clauseBodies' finds each clause's body by the marks.
+    dropMarks :: Module Resolved -> Module Resolved
+    dropMarks = Optics.over (Optics.gplate @Anno) (Optics.set annPmSynthetic Nothing)
+
+-- | Clause bodies naming definitions spelled like the desugarer's names for
+-- the clauses not yet tried.
+namedLikeLaterClauses :: Text.Text
+namedLikeLaterClauses = Text.unlines
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+  , "`the result of clauses 2 to 3` MEANS 7"
+  , "`the result of clause 3` MEANS 100"
+  , "GIVEN c IS A Colour"
+  , "GIVETH A NUMBER"
+  , "DECIDE u Red   IS `the result of clauses 2 to 3`"
+  , "DECIDE u Green IS `the result of clause 3` + 1"
+  , "DECIDE u c     IS 3"
+  , "#EVAL u Red"
+  , "#EVAL u Green"
+  , "#EVAL u Blue"
+  ]
+
+-- | A clause body naming a definition spelled like the desugarer's name for
+-- the group's input.
+namedLikeInput :: Text.Text
+namedLikeInput = Text.unlines
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+  , "`input 1` MEANS Blue"
+  , "DECIDE h Red   IS `input 1`"
+  , "DECIDE h Green IS Red"
+  , "DECIDE h Blue  IS Green"
+  , "#EVAL h Red"
+  ]
+
 spec :: Spec
 spec = describe "a multi-clause group, printed and run again" $ do
-  describe "with a drafter's names like the desugarer's" $ answersAgain $ Text.unlines
-    [ "DECLARE Colour IS ONE OF Red, Green, Blue"
-    , "`the result of clauses 2 to 3` MEANS 7"
-    , "`the result of clause 3` MEANS 100"
-    , "GIVEN c IS A Colour"
-    , "GIVETH A NUMBER"
-    , "DECIDE u Red   IS `the result of clauses 2 to 3`"
-    , "DECIDE u Green IS `the result of clause 3` + 1"
-    , "DECIDE u c     IS 3"
-    , "#EVAL u Red"
-    , "#EVAL u Green"
-    , "#EVAL u Blue"
-    ]
-  describe "with no GIVEN, beside a drafter's `input 1`" $ answersAgain $ Text.unlines
-    [ "DECLARE Colour IS ONE OF Red, Green, Blue"
-    , "`input 1` MEANS Blue"
-    , "DECIDE h Red   IS `input 1`"
-    , "DECIDE h Green IS Red"
-    , "DECIDE h Blue  IS Green"
-    , "#EVAL h Red"
-    ]
+  describe "with a drafter's names like the desugarer's" $ answersAgain namedLikeLaterClauses
+  describe "with no GIVEN, beside a drafter's `input 1`" $ answersAgain namedLikeInput
+  describe "that cannot be read back as its clauses" $ do
+    describe "beside a drafter's names like the desugarer's" $ refusedWhenUnreadable namedLikeLaterClauses
+    describe "with no GIVEN, beside a drafter's `input 1`" $ refusedWhenUnreadable namedLikeInput
   -- One clause left, matching anything: it prints as a plain definition,
   -- whose inputs must not take a name the body reads.
   describe "with no GIVEN, a first clause that matches anything, beside `input 1`" $ answersAgain $ Text.unlines
