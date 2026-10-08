@@ -331,22 +331,22 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       let
         conjunction = scanAnd e
       in
-        prettyConj "AND" (fmap parensIfConnective conjunction)
+        prettyConj "AND" (fmap parensIfOpenTailed conjunction)
     e@Or{} ->
       let
         disjunction = scanOr e
       in
-        prettyConj "OR" (fmap parensIfConnective disjunction)
+        prettyConj "OR" (fmap parensIfOpenTailed disjunction)
     e@RAnd{} ->
       let
         conjunction = scanRAnd e
       in
-        prettyConj "RAND" (fmap parensIfConnective conjunction)
+        prettyConj "RAND" (fmap parensIfOpenTailed conjunction)
     e@ROr{} ->
       let
         disjunction = scanROr e
       in
-        prettyConj "ROR" (fmap parensIfConnective disjunction)
+        prettyConj "ROR" (fmap parensIfOpenTailed disjunction)
     Implies    _ e1 e2 ->
       parensIfNeeded e1 <+> "IMPLIES" <+> parensIfNeeded e2
     Equals     _ e1 e2 ->
@@ -446,6 +446,86 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     App _ _ [] -> printWithLayout e
     Var{} -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
+
+-- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
+-- rendering has an OPEN TAIL — a comma list, a clause list, a binding group —
+-- that would otherwise swallow the connective that follows it.
+--
+-- @issuer is eligible OF plan AND rest@ re-parses as
+-- @issuer is eligible OF (plan AND rest)@: it still parses, and then fails type
+-- checking with the arguments transposed. That was the second half of
+-- smucclaw/l4-ide#932 — @l4 batch@ on Reg CF's @regcf-wizard.l4@ (now in
+-- legalese/canon) got past the parser
+-- only to be rejected by the checker. @PARTY … MUST … WITHIN …@ is the same
+-- shape for the regulative connectives: the obligation has no closing token, so
+-- a following @ROR@ reads as another of its own clauses.
+--
+-- A conjunct that is ITSELF a logical connective is the second reason, and it
+-- is not about open tails at all — it is about grouping. @scanAnd@\/@scanOr@
+-- flatten only their OWN operator, so an @And@ reaching this function is
+-- necessarily nested inside an @Or@ (or a regulative chain), and vice versa;
+-- printing it bare hands the grouping back to the parser's precedence table,
+-- which does not agree with the tree. Measured, before this clause:
+--
+--   * @(TRUE OR FALSE) AND FALSE@ and @TRUE OR (FALSE AND FALSE)@ printed to
+--     the SAME string, @TRUE OR FALSE AND FALSE@, so the first re-parsed as the
+--     second and flipped from FALSE to TRUE;
+--   * @(NOT TRUE) OR TRUE@ printed as @NOT TRUE OR TRUE@, which the parser
+--     reads as @NOT (TRUE OR TRUE)@ — TRUE became FALSE;
+--   * @(FALSE IMPLIES FALSE) AND FALSE@ likewise.
+--
+-- That is a SILENT wrong answer rather than a diagnostic: @ok/logic.l4@ went
+-- from @LIST TRUE, TRUE, FALSE, FALSE@ to @LIST TRUE, TRUE, TRUE, TRUE@ and an
+-- assertion in Reg CF's @regcf.l4@ (now in legalese/canon) went from
+-- satisfied to failed, both
+-- through @l4 batch@, with no error anywhere. Comparisons (@EQUALS@,
+-- @GREATER THAN@, …) were measured SAFE in the same harness and stay bare, so
+-- the corpus's @`mkt cap` GREATER THAN … AND …@ does not grow noise.
+--
+-- Everything else is CLOSED — the remaining binary operators bracket their own
+-- operands, projection\/postfix bind tighter than a connective, literals and
+-- variables are atoms — and the parser's precedence table reassembles the chain
+-- correctly. Bracketing those too would be safe but is pure noise in every
+-- rendering this printer feeds: evaluation traces, @#EVAL@ output, ladder
+-- labels.
+parensIfOpenTailed :: LayoutPrinterWithName a => Expr a -> Doc ann
+parensIfOpenTailed e
+  -- Classify what will be PRINTED, not what is stored: `carameliseNode` turns
+  -- `App __GEQ__ [a, b]` back into `Geq a b`, and the printer applies it before
+  -- rendering. Without it every desugared operator looks like an application
+  -- and gets brackets it does not need (`(tranche AT LEAST 1) AND …`).
+  | openTailed (carameliseNode e) = surround (printWithLayout e) "(" ")"
+  | otherwise                     = printWithLayout e
+  where
+    openTailed = \ case
+      -- Grouping, not tails: a connective nested in a chain of a DIFFERENT
+      -- connective. See the note above — bare, these re-associate silently.
+      And{}         -> True
+      Or{}          -> True
+      RAnd{}        -> True
+      ROr{}         -> True
+      Implies{}     -> True
+      App _ _ (_:_) -> True  -- `f OF x, y` — comma-separated, open-ended
+      AppNamed{}    -> True  -- `R WITH a IS 1` — open field list
+      Concat{}      -> True  -- comma list
+      List{}        -> True  -- comma list
+      Consider{}    -> True  -- open branch list
+      MultiWayIf{}  -> True  -- open arm list
+      IfThenElse{}  -> True  -- the ELSE branch keeps consuming
+      Regulative{}  -> True  -- open WITHIN/HENCE/LEST clause list
+      LetIn{}       -> True  -- the IN body keeps consuming
+      Where{}       -> True  -- open local-declaration block
+      Lam{}         -> True  -- the YIELD body keeps consuming
+      Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
+      Breach{}      -> True  -- open BY/BECAUSE clauses
+      -- `NOT` binds LOOSER than the connectives, not tighter: measured,
+      -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
+      -- conjunct is always bracketed — inheriting the operand's tail was not
+      -- enough, and `(NOT TRUE) OR TRUE` silently became `NOT (TRUE OR TRUE)`.
+      Not{}         -> True
+      Post{}        -> True  -- three juxtaposed arguments
+      Event{}       -> True
+      _             -> False
 
 prettyObligation
   :: (LayoutPrinter p, LayoutPrinter a, LayoutPrinter t,  LayoutPrinter f, LayoutPrinter l)
@@ -751,37 +831,17 @@ quoteIfNeeded n = case Text.uncons n of
 quote :: Text.Text -> Text.Text
 quote n = "`" <> n <> "`"
 
--- | Print one operand of an AND\/OR\/RAND\/ROR chain, bracketing it when it is
--- itself a logical connective.
+-- | Flatten a chain of one associative connective into its operands.
 --
--- 'scanAnd' and friends flatten only their OWN operator, so a connective
--- reaching here is nested inside a different one. Printing it bare hands the
--- grouping back to the parser's precedence table, which does not agree with the
--- tree, and @l4 batch@ (which re-parses this output and evaluates it) then
--- returns a different answer with no diagnostic. Measured on build 90:
---
---   * @(p OR q) AND r@ printed as @p OR q AND r@, read back as @p OR (q AND r)@;
---   * @(NOT p) OR q@ printed as @NOT p OR q@, read back as @NOT (p OR q)@;
---   * @(p IMPLIES q) AND r@ likewise lost its grouping.
---
--- Comparisons and arithmetic bracket their own operands already, so only the
--- six connectives need it. This is the operand rule of unstable's 58f53e6b2.
-parensIfConnective :: LayoutPrinterWithName a => Expr a -> Doc ann
-parensIfConnective e = case carameliseNode e of
-  And{}     -> bracketed
-  Or{}      -> bracketed
-  RAnd{}    -> bracketed
-  ROr{}     -> bracketed
-  Implies{} -> bracketed
-  Not{}     -> bracketed
-  _         -> printWithLayout e
-  where
-    bracketed = surround (printWithLayout e) "(" ")"
-
--- | Caramelise as we descend, so a chain stored as a builtin @App@ (rather than
--- an 'And'\/'Or' node) is flattened all the way down instead of peeling one
--- level and leaving 'parensIfConnective' to bracket an associative nest that
--- needs none.
+-- The match runs on @carameliseNode e@, not on @e@: a chain the type checker
+-- left as @App __AND__ [a, b]@ does not match the @And@ constructor, so an
+-- un-caramelised scan peeled exactly one level and handed the REST back as a
+-- single operand. That was invisible while conjuncts printed bare; once
+-- 'parensIfOpenTailed' started bracketing a nested connective (which it must —
+-- see the note there) it turned @a AND b AND c AND d@ into
+-- @a AND (b AND (c AND d))@, bracketing an associative nest that needs none.
+-- Caramelising as we descend flattens the chain properly, so the only operand
+-- that can still BE a connective is one of a genuinely different kind.
 scanOp :: HasName a => (forall r. Expr a -> (r, Expr a -> Expr a -> r) -> r) -> Expr a -> [Expr a]
 scanOp match e = match (carameliseNode e) ([e], \e1 e2 -> scanOp match e1 <> scanOp match e2)
 

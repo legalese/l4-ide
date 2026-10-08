@@ -10,7 +10,7 @@ import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
 import qualified L4.Evaluate.ValueLazy as Eval
 import qualified L4.EvaluateLazy as Eval
-import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment)
+import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, parseDateText, parseTimeText, parseDatetimeText)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import L4.EvaluateLazy.Trace
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
@@ -35,7 +35,7 @@ import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 
 import Backend.Api
-import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..))
+import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..), AnswerShape(..), RequiredInput(..))
 import L4.Export (extractAssumeParamTypes, extractAssumeParamResolveds)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
@@ -595,7 +595,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz compiled.compiledModule
+      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode params traceLevel includeGraphViz compiled.compiledModule
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -751,7 +751,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz compiled.compiledModule
+      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode params traceLevel includeGraphViz compiled.compiledModule
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -849,58 +849,107 @@ fnLiteralToJson = \case
   FnUncertain -> Aeson.Null
   FnUnknown -> Aeson.Null
 
--- | Handle evaluation result, checking for decode failure sentinel
+-- | Handle the result of a generated wrapper.
+--
+-- The wrapper answers @JUST answer@, or @NOTHING@ when it could not call the
+-- function (see 'AnswerShape'). That envelope is taken apart here, at the
+-- 'Eval.Value' level, and the answer inside it is then handled exactly as the
+-- direct path handles its own, by 'handleEvalResultDirect'. Taking it apart
+-- after conversion does not work: 'valueToFnLiteral' dissolves every @JUST@,
+-- the envelope's included, so @JUST NOTHING@ arrived as no value at all and
+-- @JUST (LIST x)@ as a one-element list that was then unwrapped to @x@
+-- (smucclaw/l4-ide#1003).
+--
+-- So a top-level answer that converts to 'FnUnknown' is returned as @null@
+-- with status 200, as on the direct path. Before the fix for #1003 this
+-- path's handler refused it with "Evaluation produced unknown value";
+-- dropping that refusal is deliberate.
+-- 'FnUnknown' at the top level is now @NOTHING@ or @JUST NOTHING@, which are
+-- answers: refusing it here would refuse on this path an answer the direct
+-- path gives. "Could not compute" does not arrive as @null@ on either path:
+-- an evaluation that fails is a @Reduction (Left _)@ and is refused. Nor can
+-- the top-level value be the evaluator's 'Eval.Omitted' truncation marker:
+-- 'Eval.nf' starts at depth 'maximumStackSize' (200) and marks 'Eval.Omitted'
+-- only below depth 0, so the direct path's answer is read at depth 200 and
+-- this path's, one level inside the envelope, at 199. 'Eval.Omitted' appears
+-- only nested, as the @null@s that end a list answer cut short at the README's
+-- limit on list answers.
 handleEvalResult
   :: EntityInfo
   -> Eval.EvalDirectiveValue
   -> Maybe EvalTrace
-  -> Text
+  -> Text  -- ^ the function's name, for a NOTHING no input explains
+  -> GeneratedCode
+  -> [(Text, Maybe FnLiteral)]  -- ^ the request's inputs, to say why a NOTHING came back
   -> TraceLevel
   -> Bool
   -> Module Resolved
   -> ExceptT EvaluatorError IO ResponseWithReason
-handleEvalResult ei result trace _sentinel traceLevel includeGraphViz mModule = case result of
-  Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
-  Eval.Reduction (Left evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
-  Eval.Reduction (Right val) -> do
-    r <- nfToFnLiteral ei val
-    -- Check if the result is NOTHING (decode failure from LEFT error) or JUST value
-    actualResult <- case r of
-      -- If result is FnUnknown, it means evaluation produced undefined/unknown
-      FnUnknown ->
-        throwError $ InterpreterError "Evaluation produced unknown value"
-      -- If result is NOTHING constructor, it means JSONDECODE returned LEFT (JSON decode failed)
-      FnObject [("NOTHING", _)] ->
-        throwError $ InterpreterError "JSON decoding failed: input does not match expected schema"
-      -- If result is JUST x (wrapper returns JUST when JSONDECODE returns RIGHT)
-      FnObject [("JUST", FnArray [val'])] ->
-        pure val'
-      FnObject [("JUST", FnObject [(_fieldName, val')])] ->
-        pure val'
-      -- For backwards compatibility, if result is an array with one element
-      FnArray [val'] ->
-        pure val'
-      -- For any other result, return as-is
-      _ ->
-        pure r
+handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule = do
+  answer <- case (genCode.answerShape, result) of
+    (WrappedInJust, Eval.Reduction (Right envelope)) ->
+      Eval.Reduction . Right <$> openEnvelope envelope
+    _ -> pure result
+  handleEvalResultDirect ei answer trace traceLevel includeGraphViz mModule
+  where
+    openEnvelope = \case
+      Eval.MkNF (Eval.ValConstructor con [inner])
+        | getUnique con == TypeCheck.justUnique -> pure inner
+      Eval.MkNF (Eval.ValConstructor con [])
+        | getUnique con == TypeCheck.nothingUnique -> throwError (wrapperDeclined fnName genCode params)
+      _ -> throwError $ InterpreterError "L4: the generated wrapper answered neither JUST nor NOTHING."
 
-    pure $ ResponseWithReason
-      { fnResult = Map.singleton "value" actualResult
-      , reasoning = case traceLevel of
-          TraceNone -> emptyTree
-          TraceFull -> buildReasoningTree trace
-      , graphviz =
-          if includeGraphViz && traceLevel == TraceFull
-            then
-              fmap
-                ( \tr ->
-                    GraphVizResponse
-                      { dot = GraphViz.traceToGraphViz GraphViz.defaultGraphVizOptions (Just mModule) tr
-                      }
-                )
-                trace
-            else Nothing
-      }
+-- | Why a wrapper answered NOTHING. It does so without calling the function
+-- for one of the two reasons given at 'requiredInputs': a required input is
+-- absent, which here means left out, @null@ or @{}@; or a required DATE, TIME
+-- or DATETIME string does not parse. A value of the wrong JSON type is not
+-- one of them: it stops JSONDECODE with an error of its own. An absent input
+-- is reported with the message the direct path gives for it. When both happen,
+-- the absent input is named, though the wrapper may have stopped earlier, at
+-- a string it could not parse.
+wrapperDeclined :: Text -> GeneratedCode -> [(Text, Maybe FnLiteral)] -> EvaluatorError
+wrapperDeclined fnName genCode params = InterpreterError $
+  case (filter (absent . valueOf) required, if null failing then unparsed else failing) of
+    (input : _, _) -> label input <> ": missing required parameter"
+    ([], [(input, ty, s)]) -> label input <> ": could not read " <> Text.textShow s <> " as a " <> ty
+    ([], candidates@(_ : _)) ->
+      "One of these inputs could not be read: "
+        <> Text.intercalate ", " [ label input <> " as a " <> ty | (input, ty, _) <- candidates ]
+    -- Defensive: no request is known to reach this. A wrapper answers NOTHING
+    -- only for a required input that is absent or a temporal string it cannot
+    -- parse, and both are caught above; a value of the wrong JSON type stops
+    -- JSONDECODE with an error of its own before the envelope is read. No
+    -- test pins this message.
+    ([], []) ->
+      "L4: the generated wrapper did not call '" <> fnName
+        <> "', and no input explains why. The inputs it checked: "
+        <> (if null required then "none" else Text.intercalate ", " (map label required))
+        <> "."
+  where
+    required = genCode.requiredInputs
+    valueOf input = join (lookup input.inputName params)
+    unparsed =
+      [ (input, ty, s)
+      | input <- required, Just ty <- [input.parsedAs], Just (FnLitString s) <- [valueOf input] ]
+    -- The wrapper's own parsers, those of TODATE, TOTIME and TODATETIME, pick
+    -- out the string that failed. The direct path's ISO parsers are stricter
+    -- ("2026/01/31" is a DATE to TODATE and not to parseIsoDate), so with two
+    -- such inputs they could blame one the wrapper had read.
+    failing = [ c | c@(_, ty, s) <- unparsed, not (parses ty s) ]
+    parses = \case
+      "DATE"     -> isJust . parseDateText
+      "TIME"     -> isJust . parseTimeText
+      "DATETIME" -> isJust . parseDatetimeText
+      _          -> const False
+    -- the direct path's labels ('evaluateDirectAST')
+    label input
+      | input.isRuleGiven = "Parameter '" <> input.inputName <> "'"
+      | otherwise = "ASSUME '" <> input.inputName <> "'"
+    absent = \case
+      Nothing          -> True
+      Just FnUnknown   -> True
+      Just FnUncertain -> True
+      Just _           -> False
 
 createFunction ::
   FilePath ->
@@ -961,7 +1010,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 case mEvalRes of
                   Nothing -> throwError $ InterpreterError (mconcat errs)
                   Just [Eval.MkEvalDirectiveResult{result, trace}] ->
-                    handleEvalResult tcRes.entityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz tcRes.module'
+                    handleEvalResult tcRes.entityInfo result trace fnDecl.name genCode params' traceLevel includeGraphViz tcRes.module'
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
             }
@@ -1112,17 +1161,34 @@ valueToFnLiteral ei = \case
   Eval.ValEnvironment{} -> throwError $ InterpreterError "#EVAL produced environment."
   Eval.ValUnappliedConstructor name ->
     pure $ FnLitString $ prettyLayout name
+  -- NOTHING is the absence of a value, and JSON spells that null.
+  -- Emitting the string "NOTHING" made an optional field's empty case
+  -- indistinguishable from a genuine string answer, and made
+  -- `MAYBE NUMBER` unusable for exactly the job it is for: saying that
+  -- a limit does not apply without naming a number that could be
+  -- mistaken for one.
+  --
+  -- NOTHING and JUST are recognised by their uniques, not their names: a
+  -- rule may declare its own constructor called @Nothing@ or @Just@, and
+  -- that is an answer, not the absence of one.
+  Eval.ValConstructor resolved []
+    | getUnique resolved == TypeCheck.nothingUnique -> pure FnUnknown
   Eval.ValConstructor resolved [] ->
     -- Special case boolean constructors (preserve original casing for others)
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
      in case Text.toUpper name of
           "TRUE" -> pure $ FnLitBool True
           "FALSE" -> pure $ FnLitBool False
           -- Other nullary constructors become strings (original casing preserved)
           _ -> pure $ FnLitString name
+  -- JUST x is x. The Maybe wrapper is L4's, not the caller's, and wrapping it
+  -- in an object would make every optional field a tagged union the client has
+  -- to unwrap.
+  Eval.ValConstructor resolved [v]
+    | getUnique resolved == TypeCheck.justUnique -> nfToFnLiteral ei v
   Eval.ValConstructor resolved vals -> do
     lits <- traverse (nfToFnLiteral ei) vals
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
         fieldNames = lookupFieldNames ei resolved
     pure $ case fieldNames of
       Just names | length names == length lits ->
@@ -1137,6 +1203,23 @@ valueToFnLiteral ei = \case
           ]
   Eval.ValAssumed var ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+
+-- | A constructor's name, as a JSON payload should carry it.
+--
+-- NOT 'prettyLayout': that renders a 'Name' as L4 /source/, so an identifier
+-- with spaces in it comes back backtick-quoted — and this value is compared by
+-- clients against the @enum@ the service itself declared in its
+-- @returnSchema@, which is built by 'L4.FunctionSchema.resolvedNameText' and
+-- carries no backticks. So the service was handing out a schema and then
+-- returning values that fail it: declared
+-- @\"financial statements reviewed by an independent public accountant\"@,
+-- returned
+-- @\"\`financial statements reviewed by an independent public accountant\`\"@.
+--
+-- 'getActual' rather than 'getOriginal', matching 'L4.FunctionSchema', so that
+-- the two agree by construction rather than by coincidence.
+constructorText :: Resolved -> Text
+constructorText = rawNameToText . rawName . getActual
 
 -- | Look up field names for a constructor from the EntityInfo.
 -- Returns 'Just' field names if the constructor has named fields, 'Nothing' otherwise.

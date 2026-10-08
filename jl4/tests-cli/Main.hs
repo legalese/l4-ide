@@ -395,6 +395,25 @@ spec bin = do
           svg `shouldSatisfy` ("<svg" `isInfixOf`)
 
   -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer's brackets as much as batch. Each operand nests inside an
+  -- AND, and each expected answer is the fixture's own #EVAL under `l4 run`.
+  -- With the printer as it was, batch answered `true` to every one of them,
+  -- with "status":"success" and no diagnostic.
+  describe "l4 batch keeps the grouping the rule wrote" $ do
+    let bracket = fixtureDir </> "batch-bracket.l4"
+        rows f  = fixtureDir </> ("batch-bracket-" ++ f ++ ".json")
+    it "brackets an OR inside an AND" $
+      batchAnswer bin bracket (rows "tff") "or under and" `shouldReturn` Bool False
+    it "brackets a NOT inside an AND" $
+      batchAnswer bin bracket (rows "tff") "not under and" `shouldReturn` Bool False
+    it "brackets an IMPLIES inside an AND" $
+      batchAnswer bin bracket (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "brackets an IF inside an AND" $
+      batchAnswer bin bracket (rows "ttf") "if under and" `shouldReturn` Bool False
+    it "brackets a function call inside an AND" $
+      batchAnswer bin bracket (rows "fff") "call under and" `shouldReturn` Bool False
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
   -- check the printer as much as batch. Each expected value is what `l4 run`
   -- gives on the fixture's own #EVAL. On build 90 the first three returned the
   -- opposite answer with "status":"success", and the division failed to
@@ -403,19 +422,19 @@ spec bin = do
     let grouping = fixtureDir </> "batch-grouping.l4"
         rows f   = fixtureDir </> ("batch-grouping-" ++ f ++ ".json")
     it "keeps the brackets on an OR inside an AND" $
-      batchResult bin grouping (rows "tff") "or under and" `shouldReturn` Bool False
+      batchAnswer bin grouping (rows "tff") "or under and" `shouldReturn` Bool False
     it "keeps the brackets on a NOT inside an OR" $
-      batchResult bin grouping (rows "ttf") "not under or" `shouldReturn` Bool True
+      batchAnswer bin grouping (rows "ttf") "not under or" `shouldReturn` Bool True
     it "keeps the brackets on an IMPLIES inside an AND" $
-      batchResult bin grouping (rows "fff") "implies under and" `shouldReturn` Bool False
+      batchAnswer bin grouping (rows "fff") "implies under and" `shouldReturn` Bool False
     it "evaluates an exported division" $
-      batchResult bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
+      batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
         `shouldReturn` Number 2
 
 -- | Run one row through @l4 batch@ and return its result, failing the test
 -- unless the row's status is @success@.
-batchResult :: FilePath -> FilePath -> FilePath -> String -> IO Value
-batchResult bin file inputs entry = do
+batchAnswer :: FilePath -> FilePath -> FilePath -> String -> IO Value
+batchAnswer bin file inputs entry = do
   Output code sout serr <- runL4 bin ["batch", file, "-i", inputs, "-e", entry]
   unless (code == ExitSuccess) $
     expectationFailure ("l4 batch exited " ++ show code ++ "\nstdout:\n" ++ sout ++ "\nstderr:\n" ++ serr)

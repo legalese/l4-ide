@@ -29,26 +29,26 @@ lazytrace-exception.l4:10:1-66:
   │┌ and
   │└ <function>
   ├ CONSIDER list WHEN EMPTY THEN TRUE,
-  │                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  ├ x AND and OF xs
+  │                 WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ├ x AND (and OF xs)
   │┌ and OF xs
   ││┌ and
   ││└ <function>
   │├ CONSIDER list WHEN EMPTY THEN TRUE,
-  ││                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  │├ x AND and OF xs
+  ││                 WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  │├ x AND (and OF xs)
   ││┌ and OF xs
   │││┌ and
   │││└ <function>
   ││├ CONSIDER list WHEN EMPTY THEN TRUE,
-  │││                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  ││├ x AND and OF xs
+  │││                 WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ││├ x AND (and OF xs)
   │││┌ and OF xs
   ││││┌ and
   ││││└ <function>
   │││├ CONSIDER list WHEN EMPTY THEN TRUE,
-  ││││                 WHEN x FOLLOWED BY xs THEN x AND and OF xs
-  │││├ x AND and OF xs
+  ││││                 WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  │││├ x AND (and OF xs)
   │││├ IF a THEN b ELSE FALSE
   ││││┌ a
   ││││└ something
