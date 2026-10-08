@@ -27,6 +27,16 @@
 #   in the summary table. A test suite that fails keeps its full log, and the
 #   run prints the log's path and the failing examples; passing suites' logs go.
 #
+# CONDITIONAL PROBES — each runs only when the diff against --base touches what
+# it guards, and each came from a review the test suites had passed
+# (specs/todo/MAIN-PRE-REVIEW.md):
+#   (a) jl4-core/src/L4/Parser*: `l4 check` CPU time at 1,000 and 4,000 lines
+#       (etc/probe-parse-scaling.mjs). FAIL above a ratio of 8.
+#   (b) jl4-service/: the same calls before and after a restart that loads
+#       bundle.cbor (etc/probe-service-restart.mjs). FAIL on any difference.
+#   (c) jl4/tests-cli/: new assertions comparing output without dropping '\r'
+#       (etc/probe-cli-crlf.mjs). WARN only: it reads text, not behaviour.
+#
 # WHAT IT DOES NOT CHECK — stated because a green run must not be mistaken for
 # CI. See the memory note "local gate is not CI".
 #   Test suites NOT run here, although CI runs `cabal test all`: jl4-lsp-test,
@@ -47,7 +57,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --quick) QUICK=1; shift ;;
     --base)  BASE="${2:-}"; [ -n "$BASE" ] || { echo "--base needs a ref" >&2; exit 2; }; shift 2 ;;
-    -h|--help) sed -n '3,33p' "$0"; exit 0 ;;
+    -h|--help) sed -n '3,48p' "$0"; exit 0 ;;
     -*) echo "unknown flag: $1" >&2; exit 2 ;;
     *)  [ -z "$WT" ] || { echo "give exactly one worktree path" >&2; exit 2; }; WT="$1"; shift ;;
   esac
@@ -137,8 +147,11 @@ fi
 LOGDIR=$(mktemp -d "${TMPDIR:-/tmp}/verify-branch.XXXXXX") \
   || { echo "FATAL: cannot create a log directory" >&2; exit 2; }
 KEPT=()
-# On any exit, Ctrl-C included, the directory goes unless a failed suite's log is in it.
-cleanup() { [ "${#KEPT[@]}" -gt 0 ] || rm -rf "$LOGDIR"; }
+# The probes below run copies of the built binaries, kept here and always removed.
+PROBEDIR=$(mktemp -d "${TMPDIR:-/tmp}/verify-branch-probe.XXXXXX") \
+  || { echo "FATAL: cannot create a probe directory" >&2; exit 2; }
+# On any exit, Ctrl-C included, the log directory goes unless a failed suite's log is in it.
+cleanup() { rm -rf "$PROBEDIR"; [ "${#KEPT[@]}" -gt 0 ] || rm -rf "$LOGDIR"; }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -176,6 +189,46 @@ suite "jl4-core-test" jl4-core-test 2
 # (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
 # lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
 suite "jl4-service-test" jl4-service-test 2
+
+# ---------------------------------------------------------------- probes
+# Each probe guards a defect that a review of a main-bound PR found after every
+# suite above had passed, and runs only when the diff touches what it guards
+# (header; specs/todo/MAIN-PRE-REVIEW.md). They run copies of the binaries: a
+# build in this worktree relinks the originals, and a half-written binary fails
+# both sides of a before/after comparison alike (CLAUDE.md §3.2.1).
+DIFF_FILES=$(git -C "$WT" diff --name-only "$BASE"...HEAD 2>/dev/null)
+NOT_PROBED=()
+snapshot() { # snapshot <exe> prints the path of a copy of the built exe
+  local bin
+  bin=$(cd "$WT" && cabal list-bin "exe:$1" 2>/dev/null) && [ -x "$bin" ] && cp "$bin" "$PROBEDIR/$1" && echo "$PROBEDIR/$1"
+}
+
+if echo "$DIFF_FILES" | grep -q '^jl4-core/src/L4/Parser'; then
+  if L4_COPY=$(snapshot l4); then
+    step "probe (a): l4 check time is linear in file length" \
+      bash -c "cd '$WT' && node etc/probe-parse-scaling.mjs --selftest && node etc/probe-parse-scaling.mjs '$L4_COPY'"
+  else RESULTS+=("FAIL  probe (a): no built l4 to time"); FAILED=1; fi
+else NOT_PROBED+=("(a) parse time"); fi
+
+if echo "$DIFF_FILES" | grep -q '^jl4-service/'; then
+  if SVC_COPY=$(snapshot jl4-service); then
+    step "probe (b): jl4-service answers the same after a restart from bundle.cbor" \
+      bash -c "cd '$WT' && node etc/probe-service-restart.mjs '$SVC_COPY'"
+  else RESULTS+=("FAIL  probe (b): no built jl4-service to start"); FAILED=1; fi
+else NOT_PROBED+=("(b) service restart"); fi
+
+if echo "$DIFF_FILES" | grep -q '^jl4/tests-cli/'; then
+  printf '\n=== probe (c): CLI tests that compare output without dropping \\r ===\n'
+  if CRLF=$(cd "$WT" && node etc/probe-cli-crlf.mjs --selftest >/dev/null && node etc/probe-cli-crlf.mjs --base "$BASE" "$WT"); then
+    echo "$CRLF"
+    case "$CRLF" in
+      *WARN:*) RESULTS+=("WARN  probe (c): $(echo "$CRLF" | grep -c '^  ') CLI-test line(s) may need '\\r' dropped; read them above") ;;
+      *) RESULTS+=("PASS  probe (c): no new CLI-test comparison of raw output") ;;
+    esac
+  else echo "$CRLF"; RESULTS+=("FAIL  probe (c) could not run"); FAILED=1; fi
+else NOT_PROBED+=("(c) CLI \\r"); fi
+[ "${#NOT_PROBED[@]}" -eq 0 ] ||
+  note "probes not run, the diff does not touch what they guard: $(printf '%s, ' "${NOT_PROBED[@]}" | sed 's/, $//')"
 
 step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
 
