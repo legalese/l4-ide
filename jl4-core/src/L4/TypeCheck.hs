@@ -102,6 +102,7 @@ import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
 import L4.Lexer (FixityDirection (..), fixityHerald)
 import qualified L4.Lexer as Lexer
+import qualified L4.ExactPrint as ExactPrint
 import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
 import qualified L4.Discharge as Discharge
 import qualified L4.Export as Export
@@ -119,6 +120,7 @@ import Optics ((%~), (^.), gplate, traverseOf)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
+import Data.Char (isPrint)
 import Text.Read (readMaybe)
 import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
@@ -1700,6 +1702,7 @@ checkClauseMatrix dec dHead =
               let tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rs ]
               in flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
           render uncovered =
+            map (map respell) $
             nubOrdOn (map (fmap getUnique)) $
               concatMap
                 (\ nabla ->
@@ -1710,6 +1713,23 @@ checkClauseMatrix dec dHead =
                      | scrutR <- colScruts
                      ])
                 uncovered
+          -- A key renders with the first spelling the clauses give it, tokens
+          -- and all ('literalAsWritten'): @1.50@ as @1.50@, not @1.5@.
+          spellings =
+            Map.fromListWith (\ _ firstSpelling -> firstSpelling)
+              [ (litKey l, l) | (_, rpats) <- counted, l <- concatMap patLits rpats ]
+          patLits = \ case
+            PatLit _ l          -> [l]
+            PatExpr _ (Lit _ l) -> [l]
+            PatApp _ _ ps       -> concatMap patLits ps
+            PatCons _ p1 p2     -> patLits p1 <> patLits p2
+            PatVar {}           -> []
+            PatExpr {}          -> []
+          respell = \ case
+            PatLit a l      -> PatLit a (Map.findWithDefault l (litKey l) spellings)
+            PatApp a c ps   -> PatApp a c (map respell ps)
+            PatCons a p1 p2 -> PatCons a (respell p1) (respell p2)
+            p               -> p
           overCap missingRows =
             length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
           exact = analyse rows
@@ -5208,9 +5228,10 @@ litKey = \ case
   NumericLit _ r -> LitNum r
   StringLit _ t  -> LitStr t
 
--- | The literal a key renders as. A number prints exactly
--- ('L4.Utils.Ratio.prettyRatioExact'), so a suggested clause names the
--- number the clauses name, however many digits it has.
+-- | The literal a key stands for, with no tokens. A suggested clause prints
+-- the first spelling the clauses give the key instead ('checkClauseMatrix',
+-- 'literalAsWritten'); this one prints exactly
+-- ('L4.Utils.Ratio.prettyRatioExact'), however many digits it has.
 litKeyToLit :: LitKey -> Lit
 litKeyToLit = \ case
   LitNum r -> NumericLit emptyAnno r
@@ -8154,12 +8175,35 @@ prettyMissingPattern = go
       parensIf nested (prettyLayout (PatApp a c []) <> " " <> Text.unwords (map (go True) ps))
     go nested (PatCons _ ph pt) =
       parensIf nested (go True ph <> " FOLLOWED BY " <> go True pt)
-    -- a literal prints as itself, exactly ('litKeyToLit'); an expression
-    -- pattern is never synthesized as missing, so the generic printer is a
-    -- fallback only
+    go _ (PatLit _ lit) = literalAsWritten lit
+    -- an expression pattern is never synthesized as missing, so the generic
+    -- printer is a fallback only
     go _ p = prettyLayout p
 
     parensIf b txt = if b then "(" <> txt <> ")" else txt
+
+-- | A number as its clause spelled it: @1.0@, @0.10@, @100_000@, @-1@. The
+-- token is read off the literal's own annotation, which is the first
+-- spelling the clauses give the number ('checkClauseMatrix'), so a number
+-- with more digits than a double holds prints with every digit; a number
+-- without a token prints through the generic printer, exactly
+-- ('litKeyToLit').
+--
+-- A piece of text prints as L4 writes it: every printable character as it
+-- is, @"@ and @\\@ escaped. A text with a character that does not print (a
+-- tab, a newline) is written with Haskell-style escapes instead
+-- ('L4.Lexer.showStringLit'), which L4 reads back, so that the suggested
+-- clause stays on one line.
+literalAsWritten :: Lit -> Text
+literalAsWritten lit = case lit of
+  StringLit _ t
+    | Text.all isPrint t -> prettyLayout lit
+    | otherwise -> Lexer.showStringLit t
+  NumericLit {} -> case runExcept (ExactPrint.concreteNodesToTokens lit) of
+    Right toks
+      | (tok : _) <- [ t | t@(Lexer.MkPosToken _ (Lexer.TLiterals _)) <- toks ]
+      -> Lexer.displayPosToken tok
+    _ -> prettyLayout lit
 
 
 -- | Render a fixity declaration the way the user writes it, e.g. "@infixl 6".
