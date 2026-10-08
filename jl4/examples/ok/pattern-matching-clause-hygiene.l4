@@ -1,0 +1,83 @@
+-- =============================================================================
+-- Multi-clause DECIDE groups are reported in terms of the clauses the drafter
+-- wrote, not the CONSIDERs they compile to (review of legalese/l4-ide#545,
+-- items 2 to 4). Warnings do not stop a file, so this one lives in ok/. This
+-- tree's golden records only what each #EVAL gives; the warnings described
+-- below are pinned in jl4-core/test/PatternClausesMissingSpec.hs.
+-- =============================================================================
+DECLARE Colour IS ONE OF Red, Green, Blue
+DECLARE Size IS ONE OF Small, Large
+DECLARE Shape IS ONE OF
+  Circle HAS colour IS A Colour
+  Square
+
+-- (2) A CONSIDER written inside a later clause's body still warns: no Blue.
+GIVEN m IS A MAYBE NUMBER
+      c IS A Colour
+GIVETH A NUMBER
+DECIDE `consider in clause two` (JUST n) c IS n
+DECIDE `consider in clause two` NOTHING  c IS
+  CONSIDER c
+  WHEN Red   THEN 1
+  WHEN Green THEN 2
+
+-- (2) A definition named like the compiler's generated definitions were
+-- named until 2026-10-07 is an ordinary definition, and keeps its warning: no
+-- Green, no Blue.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+`__pm_fallthrough_0` c MEANS
+  CONSIDER c
+  WHEN Red THEN 1
+
+-- (3) The first clause matches every input (its pattern is the input's own
+-- name), so the two clauses after it are never used.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `matches anything first` c     IS 0
+DECIDE `matches anything first` Red   IS 1
+DECIDE `matches anything first` Green IS 2
+
+-- (3) A fresh name matches anything too, so the last clause is never used,
+-- and neither is a clause that repeats an earlier one. Neither draws a
+-- warning in this tree: that needs the redundant clauses of a coverage
+-- analysis this tree does not have (the reference page says so).
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `fresh name in the middle` Red   IS 1
+DECIDE `fresh name in the middle` other IS 0
+DECIDE `fresh name in the middle` Green IS 5
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `repeated clause` Red   IS 1
+DECIDE `repeated clause` Red   IS 2
+DECIDE `repeated clause` Green IS 3
+DECIDE `repeated clause` Blue  IS 4
+
+-- (4) With no GIVEN to name the inputs, a missing clause is suggested with
+-- `_` for an input the clauses leave open, never with a generated name.
+DECIDE `no given` Red   Small IS 1
+DECIDE `no given` Green Large IS 0
+
+-- (4) A group of one clause is checked as a clause, and warned about at it.
+GIVEN s IS A Shape
+GIVETH A NUMBER
+DECIDE `one clause` (Circle Red) IS 1
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `two clauses` Red   IS 1
+DECIDE `two clauses` Green IS 2
+
+#EVAL `consider in clause two` NOTHING Green -- 2
+#EVAL `matches anything first` Red           -- 0: the first clause applies
+#EVAL `fresh name in the middle` Green       -- 0, not 5
+#EVAL `repeated clause` Red                  -- 1, not 2
+
+-- (4) At run time, a group that runs out of clauses says so in clause terms ...
+#EVAL `two clauses` Blue
+#EVAL `one clause` Square
+
+-- ... while a CONSIDER the drafter wrote keeps its own wording.
+#EVAL `__pm_fallthrough_0` Blue

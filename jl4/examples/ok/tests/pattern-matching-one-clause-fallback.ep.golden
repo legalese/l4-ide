@@ -1,0 +1,38 @@
+-- =============================================================================
+-- A group of ONE clause is checked as a clause ("This clause does not cover all
+-- cases"), at the clause. Where that check gives up, the clause keeps the
+-- warning it had before the check existed, the one for a CONSIDER, now at the
+-- clause rather than at no location. Two ways the check gives up, and a
+-- control (review of legalese/l4-ide#545; probes m01, p02, p02b). This tree's
+-- golden records only what each #EVAL gives; the warnings are pinned in
+-- jl4-core/test/PatternClausesMissingSpec.hs.
+-- =============================================================================
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+-- A literal pattern: the check gives up, so the CONSIDER warning (no Green or
+-- Blue branch for the second input) is kept.
+GIVEN n IS A NUMBER
+      c IS A Colour
+GIVETH A NUMBER
+DECIDE `one clause with a literal` 1 Red IS 1
+
+DECLARE Big IS ONE OF B01, B02, B03, B04, B05, B06, B07, B08, B09, B10, B11, B12, B13, B14, B15, B16, B17, B18, B19, B20, B21, B22, B23, B24, B25
+DECLARE Box IS ONE OF Boxed HAS content IS A Big
+
+-- More than 64 missing clauses (three inputs, each a box of 25 values): the check gives
+-- up, so the CONSIDER warnings, one per input, are kept.
+GIVEN x IS A Box
+      y IS A Box
+      z IS A Box
+GIVETH A NUMBER
+DECIDE `one clause three columns` (Boxed B01) (Boxed B01) (Boxed B01) IS 1
+
+-- Control: two such inputs leave 48 missing clauses, which the check lists.
+GIVEN x IS A Box
+      y IS A Box
+GIVETH A NUMBER
+DECIDE `one clause two columns` (Boxed B01) (Boxed B01) IS 1
+
+#EVAL `one clause with a literal` 1 Red          -- 1
+#EVAL `one clause three columns` (Boxed B01) (Boxed B01) (Boxed B01) -- 1
+#EVAL `one clause two columns` (Boxed B01) (Boxed B01)              -- 1

@@ -1,0 +1,11 @@
+-- A multi-clause group with no clause for Blue, evaluated on Blue:
+-- `l4 run --json` reports the error in the drafter's terms.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+
+#EVAL price Blue

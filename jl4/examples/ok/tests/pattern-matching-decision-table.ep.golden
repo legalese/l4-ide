@@ -1,0 +1,33 @@
+-- =============================================================================
+-- Pattern Matching: wide multi-column decision table (regression test)
+--
+-- Regression guard for the fall-through desugaring. Each non-final clause here
+-- has several distinguishable (literal) columns. The original desugaring inlined
+-- the desugaring of the ENTIRE remaining clause tail into every WHEN/OTHERWISE,
+-- so the generated CONSIDER tree grew multiplicatively and `l4 check` on a table
+-- this size took well over a minute. The linear desugaring binds each
+-- fall-through once (via a nullary LET ... IN), so this now checks in well under
+-- a second. Keep this table modest so CI stays quick.
+-- =============================================================================
+
+IMPORT prelude
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+      d IS A NUMBER
+      e IS A NUMBER
+GIVETH A NUMBER
+DECIDE tariff 0 1 2 3 4 IS 10
+DECIDE tariff 1 2 3 4 5 IS 20
+DECIDE tariff 2 3 4 5 6 IS 30
+DECIDE tariff 3 4 5 6 7 IS 40
+DECIDE tariff 4 5 6 7 8 IS 50
+DECIDE tariff 5 6 7 8 9 IS 60
+DECIDE tariff 0 1 2 3 4 IS 999   -- shadowed by the first clause (first match wins)
+DECIDE tariff a b c d e IS 0     -- catch-all
+
+#EVAL tariff 0 1 2 3 4   -- 10 (first match wins, not 999)
+#EVAL tariff 3 4 5 6 7   -- 40
+#EVAL tariff 5 6 7 8 9   -- 60
+#EVAL tariff 9 9 9 9 9   -- 0 (catch-all)

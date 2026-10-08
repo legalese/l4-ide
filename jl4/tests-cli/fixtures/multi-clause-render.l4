@@ -1,0 +1,20 @@
+-- How a rule written as a list of clauses reads in `l4 render` and in a
+-- trace. An earlier build rendered the later clauses as a definition called
+-- `__pm_fallthrough_0`, lost the third clause altogether, and called the
+-- inputs of a rule with no GIVEN "pm arg 1".
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+-- One input: the clauses read as one list of cases.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+DECIDE price c     IS 3
+
+-- Two inputs and no GIVEN: the later clauses are read from two places, so
+-- they keep a definition of their own, named for the clause they hold.
+DECIDE pair Red   Red   IS 1
+DECIDE pair Green Green IS 2
+
+#EVALTRACE price Green

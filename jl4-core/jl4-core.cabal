@@ -163,10 +163,13 @@ test-suite jl4-core-test
     ImportResolutionSpec
     TemporalContextSpec
     MixfixParserSpec
+    PatternMatchParserSpec
+    PatternClausesMissingSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    MultiClausePrintSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

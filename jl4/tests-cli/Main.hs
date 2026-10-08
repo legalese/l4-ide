@@ -186,6 +186,27 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalTraceFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 
+-- | Multi-clause groups whose compiled form, printed back as source for
+-- @l4 batch@, met a drafter's name or depended on the source text around it
+-- (review of legalese/l4-ide#545 and #581); see the fixtures.
+batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto, batchClausesDittoHead
+  , batchClausesTabs, batchClausesString
+  , batchClausesColours, batchClausesBooleans, batchClausesB :: FilePath
+batchClauses          = fixtureDir </> "batch-multi-clause.l4"
+batchClausesCapture   = fixtureDir </> "batch-multi-clause-capture.l4"
+batchClausesCatchAll  = fixtureDir </> "batch-multi-clause-catch-all.l4"
+batchClausesDitto     = fixtureDir </> "batch-multi-clause-ditto.l4"
+batchClausesDittoHead = fixtureDir </> "batch-multi-clause-ditto-head.l4"
+batchClausesTabs      = fixtureDir </> "batch-multi-clause-tabs.l4"
+batchClausesString    = fixtureDir </> "batch-multi-clause-string.l4"
+batchClausesColours   = fixtureDir </> "batch-multi-clause-colours.json"
+batchClausesBooleans  = fixtureDir </> "batch-multi-clause-booleans.json"
+batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
+
+-- | Two multi-clause groups, for how @l4 render@ and a trace name their parts.
+multiClauseRenderFixture :: FilePath
+multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -196,7 +217,11 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , evalTraceFixture ] \fp -> do
+       , evalTraceFixture
+       , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
+       , batchClausesDittoHead, batchClausesTabs, batchClausesString
+       , batchClausesColours, batchClausesBooleans, batchClausesB
+       , multiClauseRenderFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -249,6 +274,17 @@ spec bin = do
       env <- jsonEnvelope bin ["run", errorFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
 
+    it "reports an evaluation error in JSON in the drafter's terms, not as Haskell" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "multi-clause-no-match.l4", "--json"]
+      case objField env "results" of
+        Just (Array v) | [Object r] <- foldr (:) [] v -> case KeyMap.lookup (Key.fromString "value") r of
+          Just (String msg) -> do
+            T.unpack msg `shouldSatisfy` ("No clause of `price` matches" `isInfixOf`)
+            T.unpack msg `shouldSatisfy` (not . ("MkPmGroup" `isInfixOf`))
+            T.unpack msg `shouldSatisfy` (not . ("NonExhaustivePatterns" `isInfixOf`))
+          other -> expectationFailure ("Expected an error string, got " ++ show other)
+        other -> expectationFailure ("Expected one result, got " ++ show other)
+
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
 
@@ -271,6 +307,92 @@ spec bin = do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
 
+    it "warns that a multi-clause DECIDE misses a case, and still succeeds" $ do
+      let fixture = fixtureDir </> "multi-clause-missing.l4"
+      Output code sout serr <- runL4 bin ["check", fixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
+      serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
+
+  -- The names a multi-clause group is compiled to are spelled so that no
+  -- source can write them ('L4.Parser.generatedName'), and say what they are.
+  describe "multi-clause groups: the names they are compiled to" $ do
+    let generatedSpellings = ["_pm_", "__pm_", "pm arg", "pm_fallthrough"]
+        mentionsOldName out = any (`isInfixOf` out) generatedSpellings
+
+    it "reads the clauses as one list of cases in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
+      sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
+      sout `shouldSatisfy` ("- otherwise: the result of clause 2" `isInfixOf`)
+      sout `shouldSatisfy` ("The result of clause 2 is determined by:" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names no generated input in the HTML rendering either" $ do
+      Output code sout _ <- runL4 bin ["render", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input 1" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names the later clauses by the clauses they hold in a trace" $ do
+      Output code sout _ <- runL4 bin ["trace", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("`the result of clauses 2 to 3`" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+  -- `l4 batch` runs a module printed back as source. A multi-clause group
+  -- prints as its clauses, from the AST ('L4.Print.writtenClauses'), so that
+  -- no name the desugarer made up is written out as source, where a
+  -- drafter's name could capture it, and nothing depends on the text around
+  -- the clauses in the source (dittos, indentation).
+  describe "l4 batch: re-prints a multi-clause group as its clauses" $ do
+    let results args = do
+          Output code sout _ <- runL4 bin (["batch"] <> args)
+          code `shouldBe` ExitSuccess
+          pure [ (objField row "status", outResult row)
+               | l <- lines sout
+               , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value]
+               ]
+        outResult row = case objField row "output" of
+          Just (Array os) | [o] <- foldr (:) [] os -> objField o "result"
+          _ -> Nothing
+        ok v = (Just (String "success"), Just v)
+    it "reads a drafter's definition named like the binding of the later clauses" $
+      results [batchClauses, "-e", "later", "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [Number 7, Number 2, Number 3])
+    it "reads a drafter's definition named like the binding of the last clause" $
+      results [batchClauses, "-e", "fee", "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [Number 1, Number 101, Number 3])
+    it "reads a drafter's definition named like an input of a group with no GIVEN" $
+      results [batchClauses, "-e", "through", "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [String "Blue", String "Red", String "Green"])
+    it "reads a drafter's `input 1` in a group whose only clause left matches anything" $ do
+      results [batchClausesCatchAll, "-e", "one", "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+      results [batchClausesCatchAll, "-e", "two", "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+    it "tests the input a pattern variable is named after, not the variable" $
+      results [batchClausesCapture, "-e", "capture", "--inputs", batchClausesBooleans]
+        >>= (`shouldBe` map ok [Number 1, Number 2, Number 1, Number 2])
+    it "keeps what a ditto in a clause body copies" $
+      results [batchClausesDitto, "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [Number 1, Number 0, Number 0])
+    it "keeps what a ditto in a clause head copies" $
+      results [batchClausesDittoHead, "--inputs", batchClausesB]
+        >>= (`shouldBe` map ok [Number 1, Number 2])
+    it "reads clauses indented with tabs" $
+      results [batchClausesTabs, "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [Number 1, Number 3, Number 3])
+    -- The printer adds its indentation to the later lines of any string
+    -- that spans lines, in a rule written as clauses or not. `l4 run` gives
+    -- "a\n      b".
+    it "keeps a string that spans lines in a clause body" $ do
+      pendingWith "the printer indents the later lines of a multi-line string, in every rule"
+      results [batchClausesString, "--inputs", batchClausesColours]
+        >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
+
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do
       Output code sout _ <- runL4 bin ["format", cleanFixture]
@@ -282,6 +404,16 @@ spec bin = do
     it "writes nothing to stdout and exits non-zero on a broken file" $ do
       Output code _ _ <- runL4 bin ["format", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    it "reproduces multi-clause DECIDE and MEANS groups byte-for-byte" $ do
+      -- The parser fuses a clause group into one definition; formatting must
+      -- still print every clause as written. Carriage returns are dropped on
+      -- both sides so a CRLF checkout on Windows compares equal.
+      let fixture = fixtureDir </> "multi-clause-format.l4"
+      src <- readFile fixture
+      Output code sout _ <- runL4 bin ["format", fixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
 
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do

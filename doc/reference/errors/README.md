@@ -22,10 +22,14 @@ If you already know what error you are looking at, use the table of contents bel
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
   - [Function arity mismatch](#function-arity-mismatch)
+  - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
   - [APPEND vs append](#append-vs-append)
+  - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
+  - [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
+  - [Clause that is never used](#clause-that-is-never-used)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
   - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
@@ -307,6 +311,55 @@ result MEANS
 
 ---
 
+### Clauses with more or fewer patterns than the GIVEN names
+
+**Error message:**
+
+```
+Each clause of `g` has 2 patterns, but its GIVEN names 1 input.
+A clause needs one pattern for each input the GIVEN names, in the same order.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE g Red   Red IS 1
+DECIDE g Green c   IS 2
+```
+
+**What went wrong:** A rule written as a list of clauses takes its inputs from the `GIVEN` above the clauses, in order.
+The first pattern in each clause is matched against the first input the `GIVEN` names, the second pattern against the second input, and so on.
+Here each clause has two patterns, but the `GIVEN` names only one input, `c`, so L4 cannot tell which input each pattern is about.
+The error appears once, at the first clause.
+A clause body may still read an input the `GIVEN` names; L4 checks it against the type the `GIVEN` declares, so only a body that uses it as something else draws a second error.
+L4 says nothing about missing or unused clauses until the counts agree.
+
+A `GIVEN` that declares only a type, such as `GIVEN a IS A TYPE`, names no inputs, so clauses with patterns under it draw the same error, ending "its GIVEN names no inputs".
+
+**How to fix it:** Name one input in the `GIVEN` for each pattern, in the order the patterns appear:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+DECIDE g Red   Red IS 1
+DECIDE g Green d   IS 2
+```
+
+or give every clause one pattern for each input the `GIVEN` names.
+
+A list of clauses with no `GIVEN` at all is allowed.
+L4 then works out the type of each input from the patterns and the clause bodies, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
+Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
+
+---
+
 ### APPEND vs append
 
 **Error message:** Unexpected type error involving strings or lists
@@ -341,6 +394,52 @@ CONCAT "hello", " world"
 
 ---
 
+### An @export of clauses with no GIVEN
+
+**Error message:**
+
+```
+`size` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input by name, as a value of that input's type.
+A rule written as clauses with patterns and no `GIVEN`, whether one clause or several, has neither.
+L4 names its inputs itself, `input 1`, `input 2` and so on, and works out their types from the patterns and the clause bodies, so a request could not say which input a value is for, and there is no declared type to check the value against.
+So an `@export` of such a rule is an error, reported at the `@export` line, because that is where the missing `GIVEN` goes.
+The error stops the whole file from checking: `l4 run`, the REPL and `l4 batch` refuse the file, the `#EVAL`s of its other rules included, and jl4-service will not deploy it, until you add the `GIVEN` or remove the `@export`.
+`@export default` is refused the same way.
+Without `@export`, clauses with no `GIVEN` are fine.
+
+**How to fix it:** Add a `GIVEN` below `@export` that names and types each input, in the order the patterns appear, and say what the rule gives back with `GIVETH`:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+```
+
+The rule is then published with the inputs `c` and `n`.
+Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
 ## Compiler Warnings
 
 Warnings do not stop compilation, but they flag code that is likely to fail at runtime or that contains dead branches.
@@ -372,6 +471,53 @@ OTHERWISE "unknown"
 
 ---
 
+### Multi-clause DECIDE does not cover all cases
+
+**Warning message:**
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `price` Blue IS
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+```
+
+**What went wrong:** The clauses of `price` match `Red` and `Green` but no clause matches `Blue`, so `price Blue` would stop evaluation with an error. This is a **compile-time warning** (not an error); an editor underlines it from the first clause's name to the last's.
+
+**How to fix it:** Add each listed clause and write its result after `IS`:
+
+```l4
+DECIDE price Blue IS 3
+```
+
+Or end the group with a clause that matches anything, written with the `GIVEN` name:
+
+```l4
+DECIDE price c IS 0
+```
+
+When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
+
+**Note:** Only rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked.
+Rules that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning.
+Neither does a rule with a number, a piece of text or an `EXACTLY` pattern anywhere in its clauses, even if its other inputs are enumerations.
+Neither does a rule that would need more than 64 clauses listed, or more than 10000 steps to find them.
+[Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits) gives an example of each.
+A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER over a number or a piece of text gives none.
+See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
+
+---
+
 ### Redundant pattern match branch
 
 **Warning message:** pattern match branches are redundant (the warning lists the unreachable branches)
@@ -379,6 +525,39 @@ OTHERWISE "unknown"
 **What went wrong:** A WHEN branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover every value it could match.
 
 **How to fix it:** Delete the unreachable branch, or reorder branches if a more specific pattern was accidentally placed after a more general one.
+
+---
+
+### Clause that is never used
+
+**Warning message:**
+
+```
+This clause of `describe` is never used, and neither is the clause after it.
+The clause above it matches every input, so `describe` never gets this far.
+Move these clauses above that one, or remove them.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN status IS A Status
+GIVETH A STRING
+DECIDE describe status IS "some status"
+DECIDE describe Active IS "running"
+DECIDE describe Closed IS "stopped"
+```
+
+**What went wrong:** A rule written as a list of clauses tries them from the top, and the first clause that matches is the one that applies. The first clause here matches every status, because its pattern is `status`, the name of the input itself. So `describe Active` is `"some status"`, and the two clauses below it are never reached. The warning appears once, at the first clause that cannot be reached, and says how many more follow it.
+
+A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
+
+Only the clauses after one that matches every input are warned about: a clause whose every pattern is its input's own name or `_`.
+There is no warning for a clause that repeats one above it, and none for a clause after one whose pattern is a new name such as `other`, although a new name matches anything too.
+
+**How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
 
 ---
 
@@ -425,6 +604,17 @@ The typechecker's exhaustiveness warning lists all missing branches.
 **What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the compile-time warning was ignored, or the value escaped the analysis — in particular matches on NUMBER, STRING, or DATE scrutinees, for which exhaustiveness checking is skipped (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match) under Compiler Warnings). A directive that crashes this way makes `l4 run` exit non-zero.
 
 **How to fix it:** Add branches for the missing cases, or add an OTHERWISE branch as a catch-all. For matches on NUMBER, STRING, or DATE values, always include OTHERWISE.
+
+When the rule was written as a list of clauses rather than with a CONSIDER, the message talks about its clauses instead:
+
+```
+No clause of `label` matches these inputs.
+The value that the last clause could not match is
+  Suspended
+Add a clause for this case, or end the clauses with one that matches every input.
+```
+
+Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning described under [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
 
 ---
 

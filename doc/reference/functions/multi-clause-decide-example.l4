@@ -1,0 +1,64 @@
+-- Multi-clause DECIDE examples
+
+-- Numbers: the first clause matches only 0, the second any number
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE factorial 0 IS 1
+DECIDE factorial n IS n TIMES factorial (n MINUS 1)
+
+#EVAL factorial 5
+
+-- The same function written with CONSIDER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `factorial with CONSIDER` n IS
+  CONSIDER n
+  WHEN 0 THEN 1
+  OTHERWISE n TIMES `factorial with CONSIDER` (n MINUS 1)
+
+#EVAL `factorial with CONSIDER` 5
+
+-- Enumerations: one clause per value
+
+DECLARE Peril IS ONE OF Water, Fire, Cosmetic
+
+GIVEN p IS A Peril
+GIVETH A BOOLEAN
+DECIDE covered Water    IS TRUE
+DECIDE covered Fire     IS TRUE
+DECIDE covered Cosmetic IS FALSE
+
+#EVAL covered Fire
+#EVAL covered Cosmetic
+
+-- A decision table over two inputs; the last clause catches the rest
+
+GIVEN weekend IS A BOOLEAN
+      day IS A STRING
+GIVETH A NUMBER
+DECIDE `parking fee` TRUE  day        IS 0
+DECIDE `parking fee` FALSE "Saturday" IS 5
+DECIDE `parking fee` FALSE day        IS 10
+
+#EVAL `parking fee` TRUE "Sunday"
+#EVAL `parking fee` FALSE "Saturday"
+#EVAL `parking fee` FALSE "Monday"
+
+-- Lists and MAYBE values: a pattern with an argument goes in parentheses
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE total EMPTY IS 0
+DECIDE total (x FOLLOWED BY rest) IS x PLUS total rest
+
+#EVAL total (LIST 1, 2, 3)
+
+GIVEN amount IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `amount or zero` NOTHING IS 0
+DECIDE `amount or zero` (JUST a) IS a
+
+#EVAL `amount or zero` (JUST 4)
+#EVAL `amount or zero` NOTHING

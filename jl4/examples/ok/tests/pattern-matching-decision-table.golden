@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-decision-table.l4:30:1-23:
+  10
+pattern-matching-decision-table.l4:31:1-23:
+  40
+pattern-matching-decision-table.l4:32:1-23:
+  60
+pattern-matching-decision-table.l4:33:1-23:
+  0

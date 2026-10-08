@@ -1,0 +1,40 @@
+-- `l4 batch` runs a PRINTED copy of the module. Each group below has a
+-- definition named like a name the compiler makes up for it. Printed from
+-- what the clauses compile to, the made-up name met the drafter's as source
+-- and changed the answer, with no diagnostic; printed as the clauses the
+-- drafter wrote, it cannot. tests-cli/Main.hs gives the answers.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+-- the binding of the later clauses (probe b2)
+`the result of clauses 2 to 3` MEANS 7
+
+@export later
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE later Red   IS `the result of clauses 2 to 3`
+DECIDE later Green IS 2
+DECIDE later c     IS 3
+
+-- the binding of the last clause (probe b4)
+`the result of clause 3` MEANS 100
+
+@export fee
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE fee Red   IS 1
+DECIDE fee Green IS `the result of clause 3` + 1
+DECIDE fee c     IS 3
+
+-- an input of a group with no GIVEN (probe b5), read through an export
+-- that has one
+`input 1` MEANS Blue
+
+DECIDE untyped Red   IS `input 1`
+DECIDE untyped Green IS Red
+DECIDE untyped Blue  IS Green
+
+@export through
+GIVEN c IS A Colour
+GIVETH A Colour
+DECIDE through c IS untyped c

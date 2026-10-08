@@ -67,6 +67,18 @@ Warning: The following CONSIDER branch is redundant:
 
 Redundancy matters legally too — an unreachable branch is usually a sign that the author _believed_ some case was being handled there, when in fact an earlier branch is absorbing it.
 
+### Multi-clause DECIDE
+
+A function written as [one DECIDE clause per case](../../reference/functions/multi-clause-DECIDE.md) is checked the same way, as a whole group: the warning lists the clauses still needed, ready to paste.
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `price` Blue IS
+```
+
+Only clauses that match enumeration values or `TRUE`/`FALSE` are checked; the page linked above lists the groups that are not. A clause below one that matches every input is never reached, and is warned about too.
+
 ### The amendment scenario
 
 The payoff comes when a category grows. Add a fourth variant to `` `visa status` `` and every checked `CONSIDER` site that scrutinises it — every letter template, every fee rule, every appeal-rights determination — immediately warns that the new case "still needs to be considered". The legislature's amendment becomes a checklist of code sites to revisit. This is the property flattened boolean encodings cannot offer: a bundle of independent `IF` tests has no notion of "covering" a category, so nothing notices when the category changes.
@@ -130,6 +142,7 @@ The intended discipline: treat the warnings as a completeness report. A finished
 | Property                                          | Behaviour                                                                |
 | ------------------------------------------------- | ------------------------------------------------------------------------ |
 | Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                      |
+| Missing case in a multi-clause `DECIDE`           | Compile-time warning listing the clauses still needed                    |
 | Unreachable branch                                | Compile-time warning that the branch is redundant                        |
 | `NUMBER` / `STRING` / `DATE` scrutinee            | Not analysed — values can't be enumerated                                |
 | `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                           |

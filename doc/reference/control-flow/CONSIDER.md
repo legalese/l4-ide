@@ -121,6 +121,7 @@ See [Troubleshooting: Compiler Warnings](../errors/README.md#compiler-warnings) 
 ## Related Keywords
 
 - **[IF](IF.md)** - Simple conditional alternative
+- **[Multi-clause DECIDE](../functions/multi-clause-DECIDE.md)** - One `DECIDE` clause per case, which L4 turns into a CONSIDER
 - **[CONTROL-FLOW](README.md)** - All control flow keywords
 
 > Note: WHEN, OTHERWISE, and BRANCH are part of the CONSIDER syntax.
