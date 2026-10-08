@@ -564,7 +564,9 @@ This clause of `colour` is never used, because the clause above it with the new 
 If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
 ```
 
-This holds for every rule, including one that matches numbers or text.
+This holds in rules that match numbers or text too.
+It is not given when a pattern of the rule does not fit its input's type, since the rule is then an error.
+A new name inside a larger pattern draws no warning: after `(JUST Gren)`, a clause for `(JUST Blue)` is never used, and nothing says so.
 There is no warning for a clause that repeats one above it.
 
 **How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
