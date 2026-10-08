@@ -224,16 +224,17 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
+It stops however the rule reads the input, including through a `CONSIDER` with an `OTHERWISE` branch: before UNKNOWN-EVALUATION-SPEC §8 step 1 the `OTHERWISE` took the missing input, and the request answered `200` with that branch's value, where it now answers `422` and names the input.
+
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
 A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
 
 Limits, measured 2026-10-02:
 
-- **A `CONSIDER` with an `OTHERWISE` branch does not stop.** It reads an assumed term, matches none of its `WHEN` patterns, and takes the `OTHERWISE` branch, with no error: `ASSUME x IS A BOOLEAN` then `CONSIDER x WHEN TRUE THEN 1 OTHERWISE 2` gives `2`. So on the wrapper path, a missing `BOOLEAN` that the rule reads only through such a `CONSIDER` gets the catch-all answer. Build step 1 (§8) of `UNKNOWN-EVALUATION-SPEC.md`, specified in legalese/l4-ide#526 (merged as a spec) and not built yet, makes such a `CONSIDER` stop and name the input.
 - On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
 - **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. This extends the early/late split above; it did not create it.
-- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
+- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
 

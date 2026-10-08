@@ -4,8 +4,11 @@
 § `Example: Annotations in L4`
     GIVEN `person age` IS A NUMBER
 
+GIVETH A NUMBER
+`age next year` MEANS `person age` PLUS 1
+
 @nlg "the applicant's age"
 
 @ref "Section 4(1)(a) of the Act"
 
-#EVAL `person age`
+#EVAL `age next year` WITH `person age` IS 41

@@ -1,5 +1,5 @@
 -- Negation as failure (NAF), the functional way.
--- Companion to specs/todo/NEGATION-AS-FAILURE-SPEC.md
+-- Companion to specs/done/NEGATION-AS-FAILURE-SPEC.md
 --
 -- The whole idea: a proposition that may or may not have been settled is a
 -- MAYBE BOOLEAN. Negation as failure is the closed-world assumption -- the act
@@ -76,13 +76,16 @@ GIVETH A BOOLEAN
 -- A proven prohibition => may not park.
 #ASSERT NOT (`may park` (JUST TRUE))
 
-§ `The Kleene lift: propagating "unknown" through the connectives`
+§ `Truth-functional strong Kleene: propagating "unknown" through the connectives`
 
 -- The combinators above apply NAF at the leaves, with ordinary two-valued AND/OR
 -- above. If instead you want NOTHING ("unknown") to flow THROUGH the connectives
--- -- the road to well-founded / stable-model semantics -- lift the operators to
--- Kleene strong three-valued logic over MAYBE BOOLEAN, treating NOTHING as the
--- undefined element, and ground to two-valued just once, at the top, with `holds`.
+-- -- the road to well-founded / stable-model semantics -- define the operators
+-- over MAYBE BOOLEAN by strong Kleene's three-valued truth tables, treating
+-- NOTHING as the undefined element, and ground to two-valued just once, at the
+-- top, with `holds`. This is truth-functional strong Kleene, reading (a) of
+-- specs/todo/UNKNOWN-EVALUATION-SPEC.md §4.1 (#526): each connective sees only
+-- the truth values of its operands, never which unknown each one is.
 
 GIVEN p IS A DefBool
 GIVETH A DefBool
@@ -124,5 +127,12 @@ p `kor` q MEANS
 #ASSERT (NOTHING `kand` (JUST TRUE)) EQUALS NOTHING
 #ASSERT (NOTHING `kor` (JUST TRUE)) EQUALS (JUST TRUE)
 #ASSERT (knot (JUST TRUE)) EQUALS (JUST FALSE)
+-- Truth-functional tables cannot see that both operands are the same unknown,
+-- so "unknown OR NOT unknown" stays unknown. The residual evaluator #526
+-- specifies keeps that information, and decides `x OR NOT x` TRUE at the
+-- boundary (§4.7.2, its build step 4, which is not built: today the evaluator
+-- is stuck on `x OR NOT x` for an unsupplied input `x`). That is the contrast
+-- between readings (a) and (c) of its §4.1.
+#ASSERT (NOTHING `kor` (knot NOTHING)) EQUALS NOTHING
 -- Ground the three-valued result back to a yes/no with the same `holds`:
 #ASSERT holds (NOTHING `kand` (JUST TRUE)) EQUALS FALSE

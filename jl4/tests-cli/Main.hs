@@ -105,6 +105,10 @@ refuseBatchJson    = fixtureDir </> "refuse-batch.json"
 assertAssumedFixture :: FilePath
 assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
 
+-- | Typechecks cleanly; one @#EVAL@ whose result is a bare assumed BOOLEAN.
+evalAssumedFixture :: FilePath
+evalAssumedFixture = fixtureDir </> "eval-assumed.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -397,7 +401,7 @@ coreFixtures =
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
-  , assertRaisesFixture, assertAssumedFixture
+  , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
@@ -613,6 +617,26 @@ spec bin = do
 
     it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
       expectFail bin ["run", assertAssumedFixture]
+
+    -- The same bare term as an #EVAL's result is no value either. It used to
+    -- print as one, with exit 0, while #ASSERT on it was stuck
+    -- (UNKNOWN-EVALUATION-SPEC row 52).
+    it "fails the run when an #EVAL's result is a bare assumed term" $
+      expectFail bin ["run", evalAssumedFixture]
+
+    it "reports a bare assumed #EVAL result as stuck, never as a value" $ do
+      env <- jsonEnvelope bin ["run", evalAssumedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [r] -> do
+            objField r "kind"  `shouldBe` Just (String "error")
+            -- an #EVAL's exception is carried in "value", as for every crash
+            case objField r "value" of
+              Just (String e) -> e `shouldSatisfy` ("assumed term" `T.isInfixOf`)
+              other -> expectationFailure ("Expected the exception text, got " ++ show other)
+          other -> expectationFailure ("Expected 1 result, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."

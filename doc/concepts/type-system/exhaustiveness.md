@@ -97,6 +97,7 @@ The check applies wherever the `CONSIDER` appears — in a rule's main body and 
 ### OTHERWISE trades checking for coverage
 
 `OTHERWISE` is a catch-all branch. It makes any match complete, and thereby switches the missing-case warning off — including for variants added in the future, which it will absorb without comment. Use it when the remaining cases genuinely share one treatment; avoid it when each case of a determination deserves an explicit decision.
+`OTHERWISE` is not taken just because an input has not been supplied. If a branch before it could still match, depending on that input, the `CONSIDER` stops and names the input, because the input could turn out to be the case that branch covers (see [CONSIDER](../../reference/control-flow/CONSIDER.md#otherwise)).
 
 ### What happens if a hole is hit at runtime
 

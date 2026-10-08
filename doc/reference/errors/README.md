@@ -837,6 +837,8 @@ Add a clause for this case, or end the clauses with one that matches every input
 
 Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning described under [Non-exhaustive pattern match](#non-exhaustive-pattern-match) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
 
+A value that nobody supplied never produces this message: a `CONSIDER` on it stops with [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term) instead, `OTHERWISE` or not.
+
 ---
 
 ### DEONTIC rule does not execute
@@ -866,6 +868,8 @@ but it is an assumed term.
 ```
 
 **What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
+
+Evaluation stops wherever it needs the blank's value: to test it with `IF` or `CONSIDER`, to read one of its fields, to compare it with `EQUALS` on either side, to calculate with it, to turn it into text with `AS STRING`, `TOSTRING` or `JSONENCODE`, or as the answer, day by day, of `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST` or `WHEN NEXT`. A `CONSIDER` stops even when it has an `OTHERWISE` branch, if a branch before the `OTHERWISE` could still match depending on the blank: `OTHERWISE` is not taken just because the blank is there, since the blank could be any value (see [CONSIDER](../control-flow/CONSIDER.md#otherwise)). An `#EVAL` whose answer _is_ the blank, such as `#EVAL rate`, or `#EVAL TRUE AND eligible` with `eligible` a blank, stops the same way rather than print the name as though it were the answer. A rule that only carries the blank along gives its answer with the name in it: `#EVAL LIST rate, 6` prints `LIST rate, 6`.
 
 **How to fix it:** Decide which of three things you meant.
 
