@@ -6,13 +6,16 @@ module SerialisationSpec (spec) where
 import Test.Hspec
 
 import Application (app)
-import Backend.Api (FnLiteral (..), ResponseWithReason (..))
+import Backend.Api (EvaluatorError (..), FnLiteral (..), ResponseWithReason (..))
+import Backend.Jl4 (emptyEvalEnvironment)
 import BundleStore (BundleStore (..), initStore, saveBundle, loadBundle, deleteBundle, saveBundleCbor, loadBundleCbor, SerializedBundle (..), StoredMetadata (..))
 import Compiler (compileBundle, buildFromCborBundle, computeVersion)
 import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger)
 import Options (Options (..))
 import Types
+import L4.EvaluateLazy (execEvalModuleWithEnv, prettyEvalDirectiveResult, resolveEvalConfig)
+import L4.TracePolicy (apiDefaultPolicy)
 
 import Codec.Serialise (serialise, deserialiseOrFail)
 import Control.Concurrent (threadDelay)
@@ -31,7 +34,7 @@ import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.FilePath ((</>))
 
-import TestData (qualifiesJL4)
+import TestData (partialClausesJL4, qualifiesJL4)
 import TestStoreDir (withStoreDir)
 
 -- | Default options for tests.
@@ -319,9 +322,77 @@ spec = describe "CBOR serialisation" do
         assertSuccess resp $ \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
 
+  -- A rule written as clauses words an input that no clause matches in the
+  -- drafter's terms, from a mark on the CONSIDERs the clauses compile to. The
+  -- mark is on their annotations, which the bundle used to drop entirely, so
+  -- the module read back from bundle.cbor reported a CONSIDER the drafter never
+  -- wrote (review of legalese/l4-ide#545).
+  describe "a rule written as clauses, across a reload" do
+    it "is worded the same by the module read back from bundle.cbor" do
+      -- The module itself, run directive by directive: what a restarted
+      -- process serves whenever it does not re-check the sources.
+      logger <- newLogger False
+      let sources = Map.singleton "price.l4" (partialClausesJL4 <> "\n#EVAL price Blue\n")
+      result <- compileBundle logger "test" sources
+      written <- case result of
+        Left err -> fail ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, _meta, bundles) -> pure bundles
+      readBack <- case deserialiseOrFail (serialise written) of
+        Left err -> fail ("CBOR decode failed: " <> show err)
+        Right (bundles :: [SerializedBundle]) -> pure bundles
+      fromSource <- concat <$> traverse evalDirectives written
+      fromCbor <- concat <$> traverse evalDirectives readBack
+      fromSource `shouldSatisfy` any (Text.isInfixOf noClauseForBlue)
+      fromCbor `shouldBe` fromSource
+
+    it "is worded the same by the service before and after a reload" do
+      logger <- newLogger False
+      withEmptyService $ \baseUrl mgr store -> do
+        let zipBytes = createZipBundle [("price.l4", partialClausesJL4)]
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "clauses" zipBytes
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "clauses" 60
+        evalFunction baseUrl mgr "clauses" "price" blue >>= assertNoClauseForBlue
+
+        -- The reload: rebuild from the bundle.cbor the deploy wrote, as a
+        -- restarted process does, and serve that.
+        mCbor <- loadBundleCbor logger store "clauses"
+        loaded <- maybe (fail "Expected the deploy to have written bundle.cbor") pure mCbor
+        (loadedSources, storedMeta) <- loadBundle store "clauses"
+        rebuilt <- buildFromCborBundle logger "clauses" loaded loadedSources storedMeta
+        (fns, meta) <- either (fail . Text.unpack) pure rebuilt
+        registry <- newTVarIO $ Map.singleton (DeploymentId "clauses") (DeploymentReady fns meta)
+        pendingUpd <- newTVarIO Map.empty
+        tasksReg <- newTVarIO Map.empty
+        slots <- newBatchSlots
+        let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg slots
+        testWithApplication (pure $ app env) $ \port' ->
+          evalFunction ("http://localhost:" <> show port') mgr "clauses" "price" blue
+            >>= assertNoClauseForBlue
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
+
+-- | What 'partialClausesJL4' says when called with Blue, which no clause matches.
+noClauseForBlue :: Text
+noClauseForBlue = "No clause of `price` matches these inputs."
+
+blue :: Aeson.Value
+blue = Aeson.object ["arguments" Aeson..= Aeson.object ["c" Aeson..= ("Blue" :: Text)]]
+
+assertNoClauseForBlue :: Response LBS.ByteString -> IO ()
+assertNoClauseForBlue resp = case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+  Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf noClauseForBlue
+  other -> expectationFailure ("Expected " <> show noClauseForBlue <> ", got: " <> show other)
+
+-- | Run a bundle's module, directives and all, and render each result.
+evalDirectives :: SerializedBundle -> IO [Text]
+evalDirectives bundle = do
+  evalConfig <- resolveEvalConfig Nothing apiDefaultPolicy
+  (_, results) <- execEvalModuleWithEnv evalConfig bundle.sbEntityInfo emptyEvalEnvironment bundle.sbModule
+  pure (map prettyEvalDirectiveResult results)
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
