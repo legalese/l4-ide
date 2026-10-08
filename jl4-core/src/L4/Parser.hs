@@ -41,7 +41,6 @@ import qualified Control.Applicative as Applicative
 import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.IntSet as IntSet
 import qualified Data.List.Extra as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -999,49 +998,50 @@ decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
 decidePatternMatch sig = do
   clauseCol <- Lexer.indentLevel
   -- A clause of a run already turned down below starts no group either, so
-  -- fail at once (see 'turnDownRun').
+  -- fail at once, with the error the run failed with (see 'turnDownRun').
   start <- getOffset
   turnedDown <- runTurnedDown start
-  guard (not turnedDown)
-  -- Capture the raw token span of the whole clause group. The clauses are
-  -- fused into a single CONSIDER tree below (whose synthetic nodes carry no
-  -- source tokens), so exactprint cannot reproduce the multi-clause source
-  -- structurally. Instead we store these verbatim tokens as one visible CSN on
-  -- the resulting Decide's annotation, and drop the hole for the fused body, so
-  -- @l4 format@ round-trips the source (see 'desugarPatternClauses').
-  (rawToks, (firstClause, rest, restStarts)) <- match $ do
-    firstClause <- pmClause clauseCol
-    let firstHead  = pmHead firstClause
-        firstArity = length (pmPats firstClause)
-    rest <- many (try (withIndent EQ clauseCol (\ _ -> (,) <$> getOffset <*> sameHeadClause clauseCol firstHead firstArity)))
-    pure (firstClause, map snd rest, map fst rest)
-  let clauses = firstClause : rest
-  -- Treat this as pattern matching when either:
-  --
-  --  * at least one clause carries a clearly /distinguishable/ pattern (a
-  --    literal, an applied constructor, a cons, or an EXACTLY expression); or
-  --
-  --  * it is a genuine multi-clause group (>= 2 clauses) discriminated only by
-  --    differing nullary columns, e.g. @DECIDE f TRUE IS 1 / DECIDE f FALSE IS
-  --    0@ or an enum decision table. A bare @PatApp n []@ is ambiguous at parse
-  --    time between a variable and a nullary constructor (@TRUE@ / @EMPTY@), so
-  --    we require >= 2 clauses AND at least one column whose bare names actually
-  --    differ across the group before committing.
-  --
-  -- The second kind can gather overloads: @show n MEANS n + 1@ followed by
-  -- @show b MEANS b AND TRUE@ is two definitions told apart by their types,
-  -- and its bare names differ too. Which it is depends on whether any of the
-  -- names is a constructor, which only resolving them tells, so the checker
-  -- turns such a group back into the separate definitions it is made of when
-  -- none is ('L4.TypeCheck.separateOverloads'). Overloads that each carry their
-  -- own GIVEN/GIVETH signature (such as the two @`is leap year`@ overloads in
-  -- daydate.l4) are never gathered here: an intervening GIVEN makes
-  -- 'sameHeadClause' fail. A lone bare-name clause still falls through to the
-  -- ordinary 'decide' path.
-  let isGroup = any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses
-  unless isGroup $ turnDownRun (start : restStarts)
-  guard isGroup
-  pure (desugarPatternClauses sig rawToks firstClause rest)
+  for_ turnedDown parseError
+  recordRunFailure $ do
+    -- Capture the raw token span of the whole clause group. The clauses are
+    -- fused into a single CONSIDER tree below (whose synthetic nodes carry no
+    -- source tokens), so exactprint cannot reproduce the multi-clause source
+    -- structurally. Instead we store these verbatim tokens as one visible CSN on
+    -- the resulting Decide's annotation, and drop the hole for the fused body, so
+    -- @l4 format@ round-trips the source (see 'desugarPatternClauses').
+    (rawToks, (firstClause, rest, restStarts)) <- match $ do
+      firstClause <- pmClause clauseCol
+      let firstHead  = pmHead firstClause
+          firstArity = length (pmPats firstClause)
+      rest <- many (try (withIndent EQ clauseCol (\ _ -> (,) <$> getOffset <*> sameHeadClause clauseCol firstHead firstArity)))
+      pure (firstClause, map snd rest, map fst rest)
+    let clauses = firstClause : rest
+    -- Treat this as pattern matching when either:
+    --
+    --  * at least one clause carries a clearly /distinguishable/ pattern (a
+    --    literal, an applied constructor, a cons, or an EXACTLY expression); or
+    --
+    --  * it is a genuine multi-clause group (>= 2 clauses) discriminated only by
+    --    differing nullary columns, e.g. @DECIDE f TRUE IS 1 / DECIDE f FALSE IS
+    --    0@ or an enum decision table. A bare @PatApp n []@ is ambiguous at parse
+    --    time between a variable and a nullary constructor (@TRUE@ / @EMPTY@), so
+    --    we require >= 2 clauses AND at least one column whose bare names actually
+    --    differ across the group before committing.
+    --
+    -- The second kind can gather overloads: @show n MEANS n + 1@ followed by
+    -- @show b MEANS b AND TRUE@ is two definitions told apart by their types,
+    -- and its bare names differ too. Which it is depends on whether any of the
+    -- names is a constructor, which only resolving them tells, so the checker
+    -- turns such a group back into the separate definitions it is made of when
+    -- none is ('L4.TypeCheck.separateOverloads'). Overloads that each carry their
+    -- own GIVEN/GIVETH signature (such as the two @`is leap year`@ overloads in
+    -- daydate.l4) are never gathered here: an intervening GIVEN makes
+    -- 'sameHeadClause' fail. A lone bare-name clause still falls through to the
+    -- ordinary 'decide' path.
+    let isGroup = any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses
+    unless isGroup $ turnDownRun (start : restStarts)
+    guard isGroup
+    pure (desugarPatternClauses sig rawToks firstClause rest)
   where
     sameHeadClause clauseCol h ar = do
       c <- pmClause clauseCol
@@ -1074,22 +1074,40 @@ decidePatternMatch sig = do
 -- where backtracking does not undo them (as 'memoGroup' does), and
 -- 'decidePatternMatch' fails at once at any of them.
 --
+-- It fails there with the error the run itself failed with
+-- ('recordRunFailure'): reading the rest of the run from any of its clauses
+-- fails at the same place, the run's end, in the same way, so the error a
+-- file reports is the same whether the run is read again or not.
+--
 -- Like 'memoGroup', this is off when 'memoiseGroups' is, so that jl4-test's
 -- "parser memo changes nothing" check covers it too.
 turnDownRun :: [Int] -> Parser ()
 turnDownRun starts = do
   memo <- asks (.memoiseGroups)
   when memo $
-    lift (lift (lift (modify' (over #notClauseGroups (IntSet.union (IntSet.fromList starts))))))
+    lift (lift (lift (modify' (over #notClauseGroups (IntMap.union (IntMap.fromList [ (o, Nothing) | o <- starts ]))))))
 
--- | Has a run containing the clause at this position been turned down
--- ('turnDownRun')?
-runTurnedDown :: Int -> Parser Bool
+-- | The error a run turned down at this position failed with
+-- ('turnDownRun'), if there is one.
+runTurnedDown :: Int -> Parser (Maybe (ParseError TokenStream Void))
 runTurnedDown start = do
   memo <- asks (.memoiseGroups)
   if memo
-    then lift (lift (lift (gets (IntSet.member start . view #notClauseGroups))))
-    else pure False
+    then lift (lift (lift (gets (join . IntMap.lookup start . view #notClauseGroups))))
+    else pure Nothing
+
+-- | Run an attempt at a clause group, and when it fails having turned a run
+-- down ('turnDownRun'), record the error it failed with at every clause of
+-- that run. The error is the one handed on to what follows, hints included,
+-- so failing with it again is failing as the attempt did.
+recordRunFailure :: Parser a -> Parser a
+recordRunFailure p =
+  ReaderT \ env -> StateT \ st -> Megaparsec.ParsecT \ s cok cerr eok eerr ->
+    let record e = modify' (over #notClauseGroups (fmap (<|> Just e)))
+    in Megaparsec.unParser (runStateT (runReaderT p env) st) s cok
+         (\ e s' -> record e >> cerr e s')
+         eok
+         (\ e s' -> record e >> eerr e s')
 
 -- | Parse a single clause, in either the @DECIDE head pats IS body@ form or the
 -- @head pats MEANS body@ form. Argument patterns are parsed with
@@ -1484,14 +1502,15 @@ data GroupMemo = MkGroupMemo
   , patternGroups :: !(IntMap.IntMap (GroupReply (Pattern Name)))
   , clauseBodies :: !(IntMap.IntMap (GroupReply (Expr Name)))
     -- ^ The body of a @DECIDE@ or @MEANS@ clause ('clauseBody').
-  , notClauseGroups :: !IntSet.IntSet
-    -- ^ The positions of clauses that start no clause group: every clause of
-    -- a run 'decidePatternMatch' has turned down.
+  , notClauseGroups :: !(IntMap.IntMap (Maybe (ParseError TokenStream Void)))
+    -- ^ The positions of clauses that start no clause group, every clause of
+    -- a run 'decidePatternMatch' has turned down, with the error the run
+    -- failed with ('turnDownRun').
   }
   deriving stock Generic
 
 emptyGroupMemo :: GroupMemo
-emptyGroupMemo = MkGroupMemo IntMap.empty IntMap.empty IntMap.empty IntSet.empty
+emptyGroupMemo = MkGroupMemo IntMap.empty IntMap.empty IntMap.empty IntMap.empty
 
 -- | Everything one parse of a group came to, as megaparsec reports it: the
 -- state it left (offset, input, delayed errors), whether it consumed input,
