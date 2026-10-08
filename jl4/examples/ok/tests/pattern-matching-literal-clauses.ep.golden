@@ -1,0 +1,239 @@
+-- =============================================================================
+-- A number or a piece of text in a clause matches one value of its input, and
+-- the input has no end of other values. So a rule written as clauses that
+-- match particular numbers or texts is complete only with a clause written
+-- with the input's name, and the missing-clause warning suggests that clause.
+-- The enumeration inputs of the same rule are still analysed, and a clause
+-- that repeats a number is reported as never used (review of
+-- legalese/l4-ide#545, round 2, item 4). The groups below are the rows of the
+-- design's test plan that are pinned by golden.
+-- =============================================================================
+
+IMPORT time
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+DECLARE Tier IS ONE OF Basic, Premium
+DECLARE Plan IS ONE OF Standard, Plus, Gold
+DECLARE Box HAS n IS A NUMBER
+
+-- Test 1: two numbers, no catch-all. The clause with the input's name is
+-- suggested, and `describe 2` fails at run time.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE describe 0 IS "zero"
+DECIDE describe 1 IS "one"
+
+#EVAL describe 0   -- "zero"
+#EVAL describe 2   -- no clause matches
+
+-- Test 2: the same with the suggested clause: silent.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `describe with a catch-all` 0 IS "zero"
+DECIDE `describe with a catch-all` 1 IS "one"
+DECIDE `describe with a catch-all` n IS "many"
+
+#EVAL `describe with a catch-all` 2   -- "many"
+
+-- Test 3: two pieces of text, no catch-all.
+GIVEN s IS A STRING
+GIVETH A NUMBER
+DECIDE code "red"   IS 1
+DECIDE code "green" IS 2
+
+-- Test 7: EXACTLY of a number is that number.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE ex (EXACTLY 0) IS "zero"
+DECIDE ex (EXACTLY 1) IS "one"
+
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `ex with a catch-all` (EXACTLY 0) IS "zero"
+DECIDE `ex with a catch-all` n IS "other"
+
+-- Test 8: EXACTLY of a value of the input's type is that value.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price (EXACTLY Red) IS 1
+DECIDE price Green IS 2
+
+-- Test 9b: EXACTLY over an enumeration from another file, every value: silent.
+GIVEN m IS A `Meridiem Indicator`
+GIVETH A NUMBER
+DECIDE meridiem (EXACTLY am) IS 1
+DECIDE meridiem (EXACTLY pm) IS 2
+
+#EVAL meridiem pm   -- 2
+
+-- Test 9c: EXACTLY over a MAYBE BOOLEAN, every value: silent.
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A STRING
+DECIDE `maybe boolean` (EXACTLY NOTHING) IS "none"
+DECIDE `maybe boolean` (EXACTLY (JUST TRUE)) IS "t"
+DECIDE `maybe boolean` (EXACTLY (JUST FALSE)) IS "f"
+
+#EVAL `maybe boolean` (JUST FALSE)   -- "f"
+
+-- Test 10: a table keyed by a number and an enumeration, no catch-all.
+GIVEN level IS A NUMBER
+      tier IS A Tier
+GIVETH A NUMBER
+DECIDE charge 1 Basic   IS 10
+DECIDE charge 1 Premium IS 20
+DECIDE charge 2 Basic   IS 30
+DECIDE charge 2 Premium IS 40
+
+-- Test 11: the same with a catch-all per tier: silent.
+GIVEN level IS A NUMBER
+      tier IS A Tier
+GIVETH A NUMBER
+DECIDE `charge with catch-alls` 1 Basic       IS 10
+DECIDE `charge with catch-alls` 1 Premium     IS 20
+DECIDE `charge with catch-alls` level Basic   IS 30
+DECIDE `charge with catch-alls` level Premium IS 40
+
+-- Test 13: the enumeration column is still analysed: Gold is missed both for
+-- level 1 and for every other level.
+GIVEN level IS A NUMBER
+      plan IS A Plan
+GIVETH A NUMBER
+DECIDE `charge by plan` 1 Standard     IS 10
+DECIDE `charge by plan` level Standard IS 30
+DECIDE `charge by plan` level Plus     IS 40
+
+-- Test 13b: a gap inside the table, and the catch-all.
+GIVEN level IS A NUMBER
+      tier IS A Tier
+GIVETH A NUMBER
+DECIDE `charge with a gap` 1 Basic   IS 10
+DECIDE `charge with a gap` 1 Premium IS 20
+DECIDE `charge with a gap` 2 Basic   IS 30
+
+-- Test 15: a BOOLEAN column next to a text column.
+GIVEN flag IS A BOOLEAN
+      day IS A STRING
+GIVETH A NUMBER
+DECIDE fee TRUE  day        IS 0
+DECIDE fee FALSE "Saturday" IS 5
+
+GIVEN flag IS A BOOLEAN
+      day IS A STRING
+GIVETH A NUMBER
+DECIDE `fee with a catch-all` TRUE  day        IS 0
+DECIDE `fee with a catch-all` FALSE "Saturday" IS 5
+DECIDE `fee with a catch-all` FALSE day        IS 1
+
+-- Test 17: two number columns: the gap under the key 1, then the rest.
+GIVEN n IS A NUMBER
+      k IS A NUMBER
+GIVETH A STRING
+DECIDE `two numbers` 0 k IS "zero"
+DECIDE `two numbers` 1 0 IS "one zero"
+
+-- Test 19b: one clause, an enumeration and a MAYBE.
+GIVEN c IS A Colour
+      m IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `one clause maybe` Red (JUST x) IS x
+
+-- Test 20: a number inside a record.
+GIVEN b IS A Box
+GIVETH A STRING
+DECIDE boxed (Box 0) IS "zero"
+DECIDE boxed (Box 1) IS "one"
+
+GIVEN b IS A Box
+GIVETH A STRING
+DECIDE `boxed with a catch-all` (Box 0) IS "zero"
+DECIDE `boxed with a catch-all` (Box m) IS "other"
+
+-- Test 21: a number inside a MAYBE.
+GIVEN m IS A MAYBE NUMBER
+GIVETH A STRING
+DECIDE show NOTHING  IS "none"
+DECIDE show (JUST 0) IS "zero"
+
+-- Test 22: a number at the head of a list.
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `list head` EMPTY               IS 0
+DECIDE `list head` (0 FOLLOWED BY rest) IS 1
+
+-- Test 23: 1 and 1.0 are the same number, and so are 0.10 and 0.1: the second
+-- and fourth clauses are never used. Test 30: `l4 run` agrees.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE h 1    IS "one"
+DECIDE h 1.0  IS "one point zero"
+DECIDE h 0.10 IS "tenth"
+DECIDE h 0.1  IS "tenth again"
+DECIDE h n    IS "other"
+
+#EVAL h 1.0   -- "one"
+#EVAL h 0.1   -- "tenth"
+
+-- Test 24: a repeated number: the second clause is never used.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE g 0 IS "zero"
+DECIDE g 0 IS "zero again"
+DECIDE g n IS "other"
+
+-- Test 29: @nonexhaustive declares the rule partial on purpose: silent.
+@nonexhaustive
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `partial on purpose` 0 IS "zero"
+DECIDE `partial on purpose` 1 IS "one"
+
+-- Test 30: a number with more digits than a double holds is matched exactly.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `long decimal` 0.1234567890123456789 IS "long"
+DECIDE `long decimal` n IS "other"
+
+#EVAL `long decimal` 0.1234567890123456789   -- "long"
+#EVAL `long decimal` 0.12345678901234568     -- "other"
+
+-- Test 31: EXACTLY of the input's own name compares the input with itself,
+-- so it matches every input, like the bare name; a clause after it is never
+-- used.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE self 0 IS "zero"
+DECIDE self (EXACTLY n) IS "self"
+
+#EVAL self 7   -- "self"
+
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `self then dead` 0 IS "zero"
+DECIDE `self then dead` (EXACTLY n) IS "self"
+DECIDE `self then dead` 1 IS "one"
+
+-- Test 32: EXACTLY of a constant is a value the check cannot name. In a
+-- column of numbers that clause counts for nothing: only a clause written
+-- with the input's name can cover the rest of the numbers, and it covers
+-- that one too.
+zero MEANS 0
+
+GIVEN n IS A NUMBER
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE `constant key` (EXACTLY zero) Basic IS 1
+DECIDE `constant key` n Premium IS 2
+
+-- Test 34: the suggested clause names the number as the clauses write it,
+-- not rounded through a double. The second clause covers Premium for every
+-- number, so only Basic is open.
+GIVEN n IS A NUMBER
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE `long key` 0.1234567890123456789 Basic IS 1
+DECIDE `long key` n Premium IS 2
+
+GIVEN n IS A NUMBER
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE `long key alone` 0.1234567890123456789 Basic IS 1
