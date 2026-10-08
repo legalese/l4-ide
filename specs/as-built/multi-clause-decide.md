@@ -5,7 +5,7 @@ Every `file:line` below is at the commit that last changed this file; every prob
 The branch carries work first merged into unstable, one PR at a time, and each section below names its unstable source.
 The unstable commits named here are on unstable only: none of them is on this branch or on main.
 
-This branch, oldest first: `d0905e1d8` (the clauses, from #49), `d6594578b` (exact-print, from #130), `17e944423` (the missing-case warning, adapted from #185), `1a67532c7` (clause hygiene, from #569), `f02f0a6b7` (a merge of main), `ee407387b` (ruling M1), `b7c54a6cb` (generated names, printing, editor and render, from #581), `f2d938863` (the missing-case check's limits in the user documentation; this file rewritten for main), `36c549226` (`l4 run --json` reports an evaluation error in the drafter's terms), `6d0146f27` (ruling M2, from legalese/l4-ide#587), the round-2 review's `c8907bf66`, `21df62c92`, `526f70396`, `d0f4c7afa` and `232e14b1b`, the commit that wrote that review into this file (`b1002d9af`), the round-3 fixes `8e4c920ca`, `05559e4ec` and `2113516a1`, and the commit that wrote those into this file.
+This branch, oldest first: `d0905e1d8` (the clauses, from #49), `d6594578b` (exact-print, from #130), `17e944423` (the missing-case warning, adapted from #185), `1a67532c7` (clause hygiene, from #569), `f02f0a6b7` (a merge of main), `ee407387b` (ruling M1), `b7c54a6cb` (generated names, printing, editor and render, from #581), `f2d938863` (the missing-case check's limits in the user documentation; this file rewritten for main), `36c549226` (`l4 run --json` reports an evaluation error in the drafter's terms), `6d0146f27` (ruling M2, from legalese/l4-ide#587), the round-2 review's `c8907bf66`, `21df62c92`, `526f70396`, `d0f4c7afa` and `232e14b1b`, the commit that wrote that review into this file (`b1002d9af`), the round-3 fixes `8e4c920ca`, `05559e4ec` and `2113516a1`, the commit that wrote those into this file (`0350c079b`), the second round-3 fix `67d0903c2`, `764671496` (the round-3 fixtures' goldens, made on main), and the commit that wrote those into this file.
 
 Source spec: `specs/done/PATTERN-MATCHING-SPEC.md`.
 Differences from the source spec, each probed on this branch:
@@ -40,10 +40,10 @@ In `jl4-core/src/L4/Parser.hs`:
 - `topdecl` tries the group parser first: `try (decidePatternMatch sig) <|> decide sig` (`:466`).
 - `PMClause`, a parser-internal clause record that never enters the AST (`:734`).
 - `decidePatternMatch`, grouping and the commit test (`:757`); `pmClause`, one clause (`:827`).
-- `givenTermNames` (`:954`) and `givenTermParams` (`:959`).
-- `desugarPatternClauses`, which builds the fused `MkDecide` and records the clause matrix (`:971`).
-- `generatedName` (`:1043`), `givenInputBinding` (`:1052`), `scrutineeRef` (`:1060`), `rawTokensAnno` (`:1073`).
-- `matchClauses` (`:1101`), `clauseMatchesAnything` (`:1132`), `fallthroughName` (`:1139`), `clausesSrcAnno` (`:1160`), `bindFallthrough` (`:1169`), `generatedConsider` (`:1180`), `matchOne` (`:1186`), `matchLast` (`:1206`).
+- `givenTermNames` (`:967`) and `givenTermParams` (`:972`).
+- `desugarPatternClauses`, which builds the fused `MkDecide` and records the clause matrix (`:984`).
+- `generatedName` (`:1056`), `givenInputBinding` (`:1065`), `scrutineeRef` (`:1073`), `rawTokensAnno` (`:1086`).
+- `matchClauses` (`:1114`), `clauseMatchesAnything` (`:1145`), `fallthroughName` (`:1152`), `clausesSrcAnno` (`:1173`), `bindFallthrough` (`:1182`), `generatedConsider` (`:1193`), `matchOne` (`:1199`), `matchLast` (`:1219`).
 
 In `jl4-core/src/L4/Syntax.hs`: `isDistinguishablePat` (`:103`), `patAlwaysMatchesAs` (`:116`) and `isGeneratedName` (`:124`), shared by the parser, the checker, the printer and the editor.
 
@@ -92,7 +92,7 @@ The clauses after one in which every column matches without a test are bound too
 
 ## Tests and fixtures that pin it
 
-- `jl4-core/test/PatternMatchParserSpec.hs` (in `jl4-core-test`), six cases: literal and variable clauses group into one `CONSIDER`-bodied `Decide`; `EMPTY`/`FOLLOWED BY` clauses group; a single literal clause desugars; a single variable clause is left alone; two different heads stay two `Decide`s; and a group's range stops at its own lines and the file exact-prints unchanged.
+- `jl4-core/test/PatternMatchParserSpec.hs` (in `jl4-core-test`), eight cases: literal and variable clauses group into one `CONSIDER`-bodied `Decide`; `EMPTY`/`FOLLOWED BY` clauses group; a single literal clause desugars; a single variable clause is left alone; two different heads stay two `Decide`s; a group's range stops at its own lines and the file exact-prints unchanged; and two timing guards, for a run of one name and for definitions with different names (see "Review round 3").
 - `jl4-core/test/PatternClausesMissingSpec.hs`, 25 cases, and `jl4-core/test/MultiClausePrintSpec.hs`, both described below.
 - `jl4/examples/ok/`: `pattern-matching.l4` (factorial, fib, list length, `from maybe`, a two-column decision table, nested `(JUST (JUST k))`), `pattern-matching-nullary.l4`, `pattern-matching-decision-table.l4`, `pattern-matching-clause-hygiene.l4`, `pattern-matching-one-clause-fallback.l4`, `pattern-matching-fallthrough-name.l4` and `pattern-matching-input-names.l4`, each with its four goldens under `tests/`.
 - `jl4/examples/not-ok/tc/`: `pattern-matching-clause-type-errors.l4` and `pattern-matching-clause-inputs.l4`.
@@ -118,7 +118,7 @@ This branch carries the parts that do not depend on unstable's coverage analysis
 Where it lives:
 
 - `jl4-core/src/L4/Syntax.hs`: `PmGroup` (`:541`) and `PmSynthetic` (`:555`: `PmConsider`, `PmFallthrough`, `PmUnreachable`), the `pmSynthetic` field of `Extension` (`:581`), `annPmSynthetic` (`:630`) and `setPmSynthetic` (`:633`); `PmMatrix` has `synthesizedScrutinees` (`:510`) and `catchAll` (`:515`).
-- `jl4-core/src/L4/Parser.hs`: `matchClauses` (`:1101`) marks every generated CONSIDER (`generatedConsider`, `:1180`) and binding of later clauses (`bindFallthrough`, `:1169`), and binds the clauses after a clause that matches every input instead of dropping them (`PmUnreachable`); `clauseMatchesAnything` (`:1132`); `givenTermParams` (`:959`).
+- `jl4-core/src/L4/Parser.hs`: `matchClauses` (`:1114`) marks every generated CONSIDER (`generatedConsider`, `:1193`) and binding of later clauses (`bindFallthrough`, `:1182`), and binds the clauses after a clause that matches every input instead of dropping them (`PmUnreachable`); `clauseMatchesAnything` (`:1145`); `givenTermParams` (`:972`).
 - `jl4-core/src/L4/TypeCheck.hs`: `settleOneClause` (`:647`), `decideErrorContext` (`:672`), `isClausesBinding` (`:680`), `checkClausesLet` (`:814`, dispatched from `checkExpr` at `:1782`), `speculatively` (`:851`), `warnUnreachableClauses` (`:1063`); `checkConsider` (`:1868`) reads the mark; the messages (`:4069`, `:4151`).
 - `jl4-core/src/L4/TypeCheck/Types.hs`: `UnreachableClause` (`:120`), `PatternClauseUnreachable` (`:143`), `ExpectClauseInputContext` (`:173`).
 - `jl4-core/src/L4/EvaluateLazy/Exceptions.hs:110` and `Machine.hs` (`consideredClauses`, `:358`): the run-time message in clause terms.
@@ -159,7 +159,7 @@ Main's own CONSIDER analysis is not reused either: `normalizeRefinement` merges 
 Where it lives:
 
 - `jl4-core/src/L4/Syntax.hs`: `PmMatrixClause` and `PmMatrix` (`:477`, `:508`), the `pmMatrix` field of `Extension` (`:580`), `annPmMatrix` and `setPmMatrix` (`:624-628`).
-- `jl4-core/src/L4/Parser.hs:1019-1033`: `desugarPatternClauses` records the inputs and each clause's head range and patterns.
+- `jl4-core/src/L4/Parser.hs:1032-1046`: `desugarPatternClauses` records the inputs and each clause's head range and patterns.
 - `jl4-core/src/L4/TypeCheck.hs`: `inferDecide` calls `checkClauseMatrix` after checking the body (`:623`); `checkClauseMatrix` (`:878`), `quietly` (`:1095`), `coveragePattern` (`:1112`), `constructorFamilies` (`:1132`), `uncoveredRows` (`:1167`), `maxMissingClauses` (`:1212`), `clauseMatrixFuel` (`:1216`), `patternHasOpaque` (`:1222`); the message (`:4047`) and `prettyMissingClauseLhs` (`:4088`).
 - `jl4-core/src/L4/TypeCheck/Types.hs:136`: the warning `PatternClausesMissing`, whose range (`:250`) is the hull of the clause heads.
 
@@ -268,9 +268,9 @@ Measured: the `show n` / `show b` file failed to check at `6d0146f27` and now gi
 
 Item 2, linear parsing.
 Every clause of a run the group parser turned down was then parsed as a definition of its own, where the group parser read the rest of the run again, so a file of n lines `f x MEANS i` took time quadratic in n.
-`decidePatternMatch` now records the positions of a run it turns down (`turnDownRun`, `Parser.hs:928`) and fails at once at any of them (`runTurnedDown`, `:934`); every suffix of a run turned down is turned down too.
-The body of a clause is parsed once per position (`clauseBody`, `:855`; `memoClauseBody`, `:892`), so an ordinary definition replays the body the group parser read.
-Both live in `ClauseMemo` (`:861`), a layer below megaparsec in `Parser` (`:68`) that backtracking does not undo, run by `runJl4Parser` (`:2683`).
+`decidePatternMatch` now records the positions of a run it turns down (`turnDownRun`, `Parser.hs:933`) and fails at once at any of them (`runTurnedDown`, `:939`); every suffix of a run turned down is turned down too.
+The body of a clause is parsed once per position (`clauseBody`, `:855`; `memoClauseBody`, `:895`), so an ordinary definition replays the body the group parser read.
+Both live in `ClauseMemo` (`:861`), a layer below megaparsec in `Parser` (`:68`) that backtracking does not undo, run by `runJl4Parser` (`:2696`).
 On unstable the same replay is `memoGroup` (legalese/l4-ide#582), which also serves bracketed groups; main has no `memoGroup`, so `ClauseMemo` holds only these two tables, and main has no switch to turn the memo off for a comparison run.
 Measured, `l4 check`: 1,000 lines took 29.5 s at `6d0146f27`; now 2,000 take 0.38 s and 4,000 take 0.73 s.
 `PatternMatchParserSpec` required 1,000 lines to parse in less than 8 times the wall-clock time of 250; since round 3 it compares CPU time for 250 and 2,000 lines.
@@ -295,6 +295,7 @@ Not done here, for later: literal patterns in `jl4-mlir`, which compile as "alwa
 ## Review round 3 (the refutation of round 2's fixes)
 
 A refuter probed the round-2 fixes on unstable and found three defects that this branch had too; each was fixed on unstable first, on `fix/clause-group-round3` (`fd4209700`, `0c1844c22`, `182dff94e`), and carried here as `8e4c920ca`, `05559e4ec` and `2113516a1`.
+A second refuter pass found that the L2 fix made the parse quadratic in the number of definitions (F1, below), fixed on unstable as `99f9f9075` and here as `67d0903c2`.
 
 S1 and L1, the overloads' own annotations.
 `separateOverloads` gave the first definition the first `AKA` written on any clause, and the later definitions no `AKA`, no `@desc` or `@export`, and no `@nlg`.
@@ -302,22 +303,35 @@ Measured at `b1002d9af`: `DECIDE f n IS n + 1` / `DECIDE f m AKA g IS m > 3` gav
 Each clause now keeps its head as written, its `AKA` and the `@desc` or `@export` above it in the clause matrix (`PmMatrixClause`, `Syntax.hs:477`), and the annotation passes give a later clause of a run of bare names (`isRunOfBareNames`, `Syntax.hs:526`) the `@desc` or `@export` and the `@nlg` above it (`claimRunClauseDescs`, `claimRunClauseNlgs`, `jl4-core/src/L4/Parser/ResolveAnnotation.hs`).
 `separateOverloads` gives each definition its own clause's head, `AKA` and annotations, and the printer writes each clause's own `AKA` (`writtenClauses`, `Print.hs:311`).
 Main's printer prints no `@desc` and no `@nlg` for any definition, and `l4 batch` finds its `@export` on the checked module before printing it, so the printer change here is the `AKA` alone; on unstable the printer writes the `@desc` too.
-Measured on this branch: `g 5` is TRUE under `l4 run`, `l4 batch` (through an exported rule that calls `g`) and the REPL; the two-`AKA` file gives 6 and TRUE; `l4 batch` finds the `@export` on the second overload and then fails to read a boolean for its untyped input, "Expected JSON number but got: Bool True", the known limit smucclaw/l4-ide#1024; the `@nlg` is attached.
+Measured on this branch: `g 5` is TRUE under `l4 run`, `l4 batch` (through an exported rule that calls `g`) and the REPL; the two-`AKA` file gives 6 and TRUE; `l4 batch` finds the `@export` on the second overload, and then evaluates the first overload of that name (see the known limit below); the `@nlg` is attached.
 In a group that stays a group, an annotation above a later clause is still used by nothing, as before, and one case became quiet: with `DECIDE k Red IS 1` / `@nlg the green value` / `DECIDE k Green IS 2`, the `@nlg` drew "Not attached to any valid syntax node" at `b1002d9af` and now draws nothing, because it is kept, unused, on the clause in the matrix.
 An `@export` there drew no diagnostic before or after.
 Test: `ok/pattern-matching-overloads-own-annotations.l4`, and the jl4-service case "publishes the overload whose @export is written above it".
+Its second `AKA` is `c` here and `b` on unstable: main reads the input `b` in `DECIDE shown b IS b AND TRUE` as ambiguous with an `AKA` named `b`, where unstable lets the input win.
+On main the `@nlg` above the second `shown` is used for that overload's call only ("`b` is shown with `TRUE`", and "`shown` with 3" for the first); unstable uses it for both.
+A known limit, before and after: `l4 batch` and jl4-service find an overloaded `@export` by its name, and evaluate the first overload of that name.
+With the `@export` on the second `twice`, `l4 batch` given `{"b": 3}` answers 6, from the number overload, and given `{"b": true}` fails with "Expected JSON number but got: Bool True" (measured on this branch and on unstable); the refuter found jl4-service answering "Parameter 'n': missing required parameter" on unstable, and the limit on unstable's base and on main.
 
 L2, the parse error a turned-down run reports.
 `decidePatternMatch` failed at once, with no error of its own, at a clause of a run it had turned down, so megaparsec reported a nearer error than reading the run again would have.
 Measured at `b1002d9af`: `f x MEANS 1` / `f x MEANS 2` / `f (x) MEANS 3` / `f x MEANS 4` / `g y MEANS 5` gave its error at 3:3, and at 5:1 with the run memo turned off.
-The attempt now records the error it failed with at every clause of the run (`recordRunFailure`, `Parser.hs:942`), and fails with it at any of them; `ClauseMemo` keeps an `IntMap` from position to that error.
-Measured with a control binary built with `runTurnedDown` (`Parser.hs:934`) returning nothing, which is the parser without the run memo: on the refuter's 12 parse probes, its 21 fuzzed files on which the memo had changed the output, and the new fixture, `l4 check` gives byte-identical output and exit code with and without the memo; at `b1002d9af`, 23 of those 34 differed.
+The attempt now records the error it failed with at every clause of the run (`recordRunFailure`, `Parser.hs:952`), and fails with it at any of them; `ClauseMemo` keeps an `IntMap` from position to that error.
+Measured with a control binary built with `runTurnedDown` (`Parser.hs:939`) returning nothing, which is the parser without the run memo: on the refuter's 12 parse probes, its 21 fuzzed files on which the memo had changed the output, and the new fixture, `l4 check` gives byte-identical output and exit code with and without the memo; at `b1002d9af`, 23 of those 34 differed.
 Main has no switch to turn the memo off and no test comparing the two, so this comparison was made by hand.
 Test: `not-ok/tc/pattern-matching-run-parse-error.l4`.
+
+F1, the cost of recording that error.
+`recordRunFailure` first recorded the error by rewriting the whole table of turned-down positions on every failed attempt, and every definition that is not a clause group fails one, so `n` definitions with different names cost time quadratic in `n`.
+Measured, `l4 check` on 16,000 lines `f<i> x MEANS <i>`, user CPU: 3.68 s at `b1002d9af`, 24.50 s at `2113516a1`, 3.80 s at `67d0903c2`.
+`turnDownRun` now puts the run's positions in a list of their own (`turnedDownRun`, in `ClauseMemo`), and the failure that follows at once records them with its error and empties it (`recordRunFailure`, `Parser.hs:952`); a failed attempt that turned no run down records nothing.
+Re-run at `67d0903c2`, the comparison with the memo-off control above is still identical on all 34 files.
 
 L3, the linear-parsing guard.
 It compared wall-clock time, and on a busy machine it failed (the refuter, on unstable: 12 failures in 60 runs with twelve jobs at once).
 `PatternMatchParserSpec` now compares the process's CPU time for 250 and 2,000 lines, and fails at a ratio of 24 (linear is about 8, quadratic about 64).
+Since F1 it also times definitions with different names, at 1,000 and 12,000 lines, failing at 24, twice linear, because at 250 and 2,000 lines F1's quadratic part was too small to show (measured on unstable: 8.4, where linear is 8).
+With F1's recorder that test failed 3 runs of 3 on this branch (ratios 59.9 to 108.9); with the fix both guards passed 10 runs of 10 at a load average of about 8.
+The parse-scaling probe (`etc/probe-parse-scaling.mjs` on `docs/main-pre-review`, 1,000 and 4,000 lines, `l4 check`) gives 5.1 for different names and 4.0 for one name at `67d0903c2`, and 7.5 and 3.6 at `2113516a1`; it passes both.
 
 Not carried, because main lacks what they changed: the wording of unstable's hint for a name close to a value (main has no such hint), and a sentence in `specs/done/PATTERN-MATCHING-SPEC.md` (main's copy has no sentence about overloads).
 The user documentation's claim that the warning naming a new name "holds for every rule" is corrected: it is not given when a pattern of the rule does not fit its input's type, and not for a new name inside a larger pattern (`doc/reference/errors/README.md`).
