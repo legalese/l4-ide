@@ -181,11 +181,11 @@ data Severity = SWarn | SError | SInfo
   deriving stock (Eq, Show)
 
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
--- A @#CHECK@ is answered with a 'CheckInfo'. The other diagnostics that do not
--- block a check ('SWarn' and the other 'SInfo's, such as a @CONSIDER@ that
--- misses a case) answer no directive, so whatever lists @#CHECK@ results, the
--- editor's Inspector panel and its directive listing among them, must leave
--- them out.
+-- A @#CHECK@ is answered with a 'CheckInfo', the only 'SInfo' diagnostic.
+-- The warnings beside it ('SWarn', such as a @CONSIDER@ that misses a case)
+-- do not block a check either, but they answer no directive, so whatever lists
+-- @#CHECK@ results, the editor's Inspector panel and its directive listing
+-- among them, must leave them out.
 checkDirectiveResults :: [CheckErrorWithContext] -> [CheckErrorWithContext]
 checkDirectiveResults = filter isCheckResult
   where
