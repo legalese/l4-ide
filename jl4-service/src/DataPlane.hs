@@ -306,26 +306,28 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case that finishes comes back. An answer carries its result; an
+    -- error carries its message, so that no case vanishes into the count
+    -- without a reason. Only answers count as processed. A case that reaches
+    -- --eval-timeout or --max-eval-memory-mb does not finish: 'timeoutAction'
+    -- throws, and the check above fails the whole batch with it. Unstable
+    -- returns such a case with @error and @limit, from 0765fef5d and
+    -- a09544dd6, later commits of #549 than the one this carries (35d7b63b3),
+    -- which need its EvalLimits module and threaded RTS.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , outcome = CaseAnswered }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, c.outcome == CaseAnswered ]
     nIgnored = nCases - nSuccessful
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful
