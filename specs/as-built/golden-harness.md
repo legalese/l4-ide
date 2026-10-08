@@ -1,87 +1,79 @@
 # Golden harness repairs (as built)
 
-As built on unstable at 73a953821. Source spec: none. Differences from the source spec: not applicable.
-
-This PR carries three units: #67 (inside batch #77, commit `1dde8d8aa9`), #82 (`754c44db05`) and #419 (`b793264749`).
-`specs/todo/CANON-REGRESSION-CORPUS-SPEC.md` (on unstable; not on main or in this PR) covers only #398 (the canon glob), which is a separate change on unstable and is described there.
-`specs/todo/MULTILINGUAL-NLG-SPEC.md` §2.6 (on unstable, `:263`; not on main or in this PR) records the defect #419 fixes (smucclaw/l4-ide#962) as a precondition for Hebrew goldens; it is not this PR's spec.
+As built on `main` by legalese/l4-ide#544.
+Source spec: none.
+The repairs came from `unstable`: #67 (inside batch #77, commit `1dde8d8aa9`), #82 (`754c44db05`), #419 (`b793264749`) and the directive-results filter of #567 (`57011bed2`); this page describes only what `main` has.
+Line numbers are in this PR's tree, merged with `main` at `71ebf5ca1`.
 
 ## What it does
 
 These are repairs to the golden test suite `jl4-test` and to how the type-check rule sorts diagnostics.
-What L4 accepts and computes does not change; the golden harness now prints warnings, which on main it does not (see "Relation to main").
+What L4 accepts and computes does not change.
 
 - The suite resolves libraries on its own under a bare `cabal test`.
 - Three top-level `not-ok/export-*.l4` fixtures that no glob matched are now run.
 - A glob that matches no files fails the suite instead of passing vacuously.
-- `empty.l4`, whose only diagnostics are warnings, already type-checks on main (see "Relation to main"); it moves from `not-ok/`, where no glob ran it, to `ok/`.
+- `empty.l4`, whose only diagnostics are warnings, moves from `not-ok/`, where no glob ran it, to `ok/`; it type-checks, and did before this change too.
+- Warnings now sort with the non-blocking diagnostics, so the golden harness prints them after "Typechecking successful" (see "Warnings, and who reads them").
 - `.schema.golden` files store each non-ASCII character once, not double-encoded.
 
 ## Where it lives
 
-- Library path: `jl4/tests/Main.hs:65-74 @ 73a953821` (#67).
-- Export-placement glob and its block: `Main.hs:97-102` and `:164-165` @ 73a953821 (#67; the comment at `:100-101` is #82's).
-- Corpus guard: `Main.hs:116-128` @ 73a953821 (#67, with later rows).
-- Success rule: `jl4-lsp/src/LSP/L4/Rules.hs:886-890, 898 @ 73a953821`, field notes at `:132-133` (#82).
-- Schema golden encoding: `jl4JsonSchemaGolden`, `Main.hs:483-523` @ 73a953821, fix at `:499-513`, import at `:9` (#419).
-- `jl4/jl4.cabal:146 @ 73a953821` lists `text` in `jl4-test`'s build-depends, which `Data.Text.Encoding` needs; that line came from #399, not from #419.
-- Directive-results filter: `checkDirectiveResults`, `jl4-core/src/L4/TypeCheck/Types.hs:183-193` with this change, carried from #567 on unstable (`57011bed2`).
-  It is called at `jl4-lsp/app/LSP/L4/Handlers.hs:209` (the directive-results notification) and `:797` (the `#CHECK` result lookup), with this change.
+- Library path: `jl4/tests/Main.hs:51-60` (#67).
+- Export-placement glob: `Main.hs:76-81`, and its block at `:96-97` (#67; the comment at `:79-80` is #82's).
+- Corpus guard: `Main.hs:83-92` (#67, with the export-placement row).
+- Sorting diagnostics: the partition at `jl4-lsp/src/LSP/L4/Rules.hs:546` and `success` at `:558`, with the field notes at `:128-129` (#82).
+- Schema golden encoding: `jl4JsonSchemaGolden`, `Main.hs:181-217`, the fix at `:197-211`, its import at `:8` (#419).
+- `jl4/jl4.cabal:101` adds `text` to `jl4-test`'s build-depends, which `Data.Text.Encoding` needs; on `unstable` that line came from #399.
+- Directive-results filter: `checkDirectiveResults`, `jl4-core/src/L4/TypeCheck/Types.hs:184-194` (#567).
+  It is called at `jl4-lsp/app/LSP/L4/Handlers.hs:209` (the directive-results notification) and `:797` (the `#CHECK` result lookup).
 
-## Behaviour and rules (read in code on unstable)
+## Behaviour and rules (read in code)
 
 Library path: if `JL4_LIBRARY_PATH` is unset when the suite starts, it is set to `<jl4-core data dir>/libraries`; an explicit setting is kept.
 Export placement: the glob `not-ok/export-*.l4` runs with the same flags as the ok corpus (parse, check, exact-print, NLG, schema).
 Its three files put `@export` after `GIVETH`, between `GIVEN` and `GIVETH`, and just before `DECIDE`; each `.schema.golden` pins `No @export annotations found in file`, i.e. an `@export` in those positions yields no default export.
 Corpus guard: one `it` per glob asserts that the glob matched at least one file.
-#67 created it with nine rows; #82 removed `not-ok-root-tc`; with this change it has eight rows (ok, libraries, legal, tc-fails, nlg-fails, semantic-tokens, hover, export-placement), and on unstable eleven (those plus canon, import-refusal, import-unresolved).
-Success rule: the type-check rule partitions diagnostics as `partition ((/= TypeCheck.SError) . TypeCheck.severity)`.
-`infos` holds `SInfo` and `SWarn`, `errors` holds `SError` only, and `success = null errors`.
-Every diagnostic is still published to the editor; the partition only decides what blocks `SuccessfulTypeCheck`.
+It has eight rows: ok, libraries, legal, tc-fails, nlg-fails, semantic-tokens, hover and export-placement.
+Sorting diagnostics: the type-check rule partitions diagnostics as `partition ((/= TypeCheck.SError) . TypeCheck.severity)`.
+`infos` holds `SInfo` and `SWarn`, and `errors` holds `SError` only.
+`success = all ((/= TypeCheck.SError) . TypeCheck.severity) errors` is unchanged, and with `errors` holding `SError` only it is true exactly when `errors` is empty.
+Every diagnostic is still published to the editor; the partition only decides what blocks `SuccessfulTypeCheck` (`Rules.hs:595-599`).
 Schema encoding: the JSON from `AP.encodePretty` is UTF-8 bytes, and is now decoded with `TE.decodeUtf8` before `writeFile`.
 Before #419, `BL.unpack` mapped each byte to a `Char` and `writeFile` re-encoded each one, so `ä` (`c3 a4`) was stored as `c3 83 c2 a4`.
-It round-tripped through `readFile`, so golden and actual agreed and the suite stayed green on mojibake; the `.ep.golden` beside it, written from `Text`, was the control that exposed it.
+It round-tripped through `readFile`, so golden and actual agreed and the suite stayed green on mojibake.
+
+## Warnings, and who reads them
+
+Before this change, `main` partitioned with `partition ((== TypeCheck.SInfo) . TypeCheck.severity)` (`Rules.hs:542` at `71ebf5ca1`), so `SWarn` diagnostics stayed in `errors` and `infos` held `SInfo` entries only.
+`success` was the same expression then, so whether a module checks does not change.
+`CheckInfo` is the only diagnostic with severity `SInfo` (`severity`, `jl4-core/src/L4/TypeCheck.hs:3060-3065`).
+Of the readers of `infos`, only the golden harness shows the warnings:
+
+- the golden harness prints them after "Typechecking successful" (`jl4/tests/Main.hs`, `checkFile`), as `ok/tests/empty.golden` shows;
+- the language server's directive-results notification reads `infos` through `checkDirectiveResults`, which keeps `CheckInfo` entries only (`Handlers.hs:209`), so it lists `#CHECK` results and no warnings;
+- the `#CHECK` result lookup reads `infos` through the same filter (`Handlers.hs:797`), so it can return only a `#CHECK` answer.
+
+So the language server sends the same directive results as before, when both sites read `infos` unfiltered and `infos` held `CheckInfo` entries only.
+
+The REPL's "Type error" branches also print `infos` (`jl4-repl/app/Main.hs:610`, `:691`, `:740` and `:968`), but they are unreachable: they sit behind `SuccessfulTypeCheck`, which yields nothing when a check fails.
+The REPL's type lookup (`getExpressionType`, `jl4-repl/app/Main.hs:927`) takes `CheckInfo` entries only (`:963`).
 
 ## Tests and fixtures that pin it
 
 - `jl4/examples/not-ok/export-{after-giveth,before-decide,between-given-giveth}.l4`, four goldens each in `jl4/examples/not-ok/tests/` (#67).
 - `jl4/examples/ok/empty.l4` and `jl4/examples/ok/tests/empty.{golden,ep.golden,nlg.golden,schema.golden}` (#82): the golden reads "Typechecking successful" followed by its exhaustiveness and redundancy warnings.
-  It records main's checker, which for `xx` lists six missing cases and omits two (`faz bar qux`, `faz baz qux`); unstable's golden covers all eight with four patterns, through #182's checker, so the two goldens differ in content as well as layout.
-- Measured on unstable: 14 `.schema.golden` files contain non-ASCII bytes; 13 are in the canon mirror, and the other is `jl4/examples/ok/closing-the-loop/tests/fristberechnung.schema.golden`, which #419 re-blessed.
-- #419 also re-blessed `legal/regcf/denovo/tests/regcf-denovo.schema.golden`, which #489 later removed from `legal/`; on unstable its copy is at `jl4/examples/canon/us/regcf/cleanroom/tests/`.
-- `jl4/examples/ok/export-non-ascii.l4` and its four goldens in `jl4/examples/ok/tests/` pin #419's fix on this branch.
-  Its exported function's description and input name are not ASCII; before it, none of the 221 `.schema.golden` files on this branch held a non-ASCII byte.
+  It records `main`'s checker, which for `xx` lists six missing cases and omits two (`faz bar qux`, `faz baz qux`).
+- `jl4/examples/ok/export-non-ascii.l4` and its four goldens in `jl4/examples/ok/tests/` pin #419's fix.
+  Its exported function's description and input name are not ASCII; none of the other 221 `.schema.golden` files in this tree holds a non-ASCII byte, so no existing golden changes.
   With the fix's output reverted to `BL.unpack`, its `json schema` test fails on the double-encoded text (`GebÃ¼hr` for `Gebühr`) and the other 221 still pass (measured with `-m "json schema"`: 222 examples, 1 failure).
-- `jl4-core/test/CheckDirectiveResultsSpec.hs`, in `jl4-core-test`, pins the directive-results filter (#567).
+- `jl4-core/test/CheckDirectiveResultsSpec.hs`, in `jl4-core-test`, pins the directive-results filter.
   On a module with one `#CHECK` and three `CONSIDER`s that each miss a case, the diagnostics that do not block a check are one `CheckInfo` and three `CheckWarning`s, and `checkDirectiveResults` keeps only the `CheckInfo`, on line 20.
 - No test pins the library-path default or the corpus guard itself beyond the suite running.
-
-## Relation to main
-
-Main already treats warnings as non-fatal, with a different line: `success = all ((/= TypeCheck.SError) . TypeCheck.severity) errors` (`jl4-lsp/src/LSP/L4/Rules.hs:568` at main `66c30f987`, from `7531f1d9a`).
-The two agree on `success`; they differ in `TypeCheckResult.errors`, which on main still holds `SWarn` diagnostics and on unstable does not.
-Moving `SWarn` out of `errors` puts warnings into `TypeCheckResult.infos`, which on main holds `SInfo` entries only (`Rules.hs:556` at main `66c30f987`).
-`CheckInfo` is the only diagnostic with that severity (`severity`, `jl4-core/src/L4/TypeCheck.hs:3064-3069` with this change).
-Of the readers of `infos`, only the golden harness shows the warnings (read in code in this PR):
-
-- the golden harness prints them after "Typechecking successful" (`jl4/tests/Main.hs`, `checkFile`), as `ok/tests/empty.golden` shows;
-- the language server's directive-results notification reads `infos` through `checkDirectiveResults`, which keeps `CheckInfo` entries only (`jl4-lsp/app/LSP/L4/Handlers.hs:209` with this change), so it lists `#CHECK` results and no warnings;
-- the `#CHECK` result lookup reads `infos` through the same filter (`jl4-lsp/app/LSP/L4/Handlers.hs:797` with this change), so it can return only a `#CHECK` answer.
-
-So the language server sends the same directive results as on main, where both sites read `infos` unfiltered (`Handlers.hs:209` and `:797` at main `66c30f987`).
-
-The REPL's "Type error" branches also print `infos` (`jl4-repl/app/Main.hs:610`, `:691`, `:740` and `:968` with this change), but they are unreachable: they sit behind `SuccessfulTypeCheck`, which yields nothing when a check fails (`jl4-lsp/src/LSP/L4/Rules.hs:609-613` with this change).
-The REPL's type lookup (`getExpressionType`, `jl4-repl/app/Main.hs:963` with this change) takes `CheckInfo` entries only.
-
-At main, `empty.l4` is still at `not-ok/empty.l4`, and `jl4/tests/Main.hs` has none of the three repairs.
 
 ## Limits (verified)
 
 The guard proves only that each glob is non-empty; it does not find `.l4` files that are in no glob.
-Nothing pins the two call sites of `checkDirectiveResults`: on this branch `jl4-lsp` has no test suite, and `Handlers.hs` is in its executable (`jl4-lsp/jl4-lsp.cabal:110`, `hs-source-dirs: app`).
-The schema golden's `readFromFile` is still `readFile` (`jl4/tests/Main.hs:217` with this change); correct now that the written text is decoded characters.
-
-## Later changes
-
-- #369: the path scrubber (`mkPathScrubber`) and the `import-refusal` glob; #451: the `import-unresolved` glob.
-- #398: the `canon/**` glob, its guard row, and the shared `goldenCorpus` list (a separate change on unstable).
+Eight such files remain under `jl4/examples/`: `advanced/legislative-ingestion.l4`, `advanced/llm-judgment-calls.l4`, the five files under `experiments/excel-date/`, and `implicit-assume-test.l4`.
+Nothing pins the two call sites of `checkDirectiveResults`: `jl4-lsp` has no test suite on `main`, and `Handlers.hs` is in its executable (`jl4-lsp/jl4-lsp.cabal:110`, `hs-source-dirs: app` at `:119`).
+The schema golden's `readFromFile` is still `readFile` (`jl4/tests/Main.hs:217`); correct now that the written text is decoded characters.
