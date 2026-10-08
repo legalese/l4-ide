@@ -22,6 +22,11 @@ module L4.EvaluateLazy.Machine
 , getEvalTime
 , getModuleUri
 , getSafeMode
+-- * The string parsers TODATE, TOTIME and TODATETIME use, for callers that must
+-- agree with them (jl4-service names the input one of them refused).
+, parseDateText
+, parseTimeText
+, parseDatetimeText
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -398,9 +403,6 @@ forwardExpr env = \ case
     continueExpr env e1
   Modulo _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpModulo e2 env)
-    continueExpr env e1
-  Exponent _ann e1 e2 -> do
-    pushFrame (BinOp1 BinOpExponent e2 env)
     continueExpr env e1
   Leq _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpLeq e2 env)
