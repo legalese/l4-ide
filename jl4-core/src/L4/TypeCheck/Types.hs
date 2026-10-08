@@ -335,6 +335,11 @@ data CheckError =
     -- same level. Carries the chain's range and both operators with their
     -- fixities.
   | SuspiciousBinderPattern Resolved Resolved
+  | SuspiciousClausePattern Name Resolved Resolved
+    -- ^ 'SuspiciousBinderPattern' for a pattern of a multi-clause group
+    -- ('L4.TypeCheck.checkClauseMatrix'): a pattern that is a new name, close
+    -- to a value of its input's type that no clause of the group matches.
+    -- Arguments: the group's name, the new name, the value it resembles.
     -- ^ A CONSIDER branch pattern is a fresh binder (matching everything)
     -- whose name closely resembles a constructor of the scrutinee's type
     -- that no other branch covers — very likely a misspelled constructor.
@@ -369,6 +374,11 @@ data UnreachableClause
     -- clauses after this one are unreachable for the same reason
   | CoveredByClausesAbove
     -- ^ every input it matches is matched by a clause above it
+  | AfterClauseBindingNewName [Name] Int
+    -- ^ a clause above it matches every input because its patterns are
+    -- new names (the first argument, as written), such as a misspelled
+    -- value; carries how many further clauses are unreachable for the same
+    -- reason
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -704,6 +714,7 @@ severity (MkCheckErrorWithContext e _) =
     CheckInfo {}               -> SInfo
     CheckWarning {}            -> SWarn
     SuspiciousBinderPattern {} -> SInfo
+    SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
     _                          -> SError
 
@@ -810,6 +821,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
+  rangeOf (SuspiciousClausePattern _ b _)   = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r

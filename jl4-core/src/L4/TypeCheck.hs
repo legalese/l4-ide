@@ -1506,8 +1506,8 @@ checkClauseMatrix dec dHead =
     Just _ | givenMisnamesInputs dec -> pure True
     Just matrix -> do
       recordInputPatterns matrix
-      (answered, redundant) <- analyseMatrix matrix
-      warnUnreachableClauses matrix (getName dHead.rappForm) redundant
+      (answered, redundant, byNewName) <- analyseMatrix matrix
+      warnUnreachableClauses matrix (getName dHead.rappForm) redundant byNewName
       pure answered
     Nothing -> pure False
   where
@@ -1535,9 +1535,16 @@ checkClauseMatrix dec dHead =
     warnMissing = not (Export.isNonexhaustiveDecide dec)
 
     -- | Warns about missing clauses. Returns whether it reached a verdict on
-    -- them (not when it bails, nor when there are more than it lists), and
-    -- the indices of the clauses it found redundant (none when it bails).
-    analyseMatrix :: PmMatrix -> Check (Bool, [Int])
+    -- them (not when it bails, nor when there are more than it lists), the
+    -- indices of the clauses it found redundant (none when it bails), and the
+    -- first clause that matches every input because its patterns are new
+    -- names, with those names ('newNameCatchAll').
+    --
+    -- The patterns are resolved even where the analysis of missing clauses
+    -- stands down for a literal, because reading a name as new or as a value
+    -- does not depend on it; the hints about names that look like values
+    -- ('hintSuspiciousClausePatterns') come from the same resolution.
+    analyseMatrix :: PmMatrix -> Check (Bool, [Int], Maybe (Int, [Name]))
     analyseMatrix matrix = do
       ei <- asks (.entityInfo)
       let clauseRows = matrix.clauses
@@ -1562,7 +1569,7 @@ checkClauseMatrix dec dHead =
                   _ -> Nothing)
               colScruts
       case mColTypes of
-        Just colTypes0 | columnCountOk, not hasOpaque -> do
+        Just colTypes0 | columnCountOk -> do
           colTypes <- traverse applySubst colTypes0
           -- Re-resolve each clause's patterns against the column types,
           -- 'quietly': the same patterns were already checked inside the
@@ -1579,10 +1586,59 @@ checkClauseMatrix dec dHead =
                   else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
           case traverse sequence rpatssM of
             Just rpatss
-              | all (all patternInfoComplete) rpatss ->
-                  analyseResolvedRows matrix ei rpatss
-            _ -> pure (False, [])
-        _ -> pure (False, [])
+              | all (all patternInfoComplete) rpatss -> do
+                  hintSuspiciousClausePatterns ei colTypes rpatss
+                  (answered, redundant) <-
+                    if hasOpaque then pure (False, []) else analyseResolvedRows matrix ei rpatss
+                  pure (answered, redundant, newNameCatchAll matrix rpatss)
+            _ -> pure (False, [], Nothing)
+        _ -> pure (False, [], Nothing)
+
+    -- | The first clause whose every pattern matches anything, when at least
+    -- one of them does so because it is a new name rather than its input's
+    -- own name (the parser already knows of a clause whose patterns are all
+    -- input names: 'PmMatrix' @catchAll@). A pattern that is a new name
+    -- resolves to a 'PatVar' of that name; a column wildcard to a 'PatVar' of
+    -- the input ('patIsColumnWildcard').
+    newNameCatchAll :: PmMatrix -> [[Pattern Resolved]] -> Maybe (Int, [Name])
+    newNameCatchAll matrix rpatss =
+      listToMaybe
+        [ (i, newNames)
+        | (i, cl, rpats) <- List.zip3 [0 ..] matrix.clauses rpatss
+        , all isVarPattern rpats
+        , let newNames =
+                [ n
+                | (PatVar _ r, s, PatApp _ n []) <- List.zip3 rpats colScruts cl.patterns
+                , rawName (getName r) /= rawName (getName s)
+                ]
+        , not (null newNames)
+        ]
+      where
+        isVarPattern = \ case
+          PatVar {} -> True
+          _ -> False
+
+    -- | 'hintSuspiciousBinders' for the clauses of the group, in their terms:
+    -- a pattern that is a new name close to a value of its input's type that
+    -- no clause matches in that column. (The CONSIDERs the clauses compile to
+    -- leave this hint to here: each sees only its own clause, so a value
+    -- another clause matches would look uncovered to it.)
+    hintSuspiciousClausePatterns :: EntityInfo -> [Type' Resolved] -> [[Pattern Resolved]] -> Check ()
+    hintSuspiciousClausePatterns ei colTypes rpatss = do
+      let ctorSets = constructorsInScopeFromEntityInfo ei
+      for_ (List.zip3 [0 :: Int ..] colTypes colScruts) \ (j, colTy, s) -> do
+        let column = mapMaybe (listToMaybe . drop j) rpatss
+            ctors = case colTy of
+              TyApp _ r _ -> Map.findWithDefault [] (getUnique r) ctorSets
+              _           -> []
+            covered = Set.fromList [ getUnique c | PatApp _ c _ <- column ]
+            uncovered = filter (\ c -> getUnique c `Set.notMember` covered) ctors
+        for_ column \ case
+          PatVar _ binder
+            | rawName (getName binder) /= rawName (getName s)
+            , Just ctor <- find (resemblesConstructor (lastNameSegment (getName binder))) uncovered ->
+                addError (SuspiciousClausePattern (getName dHead.rappForm) binder ctor)
+          _ -> pure ()
 
     analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check (Bool, [Int])
     analyseResolvedRows matrix ei rpatss = do
@@ -1728,18 +1784,26 @@ checkClauseMatrix dec dHead =
 -- A redundant clause is unreachable because the group tries its clauses in
 -- order and the first match wins, so this is the same finding as a redundant
 -- WHEN branch, in the terms the drafter wrote.
-warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Check ()
-warnUnreachableClauses matrix headName redundant = do
+warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Maybe (Int, [Name]) -> Check ()
+warnUnreachableClauses matrix headName redundant newNameCatchAll = do
   let n = length matrix.clauses
       headRangeAt i = case drop i matrix.clauses of
         cl : _ -> cl.headRange
         [] -> Nothing
-      afterCatchAll = case matrix.catchAll of
-        Just i | i + 1 < n -> [i + 1 .. n - 1]
+      -- The first clause that matches every input: by its inputs' own names
+      -- (the parser's 'PmMatrix' @catchAll@), or by new names, such as a
+      -- misspelled value ('checkClauseMatrix').
+      firstCatchAll = case (matrix.catchAll, newNameCatchAll) of
+        (Just i, Just (j, names)) | j < i -> Just (j, AfterClauseBindingNewName names)
+        (Just i, _)                       -> Just (i, AfterClauseMatchingAnything)
+        (Nothing, Just (j, names))        -> Just (j, AfterClauseBindingNewName names)
+        (Nothing, Nothing)                -> Nothing
+      afterCatchAll = case firstCatchAll of
+        Just (i, _) | i + 1 < n -> [i + 1 .. n - 1]
         _ -> []
-  case afterCatchAll of
-    firstDead : rest | Just r <- headRangeAt firstDead ->
-      addWarning (PatternClauseUnreachable r headName (AfterClauseMatchingAnything (length rest)))
+  case (afterCatchAll, firstCatchAll) of
+    (firstDead : rest, Just (_, reason)) | Just r <- headRangeAt firstDead ->
+      addWarning (PatternClauseUnreachable r headName (reason (length rest)))
     _ -> pure ()
   for_ redundant \ i ->
     unless (i `elem` afterCatchAll) $
@@ -3526,7 +3590,10 @@ checkConsider ec ann e branches t = do
   unless (hasOpaquePatterns || isPrimitiveScrutinee || null redundant) do
     addWarning $ PatternMatchRedundant redundant
 
-  hintSuspiciousBinders cl resolvedTe rbranches
+  -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
+  -- it leaves this hint to the group ('checkClauseMatrix').
+  unless (isJust generated) $
+    hintSuspiciousBinders cl resolvedTe rbranches
 
   pure (Consider ann re rbranches)
 
@@ -4076,13 +4143,18 @@ hintSuspiciousBinders cl scrutTy rbranches =
     uncovered =
       filter (\c -> getUnique c `Set.notMember` coveredCtorUniques) scrutCtors
 
-    suspiciouslyClose binderName ctor =
-      let ctorName = lastNameSegment (getName ctor)
-          lb = Text.toLower binderName
-          lc = Text.toLower ctorName
-      in lb == lc
-         || ( min (Text.length binderName) (Text.length ctorName) >= 4
-              && exactlyOneEditApart lb lc )
+    suspiciouslyClose = resemblesConstructor
+
+-- | Is a new name \"suspiciously close\" to this constructor, as
+-- 'hintSuspiciousBinders' means it?
+resemblesConstructor :: Text -> Resolved -> Bool
+resemblesConstructor binderName ctor =
+  let ctorName = lastNameSegment (getName ctor)
+      lb = Text.toLower binderName
+      lc = Text.toLower ctorName
+  in lb == lc
+     || ( min (Text.length binderName) (Text.length ctorName) >= 4
+          && exactlyOneEditApart lb lc )
 
 -- | The last segment of a name — for a qualified name (@foo.green@), the
 -- part after the final dot, so a qualified typo still resembles the bare
@@ -6919,6 +6991,12 @@ anchorWords = \ case
   AnchorAt{}       -> "…"
 
 prettyCheckError :: CheckError -> [Text]
+prettyCheckError (SuspiciousClausePattern headName binder ctor) =
+  [ "The pattern " <> quotedName (getName binder) <> " in this clause of " <> quotedName headName
+      <> " is a new name, which matches every input."
+  , "It is very close to " <> quotedName (getName ctor) <> ", a value of its input's type that no clause matches."
+  , "If you meant that value, correct the spelling; if you meant to match anything, use the input's GIVEN name."
+  ]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   [ "This CONSIDER branch introduces a new name"
   , ""
@@ -7623,6 +7701,21 @@ prettyCheckWarning = \ case
     , "The clause above it matches every input, so " <> quotedName headName <> " never gets this far."
     , "Move these clauses above that one, or remove them."
     ]
+  PatternClauseUnreachable _ headName (AfterClauseBindingNewName names k) ->
+    [ "This clause of " <> quotedName headName <> " is never used"
+        <> (case k of
+              0 -> ""
+              1 -> ", and neither is the clause after it"
+              _ -> ", and neither are the " <> Text.textShow k <> " clauses after it")
+        <> ", because the clause above it with " <> newNames <> " matches every input."
+    , listed <> (if single then " is not a value of its input's type, so it is a new name," else " are not values of their inputs' types, so they are new names,")
+        <> " and a new name matches anything."
+    , "If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others."
+    ]
+    where
+      single = length names == 1
+      listed = Text.intercalate " and " (map quotedName names)
+      newNames = (if single then "the new name " else "the new names ") <> listed
   PatternClauseUnreachable _ headName CoveredByClausesAbove ->
     [ "This clause of " <> quotedName headName <> " is never used."
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."

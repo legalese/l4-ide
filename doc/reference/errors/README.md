@@ -721,7 +721,19 @@ DECIDE describe Closed IS "stopped"
 
 **What went wrong:** A rule written as a list of clauses tries them from the top, and the first clause that matches is the one that applies. The first clause here matches every status, because its pattern is `status`, the name of the input itself. So `describe Active` is `"some status"`, and the two clauses below it are never reached. The warning appears once, at the first clause that cannot be reached, and says how many more follow it.
 
-The same warning has a second form, "Every input it matches is already matched by a clause above it", for a clause that repeats an earlier one, or that comes after a clause whose pattern is a new name such as `other` (a new name also matches anything). This second form is only given when no pattern in the rule contains a number or a piece of text, or is an `EXACTLY` pattern: in a table keyed by amounts or codes, a repeated clause, or one after `other`, draws no warning. (`TRUE` and `FALSE` are not numbers or text; a table keyed by them is checked.) The first form does not have that limit.
+A pattern that is not a value of its input's type is a new name, such as `other`, or `Gren` where `Green` was meant, and a new name matches anything too.
+The clauses after such a clause get a second form of the warning, which names it:
+
+```
+This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input.
+`Gren` is not a value of its input's type, so it is a new name, and a new name matches anything.
+If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+```
+
+This form is given for every rule, including one that matches numbers or text.
+When the new name is very close to a value that no clause matches, as `Gren` is to `Green`, a hint at the pattern says so as well.
+
+A third form, "Every input it matches is already matched by a clause above it", is for a clause that repeats an earlier one. It is only given when no pattern in the rule contains a number or a piece of text, or is an `EXACTLY` pattern: in a table keyed by amounts or codes, a repeated clause draws no warning. (`TRUE` and `FALSE` are not numbers or text; a table keyed by them is checked.)
 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
