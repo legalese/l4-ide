@@ -1,0 +1,74 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+connectives-indirect.l4:29:1-34:
+  TRUE
+connectives-indirect.l4:30:1-35:
+  FALSE
+connectives-indirect.l4:31:1-35:
+  FALSE
+connectives-indirect.l4:32:1-34:
+  TRUE
+connectives-indirect.l4:33:1-39:
+  FALSE
+connectives-indirect.l4:34:1-38:
+  TRUE
+connectives-indirect.l4:35:1-27:
+  FALSE
+connectives-indirect.l4:36:1-28:
+  TRUE
+connectives-indirect.l4:39:1-62:
+  FALSE
+connectives-indirect.l4:40:1-60:
+  TRUE
+connectives-indirect.l4:41:1-66:
+  TRUE
+connectives-indirect.l4:43:1-61:
+  Division by zero in the operation:
+  DIVIDED BY
+connectives-indirect.l4:46:1-46:
+  FALSE
+connectives-indirect.l4:47:1-44:
+  TRUE
+connectives-indirect.l4:50:1-40:
+  FALSE
+  ─────
+  ┌ combine OF `__AND__`, TRUE, FALSE
+  │┌ combine
+  │└ <function>
+  ├ f OF p, q
+  │┌ f
+  │└ <function>
+  └ FALSE
+connectives-indirect.l4:51:1-65:
+  TRUE
+  ─────
+  ┌ combine OF `__OR__`, TRUE, (`has a positive reciprocal` OF 0)
+  │┌ combine
+  │└ <function>
+  ├ f OF p, q
+  │┌ f
+  │└ <function>
+  └ TRUE
+connectives-indirect.l4:52:1-32:
+  FALSE
+  ─────
+  ┌ apply OF `__NOT__`, TRUE
+  │┌ apply
+  │└ <function>
+  ├ g OF p
+  │┌ g
+  │└ <function>
+  └ FALSE
+connectives-indirect.l4:53:1-61:
+  TRUE
+  ─────
+  ┌ TRUE AND (FALSE OR (`has a positive reciprocal` OF 2))
+  ├ FALSE OR (`has a positive reciprocal` OF 2)
+  ├ `has a positive reciprocal` OF 2
+  │┌ `has a positive reciprocal`
+  │└ <function>
+  ├ (1 DIVIDED BY n) GREATER THAN 0
+  │┌ 1 DIVIDED BY n
+  │└ 0.5
+  └ TRUE

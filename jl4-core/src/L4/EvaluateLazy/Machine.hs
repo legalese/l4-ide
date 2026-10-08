@@ -69,6 +69,7 @@ module L4.EvaluateLazy.Machine
 , emptyEnvironment
 , boolView
 , pattern ValBool
+, builtinConnective
 -- * Constants exposed for the eager evaluator
 , builtinBinOps
 , writeJSONToReferences
@@ -141,6 +142,14 @@ import Control.Exception (SomeException, catch, fromException, throwIO, uninterr
 import GHC.Conc (getAllocationCounter, setAllocationCounter)
 import qualified Control.Exception
 
+-- | The right operand of a built-in connective, kept until the left has said
+-- whether it is needed: an expression, from a call written as @a AND b@, or
+-- a reference, from a call through a variable holding the connective.
+data ConnRight
+  = ConnRightExpr (Expr Resolved) Environment
+  | ConnRightRef Reference
+  deriving stock Show
+
 data Frame =
     BinOp1 BinOp {- -} (Expr Resolved) Environment
   | BinOp2 BinOp WHNF {- -}
@@ -200,6 +209,9 @@ data Frame =
   | RestoreCurrentParty (Maybe Text) Bool
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
+  | ConnectiveLeft Connective (Maybe ConnRight) {- -}
+    -- ^ the left operand of a built-in connective (NOT's only one) is being
+    -- evaluated; the right operand is still to come, if there is one
   | ConsiderWhen1 (Maybe PmGroup) Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
@@ -944,6 +956,7 @@ unwindFrame = \ case
   ReadCell1 {}                  -> pure ()
   ReadCell2 {}                  -> pure ()
   App1 {}                       -> pure ()
+  ConnectiveLeft {}             -> pure ()
   IfThenElse1 {}                -> pure ()
   ConsiderWhen1 {}              -> pure ()
   PatNil0 {}                    -> pure ()
@@ -1418,14 +1431,13 @@ forwardExpr :: Environment -> Expr Resolved -> Machine Config
 forwardExpr env = \ case
   RAnd _ann e1 e2 -> continueBackward (ValROp env ValRAnd (Left e1) (Left e2))
   ROr  _ann e1 e2 -> continueBackward (ValROp env ValROr (Left e1) (Left e2))
-  And  _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 e2 falseExpr)
-  Or   _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 trueExpr e2)
-  Implies _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 e2 trueExpr)
-  Not _ann e ->
-    continueExpr env (IfThenElse emptyAnno e falseExpr trueExpr)
+  -- The surface connectives do not survive type checking (it rewrites them to
+  -- applications of the built-ins, below), but should one reach here it gets
+  -- the same frames.
+  And  _ann e1 e2 -> connective env ConnAnd e1 (Just e2)
+  Or   _ann e1 e2 -> connective env ConnOr e1 (Just e2)
+  Implies _ann e1 e2 -> connective env ConnImplies e1 (Just e2)
+  Not _ann e -> connective env ConnNot e Nothing
   Equals _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpEquals e2 env)
     continueExpr env e1
@@ -1502,6 +1514,12 @@ forwardExpr env = \ case
                thunkRef <- allocate_ thunkExpr env
                pushFrame (EvalUnderRulesEncodedAt1 thunkRef env)
                continueExpr env dateExpr
+      -- A built-in connective called by name: its operands are evaluated in
+      -- its frames, as expressions, so that each shows in a trace under its
+      -- own source text ('connective').
+      uniq | Just conn <- builtinConnective uniq
+           , Just (left, right) <- connectiveOperands conn es ->
+               connective env conn left right
       _ -> do
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
@@ -1781,6 +1799,16 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- to ('operandHandoff').
         operandHandoff env rexpr1
         maybeEvaluate env rexpr1 -- TODO: build application
+      ValConnective conn ->
+        case (conn, rs) of
+          (ConnNot, [r]) -> do
+            pushFrame (ConnectiveLeft ConnNot Nothing)
+            autoApplyDischargedImport r
+          (_, [r1, r2]) | conn /= ConnNot -> do
+            pushFrame (ConnectiveLeft conn (Just (ConnRightRef r2)))
+            autoApplyDischargedImport r1
+          _ -> internalException $ RuntimeTypeError $
+            connectiveName conn <> " applied to " <> Text.textShow (length rs) <> " arguments"
       ValUnaryBuiltinFun fn -> do
         r <- expect1 rs
         pushFrame (UnaryBuiltin0 fn mTy)
@@ -1858,6 +1886,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
+  Just (ConnectiveLeft conn right) ->
+    connectiveLeft conn right val
   Just (ConsiderWhen1 _clauses _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
@@ -6369,9 +6399,6 @@ evalConDecl env (MkConDecl _ann n tns) = do
 -- Premade expressions and values
 -----------------------------------------------------------------------------
 
-falseExpr :: Expr Resolved
-falseExpr = App emptyAnno TypeCheck.falseRef []
-
 falseVal :: Value a
 falseVal = ValConstructor TypeCheck.falseRef []
 
@@ -6548,10 +6575,10 @@ initialEnvironment = do
   neverMatchesPartyRef <- allocateValue ValNeverMatchesParty
   neverMatchesActRef <- allocateValue ValNeverMatchesAct
   waitUntilRef <- allocateValue =<< waitUntilVal eventCRef neverMatchesPartyRef neverMatchesActRef
-  andRef <- allocateValue =<< andValClosure trueRef falseRef
-  orRef <- allocateValue =<< orValClosure trueRef falseRef
-  impliesRef <- allocateValue =<< impliesValClosure trueRef falseRef
-  notRef <- allocateValue =<< notValClosure trueRef falseRef
+  andRef <- allocateValue (ValConnective ConnAnd)
+  orRef <- allocateValue (ValConnective ConnOr)
+  impliesRef <- allocateValue (ValConnective ConnImplies)
+  notRef <- allocateValue (ValConnective ConnNot)
 
   builtinBinOpRefs <-
     traverse
@@ -7246,85 +7273,66 @@ expectDateTimeValue (ValDateTime utc tz) = pure (utc, tz)
 expectDateTimeValue val = internalException $ RuntimeTypeError $
   "Expected DATETIME value but got: " <> prettyLayout val
 
-boolBinOpClosure :: Reference -> Reference -> (Resolved -> Resolved -> Expr Resolved) -> Machine (Value a)
-boolBinOpClosure true false buildExpr = do
-  let
-    mkName = MkName emptyAnno . NormalName
-    na = mkName "a"
-    nb = mkName "b"
-  aDef <- def na
-  bDef <- def nb
-  aRef <- ref na aDef
-  bRef <- ref nb bDef
-  pure $ ValClosure
-    (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
-      , MkOptionallyTypedName emptyAnno bDef (Just TypeCheck.boolean) Nothing
-      ])
-    (buildExpr aRef bRef)
-    ( Map.fromList
-      [ (TypeCheck.trueUnique, true)
-      , (TypeCheck.falseUnique, false)
-      ]
-    )
+-- | Evaluate a built-in connective written out as a call (UNKNOWN-EVALUATION-SPEC
+-- §4.4, U2, U2b). The left operand (NOT's only one) is evaluated in a frame of
+-- its own, so it shows in a trace as a child of the call, under its own source
+-- text and with its value; the right operand, if the left does not decide, is
+-- evaluated in tail position ('connectiveLeft'). In two-valued evaluation this
+-- computes exactly what @IF a THEN b ELSE FALSE@ and its siblings did, in the
+-- same order, for programs that finish. One that does not finish through the
+-- right operand, such as @loop n MEANS TRUE AND loop n@, now runs until it is
+-- stopped, since the operand is in tail position, where the @IF@'s closure
+-- body overflowed the frame cap; a recursion through an @IF@'s branch already
+-- ran that way.
+connective :: Environment -> Connective -> Expr Resolved -> Maybe (Expr Resolved) -> Machine Config
+connective env conn left right = do
+  pushFrame (ConnectiveLeft conn ((`ConnRightExpr` env) <$> right))
+  continueExpr env left
 
-boolUnaryOpClosure :: Reference -> Reference -> (Resolved -> Expr Resolved) -> Machine (Value a)
-boolUnaryOpClosure true false buildExpr = do
-  let
-    mkName = MkName emptyAnno . NormalName
-    na = mkName "a"
-  aDef <- def na
-  aRef <- ref na aDef
-  pure $ ValClosure
-    (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
-      ])
-    (buildExpr aRef)
-    ( Map.fromList
-      [ (TypeCheck.trueUnique, true)
-      , (TypeCheck.falseUnique, false)
-      ]
-    )
+-- | The left operand's value has arrived: decide, or go on to the right
+-- operand. The right operand continues in tail position, with no frame of its
+-- own and no check that it is a BOOLEAN, so the prelude's @x AND and xs@ stays
+-- flat and its value is whatever the right operand's is.
+connectiveLeft :: Connective -> Maybe ConnRight -> WHNF -> Machine Config
+connectiveLeft conn right val =
+  case val of
+    ValBool b ->
+      case (conn, b) of
+        (ConnNot,     _)     -> continueBackward (valBool (not b))
+        (ConnAnd,     False) -> continueBackward (valBool False)
+        (ConnOr,      True)  -> continueBackward (valBool True)
+        (ConnImplies, False) -> continueBackward (valBool True)
+        _ -> case right of
+          Just (ConnRightExpr e env) -> continueExpr env e
+          Just (ConnRightRef r)      -> autoApplyDischargedImport r
+          Nothing -> internalException $ RuntimeTypeError $
+            connectiveName conn <> " has no right operand"
+    ValAssumed r -> stuckOnAssumed r
+    _ -> internalException $ RuntimeTypeError $
+      "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating " <> connectiveName conn
 
-andValClosure :: Reference -> Reference -> Machine (Value a)
-andValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        (Var emptyAnno bRef)
-        falseExpr
-    )
+-- | The built-in connective a name stands for, if it is one.
+builtinConnective :: Unique -> Maybe Connective
+builtinConnective u
+  | u == TypeCheck.andUnique     = Just ConnAnd
+  | u == TypeCheck.orUnique      = Just ConnOr
+  | u == TypeCheck.impliesUnique = Just ConnImplies
+  | u == TypeCheck.notUnique     = Just ConnNot
+  | otherwise                    = Nothing
 
-notValClosure :: Reference -> Reference -> Machine (Value a)
-notValClosure true false =
-  boolUnaryOpClosure true false
-    (\aRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        falseExpr
-        trueExpr
-    )
+-- | A connective's operands, if the call has the connective's arity.
+connectiveOperands :: Connective -> [Expr Resolved] -> Maybe (Expr Resolved, Maybe (Expr Resolved))
+connectiveOperands ConnNot [e]      = Just (e, Nothing)
+connectiveOperands ConnNot _        = Nothing
+connectiveOperands _       [e1, e2] = Just (e1, Just e2)
+connectiveOperands _       _        = Nothing
 
-orValClosure :: Reference -> Reference -> Machine (Value a)
-orValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        trueExpr
-        (Var emptyAnno bRef)
-    )
-
-impliesValClosure :: Reference -> Reference -> Machine (Value a)
-impliesValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        (Var emptyAnno bRef)
-        trueExpr
-    )
+connectiveName :: Connective -> Text
+connectiveName = \ case
+  ConnAnd     -> "AND"
+  ConnOr      -> "OR"
+  ConnImplies -> "IMPLIES"
+  ConnNot     -> "NOT"
 
 ----------------------------------------------------------------------------
 -- JSON to Environment conversion for batch processing

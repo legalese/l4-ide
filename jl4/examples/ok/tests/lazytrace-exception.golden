@@ -13,10 +13,7 @@ lazytrace-exception.l4:11:1-66:
   ││┌ LIST (FALSE OR TRUE), TRUE, something, FALSE
   ││├ (FALSE OR TRUE) FOLLOWED BY (LIST TRUE, something, FALSE)
   │││┌ FALSE OR TRUE
-  │││├ IF a THEN TRUE ELSE b
-  ││││┌ a
-  ││││└ FALSE
-  │││├ b
+  │││├ TRUE
   │││└ TRUE
   │││┌ LIST TRUE, something, FALSE
   │││├ TRUE FOLLOWED BY (LIST something, FALSE)
@@ -32,45 +29,35 @@ lazytrace-exception.l4:11:1-66:
   │   WHEN EMPTY THEN TRUE
   │   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
   ├ x AND (and OF xs)
-  │┌ and OF xs
-  ││┌ and
-  ││└ <function>
-  │├ CONSIDER list
-  ││   WHEN EMPTY THEN TRUE
-  ││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
-  │├ x AND (and OF xs)
-  ││┌ and OF xs
-  │││┌ and
-  │││└ <function>
-  ││├ CONSIDER list
-  │││   WHEN EMPTY THEN TRUE
-  │││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
-  ││├ x AND (and OF xs)
-  │││┌ and OF xs
-  ││││┌ and
-  ││││└ <function>
-  │││├ CONSIDER list
-  ││││   WHEN EMPTY THEN TRUE
-  ││││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
-  │││├ x AND (and OF xs)
-  │││├ IF a THEN b ELSE FALSE
-  ││││┌ a
-  ││││└ something
-  │││└ ↯ stuck
-  ││├ IF a THEN b ELSE FALSE
-  │││┌ a
-  │││└ TRUE
-  ││├ b
-  ││└ ↯ stuck
-  │├ IF a THEN b ELSE FALSE
-  ││┌ a
-  ││└ TRUE
-  │├ b
-  │└ ↯ stuck
-  ├ IF a THEN b ELSE FALSE
-  │┌ a
+  │┌ x
   │└ TRUE
-  ├ b
+  ├ and OF xs
+  │┌ and
+  │└ <function>
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN TRUE
+  │   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ├ x AND (and OF xs)
+  │┌ x
+  │└ TRUE
+  ├ and OF xs
+  │┌ and
+  │└ <function>
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN TRUE
+  │   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ├ x AND (and OF xs)
+  │┌ x
+  │└ TRUE
+  ├ and OF xs
+  │┌ and
+  │└ <function>
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN TRUE
+  │   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  ├ x AND (and OF xs)
+  │┌ x
+  │└ something
   └ ↯ stuck
 lazytrace-exception.l4:20:1-52:
   Division by zero in the operation:
