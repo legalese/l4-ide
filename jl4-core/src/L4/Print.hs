@@ -230,9 +230,14 @@ mixfixCanonicalByUnique reg = Map.fromList
 --
 -- A pass rather than an environment threaded through 'LayoutPrinter': the
 -- class has ~100 instances and none of the others wants a registry.
+--
+-- It also marks the names the compiler made up ('markGeneratedNames'), the
+-- other thing a module printed back to source needs, so that every path that
+-- prints one gets both.
 restoreMixfixPatterns :: TC.MixfixRegistry -> Module Resolved -> Module Resolved
 restoreMixfixPatterns reg m0 =
-    ( Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
+    ( markGeneratedNames
+    . Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
     . Optics.over (Optics.gplate @(Expr Resolved)) deepExpr
     ) m0
  where
@@ -277,6 +282,48 @@ restoreMixfixPatterns reg m0 =
     MkAppForm ann n ns@(_ : _) maka | Just c <- look n ->
       MkAppForm (Optics.set annMixfixCanonical (Just c) ann) n ns maka
     _ -> a
+
+-- | Mark every name the compiler made up ('isGeneratedName'), so that the
+-- printer spells it as no source can be read.
+--
+-- A module printed back to source should never write one. Only what a
+-- multi-clause group compiles to holds one, and a group prints as the clauses
+-- the drafter wrote ('writtenClauses'). A group that fell back to printing
+-- its tree would write them as text, where each is an ordinary name. The
+-- printed module would read back with no error, and where a drafter's
+-- definition or a pattern variable shared a generated name's text, it would
+-- capture it and the module would answer differently with exit 0 (@l4 batch@
+-- and the REPL run it). No corpus module falls back so today, but a pass that
+-- reshaped the tree could make one. Marked, the name prints as @⟪input 1⟫@,
+-- which does not lex, so the printed module fails to read back instead: at
+-- the corpus round-trip check in @jl4/tests/Main.hs@; in @l4 batch@, as status
+-- "error" with the parser's diagnostic; in the REPL, which loads the file and
+-- then answers every expression with "Failed to type check expression".
+--
+-- It fails closed: a fallback whose answers would have been right fails too.
+-- That is the point of a tripwire. A fallback should not happen, so any one
+-- that does is reported, not judged.
+--
+-- The mark is a leading NUL ('generatedNameMark'), which does not lex either,
+-- so a printer path that wrote the name's text without the 'RawName' instance
+-- would still fail to read back, with a lexer message about the NUL. Neither
+-- NUL nor @⟪@ fails inside an inline NLG annotation (@[the %⟪y⟫% thing]@),
+-- but nothing prints a generated name there. The mark stays a 'PreDef', so
+-- 'writtenSignature' and the plain-definition fallback still find the inputs
+-- the desugarer named.
+--
+-- Only the paths that print a module back to source mark one. Anywhere else
+-- (a trace, a hover, a message) a generated name reads as its text.
+markGeneratedNames :: Module Resolved -> Module Resolved
+markGeneratedNames = Optics.over (Optics.gplate @Name) mark
+ where
+  mark (MkName ann (PreDef t))
+    | not (generatedNameMark `Text.isPrefixOf` t) = MkName ann (PreDef (generatedNameMark <> t))
+  mark n = n
+
+-- | See 'markGeneratedNames'.
+generatedNameMark :: Text
+generatedNameMark = "\0"
 
 -- | A canonical pattern split into its keyword runs and its slots.
 --
@@ -390,7 +437,11 @@ instance LayoutPrinter RawName where
     -- printed to unparseable source.
     QualifiedName qs t ->
       pretty (Text.intercalate "." (fmap quoteIfNeeded (NE.toList qs) <> [quoteIfNeeded t]))
-    PreDef t -> pretty $ quoteIfNeeded t
+    -- Marked on the way to being printed back as source: see
+    -- 'markGeneratedNames'. @⟪@ starts no token, so this does not lex.
+    PreDef t
+      | Just t' <- Text.stripPrefix generatedNameMark t -> pretty ("⟪" <> t' <> "⟫")
+      | otherwise -> pretty $ quoteIfNeeded t
 
 instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
   printWithLayout = \ case
@@ -743,6 +794,13 @@ unusedInputNames n body = take n (filter (`notElem` used) candidates)
 -- ('patAlwaysMatchesAs'), its body is under their first branches, and the
 -- clauses after it are under the binding of the later clauses. 'Nothing'
 -- when the tree is not shaped so.
+--
+-- Only two clauses may have no binding of the clauses after them: the last,
+-- and one that matches anything, after which the checker dropped the binding
+-- of clauses never tried. Any other clause without one is in a tree a pass
+-- has reshaped since, by inlining that binding, say; its body is no longer
+-- marked off from the clauses after it, and reading it as the last clause
+-- would print the group as its first clauses alone.
 clauseBodies :: [Name] -> [[Pattern Name]] -> Expr a -> Maybe [Expr a]
 clauseBodies scrutinees = go
   where
@@ -750,8 +808,9 @@ clauseBodies scrutinees = go
     go (pats : rest) e = case e of
       LetIn _ [LocalDecide _ (MkDecide dann _ _ later)] tree
         | isLaterClauses dann -> (:) <$> bodyOf pats tree <*> go rest later
-      -- the last clause, or one that matches anything, the rest dropped
-      _ -> (: []) <$> bodyOf pats e
+      _ | null rest || matchesAnything pats -> (: []) <$> bodyOf pats e
+        | otherwise -> Nothing
+    matchesAnything pats = and (zipWith patAlwaysMatchesAs scrutinees pats)
     bodyOf pats = under (length (filter not (zipWith patAlwaysMatchesAs scrutinees pats)))
     under :: Int -> Expr a -> Maybe (Expr a)
     under 0 e = Just e
