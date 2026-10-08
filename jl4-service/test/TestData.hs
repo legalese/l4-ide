@@ -49,6 +49,7 @@ module TestData (
   heavyLibJL4,
   heavyMainJL4,
   deepJL4,
+  partialClausesJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1036,4 +1037,20 @@ GIVETH A NUMBER
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 DECIDE deep IS `sum to` n
+|]
+
+-- | A rule written as clauses, with no clause for Blue. The error for Blue is
+-- worded from the clauses ("No clause of `price` matches these inputs"), and
+-- the evaluator reads that from a mark on the CONSIDERs the clauses compile
+-- to, which the bundle has to keep (review of legalese/l4-ide#545).
+partialClausesJL4 :: Text
+partialClausesJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default The price of a colour
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
 |]

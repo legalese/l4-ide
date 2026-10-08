@@ -3322,8 +3322,9 @@ hasDecisionQueryCache registry deployId fnName = do
 -- Every other helper in this file registers freshly-compiled
 -- 'ValidatedFunction's straight into the TVar, which makes the whole suite
 -- blind to anything that differs only after a restart. The CBOR round-trip is
--- exactly such a thing: 'L4.Instances.Serialise' encodes every annotation as
--- @()@, so a rehydrated AST carries no type information. That is what made
+-- exactly such a thing: a bundle keeps no part of an annotation but the
+-- multi-clause mark (@Serialise Anno@ in "L4.Syntax"), so a rehydrated AST
+-- carries no type information. That is what made
 -- @\/query-plan@ and @\/ladder@ answer 400 ("Can only visualize, as a ladder
 -- diagram, a DECIDE that returns a boolean") on any process restarted since the
 -- deploy, while @\/evaluation@ — which needs no annotations — kept working.
