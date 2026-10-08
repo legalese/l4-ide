@@ -567,8 +567,9 @@ attempt act = StateT \ st -> case runStateT act st of
 -- unwrapping, record construction (via declaration-order field lookup),
 -- enum constructor coercion from 'FnLitString', and nested lists /
 -- records. Fails for cases that can't be represented as a pure
--- AST value ('FnUnknown' / 'FnUncertain' against a non-MAYBE type) —
--- callers can then fall back to the wrapper path.
+-- AST value ('FnUnknown' / 'FnUncertain' against a non-MAYBE type); such a
+-- failure is a refusal, not a fallback. With 'requiresWrapperEvaluation' in
+-- front, a request holding either value does not get here.
 --
 -- A record field the value leaves out takes its @DECLARE@'s @TYPICALLY@ while
 -- presumption is soft (T1b), as a root fill named by its path.
@@ -694,15 +695,24 @@ buildFunctionCallExpr :: Resolved -> [Expr Resolved] -> Expr Resolved
 buildFunctionCallExpr funName args =
   App emptyAnno funName args
 
--- | Check if any parameter value requires wrapper-based evaluation
--- Returns True for:
--- - Missing parameters (Nothing) - need wrapper to handle as UNKNOWN
--- - FnObject, FnUncertain, FnUnknown, FnLitString (enum coercion)
--- These types need JSONDECODE to handle properly
--- | The only shapes direct-AST can't express are 'FnUncertain' (an
--- L4 UNCERTAIN value) and 'FnUnknown' outside a MAYBE-typed slot. The
--- direct path handles everything else — including records, enums,
--- lists, and missing optional parameters — in 'fnLiteralToExprTyped'.
+-- | In 'evaluateWithCompiled', whether a request takes the wrapper path:
+-- when any supplied value holds an 'FnUncertain' (@{}@) or an 'FnUnknown'
+-- (@null@), anywhere in it, the top level included, and in a slot of any
+-- type. The test is conservative: the direct path could express some of
+-- these (a @null@ in a MAYBE slot is NOTHING in 'fnLiteralToExprTyped'), but
+-- not all. It handles everything else, records, enums and lists included.
+-- A DEONTIC function called on @/evaluation@, and a module that did not
+-- precompile, take the wrapper path whatever this says
+-- ('evaluateWithCompiledDeontic', 'createFunction'); MCP and batch call a
+-- DEONTIC function through 'evaluateWithCompiled' like any other.
+--
+-- A 'Nothing' does not take it. That is a parameter left out, a top-level
+-- @null@ on the single evaluation endpoint, which 'FnArguments' decodes as a
+-- key with no value, or an MCP argument that fails to parse
+-- ('parseFnLiteral'). The direct path then fills the input's default, makes
+-- a MAYBE NOTHING, or refuses it ('L4.Presumption.fillDecision'). MCP and
+-- the batch endpoint decode a top-level @null@ as 'FnUnknown' instead, so
+-- they take the wrapper path for it (smucclaw/l4-ide#1021).
 requiresWrapperEvaluation :: [(Text, Maybe FnLiteral)] -> Bool
 requiresWrapperEvaluation = any (\(_, mVal) -> maybe False needsWrapper mVal)
   where
@@ -795,7 +805,9 @@ requestEvalConfig policy presumption viaWrapper = do
 
 -- | Evaluate using precompiled module (fast path) - direct AST evaluation
 -- This avoids the text round-trip through prettyLayout and re-parsing
--- Falls back to wrapper-based evaluation for FnObject parameters or missing params
+-- Sends a request to the wrapper path instead when it holds a @{}@ anywhere,
+-- or a @null@ the decoder kept as a value: inside a record or list, or at
+-- the top level from MCP and batch ('requiresWrapperEvaluation').
 evaluateWithCompiled
   :: FilePath
   -> FunctionDeclaration
@@ -808,15 +820,14 @@ evaluateWithCompiled
   -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiled filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption = do
-  -- Fill in missing parameters with Nothing
-  -- The input params may only contain provided parameters; we need explicit Nothing
-  -- entries for missing parameters so requiresWrapperEvaluation can detect them
+  -- One entry per GIVEN: Nothing for one left out, or for a top-level null on
+  -- /evaluation, which 'FnArguments' decodes the same way.
   let expectedParams = map fst (extractParamTypes compiled.compiledDecide)
       inputMap = Map.fromList params
       -- join flattens Maybe (Maybe FnLiteral) -> Maybe FnLiteral
       fullParams = [(name, join $ Map.lookup name inputMap) | name <- expectedParams]
       -- ASSUMEs referenced by the function body — promoted to parameters in
-      -- the schema and bound locally via LetIn in the direct-AST path.
+      -- the schema, and bound by 'rewriteModuleAssumes' in 'evaluateDirectAST'.
       assumeRefs = extractAssumeParamResolveds compiled.compiledModule compiled.compiledDecide
       assumeNameOf r = rawNameToText (rawName (getActual r))
       assumeValues = [(assumeNameOf r, join $ Map.lookup (assumeNameOf r) inputMap) | (r, _) <- assumeRefs]
@@ -825,9 +836,11 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
     (inputDefaults compiled.compiledModule compiled.compiledDecide)
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
-  -- Fall back to the wrapper path only for values the direct path can't express
-  -- as AST (FnObject / FnUncertain / FnUnknown / missing non-MAYBE). ASSUMEs
-  -- are handled directly via LetIn bindings.
+  -- Take the wrapper path only for a @{}@ anywhere, or a @null@ the decoder
+  -- kept as a value: inside a record or list, or at the top level from MCP
+  -- and batch ('requiresWrapperEvaluation'). A parameter left out, or a
+  -- top-level @null@ on /evaluation, stays on the direct path, and so do the
+  -- ASSUMEs, which 'evaluateDirectAST' binds by 'rewriteModuleAssumes'.
   if requiresWrapperEvaluation (fullParams ++ assumeValues)
     then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
     else evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presumption
@@ -971,7 +984,9 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
--- | Direct AST evaluation (fast path) - for simple types without FnObject.
+-- | Direct AST evaluation (fast path), for a request with no @{}@ in it and
+-- no @null@ the decoder kept as a value ('requiresWrapperEvaluation');
+-- records, enums and lists included.
 -- Each supplied ASSUME is bound by installing a nullary DECIDE at the
 -- ASSUME's own address in the module ('rewriteModuleAssumes'): the
 -- exported body and every helper it reaches resolve the ASSUME by its

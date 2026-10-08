@@ -2,7 +2,7 @@
 
 MLIR / WebAssembly compiler backend for L4.
 
-Takes a typechecked L4 program (`Module Resolved` straight out of `jl4-core`) and lowers it through MLIR's standard dialects — `func`, `arith`, `scf`, `cf`, `memref`, `llvm` — down to a `.wasm` binary that runs in Node, browsers, or any wasm runtime. Alongside the binary it emits a `.schema.json` sidecar that is wire-compatible with [`jl4-service`](../jl4-service/)'s `FunctionSchema`, so a compiled `.wasm` can slot in anywhere the HTTP service already speaks.
+Takes a typechecked L4 program (`Module Resolved` straight out of `jl4-core`) and lowers it through MLIR's standard dialects — `func`, `arith`, `scf`, `cf`, `memref`, `llvm` — down to a `.wasm` binary that runs in Node, browsers, or any wasm runtime. Alongside the binary it emits a `.schema.json` sidecar in the shape of [`jl4-service`](../jl4-service/)'s `FunctionSchema`, so a compiled `.wasm` can slot in where the HTTP service already speaks, with the differences listed under [CLI](#cli).
 
 ```
 test.l4  ──►  MLIR (textual IR)
@@ -57,10 +57,16 @@ echo '{"arguments":{"years of service":5,"performance rating":4}}' \
 # {"contents":{"result":{"value":true}},"report":"default","tag":"SimpleResponse"}
 ```
 
-The input and output wire format is byte-identical to [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so the same client code works against either backend.
+The request and response shapes are those of [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so a client that sends every input with a value of its type gets the same answer from either backend.
 A required input left out or sent as null, a record input missing a required field, or a list input with a null element is refused, naming the first such input.
 The HTTP wrapper (`scripts/wasm-server.mjs`) answers `422` with `jl4-service`'s own body, `{"contents":{"contents":"Parameter 'y': missing required parameter","tag":"InterpreterError"},"report":"default","tag":"Error"}`; for a field or element sent as null, `jl4-service`'s message is its JSON decoder's instead (`Expected JSON boolean but got: Null`).
 `jl4-mlir run` exits 1: with `Request validation failed: Missing required parameters: p` for an input left out, and with the runtime's `MissingInputError` for one sent as null or missing inside a record or list.
+Beyond that they differ, at least in these ways (read from the source; this is not an exhaustive audit):
+
+- a successful response carries no `presumed` list, which the service's always does;
+- a `BOOLEAN` sent as `{}`, or as any other value JavaScript counts as true, such as `"no"`, reads `TRUE` (`marshalArg`), where the service takes `{}` as not known;
+- an enum value the schema does not list becomes the enum's first member, where the service refuses it;
+- a `TYPICALLY` default is not used, and `presumption` is not read: the WASM schema lists a defaulted input as required, where the service's lets a caller leave it out.
 
 ## Architecture
 
@@ -106,7 +112,7 @@ Known gaps:
 
 ## Performance
 
-Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `validation/test.l4` fixture — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and return the same `SimpleResponse` envelope.
+Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `validation/test.l4` fixture — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and returned the same `SimpleResponse` envelope as of the README's first commit (2026-04-12), before the service added `presumed` to its responses (2026-10-02).
 
 | Backend                                       |  Wall time | Per-call avg | Server RSS |
 | --------------------------------------------- | ---------: | -----------: | ---------: |
@@ -115,7 +121,7 @@ Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `valid
 
 Across non-trivial functions (anything taking a record input), the wasm path runs between 1,300× and 2,000× faster per call and uses ~40% less server memory. Tiny scalar-only functions (`is-eligible`, `calculate-bonus`) are a wash because per-request overhead dominates on both sides.
 
-Output correctness was verified on all 12 exports: 11 return JSON byte-identical to the service, 1 (`order-total`) differs by a single ULP due to floating-point accumulation order.
+Output correctness was verified on all 12 exports by then: 11 returned JSON byte-identical to the service, 1 (`order-total`) differed by a single ULP due to floating-point accumulation order.
 
 ## Scripts
 

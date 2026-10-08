@@ -314,9 +314,9 @@ function allNodes(e: IRExpr, out: IRExpr[] = []): IRExpr[] {
  * `provenance: 'default'`. That is wrong twice over, and dangerously so. `provenance`
  * marks a DECLARATION site ("this leaf has a TYPICALLY clause"), not the origin of the
  * value now sitting on it, so the deletion threw away the USER'S OWN ANSWER on any atom
- * the drafter happened to write a TYPICALLY for. In the real decode path the adapter
- * marks provenance but supplies no default value at all, which made that the *only*
- * thing the switch could ever do.
+ * the drafter happened to write a TYPICALLY for. At the time, the adapter marked
+ * provenance but supplied no default value at all, which made that the *only* thing the
+ * switch could ever do; it now lifts the value into `defaults` as well (`viz-adapter.ts`).
  */
 function effectiveValuation(vs: ViewSpec): ReadonlyMap<NodeId, UBoolValue> {
   if (!vs.respectDefaults || vs.defaults.size === 0) return vs.valuation;
