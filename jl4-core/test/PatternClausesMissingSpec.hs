@@ -248,6 +248,28 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     ws `shouldBe` []
 
+  it "reads an input declared under another name for a number as a number input" $ do
+    let age cls = Text.unlines $
+          [ "DECLARE Age IS A NUMBER"
+          , ""
+          , "zero MEANS 0"
+          , ""
+          , "GIVEN a IS AN Age"
+          , "GIVETH A STRING"
+          ] <> cls
+    plain <- clauseWarnings $ age
+      [ "DECIDE g 0 IS \"zero\""
+      , "DECIDE g 1 IS \"one\""
+      ]
+    missingClauses plain `shouldBe` ["DECIDE `g` a IS"]
+    -- An EXACTLY of a constant counts for nothing on it, as on an input
+    -- written NUMBER, rather than stopping the group.
+    exactly <- clauseWarnings $ age
+      [ "DECIDE f (EXACTLY zero) IS \"zero\""
+      , "DECIDE f 1              IS \"one\""
+      ]
+    missingClauses exactly `shouldBe` ["DECIDE `f` a IS"]
+
   it "stands down for an EXACTLY of a constant under a record's field" $ do
     -- The field's type is read off the pattern's annotation, which the
     -- re-resolution leaves as an inference variable, so the EXACTLY is not

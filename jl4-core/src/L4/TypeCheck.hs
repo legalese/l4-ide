@@ -944,6 +944,11 @@ checkClauseMatrix dec dHead =
       case mColTypes of
         Just colTypes0 | columnCountOk -> do
           colTypes <- traverse applySubst colTypes0
+          -- An input declared under another name for a number, a piece of
+          -- text or a date (DECLARE Age IS A NUMBER) is one, to the
+          -- coverage analysis: the synonyms are expanded for it, and only
+          -- for it, since the re-resolution below expands them itself.
+          colTypesExpanded <- traverse (expandSynonyms (8 :: Int)) colTypes
           -- Re-resolve each clause's patterns against the column types,
           -- 'quietly': the same patterns were already checked inside the
           -- desugared tree, so all diagnostics are discarded (re-emitting
@@ -966,7 +971,7 @@ checkClauseMatrix dec dHead =
               -- 'quietly' re-resolution does not record on the patterns.
               missingRows = do
                 rpatss <- traverse sequence rpatssM
-                rows <- catMaybes <$> traverse (coverageRow families colScruts colTypes) rpatss
+                rows <- catMaybes <$> traverse (coverageRow families colScruts colTypesExpanded) rpatss
                 uncoveredRows families (length colScruts) rows
           case missingRows of
             Just rows -> do
@@ -979,6 +984,21 @@ checkClauseMatrix dec dHead =
               pure (True, byNewName)
             Nothing -> pure (False, byNewName)
         _ -> pure (False, Nothing)
+
+    -- | A type under its synonyms, read off the entity information with
+    -- no diagnostic: 'L4.TypeCheck.Unify.tryExpandTypeSynonym' would add
+    -- an internal error for a name with no entry, such as a type from a
+    -- module that failed to import, on top of the error already reported.
+    expandSynonyms :: Int -> Type' Resolved -> Check (Type' Resolved)
+    expandSynonyms 0 ty = pure ty
+    expandSynonyms k ty = case ty of
+      TyApp _ n ts -> do
+        ei <- asks (.entityInfo)
+        case Map.lookup (getUnique n) ei of
+          Just (_, KnownType _ params (Just t)) ->
+            expandSynonyms (k - 1) (substituteType (Map.fromList (zipWith (\ p t' -> (getUnique p, t')) params ts)) t)
+          _ -> pure ty
+      _ -> pure ty
 
     -- | The first clause whose every pattern matches anything, when at least
     -- one of them does so because it is a new name rather than its input's
@@ -1163,8 +1183,9 @@ coverageRow families colScruts colTypes pats =
 --   input name compares the input with itself, so it matches every input,
 --   like the bare name.
 --
--- A top-level column is classified by its type after substitution (the
--- caller's @colTypes@), never by the pattern's annotation, which the
+-- A top-level column is classified by its type after substitution and
+-- synonym expansion (the caller's @colTypesExpanded@), never by the
+-- pattern's annotation, which the
 -- 'quietly' re-resolution leaves unsubstituted; a nested position has only
 -- its annotation, and an inference variable there is not primitive, so an
 -- EXACTLY under it stands the group down.
