@@ -5,7 +5,7 @@
 -- | Unit tests for Phase 1 pattern matching in function definitions: multiple
 -- DECIDE/MEANS clauses sharing a head name are grouped into a single 'MkDecide'
 -- whose body is a nested CONSIDER, while ordinary single-clause definitions are
--- left untouched. See specs/todo/PATTERN-MATCHING-SPEC.md.
+-- left untouched. See specs/done/PATTERN-MATCHING-SPEC.md.
 module PatternMatchParserSpec (spec) where
 
 import Base

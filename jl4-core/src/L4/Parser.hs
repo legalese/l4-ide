@@ -704,7 +704,7 @@ decide sig = do
 -- Haskell-style multi-clause function definitions with literal and constructor
 -- patterns on the DECIDE/MEANS left-hand side, desugared here (in the parser) to
 -- the existing CONSIDER/WHEN machinery. See
--- specs/todo/PATTERN-MATCHING-SPEC.md, "Approach 1: Desugar to CONSIDER/WHEN".
+-- specs/done/PATTERN-MATCHING-SPEC.md, "Approach 1: Desugar to CONSIDER/WHEN".
 --
 -- Note: the anonymous wildcard @_@ from the spec is not currently accepted by
 -- the lexer; per the spec's own guidance, an ignored argument reuses its GIVEN

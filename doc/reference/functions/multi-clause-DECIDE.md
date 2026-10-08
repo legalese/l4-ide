@@ -161,6 +161,11 @@ A clause that is never used is still checked: a body of the wrong type, or a nam
 
 These were measured with the `l4` built from this version of L4.
 
+**Only at the top level, and only with a plain name first.**
+Clauses make one rule only where the rule is defined at the top level of a file or of a section, not inside `WHERE` or `LET`: there, `DECIDE rank Red IS 1` and `DECIDE rank x IS 2` are two definitions, and the first is reported for not matching its `GIVEN`.
+A rule whose name sits between or after its inputs, such as ``c `costs` n MEANS n``, cannot be written as clauses either: a line ``Red `costs` 0 MEANS 1`` below it is not read as a clause of that rule, and ``Red `costs` 0`` gives `0`.
+Write such a rule with `CONSIDER` instead.
+
 **A bare `_` is not a wildcard.**
 `DECIDE f _ IS 2` is a syntax error, `unexpected '_'`.
 To match anything, use the `GIVEN` input's name, as `factorial n` does, or write `` `_` `` in backquotes, which is how the missing-case warning writes an input that has no `GIVEN`.

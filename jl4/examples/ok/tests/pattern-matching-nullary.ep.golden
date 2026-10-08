@@ -6,7 +6,7 @@
 -- as pattern-matching clauses and desugared to CONSIDER/WHEN, so long as they
 -- share a single GIVEN/GIVETH signature. (Overloaded, same-name, different-type
 -- definitions each carry their own signature and are never grouped.)
--- See specs/todo/PATTERN-MATCHING-SPEC.md, Examples 4 and 5.
+-- See specs/done/PATTERN-MATCHING-SPEC.md, Examples 4 and 5.
 -- =============================================================================
 
 IMPORT prelude
