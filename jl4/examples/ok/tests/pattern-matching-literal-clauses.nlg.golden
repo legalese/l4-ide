@@ -8,3 +8,7 @@
 `long decimal` with 0.12345678901234568
 `long decimal` with 0.12345678901234568
 `self` with 7
+`plus zero` with 5
+`diagonal` with 3 and 3
+`diagonal` with 1 and 2
+`by date` with `d2`

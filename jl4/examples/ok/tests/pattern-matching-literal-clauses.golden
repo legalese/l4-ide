@@ -1,77 +1,77 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-pattern-matching-literal-clauses.l4:23:8-24:16:
+pattern-matching-literal-clauses.l4:25:8-26:16:
   I found a problem while checking the definition of `describe`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `describe` n IS
     
-pattern-matching-literal-clauses.l4:26:1-17:
+pattern-matching-literal-clauses.l4:28:1-17:
   "zero"
-pattern-matching-literal-clauses.l4:27:1-17:
+pattern-matching-literal-clauses.l4:29:1-17:
   No clause of `describe` matches these inputs.
   The value that the last clause could not match is
     2
   Add a clause for this case, or end the clauses with one that matches every input.
-pattern-matching-literal-clauses.l4:36:1-36:
+pattern-matching-literal-clauses.l4:38:1-36:
   "many"
-pattern-matching-literal-clauses.l4:41:8-42:12:
+pattern-matching-literal-clauses.l4:43:8-44:12:
   I found a problem while checking the definition of `code`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `code` s IS
     
-pattern-matching-literal-clauses.l4:47:8-48:10:
+pattern-matching-literal-clauses.l4:49:8-50:10:
   I found a problem while checking the definition of `ex`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `ex` n IS
     
-pattern-matching-literal-clauses.l4:58:8-59:13:
+pattern-matching-literal-clauses.l4:60:8-61:13:
   I found a problem while checking the definition of `price`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `price` Blue IS
     
-pattern-matching-literal-clauses.l4:67:1-18:
+pattern-matching-literal-clauses.l4:69:1-18:
   2
-pattern-matching-literal-clauses.l4:76:1-35:
+pattern-matching-literal-clauses.l4:78:1-35:
   "f"
-pattern-matching-literal-clauses.l4:82:8-85:14:
+pattern-matching-literal-clauses.l4:84:8-87:14:
   I found a problem while checking the definition of `charge`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `charge` level tier IS
     
-pattern-matching-literal-clauses.l4:101:8-103:24:
+pattern-matching-literal-clauses.l4:103:8-105:24:
   I found a problem while checking the definition of `charge by plan`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `charge by plan` 1 Gold IS
       DECIDE `charge by plan` level Gold IS
     
-pattern-matching-literal-clauses.l4:109:8-111:27:
+pattern-matching-literal-clauses.l4:111:8-113:27:
   I found a problem while checking the definition of `charge with a gap`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `charge with a gap` 2 Premium IS
       DECIDE `charge with a gap` level tier IS
     
-pattern-matching-literal-clauses.l4:117:8-118:11:
+pattern-matching-literal-clauses.l4:119:8-120:11:
   I found a problem while checking the definition of `fee`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `fee` FALSE day IS
     
-pattern-matching-literal-clauses.l4:131:8-132:21:
+pattern-matching-literal-clauses.l4:133:8-134:21:
   I found a problem while checking the definition of `two numbers`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `two numbers` 1 k IS
       DECIDE `two numbers` n k IS
     
-pattern-matching-literal-clauses.l4:138:8-26:
+pattern-matching-literal-clauses.l4:140:8-26:
   I found a problem while checking the definition of `one clause maybe`:
     This clause does not cover all cases. The following clauses are still needed:
     
@@ -79,70 +79,152 @@ pattern-matching-literal-clauses.l4:138:8-26:
       DECIDE `one clause maybe` Blue m IS
       DECIDE `one clause maybe` Red NOTHING IS
     
-pattern-matching-literal-clauses.l4:143:8-144:13:
+pattern-matching-literal-clauses.l4:145:8-146:13:
   I found a problem while checking the definition of `boxed`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `boxed` (Box `_`) IS
     
-pattern-matching-literal-clauses.l4:154:8-155:12:
+pattern-matching-literal-clauses.l4:156:8-157:12:
   I found a problem while checking the definition of `show`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `show` (JUST `_`) IS
     
-pattern-matching-literal-clauses.l4:160:8-161:19:
+pattern-matching-literal-clauses.l4:162:8-163:19:
   I found a problem while checking the definition of `list head`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `list head` (`_` FOLLOWED BY `_`) IS
     
-pattern-matching-literal-clauses.l4:168:8-9:
-  I found a problem while checking the definition of `h`:
-    This clause of `h` is never used.
-    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
-    Remove it, or change its patterns.
 pattern-matching-literal-clauses.l4:170:8-9:
   I found a problem while checking the definition of `h`:
     This clause of `h` is never used.
     Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
     Remove it, or change its patterns.
-pattern-matching-literal-clauses.l4:173:1-12:
+pattern-matching-literal-clauses.l4:172:8-9:
+  I found a problem while checking the definition of `h`:
+    This clause of `h` is never used.
+    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
+    Remove it, or change its patterns.
+pattern-matching-literal-clauses.l4:175:1-12:
   "one"
-pattern-matching-literal-clauses.l4:174:1-12:
+pattern-matching-literal-clauses.l4:176:1-12:
   "tenth"
-pattern-matching-literal-clauses.l4:180:8-9:
+pattern-matching-literal-clauses.l4:182:8-9:
   I found a problem while checking the definition of `g`:
     This clause of `g` is never used.
     Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
     Remove it, or change its patterns.
-pattern-matching-literal-clauses.l4:196:1-43:
+pattern-matching-literal-clauses.l4:198:1-43:
   "long"
-pattern-matching-literal-clauses.l4:197:1-41:
+pattern-matching-literal-clauses.l4:199:1-41:
   "other"
-pattern-matching-literal-clauses.l4:207:1-13:
+pattern-matching-literal-clauses.l4:209:1-13:
   "self"
-pattern-matching-literal-clauses.l4:213:8-24:
+pattern-matching-literal-clauses.l4:215:8-24:
   I found a problem while checking the definition of `self then dead`:
     This clause of `self then dead` is never used.
     Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
     Remove it, or change its patterns.
-pattern-matching-literal-clauses.l4:224:8-225:22:
+pattern-matching-literal-clauses.l4:226:8-227:22:
   I found a problem while checking the definition of `constant key`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `constant key` n Basic IS
     
-pattern-matching-literal-clauses.l4:233:8-234:18:
+pattern-matching-literal-clauses.l4:235:8-236:18:
   I found a problem while checking the definition of `long key`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
       DECIDE `long key` n Basic IS
     
-pattern-matching-literal-clauses.l4:239:8-24:
+pattern-matching-literal-clauses.l4:241:8-24:
   I found a problem while checking the definition of `long key alone`:
     This clause does not cover all cases. The following clauses are still needed:
     
       DECIDE `long key alone` 0.1234567890123456789 Premium IS
       DECIDE `long key alone` n t IS
     
+pattern-matching-literal-clauses.l4:249:8-250:24:
+  I found a problem while checking the definition of `constants only`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `constants only` n IS
+    
+pattern-matching-literal-clauses.l4:261:1-20:
+  "any"
+pattern-matching-literal-clauses.l4:270:8-271:16:
+  I found a problem while checking the definition of `diagonal`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `diagonal` a b IS
+    
+pattern-matching-literal-clauses.l4:273:1-19:
+  "same"
+pattern-matching-literal-clauses.l4:274:1-19:
+  No clause of `diagonal` matches these inputs.
+  The value that the last clause could not match is
+    1
+  Add a clause for this case, or end the clauses with one that matches every input.
+pattern-matching-literal-clauses.l4:282:8-283:18:
+  I found a problem while checking the definition of `in money`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `in money` m IS
+    
+pattern-matching-literal-clauses.l4:293:8-294:17:
+  I found a problem while checking the definition of `by date`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `by date` d IS
+    
+pattern-matching-literal-clauses.l4:296:1-19:
+  2
+pattern-matching-literal-clauses.l4:303:8-304:24:
+  I found a problem while checking the definition of `boxed constant`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `boxed constant` (Box `_`) IS
+    
+pattern-matching-literal-clauses.l4:311:8-313:20:
+  I found a problem while checking the definition of `as spelled`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `as spelled` 1.50 Premium IS
+      DECIDE `as spelled` 1_000 Premium IS
+      DECIDE `as spelled` n t IS
+    
+pattern-matching-literal-clauses.l4:313:8-20:
+  I found a problem while checking the definition of `as spelled`:
+    This clause of `as spelled` is never used.
+    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
+    Remove it, or change its patterns.
+pattern-matching-literal-clauses.l4:321:8-322:25:
+  I found a problem while checking the definition of `text as written`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `text as written` "São Paulo" Premium IS
+      DECIDE `text as written` "tab\there" Premium IS
+      DECIDE `text as written` s t IS
+    
+pattern-matching-literal-clauses.l4:329:8-333:19:
+  I found a problem while checking the definition of `key order`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `key order` 1 Gold IS
+      DECIDE `key order` 2 Gold IS
+      DECIDE `key order` 3 Gold IS
+      DECIDE `key order` n Gold IS
+    
+pattern-matching-literal-clauses.l4:342:8-406:25:
+  I found a problem while checking the definition of `sixty-four keys`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `sixty-four keys` n t IS
+    
+pattern-matching-literal-clauses.l4:406:8-25:
+  I found a problem while checking the definition of `sixty-four keys`:
+    This clause of `sixty-four keys` is never used.
+    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
+    Remove it, or change its patterns.

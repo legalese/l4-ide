@@ -2,9 +2,13 @@
 -- A group of ONE clause is checked as a clause ("This clause does not cover all
 -- cases"), at the clause. Where that check gives up, the clause keeps the
 -- warning it had before the check existed, the one for a CONSIDER, now at the
--- clause rather than at no location. A clause with a number, one way the
--- check gives up, and a control (review of legalese/l4-ide#545; probes m01,
--- p02, p02b; round 2 item 4 for the number).
+-- clause rather than at no location. Below: a clause with a number, which
+-- the check reads (since round 2 item 4 of the review); a clause with more
+-- than 64 missing clauses, where the check gives up; a control under that
+-- cap; the same clause over the cap with a number in it, which the check
+-- answers with a shorter list; and two clauses over the cap, the second
+-- reported as never used (review of legalese/l4-ide#545; probes m01, p02,
+-- p02b).
 -- =============================================================================
 
 -- A number in a pattern is one value of its input, and the input has no end
@@ -33,6 +37,28 @@ GIVEN x IS A MAYBE Big
 GIVETH A NUMBER
 DECIDE `one clause two columns` (JUST B01) (JUST B01) IS 1
 
+-- The three inputs again, with a number before them: the exact list is over
+-- the cap again, so the check lists instead what the clauses without a
+-- number leave open. There are none, so everything is open, and that is one
+-- clause, which is listed; the CONSIDER warnings are withdrawn.
+GIVEN n IS A NUMBER
+      x IS A MAYBE Big
+      y IS A MAYBE Big
+      z IS A MAYBE Big
+GIVETH A NUMBER
+DECIDE `one clause four columns` 1 (JUST B01) (JUST B01) (JUST B01) IS 1
+
+-- Two clauses over the cap: no missing-clause warning, and the second
+-- clause, which repeats the first, is still reported as never used.
+GIVEN x IS A MAYBE Big
+      y IS A MAYBE Big
+      z IS A MAYBE Big
+GIVETH A NUMBER
+DECIDE `two clauses three columns` (JUST B01) (JUST B01) (JUST B01) IS 1
+DECIDE `two clauses three columns` (JUST B01) (JUST B01) (JUST B01) IS 2
+
 #EVAL `one clause with a literal` 1 (JUST 5)           -- 5
 #EVAL `one clause three columns` (JUST B01) (JUST B01) (JUST B01) -- 1
 #EVAL `one clause two columns` (JUST B01) (JUST B01)    -- 1
+#EVAL `one clause four columns` 1 (JUST B01) (JUST B01) (JUST B01) -- 1
+#EVAL `two clauses three columns` (JUST B01) (JUST B01) (JUST B01) -- 1

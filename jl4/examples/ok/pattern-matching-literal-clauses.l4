@@ -6,10 +6,12 @@
 -- The enumeration inputs of the same rule are still analysed, and a clause
 -- that repeats a number is reported as never used (review of
 -- legalese/l4-ide#545, round 2, item 4). The groups below are the rows of the
--- design's test plan that are pinned by golden.
+-- design's test plan that are pinned by golden, then (from `constants only`)
+-- the groups the review of the first build added.
 -- =============================================================================
 
 IMPORT time
+IMPORT daydate
 
 DECLARE Colour IS ONE OF Red, Green, Blue
 DECLARE Tier IS ONE OF Basic, Premium
@@ -237,3 +239,168 @@ GIVEN n IS A NUMBER
       t IS A Tier
 GIVETH A NUMBER
 DECIDE `long key alone` 0.1234567890123456789 Basic IS 1
+
+-- Every clause is EXACTLY of a constant: every clause is left out, and
+-- everything is open.
+one MEANS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `constants only` (EXACTLY zero) IS 1
+DECIDE `constants only` (EXACTLY one) IS 2
+
+-- An EXACTLY whose expression mentions its own input matches a value that
+-- depends on that input (`n PLUS 0` is every number), so the check stands
+-- down for the rule: a clause suggested for "every other number" would never
+-- be used. The dead clause after it goes unreported for the same reason.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `plus zero` (EXACTLY (n PLUS 0)) IS "any"
+DECIDE `plus zero` 0 IS "zero"
+
+#EVAL `plus zero` 5   -- "any"
+
+-- An EXACTLY that mentions only another input matches one value of its own
+-- input for each value of the other, so it counts for nothing, as a constant
+-- does, and the clause for every other pair is suggested: `diagonal 1 2` has
+-- no clause.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A STRING
+DECIDE diagonal a (EXACTLY a) IS "same"
+DECIDE diagonal 0 b IS "zero"
+
+#EVAL diagonal 3 3   -- "same"
+#EVAL diagonal 1 2   -- no clause matches
+
+-- An input declared under another name for a number is a number input: an
+-- EXACTLY of a constant counts for nothing there too.
+DECLARE Money IS A NUMBER
+
+GIVEN m IS A Money
+GIVETH A STRING
+DECIDE `in money` (EXACTLY zero) IS "nothing"
+DECIDE `in money` (EXACTLY one) IS "one"
+
+-- A date is matched only through EXACTLY of a date, which the check cannot
+-- name, so every clause counts for nothing; a date input has no end of values
+-- either, so the clause with the input's name is suggested.
+d1 MEANS Date 2024 1 1
+d2 MEANS Date 2024 1 2
+
+GIVEN d IS A DATE
+GIVETH A NUMBER
+DECIDE `by date` (EXACTLY d1) IS 1
+DECIDE `by date` (EXACTLY d2) IS 2
+
+#EVAL `by date` d2   -- 2
+
+-- EXACTLY of a constant nested in a position that is a number: the clause
+-- counts for nothing, as it does at the top level, and the record's other
+-- values are open.
+GIVEN b IS A Box
+GIVETH A STRING
+DECIDE `boxed constant` (Box (EXACTLY zero)) IS "zero"
+DECIDE `boxed constant` (Box 1) IS "one"
+
+-- A suggested number is written as the first clause that names it spells
+-- it; the clause for `1.5` repeats `1.50` and is never used.
+GIVEN n IS A NUMBER
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE `as spelled` 1.50  Basic IS 1
+DECIDE `as spelled` 1_000 Basic IS 2
+DECIDE `as spelled` 1.5   Basic IS 3
+
+-- A suggested piece of text is written as L4 writes it, every printable
+-- character as it is; a character that does not print is escaped, so the
+-- clause stays on one line.
+GIVEN s IS A STRING
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE `text as written` "São Paulo" Basic IS 1
+DECIDE `text as written` "tab\there" Basic IS 2
+
+-- The keyed rows are listed in the order the clauses first name the keys,
+-- then the row for every other number.
+GIVEN n IS A NUMBER
+      plan IS A Plan
+GIVETH A NUMBER
+DECIDE `key order` 1 Standard IS 1
+DECIDE `key order` 2 Standard IS 2
+DECIDE `key order` 3 Standard IS 3
+DECIDE `key order` n Standard IS 4
+DECIDE `key order` n Plus IS 5
+
+-- Sixty-four keys, one tier each: the exact list would be 65 rows, over the
+-- cap of 64, so the check lists instead what the clauses without a number
+-- leave open, which here is everything. The repeated key at the end is still
+-- never used.
+GIVEN n IS A NUMBER
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE `sixty-four keys` 1 Basic IS 1
+DECIDE `sixty-four keys` 2 Basic IS 2
+DECIDE `sixty-four keys` 3 Basic IS 3
+DECIDE `sixty-four keys` 4 Basic IS 4
+DECIDE `sixty-four keys` 5 Basic IS 5
+DECIDE `sixty-four keys` 6 Basic IS 6
+DECIDE `sixty-four keys` 7 Basic IS 7
+DECIDE `sixty-four keys` 8 Basic IS 8
+DECIDE `sixty-four keys` 9 Basic IS 9
+DECIDE `sixty-four keys` 10 Basic IS 10
+DECIDE `sixty-four keys` 11 Basic IS 11
+DECIDE `sixty-four keys` 12 Basic IS 12
+DECIDE `sixty-four keys` 13 Basic IS 13
+DECIDE `sixty-four keys` 14 Basic IS 14
+DECIDE `sixty-four keys` 15 Basic IS 15
+DECIDE `sixty-four keys` 16 Basic IS 16
+DECIDE `sixty-four keys` 17 Basic IS 17
+DECIDE `sixty-four keys` 18 Basic IS 18
+DECIDE `sixty-four keys` 19 Basic IS 19
+DECIDE `sixty-four keys` 20 Basic IS 20
+DECIDE `sixty-four keys` 21 Basic IS 21
+DECIDE `sixty-four keys` 22 Basic IS 22
+DECIDE `sixty-four keys` 23 Basic IS 23
+DECIDE `sixty-four keys` 24 Basic IS 24
+DECIDE `sixty-four keys` 25 Basic IS 25
+DECIDE `sixty-four keys` 26 Basic IS 26
+DECIDE `sixty-four keys` 27 Basic IS 27
+DECIDE `sixty-four keys` 28 Basic IS 28
+DECIDE `sixty-four keys` 29 Basic IS 29
+DECIDE `sixty-four keys` 30 Basic IS 30
+DECIDE `sixty-four keys` 31 Basic IS 31
+DECIDE `sixty-four keys` 32 Basic IS 32
+DECIDE `sixty-four keys` 33 Basic IS 33
+DECIDE `sixty-four keys` 34 Basic IS 34
+DECIDE `sixty-four keys` 35 Basic IS 35
+DECIDE `sixty-four keys` 36 Basic IS 36
+DECIDE `sixty-four keys` 37 Basic IS 37
+DECIDE `sixty-four keys` 38 Basic IS 38
+DECIDE `sixty-four keys` 39 Basic IS 39
+DECIDE `sixty-four keys` 40 Basic IS 40
+DECIDE `sixty-four keys` 41 Basic IS 41
+DECIDE `sixty-four keys` 42 Basic IS 42
+DECIDE `sixty-four keys` 43 Basic IS 43
+DECIDE `sixty-four keys` 44 Basic IS 44
+DECIDE `sixty-four keys` 45 Basic IS 45
+DECIDE `sixty-four keys` 46 Basic IS 46
+DECIDE `sixty-four keys` 47 Basic IS 47
+DECIDE `sixty-four keys` 48 Basic IS 48
+DECIDE `sixty-four keys` 49 Basic IS 49
+DECIDE `sixty-four keys` 50 Basic IS 50
+DECIDE `sixty-four keys` 51 Basic IS 51
+DECIDE `sixty-four keys` 52 Basic IS 52
+DECIDE `sixty-four keys` 53 Basic IS 53
+DECIDE `sixty-four keys` 54 Basic IS 54
+DECIDE `sixty-four keys` 55 Basic IS 55
+DECIDE `sixty-four keys` 56 Basic IS 56
+DECIDE `sixty-four keys` 57 Basic IS 57
+DECIDE `sixty-four keys` 58 Basic IS 58
+DECIDE `sixty-four keys` 59 Basic IS 59
+DECIDE `sixty-four keys` 60 Basic IS 60
+DECIDE `sixty-four keys` 61 Basic IS 61
+DECIDE `sixty-four keys` 62 Basic IS 62
+DECIDE `sixty-four keys` 63 Basic IS 63
+DECIDE `sixty-four keys` 64 Basic IS 64
+DECIDE `sixty-four keys` 1 Basic IS 99
