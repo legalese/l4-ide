@@ -84,7 +84,7 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
   -- bound in seconds, so that a slow machine does not fail it; and in the
   -- process's CPU time, not wall-clock time, so that time spent waiting for a
   -- busy machine is not counted. Eight times the lines take about eight times
-  -- as long when parsing is linear, and sixteen times that when it is
+  -- as long when parsing is linear, and sixty-four times as long when it is
   -- quadratic; the test fails above three times linear. A ratio short of
   -- clearly quadratic is measured again, so that one pause does not fail it.
   it "parses a run of same-headed definitions in time linear in its length" $ do
