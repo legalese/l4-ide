@@ -309,7 +309,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
 -- be read back as a group (no pattern in it tells it from a plain
 -- definition): those print as a plain definition.
 writtenClauses :: LayoutPrinterWithName a => Anno -> AppForm a -> Expr a -> Maybe [Doc ann]
-writtenClauses ann (MkAppForm _ hd _ maka) expr = do
+writtenClauses ann (MkAppForm _ hd _ _) expr = do
   matrix <- view annPmMatrix ann
   let patterns = map (.patterns) matrix.clauses
   guard (all ((== length matrix.scrutinees) . length) patterns)
@@ -318,12 +318,15 @@ writtenClauses ann (MkAppForm _ hd _ maka) expr = do
   guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
   pure
     [ vcat
+        -- Each clause with its own @AKA@ ('PmMatrixClause'): a run of bare
+        -- names that the checker separates into overloads gives each its
+        -- own, so a printed module must keep them with their clauses.
         [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . clauseHeadPattern) pats
-            <> (if i == 0 then foldMap ((space <>) . printWithLayout) maka else mempty)
+            <> foldMap ((space <>) . printWithLayout) cl.clauseAka
             <+> "IS"
         , indent 2 (printWithLayout body)
         ]
-    | (i, (pats, body)) <- zip [0 :: Int ..] clauses
+    | (cl, (pats, body)) <- zip matrix.clauses clauses
     ]
 
 -- | A pattern in a clause head, as 'L4.Parser.pmClause' reads one: all on one
