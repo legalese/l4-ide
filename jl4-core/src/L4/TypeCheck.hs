@@ -1084,6 +1084,7 @@ inferTopDecl _ (Declare ann declare) = do
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
 inferTopDecl _ (Decide ann decide) = do
+  refuseExportedClausesWithoutGiven decide
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
 inferTopDecl origin (Assume ann assume) = do
@@ -1268,6 +1269,34 @@ givenMisnamesInputs (MkDecide ann (MkTypeSig _ (MkGivenSig _ otns) _) _ _) =
   case view annPmMatrix ann of
     Just matrix -> matrix.synthesizedScrutinees && not (null otns)
     Nothing     -> False
+
+-- | Refuse an @\@export@ of a definition written as clauses with patterns,
+-- one clause or several, with no GIVEN (ruling M2, option A, 2026-10-08). The
+-- desugarer made up its inputs' names ('L4.Parser.generatedName'), and
+-- nothing declares their types, so an export would publish inputs that no
+-- request can name and that have no declared type to check a value against:
+-- jl4-service published @input 1@ and @input 2@, typed "object", and every
+-- call failed. Every spelling of @\@export@ counts, as it does for
+-- publication ('L4.Export.isExportedDecide'). Clauses with a GIVEN that
+-- misnames their inputs are already refused ('clauseInputsAgainstGiven'), and
+-- are not refused twice.
+--
+-- The error is at the @\@export@, which is where the GIVEN it asks for goes.
+-- 'L4.Export.isExportedDecide' holds only where there is an @\@export@, and
+-- that is parsed from source tokens, so it has a range; the first clause's
+-- head is a defensive fallback.
+-- Only top-level definitions are published, so 'inferTopDecl' calls this.
+refuseExportedClausesWithoutGiven :: Decide Name -> Check ()
+refuseExportedClausesWithoutGiven dec@(MkDecide ann (MkTypeSig _ (MkGivenSig _ otns) _) appForm _) =
+  case view annPmMatrix ann of
+    Just matrix
+      | matrix.synthesizedScrutinees
+      , not (null matrix.scrutinees)
+      , null otns
+      , Export.isExportedDecide dec ->
+          let at = (view annDesc ann >>= rangeOf) <|> (listToMaybe matrix.clauses >>= (.headRange))
+          in addError (ExportedClausesWithoutGiven at (getName appForm))
+    _ -> pure ()
 
 -- | The names a multi-clause group's generated CONSIDERs read its GIVEN
 -- inputs by ('L4.Parser.scrutineeRef'): each input's name respelled with
@@ -7034,6 +7063,8 @@ prettyCheckError (InconsistentNameInAppForm n (Just n'))   =
   , ""
   , "  " <> prettyNameWithRange n'
   ]
+prettyCheckError (ExportedClausesWithoutGiven _ n) =
+  [ quotedName n <> " is published with @export, but its inputs have no names: add a GIVEN that names and types each one." ]
 prettyCheckError (ClausePatternCountMismatch _ n patterns inputs) =
   [ "Each clause of " <> quotedName n <> " has " <> counted patterns "pattern"
       <> ", but its GIVEN names " <> counted inputs "input" <> "."

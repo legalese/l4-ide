@@ -727,7 +727,10 @@ collectExportedDecides (MkModule _ _ section) = goSection section
     Section _ sub -> goSection sub
     _ -> []
 
-isExportedDecide :: Decide Resolved -> Bool
+-- | Is this definition published with @\@export@ (or @\@export default@,
+-- or a @\@desc@ that starts @export@ or @default@)? Polymorphic in the pass
+-- so the type checker can consult it before resolution.
+isExportedDecide :: Decide n -> Bool
 isExportedDecide decide =
   case getAnno decide ^. annDesc of
     Just desc -> (parseDescText (getDesc desc)).flags.isExport
