@@ -1140,7 +1140,12 @@ coverageRow families colScruts colTypes pats =
 --   group down (fail-open, as every bail): a list cons (LIST's constructors
 --   are not in 'constructorFamilies'); an EXACTLY of a value it cannot name
 --   in a column whose values it could otherwise list, where reading the
---   clause either way would mis-report.
+--   clause either way would mis-report; or an EXACTLY whose expression
+--   mentions the column's own input (@EXACTLY (n PLUS 0)@ matches every
+--   @n@, @EXACTLY (n TIMES 0)@ only @0@), which may match any number of the
+--   column's values, so neither reading below is safe. An expression that
+--   mentions only OTHER inputs still matches one value of this column per
+--   value of theirs, so it is left out as below.
 --
 -- * @Just Nothing@: an EXACTLY of a value the analysis cannot name
 --   (@EXACTLY someConstant@, @EXACTLY (m PLUS 1)@ with @m@ another input) in
@@ -1187,7 +1192,8 @@ coveragePattern families input top colTy = \ case
       | Just fam <- Map.lookup (getUnique r) families
       , Just (c, 0) <- List.find ((`sameResolved` r) . fst) fam
       -> Just (Just (CovCon c []))
-    _ | Just ty <- colTy, isPrimitiveType ty -> Just Nothing
+    _ | any (`sameResolved` input) (toList e) -> Nothing
+      | Just ty <- colTy, isPrimitiveType ty -> Just Nothing
       | otherwise -> Nothing
   where
     annoType p = case getAnno p ^. annInfo of

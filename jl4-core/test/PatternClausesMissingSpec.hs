@@ -775,6 +775,30 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     missingClauses ws `shouldBe` ["DECIDE `f` n IS"]
 
+  it "stands down for an EXACTLY whose expression mentions the input itself, and not for one that mentions another input" $ do
+    -- `n PLUS 0` is every number, so the group is complete and a clause
+    -- suggested for every other number would never be used; `n TIMES 0` is
+    -- only 0. Neither reading of such a clause is safe, so the check gives
+    -- up on the group.
+    ws <- warnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE f (EXACTLY (n PLUS 0)) IS \"any\""
+      , "DECIDE f 0                    IS \"zero\""
+      ]
+    ws `shouldBe` []
+    -- `m PLUS 1` is one value of n for each m, so that clause counts for
+    -- nothing and the rest of the numbers are still open: `f 5 0` has no
+    -- clause.
+    other <- clauseWarnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "      m IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE f (EXACTLY (m PLUS 1)) m IS \"next\""
+      , "DECIDE f 0                    m IS \"zero\""
+      ]
+    missingClauses other `shouldBe` ["DECIDE `f` n m IS"]
+
   it "suggests the clause with both inputs' names for a cross table of a hundred keys" $ do
     let tshow = Text.pack . show
         cross = Text.unlines $
