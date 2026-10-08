@@ -637,9 +637,12 @@ inferDecide dec@(MkDecide ann _tysig _appForm expr) = do
 -- A one-clause group's generated CONSIDERs miss exactly what the clause
 -- misses, so 'checkConsider' still reports them; but in WHEN terms, located
 -- nowhere. When the matrix reached a verdict, it has said the same thing as a
--- clause, at the clause, so they are withdrawn. When it gave up (a literal
--- pattern, or more missing clauses than it lists), they are the only warning
--- the group gets, and are kept, moved to the definition's own location.
+-- clause, at the clause, so they are withdrawn. When it gave up (a value of
+-- a type whose values it cannot list, such as a MAYBE or a list, an EXACTLY
+-- it cannot read, or more missing clauses than it lists), they are the only
+-- warning the group gets, and are kept, moved to the definition's own
+-- location. A clause with a number or a piece of text in it gets a verdict
+-- like any other, so its CONSIDER warnings are withdrawn too.
 -- A group of two clauses or more never reaches here: its generated CONSIDERs
 -- do not report at all.
 --
@@ -909,13 +912,13 @@ checkClauseMatrix dec dHead =
           _ -> pure ()
 
     -- | Warns about missing clauses. Returns whether it reached a verdict on
-    -- them (not when it bails, nor when there are more than it lists).
-    -- | Warns about missing clauses. Returns whether it reached a verdict on
-    -- them, and the first clause that matches every input because its
-    -- patterns are new names, with those names ('newNameCatchAll'). The
-    -- patterns are resolved even where the analysis of missing clauses
-    -- stands down for a literal, because reading a name as new or as a value
-    -- does not depend on it.
+    -- them (not when it bails, nor when there are more than it lists), and
+    -- the first clause that
+    -- matches every input because its patterns are new names, with those
+    -- names ('newNameCatchAll'). The patterns are resolved even where the
+    -- analysis of missing clauses stands down (a list, a value of a type
+    -- declared in another module, an EXACTLY it cannot read), because
+    -- reading a name as new or as a value does not depend on it.
     analyseMatrix :: PmMatrix -> Check (Bool, Maybe (Int, [Name]))
     analyseMatrix matrix = do
       ei <- asks (.entityInfo)
@@ -925,10 +928,6 @@ checkClauseMatrix dec dHead =
           columnCountOk =
             not (null colScruts)
               && all (\ cl -> length cl.patterns == length colScruts) clauseRows
-          -- Any literal or expression pattern anywhere stands the whole
-          -- analysis down: a number or a string has no finite set of
-          -- values to enumerate, and an EXACTLY expression is opaque.
-          hasOpaque = any (any patternHasOpaque . (.patterns)) clauseRows
           -- Column types, read off the GIVEN binders' entityInfo entries
           -- (in scope: we are called inside @extendKnownMany
           -- dHead.arguments@).
@@ -957,11 +956,14 @@ checkClauseMatrix dec dHead =
           resolvedDecls <- asks (Map.elems . (.declareDeclarations))
           let families = constructorFamilies resolvedDecls
               byNewName = traverse sequence rpatssM >>= newNameCatchAll matrix
+              -- A clause the analysis cannot count is left out, and one it
+              -- cannot read stands the group down ('coveragePattern'); the
+              -- column types are the ones after substitution, which the
+              -- 'quietly' re-resolution does not record on the patterns.
               missingRows = do
-                guard (not hasOpaque)
-                traverse sequence rpatssM
-                  >>= traverse (traverse coveragePattern)
-                  >>= uncoveredRows families
+                rpatss <- traverse sequence rpatssM
+                rows <- catMaybes <$> traverse (coverageRow families colScruts colTypes) rpatss
+                uncoveredRows families (length colScruts) rows
           case missingRows of
             Just rows -> do
               case (rows, hullRange matrix) of
@@ -1106,16 +1108,72 @@ data CoveragePattern
   = CovWild
   | CovCon Resolved [CoveragePattern]
 
--- | 'Nothing' for a pattern the coverage analysis cannot enumerate: a list
--- cons (LIST's constructors are not in 'constructorFamilies'), a literal or
--- an expression.
-coveragePattern :: Pattern Resolved -> Maybe CoveragePattern
-coveragePattern = \ case
-  PatVar {}     -> Just CovWild
-  PatApp _ c ps -> CovCon c <$> traverse coveragePattern ps
+-- | A clause's patterns as the coverage analysis sees them, column by column
+-- ('coveragePattern'): the outer 'Nothing' stands the group down, the inner
+-- one leaves the clause out.
+coverageRow :: Map Unique [(Resolved, Int)] -> [Resolved] -> [Type' Resolved] -> [Pattern Resolved] -> Maybe (Maybe [CoveragePattern])
+coverageRow families colScruts colTypes pats =
+  sequence <$> sequence (zipWith3 (\ s t p -> coveragePattern families s True (Just t) p) colScruts colTypes pats)
+
+-- | What one pattern covers, read against its column's type.
+--
+-- * 'Nothing': a pattern the analysis cannot read, which stands the whole
+--   group down (fail-open, as every bail): a list cons (LIST's constructors
+--   are not in 'constructorFamilies'), or an EXACTLY of a value it cannot
+--   name in a column whose values it could otherwise list, where reading
+--   the clause either way would mis-report.
+--
+-- * @Just Nothing@: a number or a piece of text, bare or under EXACTLY, or
+--   an EXACTLY of a value the analysis cannot name (@EXACTLY someConstant@,
+--   @EXACTLY (m PLUS 1)@ with @m@ another input) in a column of numbers,
+--   text or dates ('isPrimitiveType'). Of the endless values of that column
+--   the clause matches one per value of the other columns, and only a
+--   clause written with the input's name can cover the rest, which covers
+--   that one too; so leaving the clause out turns neither "complete" into
+--   "incomplete" nor the reverse, and no suggested clause ever has to
+--   render it. The clause is left out of the analysis.
+--
+-- * @Just (Just p)@: what the pattern covers. EXACTLY of a value of the
+--   column's type is that value; EXACTLY of the column's own input name
+--   compares the input with itself, so it matches every input, like the
+--   bare name.
+--
+-- A top-level column is classified by its type after substitution (the
+-- caller's @colTypes@), never by the pattern's annotation, which the
+-- 'quietly' re-resolution leaves unsubstituted; a nested position has only
+-- its annotation, and an inference variable there is not primitive, so an
+-- EXACTLY under it stands the group down.
+coveragePattern
+  :: Map Unique [(Resolved, Int)]
+  -> Resolved
+  -- ^ the column's input, at every depth
+  -> Bool
+  -- ^ at the top level of the column, where the input's own name is the
+  -- pattern's scrutinee
+  -> Maybe (Type' Resolved)
+  -- ^ the type at this position, where known
+  -> Pattern Resolved
+  -> Maybe (Maybe CoveragePattern)
+coveragePattern families input top colTy = \ case
+  PatVar {}     -> Just (Just CovWild)
+  PatApp _ c ps -> do
+    subs <- traverse (\ p -> coveragePattern families input False (annoType p) p) ps
+    pure (CovCon c <$> sequence subs)
   PatCons {}    -> Nothing
-  PatLit {}     -> Nothing
-  PatExpr {}    -> Nothing
+  PatLit {}     -> Just Nothing
+  PatExpr _ e   -> case e of
+    Lit {} -> Just Nothing
+    Var _ r
+      | top, r `sameResolved` input -> Just (Just CovWild)
+      | Just fam <- Map.lookup (getUnique r) families
+      , Just (c, 0) <- List.find ((`sameResolved` r) . fst) fam
+      -> Just (Just (CovCon c []))
+    _ | Just ty <- colTy, isPrimitiveType ty -> Just Nothing
+      | otherwise -> Nothing
+  where
+    annoType p = case getAnno p ^. annInfo of
+      Just (TypeInfo ty _) -> Just ty
+      _ -> Nothing
 
 coverageToPattern :: CoveragePattern -> Pattern Resolved
 coverageToPattern = \ case
@@ -1149,7 +1207,8 @@ constructorFamilies decls =
 -- | The values that no row of a clause matrix matches, as rows of patterns
 -- with wildcards, computed by specialisation and the default matrix
 -- (L. Maranget, "Warnings for pattern matching", JFP 17(3), 2007, §3.1 and
--- §5). If no row names a constructor in the first column, that column is a
+-- §5). A row of wildcards matches everything, so nothing is missing below
+-- it. If no row names a constructor in the first column, that column is a
 -- wildcard over the rows' remaining columns. Otherwise every constructor of
 -- the column's type is tried in turn: one that some row names recurses into
 -- the rows that can match it (those naming it, with its argument patterns
@@ -1159,43 +1218,57 @@ constructorFamilies decls =
 -- returns covers only unmatched values, and every unmatched value is an
 -- instance of exactly one returned row.
 --
+-- The rows are the clauses the analysis can count ('coverageRow'): a clause
+-- with a number or a piece of text in it is not among them, so a column of
+-- numbers or text is covered only by a wildcard row, which renders as the
+-- input's name ('renderRow'), Maranget's own witness for a column whose
+-- values cannot all be named. No rows at all leave everything uncovered:
+-- one row, every column a wildcard. So a column of numbers or text with no
+-- catch-all always warns.
+--
 -- 'Nothing' bails to no warning: a constructor whose type's constructors are
 -- unknown, an arity that disagrees with the declaration, more than
 -- 'maxMissingClauses' rows at any level (each intermediate row yields at
 -- least one final row, so the final list would be longer still), or more
 -- than 'clauseMatrixFuel' steps.
-uncoveredRows :: Map Unique [(Resolved, Int)] -> [[CoveragePattern]] -> Maybe [[CoveragePattern]]
-uncoveredRows families rows0 =
-  case rows0 of
-    [] -> Nothing
-    (r : _) -> evalStateT (go (length r) rows0) clauseMatrixFuel
+uncoveredRows :: Map Unique [(Resolved, Int)] -> Int -> [[CoveragePattern]] -> Maybe [[CoveragePattern]]
+uncoveredRows families n rows0 =
+  evalStateT (go n rows0) clauseMatrixFuel
   where
+    isWild = \ case
+      CovWild -> True
+      _       -> False
+
     go :: Int -> [[CoveragePattern]] -> StateT Int Maybe [[CoveragePattern]]
-    go n rows = do
+    go m rows = do
       fuel <- get
       lift (guard (fuel > 0))
       put (fuel - 1)
-      result <- uncoveredStep n rows
+      result <- uncoveredStep m rows
       lift (guard (length result <= maxMissingClauses))
       pure result
 
     uncoveredStep :: Int -> [[CoveragePattern]] -> StateT Int Maybe [[CoveragePattern]]
     uncoveredStep 0 rows = pure [ [] | null rows ]
-    uncoveredStep n rows =
-      case [ (c, length ps) | (CovCon c ps : _) <- rows ] of
-        [] -> map (CovWild :) <$> go (n - 1) (mapMaybe dropWildcard rows)
-        heads@((c0, _) : _) -> do
-          family <- lift (Map.lookup (getUnique c0) families)
-          lift (guard (all (\ (c, a) -> any (\ (c', a') -> c `sameResolved` c' && a == a') family) heads))
-          let named c = any ((c `sameResolved`) . fst) heads
-          missingBelow <-
-            if all (named . fst) family
-              then pure []
-              else go (n - 1) (mapMaybe dropWildcard rows)
-          concat <$> forM family \ (c, a) ->
-            if named c
-              then map (\ w -> CovCon c (take a w) : drop a w) <$> go (a + n - 1) (mapMaybe (specialise c a) rows)
-              else pure [ CovCon c (replicate a CovWild) : w | w <- missingBelow ]
+    uncoveredStep m rows
+      -- a row that matches everything: nothing is missing, and no value
+      -- below needs trying
+      | any (all isWild) rows = pure []
+      | otherwise =
+          case [ (c, length ps) | (CovCon c ps : _) <- rows ] of
+            [] -> map (CovWild :) <$> go (m - 1) (mapMaybe dropWildcard rows)
+            heads@((c0, _) : _) -> do
+              family <- lift (Map.lookup (getUnique c0) families)
+              lift (guard (all (\ (c, a) -> any (\ (c', a') -> c `sameResolved` c' && a == a') family) heads))
+              let named c = any ((c `sameResolved`) . fst) heads
+              missingBelow <-
+                if all (named . fst) family
+                  then pure []
+                  else go (m - 1) (mapMaybe dropWildcard rows)
+              concat <$> forM family \ (c, a) ->
+                if named c
+                  then map (\ w -> CovCon c (take a w) : drop a w) <$> go (a + m - 1) (mapMaybe (specialise c a) rows)
+                  else pure [ CovCon c (replicate a CovWild) : w | w <- missingBelow ]
 
     dropWildcard = \ case
       CovWild : rest -> Just rest
@@ -1215,17 +1288,6 @@ maxMissingClauses = 64
 -- | Recursion steps 'uncoveredRows' may take before it gives up.
 clauseMatrixFuel :: Int
 clauseMatrixFuel = 10000
-
--- | Does this pattern contain a literal or expression pattern anywhere?
--- Pass-polymorphic so 'checkClauseMatrix' can apply it to the Name-pass
--- patterns of a clause matrix before resolving them.
-patternHasOpaque :: Pattern n -> Bool
-patternHasOpaque = \ case
-  PatLit {}       -> True
-  PatExpr {}      -> True
-  PatVar {}       -> False
-  PatApp _ _ ps   -> any patternHasOpaque ps
-  PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
 
 -- | We allow the following cases:
 --
@@ -4109,7 +4171,6 @@ prettyMissingPattern = go
     go _ p = prettyLayout p
 
     parensIf b txt = if b then "(" <> txt <> ")" else txt
-
 
 -- | Forms a plural when needed.
 prettyCount :: Int -> Text -> Text

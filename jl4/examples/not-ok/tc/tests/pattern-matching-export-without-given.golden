@@ -39,6 +39,18 @@ File: pattern-matching-export-without-given.l4
 
 File: pattern-matching-export-without-given.l4
   Hidden: no
+  Range: 28:8-28:16
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This clause does not cover all cases. The following clauses are still needed:
+
+      DECIDE `discount` `_` IS
+
+
+File: pattern-matching-export-without-given.l4
+  Hidden: no
   Range: 34:8-34:13
   Source: check
   Severity: DiagnosticSeverity_Error

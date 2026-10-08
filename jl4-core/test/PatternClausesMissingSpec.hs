@@ -148,14 +148,366 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ])
     ws `shouldBe` []
 
-  it "does not check a group that matches numbers (no finite set of values)" $ do
+  -- Review of legalese/l4-ide#545, round 2, item 4: a number or a piece of
+  -- text in a clause matches one value of its input, and the input has no
+  -- end of other values, so a group of such clauses is complete only with a
+  -- clause written with the input's name, and the warning suggests it.
+  it "suggests the clause with the input's name for a group that matches numbers" $ do
     ws <- clauseWarnings $ Text.unlines
       [ "GIVEN n IS A NUMBER"
       , "GIVETH A STRING"
       , "DECIDE describe 0 IS \"zero\""
       , "DECIDE describe 1 IS \"one\""
       ]
+    map snd ws `shouldBe`
+      [ [ "I found a problem while checking the definition of `describe`:"
+        , "  This multi-clause definition does not cover all cases. The following clauses are still needed:"
+        , "  "
+        , "    DECIDE `describe` n IS"
+        , "  "
+        ]
+      ]
+    map fst ws `shouldBe` [Just (3, 8, 4)]
+
+  it "is silent when a group that matches numbers ends with the input's name" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE describe 0 IS \"zero\""
+      , "DECIDE describe 1 IS \"one\""
+      , "DECIDE describe n IS \"many\""
+      ]
     ws `shouldBe` []
+
+  it "suggests the clause with the input's name for a group that matches text, and is silent with it" $ do
+    let code cls = Text.unlines $ [ "GIVEN s IS A STRING", "GIVETH A NUMBER" ] <> cls
+    partial <- clauseWarnings $ code
+      [ "DECIDE code \"red\"   IS 1"
+      , "DECIDE code \"green\" IS 2"
+      ]
+    missingClauses partial `shouldBe` ["DECIDE `code` s IS"]
+    total <- clauseWarnings $ code
+      [ "DECIDE code \"red\"   IS 1"
+      , "DECIDE code \"green\" IS 2"
+      , "DECIDE code s         IS 0"
+      ]
+    total `shouldBe` []
+
+  it "suggests the input's name for a negative number and for a decimal" $ do
+    sign <- clauseWarnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE sign -1 IS 0"
+      , "DECIDE sign 0  IS 1"
+      ]
+    missingClauses sign `shouldBe` ["DECIDE `sign` n IS"]
+    half <- clauseWarnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE half 0.5 IS 0"
+      , "DECIDE half 1   IS 1"
+      ]
+    missingClauses half `shouldBe` ["DECIDE `half` n IS"]
+
+  it "reads EXACTLY of a number as that number" $ do
+    let ex cls = Text.unlines $ [ "GIVEN n IS A NUMBER", "GIVETH A STRING" ] <> cls
+    partial <- clauseWarnings $ ex
+      [ "DECIDE ex (EXACTLY 0) IS \"zero\""
+      , "DECIDE ex (EXACTLY 1) IS \"one\""
+      ]
+    missingClauses partial `shouldBe` ["DECIDE `ex` n IS"]
+    total <- clauseWarnings $ ex
+      [ "DECIDE ex (EXACTLY 0) IS \"zero\""
+      , "DECIDE ex n           IS \"other\""
+      ]
+    total `shouldBe` []
+
+  it "reads EXACTLY of a value of the input's type as that value" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE price (EXACTLY Red) IS 1"
+      , "DECIDE price Green         IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `price` Blue IS"]
+
+  it "stands down for an EXACTLY of a constant on an enumeration input" $ do
+    -- The constant is one of three values, and the check cannot tell which:
+    -- reading it either way could mis-report, so the group gets no warning.
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "someColour MEANS Red"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE price (EXACTLY someColour) IS 1"
+      , "DECIDE price Green               IS 2"
+      ]
+    ws `shouldBe` []
+
+  it "stands down for an EXACTLY of a constant under a record's field" $ do
+    -- The field's type is read off the pattern's annotation, which the
+    -- re-resolution leaves as an inference variable, so the EXACTLY is not
+    -- read as one of a number's endless values; the group gets no warning.
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium"
+      , "DECLARE Box HAS n IS A NUMBER"
+      , ""
+      , "zero MEANS 0"
+      , ""
+      , "GIVEN b IS A Box"
+      , "      t IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE f (Box (EXACTLY zero)) Premium IS 1"
+      , "DECIDE f (Box n)              Basic   IS 2"
+      ]
+    ws `shouldBe` []
+
+  it "stands down for EXACTLY over an enumeration declared in another file" $ do
+    ws <- filter isClauseWarning <$> warningsWith
+      (vfsFromList [("colours", "DECLARE Colour IS ONE OF Red, Green, Blue\n")])
+      (Text.unlines
+        [ "IMPORT colours"
+        , ""
+        , "GIVEN c IS A Colour"
+        , "GIVETH A NUMBER"
+        , "DECIDE price (EXACTLY Red)   IS 1"
+        , "DECIDE price (EXACTLY Green) IS 2"
+        , "DECIDE price (EXACTLY Blue)  IS 3"
+        ])
+    ws `shouldBe` []
+
+  it "stands down for EXACTLY over a MAYBE value" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "IMPORT prelude"
+      , ""
+      , "GIVEN m IS A MAYBE BOOLEAN"
+      , "GIVETH A STRING"
+      , "DECIDE f (EXACTLY NOTHING)      IS \"none\""
+      , "DECIDE f (EXACTLY (JUST TRUE))  IS \"t\""
+      , "DECIDE f (EXACTLY (JUST FALSE)) IS \"f\""
+      ]
+    ws `shouldBe` []
+
+  it "suggests the inputs' names for a table keyed by a number and an enumeration, and is silent with a catch-all per value" $ do
+    let charge cls = Text.unlines $
+          [ "DECLARE Tier IS ONE OF Basic, Premium"
+          , ""
+          , "GIVEN level IS A NUMBER"
+          , "      tier IS A Tier"
+          , "GIVETH A NUMBER"
+          ] <> cls
+    partial <- clauseWarnings $ charge
+      [ "DECIDE charge 1 Basic   IS 10"
+      , "DECIDE charge 1 Premium IS 20"
+      , "DECIDE charge 2 Basic   IS 30"
+      , "DECIDE charge 2 Premium IS 40"
+      ]
+    missingClauses partial `shouldBe` ["DECIDE `charge` level tier IS"]
+    total <- clauseWarnings $ charge
+      [ "DECIDE charge 1 Basic       IS 10"
+      , "DECIDE charge 1 Premium     IS 20"
+      , "DECIDE charge level Basic   IS 30"
+      , "DECIDE charge level Premium IS 40"
+      ]
+    total `shouldBe` []
+
+  it "suggests the inputs' names for a table keyed by text" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium"
+      , ""
+      , "GIVEN region IS A STRING"
+      , "      tier IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE charge \"SG\" Basic   IS 10"
+      , "DECIDE charge \"SG\" Premium IS 20"
+      , "DECIDE charge \"MY\" Basic   IS 30"
+      , "DECIDE charge \"MY\" Premium IS 40"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `charge` region tier IS"]
+
+  it "still analyses the enumeration input beside a number" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium, Gold"
+      , ""
+      , "GIVEN level IS A NUMBER"
+      , "      tier IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE charge 1 Basic       IS 10"
+      , "DECIDE charge level Basic   IS 30"
+      , "DECIDE charge level Premium IS 40"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `charge` level Gold IS"]
+
+  it "suggests the inputs' names for a table with a gap inside it" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium"
+      , ""
+      , "GIVEN level IS A NUMBER"
+      , "      tier IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE charge 1 Basic   IS 10"
+      , "DECIDE charge 1 Premium IS 20"
+      , "DECIDE charge 2 Basic   IS 30"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `charge` level tier IS"]
+
+  it "analyses the enumeration input of a group with a number in another input" $ do
+    -- The reference page's former example of a group that was not checked
+    -- because of the number: now the number's clause is read as one value,
+    -- the clause below it covers the rest of Red, and Blue is reported.
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE charge Red   0 IS 0"
+      , "DECIDE charge Red   n IS n"
+      , "DECIDE charge Green n IS n TIMES 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `charge` Blue n IS"]
+
+  it "writes a number input left open as its name beside each missing enumeration value" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE p Red   0 IS 1"
+      , "DECIDE p Green n IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `p` Red n IS", "DECIDE `p` Blue n IS"]
+
+  it "writes a text input left open as its name beside a BOOLEAN, and is silent with a catch-all" $ do
+    let fee cls = Text.unlines $
+          [ "GIVEN weekend IS A BOOLEAN"
+          , "      day IS A STRING"
+          , "GIVETH A NUMBER"
+          ] <> cls
+    partial <- clauseWarnings $ fee
+      [ "DECIDE fee TRUE  day        IS 0"
+      , "DECIDE fee FALSE \"Saturday\" IS 5"
+      ]
+    missingClauses partial `shouldBe` ["DECIDE `fee` FALSE day IS"]
+    total <- clauseWarnings $ fee
+      [ "DECIDE fee TRUE  day        IS 0"
+      , "DECIDE fee FALSE \"Saturday\" IS 5"
+      , "DECIDE fee FALSE day        IS 10"
+      ]
+    total `shouldBe` []
+
+  it "suggests the inputs' names for two number inputs keyed on the first, and is silent with a catch-all" $ do
+    let f cls = Text.unlines $
+          [ "GIVEN n IS A NUMBER"
+          , "      k IS A NUMBER"
+          , "GIVETH A NUMBER"
+          ] <> cls
+    partial <- clauseWarnings $ f
+      [ "DECIDE f 0 k IS 1"
+      , "DECIDE f 1 k IS 2"
+      ]
+    missingClauses partial `shouldBe` ["DECIDE `f` n k IS"]
+    total <- clauseWarnings $ f
+      [ "DECIDE f 0 k IS 1"
+      , "DECIDE f n 0 IS 2"
+      , "DECIDE f n k IS 3"
+      ]
+    total `shouldBe` []
+
+  it "suggests the inputs' names for two number inputs keyed on both" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "      k IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 0 k IS 1"
+      , "DECIDE f 1 0 IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` n k IS"]
+
+  it "checks a one-clause group with a number as a clause, and says so" $ do
+    allWs <- warnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE only 0 IS 1"
+      ]
+    map snd allWs `shouldBe`
+      [ [ "I found a problem while checking the definition of `only`:"
+        , "  This clause does not cover all cases. The following clauses are still needed:"
+        , "  "
+        , "    DECIDE `only` n IS"
+        , "  "
+        ]
+      ]
+    map fst allWs `shouldBe` [Just (3, 8, 3)]
+
+  it "checks a one-clause group with a number and an enumeration, and withdraws its CONSIDER warning" $ do
+    -- One warning, at the clause, in clause terms. The CONSIDER the clause
+    -- is compiled to no longer reports `WHEN Green THEN` for the second
+    -- input.
+    allWs <- warnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 1 Red IS 1"
+      ]
+    map snd allWs `shouldBe`
+      [ [ "I found a problem while checking the definition of `f`:"
+        , "  This clause does not cover all cases. The following clauses are still needed:"
+        , "  "
+        , "    DECIDE `f` n c IS"
+        , "  "
+        ]
+      ]
+    map fst allWs `shouldBe` [Just (6, 8, 6)]
+
+  it "keeps a one-clause group's CONSIDER warning, at the clause, where it cannot check the clause" $ do
+    -- The MAYBE value stops the clause analysis (main's constructor lookup
+    -- does not know MAYBE's values); the warning for the CONSIDER the clause
+    -- is compiled to is kept, moved from no location to the clause.
+    allWs <- filter (\ w -> mentions "still need to be considered" w || isClauseWarning w) <$> warnings (Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      m IS A MAYBE NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f Red (JUST x) IS x"
+      ])
+    allWs `shouldBe`
+      [ ( Just (6, 8, 6)
+        , [ "I found a problem while checking the definition of `f`:"
+          , "  The following branches still need to be considered:"
+          , "  "
+          , "    WHEN Green THEN"
+          , "    WHEN Blue THEN"
+          , "  "
+          ]
+        )
+      ]
+
+  it "suggests the input's name for a record whose number field is matched, and is silent with a name there" $ do
+    let f cls = Text.unlines $
+          [ "DECLARE Box HAS n IS A NUMBER"
+          , ""
+          , "GIVEN b IS A Box"
+          , "GIVETH A STRING"
+          ] <> cls
+    partial <- clauseWarnings $ f
+      [ "DECIDE f (Box 0) IS \"zero\""
+      , "DECIDE f (Box 1) IS \"one\""
+      ]
+    missingClauses partial `shouldBe` ["DECIDE `f` b IS"]
+    total <- clauseWarnings $ f
+      [ "DECIDE f (Box 0) IS \"zero\""
+      , "DECIDE f (Box m) IS \"other\""
+      ]
+    total `shouldBe` []
 
   it "does not check a group that matches lists" $ do
     ws <- clauseWarnings $ Text.unlines
@@ -163,6 +515,15 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "GIVETH A NUMBER"
       , "DECIDE h EMPTY IS 0"
       , "DECIDE h (TRUE FOLLOWED BY rest) IS 1"
+      ]
+    ws `shouldBe` []
+
+  it "does not check a group that matches lists, even with a number at the head" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "GIVEN xs IS A LIST OF NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE t EMPTY IS 0"
+      , "DECIDE t (0 FOLLOWED BY rest) IS 1"
       ]
     ws `shouldBe` []
 
@@ -174,6 +535,44 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "GIVETH A NUMBER"
       , "DECIDE g NOTHING IS 0"
       , "DECIDE g (JUST TRUE) IS 1"
+      ]
+    ws `shouldBe` []
+
+  it "does not check a group that matches MAYBE values, even with a number inside" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "IMPORT prelude"
+      , ""
+      , "GIVEN m IS A MAYBE NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE show NOTHING  IS \"none\""
+      , "DECIDE show (JUST 0) IS \"zero\""
+      ]
+    ws `shouldBe` []
+
+  it "suggests the one clause with every input's name where every clause has a number inside a MAYBE" $ do
+    -- The clause has a number in it, so it is left out; no clause is left,
+    -- so everything is open: one row, the input's name. Unstable lists
+    -- NOTHING and (JUST `_`).
+    ws <- clauseWarnings $ Text.unlines
+      [ "IMPORT prelude"
+      , ""
+      , "GIVEN m IS A MAYBE NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE f (JUST 0) IS \"zero\""
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` m IS"]
+
+  it "answers complete where the exact analysis cannot read a MAYBE below a number" $ do
+    -- The JUST the analysis cannot enumerate is in a clause with a number,
+    -- which is left out; the catch-all answers.
+    ws <- clauseWarnings $ Text.unlines
+      [ "IMPORT prelude"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      m IS A MAYBE NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 0 (JUST x) IS x"
+      , "DECIDE f n m        IS 0"
       ]
     ws `shouldBe` []
 
@@ -189,6 +588,183 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
         , "DECIDE price Green IS 2"
         ])
     ws `shouldBe` []
+
+  it "still finds a gap beside a list, a MAYBE value or another file's enumeration where it need not tell them apart" $ do
+    -- The check cannot tell such values apart, so it gives up only where a
+    -- missing case could be found no other way; here the other input
+    -- settles the question before any such value is read.
+    list <- clauseWarnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      xs IS A LIST OF NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE t Red   EMPTY IS 0"
+      , "DECIDE t Red   xs    IS 1"
+      , "DECIDE t Green xs    IS 2"
+      ]
+    missingClauses list `shouldBe` ["DECIDE `t` Blue xs IS"]
+    -- A MAYBE value in a clause with a number: that clause is left out, and
+    -- the ones without a number leave Red and Blue open.
+    maybeKeyed <- clauseWarnings $ Text.unlines
+      [ "IMPORT prelude"
+      , ""
+      , "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN c IS A Colour"
+      , "      m IS A MAYBE NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f Red   (JUST 0) IS 0"
+      , "DECIDE f Green m        IS 1"
+      ]
+    missingClauses maybeKeyed `shouldBe` ["DECIDE `f` Red m IS", "DECIDE `f` Blue m IS"]
+    imported <- filter isClauseWarning <$> warningsWith
+      (vfsFromList [("colours", "DECLARE Colour IS ONE OF Red, Green, Blue\n")])
+      (Text.unlines
+        [ "IMPORT colours"
+        , ""
+        , "DECLARE Tier IS ONE OF Basic, Premium, Gold"
+        , ""
+        , "GIVEN t IS A Tier"
+        , "      c IS A Colour"
+        , "GIVETH A NUMBER"
+        , "DECIDE f Basic   Red IS 0"
+        , "DECIDE f Basic   c   IS 1"
+        , "DECIDE f Premium c   IS 2"
+        ])
+    missingClauses imported `shouldBe` ["DECIDE `f` Gold c IS"]
+
+  it "does not flag a repeated number, nor 1 after 1.0" $ do
+    -- Unstable flags these as never used, from redundant rows its coverage
+    -- analysis computes and main's does not (ruling M1's condition); the
+    -- reference page says so. `1` and `1.0` are one number, and so are
+    -- `0.10` and `0.1`, so nothing is missing either.
+    h <- warnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE h 1    IS \"one\""
+      , "DECIDE h 1.0  IS \"one point zero\""
+      , "DECIDE h 0.10 IS \"tenth\""
+      , "DECIDE h 0.1  IS \"tenth again\""
+      , "DECIDE h n    IS \"other\""
+      ]
+    h `shouldBe` []
+    g <- warnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE g 0 IS \"zero\""
+      , "DECIDE g 0 IS \"zero again\""
+      , "DECIDE g n IS \"other\""
+      ]
+    g `shouldBe` []
+
+  it "reads EXACTLY of the input's own name as matching every input" $ do
+    total <- warnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE f 0           IS \"zero\""
+      , "DECIDE f (EXACTLY n) IS \"self\""
+      ]
+    total `shouldBe` []
+    -- A clause after it is never used; unstable says so, from the redundant
+    -- rows its analysis computes, and main does not (ruling M1's condition).
+    dead <- warnings $ Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "DECIDE f 0           IS \"zero\""
+      , "DECIDE f (EXACTLY n) IS \"self\""
+      , "DECIDE f 1           IS \"one\""
+      ]
+    dead `shouldBe` []
+
+  it "reads EXACTLY of the input's own name as matching every input beside an enumeration" $ do
+    -- Read as a clause that counts for nothing instead, the group would
+    -- have no clause left and the warning would suggest the one clause
+    -- with both inputs' names.
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      c IS A Colour"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 0           Red   IS 1"
+      , "DECIDE f (EXACTLY n) Green IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` n Red IS", "DECIDE `f` n Blue IS"]
+
+  it "leaves out a clause with EXACTLY of a constant on a number input, which only the input's name can cover" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium"
+      , ""
+      , "zero MEANS 0"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      t IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE f (EXACTLY zero) Basic   IS 1"
+      , "DECIDE f n              Premium IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` n Basic IS"]
+
+  it "suggests the input's name where every clause is EXACTLY of a constant" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "zero MEANS 0"
+      , "one MEANS 1"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f (EXACTLY zero) IS 1"
+      , "DECIDE f (EXACTLY one)  IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` n IS"]
+
+  it "suggests the clause with both inputs' names for a cross table of a hundred keys" $ do
+    let tshow = Text.pack . show
+        cross = Text.unlines $
+          [ "GIVEN n IS A NUMBER"
+          , "      k IS A NUMBER"
+          , "GIVETH A NUMBER"
+          ]
+          <> [ "DECIDE f " <> tshow i <> " k IS " <> tshow i | i <- [1 .. 100 :: Int] ]
+          <> [ "DECIDE f n " <> tshow j <> " IS " <> tshow j | j <- [1 .. 100 :: Int] ]
+    ws <- clauseWarnings cross
+    missingClauses ws `shouldBe` ["DECIDE `f` n k IS"]
+
+  it "suggests the clause for every other number alone, however many keys" $ do
+    -- The keyed clauses are left out, so the one clause for every other
+    -- number is all that is open, for sixty-three keys and for sixty-four.
+    let tshow = Text.pack . show
+        keyed :: Int -> Text
+        keyed k = Text.unlines $
+          [ "DECLARE Tier IS ONE OF Basic, Premium"
+          , ""
+          , "GIVEN n IS A NUMBER"
+          , "      t IS A Tier"
+          , "GIVETH A NUMBER"
+          ]
+          <> [ "DECIDE f " <> tshow i <> " Basic IS " <> tshow i | i <- [1 .. k] ]
+    sixtyThree <- clauseWarnings (keyed 63)
+    missingClauses sixtyThree `shouldBe` ["DECIDE `f` n t IS"]
+    sixtyFour <- clauseWarnings (keyed 64)
+    missingClauses sixtyFour `shouldBe` ["DECIDE `f` n t IS"]
+
+  it "still lists sixty-four missing enumeration values, and none for sixty-five" $ do
+    -- The enumeration control: the cap silences the group as before.
+    let tshow = Text.pack . show
+        big :: Int -> Text
+        big k = Text.unlines $
+          [ "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "E" <> tshow i | i <- [1 .. k] ]
+          , "DECLARE Tier IS ONE OF Basic, Premium"
+          , ""
+          , "GIVEN e IS A Big"
+          , "      t IS A Tier"
+          , "GIVETH A NUMBER"
+          ]
+          <> [ "DECIDE f E" <> tshow i <> " Basic IS " <> tshow i | i <- [1 .. k] ]
+    sixtyFour <- clauseWarnings (big 64)
+    missingClauses sixtyFour `shouldBe` [ "DECIDE `f` E" <> tshow i <> " Premium IS" | i <- [1 .. 64 :: Int] ]
+    sixtyFive <- clauseWarnings (big 65)
+    sixtyFive `shouldBe` []
 
   it "stays silent rather than list more than 64 missing clauses" $ do
     ws <- clauseWarnings $ Text.unlines
@@ -210,51 +786,12 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     ws `shouldBe` []
 
-  -- The three silences below are the examples doc/reference/functions/
-  -- multi-clause-DECIDE.md gives under "Limits"; each has its control, the
-  -- same group with the warning back.
-  it "does not check a group with a number anywhere in its patterns, though its other input is an enumeration" $ do
-    let charge cls = Text.unlines $
-          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
-          , ""
-          , "GIVEN c IS A Colour"
-          , "      n IS A NUMBER"
-          , "GIVETH A NUMBER"
-          ] <> cls
-    unchecked <- clauseWarnings $ charge
-      [ "DECIDE charge Red   0 IS 0"
-      , "DECIDE charge Red   n IS n"
-      , "DECIDE charge Green n IS n TIMES 2"
-      ]
-    unchecked `shouldBe` []
-    checked <- clauseWarnings $ charge
-      [ "DECIDE charge Red   n IS n"
-      , "DECIDE charge Green n IS n TIMES 2"
-      ]
-    missingClauses checked `shouldBe` ["DECIDE `charge` Blue n IS"]
-
-  it "does not check a group with an EXACTLY pattern" $ do
-    let price cls = Text.unlines $
-          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
-          , ""
-          , "GIVEN c IS A Colour"
-          , "GIVETH A NUMBER"
-          ] <> cls
-    unchecked <- clauseWarnings $ price
-      [ "DECIDE price (EXACTLY Red) IS 1"
-      , "DECIDE price Green         IS 2"
-      ]
-    unchecked `shouldBe` []
-    checked <- clauseWarnings $ price
-      [ "DECIDE price Red   IS 1"
-      , "DECIDE price Green IS 2"
-      ]
-    missingClauses checked `shouldBe` ["DECIDE `price` Blue IS"]
-
-  it "stays silent rather than take more than 10000 steps" $ do
+  it "finds the one clause missing from a group keyed on each enumeration input in turn, however many inputs" $ do
     -- k inputs, each tested for Red in one clause and for Green in another:
-    -- the one clause missing is all Blue, and finding it takes more steps
-    -- with each input; eight inputs stay under 10000 steps, nine do not.
+    -- the one clause missing is all Blue. Under each key the clause that
+    -- tested it has only its inputs' names left, which match everything, so
+    -- the search ends there and grows with the inputs, not with their
+    -- powers: nine inputs used to run out of steps, and now do not.
     let tshow = Text.pack . show
         pick :: Int -> Text
         pick k = Text.unlines $
@@ -265,10 +802,34 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
                  <> Text.unwords [ if j == i then v else "c" <> tshow j | j <- [1 .. k] ]
                  <> " IS " <> tshow i
              | v <- ["Red", "Green"], i <- [1 .. k] ]
-    nine <- clauseWarnings (pick 9)
-    nine `shouldBe` []
     eight <- clauseWarnings (pick 8)
     missingClauses eight `shouldBe` ["DECIDE `pick` " <> Text.unwords (replicate 8 "Blue") <> " IS"]
+    nine <- clauseWarnings (pick 9)
+    missingClauses nine `shouldBe` ["DECIDE `pick` " <> Text.unwords (replicate 9 "Blue") <> " IS"]
+
+  it "suggests the one clause with every input's name for a group keyed on each number input in turn" $ do
+    -- The same table over numbers: every clause has a number, so none is
+    -- counted, and the clause for every other number of every input is the
+    -- one missing.
+    let tshow = Text.pack . show
+        pick :: Int -> Text
+        pick k = Text.unlines $
+          [ (if i == 1 then "GIVEN " else "      ") <> "n" <> tshow i <> " IS A NUMBER" | i <- [1 .. k] ]
+          <> [ "GIVETH A NUMBER" ]
+          <> [ "DECIDE pick "
+                 <> Text.unwords [ if j == i then v else "n" <> tshow j | j <- [1 .. k] ]
+                 <> " IS " <> tshow i
+             | v <- ["0", "1"], i <- [1 .. k] ]
+    eight <- clauseWarnings (pick 8)
+    missingClauses eight `shouldBe` ["DECIDE `pick` " <> Text.unwords [ "n" <> tshow i | i <- [1 .. 8 :: Int] ] <> " IS"]
+    nine <- clauseWarnings (pick 9)
+    missingClauses nine `shouldBe` ["DECIDE `pick` " <> Text.unwords [ "n" <> tshow i | i <- [1 .. 9 :: Int] ] <> " IS"]
+
+  it "writes an open column that has no GIVEN as `_` for a one-clause group with a number" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECIDE describe 0 IS \"zero\""
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `describe` `_` IS"]
 
   it "checks a one-clause group as a clause, and says so" $ do
     allWs <- warnings $ Text.unlines
@@ -295,29 +856,6 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
         ]
       ]
     map fst allWs `shouldBe` [Just (9, 8, 9)]
-
-  it "keeps a one-clause group's CONSIDER warning, at the clause, where it cannot check the clause" $ do
-    -- The literal stops the clause analysis; the warning for the CONSIDER the
-    -- clause is compiled to is kept, moved from no location to the clause.
-    allWs <- warnings $ Text.unlines
-      [ "DECLARE Colour IS ONE OF Red, Green, Blue"
-      , ""
-      , "GIVEN c IS A Colour"
-      , "      n IS A NUMBER"
-      , "GIVETH A NUMBER"
-      , "DECIDE f Red 1 IS 1"
-      ]
-    allWs `shouldBe`
-      [ ( Just (6, 8, 6)
-        , [ "I found a problem while checking the definition of `f`:"
-          , "  The following branches still need to be considered:"
-          , "  "
-          , "    WHEN Green THEN"
-          , "    WHEN Blue THEN"
-          , "  "
-          ]
-        )
-      ]
 
   it "warns once about the clauses after a clause that matches every input" $ do
     ws <- filter (mentions "is never used") <$> warnings (Text.unlines
@@ -389,15 +927,16 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others."
       ]
 
-  it "warns about the clauses after a new name in a group that matches numbers" $ do
-    ws <- filter (mentions "never used") <$> warnings (Text.unlines
+  it "warns about the clauses after a new name in a group that matches numbers, and about nothing missing" $ do
+    ws <- warnings $ Text.unlines
       [ "GIVEN n IS A NUMBER"
       , "GIVETH A NUMBER"
       , "DECIDE size 0     IS 1"
       , "DECIDE size other IS 2"
       , "DECIDE size 1     IS 3"
-      ])
-    map fst ws `shouldBe` [Just (5, 8, 5)]
+      ]
+    map fst (filter (mentions "never used") ws) `shouldBe` [Just (5, 8, 5)]
+    filter isClauseWarning ws `shouldBe` []
 
   it "still warns about a CONSIDER written inside a later clause" $ do
     ws <- filter (mentions "still need to be considered") <$> warnings (Text.unlines
