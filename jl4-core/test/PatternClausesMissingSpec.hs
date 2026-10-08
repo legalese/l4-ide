@@ -329,7 +329,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     missingClauses ws `shouldBe` ["DECIDE `charge` region tier IS"]
 
-  it "still analyses the enumeration input beside a number" $ do
+  it "still analyses the enumeration input beside a number: the gap under a key first, then under every other number" $ do
     ws <- clauseWarnings $ Text.unlines
       [ "DECLARE Tier IS ONE OF Basic, Premium, Gold"
       , ""
@@ -340,9 +340,9 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE charge level Basic   IS 30"
       , "DECIDE charge level Premium IS 40"
       ]
-    missingClauses ws `shouldBe` ["DECIDE `charge` level Gold IS"]
+    missingClauses ws `shouldBe` ["DECIDE `charge` 1 Gold IS", "DECIDE `charge` level Gold IS"]
 
-  it "suggests the inputs' names for a table with a gap inside it" $ do
+  it "lists a gap inside the table before the clause for every other number" $ do
     ws <- clauseWarnings $ Text.unlines
       [ "DECLARE Tier IS ONE OF Basic, Premium"
       , ""
@@ -353,7 +353,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE charge 1 Premium IS 20"
       , "DECIDE charge 2 Basic   IS 30"
       ]
-    missingClauses ws `shouldBe` ["DECIDE `charge` level tier IS"]
+    missingClauses ws `shouldBe` ["DECIDE `charge` 2 Premium IS", "DECIDE `charge` level tier IS"]
 
   it "analyses the enumeration input of a group with a number in another input" $ do
     -- The reference page's former example of a group that was not checked
@@ -419,7 +419,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     total `shouldBe` []
 
-  it "suggests the inputs' names for two number inputs keyed on both" $ do
+  it "lists the gap under one key of two number inputs, then the rest" $ do
     ws <- clauseWarnings $ Text.unlines
       [ "GIVEN n IS A NUMBER"
       , "      k IS A NUMBER"
@@ -427,7 +427,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f 0 k IS 1"
       , "DECIDE f 1 0 IS 2"
       ]
-    missingClauses ws `shouldBe` ["DECIDE `f` n k IS"]
+    missingClauses ws `shouldBe` ["DECIDE `f` 1 k IS", "DECIDE `f` n k IS"]
 
   it "checks a one-clause group with a number as a clause, and says so" $ do
     allWs <- warnings $ Text.unlines
@@ -446,9 +446,9 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     map fst allWs `shouldBe` [Just (3, 8, 3)]
 
   it "checks a one-clause group with a number and an enumeration, and withdraws its CONSIDER warning" $ do
-    -- One warning, at the clause, in clause terms. The CONSIDER the clause
-    -- is compiled to no longer reports `WHEN Green THEN` for the second
-    -- input.
+    -- One warning, at the clause, in clause terms: the keyed gaps under 1,
+    -- then every other number. The CONSIDER the clause is compiled to no
+    -- longer reports `WHEN Green THEN` for the second input.
     allWs <- warnings $ Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"
       , ""
@@ -461,6 +461,8 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       [ [ "I found a problem while checking the definition of `f`:"
         , "  This clause does not cover all cases. The following clauses are still needed:"
         , "  "
+        , "    DECIDE `f` 1 Green IS"
+        , "    DECIDE `f` 1 Blue IS"
         , "    DECIDE `f` n c IS"
         , "  "
         ]
@@ -491,7 +493,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
         )
       ]
 
-  it "suggests the input's name for a record whose number field is matched, and is silent with a name there" $ do
+  it "lists a record whose number field is left open with `_` in its place, and is silent with a name there" $ do
     let f cls = Text.unlines $
           [ "DECLARE Box HAS n IS A NUMBER"
           , ""
@@ -502,7 +504,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       [ "DECIDE f (Box 0) IS \"zero\""
       , "DECIDE f (Box 1) IS \"one\""
       ]
-    missingClauses partial `shouldBe` ["DECIDE `f` b IS"]
+    missingClauses partial `shouldBe` ["DECIDE `f` (Box `_`) IS"]
     total <- clauseWarnings $ f
       [ "DECIDE f (Box 0) IS \"zero\""
       , "DECIDE f (Box m) IS \"other\""
@@ -550,9 +552,9 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     ws `shouldBe` []
 
   it "suggests the one clause with every input's name where every clause has a number inside a MAYBE" $ do
-    -- The clause has a number in it, so it is left out; no clause is left,
-    -- so everything is open: one row, the input's name. Unstable lists
-    -- NOTHING and (JUST `_`).
+    -- The exact analysis cannot read JUST; the coarse tier, over the
+    -- clauses without a number, has no clause left, so everything is open:
+    -- one row, the input's name. Unstable lists NOTHING and (JUST `_`).
     ws <- clauseWarnings $ Text.unlines
       [ "IMPORT prelude"
       , ""
@@ -563,8 +565,8 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     missingClauses ws `shouldBe` ["DECIDE `f` m IS"]
 
   it "answers complete where the exact analysis cannot read a MAYBE below a number" $ do
-    -- The JUST the analysis cannot enumerate is in a clause with a number,
-    -- which is left out; the catch-all answers.
+    -- Under the key 0 the row `f n m` has only wildcards left, which ends
+    -- the search before the JUST is read, so the exact tier answers.
     ws <- clauseWarnings $ Text.unlines
       [ "IMPORT prelude"
       , ""
@@ -575,6 +577,21 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f n m        IS 0"
       ]
     ws `shouldBe` []
+
+  it "falls back to the clauses without a number where the exact analysis meets a MAYBE below a key" $ do
+    -- Under the key 0 the exact tier meets JUST, which it cannot
+    -- enumerate, and no row of wildcards ends the search first; the coarse
+    -- tier has no clause without a number, so everything is open.
+    ws <- clauseWarnings $ Text.unlines
+      [ "IMPORT prelude"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      m IS A MAYBE NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 0 (JUST x) IS x"
+      , "DECIDE f 1 m        IS 0"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` n m IS"]
 
   it "does not check a group over an enumeration declared in another file" $ do
     ws <- filter isClauseWarning <$> warningsWith
@@ -658,6 +675,46 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     g `shouldBe` []
 
+  it "names a key by the first spelling the clauses give it" $ do
+    ws <- clauseWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium, Gold"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      t IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE f 1   Basic   IS 1"
+      , "DECIDE f 1.0 Premium IS 2"
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` 1 Gold IS", "DECIDE `f` n t IS"]
+
+  it "names a number with every digit the clause gives it, as the clause spelled it" $ do
+    -- Not rounded through a double, which would print 0.12345678901234568;
+    -- and as written, so `1.50` stays `1.50`, a negative number keeps its
+    -- sign, and a number under EXACTLY prints as the number alone.
+    let long cls = Text.unlines $
+          [ "DECLARE Tier IS ONE OF Basic, Premium"
+          , ""
+          , "GIVEN n IS A NUMBER"
+          , "      t IS A Tier"
+          , "GIVETH A NUMBER"
+          ] <> cls
+    alone <- clauseWarnings $ long [ "DECIDE f 0.1234567890123456789 Basic IS 1" ]
+    missingClauses alone `shouldBe` ["DECIDE `f` 0.1234567890123456789 Premium IS", "DECIDE `f` n t IS"]
+    withRest <- clauseWarnings $ long
+      [ "DECIDE f 0.1234567890123456789 Basic IS 1"
+      , "DECIDE f n Premium IS 2"
+      ]
+    missingClauses withRest `shouldBe` ["DECIDE `f` n Basic IS"]
+    spelled <- clauseWarnings $ long [ "DECIDE f 1.50 Basic IS 1" ]
+    missingClauses spelled `shouldBe` ["DECIDE `f` 1.50 Premium IS", "DECIDE `f` n t IS"]
+    negative <- clauseWarnings $ long [ "DECIDE f -1 Basic IS 1" ]
+    missingClauses negative `shouldBe` ["DECIDE `f` -1 Premium IS", "DECIDE `f` n t IS"]
+    exactly <- clauseWarnings $ long
+      [ "DECIDE f (EXACTLY 1.50)  Basic IS 1"
+      , "DECIDE f (EXACTLY -0.10) Basic IS 2"
+      ]
+    missingClauses exactly `shouldBe` ["DECIDE `f` 1.50 Premium IS", "DECIDE `f` -0.10 Premium IS", "DECIDE `f` n t IS"]
+
   it "reads EXACTLY of the input's own name as matching every input" $ do
     total <- warnings $ Text.unlines
       [ "GIVEN n IS A NUMBER"
@@ -678,8 +735,8 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     dead `shouldBe` []
 
   it "reads EXACTLY of the input's own name as matching every input beside an enumeration" $ do
-    -- Read as a clause that counts for nothing instead, the group would
-    -- have no clause left and the warning would suggest the one clause
+    -- Read as a clause that counts for nothing instead, only the keyed
+    -- clause would be left and the warning would suggest the one clause
     -- with both inputs' names.
     ws <- clauseWarnings $ Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"
@@ -690,7 +747,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f 0           Red   IS 1"
       , "DECIDE f (EXACTLY n) Green IS 2"
       ]
-    missingClauses ws `shouldBe` ["DECIDE `f` n Red IS", "DECIDE `f` n Blue IS"]
+    missingClauses ws `shouldBe` ["DECIDE `f` 0 Blue IS", "DECIDE `f` n Red IS", "DECIDE `f` n Blue IS"]
 
   it "leaves out a clause with EXACTLY of a constant on a number input, which only the input's name can cover" $ do
     ws <- clauseWarnings $ Text.unlines
@@ -730,9 +787,10 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     ws <- clauseWarnings cross
     missingClauses ws `shouldBe` ["DECIDE `f` n k IS"]
 
-  it "suggests the clause for every other number alone, however many keys" $ do
-    -- The keyed clauses are left out, so the one clause for every other
-    -- number is all that is open, for sixty-three keys and for sixty-four.
+  it "lists sixty-three keyed gaps, and for sixty-four keys only the clause for every other number" $ do
+    -- Sixty-four keys and the clause for the rest would be sixty-five
+    -- clauses, over the cap; the warning then lists what the clauses
+    -- without a number leave open, which here is everything.
     let tshow = Text.pack . show
         keyed :: Int -> Text
         keyed k = Text.unlines $
@@ -744,12 +802,14 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
           ]
           <> [ "DECIDE f " <> tshow i <> " Basic IS " <> tshow i | i <- [1 .. k] ]
     sixtyThree <- clauseWarnings (keyed 63)
-    missingClauses sixtyThree `shouldBe` ["DECIDE `f` n t IS"]
+    missingClauses sixtyThree `shouldBe`
+      [ "DECIDE `f` " <> tshow i <> " Premium IS" | i <- [1 .. 63 :: Int] ] <> ["DECIDE `f` n t IS"]
     sixtyFour <- clauseWarnings (keyed 64)
     missingClauses sixtyFour `shouldBe` ["DECIDE `f` n t IS"]
 
   it "still lists sixty-four missing enumeration values, and none for sixty-five" $ do
-    -- The enumeration control: the cap silences the group as before.
+    -- The enumeration control: no number, so no coarse tier to fall back
+    -- on, and the cap silences the group as before.
     let tshow = Text.pack . show
         big :: Int -> Text
         big k = Text.unlines $
@@ -808,9 +868,8 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
     missingClauses nine `shouldBe` ["DECIDE `pick` " <> Text.unwords (replicate 9 "Blue") <> " IS"]
 
   it "suggests the one clause with every input's name for a group keyed on each number input in turn" $ do
-    -- The same table over numbers: every clause has a number, so none is
-    -- counted, and the clause for every other number of every input is the
-    -- one missing.
+    -- The same table over numbers: under each key the rest is covered, and
+    -- the clause for every other number of every input is the one missing.
     let tshow = Text.pack . show
         pick :: Int -> Text
         pick k = Text.unlines $
