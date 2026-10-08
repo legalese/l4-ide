@@ -4311,8 +4311,9 @@ data ClauseVerdict
 
 -- | A number, a piece of text, @EXACTLY@ of either, @EXACTLY@ of a value of
 -- the input's type and @EXACTLY@ of the input's own name are all read
--- exactly. Any other @EXACTLY@ (@EXACTLY someConstant@, @EXACTLY (n PLUS 1)@)
--- compares the input with a value the analysis cannot name:
+-- exactly. Any other @EXACTLY@ (@EXACTLY someConstant@,
+-- @EXACTLY (someConstant PLUS 1)@) compares the input with a value the
+-- analysis cannot name:
 --
 -- * in a column of numbers or text, the clause counts for nothing. Of the
 --   infinitely many values of that column it matches one per value of the
@@ -4324,6 +4325,16 @@ data ClauseVerdict
 -- * in any other column, the group is not analysed, as before: the value is
 --   one of finitely many, and reading it either way would mis-report.
 --
+-- "One per value of the other columns" holds only of a value that does not
+-- depend on the column's own input, so an @EXACTLY@ whose expression
+-- mentions that input, at any depth (@EXACTLY (n PLUS 0)@ matches every
+-- @n@, @EXACTLY (n TIMES 0)@ only @0@), stands the group down instead:
+-- dropping it would report a gap that is not there, and the clause pasted
+-- for it would never be used. An expression that mentions only the rule's
+-- OTHER inputs (@EXACTLY (m PLUS 1)@, or @EXACTLY a@ in the column after
+-- @a@) still matches one value of this column per value of theirs, so it
+-- counts for nothing, as a constant does.
+--
 -- The top-level columns are classified by their types after substitution,
 -- never by the pattern's annotation, which 'quietly' re-resolution leaves
 -- unsubstituted; a nested position has only its annotation, and an
@@ -4334,19 +4345,20 @@ clauseVerdict ei ctorSets colTypes colScruts pats =
   where
     top colTy scrutR = \ case
       PatExpr _ (Var _ r) | r `sameResolved` scrutR -> ClauseCounts
-      p -> nested (Just colTy) p
-    nested mty = \ case
+      p -> nested scrutR (Just colTy) p
+    nested scrutR mty = \ case
       PatVar {}           -> ClauseCounts
       PatLit {}           -> ClauseCounts
-      PatApp _ _ ps       -> maximum (ClauseCounts : map (\ p -> nested (annoType p) p) ps)
-      PatCons _ p1 p2     -> max (nested (annoType p1) p1) (nested (annoType p2) p2)
+      PatApp _ _ ps       -> maximum (ClauseCounts : map (\ p -> nested scrutR (annoType p) p) ps)
+      PatCons _ p1 p2     -> max (nested scrutR (annoType p1) p1) (nested scrutR (annoType p2) p2)
       PatExpr _ (Lit {})  -> ClauseCounts
       PatExpr a (Var _ r)
         | Just (_, KnownTerm cty Constructor) <- Map.lookup (getUnique r) ei
         , Just tyUnique <- resultTypeHeadUnique cty
         , Map.member tyUnique ctorSets
         -> if isJust (view annInfo a) then ClauseCounts else BailGroup
-      PatExpr {}
+      PatExpr _ e
+        | any (sameResolved scrutR) (toList e) -> BailGroup
         | Just ty <- mty, isPrimitiveType ty -> ClauseCoversNothing
         | otherwise -> BailGroup
     annoType p = case view annInfo (getAnno p) of
