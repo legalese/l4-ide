@@ -106,7 +106,7 @@ Clauses after the first are reached only when the earlier ones do not match, lik
 
 ## Missing cases
 
-When the clauses match only some of the values of an enumeration, or only one of `TRUE` and `FALSE`, `l4 check` warns and lists the clauses still needed.
+When the clauses match only some of the values of an enumeration, or only one of `TRUE` and `FALSE`, or match particular numbers or texts with no clause for the rest, `l4 check` warns and lists the clauses still needed.
 For this `colour.l4`:
 
 ```l4
@@ -193,19 +193,28 @@ and the corresponding name in the definition is
   b (at double.l4:3:15-16)
 ```
 
+**Numbers and text.**
+A number or a piece of text matches one value, and there is no end of the others, so a group that matches numbers or texts is complete only with a clause written with the `GIVEN` name, and the warning suggests that clause.
+The other inputs of the group are still checked: with `DECIDE charge Red 0 IS 0`, `DECIDE charge Red n IS n` and `DECIDE charge Green n IS n TIMES 2`, the warning lists ``DECIDE `charge` Blue n IS``, since the clause for `0` is one value of `n`, the clause below it covers the rest of `Red`, and `Blue` is still missing.
+In a table keyed by a number, the gaps under each number come first, then the clause for every other number: `DECIDE charge 1 Basic IS 10`, `DECIDE charge level Basic IS 30` and `DECIDE charge level Premium IS 40`, over a `Tier` that also has `Gold`, list ``DECIDE `charge` 1 Gold IS`` and then ``DECIDE `charge` level Gold IS``.
+A number is written in the warning as the clauses spelled it (`1.50`, `0.1234567890123456789`), by the first clause that names it.
+`EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value: `DECIDE price (EXACTLY Red) IS 1` and `DECIDE price Green IS 2` draw the warning for `Blue`, as `Red` in place of `(EXACTLY Red)` does.
+`EXACTLY` of the input's own name, as in `DECIDE f (EXACTLY n) IS 1`, matches every input, like the bare name.
+Any other `EXACTLY` (`EXACTLY someConstant`, `EXACTLY (m PLUS 1)` with `m` another input) is a clause the check cannot count: on a number or text input it counts for nothing, since only the clause with the input's name can cover the rest of the numbers, and that clause covers it too; on an enumeration input it stops the check for the group.
+An `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, stops the check for the group on any input, since such a clause may match any number of the input's values.
+
 **Some groups are not checked for missing cases.**
-The warning above covers clauses that match values of an enumeration declared in the same file, and `TRUE` and `FALSE`.
-A group that matches numbers or text gets no warning, because there is no end to the numbers and texts that could be listed.
-That holds for the whole group: a number or a piece of text anywhere in its patterns, or an `EXACTLY` pattern, stops the check even where the other inputs are enumerations.
-With `DECIDE charge Red 0 IS 0`, `DECIDE charge Red n IS n` and `DECIDE charge Green n IS n TIMES 2`, nothing warns that `Blue` is missing; without the first clause, the warning lists ``DECIDE `charge` Blue n IS``.
-Likewise `DECIDE price (EXACTLY Red) IS 1` and `DECIDE price Green IS 2` draw no warning, where `Red` in place of `(EXACTLY Red)` draws one for `Blue`.
-Nor does a group that matches lists or `MAYBE` values, or values of an enumeration declared in another file.
+A group that matches lists or `MAYBE` values, or values of an enumeration declared in another file, gets no warning for them, not even for a number nested inside such a value: `DECIDE show NOTHING IS "none"` and `DECIDE show (JUST 0) IS "zero"` draw none.
+When every clause of such a group has a number or a piece of text in it, as `DECIDE f (JUST 0) IS "zero"` on its own does, the warning suggests the one clause with every input's name, ``DECIDE `f` m IS``, and nothing finer.
 
 The check also gives up, with no warning, when it would list more than 64 clauses, or when it takes more than 10000 steps to find them.
 Five inputs over a five-day week, with one clause for each day on all five (`DECIDE same Mon Mon Mon Mon Mon IS 1`, and so on to `Fri`), would need more than 64 clauses listed, and get no warning; the same table with four inputs lists 60.
-Nine inputs, each tested for `Red` in one clause and for `Green` in another, take more than 10000 steps and get no warning; with eight inputs the warning lists the one clause still needed.
+A clause whose patterns all match anything ends the search, so a table of nine inputs, each tested for `Red` in one clause and for `Green` in another, which used to take more than 10000 steps, lists its one missing clause, `Blue` nine times over.
+When the clauses match numbers or texts, the check does not fall silent at those limits: it lists instead only the clauses that the clauses without a number or a piece of text leave open, which for a group with no catch-all is the `GIVEN`-name clause alone, and a gap inside the table is then not listed.
+Sixty-four clauses `DECIDE f 1 Basic IS 1` to `DECIDE f 64 Basic IS 64`, over `GIVEN n IS A NUMBER` and `t IS A Tier` of `Basic` and `Premium`, would need 65 clauses listed (`1 Premium` to `64 Premium`, then `n t`), so the warning lists ``DECIDE `f` n t IS`` alone; with 63 such clauses it lists all 64.
+There is no `@nonexhaustive` in this version, so a group over numbers or texts that is partial on purpose is silenced only by a clause that matches anything.
 
-In a group that is not checked, when no clause matches, evaluation stops with an error.
+When no clause matches at run time, evaluation stops with an error.
 For this `describe.l4`:
 
 ```l4
@@ -218,7 +227,7 @@ DECIDE describe 1 IS "one"
 #EVAL describe 2
 ```
 
-`l4 check describe.l4` succeeds with no warning, and `l4 run describe.l4` reports for `describe 2`:
+`l4 check describe.l4` warns ``DECIDE `describe` n IS``; left as written, `l4 run describe.l4` reports for `describe 2`:
 
 ```
 No clause of `describe` matches these inputs.

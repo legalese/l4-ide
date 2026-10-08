@@ -174,14 +174,16 @@ Behaviour:
 Limits.
 Each is fail-open: the check gives up with no warning, and no diagnostic says that it gave up (assumed, not ruled, 2026-10-08: the user documentation names the limits instead).
 
-- A group matching numbers, text, lists (`EMPTY`, `FOLLOWED BY`), or values of a type declared in another module (such as `MAYBE` from the prelude) is not checked: main's constructor lookup does not know those constructors.
-- A number, a piece of text or an `EXACTLY` pattern anywhere in a group's patterns stops the check for the whole group, even where its other inputs are enumerations (`patternHasOpaque`).
-- More than 64 rows at any level of the analysis (`maxMissingClauses`), or more than 10000 steps (`clauseMatrixFuel`).
+- A group matching lists (`EMPTY`, `FOLLOWED BY`), or values of a type declared in another module (such as `MAYBE` from the prelude), is not checked: main's constructor lookup does not know those constructors.
+  A number or a piece of text nested inside such a value does not change that (`show NOTHING` / `show (JUST 0)` is silent), except that a group whose every clause has a number or a piece of text in it is answered by the coarse tier below with the one all-names clause (`f (JUST 0)` alone suggests ``DECIDE `f` m IS``).
+- An `EXACTLY` the analysis cannot read: on an enumeration or `BOOLEAN` input, any `EXACTLY` other than a value of the input's type or the input's own name; on any input, an `EXACTLY` whose expression mentions the input itself.
+  On a number, text or date input, an `EXACTLY` of a value the analysis cannot name (`EXACTLY someConstant`) leaves its clause out instead of stopping the group; see "Literal patterns" below.
+- More than 64 rows at any level of the analysis (`maxMissingClauses`), or more than 10000 steps (`clauseMatrixFuel`), in both tiers.
 - A pattern that does not re-check against its `GIVEN` type.
 - There is no `@nonexhaustive`, so a group cannot be marked deliberately partial.
 - #185's DMN channel (`siClauseMatrixRanges`) is not carried: main has no DMN export.
 
-Tests: `jl4-core/test/PatternClausesMissingSpec.hs` (25 cases, matching warnings by severity and rendered text): 14 from `17e944423`, including the silences for numbers, lists, `MAYBE`, an enumeration from another file and the 64-row cap; eight for clause hygiene; and three pinning the examples the reference page gives for a number anywhere, an `EXACTLY` pattern and the step limit, each with its control that warns.
+Tests: `jl4-core/test/PatternClausesMissingSpec.hs` (61 cases, matching warnings by severity and rendered text): the 14 from `17e944423` less the number silence, including the silences for lists, `MAYBE`, an enumeration from another file and the 64-row cap; eight for clause hygiene; and the literal-pattern cases listed under "Literal patterns" below, which replaced the three that pinned the former silences for a number anywhere, an `EXACTLY` pattern and the nine-input step limit.
 `jl4/tests-cli` "warns that a multi-clause DECIDE misses a case, and still succeeds" (fixture `tests-cli/fixtures/multi-clause-missing.l4`).
 
 ## Generated names, printing, editor and render (from #581)
@@ -257,7 +259,7 @@ User documentation: `doc/reference/errors/README.md` ("An @export of clauses wit
 
 ## Review round 2 (items 1, 2, 3, 5 and 6)
 
-The second review of #545 asked for six changes; item 4, literal patterns in the missing-case check, is being designed separately.
+The second review of #545 asked for six changes; item 4, literal patterns in the missing-case check, is under "Literal patterns (review round 2, item 4)" below.
 Items 1 to 3 were made for unstable first, on branch `fix/clause-group-round3` (`64e917f1d`, `cdd3e5515`, `cb1167363`), and item 5 is legalese/l4-ide#591 (`635507a96`); none of these commits is on this branch.
 
 Item 1, overloads.
@@ -291,3 +293,36 @@ Item 6: the `l4 render` test in `jl4/tests-cli` drops carriage returns before ma
 
 Also from the review: the user documentation says clause groups are top level only and cannot have a mixfix head; this spec's source, `PATTERN-MATCHING-SPEC.md`, moved to `specs/done/`; the bench links in the ruling lines are replaced by "ruled by Meng"; and the glossary has an entry for clauses.
 Not done here, for later: literal patterns in `jl4-mlir`, which compile as "always matches"; semantic tokens and go-to-definition inside a clause group; and the release notes.
+
+## Literal patterns (review round 2, item 4)
+
+The reviewer's item 4: let the missing-case check cope with number and text patterns instead of giving up (`hasOpaque`).
+Designed in the session's `scratchpad/clause-literals/wf-finalDesign.md`, critiqued adversarially there (`wf-soundness.md`, `wf-fit.md`), built on unstable first (branch `fix/clause-literals`, five commits ending at `483b29175`, on unstable's guard model) and then here on main's own engine (ruling M1).
+
+What changed, 2026-10-09:
+
+- `coveragePattern` (`TypeCheck.hs:1168`) reads a number or a piece of text, bare or under `EXACTLY`, as one value of its column (`CovLit`, keyed by `LitKey`, `:1120`: `1` and `1.0` are one key, as the evaluator compares them); `EXACTLY` of a value of the column's type as that value; `EXACTLY` of the column's own input as a wildcard; any other `EXACTLY` as a clause that counts for nothing on a number, text or date input (`isPrimitiveType`), and as a bail on any other input, or on any input when its expression mentions the input itself.
+  The top-level column is classified by its type after substitution; a nested position by its annotation, and an inference variable there bails.
+  `hasOpaque` and `patternHasOpaque` are gone.
+- `uncoveredRows` (`:1267`) takes the column count, so that no rows at all yield the one all-wildcard row; a row of wildcards ends the recursion; a column of numbers or text recurses into each key the rows name, in the order the rows first name them, and then into the wildcard rows for the rest of the column, which renders as the input's name (`renderRow`).
+  Two tiers: the exact partition, and when that bails (the cap, the fuel, or a constructor it cannot enumerate below a key) the same engine over the rows without a number or a piece of text, with fresh fuel.
+- `prettyMissingPattern` (`:4218`) prints a literal as its clause spelled it, from the token on its annotation (`literalAsWritten`, `:4241`): `1.50` stays `1.50`, and `0.1234567890123456789` keeps every digit, where `prettyRatio` rounds past sixteen.
+- `settleOneClause` (`:653`): a one-clause group with a number in it now gets a verdict, so its CONSIDER warnings are withdrawn.
+
+Decisions, all assumed, not ruled, 2026-10-09, each kept so that it can be reverted alone:
+
+- M-A: the exact partition when it fits, keyed gaps first and then the row with the input's name (`charge 1 Basic` / `level Basic` / `level Premium`, over a `Tier` that also has `Gold`, lists `1 Gold` then `level Gold`).
+- M-B: no redundancy analysis on main, so ruling M1's condition stands: `g 0` / `g 0` / `g n`, `h 1` / `h 1.0`, and a clause after `EXACTLY n` draw no warning here, where unstable reports each as never used.
+- M-C: the warning text is unchanged when the coarse tier answers; the user documentation says that a gap inside the table is then not listed.
+- M-D: a hand-written `CONSIDER` over a number or a piece of text still gets no warning (`checkConsider`'s gates are untouched), and the user documentation says that the two spellings of one rule differ; waits on Meng's word GANDER.
+- Beyond the design: an `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, which matches every `n`, stands the group down on any input, because the design's argument for leaving such a clause out (it matches one value of the column per value of the other columns) does not hold for it; by the algorithm as designed, `f (EXACTLY (n PLUS 0))` / `f 0` would have suggested `f n`, a clause that would never be used.
+
+Measured on this build, in `jl4-core/test/PatternClausesMissingSpec.hs` and the probes under the session's `scratchpad/clause-literals/impl-main/`:
+
+- The cap: 63 keys × `Basic` over `Tier` list the 63 keyed rows and `n t`; 64 keys would list 65, over the cap, so the coarse tier lists `n t` alone; the enumeration control (E1..E64 × `Basic`) still lists 64 rows and falls silent at 65.
+- The fuel: a row of wildcards ends the recursion, so the nine-input `pick` table (each input tested for `Red` in one clause and for `Green` in another), which used to run out of steps, lists `Blue` nine times, and its twin over numbers lists `n1 … n9`; a cross table of 100 keys on each of two inputs lists `n k`.
+  None of the tests reaches the 10000-step limit on this build; it is kept as a guard.
+- Residues against unstable, all predicted by the design: `MAYBE` and `LIST` values are not analysed here (`show NOTHING` / `show (JUST 0)` is silent; `f (JUST 0)` alone suggests `f m`, where unstable lists `NOTHING` and `(JUST `\_`)`); the one-clause `f Red (JUST x)` keeps its CONSIDER warning (`WHEN Green THEN`, `WHEN Blue THEN`), where unstable lists three clauses; `@nonexhaustive` is a lexer error here.
+  Not predicted, and cosmetic: unstable prints keyed rows and enumeration rows in the reverse order (`63 Premium` … `1 Premium`; `Blue n` before `Red n`).
+
+Corpus: `ok/pattern-matching-literal-clauses.l4` is new, with this tree's goldens recording only its `#EVAL`s; `ok/pattern-matching-one-clause-fallback.l4`'s number example became the `MAYBE` one; `not-ok/tc/pattern-matching-export-without-given.l4`'s golden gains the warning for `discount 0`.
