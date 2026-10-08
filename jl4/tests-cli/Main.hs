@@ -144,6 +144,11 @@ batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 
+-- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
+batchLineBreakFixture, batchLineBreakJson :: FilePath
+batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
+batchLineBreakJson    = fixtureDir </> "batch-string-line-break.json"
+
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
 batchAssumeDirectFixture, batchAssumeHelperFixture, batchAssumeFullJson, batchAssumeMissingJson :: FilePath
@@ -1437,6 +1442,17 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "keeps a line break inside a string literal as it is written" $ do
+      -- batch runs the re-printed module; before #1028 the newline came back
+      -- followed by the body's indentation ("line\\n  next"), status success.
+      Output code sout _ <- runL4 bin ["batch", batchLineBreakFixture, "--inputs", batchLineBreakJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [broken, tabbed] -> do
+          broken `shouldSatisfy` ("\"result\":\"line\\nnext\"" `isInfixOf`)
+          tabbed `shouldSatisfy` ("\"result\":\"tab\\there\"" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
       -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
