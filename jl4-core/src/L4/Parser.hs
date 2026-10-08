@@ -32,6 +32,7 @@ module L4.Parser (
   execProgramParserWithHints,
   execProgramParserForTokensWithHints,
   execProgramParserWithHintPass,
+  execProgramParserWithHintPassUnmemoised,
 ) where
 
 import Base
@@ -39,6 +40,7 @@ import Base
 import qualified Control.Applicative as Applicative
 import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List.Extra as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -48,6 +50,7 @@ import GHC.Records
 import Optics
 import Text.Megaparsec hiding (parseTest)
 import qualified Text.Megaparsec.Char.Lexer as Lexer
+import qualified Text.Megaparsec.Internal as Megaparsec
 import Text.Pretty.Simple
 
 import L4.Annotation
@@ -61,7 +64,11 @@ import qualified Generics.SOP as SOP
 import L4.Parser.Anno
 import L4.Parser.MixfixRegistry
 
-type Parser = ReaderT Env (StateT PState (Parsec Void TokenStream))
+-- | The memo of bracketed groups ('GroupMemo') sits BELOW megaparsec, where
+-- backtracking cannot roll it back: a group parsed inside an alternative that
+-- then fails stays parsed. Everything above megaparsec ('Env', 'PState') is
+-- rolled back with the parser state, as before.
+type Parser = ReaderT Env (StateT PState (ParsecT Void TokenStream (StateT GroupMemo Identity)))
 
 data Env = Env
   { moduleUri :: NormalizedUri
@@ -76,9 +83,19 @@ data Env = Env
     -- parenthesised. Set by 'deadline' and 'opening'; reset by 'paren' and
     -- inside the anchor itself ('inExprSlot'). Everywhere else it is
     -- 'False' — including inside a @BEFORE@, which takes no anchor.
+    --
+    -- This is the only field any parser changes with 'local', which is why
+    -- 'memoGroup' keys on it and on nothing else of the 'Env'.
+  , memoiseGroups :: Bool
+    -- ^ Does 'memoGroup' memoise? 'True' for every parse the tools run.
+    -- 'False' parses a bracketed group afresh wherever it is reached, as the
+    -- parser did before MATRYOSHKA, in time exponential in how deeply groups
+    -- nest. It exists so that a test can check that the memo changes nothing
+    -- ('execProgramParserWithHintPassUnmemoised'). Fixed for a whole run.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
+-- | Only ever prepended to, and read only once the parse is over: 'memoGroup' replays a group's additions on that basis.
 data PState = PState
   { comments :: [Comment]
   , nlgs :: [Nlg]
@@ -1393,6 +1410,107 @@ paren p =
 inExprSlot :: Parser a -> Parser a
 inExprSlot = local \ e -> e { ofIsAnchor = False }
 
+-- | A bracketed expression, @(e)@, parsed at most once per position: see
+-- 'memoGroup'.
+parenExpr :: Parser (Expr Name)
+parenExpr = memoGroup #exprGroups (paren expr)
+
+-- | A bracketed pattern, @(p)@, parsed at most once per position: see
+-- 'memoGroup'.
+parenPattern :: Parser (Pattern Name)
+parenPattern = memoGroup #patternGroups (paren pattern')
+
+-- | Every outcome 'memoGroup' has recorded in one run of the parser, by
+-- position. It lives below megaparsec in the 'Parser' stack, so backtracking
+-- does not discard it.
+data GroupMemo = MkGroupMemo
+  { exprGroups :: !(IntMap.IntMap (GroupReply (Expr Name)))
+  , patternGroups :: !(IntMap.IntMap (GroupReply (Pattern Name)))
+  }
+  deriving stock Generic
+
+emptyGroupMemo :: GroupMemo
+emptyGroupMemo = MkGroupMemo IntMap.empty IntMap.empty
+
+-- | Everything one parse of a group came to, as megaparsec reports it: the
+-- state it left (offset, input, delayed errors), whether it consumed input,
+-- and either the value with its hints and the annotations it collected, or
+-- the error. 'Megaparsec.runParsecT' produces it and 'memoGroup' replays it.
+type GroupReply a = Megaparsec.Reply Void TokenStream (a, PState)
+
+-- | @memoGroup table p@ behaves exactly as @p@, but parses at most once at
+-- each position, for each value of 'ofIsAnchor' (MATRYOSHKA,
+-- smucclaw/l4-ide#1017).
+--
+-- __Why.__ A bracketed group can be parsed more than once at the same
+-- position, by two alternatives that both start with it. In pattern position
+-- the group is tried as a pattern and then as an expression
+-- ('parenPatternOrExpr'); when it holds a @CONSIDER@ or a @MUST@ whose own
+-- pattern slot holds the next bracket, the failed pattern attempt has already
+-- parsed the inner group, and the expression reading parses it again. Nested,
+-- that doubles with every level. Here the second parse of a group at a
+-- position replays the first.
+--
+-- __Why replaying is exact.__ The first parse runs @p@ to completion with
+-- 'Megaparsec.runParsecT', which records everything megaparsec would have
+-- handed on to what follows: the state @p@ left, whether it consumed input,
+-- and its value and hints or its error. Replaying hands exactly that on, to
+-- the same continuations. That gives the same answer as parsing again
+-- because what @p@ does depends on nothing but the position and
+-- 'ofIsAnchor', which together are the key:
+--
+--   * the input at a position is always the same, because the stream only
+--     ever advances by dropping the tokens consumed (and their text), and no
+--     parser sets the input;
+--
+--   * the source position cached in the state ('statePosState') is read
+--     from the tokens themselves by a token stream's 'reachOffset', so every
+--     position a parser asks for is the same after a replay. Two parts of
+--     it do depend on what was reached before. Its line prefix is read only
+--     when an error bundle is rendered, and the bundle is rendered from the
+--     run's initial state. Its offset must never move backwards
+--     ('reachOffset' splits the tokens at the distance from it), and a
+--     replayed state was only advanced to offsets at or below the group's
+--     end, which is where parsing resumes;
+--
+--   * of the 'Env', only 'ofIsAnchor' is ever changed with 'local'; the
+--     module's URI and the mixfix hints are fixed for a whole run, and so is
+--     this memo, which a run starts empty ('runJl4Parser');
+--
+--   * nothing reads the collected annotations ('PState') or megaparsec's
+--     delayed errors while parsing; they are only ever added to, at the
+--     front. So @p@ runs with both empty, and what it added is put in front
+--     of what was there, which is what running it with them would have made.
+--
+-- Nothing fails loudly when one of these stops being true: the memo would
+-- replay a wrong syntax tree or a wrong error, with no other symptom. So
+-- jl4-test parses its whole corpus with the memo on and off ('memoiseGroups')
+-- and requires the same answer ("parser memo changes nothing"), and
+-- jl4-core-test does the same on nests that replay often
+-- (NestedParenParserSpec).
+memoGroup :: Lens' GroupMemo (IntMap.IntMap (GroupReply a)) -> Parser a -> Parser a
+memoGroup table p =
+  ReaderT \ env ->
+    if env.memoiseGroups
+      then memoised env
+      else runReaderT p env
+  where
+    memoised env = StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
+      let key = 2 * s.stateOffset + fromEnum env.ofIsAnchor
+      known <- gets (IntMap.lookup key . view table)
+      Megaparsec.Reply s' consumption result <- case known of
+        Just reply -> pure reply
+        Nothing -> do
+          reply <- Megaparsec.runParsecT (runStateT (runReaderT p env) mempty) s { stateParseErrors = [] }
+          modify' (over table (IntMap.insert key reply))
+          pure reply
+      let s'' = s' { stateParseErrors = s'.stateParseErrors ++ s.stateParseErrors }
+      case (consumption, result) of
+        (Megaparsec.Consumed, Megaparsec.OK hs (a, added)) -> cok (a, added <> outer) s'' hs
+        (Megaparsec.Consumed, Megaparsec.Error err) -> cerr err s''
+        (Megaparsec.NotConsumed, Megaparsec.OK hs (a, added)) -> eok (a, added <> outer) s'' hs
+        (Megaparsec.NotConsumed, Megaparsec.Error err) -> eerr err s''
+
 -- We don't actually currently allow parsing an optional name
 optionallyNamedType :: Parser (OptionallyNamedType Name)
 optionallyNamedType = do
@@ -1816,14 +1934,24 @@ keywordAlignedWith allowNextLine MkExprLineInfo{..} MkSrcPos{line = tokLine, col
 -- a line-aware postfix parser. This is used for mixfix postfix operators
 -- which must be on the same line as the base expression.
 postfixPWithLine :: (HasAnno a, HasSrcRange a) => (ExprLineInfo -> Parser (a -> a)) -> Parser (a -> a) -> Parser a -> Parser a
-postfixPWithLine lineAwareOps regularOps p = do
-  a <- p
-  let exprRange = rangeOf a <|> (getAnno a).range
-      exprInfo = exprLineInfoWithFallback defaultExprLineInfo exprRange Nothing
+postfixPWithLine lineAwareOps regularOps p =
+  p >>= postfixAfter lineAwareOps regularOps
+
+-- | The postfix half of 'postfixPWithLine', on an operand that has already
+-- been parsed: at most one postfix operator.
+postfixAfter :: (HasAnno a, HasSrcRange a) => (ExprLineInfo -> Parser (a -> a)) -> Parser (a -> a) -> a -> Parser a
+postfixAfter lineAwareOps regularOps a = do
+  let exprInfo = postfixLineInfo a
   mf <- optional (try (lineAwareOps exprInfo) <|> try regularOps)
   case mf of
     Nothing -> pure a
     Just f -> pure $ f a
+
+-- | Where an operand ends, as the postfix operators see it.
+postfixLineInfo :: (HasAnno a, HasSrcRange a) => a -> ExprLineInfo
+postfixLineInfo a =
+  let exprRange = rangeOf a <|> (getAnno a).range
+  in  exprLineInfoWithFallback defaultExprLineInfo exprRange Nothing
 
 type Prio = Int
 data Assoc = AssocLeft | AssocRight
@@ -1875,8 +2003,37 @@ regularPostfixOperator =
 -- if the postfix operator is on the same line.
 -- e.g., `50 `percent`` becomes `App anno percent [50]`
 -- We use `try` because if this is actually a binary operator (followed by
-mixfixPostfixOp :: ExprLineInfo -> Parser (Expr Name -> Expr Name)
-mixfixPostfixOp exprLineInfo = hidden $ try $ do
+--
+-- @notFollowedByOperand@ answers the one question 'mixfixPostfixHead' leaves
+-- open: is the keyword followed, on the line its argument ends (which it is
+-- given), by an operand of its own, which would make it infix rather than
+-- postfix? It must succeed exactly when there is no such operand. Neither
+-- caller parses that operand to find out, because parsing it here and again
+-- as the infix operand is exponential when operands nest (MATRYOSHKA): see
+-- 'postfixOrInfix' and 'genitiveAhead'.
+mixfixPostfixOpWith :: (Int -> Parser ()) -> ExprLineInfo -> Parser (Expr Name -> Expr Name)
+mixfixPostfixOpWith notFollowedByOperand exprLineInfo = hidden $ try $ do
+  (eN, sameLine) <- mixfixPostfixHead exprLineInfo
+  unless sameLine $ do
+    nextAfterKeyword <- optional (lookAhead (spaceOrAnnotations *> anySingle))
+    let allowsPostfixNewline =
+          case (exprLineInfo.exprIndentColumn, nextAfterKeyword) of
+            (_, Nothing) -> True
+            (Just indent, Just peekTok) -> peekTok.range.start.column < indent
+            _ -> False
+    guard allowsPostfixNewline
+  -- Check that this is NOT followed by an expression ON THE SAME LINE
+  -- (which would make it infix). Expressions on subsequent lines don't count.
+  notFollowedByOperand exprLineInfo.exprEndLine
+  let funcName = eN.payload
+      op = mkSimpleEpaAnno eN
+  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
+
+-- | The guards of a mixfix postfix operator, and its keyword, with whether
+-- the keyword is on the line where its argument ends. 'mixfixPostfixOpWith'
+-- and 'infixAhead' both start here, and must agree on it.
+mixfixPostfixHead :: ExprLineInfo -> Parser (Epa Name, Bool)
+mixfixPostfixHead exprLineInfo = do
   hints <- asks (.mixfixHints)
   let allowNextLine = hasMixfixHints hints
   -- Peek at the next token to check its line number
@@ -1895,26 +2052,7 @@ mixfixPostfixOp exprLineInfo = hidden $ try $ do
   let candidateRaw = rawName eN.payload
   when (hasMixfixHints hints) $
     guard (isKnownMixfixKeyword candidateRaw hints)
-  unless sameLine $ do
-    nextAfterKeyword <- optional (lookAhead (spaceOrAnnotations *> anySingle))
-    let allowsPostfixNewline =
-          case (exprLineInfo.exprIndentColumn, nextAfterKeyword) of
-            (_, Nothing) -> True
-            (Just indent, Just peekTok) -> peekTok.range.start.column < indent
-            _ -> False
-    guard allowsPostfixNewline
-  -- Check that this is NOT followed by an expression ON THE SAME LINE
-  -- (which would make it infix). Expressions on subsequent lines don't count.
-  notFollowedBy (sameLineExpr exprLineInfo.exprEndLine)
-  let funcName = eN.payload
-      op = mkSimpleEpaAnno eN
-  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
-  where
-    -- A parser that only succeeds if there's a base expression on the same line
-    sameLineExpr line = do
-      tok <- lookAhead anySingle
-      guard (tok.range.start.line == line)
-      baseExpr'
+  pure (eN, sameLine)
 
 opToken :: TokenType -> Parser Anno
 opToken t =
@@ -1950,8 +2088,64 @@ postfix :: HasSrcRange (a n) => (Anno -> a n -> a n) -> Lexeme PosToken -> a n -
 postfix f op l =
   f (fixAnnoSrcRange $ mkHoleAnnoFor l <> mkSimpleEpaAnno (lexToEpa op)) l
 
-baseExpr :: Parser (Expr Name)
-baseExpr = postfixPWithLine mixfixPostfixOp regularPostfixOperator baseExpr'
+-- | A same-line mixfix keyword and the operand after it, found by
+-- 'postfixOrInfix' and already parsed: the keyword, the layout of the
+-- operand's first token (what 'peekNextTokenLayout' reports there), and the
+-- operand as 'baseExpr'' parsed it, before any postfix operator.
+data InfixAhead = MkInfixAhead (Epa Name) ExprLineInfo (Expr Name)
+
+-- | A base expression and at most one postfix operator; or, when a same-line
+-- mixfix keyword with an operand after it follows the base expression, the
+-- base expression and that keyword and operand ('InfixAhead').
+-- 'mixfixChainExprNextLine', the only caller, continues the chain from an
+-- 'InfixAhead' exactly as it would have from the keyword.
+baseExprStep :: Parser (Expr Name, Maybe InfixAhead)
+baseExprStep = baseExpr' >>= postfixOrInfix
+
+-- | The postfix half of 'baseExprStep', on a base expression already parsed.
+--
+-- __Why the operand is parsed here (MATRYOSHKA).__ In @a kw b@, a keyword
+-- @kw@ that passes the postfix guards is still not a postfix operator when an
+-- operand @b@ follows it on the same line: then it is infix, and the chain
+-- needs @b@. This used to be decided by parsing @b@ inside a 'notFollowedBy'
+-- and then, when that succeeded, parsing @b@ again as the chain's operand.
+-- Nested, that doubles per level: @1 `plus` (1 `plus` (1 `plus` 1))@ nested
+-- ten deep took more than a minute. 'infixAhead' parses @b@ once and keeps it.
+--
+-- When 'infixAhead' fails, the operand look-ahead of the postfix reading is
+-- certain to fail too, so the postfix reading skips it. Both start with
+-- 'mixfixPostfixHead', and after it 'infixAhead' fails only where that
+-- look-ahead fails: the keyword is not on the argument's last line, no token
+-- follows the keyword on that line, or 'baseExpr'' fails there.
+--
+-- And when 'infixAhead' succeeds, the chain is certain to take the keyword:
+-- for a keyword on the argument's last line, 'mixfixKeywordAligned' checks
+-- what 'mixfixPostfixHead' checked, against the same line (both compute it
+-- from the argument's range, and the head fails when it has none).
+postfixOrInfix :: Expr Name -> Parser (Expr Name, Maybe InfixAhead)
+postfixOrInfix a = do
+  mAhead <- optional (infixAhead (postfixLineInfo a))
+  case mAhead of
+    Just ahead -> pure (a, Just ahead)
+    Nothing -> do
+      a' <- postfixAfter (mixfixPostfixOpWith (\ _ -> pure ())) regularPostfixOperator a
+      pure (a', Nothing)
+
+-- | A mixfix keyword on the line where the argument ends, and the base
+-- expression after it on that line.
+--
+-- Like the look-ahead it replaces, it fails without consuming input or
+-- leaving hints: the keyword's guards are 'hidden', and every later failure
+-- happens past the keyword, so 'optional' discards it.
+infixAhead :: ExprLineInfo -> Parser InfixAhead
+infixAhead exprLineInfo = try $ do
+  (kw, sameLine) <- hidden (mixfixPostfixHead exprLineInfo)
+  guard sameLine
+  tok <- lookAhead anySingle
+  guard (tok.range.start.line == exprLineInfo.exprEndLine)
+  operandLayout <- peekNextTokenLayout
+  operand <- baseExpr'
+  pure (MkInfixAhead kw operandLayout operand)
 
 -- | Parse a mixfix chain expression.
 -- After parsing a base expression, if it's followed by a backticked keyword,
@@ -1995,7 +2189,7 @@ mixfixChainExprNextLine nextLineOk = do
   hints <- asks (.mixfixHints)
   let allowNextLine = nextLineOk && hasMixfixHints hints
   firstLayoutHint <- peekNextTokenLayout
-  firstExpr <- baseExpr
+  (firstExpr, firstAhead) <- baseExprStep
   -- Compute end-line + indentation info for alignment-aware keywords.
   -- Try multiple fallbacks because rangeOf can return Nothing for some expression types:
   -- 1. rangeOf firstExpr - standard approach (fails for App with empty args)
@@ -2006,7 +2200,12 @@ mixfixChainExprNextLine nextLineOk = do
         exprLineInfoWithFallback firstLayoutHint exprRange Nothing
   -- Try to parse a mixfix chain starting with a backticked keyword
   -- The keyword must be on the same line or aligned with the first expression
-  mChain <- optional $ try (mixfixChainCont allowNextLine hints firstExprInfo)
+  -- When 'baseExprStep' has already parsed a same-line keyword and its
+  -- operand, the chain starts from them; see 'postfixOrInfix' for why the
+  -- keyword is certain to be one 'mixfixChainCont' would have taken.
+  mChain <- case firstAhead of
+    Just ahead -> Just <$> mixfixChainFrom allowNextLine hints ahead
+    Nothing -> optional $ try (mixfixChainCont allowNextLine hints firstExprInfo)
   case mChain of
     Nothing -> pure firstExpr
     Just (firstKeyword, firstArg, moreKwArgs) ->
@@ -2037,23 +2236,38 @@ mixfixChainExprNextLine nextLineOk = do
     mixfixChainCont allowNextLine hints prevInfo = do
       firstKw <- mixfixKeywordAligned allowNextLine hints prevInfo
       firstArgLayout <- peekNextTokenLayout
-      firstArg <- baseExpr
+      (firstArg, ahead) <- baseExprStep
       let firstArgInfo = advanceInfo firstArgLayout firstArg
-      rest <- gatherChain allowNextLine hints firstArgInfo
+      rest <- gatherChain allowNextLine hints firstArgInfo ahead
       pure (firstKw, firstArg, rest)
 
-    gatherChain :: Bool -> MixfixHintRegistry -> ExprLineInfo -> Parser [(Epa Name, Expr Name)]
-    gatherChain allowNextLine hints info = do
+    -- 'mixfixChainCont' from a keyword and operand 'baseExprStep' has
+    -- already parsed: the operand still takes its postfix step.
+    mixfixChainFrom :: Bool -> MixfixHintRegistry -> InfixAhead -> Parser (Epa Name, Expr Name, [(Epa Name, Expr Name)])
+    mixfixChainFrom allowNextLine hints (MkInfixAhead firstKw firstArgLayout operand) = do
+      (firstArg, ahead) <- postfixOrInfix operand
+      let firstArgInfo = advanceInfo firstArgLayout firstArg
+      rest <- gatherChain allowNextLine hints firstArgInfo ahead
+      pure (firstKw, firstArg, rest)
+
+    -- The next (keyword, operand) pair: the one an operand's 'baseExprStep'
+    -- already parsed, if any, else one found here.
+    gatherChain :: Bool -> MixfixHintRegistry -> ExprLineInfo -> Maybe InfixAhead -> Parser [(Epa Name, Expr Name)]
+    gatherChain allowNextLine hints _ (Just (MkInfixAhead kw argLayout operand)) = do
+      (arg, ahead) <- postfixOrInfix operand
+      let nextInfo = advanceInfo argLayout arg
+      ((kw, arg) :) <$> gatherChain allowNextLine hints nextInfo ahead
+    gatherChain allowNextLine hints info Nothing = do
       mNext <- optional . try $ do
         kw <- mixfixKeywordAligned allowNextLine hints info
         argLayout <- peekNextTokenLayout
-        arg <- baseExpr
+        (arg, ahead) <- baseExprStep
         let nextInfo = advanceInfo argLayout arg
-        pure ((kw, arg), nextInfo)
+        pure ((kw, arg), nextInfo, ahead)
       case mNext of
         Nothing -> pure []
-        Just ((kw, arg), nextInfo) ->
-          ((kw, arg) :) <$> gatherChain allowNextLine hints nextInfo
+        Just ((kw, arg), nextInfo, ahead) ->
+          ((kw, arg) :) <$> gatherChain allowNextLine hints nextInfo ahead
 
     -- Parse a mixfix keyword only if it's aligned with the specified anchor.
     -- Accepts both backticked names (`plus`) and bare identifiers (plus)
@@ -2129,7 +2343,7 @@ baseExpr' =
   <|> try bulletBlock   -- offside '•' bullet list (guarded; 0-cost on miss)
   <|> list
   <|> letInExpr
-  <|> paren expr
+  <|> parenExprOrProjection  -- (e), and (e)'s f: see 'projection'
 
 event :: Parser (Expr Name)
 event = attachAnno $ Event emptyAnno <$> annoHole parseEvent
@@ -2155,14 +2369,11 @@ parseEvent =
       annoLexeme (spacedKeyword_ TKAt)
       *> annoHole expr
 
-atomicExpr :: Parser (Expr Name)
-atomicExpr = postfixPWithLine mixfixPostfixOp regularPostfixOperator atomicExpr'
-
 atomicExpr' :: Parser (Expr Name)
 atomicExpr' =
       lit
   <|> nameAsApp App
-  <|> paren expr
+  <|> parenExpr
 
 nameAsApp :: (HasField "range" (AnnoToken b) SrcRange, HasAnno b, HasSrcRange a) => (Anno -> Name -> [a] -> b) -> Parser b
 nameAsApp f =
@@ -3116,19 +3327,24 @@ atomicPattern =
 -- pattern reading is tried first, so @MUST pay (Money 1000 "USD")@ — a
 -- constructor application — keeps its existing pattern semantics exactly.
 --
--- __The cost__ is one @try@ over the bracketed group: when the group is not a
--- well-formed pattern, its tokens are scanned twice. The bound on the wasted
--- scan is the bracketed group itself, not the rule or the file, because the
--- @try@ cannot reach past the closing bracket it failed to find. Only a group
--- that /fails/ as a pattern pays it, and such a group is an outright parse
--- error today.
---
 -- An unbracketed operator expression (@MUST pay price PLUS 50@) is still not
 -- admitted, and deliberately: argument juxtaposition would make it ambiguous.
+--
+-- __The cost__ (MATRYOSHKA). A group that is not a pattern is read twice,
+-- once as each. That compounded when the group holds a @CONSIDER@ or a
+-- @MUST@ whose own pattern slot holds the next bracket, as in
+-- @((CONSIDER x WHEN (…) THEN …) PLUS 1)@: the failed pattern attempt had
+-- already parsed the inner bracket, and the expression reading parsed it
+-- again, so the time doubled with every level (twelve levels took six
+-- seconds). Both readings now go through 'memoGroup', which keeps a separate
+-- table for each, so a bracket nested inside is parsed at most once as a
+-- pattern and at most once as an expression, and a later parse of it in the
+-- same reading replays the first. The two readings, their order, and so every
+-- parse and every error, are what they were before the memo.
 parenPatternOrExpr :: Parser (Pattern Name)
 parenPatternOrExpr =
-  try (paren pattern')
-  <|> attachAnno (PatExpr emptyAnno <$> annoHole (paren expr))
+  try parenPattern
+  <|> attachAnno (PatExpr emptyAnno <$> annoHole parenExpr)
 
 patLit :: Parser (Pattern Name)
 patLit = attachAnno $ PatLit emptyAnno <$> annoHole rawLit
@@ -3167,24 +3383,67 @@ patApp = do
 
 -- Some manual left-factoring here to prevent left-recursion
 -- TODO: the interaction between projection and application has to be properly sorted out
+--
+-- A projection whose head is a literal or a name. A parenthesised head is
+-- 'parenExprOrProjection''s (MATRYOSHKA): 'baseExpr'' tries this first, and
+-- when it was tried over a parenthesised group with no @'s@ after it, the
+-- group was parsed here, thrown away, and parsed again by the plain
+-- parenthesis alternative -- twice per level of nesting, so
+-- @((1 PLUS 1) PLUS 1)@ nested 16 deep took 15 s.
 projection :: Parser (Expr Name)
 projection =
       -- TODO: should 'TGenitive' be part of 'Name' or 'Proj'?
       -- May affect the source span of the name.
       -- E.g. Goto definition of `name's` would be affected, as clicking on `'s` would not be part
       -- of the overall name source span. It is possible to implement this, but slightly annoying.
-      (\ ae ns ->
-        foldl'
-          (\e (gen, n') ->
-            Proj (fixAnnoSrcRange $ mkHoleAnnoFor e <> mkSimpleEpaAnno (lexToEpa gen) <> mkHoleAnnoFor n')
-              e
-              n'
-          )
-          ae -- (Var (fixAnnoSrcRange $ mkHoleAnnoFor n) n)
-          ns
-      )
-  <$> atomicExpr
-  <*> some ((,) <$> spacedToken_ (TIdentifiers TGenitive) <*> name)
+      foldl' projectField
+  <$> projectionHead
+  <*> some genitiveField
+
+-- | The head of a 'projection': a literal or a name, then at most one postfix
+-- operator. A projection must go on with @'s@, so a postfix keyword here
+-- needs 'genitiveAhead' rather than an operand look-ahead.
+projectionHead :: Parser (Expr Name)
+projectionHead =
+  postfixPWithLine (mixfixPostfixOpWith genitiveAhead) regularPostfixOperator (lit <|> nameAsApp App)
+
+-- | A parenthesised expression, with the projections that follow it if any:
+-- @(e)@, @(e)'s f@, @(e)'s f's g@. The group is parsed once, and then the
+-- projections are tried after it, exactly as 'projection' would have tried
+-- them on that head: one postfix operator, then at least one @'s@.
+--
+-- The first @'s@ is 'hidden' because 'projection''s attempt left no trace
+-- when it failed -- the plain alternative after it succeeded on the same
+-- group and discarded its error -- so a missing @'s@ must not start appearing
+-- in the "expecting" list of a parse error just after a closing bracket.
+parenExprOrProjection :: Parser (Expr Name)
+parenExprOrProjection = do
+  e <- parenExpr
+  fromMaybe e <$> optional (try (projectionsAfter e))
+  where
+    projectionsAfter e = do
+      a <- postfixAfter (mixfixPostfixOpWith genitiveAhead) regularPostfixOperator e
+      f <- (,) <$> hidden (spacedToken_ (TIdentifiers TGenitive)) <*> name
+      fs <- many genitiveField
+      pure (foldl' projectField a (f : fs))
+
+genitiveField :: Parser (Lexeme PosToken, Name)
+genitiveField = (,) <$> spacedToken_ (TIdentifiers TGenitive) <*> name
+
+projectField :: Expr Name -> (Lexeme PosToken, Name) -> Expr Name
+projectField e (gen, n') =
+  Proj (fixAnnoSrcRange $ mkHoleAnnoFor e <> mkSimpleEpaAnno (lexToEpa gen) <> mkHoleAnnoFor n')
+    e
+    n'
+
+-- | The operand test of a postfix keyword in a projection's head: is it
+-- followed by @'s@? This stands in for the look-ahead that parses a whole
+-- operand ('mixfixPostfixOpWith'), and decides the projection identically:
+-- when @'s@ follows, no operand can (no expression begins with @'s@), so
+-- both accept the keyword; when it does not, the projection fails whichever
+-- way the keyword is read, because @'s@ must come next either way.
+genitiveAhead :: Int -> Parser ()
+genitiveAhead _ = void (lookAhead (plainToken (TIdentifiers TGenitive)))
 
 _example1 :: Text
 _example1 =
@@ -3363,6 +3622,7 @@ execNlgParserForTokens p uri input ts =
       { moduleUri = uri
       , mixfixHints = emptyMixfixHintRegistry
       , ofIsAnchor = False
+      , memoiseGroups = True
       }
     st = PState
       { nlgs = []
@@ -3391,7 +3651,12 @@ execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, R
 execParserForTokens = execParserForTokensWithHints mempty
 
 execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
-execParserForTokensWithHints hints p file input ts =
+execParserForTokensWithHints = execParserForTokensWith True
+
+-- | 'execParserForTokensWithHints', with 'memoGroup' on ('True') or off; see
+-- 'memoiseGroups'.
+execParserForTokensWith :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Bool -> MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWith memoise hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
@@ -3420,6 +3685,7 @@ execParserForTokensWithHints hints p file input ts =
       { moduleUri = file
       , mixfixHints = hints
       , ofIsAnchor = False
+      , memoiseGroups = memoise
       }
     st = PState
       { nlgs = []
@@ -3433,7 +3699,9 @@ execParserForTokensWithHints hints p file input ts =
 
 runJl4Parser :: Env -> PState -> Parser a -> FilePath -> TokenStream -> Either (ParseErrorBundle TokenStream Void) (a, PState)
 runJl4Parser env initState p input stream =
-  parse (runStateT (runReaderT (p <* eof) env) initState) input stream
+  evalState
+    (runParserT (runStateT (runReaderT (p <* eof) env) initState) input stream)
+    emptyGroupMemo
 
 -- ----------------------------------------------------------------------------
 -- JL4 Program parser
@@ -3469,12 +3737,32 @@ execProgramParserWithHintPass ::
   NormalizedUri ->
   Text ->
   Either (NonEmpty PError) (Module Name, MixfixHintRegistry, [Resolve.Warning])
-execProgramParserWithHintPass uri input = do
+execProgramParserWithHintPass = programParserWithHintPass True
+
+-- | 'execProgramParserWithHintPass' with 'memoGroup' switched off, so that
+-- every bracketed group is parsed afresh wherever it is reached. That takes
+-- time exponential in how deeply groups nest, and the answer must be
+-- identical: it exists for the tests that check so (see 'memoGroup').
+execProgramParserWithHintPassUnmemoised ::
+  NormalizedUri ->
+  Text ->
+  Either (NonEmpty PError) (Module Name, MixfixHintRegistry, [Resolve.Warning])
+execProgramParserWithHintPassUnmemoised = programParserWithHintPass False
+
+programParserWithHintPass ::
+  Bool ->
+  NormalizedUri ->
+  Text ->
+  Either (NonEmpty PError) (Module Name, MixfixHintRegistry, [Resolve.Warning])
+programParserWithHintPass memoise uri input = do
   ts <- execLexer uri input
-  (firstModule, _) <- execProgramParserForTokens uri input ts
+  (firstModule, _) <- programParser mempty ts
   let hints = buildMixfixHintRegistry firstModule
-  (finalModule, finalWarnings) <- execProgramParserForTokensWithHints hints uri input ts
+  (finalModule, finalWarnings) <- programParser hints ts
   pure (finalModule, hints, finalWarnings)
+  where
+    programParser hints ts =
+      (\ (m, warns, _) -> (m, warns)) <$> execParserForTokensWith memoise hints (module' uri) uri input ts
 
 -- ----------------------------------------------------------------------------
 -- Debug helpers
