@@ -1281,7 +1281,9 @@ constructorFamilies decls =
 -- at once), with fresh fuel: its rows are not an exact partition, but each
 -- is needed and pasting them completes the group. No rows at all leave
 -- everything uncovered: one row, every column a wildcard. So a column of
--- numbers or text with no catch-all always warns.
+-- numbers or text with no catch-all always warns. A group with no number
+-- or text in it has only the first tier: the second would re-run the same
+-- rows.
 --
 -- 'Nothing' bails to no warning, in both tiers: a constructor whose type's
 -- constructors are unknown, an arity that disagrees with the declaration,
@@ -1291,7 +1293,7 @@ constructorFamilies decls =
 uncoveredRows :: Map Unique [(Resolved, Int)] -> Int -> [[CoveragePattern]] -> Maybe [[CoveragePattern]]
 uncoveredRows families n rows0 =
       run rows0
-  <|> run (filter (not . any hasLit) rows0)
+  <|> (guard (any (any hasLit) rows0) *> run (filter (not . any hasLit) rows0))
   where
     run rows = evalStateT (go n rows) clauseMatrixFuel
 
