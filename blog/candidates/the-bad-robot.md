@@ -3,7 +3,7 @@ title: "From the Bad Man to the Bad Robot: Can Executable Law Constrain AI Agent
 status: draft
 date: 2026-10-08
 facet: formal-methods-in-law
-words: 2312
+words: 2491
 license: CC-BY-NC-4.0
 sources_checked: "not rechecked for this replacement"
 audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
@@ -37,6 +37,8 @@ This suggests two separate questions:
 2. Can its execution environment enforce those constraints?
 
 Giving an agent a legal checker and requiring its actions to pass through that checker are different interventions.
+
+Meng points to a useful cognitive-science parallel. In a familiar version of Wason’s selection task, a drinking-age rule makes the potential violations concrete: check drinkers’ ages and underage people’s drinks.[^griggs-cox] Cheng and Holyoak’s permission-schema account links actions to prerequisites; their findings also include facilitation by abstract permission rules.[^cheng-holyoak] Cosmides and Tooby offer a distinct social-contract account, focused on detecting benefits taken without satisfying required conditions.[^cosmides-tooby] These accounts motivate testing how rules and violation cases are presented to human reviewers; they do not establish that an executable rule improves AI compliance.
 
 ## Why law, and what needs formalizing?
 
@@ -83,6 +85,8 @@ An agent might find actions the checker accepts that defeat the underlying rule�
 Formal verification could reduce some loopholes by checking properties across all behaviors represented in a model. For example, we could specify that no sequence of permitted operations may disclose a record to an unauthorized recipient, even if each operation appears harmless alone. A model checker could search for a violating sequence and return a counterexample. A proof could establish that the property holds under explicit assumptions about the model and its inputs.
 
 This suggests an adversarial development loop: search for ways to satisfy the executable rules while violating a separately stated safety property, inspect counterexamples, and revise the rules or enforcement mechanism. Meng calls the related research direction white-hat loophole-finding. The purpose has to be specified separately: proving compliance with a rule cannot also prove that the rule achieves what its drafter wanted.
+
+Meng suggests oracle-guided synthesis as a connection to this process. Jha and colleagues synthesize loop-free programs from components by keeping candidates consistent with examples, finding inputs on which candidates disagree, and querying an input/output oracle to refine the candidates.[^oracle-guided] The analogy for adversarial requirements elicitation is to present distinguishing cases to a stakeholder and use the answers to refine a proposed rule. Unlike the synthesis setup, that does not give us an oracle whose answers are necessarily consistent or legally authoritative; those are questions the elicitation process must expose.
 
 There is an important implementation limit here. The [L4 verification documentation as of October 7, 2026](https://github.com/legalese/l4-ide/blob/7d260a4089be4689ad39eb840e388691b823dc39/doc/concepts/reviewing/reviewing-encoded-law.md) describes propositional analysis: the leaves of a rule are opaque, so it cannot detect a numeric contradiction such as `x > 5 AND x < 3`. It does not supply the full numeric or temporal verification needed for the sequence property above. The `unstable` tooling should not be treated as a general proof of legal consistency. That stronger experiment would need an additional model-checking or theorem-proving layer, with its own validated connection to the executable rules.
 
@@ -132,6 +136,14 @@ This remains speculative: GRAM has not demonstrated a legal module or legal comp
 [^oakhurst]: The example and the two L4 readings come from Meng Weng Wong’s draft linked above, sections “Reading the law is the hard part” and notes `oakhurst`, `forks` and `precedence`. The underlying case is [*O’Connor v. Oakhurst Dairy*, 851 F.3d 69 (1st Cir. 2017)](http://media.ca1.uscourts.gov/pdf.opinions/16-1901P-01A.pdf). The court adopted the drivers’ narrower reading and remanded; a formal encoding does not supply the legal reasoning that selects that reading. Meng’s note locates the encoding examples on a separate working branch, so they are not presented here as independently reproduced tests.
 
 [^breach]: Meng’s draft, “Laws of robotics, and a law with a deadlock,” especially source notes `pilot` and `guide`; it cites Mahajan, Strecker, Watt and Wong, [“Compliance through model checking” (WAICOM 2022)](https://ink.library.smu.edu.sg/cclaw/3/). This account follows those notes and does not treat the prototype as a deployed L4 verifier.
+
+[^griggs-cox]: Richard A. Griggs and James R. Cox, [“The Elusive Thematic-Materials Effect in Wason’s Selection Task”](https://doi.org/10.1111/j.2044-8295.1982.tb01823.x), *British Journal of Psychology* 73(3):407–420 (1982), for the familiar drinking-age example.
+
+[^cheng-holyoak]: Patricia W. Cheng and Keith J. Holyoak, [“Pragmatic Reasoning Schemas”](https://doi.org/10.1016/0010-0285(85)90014-3), *Cognitive Psychology* 17(4):391–416 (1985).
+
+[^cosmides-tooby]: Leda Cosmides and John Tooby, [“Cognitive Adaptations for Social Exchange”](https://www.cep.ucsb.edu/wp-content/uploads/2023/05/Cogadapt.pdf), in *The Adapted Mind*, pp. 163–228 (1992).
+
+[^oracle-guided]: Susmit Jha, Sumit Gulwani, Sanjit A. Seshia and Ashish Tiwari, [“Oracle-Guided Component-Based Program Synthesis”](https://doi.org/10.1145/1806799.1806833), *ICSE*, Volume 1, pp. 215–224 (2010); [author-hosted PDF](https://www.csl.sri.com/users/tiwari/papers/icse2010.pdf). The paper instantiates oracle-guided synthesis for loop-free component-based programs using SMT. The stakeholder-elicitation connection here is an analogy, not a result about the coherence or legal authority of stakeholder preferences.
 
 The following acknowledgment is retained from Meng Weng Wong’s original article and refers to the research described there:
 
