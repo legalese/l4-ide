@@ -294,9 +294,11 @@ in writing by either party." Does the termination right attach only to the **suc
 to the **initial** term as well?
 
 The CRTC first read the comma as scoping both, letting the counterparty terminate early. Rogers then
-pointed at the **French-language version** of the same agreement, which was unambiguous — and the
-Commission reversed itself. (Telecom Decision CRTC 2006-45, 28 July 2006, reversed by Telecom
-Decision CRTC 2007-75, 20 August 2007.)
+pointed at the **French-language version** of the model agreement the Commission had approved, whose
+form theirs followed. Bell Aliant objected that this was a form of words in a language the parties
+had not used; but the French could be read only one way, the Commission held it equally
+authoritative, and it reversed itself. (Telecom Decision CRTC 2006-45, 28 July 2006, reversed by
+Telecom Decision CRTC 2007-75, 20 August 2007.)
 
 The two readings, again as depth:
 
