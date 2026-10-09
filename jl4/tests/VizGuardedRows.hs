@@ -196,6 +196,20 @@ branchNumeric =
 -- spec
 ------------------------------------------------------------------------
 
+-- | A numeric rule of @k@ clauses, each TRUE or FALSE by turns, then a fall-through.
+rowsGroup :: Int -> Text
+rowsGroup k =
+  "GIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE compliant " <> Text.pack (show i) <> " IS " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. k - 1] ]
+    <> "DECIDE compliant n IS FALSE\n"
+
+-- | The same rows as a CONSIDER written by hand.
+considerRows :: Int -> Text
+considerRows k =
+  "GIVEN n IS A NUMBER\nGIVETH A BOOLEAN\nDECIDE compliant n IS\n  CONSIDER n\n"
+    <> Text.unlines [ "    WHEN " <> Text.pack (show i) <> " THEN " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. k - 1] ]
+    <> "    OTHERWISE FALSE\n"
+
 colourDecl :: Text
 colourDecl = "DECLARE Colour IS ONE OF Red, Green, Blue\n"
 
@@ -433,6 +447,21 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
     it "is the same ladder as its hand-written CONSIDER: no GIVETH" $
       shapeOf (vizBody False clauseGroupNoGiveth) `shouldBe` shapeOf (vizBody False clauseGroupNoGivethByHand)
 
+    -- The ladder of a rule written as clauses can be far larger than the clauses,
+    -- and its plan far larger still, so there is a limit ('Transform.clauseGroupLadderBudget').
+    -- A group of rows that are each TRUE or FALSE draws one node per TRUE row,
+    -- plus one: 598 rows draw 300 nodes, the most allowed, and 600 draw 301.
+    it "draws a clause group of exactly the budget's size" $
+      vizResult False (rowsGroup 598) `shouldSatisfy` either (const False) (const True)
+
+    it "refuses a clause group one node over the budget, naming why" $
+      case vizResult False (rowsGroup 600) of
+        Left e -> Ladder.prettyPrintVizError e `shouldSatisfy` Text.isInfixOf "more than 300 decision points"
+        Right _ -> expectationFailure "a clause group over the budget was drawn"
+
+    it "does not hold a CONSIDER the drafter wrote to the clause-group budget" $
+      vizResult False (considerRows 600) `shouldSatisfy` either (const False) (const True)
+
     it "names nothing the desugarer made up" $
       for_ [clauseGroup, clauseGroupByLet, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->
         for_ (atomsOf (vizBody False src)) \label ->
@@ -446,14 +475,19 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
 -- | Typecheck a source, visualise its @compliant@ DECIDE, and hand back the wire body.
 vizBody :: Bool -> Text -> V.IRExpr
 vizBody simplify src =
+  case vizResult simplify src of
+    Right body -> body
+    Left e -> error ("doVisualize failed: " <> show e)
+
+-- | The same, with the visualizer's refusal kept.
+vizResult :: Bool -> Text -> Either Ladder.VizError V.IRExpr
+vizResult simplify src =
   case checkWithImports emptyVFS src of
     Left errs -> error ("source failed to typecheck: " <> show errs)
     Right tc ->
       let verDoc = VersionedTextDocumentIdentifier (fromNormalizedUri tc.tcdUri) 0
           cfg = Ladder.mkVizConfig verDoc tc.tcdModule tc.tcdSubstitution simplify
-       in case Ladder.doVisualize (findDecide "compliant" tc.tcdModule) cfg of
-            Right (info, _) -> info.funDecl.body
-            Left e -> error ("doVisualize failed: " <> show e)
+       in (\(info, _) -> info.funDecl.body) <$> Ladder.doVisualize (findDecide "compliant" tc.tcdModule) cfg
 
 findDecide :: Text -> Module Resolved -> Decide Resolved
 findDecide nm m =

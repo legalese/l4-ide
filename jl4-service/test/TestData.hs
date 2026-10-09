@@ -42,6 +42,7 @@ module TestData (
   clauseGroupSingleJL4,
   handSingleJL4,
   clauseGroupNoGivethJL4,
+  rowsClauseGroupJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -1268,3 +1269,12 @@ DECIDE rule c IS
     WHEN Green THEN FALSE
     WHEN Blue THEN TRUE
 |]
+
+-- | A numeric rule of @k@ clauses, each TRUE or FALSE by turns, then a
+-- fall-through. It draws one ladder node per TRUE row, plus one: 598 rows draw
+-- 300 nodes, the most a rule written as clauses may draw, and 600 draw 301.
+rowsClauseGroupJL4 :: Int -> Text
+rowsClauseGroupJL4 k =
+  "@export Rows\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS " <> (if even row then "TRUE" else "FALSE") | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS FALSE\n"

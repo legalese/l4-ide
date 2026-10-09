@@ -32,6 +32,7 @@ module LSP.L4.Viz.Ladder (
   ) where
 
 import Base
+import qualified Base.Text as Text
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Data.IntSet (IntSet)
@@ -49,7 +50,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, se
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -365,6 +366,8 @@ getVizConfig vs = vs.cfg
 data VizError
   = InvalidProgramNoDecidesFound
   | InvalidDecideMustHaveBoolRetType
+  | ClauseGroupTooLarge Int
+    -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -375,6 +378,8 @@ prettyPrintVizError = \ case
     "The program isn't the right sort for visualization: there are no DECIDE rules that can be visualized."
   InvalidDecideMustHaveBoolRetType ->
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+  ClauseGroupTooLarge budget ->
+    "These clauses expand to more than " <> Text.pack (show budget) <> " decision points, too many to draw as a ladder. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Entrypoint: Visualise
@@ -472,7 +477,14 @@ translateDecide :: Decide Resolved -> Viz V.FunDecl
 translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
   do
     -- A rule written as DECIDE clauses (or with a LET) is drawn as the CONSIDER it stands for.
-    let body = Transform.inlineLetsForViz body0
+    let isClauseGroup = Transform.hasGeneratedClauses body0
+    body <- case Transform.inlineLetsForViz body0 of
+      Right inlined -> pure inlined
+      -- Too big to read through. Clauses are refused, for a plan of any size
+      -- they would be drawn as one leaf that asks nothing; a LET the drafter
+      -- wrote is drawn as it was before it was read through.
+      Left _ | isClauseGroup -> throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
+             | otherwise     -> pure body0
     unlessM (hasBooleanType (getAnno body)) $
       throwError InvalidDecideMustHaveBoolRetType
 
@@ -482,6 +494,10 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
+    -- The ladder of a rule written as clauses can be far larger than the clauses
+    -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
+    when (isClauseGroup && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+      throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl
       vid
       -- didn't want a backtick'd name in the header

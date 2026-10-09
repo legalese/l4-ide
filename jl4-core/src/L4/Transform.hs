@@ -11,6 +11,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Optics
 
+import Data.Maybe (isJust)
+
 simplify :: Expr Resolved -> Expr Resolved
 simplify = cnf . nnf
 
@@ -90,7 +92,34 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 -- binding that applies one of its own parameters as a function (see
 -- 'unfoldableDecide').
 inlineLocalBindings :: Expr Resolved -> Expr Resolved
-inlineLocalBindings = inlineLocalBindingsWhere (const True)
+inlineLocalBindings = inlineLocalBindingsWhere (const True) . inlineGeneratedLets
+
+-- | Substitute the @LET@s the clause desugarer generates (the clauses not yet
+-- tried, 'PmFallthrough') into the CONSIDERs that refer to them.
+--
+-- 'inlineLocalBindingsWhere' does this too, but does work on each @LET@ in
+-- proportion to everything under it, and a group of @n@ clauses is @n@ nested
+-- @LET@s, so it takes time quadratic in @n@: 30 s for 300 clauses. These
+-- bindings are all of one shape (no parameters, used from the CONSIDERs of
+-- their own body) and a plain substitution takes time linear in the size of
+-- the body it goes into.
+inlineGeneratedLets :: Expr Resolved -> Expr Resolved
+inlineGeneratedLets = transformOf (gplate @(Expr Resolved)) \ case
+  LetIn _ ds body
+    | not (null ds), Just defs <- traverse generatedDef ds -> substitute defs body
+  e -> e
+  where
+    generatedDef = \ case
+      LocalDecide _ (MkDecide a _ (MkAppForm _ n [] _) rhs)
+        | Just m <- view annPmSynthetic a, isLater m -> Just (getUnique n, rhs)
+      _ -> Nothing
+    isLater = \ case
+      PmFallthrough _ -> True
+      PmUnreachable _ -> True
+      PmConsider{}    -> False
+    substitute defs = transformOf (gplate @(Expr Resolved)) \ case
+      App site r [] | Just rhs <- lookup (getUnique r) defs -> withTypeOfSite site rhs
+      e -> e
 
 -- | 'inlineLocalBindings', but only at the @WHERE@ \/ @LET@ nodes the predicate
 -- accepts. Every other binding is left exactly as written.
@@ -157,23 +186,44 @@ inlineLocalBindingsWhere wanted = transformOf (gplate @(Expr Resolved)) step
 --
 -- A group of several inputs refers to the same later clauses from more than one
 -- branch, so inlining copies them, and a long group of many inputs would copy
--- them exponentially. When the result is larger than 'clauseGroupNodeBudget'
--- nodes the expression is returned as it was.
-inlineLetsForViz :: Expr Resolved -> Expr Resolved
+-- them exponentially. @Left n@ means the expression grew past
+-- 'letInliningNodeBudget' (it had reached @n@), and the caller should not draw
+-- it.
+inlineLetsForViz :: Expr Resolved -> Either Int (Expr Resolved)
 inlineLetsForViz e
-  | withinBudget inlined = joinGeneratedConsiders inlined
-  | otherwise            = e
+  | size > letInliningNodeBudget = Left size
+  | otherwise                    = Right (joinGeneratedConsiders inlined)
   where
-    inlined = inlineLocalBindingsWhere isLetIn e
+    inlined = inlineLocalBindingsWhere isLetIn (inlineGeneratedLets e)
     isLetIn = \ case
       LetIn{} -> True
       _       -> False
-    -- Lazy on purpose: only the first 'clauseGroupNodeBudget' + 1 nodes are built.
-    withinBudget x = length (take (clauseGroupNodeBudget + 1) (nodes x)) <= clauseGroupNodeBudget
+    -- Lazy on purpose: only the first 'letInliningNodeBudget' + 1 nodes are built.
+    size = length (take (letInliningNodeBudget + 1) (nodes inlined))
     nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
 
-clauseGroupNodeBudget :: Int
-clauseGroupNodeBudget = 5000
+-- | The size, in expression nodes, past which a @LET@ is not inlined for
+-- drawing. It bounds the work of drawing; 'clauseGroupLadderBudget' is the
+-- limit on what is drawn.
+letInliningNodeBudget :: Int
+letInliningNodeBudget = 20000
+
+-- | The most nodes a ladder may have when the rule was written as DECIDE
+-- clauses. A group of several inputs repeats the later clauses in each
+-- branch, and the query plan of a ladder grows faster than its node count:
+-- measured through jl4-service on randomly generated boolean groups, 128 nodes
+-- gave a 0.16 MB plan in 0.5 s, 271 nodes 2.1 MB in 1.1 s, 811 nodes 29 MB in
+-- 3.9 s and 3441 nodes 325 MB in 20 s. 300 is the largest of those that
+-- stays in a few megabytes and about a second.
+clauseGroupLadderBudget :: Int
+clauseGroupLadderBudget = 300
+
+-- | Did the clause desugarer generate any of this expression?
+hasGeneratedClauses :: Expr Resolved -> Bool
+hasGeneratedClauses = any marked . nodes
+  where
+    marked x = isJust (view annPmSynthetic (getAnno x))
+    nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
 
 -- | Join a generated CONSIDER whose last branch is an OTHERWISE holding another
 -- generated CONSIDER on the same input. Bottom-up, so a run of three joins.

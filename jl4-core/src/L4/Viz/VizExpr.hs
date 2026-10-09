@@ -9,6 +9,7 @@ module L4.Viz.VizExpr
   , VersionedDocId(..)
   , FunDecl(..)
   , IRExpr(..)
+  , irExceeds
   , InertContext(..)
   , Name(..)
   , ID(..)
@@ -225,3 +226,25 @@ boolPriorsFromBody = Map.fromList . go
     -- the atoms of a rule live on BOTH sides of the implication.
     Implies _ p q _ -> go p <> go q
     _          -> []
+
+-- | Does the expression have more than this many nodes? Stops counting at the
+-- budget, so it costs at most the budget however large the argument is.
+irExceeds :: Int -> IRExpr -> Bool
+irExceeds budget root = go (budget + 1) [root]
+ where
+  go :: Int -> [IRExpr] -> Bool
+  go fuel _ | fuel <= 0 = True
+  go _    []            = False
+  go fuel (e : rest)    = go (fuel - 1) (children e <> rest)
+
+  children :: IRExpr -> [IRExpr]
+  children = \case
+    And _ args            -> args
+    Or _ args             -> args
+    Not _ negand          -> [negand]
+    Implies _ scope req _ -> [scope, req]
+    App _ _ args _ _      -> args
+    UBoolVar{}            -> []
+    TrueE{}               -> []
+    FalseE{}              -> []
+    InertE{}              -> []

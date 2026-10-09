@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4, letEnumJL4, handLetCompareJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4, letEnumJL4, handLetCompareJL4, rowsClauseGroupJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1763,6 +1763,25 @@ spec = describe "integration" do
                   let text = Text.pack (show (responseBody qpC)) <> Text.pack (show (responseBody ldC))
                   for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
                     (g, g `Text.isInfixOf` text) `shouldBe` (g, False)
+      -- The ladder of a rule written as clauses can be far larger than the clauses,
+      -- and its plan far larger still (measured: 3,441 nodes, a 325 MB plan in 20 s),
+      -- so a rule written as clauses may draw 300 nodes and no more.
+      it "answers a clause group that draws exactly 300 nodes" do
+        withServiceFromSources "rows-598" [("rule.l4", rowsClauseGroupJL4 598)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "rows-598" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldBe` 200
+          ld <- getLadder baseUrl mgr "rows-598" "rule"
+          statusCode' ld `shouldBe` 200
+
+      it "refuses a clause group that would draw 301, on /query-plan and /ladder, naming why" do
+        withServiceFromSources "rows-600" [("rule.l4", rowsClauseGroupJL4 600)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "rows-600" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 decision points"
+          ld <- getLadder baseUrl mgr "rows-600" "rule"
+          statusCode' ld `shouldBe` 400
+          LBS.toStrict (responseBody ld) `shouldSatisfy` BS.isInfixOf "more than 300 decision points"
+
       sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
       -- A LET the drafter wrote is read the same way: it must not be one opaque
       -- atom that asks nothing.
