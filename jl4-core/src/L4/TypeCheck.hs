@@ -5470,13 +5470,33 @@ constraintName = \ case
 -- | Add one constraint to a consistent constraint set; 'Nothing' if it
 -- contradicts a constraint already present (the refined value space is
 -- empty, so the candidate 'Nabla' dies).
+--
+-- A number or a piece of text is checked by looking its key up, not by
+-- reading every constraint on its variable: a table of n keyed arms leaves
+-- n constraints on one variable. Reading them all for each arm, together
+-- with the key 'analyzeGuardRows' built for its one nabla, made a CONSIDER
+-- of 4,000 numbers take 21 s of CPU time to check, against 5.6 s without
+-- both. Only a number or a piece of text can contradict one
+-- ('isConsistentWith'): its opposite under the same key, or, for an
+-- equality, an equality under another key.
 addConstraint :: Constr Resolved -> Nabla Resolved -> Maybe (Nabla Resolved)
 addConstraint _ Bottom = Nothing
 addConstraint c nabla@(Consistent s)
   | c `Set.member` s = Just nabla
-  | all (c `isConsistentWith`) (lookupConstraints (constraintName c) nabla) =
-      Just (Consistent (Set.insert c s))
+  | consistent = Just (Consistent (Set.insert c s))
   | otherwise = Nothing
+  where
+    consistent = case c of
+      IsNotEqLit n k -> not (IsEqLit n k `Set.member` s)
+      IsEqLit n k ->
+        not (IsNotEqLit n k `Set.member` s) && not (any (pinnedElsewhere n) [Set.lookupLT c s, Set.lookupGT c s])
+      _ -> all (c `isConsistentWith`) (lookupConstraints (constraintName c) nabla)
+    -- The equalities on one variable sort together, after the tag and the
+    -- variable, by key; @c@ is not in the set, so if one is there, it is a
+    -- neighbour of where @c@ would go.
+    pinnedElsewhere n = \ case
+      Just (IsEqLit n' _) -> n' == n
+      _ -> False
 
 isConsistentWith :: Constr Resolved -> Constr Resolved -> Bool
 IsEq n1 c1 _ `isConsistentWith` IsEq n2 c2 _ | n1 `sameResolved` n2 = c1 `sameResolved` c2
@@ -5548,7 +5568,7 @@ analyzeGuardRows branches = do
             | not coversSomething, not (null guards) = b : redundant
             | otherwise = redundant
           uncovered' =
-            nubOrdOn nablaKey (concatMap (splitByGuards guards) uncovered)
+            nubNablas (concatMap (splitByGuards guards) uncovered)
       in if length (take (maxUncoveredNablas + 1) uncovered') > maxUncoveredNablas
            then Nothing
            else Just (uncovered', redundant')
@@ -5567,6 +5587,12 @@ analyzeGuardRows branches = do
     guardEq  (LitGuard b k)       = IsEqLit b k
     guardNeq (MkGuard cs b n ns)  = IsNotEq b n ns cs
     guardNeq (LitGuard b k)       = IsNotEqLit b k
+
+    -- One nabla is left alone: its key copies every constraint in it, and
+    -- a table of keyed arms leaves one nabla with a constraint per arm.
+    nubNablas = \ case
+      ns@[_] -> ns
+      ns     -> nubOrdOn nablaKey ns
 
     nablaKey = \ case
       Bottom       -> Nothing
