@@ -1,0 +1,77 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: nonassertable-on-input.l4
+  Hidden: no
+  Range: 7:1-7:15
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
+    Here it is on `Person`, a declaration, which cannot be asserted in any case; move it above the definition it is meant for, or remove it.
+
+File: nonassertable-on-input.l4
+  Hidden: no
+  Range: 10:1-10:15
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
+    Here it is on `is adult`, an input, which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it.
+
+File: nonassertable-on-input.l4
+  Hidden: no
+  Range: 11:8-11:18
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+
+      `is adult`
+
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+
+      § <heading>
+          GIVEN `is adult` IS A BOOLEAN
+
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+
+    The manual explains the move: doc/reference/types/ASSUME.md.
+
+File: nonassertable-on-input.l4
+  Hidden: no
+  Range: 16:1-16:15
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
+    Here it is on a section heading or its inputs, which cannot be asserted in any case; move it above the definition it is meant for, or remove it.
+
+File: nonassertable-on-input.l4
+  Hidden: no
+  Range: 23:1-23:15
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
+    Here it is on a directive, which cannot be asserted in any case; move it above the definition it is meant for, or remove it.
+
+File: nonassertable-on-input.l4
+  Hidden: no
+  Range: 26:22-26:36
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
+    Here it is on `x`, an input, which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it.

@@ -320,6 +320,14 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | NonassertableOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@nonassertable@ annotation sits above something that is not a
+    -- definition: the first text says what (a declaration, an input, a section
+    -- heading or its inputs, a directive, an import, a timezone), the second
+    -- names it when it has a name. Only a named step can be closed to assertion.
+    -- ^ An @\@nonassertable@ carried text after it that is not a comment.
+    -- The mark takes no words: @\@nonassertable \`alpha\` MEANS TRUE@ would
+    -- otherwise swallow the definition into the annotation and mark the next.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -820,6 +828,7 @@ instance HasSrcRange CheckError where
   rangeOf (EmptyWindow d _ _)               = rangeOf d
   rangeOf (BeforeOnJoinLine d)              = rangeOf d
   rangeOf (FixityAnnotationMalformed mr _)  = mr
+  rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing

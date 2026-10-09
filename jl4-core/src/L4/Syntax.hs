@@ -1006,6 +1006,11 @@ data Extension = Extension
   , desc         :: Maybe Desc
   , ref          :: Maybe Ref
   , fixityAnn    :: Maybe Fixity
+  , nonassertable :: Maybe Nonassertable
+    -- ^ The @\@nonassertable@ annotation above a definition. See 'annNonassertable'.
+  , nonassertableOnInputs :: [Nonassertable]
+    -- ^ Marks found on a definition's GIVEN lines, each an error the
+    -- typechecker raises naming the input; none of them closes the definition.
   , pmMatrix     :: Maybe PmMatrix
   , mixfixCanonical :: Maybe RawName
     -- ^ The CANONICAL mixfix pattern of the name this node applies, e.g.
@@ -1017,11 +1022,11 @@ data Extension = Extension
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 mx2 syn2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -1031,7 +1036,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1086,6 +1091,19 @@ annRef = #extra % #ref
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn
 
+-- | The @\@nonassertable@ annotation written above a definition: a request
+-- may not assert this node, its truth must come from its derivation
+-- (specs/todo/presumption-assertion/CONTRACT.md §6). Attached by position
+-- ('L4.Parser.ResolveAnnotation.addNonassertableCommentsToAst') to the nearest
+-- following top-level or section-level construct; the typechecker rejects it on
+-- anything that is not a definition.
+annNonassertable :: Lens' Anno (Maybe Nonassertable)
+annNonassertable = #extra % #nonassertable
+
+-- | The marks found on a definition's GIVEN lines (see 'Extension').
+annNonassertableOnInputs :: Lens' Anno [Nonassertable]
+annNonassertableOnInputs = #extra % #nonassertableOnInputs
+
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
 
@@ -1120,6 +1138,12 @@ setRef r a = a & annRef ?~ r
 
 setFixity :: Fixity -> Anno -> Anno
 setFixity f a = a & annFixity ?~ f
+
+setNonassertable :: Nonassertable -> Anno -> Anno
+setNonassertable n a = a & annNonassertable ?~ n
+
+addNonassertableOnInputs :: [Nonassertable] -> Anno -> Anno
+addNonassertableOnInputs ns a = a & annNonassertableOnInputs %~ (<> ns)
 
 setPmMatrix :: PmMatrix -> Anno -> Anno
 setPmMatrix m a = a & annPmMatrix ?~ m
@@ -1483,6 +1507,14 @@ getFixityDirection (MkFixity _ dir _) = dir
 getFixityPayload :: Fixity -> Text
 getFixityPayload (MkFixity _ _ t) = t
 
+-- | The @\@nonassertable@ mark. It carries nothing but its position: the
+-- herald takes no words ('L4.Lexer.nonassertableAnnotation'). Where it
+-- landed is which 'Extension' field holds it: 'nonassertable' above a
+-- definition, 'nonassertableOnInputs' on one of its GIVEN lines.
+data Nonassertable = MkNonassertable Anno
+  deriving stock (Show, Eq, Ord, GHC.Generic)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
 deriving via L4Syntax Nlg
   instance HasAnno Nlg
 deriving via L4Syntax (NlgFragment n)
@@ -1495,6 +1527,8 @@ deriving via L4Syntax Desc
   instance HasAnno Desc
 deriving via L4Syntax Fixity
   instance HasAnno Fixity
+deriving via L4Syntax Nonassertable
+  instance HasAnno Nonassertable
 
 instance ToConcreteNodes PosToken Comment where
   toNodes (MkComment ann _) = flattenConcreteNodes ann []
@@ -1624,6 +1658,7 @@ deriving anyclass instance HasSrcRange Name
 deriving anyclass instance HasSrcRange Nlg
 deriving anyclass instance HasSrcRange Desc
 deriving anyclass instance HasSrcRange Fixity
+deriving anyclass instance HasSrcRange Nonassertable
 deriving anyclass instance HasSrcRange (NlgFragment n)
 deriving anyclass instance HasSrcRange Comment
 deriving anyclass instance HasSrcRange Ref
@@ -1739,6 +1774,7 @@ deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
 deriving anyclass instance Serialise Desc
 deriving anyclass instance Serialise Fixity
+deriving anyclass instance Serialise Nonassertable
 deriving anyclass instance Serialise FixityDirection
 #endif
 
