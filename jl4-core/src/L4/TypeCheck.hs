@@ -882,8 +882,11 @@ checkClauseMatrix dec dHead =
     -- which clauses are missing, or never used, is a question to ask once
     -- they do. Saying it is settled also withdraws a one-clause group's
     -- CONSIDER warnings ('settleOneClause').
-    Just _ | givenMisnamesInputs dec -> pure True
+    Just matrix | givenMisnamesInputs dec -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
+      pure True
     Just matrix -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
       recordInputPatterns matrix
       (answered, byNewName) <- analyseMatrix matrix
       warnUnreachableClauses matrix (getName dHead.rappForm) byNewName
@@ -1060,6 +1063,20 @@ checkClauseMatrix dec dHead =
 -- the analysis's redundant rows, which 'uncoveredRows' does not compute; on
 -- unstable they arrive here as a further argument, reported as
 -- @CoveredByClausesAbove@.
+-- | One warning for each @\@desc@, @\@export@ or @\@nlg@ written above a later
+-- clause of a group, which uses none of them: the parser keeps them on the
+-- clause ('PmMatrixClause' @clauseDesc@, and the @\@nlg@ on @clauseHead@), for
+-- a run that turns out to be overloads ('separateOverloads'), whose
+-- definitions do use them. A group takes its annotations from above its first
+-- clause, which the parser gives to the definition itself.
+warnLaterClauseAnnotations :: PmMatrix -> Name -> Check ()
+warnLaterClauseAnnotations matrix headName =
+  for_ (zip [2 ..] (drop 1 matrix.clauses)) \ (k, cl) -> do
+    for_ cl.clauseDesc \ d -> for_ (rangeOf d) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k (if (Export.parseDescText (getDesc d)).flags.isExport then "@export" else "@desc"))
+    for_ (getAnno cl.clauseHead ^. annNlg) \ nlg -> for_ (rangeOf nlg) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k "@nlg")
+
 warnUnreachableClauses :: PmMatrix -> Name -> Maybe (Int, [Name]) -> Check ()
 warnUnreachableClauses matrix headName newNameCatchAll = do
   let n = length matrix.clauses
@@ -4077,6 +4094,15 @@ prettyCheckWarning = \ case
     , "The clause above it matches every input, so " <> quotedName headName <> " never gets this far."
     , "Move these clauses above that one, or remove them."
     ]
+  ClauseAnnotationUnused _ headName k annotation ->
+    [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."
+    , "A rule written as clauses takes its @desc, @export and @nlg from above its first clause only."
+    , "Move it above the first clause, or remove it."
+    ]
+    where
+      whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
+        w : _ | k >= 1 -> "the " <> w <> " clause"
+        _ -> "clause " <> Text.textShow k
 
 -- | Render a missing CLAUSE of a multi-clause pattern-matching group as
 -- valid, pasteable L4: a new DECIDE clause line ending at IS with no body.

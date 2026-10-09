@@ -399,6 +399,39 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ])
     map fst ws `shouldBe` [Just (5, 8, 5)]
 
+  -- A rule written as clauses takes its annotations from above its first
+  -- clause, and one above a later clause was used by nothing, mostly without
+  -- a word (refutation of legalese/l4-ide#545's review, round 3). The goldens
+  -- on main record no warnings, so the fixture
+  -- ok/pattern-matching-later-clause-annotations.l4 is pinned here.
+  it "warns at each @desc, @export and @nlg above a later clause, and not at the first clause's" $ do
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A STRING"
+      , "@desc how many there are"
+      , "DECIDE `how many` 0 IS \"none\""
+      , "@desc not used"
+      , "DECIDE `how many` 1 IS \"one\""
+      , "@export not used either"
+      , "DECIDE `how many` 2 IS \"two\""
+      , "@nlg many things"
+      , "DECIDE `how many` other IS \"many\""
+      ])
+    map fst ws `shouldBe` [Just (5, 1, 5), Just (7, 1, 7), Just (9, 1, 9)]
+    [ Text.strip l | (_, ls) <- ws, l <- ls, "This @" `Text.isPrefixOf` Text.strip l ] `shouldBe`
+      [ "This @desc is above the second clause of `how many`, where it is not used."
+      , "This @export is above the third clause of `how many`, where it is not used."
+      , "This @nlg is above the fourth clause of `how many`, where it is not used."
+      ]
+
+  it "does not warn about the annotations of overloads written one after another" $ do
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "DECIDE twice n IS n * 2"
+      , "@export the boolean version"
+      , "DECIDE twice b IS b AND b"
+      ])
+    ws `shouldBe` []
+
   it "still warns about a CONSIDER written inside a later clause" $ do
     ws <- filter (mentions "still need to be considered") <$> warnings (Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"
