@@ -2,7 +2,10 @@ import { AGENT_KEY_RE, ULID_RE } from '@repo/legalese-agent/protocol'
 import { LOCAL_AI_ENDPOINT } from '@repo/legalese-agent'
 import { parseLogLevel, type LogLevel } from './logger.js'
 
-/** Where the image puts the language server (item `cloud-agent-image`). */
+/**
+ * Where the image puts the language server (jl4-auth-proxy
+ * `cloud-sessions/agent-image`).
+ */
 export const DEFAULT_LSP_COMMAND = '/app/bin/jl4-lsp'
 /** The session task's mount (spec §5.1). */
 export const WORKSPACE_ROOT = '/workspace'
@@ -38,8 +41,9 @@ export class ConfigError extends Error {
  * The environment the harness accepts (spec §5.1): the static
  * task-definition variables plus `SESSION_ID` and `AGENT_KEY` from the
  * `RunTask` override. Everything is validated by pattern; the image's
- * entry point (item `cloud-agent-image`) already dropped everything
- * else, and this re-checks so the harness never trusts its caller.
+ * entry point (jl4-auth-proxy `cloud-sessions/agent-image`) already
+ * dropped everything else, and this re-checks so the harness never trusts
+ * its caller.
  */
 export const STATIC_ENV = [
   'AI_PROXY_URL',

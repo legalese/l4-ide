@@ -1,5 +1,0 @@
-# Only what docker/Dockerfile copies.
-*
-!bin/jl4-lsp
-!dist/cloud-agent.cjs
-!docker/entrypoint.sh

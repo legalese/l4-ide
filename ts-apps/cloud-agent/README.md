@@ -77,34 +77,25 @@ tail -f /tmp/cs/sessions/$SID/state/events/1.jsonl
 `abort`, `stop`, …). Files the agent writes land in
 `/tmp/cs/sessions/$SID/repo/` (`data/`, `tmp/`).
 
-## Image
+## Release and image
 
-`docker/Dockerfile` (base `node:24-trixie-slim`, plus `git`, `tini`,
-`ca-certificates`, `libgmp10`, `libffi8`, `zlib1g`, the linux-arm64 `jl4-lsp`
-at `/app/bin/jl4-lsp` and the bundle at `/app/cloud-agent.cjs`; user
-`1000:1000`; entry point `tini -- /app/entrypoint`). `docker/entrypoint.sh`
-ignores its arguments, validates `SESSION_ID`, `AGENT_KEY`, `AI_PROXY_URL`,
-`MCP_URL`, `AUTH_URL`, `LOG_LEVEL` (and keeps the Fargate
-`ECS_CONTAINER_METADATA_URI_V4`), drops every other variable, writes the git
-config into `HOME=/home/agent` and execs the harness. `docker/smoke.sh <image>`
-checks the image offline (contents, a rejected environment, and a start that
-parks without network).
+This repository only publishes the harness. The release build
+(`.github/workflows/main-tag.yml`) bundles and tests it and attaches
+`cloud-agent.cjs` and `jl4-lsp-linux-arm64`, each with a `.sha256`, to the
+`l4-ide-build-<n>` release.
 
-`.github/workflows/cloud-agent-image.yml` builds `jl4-lsp` for linux-arm64,
-bundles and tests the harness, builds the image on an arm64 runner, runs the
-smoke test, pushes `legalese-cloud-agent:<git sha>` to ECR and writes the
-digest to SSM `/cloud-sessions/<env>/image-digest` (rolling back = writing the
-previous digest). It runs on pushes to `main` that touch the harness, its core,
-`jl4-lsp` or `jl4-core`, and manually (optionally without publishing).
+The image (Dockerfile, entry point, smoke test) and its rollout live in
+jl4-auth-proxy under `cloud-sessions/agent-image/`, next to the task
+definition the Sessions API registers. Its `rollout-cloud-agent.yml` builds
+`legalese-cloud-agent:<tag>` from a release tag and switches new sessions to
+it; rolling back is a run with the previous tag. This repository has no AWS
+access.
 
-To build locally (Docker with arm64 support):
-
-```sh
-npm run build
-cp "$(cabal list-bin exe:jl4-lsp)" bin/jl4-lsp   # a linux-arm64 build
-docker buildx build --platform linux/arm64 -f docker/Dockerfile -t cloud-agent:dev --load .
-docker/smoke.sh cloud-agent:dev
-```
+What the image guarantees the harness: the language server at
+`/app/bin/jl4-lsp`, the bundle at `/app/cloud-agent.cjs`, user `1000:1000`,
+`HOME=/home/agent`, the session mount at `/workspace`, and an environment
+reduced to `SESSION_ID`, `AGENT_KEY`, `AI_PROXY_URL`, `MCP_URL`, `AUTH_URL`,
+`LOG_LEVEL` (plus the Fargate `ECS_CONTAINER_METADATA_URI_V4`).
 
 ## Tests
 
