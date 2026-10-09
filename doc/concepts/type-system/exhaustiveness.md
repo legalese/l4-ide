@@ -106,7 +106,7 @@ GIVETH A STRING
 
 A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is reported as a redundant branch.
 
-`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. Other builtin container types (`MAYBE`, `EITHER`, `LIST`) are not yet analysed.
+`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. The builtin container types (`MAYBE`, `EITHER`, `LIST`) are analysed only inside: a missing `WHEN NOTHING` or `WHEN EMPTY` is not reported, but `WHEN JUST Basic` over a `MAYBE Tier` asks for `WHEN JUST Premium` and `WHEN JUST Gold`.
 
 A rule written as clauses, one `DECIDE` line per case, is read the same way.
 A number or a piece of text in a clause matches one value of its input, so such a rule is complete only with a clause written with the input's name, and the missing-case warning suggests that clause:
@@ -166,7 +166,7 @@ The intended discipline: treat the warnings as a completeness report. A finished
 | `NUMBER` / `STRING` / `DATE` scrutinee            | Analysed; `OTHERWISE` is suggested when it is missing                      |
 | Clauses over a `NUMBER` or `STRING` input         | Analysed; the clause with the input's name is suggested when it is missing |
 | `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
-| `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                           |
+| `MAYBE` / `EITHER` / `LIST` scrutinee             | Their contents analysed; their own constructors not listed                 |
 | `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                    |
 | `OTHERWISE`                                       | Completes the match, disables missing-case warnings                        |
 | Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero      |
