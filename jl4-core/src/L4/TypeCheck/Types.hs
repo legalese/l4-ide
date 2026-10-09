@@ -335,6 +335,12 @@ data CheckError =
     -- same level. Carries the chain's range and both operators with their
     -- fixities.
   | SuspiciousBinderPattern Resolved Resolved
+  | SuspiciousClausePattern Name Bool Resolved Resolved
+    -- ^ 'SuspiciousBinderPattern' for a pattern of a multi-clause group
+    -- ('L4.TypeCheck.checkClauseMatrix'): a pattern that is a new name, close
+    -- to a value of its input's type that no clause of the group matches.
+    -- Arguments: the group's name, whether a GIVEN names its inputs, the new
+    -- name, the value it resembles.
     -- ^ A CONSIDER branch pattern is a fresh binder (matching everything)
     -- whose name closely resembles a constructor of the scrutinee's type
     -- that no other branch covers — very likely a misspelled constructor.
@@ -369,6 +375,11 @@ data UnreachableClause
     -- clauses after this one are unreachable for the same reason
   | CoveredByClausesAbove
     -- ^ every input it matches is matched by a clause above it
+  | AfterClauseBindingNewName [Name] Int
+    -- ^ a clause above it matches every input because its patterns are
+    -- new names (the first argument, as written), such as a misspelled
+    -- value; carries how many further clauses are unreachable for the same
+    -- reason
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -386,6 +397,14 @@ data CheckWarning
     -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
     -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
     -- range, the group's head name for display, and why.
+  | ClauseAnnotationUnused SrcRange Name Int Text Bool
+    -- ^ An @\@desc@, @\@export@ or @\@nlg@ written between two clauses of a
+    -- multi-clause group, which takes its annotations from above its first
+    -- clause only ('L4.TypeCheck.checkClauseMatrix'). Carries the
+    -- annotation's range, the group's head name, the later clause's number
+    -- (counting from 1), the annotation as written (@\@export@, say), and
+    -- whether the group has a GIVEN, which is where its @\@desc@ and
+    -- @\@export@ go.
   | FixityIgnoredNonBinary RawName (Maybe SrcRange)
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
@@ -704,6 +723,7 @@ severity (MkCheckErrorWithContext e _) =
     CheckInfo {}               -> SInfo
     CheckWarning {}            -> SWarn
     SuspiciousBinderPattern {} -> SInfo
+    SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
     _                          -> SError
 
@@ -806,10 +826,12 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
+  rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
+  rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r

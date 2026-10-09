@@ -1,0 +1,37 @@
+-- A pattern that is not a value of its input's type is a new name, and a new
+-- name matches every input, so the clauses after it are never used. Each
+-- group below says so in its clauses' terms, naming the new name; a new name
+-- that is very close to a value no clause matches also gets a hint (review
+-- of legalese/l4-ide#545, round 2).
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+-- `Gren` is a misspelling of `Green`: `colour Blue` is 2, not 3.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE colour Red  IS 1
+DECIDE colour Gren IS 2
+DECIDE colour Blue IS 3
+
+#EVAL colour Blue   -- 2
+
+-- Two clauses after it, one warning. `Green` is matched by the first clause,
+-- so `Gren` gets no hint.
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE price Green n IS 1
+DECIDE price Gren  n IS 2
+DECIDE price Red   n IS 3
+DECIDE price Blue  n IS 4
+
+#EVAL price Red 0   -- 2
+
+-- A new name in a group that matches numbers.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size 0     IS 1
+DECIDE size other IS 2
+DECIDE size 1     IS 3
+
+#EVAL size 1        -- 2

@@ -89,8 +89,9 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
+import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
+import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
 import L4.TypeCheck.Annotation
@@ -396,13 +397,101 @@ suppressResolutionCascade errs
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
-checkProgram module' = do
-  withScanTypeAndSigEnvironment scanTyDeclModule inferTyDeclModule scanFunSigModule module' \rdecides -> do
-    (rprog, topEnv) <- inferProgram module'
-    -- Build the mixfix registry from THIS module's function signatures
-    -- so it can be propagated to importing modules
-    let localMixfixRegistry = buildMixfixRegistry rdecides
-    pure (rprog, topEnv, localMixfixRegistry)
+checkProgram written = do
+  -- 'withScanTypeAndSigEnvironment', with one step between scanning the
+  -- types and scanning the definitions: once the module's constructors are
+  -- known, a run of clauses that the parser grouped on bare names alone is
+  -- told apart from a run of overloads ('separateOverloads').
+  rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
+  withDeclares rdeclares do
+    module' <- separateOverloads written
+    rdecides <- scanFunSigModule module'
+    withDecides rdecides do
+      (rprog, topEnv) <- inferProgram module'
+      -- Build the mixfix registry from THIS module's function signatures
+      -- so it can be propagated to importing modules
+      let localMixfixRegistry = buildMixfixRegistry rdecides
+      pure (rprog, topEnv, localMixfixRegistry)
+
+-- | Turn each run of clauses that the parser grouped only because their bare
+-- names differ ('L4.Parser.decidePatternMatch') back into the separate
+-- definitions it would have been without clause groups, when none of those
+-- names is a constructor.
+--
+-- The parser groups @DECIDE f TRUE IS 1@ / @DECIDE f FALSE IS 0@, and also
+-- @show n MEANS n + 1@ / @show b MEANS b AND TRUE@, because a bare name in a
+-- pattern could be a constructor or a new name, and only resolving it tells
+-- which. The second run is two overloads, told apart by their types; read as
+-- one group, its first clause matched every input and the second was never
+-- used, and a file that runs on @main@ did not check. So here, where
+-- constructors are known: a run in which no pattern is a literal, an applied
+-- constructor or a name that resolves to a constructor is checked as the
+-- definitions it is made of, the first with the run's signature and the rest
+-- with none, as the parser reads them when it does not group them, and each
+-- with its own clause's head, @AKA@ and annotations ('PmMatrixClause'). A run
+-- with a name that is a constructor stays a group, misspellings included:
+-- @Red@ / @Gren@ / @Blue@ is a group whose @Gren@ binds a new name, and
+-- whose last clause is reported as never used.
+--
+-- A name that is its column's own input matches anything rather than naming
+-- a constructor, as the desugarer reads it ('patAlwaysMatchesAs'), so it is
+-- not asked about. Only top-level definitions are ever grouped.
+separateOverloads :: Module Name -> Check (Module Name)
+separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
+  where
+    goSection (MkSection sann mn maka mgiven decls) =
+      MkSection sann mn maka mgiven . concat <$> traverse goDecl decls
+    goDecl = \ case
+      Decide tann d -> overloadsOf d >>= \ case
+        Just (d1 : ds) -> pure (Decide tann d1 : map (Decide emptyAnno) ds)
+        _ -> pure [Decide tann d]
+      Section sann sub -> List.singleton . Section sann <$> goSection sub
+      other -> pure [other]
+
+    overloadsOf :: Decide Name -> Check (Maybe [Decide Name])
+    overloadsOf (MkDecide ann sig (MkAppForm aann hd _ _) body) =
+      case view annPmMatrix ann of
+        Just matrix
+          | let patterns = map (.patterns) matrix.clauses
+          , length patterns >= 2
+          , Just names <- traverse (traverse barePatternName) patterns -> do
+              let asked = [ n | ns <- names, (s, n) <- zip matrix.scrutinees ns, rawName n /= rawName s ]
+              anyConstructor <- or <$> traverse (fmap isJust . quietly . resolveConstructor) asked
+              pure if anyConstructor then Nothing else do
+                bodies <- clauseBodies matrix.scrutinees patterns body
+                guard (length bodies == length names)
+                pure
+                  [ if i == 0
+                      then MkDecide (set annPmMatrix Nothing ann) sig (MkAppForm aann hd ns cl.clauseAka) b
+                      else MkDecide (clauseAnno cl b) noSignature (MkAppForm emptyAnno cl.clauseHead ns cl.clauseAka) b
+                  | (i, cl, ns, b) <- List.zip4 [0 :: Int ..] matrix.clauses names bodies
+                  ]
+        _ -> pure Nothing
+
+    barePatternName = \ case
+      PatApp _ n [] -> Just n
+      _ -> Nothing
+
+    noSignature = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
+
+
+    -- From the clause's head to the end of its body: the key under which its
+    -- signature is found ('scanFunSigDecide'), distinct for every clause.
+    clauseSpan cl b = do
+      h <- cl.headRange
+      r <- rangeOf b
+      pure MkSrcRange { start = h.start, end = r.end, length = h.length + r.length, moduleUri = h.moduleUri }
+
+    -- A location without tokens, read off a hole as a name's is
+    -- ('L4.Parser.givenInputBinding'); the tokens stay with the first
+    -- definition, whose annotation holds the whole run's.
+    rangedAnno r = mkAnno [mkHoleWithSrcRangeHint r]
+
+    -- A later definition carries what was written for its own clause: the
+    -- @\@desc@ or @\@export@ above it, one of them if there are several, as
+    -- a definition keeps ('PmMatrixClause' @clauseDescs@, 'pickDesc'); its
+    -- head, with any @\@nlg@ above it, and its @AKA@ come with the clause.
+    clauseAnno cl b = maybe id setDesc (pickDesc cl.clauseDescs) (rangedAnno (clauseSpan cl b))
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
@@ -1419,11 +1508,14 @@ checkClauseMatrix dec dHead =
     -- which clauses are missing, or never used, is a question to ask once
     -- they do. Saying it is settled also withdraws a one-clause group's
     -- CONSIDER warnings ('settleOneClause').
-    Just _ | givenMisnamesInputs dec -> pure True
+    Just matrix | givenMisnamesInputs dec -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
+      pure True
     Just matrix -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
       recordInputPatterns matrix
-      (answered, redundant) <- analyseMatrix matrix
-      warnUnreachableClauses matrix (getName dHead.rappForm) redundant
+      (answered, redundant, byNewName) <- analyseMatrix matrix
+      warnUnreachableClauses matrix (getName dHead.rappForm) redundant byNewName
       pure answered
     Nothing -> pure False
   where
@@ -1451,9 +1543,16 @@ checkClauseMatrix dec dHead =
     warnMissing = not (Export.isNonexhaustiveDecide dec)
 
     -- | Warns about missing clauses. Returns whether it reached a verdict on
-    -- them (not when it bails, nor when there are more than it lists), and
-    -- the indices of the clauses it found redundant (none when it bails).
-    analyseMatrix :: PmMatrix -> Check (Bool, [Int])
+    -- them (not when it bails, nor when there are more than it lists), the
+    -- indices of the clauses it found redundant (none when it bails), and the
+    -- first clause that matches every input because its patterns are new
+    -- names, with those names ('newNameCatchAll').
+    --
+    -- The patterns are resolved even where the analysis of missing clauses
+    -- stands down for a literal, because reading a name as new or as a value
+    -- does not depend on it; the hints about names that look like values
+    -- ('hintSuspiciousClausePatterns') come from the same resolution.
+    analyseMatrix :: PmMatrix -> Check (Bool, [Int], Maybe (Int, [Name]))
     analyseMatrix matrix = do
       ei <- asks (.entityInfo)
       let clauseRows = matrix.clauses
@@ -1478,7 +1577,7 @@ checkClauseMatrix dec dHead =
                   _ -> Nothing)
               colScruts
       case mColTypes of
-        Just colTypes0 | columnCountOk, not hasOpaque -> do
+        Just colTypes0 | columnCountOk -> do
           colTypes <- traverse applySubst colTypes0
           -- Re-resolve each clause's patterns against the column types,
           -- 'quietly': the same patterns were already checked inside the
@@ -1495,10 +1594,59 @@ checkClauseMatrix dec dHead =
                   else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
           case traverse sequence rpatssM of
             Just rpatss
-              | all (all patternInfoComplete) rpatss ->
-                  analyseResolvedRows matrix ei rpatss
-            _ -> pure (False, [])
-        _ -> pure (False, [])
+              | all (all patternInfoComplete) rpatss -> do
+                  hintSuspiciousClausePatterns matrix ei colTypes rpatss
+                  (answered, redundant) <-
+                    if hasOpaque then pure (False, []) else analyseResolvedRows matrix ei rpatss
+                  pure (answered, redundant, newNameCatchAll matrix rpatss)
+            _ -> pure (False, [], Nothing)
+        _ -> pure (False, [], Nothing)
+
+    -- | The first clause whose every pattern matches anything, when at least
+    -- one of them does so because it is a new name rather than its input's
+    -- own name (the parser already knows of a clause whose patterns are all
+    -- input names: 'PmMatrix' @catchAll@). A pattern that is a new name
+    -- resolves to a 'PatVar' of that name; a column wildcard to a 'PatVar' of
+    -- the input ('patIsColumnWildcard').
+    newNameCatchAll :: PmMatrix -> [[Pattern Resolved]] -> Maybe (Int, [Name])
+    newNameCatchAll matrix rpatss =
+      listToMaybe
+        [ (i, newNames)
+        | (i, cl, rpats) <- List.zip3 [0 ..] matrix.clauses rpatss
+        , all isVarPattern rpats
+        , let newNames =
+                [ n
+                | (PatVar _ r, s, PatApp _ n []) <- List.zip3 rpats colScruts cl.patterns
+                , rawName (getName r) /= rawName (getName s)
+                ]
+        , not (null newNames)
+        ]
+      where
+        isVarPattern = \ case
+          PatVar {} -> True
+          _ -> False
+
+    -- | 'hintSuspiciousBinders' for the clauses of the group, in their terms:
+    -- a pattern that is a new name close to a value of its input's type that
+    -- no clause matches in that column. (The CONSIDERs the clauses compile to
+    -- leave this hint to here: each sees only its own clause, so a value
+    -- another clause matches would look uncovered to it.)
+    hintSuspiciousClausePatterns :: PmMatrix -> EntityInfo -> [Type' Resolved] -> [[Pattern Resolved]] -> Check ()
+    hintSuspiciousClausePatterns matrix ei colTypes rpatss = do
+      let ctorSets = constructorsInScopeFromEntityInfo ei
+      for_ (List.zip3 [0 :: Int ..] colTypes colScruts) \ (j, colTy, s) -> do
+        let column = mapMaybe (listToMaybe . drop j) rpatss
+            ctors = case colTy of
+              TyApp _ r _ -> Map.findWithDefault [] (getUnique r) ctorSets
+              _           -> []
+            covered = Set.fromList [ getUnique c | PatApp _ c _ <- column ]
+            uncovered = filter (\ c -> getUnique c `Set.notMember` covered) ctors
+        for_ column \ case
+          PatVar _ binder
+            | rawName (getName binder) /= rawName (getName s)
+            , Just ctor <- find (resemblesConstructor (lastNameSegment (getName binder))) uncovered ->
+                addError (SuspiciousClausePattern (getName dHead.rappForm) (not matrix.synthesizedScrutinees) binder ctor)
+          _ -> pure ()
 
     analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check (Bool, [Int])
     analyseResolvedRows matrix ei rpatss = do
@@ -1644,18 +1792,42 @@ checkClauseMatrix dec dHead =
 -- A redundant clause is unreachable because the group tries its clauses in
 -- order and the first match wins, so this is the same finding as a redundant
 -- WHEN branch, in the terms the drafter wrote.
-warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Check ()
-warnUnreachableClauses matrix headName redundant = do
+-- | One warning for each @\@desc@, @\@export@ or @\@nlg@ written between two
+-- clauses of a group, which uses none of them: the parser keeps them on the
+-- later clause ('PmMatrixClause' @clauseDescs@ and @clauseNlgs@), for a run
+-- that turns out to be overloads ('separateOverloads'), whose definitions do
+-- use them. A group's own are those above its first clause, which the parser
+-- reads as a plain definition's.
+warnLaterClauseAnnotations :: PmMatrix -> Name -> Check ()
+warnLaterClauseAnnotations matrix headName =
+  for_ (zip [2 ..] (drop 1 matrix.clauses)) \ (k, cl) -> do
+    for_ cl.clauseDescs \ d -> for_ (rangeOf d) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k (if (Export.parseDescText (getDesc d)).flags.isExport then "@export" else "@desc") hasGiven)
+    for_ cl.clauseNlgs \ nlg -> for_ (rangeOf nlg) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k "@nlg" hasGiven)
+  where
+    hasGiven = not matrix.synthesizedScrutinees
+
+warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Maybe (Int, [Name]) -> Check ()
+warnUnreachableClauses matrix headName redundant newNameCatchAll = do
   let n = length matrix.clauses
       headRangeAt i = case drop i matrix.clauses of
         cl : _ -> cl.headRange
         [] -> Nothing
-      afterCatchAll = case matrix.catchAll of
-        Just i | i + 1 < n -> [i + 1 .. n - 1]
+      -- The first clause that matches every input: by its inputs' own names
+      -- (the parser's 'PmMatrix' @catchAll@), or by new names, such as a
+      -- misspelled value ('checkClauseMatrix').
+      firstCatchAll = case (matrix.catchAll, newNameCatchAll) of
+        (Just i, Just (j, names)) | j < i -> Just (j, AfterClauseBindingNewName names)
+        (Just i, _)                       -> Just (i, AfterClauseMatchingAnything)
+        (Nothing, Just (j, names))        -> Just (j, AfterClauseBindingNewName names)
+        (Nothing, Nothing)                -> Nothing
+      afterCatchAll = case firstCatchAll of
+        Just (i, _) | i + 1 < n -> [i + 1 .. n - 1]
         _ -> []
-  case afterCatchAll of
-    firstDead : rest | Just r <- headRangeAt firstDead ->
-      addWarning (PatternClauseUnreachable r headName (AfterClauseMatchingAnything (length rest)))
+  case (afterCatchAll, firstCatchAll) of
+    (firstDead : rest, Just (_, reason)) | Just r <- headRangeAt firstDead ->
+      addWarning (PatternClauseUnreachable r headName (reason (length rest)))
     _ -> pure ()
   for_ redundant \ i ->
     unless (i `elem` afterCatchAll) $
@@ -3442,7 +3614,10 @@ checkConsider ec ann e branches t = do
   unless (hasOpaquePatterns || isPrimitiveScrutinee || null redundant) do
     addWarning $ PatternMatchRedundant redundant
 
-  hintSuspiciousBinders cl resolvedTe rbranches
+  -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
+  -- it leaves this hint to the group ('checkClauseMatrix').
+  unless (isJust generated) $
+    hintSuspiciousBinders cl resolvedTe rbranches
 
   pure (Consider ann re rbranches)
 
@@ -3992,13 +4167,18 @@ hintSuspiciousBinders cl scrutTy rbranches =
     uncovered =
       filter (\c -> getUnique c `Set.notMember` coveredCtorUniques) scrutCtors
 
-    suspiciouslyClose binderName ctor =
-      let ctorName = lastNameSegment (getName ctor)
-          lb = Text.toLower binderName
-          lc = Text.toLower ctorName
-      in lb == lc
-         || ( min (Text.length binderName) (Text.length ctorName) >= 4
-              && exactlyOneEditApart lb lc )
+    suspiciouslyClose = resemblesConstructor
+
+-- | Is a new name \"suspiciously close\" to this constructor, as
+-- 'hintSuspiciousBinders' means it?
+resemblesConstructor :: Text -> Resolved -> Bool
+resemblesConstructor binderName ctor =
+  let ctorName = lastNameSegment (getName ctor)
+      lb = Text.toLower binderName
+      lc = Text.toLower ctorName
+  in lb == lc
+     || ( min (Text.length binderName) (Text.length ctorName) >= 4
+          && exactlyOneEditApart lb lc )
 
 -- | The last segment of a name — for a qualified name (@foo.green@), the
 -- part after the final dot, so a qualified typo still resembles the bare
@@ -6835,6 +7015,13 @@ anchorWords = \ case
   AnchorAt{}       -> "…"
 
 prettyCheckError :: CheckError -> [Text]
+prettyCheckError (SuspiciousClausePattern headName hasGiven binder ctor) =
+  [ "The pattern " <> quotedName (getName binder) <> " in this clause of " <> quotedName headName
+      <> " is a new name, which matches every input."
+  , "It is very close to " <> quotedName (getName ctor) <> ", a value of its input's type that no clause matches."
+  , "If you meant that value, correct the spelling; if you meant to match anything, "
+      <> (if hasGiven then "use the input's GIVEN name." else "write `_` in backquotes.")
+  ]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   [ "This CONSIDER branch introduces a new name"
   , ""
@@ -7539,11 +7726,39 @@ prettyCheckWarning = \ case
     , "The clause above it matches every input, so " <> quotedName headName <> " never gets this far."
     , "Move these clauses above that one, or remove them."
     ]
+  PatternClauseUnreachable _ headName (AfterClauseBindingNewName names k) ->
+    [ "This clause of " <> quotedName headName <> " is never used"
+        <> (case k of
+              0 -> ""
+              1 -> ", and neither is the clause after it"
+              _ -> ", and neither are the " <> Text.textShow k <> " clauses after it")
+        <> ", because the clause above it with " <> newNames <> " matches every input."
+    , listed <> (if single then " is not a value of its input's type, so it is a new name," else " are not values of their inputs' types, so they are new names,")
+        <> " and a new name matches anything."
+    , "If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others."
+    ]
+    where
+      single = length names == 1
+      listed = Text.intercalate " and " (map quotedName names)
+      newNames = (if single then "the new name " else "the new names ") <> listed
   PatternClauseUnreachable _ headName CoveredByClausesAbove ->
     [ "This clause of " <> quotedName headName <> " is never used."
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
     ]
+  ClauseAnnotationUnused _ headName k annotation hasGiven ->
+    [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."
+    , "A rule written as clauses takes its " <> annotation <> " from " <> place <> " only."
+    , "Move it there, or remove it."
+    ]
+    where
+      place
+        | annotation == "@nlg" = "the line above its first clause"
+        | hasGiven = "above its GIVEN"
+        | otherwise = "above its first clause"
+      whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
+        w : _ | k >= 1 -> "the " <> w <> " clause"
+        _ -> "clause " <> Text.textShow k
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
     , ""

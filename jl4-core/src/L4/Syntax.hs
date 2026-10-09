@@ -884,8 +884,13 @@ moduleTopDecls = lens
 -- ----------------------------------------------------------------------------
 
 -- | One clause of a multi-clause pattern-matching group, as parsed: the
--- clause head name's source range (the warning anchor) and the argument
--- patterns, one per column.
+-- clause head name's source range (the warning anchor), the argument
+-- patterns, one per column, and what belongs to this clause alone: its head
+-- name as written, its @AKA@, and the @\@desc@ (or @\@export@) written
+-- above it. A run that the checker turns back into separate definitions
+-- ('L4.TypeCheck.separateOverloads') gives each definition its own clause's
+-- head, @AKA@ and annotations; a group keeps those of its first clause, and
+-- warns about any above a later one ('L4.TypeCheck.checkClauseMatrix').
 --
 -- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
 -- generic traversals): the stored patterns transitively contain @Expr Name@
@@ -898,14 +903,32 @@ moduleTopDecls = lens
 data PmMatrixClause = MkPmMatrixClause
   { headRange :: Maybe SrcRange
   , patterns  :: [Pattern Name]
+  , clauseHead :: Name
+    -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
+    -- clause is attached to it ('L4.Parser.ResolveAnnotation')
+  , clauseAka :: Maybe (Aka Name)
+  , clauseDescs :: [Desc]
+    -- ^ every @\@desc@ and @\@export@ written between the clause above and a
+    -- later clause, in source order ('L4.Parser.ResolveAnnotation'); a
+    -- separated overload keeps one of them, as a definition does
+    -- ('L4.Parser.ResolveAnnotation.pickDesc'). The first clause's are the
+    -- group's own, as a plain definition's are.
+  , clauseNlgs :: [Nlg]
+    -- ^ every @\@nlg@ written between the clause above and a later clause, in
+    -- source order; the one a separated overload uses is on @clauseHead@
+  , bodyRange :: Maybe SrcRange
+    -- ^ the range of the clause's body, with a @WHERE@'s definitions and
+    -- anything written inside them; an annotation after it and before the next
+    -- clause's head is written between the two clauses
+    -- ('L4.Parser.ResolveAnnotation')
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrixClause where
-  rnf (MkPmMatrixClause r ps) = rnf r `seq` rnf ps
+  rnf (MkPmMatrixClause r ps h a d n b) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n `seq` rnf b
 
 instance ToExpr PmMatrixClause where
-  toExpr (MkPmMatrixClause r ps) = toExpr (r, ps)
+  toExpr (MkPmMatrixClause r ps h a d n b) = toExpr (r, ps, h, a, (d, n, b))
 
 -- | The source clause matrix of a multi-clause pattern-matching group,
 -- attached by the parser to the fused Decide's annotation BEFORE
@@ -1686,8 +1709,8 @@ deriving anyclass instance Serialise SrcRange
 -- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
 -- definitions), so their instances are written by hand, via tuples.
 instance Serialise PmMatrixClause where
-  encode (MkPmMatrixClause r ps) = encode (r, ps)
-  decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
+  encode (MkPmMatrixClause r ps h a d n b) = encode (r, ps, h, a, (d, n, b))
+  decode = (\ (r, ps, h, a, (d, n, b)) -> MkPmMatrixClause r ps h a d n b) <$> decode
 instance Serialise PmMatrix where
   encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
   decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode

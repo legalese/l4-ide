@@ -1,0 +1,42 @@
+-- The @nlg written above a rule is that rule's, whatever comes before it. The
+-- CONSIDERs that a rule written as clauses is lowered to hold names that the
+-- parser made up, which have no place in the file; they used to take the
+-- @nlg of the rule after the group, so that it was never used (refutation of
+-- legalese/l4-ide#545's review, round 4). Each rule below is rendered with
+-- its own, as its twin written as one definition is.
+DECLARE Colour IS ONE OF Red, Green
+
+-- A rule with no GIVEN after a group.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE one Red IS 1
+DECIDE one Green IS 2
+@nlg the second rule
+DECIDE two IS 1
+
+-- A group with no GIVEN after a group.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE three Red IS 1
+DECIDE three Green IS 2
+@nlg the fourth rule
+DECIDE four Red IS 1
+DECIDE four Green IS 2
+
+-- A group with a GIVEN after a group, whose @nlg is above its first clause.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE five Red IS 1
+DECIDE five Green IS 2
+GIVEN c IS A Colour
+GIVETH A NUMBER
+@nlg the sixth rule, for %c%
+DECIDE six Red IS 1
+DECIDE six Green IS 2
+
+#EVAL one Green
+#EVAL two
+#EVAL three Green
+#EVAL four Green
+#EVAL five Green
+#EVAL six Green

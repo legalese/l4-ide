@@ -553,8 +553,12 @@ DECIDE f FALSE IS 0`, or an insurance-perils/tax-bracket enum table — Examples
   a variable and a nullary constructor, so such a group is only treated as
   pattern matching when there are ≥ 2 clauses **sharing one GIVEN/GIVETH
   signature** and at least one column's bare names differ across the clauses.
-  This deliberately excludes (type-)overloaded definitions, which each carry
-  their own signature and are therefore never gathered into one group.
+  Overloads that each carry their own signature are never gathered into one
+  group, but overloads written one after another with no signature between
+  them (`show n MEANS n + 1` / `show b MEANS b AND TRUE`) are gathered, and
+  the checker separates them again, each with its own clause's `AKA` and
+  annotations, when none of the group's names is a constructor
+  (`separateOverloads`, review of legalese/l4-ide#545, round 2).
 - **Limitation:** a _single_ clause whose arguments are all bare names, or a
   multi-clause group in which no nullary column varies, is left on the ordinary
   single-clause `decide` path (it is indistinguishable from a plain definition).

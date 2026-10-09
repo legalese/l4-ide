@@ -6,6 +6,7 @@ module L4.Parser.ResolveAnnotation (
   addNlgCommentsToAst,
   HasDesc(..),
   addDescCommentsToAst,
+  pickDesc,
   HasFixity(..),
   addFixityCommentsToAst,
   renderFixityWarning,
@@ -256,9 +257,87 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
   addNlg a = extendNlgA a $ case a of
     MkDecide ann tySig appFormAka expr -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
-      appFormAka' <- addNlg appFormAka
-      expr' <- addNlg expr
-      pure $ MkDecide ann tySig' appFormAka' expr'
+      appFormAka' <- case view annPmMatrix ann of
+        Just _ -> addNlgGroupHead appFormAka
+        Nothing -> addNlg appFormAka
+      -- Inside the body's region, which runs from the first clause's body to
+      -- the last's, so that an annotation between two clauses is in reach.
+      -- The ones between two clauses are claimed first, before a name of the
+      -- clause below (a pattern, say) can take the one written above it.
+      (expr', ann') <- hoistNlgA (\ m -> do
+        ann'' <- claimLaterClauseNlgs ann
+        e <- m
+        pure (e, ann'')) (addNlg expr)
+      pure $ MkDecide ann' tySig' appFormAka' expr'
+
+-- | The head form of a group of clauses: its head and its @AKA@. Its inputs
+-- are the @GIVEN@'s, copied into it with the @GIVEN@'s own location
+-- ('L4.Parser.givenInputBinding') and claimed there, so they are left alone
+-- here. Claiming them again made the head form's region start above the head,
+-- which left the head none of the annotations around it (an @\@nlg@ written
+-- above the first clause, a herald written on the head), and gave them to the
+-- first input instead. Without them the head claims what a plain
+-- definition's head claims, and an @\@nlg@ and a herald that are both the
+-- head's collide there, as they do on a plain definition's.
+addNlgGroupHead :: (HasSrcRange n, HasNlg n) => AppForm n -> NlgA (AppForm n)
+addNlgGroupHead a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- addNlg n
+    maka' <- traverse addNlg maka
+    pure $ MkAppForm ann n' ns maka'
+
+-- | Is this the @LET@ that a group of clauses is lowered to, binding the clauses
+-- after the first ('L4.Parser.bindFallthrough')? Its declaration holds the
+-- LATER clauses and its body the first, so the usual descent, declarations
+-- before body, would visit the clauses last to first. The declaration has the
+-- range of the second clause's body, and its claim took the @\@desc@s written
+-- before it, among them the helper of the first clause's; the regions between
+-- neighbouring nodes, which an @\@nlg@ is claimed by, were empty for a
+-- declaration that precedes its body in the tree and follows it in the file.
+-- The descent into this @LET@ takes its body first.
+bindsLaterClauses :: [LocalDecl n] -> Bool
+bindsLaterClauses = any \ case
+  LocalDecide _ (MkDecide dann _ _ _) -> isJust (view annPmSynthetic dann)
+  LocalAssume{} -> False
+
+-- | In a group of clauses, an @\@nlg@ written above a later clause belongs to
+-- that clause's head ('PmMatrixClause' @clauseHead@). A run of bare names may
+-- be overloads, each with its own annotations
+-- ('L4.TypeCheck.separateOverloads'); a group that stays a group warns about
+-- each ('PmMatrixClause' @clauseNlgs@, 'L4.TypeCheck.checkClauseMatrix').
+-- Nothing else in the group's tree is a node it could attach to.
+claimLaterClauseNlgs :: Anno -> NlgM Anno
+claimLaterClauseNlgs ann = case view annPmMatrix ann of
+  Just m | length m.clauses >= 2 -> do
+    later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
+      case betweenClauses prev cl of
+        Just between -> do
+          nlgs <- takeNlgCommentsWhere between
+          hdAnn <- attachNlgsByLanguage cl.clauseHead (getAnno cl.clauseHead) nlgs
+          pure (MkPmMatrixClause cl.headRange cl.patterns (setAnno hdAnn cl.clauseHead) cl.clauseAka cl.clauseDescs (map (.payload) nlgs) cl.bodyRange)
+        Nothing -> pure cl
+    pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
+  _ -> pure ann
+
+-- | Is this annotation written between two clauses: on a line after the one
+-- where the clause above ends, its body and the definitions of a @WHERE@ in
+-- it included, and ending before the head of this one? Nothing inside the
+-- clause above is between the two, whatever its indentation, and nothing
+-- written after the clause above is inside it, whatever its indentation. One
+-- written on the line where the clause above ends, after its body
+-- (@DECIDE f n IS n + 1 \@export ...@), stays with that clause, as it does
+-- after a rule written as one definition.
+--
+-- Nothing if either clause has no range to measure by.
+betweenClauses :: PmMatrixClause -> PmMatrixClause -> Maybe (WithSpan a -> Bool)
+betweenClauses prev cl = do
+  h <- cl.headRange
+  prevEnd <- (.end) . fromSrcRange <$> maybe prev.headRange Just prev.bodyRange
+  let hs = (fromSrcRange h).start
+  pure \ w ->
+    let we = w.range.end
+    in w.range.start.line > prevEnd.line
+         && (we.line < hs.line || (we.line == hs.line && we.column <= hs.column))
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
@@ -618,9 +697,15 @@ addNlgFieldName mTySpan a =
 -- | The shared body of both of 'Name'\'s claims.
 addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name
 addNlgNameWhere p a = extendNlgA a $ case a of
-  MkName ann raw -> do
-    ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgCommentsWhere p)
-    pure $ MkName ann' raw
+  MkName ann raw
+    -- A name with no location was made up by the desugarer (the CONSIDERs a
+    -- group of clauses is lowered to are full of them). Having no range, its
+    -- region is not bounded by its neighbours', so it would take every
+    -- annotation up to the end of the file, among them the next rule's own.
+    | Nothing <- rangeOf a -> pure a
+    | otherwise -> do
+        ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgCommentsWhere p)
+        pure $ MkName ann' raw
 
 -- | Does this annotation begin on a line strictly below where @e@ ends?
 startsBelow :: HasSrcRange e => e -> NlgWithSpan -> Bool
@@ -852,10 +937,17 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       e' <- addNlg e
       lcl' <- traverse addNlg lcl
       pure $ Where ann e' lcl'
-    LetIn ann lcl e -> do
-      lcl' <- traverse addNlg lcl
-      e' <- addNlg e
-      pure $ LetIn ann lcl' e'
+    -- The LET a group of clauses is lowered to binds the clauses after the
+    -- first, which are written after its body: source order is the body's.
+    LetIn ann lcl e
+      | bindsLaterClauses lcl -> do
+          e' <- addNlg e
+          lcl' <- traverse addNlg lcl
+          pure $ LetIn ann lcl' e'
+      | otherwise -> do
+          lcl' <- traverse addNlg lcl
+          e' <- addNlg e
+          pure $ LetIn ann lcl' e'
     Event ann e -> Event ann <$> addNlg e
     Fetch ann e -> Fetch ann <$> addNlg e
     Env ann e -> Env ann <$> addNlg e
@@ -1016,11 +1108,33 @@ instance HasDesc (Decide n) where
     -- Attach leading desc to Decide FIRST, before processing children.
     -- This ensures @export annotations are claimed by Decide before
     -- parameters in the tySig can consume them.
-    ann' <- attachLeadingDesc dec ann
+    ann0 <- attachLeadingDesc dec ann
+    -- Then the descs above the later clauses of a group, before the body,
+    -- whose generated bindings would otherwise claim them.
+    ann' <- claimLaterClauseDescs ann0
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     expr' <- addDesc expr
     pure $ MkDecide ann' tySig' app' expr'
+
+-- | In a group of clauses, the @\@desc@s and @\@export@s written between the
+-- clause above and a later clause belong to that clause ('PmMatrixClause'
+-- @clauseDescs@): a run of bare names may be overloads, each with its own
+-- annotations ('L4.TypeCheck.separateOverloads'), and a group that stays a
+-- group warns about each ('L4.TypeCheck.checkClauseMatrix'). Those above the
+-- first clause's head are not taken here: they are the group's own, read as
+-- a plain definition's are.
+claimLaterClauseDescs :: Anno -> State DescS Anno
+claimLaterClauseDescs ann = case view annPmMatrix ann of
+  Just m | length m.clauses >= 2 -> do
+    later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
+      case betweenClauses prev cl of
+        Just between -> do
+          matches <- takeMatchingDescs between
+          pure (MkPmMatrixClause cl.headRange cl.patterns cl.clauseHead cl.clauseAka (map (.payload) matches) cl.clauseNlgs cl.bodyRange)
+        Nothing -> pure cl
+    pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
+  _ -> pure ann
 
 instance HasDesc (Assume n) where
   addDesc asm@(MkAssume ann tySig appForm mType mTypically) = do
@@ -1105,7 +1219,8 @@ instance HasDesc (Aka n) where
 --
 -- The descent is /structural and exhaustive/, mirroring 'HasRef' @(Expr n)@,
 -- and always in source order — a @WHERE@\'s body precedes its declarations, a
--- @LET@\'s declarations precede its body — so a desc is always claimed by the
+-- @LET@\'s declarations precede its body (but for the @LET@ a group of clauses
+-- is lowered to, 'bindsLaterClauses') — so a desc is always claimed by the
 -- nearest following declaration, exactly as at top level. Exhaustiveness is the
 -- point, and it is enforced by @-Wincomplete-patterns@: the first version of
 -- this instance handled only @Where@ and @LetIn@ at the top of a body and ended
@@ -1147,7 +1262,9 @@ instance HasDesc (Expr n) where
     Percent    ann e     -> Percent    ann <$> addDesc e
     List       ann es    -> List       ann <$> traverse addDesc es
     Where      ann b ds  -> Where      ann <$> addDesc b <*> traverse addDesc ds
-    LetIn      ann ds b  -> LetIn      ann <$> traverse addDesc ds <*> addDesc b
+    LetIn      ann ds b
+      | bindsLaterClauses ds -> (\ b' ds' -> LetIn ann ds' b') <$> addDesc b <*> traverse addDesc ds
+      | otherwise -> LetIn ann <$> traverse addDesc ds <*> addDesc b
     Event      ann e     -> Event      ann <$> addDesc e
     Fetch      ann e     -> Fetch      ann <$> addDesc e
     Env        ann e     -> Env        ann <$> addDesc e
@@ -1282,6 +1399,14 @@ pickLeadingDesc matches =
   case lastMaybe (filter (descIsExportMarked . (.payload)) matches) of
     Just d  -> Just d
     Nothing -> lastMaybe matches
+
+-- | 'pickLeadingDesc' for descs already taken, in source order: the one a
+-- definition keeps when several are written above it.
+pickDesc :: [Desc] -> Maybe Desc
+pickDesc ds =
+  case lastMaybe (filter descIsExportMarked ds) of
+    Just d  -> Just d
+    Nothing -> lastMaybe ds
 
 -- | True if a Desc's text begins with the @export, @default or @nonexhaustive
 -- keyword, mirroring how 'L4.Export.parseDescText' consumes the leading

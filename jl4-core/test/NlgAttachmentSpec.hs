@@ -28,7 +28,7 @@ import L4.Annotation (getAnno)
 import L4.Nlg (simpleLinearizer)
 import L4.Parser (execProgramParserWithHintPass)
 import L4.Parser.ResolveAnnotation (Warning (..))
-import L4.Syntax (Module, Name, annNlg, nameToText)
+import L4.Syntax (AppForm (..), Decide (..), Module, Name, annDesc, annNlg, getDesc, nameToText)
 import qualified Optics
 import Test.Hspec
 
@@ -39,6 +39,19 @@ attachments m =
   | n <- Optics.toListOf (Optics.gplate @Name) m
   , Just nlg <- [view annNlg (getAnno n)]
   ]
+
+-- | Every definition carrying a @\@desc@, as @(name, what it says)@: the
+-- definitions inside a definition (a @WHERE@'s) included, which 'Optics.gplate'
+-- does not reach, as it stops at the first definition on each path.
+descriptions :: Module Name -> [(Text, Text)]
+descriptions m =
+  [ (nameToText n, getDesc d)
+  | MkDecide ann _ (MkAppForm _ n _ _) _ <- concatMap withinDecide (Optics.toListOf (Optics.gplate @(Decide Name)) m)
+  , Just d <- [view annDesc ann]
+  ]
+ where
+  withinDecide :: Decide Name -> [Decide Name]
+  withinDecide d = d : concatMap withinDecide (Optics.toListOf (Optics.gplate @(Decide Name)) d)
 
 parsed :: Text -> IO (Module Name, [Warning])
 parsed src =
@@ -402,3 +415,53 @@ spec = describe "which node an @nlg attaches to" $ do
         \DECIDE `is large` IF amount GREATER THAN 100\n"
       attachments m `shouldBe` []
       [ () | NotAttached{} <- ws ] `shouldSatisfy` (not . null)
+
+  describe "in a rule written as clauses" $ do
+    -- The clauses are lowered to one tree in which the later clauses are bound
+    -- by a LET, so that the tree is visited last clause first. A definition in
+    -- the WHERE of a clause found its annotation taken, or dropped, unless the
+    -- clause was the last (refutation of legalese/l4-ide#545's review, round 4).
+    let clauses ann =
+          "GIVEN n IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \DECIDE f 0 IS g 1\n\
+          \  WHERE\n\
+          \    " <> ann <> " the helper of the first clause\n\
+          \    g x MEANS x + 1\n\
+          \DECIDE f 1 IS h 2\n\
+          \  WHERE\n\
+          \    " <> ann <> " the helper of the second clause\n\
+          \    h y MEANS y + 2\n\
+          \DECIDE f other IS k 3\n\
+          \  WHERE\n\
+          \    " <> ann <> " the helper of the last clause\n\
+          \    k z MEANS z + 3\n"
+
+    it "gives a definition in the WHERE of a clause its @nlg, whichever clause it is in" $ do
+      (m, ws) <- parsed (clauses "@nlg")
+      sortOn fst (attachments m) `shouldBe`
+        [ ("g", "the helper of the first clause")
+        , ("h", "the helper of the second clause")
+        , ("k", "the helper of the last clause")
+        ]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "gives a definition in the WHERE of a clause its @desc, whichever clause it is in" $ do
+      (m, _) <- parsed (clauses "@desc")
+      sortOn fst (descriptions m) `shouldBe`
+        [ ("g", "the helper of the first clause")
+        , ("h", "the helper of the second clause")
+        , ("k", "the helper of the last clause")
+        ]
+
+    it "still leaves an @nlg written between two clauses to the clause below" $ do
+      -- No name of the clause below, a pattern say, may take it first.
+      (m, ws) <- parsed
+        "GIVEN n IS A NUMBER\n\
+        \GIVETH A NUMBER\n\
+        \DECIDE f 0 IS 1\n\
+        \DECIDE f 1 IS 2\n\
+        \@nlg between the second and the third\n\
+        \DECIDE f other IS 3\n"
+      attachments m `shouldBe` []
+      [ () | NotAttached{} <- ws ] `shouldBe` []

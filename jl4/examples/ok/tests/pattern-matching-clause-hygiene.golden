@@ -21,9 +21,9 @@ pattern-matching-clause-hygiene.l4:33:8-32:
     Move these clauses above that one, or remove them.
 pattern-matching-clause-hygiene.l4:41:8-34:
   I found a problem while checking the definition of `fresh name in the middle`:
-    This clause of `fresh name in the middle` is never used.
-    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
-    Remove it, or change its patterns.
+    This clause of `fresh name in the middle` is never used, because the clause above it with the new name `other` matches every input.
+    `other` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
 pattern-matching-clause-hygiene.l4:47:8-25:
   I found a problem while checking the definition of `repeated clause`:
     This clause of `repeated clause` is never used.
