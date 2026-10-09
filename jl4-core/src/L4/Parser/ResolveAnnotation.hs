@@ -300,11 +300,14 @@ claimLaterClauseNlgs ann = case view annPmMatrix ann of
     pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
   _ -> pure ann
 
--- | Is this annotation written between two clauses: after everything of the
--- clause above, its body and the definitions of a @WHERE@ in it included,
--- and ending before the head of this one? Nothing inside the clause above is
--- between the two, whatever its indentation, and nothing written after the
--- clause above is inside it, whatever its indentation.
+-- | Is this annotation written between two clauses: on a line after the one
+-- where the clause above ends, its body and the definitions of a @WHERE@ in
+-- it included, and ending before the head of this one? Nothing inside the
+-- clause above is between the two, whatever its indentation, and nothing
+-- written after the clause above is inside it, whatever its indentation. One
+-- written on the line where the clause above ends, after its body
+-- (@DECIDE f n IS n + 1 \@export ...@), stays with that clause, as it does
+-- after a rule written as one definition.
 --
 -- Nothing if either clause has no range to measure by.
 betweenClauses :: PmMatrixClause -> PmMatrixClause -> Maybe (WithSpan a -> Bool)
@@ -314,7 +317,7 @@ betweenClauses prev cl = do
   let hs = (fromSrcRange h).start
   pure \ w ->
     let we = w.range.end
-    in w.range.start >= prevEnd
+    in w.range.start.line > prevEnd.line
          && (we.line < hs.line || (we.line == hs.line && we.column <= hs.column))
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
