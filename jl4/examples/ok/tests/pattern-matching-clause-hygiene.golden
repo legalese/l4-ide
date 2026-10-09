@@ -33,9 +33,9 @@ pattern-matching-clause-hygiene.l4:53:8-54:18:
   I found a problem while checking the definition of `no given`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
-      DECIDE `no given` Blue `_` IS
-      DECIDE `no given` Green (JUST `_`) IS
       DECIDE `no given` Red NOTHING IS
+      DECIDE `no given` Green (JUST `_`) IS
+      DECIDE `no given` Blue `_` IS
     
 pattern-matching-clause-hygiene.l4:59:8-20:
   I found a problem while checking the definition of `one clause`:

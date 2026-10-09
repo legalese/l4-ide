@@ -75,9 +75,9 @@ pattern-matching-literal-clauses.l4:140:8-26:
   I found a problem while checking the definition of `one clause maybe`:
     This clause does not cover all cases. The following clauses are still needed:
     
+      DECIDE `one clause maybe` Red NOTHING IS
       DECIDE `one clause maybe` Green m IS
       DECIDE `one clause maybe` Blue m IS
-      DECIDE `one clause maybe` Red NOTHING IS
     
 pattern-matching-literal-clauses.l4:145:8-146:13:
   I found a problem while checking the definition of `boxed`:

@@ -1759,17 +1759,30 @@ checkClauseMatrix dec dHead =
           fit (uncovered, redundant) =
             let missingRows = render uncovered
             in if overCap missingRows then Nothing else Just (pasteOrder missingRows, redundant)
-          -- The rows in the order they can be pasted: a row that names more
-          -- numbers or texts before one that names fewer, so that no row is
-          -- covered by a row above it (a row written with the input's name
-          -- in a column covers every row keyed in that column, and a keyed
-          -- row has strictly more literals). Among rows that name as many,
-          -- the order in which the clauses first name those numbers or
-          -- texts (@1 Gold@ before @2 Gold@). Stable, so rows that name
-          -- none keep the order the enumeration engine gives them.
-          pasteOrder = List.sortOn \ row ->
-            let ks = map litKey (concatMap patLits row)
-            in (negate (length ks), map keyRank ks)
+          -- The rows in the order main's analysis lists them: column by
+          -- column, and through a nested pattern in the order it is written,
+          -- a constructor by its place in its type's declaration, a number
+          -- or a piece of text by the order in which the clauses first name
+          -- it, and the input's name after both (@1 Gold@, @2 Gold@,
+          -- @level Gold@). That is also an order they can be pasted in: where
+          -- two rows first differ, the upper one names a constructor, a
+          -- number or a text, which the lower one names differently or
+          -- leaves open, so no row is covered by a row above it.
+          pasteOrder = List.sortOn (concatMap patRanks)
+          patRanks = \ case
+            PatApp _ c ps   -> ctorRank (getUnique c) : concatMap patRanks ps
+            PatCons _ h t   -> ctorRank consUnique : patRanks h <> patRanks t
+            PatLit _ l      -> [keyRank (litKey l)]
+            PatVar {}       -> [maxBound]
+            PatExpr {}      -> [maxBound]
+          ctorRank u = Map.findWithDefault 0 u ctorIndex
+          -- A constructor's place in its type: the order the constructor
+          -- sets list them, which is the order they were declared in, and
+          -- TRUE before FALSE, as main lists them.
+          ctorIndex =
+            Map.fromList $
+              [ (getUnique c, i) | cs <- Map.elems ctorSets, (i, c) <- zip [0 :: Int ..] cs ]
+                <> [(trueUnique, 0), (falseUnique, 1)]
           keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
           keyRank k = fromMaybe (length keyOrder) (List.elemIndex k keyOrder)
           verdict = case guard (not leftOut) *> exact >>= fit of
