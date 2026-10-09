@@ -4,6 +4,7 @@
 -- | How the check of a CONSIDER scales with its arms.
 module ConsiderScaleSpec (spec) where
 
+import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -82,6 +83,54 @@ spec = describe "CONSIDER over many numbers" $ do
     (unwarned, withoutWarning) <- allocated (arms <> "    OTHERWISE \"z\"\n")
     (warned, unwarned) `shouldBe` (1, 0)
     withWarning / withoutWarning `shouldSatisfy` (< 1.25)
+
+  -- Each level of nested CONSIDERs is checked under a context that holds
+  -- the CONSIDER at that level, and so every level inside it. Resolving
+  -- the types in a diagnostic rebuilt each level of its context apart, so
+  -- that forcing the warning at the innermost level, as the language
+  -- server's rules force every diagnostic, made a copy of the syntax per
+  -- level, quadratic in the depth: 600 levels peaked at 390 MB, where the
+  -- build before GANDER, which raised no warning there, peaked at 13 MB. A
+  -- context with nothing in it to resolve is now kept as it is, and shared
+  -- ('L4.TypeCheck.Types.contextChanges').
+  --
+  -- Counted as above, with the diagnostics forced in full, against the same
+  -- nesting with an OTHERWISE at the bottom. Measured on the change that
+  -- kept the context: 1.27 with it, 2.26 without it.
+  it "costs about the same to check with a warning deep inside nested CONSIDERs as without" $ do
+    let allocated src = do
+          _ <- evaluate (Text.length src)
+          a0 <- getAllocationCounter
+          n <- case checkWithImports emptyVFS src of
+            Left errs -> fail ("the module failed to check: " <> show errs)
+            Right r -> length <$> evaluate (force r.tcdErrors)
+          a1 <- getAllocationCounter
+          pure (n, fromIntegral (a0 - a1) :: Double)
+    _ <- allocated (nestedConsiders 1 True)
+    (warned, withWarning) <- allocated (nestedConsiders 300 False)
+    (unwarned, withoutWarning) <- allocated (nestedConsiders 300 True)
+    (warned, unwarned) `shouldBe` (1, 0)
+    withWarning / withoutWarning `shouldSatisfy` (< 1.5)
+
+-- | A rule of @d@ CONSIDERs, each in the OTHERWISE of the one before, the
+-- last with an OTHERWISE or not.
+nestedConsiders :: Int -> Bool -> Text
+nestedConsiders d closed =
+  Text.unlines $
+    [ "GIVEN n IS A NUMBER"
+    , "GIVETH A STRING"
+    , "f n MEANS"
+    ]
+      <> concat
+        [ [ pad i <> "CONSIDER n"
+          , pad i <> "  WHEN " <> Text.pack (show i) <> " THEN \"a\""
+          ]
+            <> [ pad i <> "  OTHERWISE" | i < d - 1 ]
+        | i <- [0 .. d - 1]
+        ]
+      <> [ pad (d - 1) <> "  OTHERWISE \"end\"" | closed ]
+  where
+    pad i = Text.replicate (2 + 4 * i) " "
 
 -- | A rule whose CONSIDER has an arm for each of the numbers 1 to @k@, and no
 -- OTHERWISE.
