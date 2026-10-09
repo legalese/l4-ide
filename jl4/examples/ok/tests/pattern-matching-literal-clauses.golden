@@ -185,7 +185,7 @@ pattern-matching-literal-clauses.l4:303:8-304:24:
   I found a problem while checking the definition of `boxed constant`:
     This multi-clause definition does not cover all cases. The following clauses are still needed:
     
-      DECIDE `boxed constant` (Box `_`) IS
+      DECIDE `boxed constant` b IS
     
 pattern-matching-literal-clauses.l4:311:8-313:20:
   I found a problem while checking the definition of `as spelled`:
@@ -228,3 +228,17 @@ pattern-matching-literal-clauses.l4:406:8-25:
     This clause of `sixty-four keys` is never used.
     Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
     Remove it, or change its patterns.
+pattern-matching-literal-clauses.l4:417:8-419:18:
+  I found a problem while checking the definition of `left out`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `left out` n s IS
+    
+pattern-matching-literal-clauses.l4:421:1-23:
+  "two"
+pattern-matching-literal-clauses.l4:429:8-432:19:
+  I found a problem while checking the definition of `same text`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `same text` a b p IS
+    

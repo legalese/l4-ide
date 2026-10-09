@@ -1614,7 +1614,7 @@ checkClauseMatrix dec dHead =
                   (answered, redundant) <-
                     if BailGroup `elem` verdicts
                       then pure (False, [])
-                      else analyseResolvedRows matrix ei counted
+                      else analyseResolvedRows matrix ei (ClauseCoversNothing `elem` verdicts) counted
                   pure (answered, redundant, newNameCatchAll matrix rpatss)
             _ -> pure (False, [], Nothing)
         _ -> pure (False, [], Nothing)
@@ -1681,8 +1681,18 @@ checkClauseMatrix dec dHead =
     -- and then everything is uncovered: one row, every column open. So a
     -- column of literals with no catch-all always warns. A group with no
     -- number or text in it has only the first tier.
-    analyseResolvedRows :: PmMatrix -> EntityInfo -> [(PmMatrixClause, [Pattern Resolved])] -> Check (Bool, [Int])
-    analyseResolvedRows matrix ei counted = do
+    --
+    -- When a clause was left out ('ClauseCoversNothing'), only the second
+    -- tier is reported. The first could list a keyed gap that the clause
+    -- left out covers: with @f 2 "b"@, @f (EXACTLY two) s@ and @f 1 s@ it
+    -- would list @2 s@, and every @(2, s)@ meets the second clause. The
+    -- second tier leaves every number and text position open, and each of
+    -- its rows holds an input that no clause matches: a left-out clause
+    -- matches one value of its position for each value of the others, so
+    -- putting there a value that no clause names and no left-out clause
+    -- matches gives one.
+    analyseResolvedRows :: PmMatrix -> EntityInfo -> Bool -> [(PmMatrixClause, [Pattern Resolved])] -> Check (Bool, [Int])
+    analyseResolvedRows matrix ei leftOut counted = do
       -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
       -- (scrutinee, constructor), so cross-clause payload variables are
       -- shared (which the nabla reasoning needs) and columns cannot
@@ -1733,10 +1743,11 @@ checkClauseMatrix dec dHead =
           overCap missingRows =
             length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
           exact = analyse rows
-          -- Only a group with a number or a piece of text in it has a second
-          -- tier: for any other, it would re-run the same rows.
+          -- Only a group with a number or a piece of text in it, or with a
+          -- clause left out, has a second tier: for any other, it would
+          -- re-run the same rows.
           coarse = do
-            guard (any (any isLitGuard . fst) rows)
+            guard (leftOut || any (any isLitGuard . fst) rows)
             analyse (filter (not . any isLitGuard . fst) rows)
           -- The rows to report: the exact ones when they fit, else the
           -- coarse ones when they fit, else none (fail-open, the same
@@ -1761,7 +1772,7 @@ checkClauseMatrix dec dHead =
             in (negate (length ks), map keyRank ks)
           keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
           keyRank k = fromMaybe (length keyOrder) (List.elemIndex k keyOrder)
-          verdict = case exact >>= fit of
+          verdict = case guard (not leftOut) *> exact >>= fit of
             Just v -> Just v
             Nothing -> do
               (missingRows, redundant2) <- coarse >>= fit

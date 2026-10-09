@@ -296,8 +296,8 @@ DECIDE `by date` (EXACTLY d2) IS 2
 #EVAL `by date` d2   -- 2
 
 -- EXACTLY of a constant nested in a position that is a number: the clause
--- counts for nothing, as it does at the top level, and the record's other
--- values are open.
+-- counts for nothing, as it does at the top level, and with a clause left out
+-- only the clause with the input's name is listed (see `left out` below).
 GIVEN b IS A Box
 GIVETH A STRING
 DECIDE `boxed constant` (Box (EXACTLY zero)) IS "zero"
@@ -404,3 +404,29 @@ DECIDE `sixty-four keys` 62 Basic IS 62
 DECIDE `sixty-four keys` 63 Basic IS 63
 DECIDE `sixty-four keys` 64 Basic IS 64
 DECIDE `sixty-four keys` 1 Basic IS 99
+
+-- A clause whose EXACTLY the check cannot read is left out, and then only
+-- what the clauses without a number or a piece of text leave open is listed.
+-- The full list would name `2 s`, which the second clause covers for every
+-- s, so a clause pasted for it would never be used.
+two MEANS 2
+
+GIVEN n IS A NUMBER
+      s IS A STRING
+GIVETH A STRING
+DECIDE `left out` 2 "b" IS "a"
+DECIDE `left out` (EXACTLY two) s IS "two"
+DECIDE `left out` 1 s IS "one"
+
+#EVAL `left out` 2 "z"   -- "two"
+
+-- The same for an EXACTLY that names only the other inputs: the full list
+-- would name `"c" "c" Standard`, which the first clause covers.
+GIVEN a IS A STRING
+      b IS A STRING
+      p IS A Plan
+GIVETH A NUMBER
+DECIDE `same text` (EXACTLY b) (EXACTLY a) Standard IS 0
+DECIDE `same text` a "c" Plus IS 1
+DECIDE `same text` "c" "a" p IS 2
+DECIDE `same text` a "c" Gold IS 3
