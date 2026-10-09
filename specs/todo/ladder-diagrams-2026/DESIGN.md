@@ -759,6 +759,8 @@ folded subtree _is_ a box. Proven live in `standalone/` and the `s415-interactiv
 snapshot: `harm` folded and pinned true renders a green `▸ ANY of 4` while its children
 stay unknown.
 
+**Request-side assertion (proposed 2026-10-09, not built).** An override from a request is an _assertion_, and this section is the reference model for it: `presumption-assertion/CONTRACT.md` §2 copies the override semantics above (a group with a value does not consult its children) and `UNKNOWN-EVALUATION-SPEC.md` §5 records the ruling (Meng, 2026-10-09: every named node assertable, `@nonassertable` opts out, `asserted` listed beside `presumed`). What it does not copy is drawing: `dropOpenPanels` (§27.1) and `spreadValue` stay UI rules.
+
 **Next (P1): current flow.** The energization pass (DESIGN discussion): propagate
 current from the source — closed paths drawn **thick + dark**, open ones thin + light,
 the FALSE break-glyph at the stop — so cycling values visibly closes the circuit, and
@@ -1625,6 +1627,8 @@ deleted **the user's own answer** on any atom the drafter had written a TYPICALL
 since the decode path marked provenance while dropping the payload, that was the _only_ thing
 the switch could ever do. `defaults` (the presumed values) now sits under `valuation` (the
 answers), an answer always wins, and withdrawing presumptions touches no answer.
+
+**Asserted nodes (proposed 2026-10-09).** A request-side assertion on a node is a `valuation` entry, as a click is; because `provenance` marks a declaration site, the fact that a node was _told_ rather than worked out needs its own mark, a `ViewSpec.asserted: ReadonlySet<NodeId>` (`presumption-assertion/CONTRACT.md` §2), so the renderer can draw an asserted leaf or group as told. Not built.
 
 ### 26.4 `Scene.provisional` — "made" and "made out of what" are two questions
 

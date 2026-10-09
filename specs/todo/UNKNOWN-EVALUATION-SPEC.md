@@ -881,6 +881,23 @@ Two probe results from today that this spec does not explain are in §10.
 
 ---
 
+**RULED 2026-10-09 (in chat), recorded here the same day: named derived nodes may be asserted by a request, default-open, opted out by `@nonassertable`.**
+Meng, 2026-10-09: _"How about we do V5, and flip V4 with a nonassertable annotation."_
+The conversation that led to it, and the variants V0 to V6 it names, are in `PRESUMPTION-SCENARIOS.md` §7; the contract that follows from it is `presumption-assertion/CONTRACT.md`.
+As ruled:
+
+- every named derived node (a `MEANS`, in the ladder a box or a folded group) may be valued by a request, and an asserted value beats the derivation and any `TYPICALLY` (asserted > derived > presumed);
+- `@nonassertable` on a node forbids it, because the node's truth must come from its derivation; the annotation travels with the program, and projected to s(CASP) or Blawx it means the node is not abducible;
+- the answer lists every asserted node it forced under `asserted`, beside `presumed`, by T6's rule;
+- in our own evaluators the exported function's result is nonassertable by construction; this is a property of our request decoder only, since in an abductive projection the root is the goal (Meng, same day);
+- a node must be named to be addressable.
+
+So beside this section's "a presumption is a question not yet asked, not an answer": an assertion is an answer given, and the answer says so.
+Which nodes qualify in the first version, the wire spellings, lazy binding of left-out inputs, and a presumption on a named step are assumed or proposed in `presumption-assertion/CONTRACT.md` and are not part of this ruling (its §13 lists what is open).
+Nothing of it is built.
+
+---
+
 ## 6. Reports, and what does not move
 
 **There is no switch (U7b).**
@@ -1277,6 +1294,8 @@ Amended the same day by bench card TU-wire-b, recorded in full in `TYPICALLY-ONE
 Note (Track B audit, 2026-10-02): U10's case "`FALSE AND` a call that errors" had dropped out of §8 step 7 and is restored there as row 69; `eval.ts` runs behind the language server's `l4/evalApp` or the browser build's WASM shim, never the service, so the call that replaces it goes to `l4/evalApp`, and "after service explore mode" keeps only its timing (§8 step 7).
 The shared cases are also staged rather than all added when step 3 lands, as U10 and U10b say: rows 4 and 7 join at step 4 and row 19 at step 5, because their Haskell answers are not final before those steps.
 Note (C4, 2026-10-01): "explore mode" here reads as the state in which the step counter has started, that is, after a site in §4.3's table has received a term operand; there is no evaluation mode (U7b), and C4 is recorded under U4.
+
+Note (2026-10-09): the request-side assertion ruled in §5 reaches the ladder as a `valuation` entry on the node, which `ladder-core`'s `nodeValue` already treats as an override, plus a proposed `ViewSpec.asserted` set for drawing (`presumption-assertion/CONTRACT.md` §2, §5.6); it asks nothing of `eval.ts`, which U10b retires.
 
 ### U11 — An error on the right of an undecided left
 

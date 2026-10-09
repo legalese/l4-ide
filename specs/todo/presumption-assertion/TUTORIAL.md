@@ -182,7 +182,7 @@ A request that asserts `offence made out` would then be refused by name, before 
 The rule's own final answer can never be asserted in L4's own evaluators, with or without the annotation.
 
 **Not built yet.** Nothing today refuses an assertion, because nothing today accepts one.
-Open by default, with this annotation as the opt-out, is what Meng ruled in chat on 2026-10-09 (`../PRESUMPTION-SCENARIOS.md` §7); by this repository's rules it counts as decided once it is written into the specification that owns it, which is still owed.
+Open by default, with this annotation as the opt-out, is what Meng ruled in chat on 2026-10-09 (`../PRESUMPTION-SCENARIOS.md` §7); it is recorded in the specification that owns it (`UNKNOWN-EVALUATION-SPEC.md` §5), so by this repository's rules it is decided.
 
 Why open by default?
 Because the ladder already works that way, and because it makes the author write down the one thing worth writing: that a step is a conclusion.
@@ -254,15 +254,15 @@ Spreadsheet users take note: in a comma-separated values (CSV) file an empty cel
 
 ## Where each thing stands
 
-| you want to                                                                | how                                            | status                                                                                                                     |
-| -------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| presume a fact when nobody supplies it                                     | `TYPICALLY` on a fact                          | built                                                                                                                      |
-| see what an answer rests on                                                | `presumed` in the answer                       | built                                                                                                                      |
-| ask with no presumptions                                                   | `--presumption hard` / `"presumption": "hard"` | built; in `l4 batch` and most service requests it refuses before the rule runs, see "Two ways to ask"                      |
-| have a left-out fact refused only when the rule reaches it, in either mode | the design's lazy treatment of gaps            | proposed, not ruled                                                                                                        |
-| pick door two in a picture                                                 | click the named step's box                     | built                                                                                                                      |
-| pick door two in a request                                                 | `assertions` beside `arguments`                | ruled in chat 2026-10-09 (recording owed); the key's spelling and the limits on which steps qualify are assumed; not built |
-| see what was asserted                                                      | `asserted` in the answer                       | ruled in chat 2026-10-09 (recording owed); not built                                                                       |
-| keep a conclusion from being asserted                                      | `@nonassertable` on the step                   | ruled in chat 2026-10-09 (recording owed); not built                                                                       |
-| presume a named step                                                       | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                                        |
-| say "the value is not known"                                               | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                                           |
+| you want to                                                                | how                                            | status                                                                                                |
+| -------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| presume a fact when nobody supplies it                                     | `TYPICALLY` on a fact                          | built                                                                                                 |
+| see what an answer rests on                                                | `presumed` in the answer                       | built                                                                                                 |
+| ask with no presumptions                                                   | `--presumption hard` / `"presumption": "hard"` | built; in `l4 batch` and most service requests it refuses before the rule runs, see "Two ways to ask" |
+| have a left-out fact refused only when the rule reaches it, in either mode | the design's lazy treatment of gaps            | proposed, not ruled                                                                                   |
+| pick door two in a picture                                                 | click the named step's box                     | built                                                                                                 |
+| pick door two in a request                                                 | `assertions` beside `arguments`                | ruled 2026-10-09; the key's spelling and the limits on which steps qualify are assumed; not built     |
+| see what was asserted                                                      | `asserted` in the answer                       | ruled 2026-10-09; not built                                                                           |
+| keep a conclusion from being asserted                                      | `@nonassertable` on the step                   | ruled 2026-10-09; not built                                                                           |
+| presume a named step                                                       | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                   |
+| say "the value is not known"                                               | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                      |

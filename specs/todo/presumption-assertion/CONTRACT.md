@@ -2,7 +2,7 @@
 
 **Status:** proposed, 2026-10-09, revised the same day after two rounds of Opus adversarial review (§14 says what each changed); nothing in this document is built.
 It is the normative statement of a design whose measurements are in `../PRESUMPTION-SCENARIOS.md` and whose one ruling so far is §7 there (Meng, 2026-10-09, in chat): named derived nodes may be asserted by a request, default-open, opted out by `@nonassertable`, with an `asserted` list in the answer.
-That ruling counts as decided once it is recorded in `UNKNOWN-EVALUATION-SPEC.md` (repo `CLAUDE.md` §4); the recording is owed.
+That ruling is recorded in `UNKNOWN-EVALUATION-SPEC.md` §5 (2026-10-09, the revision that carries this document), so by repo `CLAUDE.md` §4 it is decided; what it decides, and what it leaves assumed or proposed, is stated there.
 Every other choice here is **assumed, not ruled**, is marked so, and is made so that it can be reverted alone.
 Where a sentence describes what the tree does today it says _today_ and cites a line at `c6d081622`.
 
@@ -314,10 +314,10 @@ Each is written on the exporter's limits page in `doc/exports/` in the same chan
 
 ## 12. What this document supersedes, once recorded
 
-Per repo `CLAUDE.md` §4, nothing below is decided until the owning document says so; the revision that follows this draft makes these edits.
+Per repo `CLAUDE.md` §4, nothing is decided until the owning document says so; the revision that carries this document made these edits, and this list records what they were.
 
 - `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`: T6's "every service response" gains the sentence that `asserted` is listed by the same rule; TU-wire-b's "lazy binding there is its own work item" is pointed at §5.4 here, with the note that §5.4 extends it beyond the direct path; T1 is unchanged, and §7 here is recorded as a question T1 does not reach.
-- `UNKNOWN-EVALUATION-SPEC.md`: §5 gains the §7 ruling of PRESUMPTION-SCENARIOS as a ruling with its date and Meng's words; §5's "a presumption is a question not yet asked" (`:871`) is joined by "an assertion is an answer given"; U9's three absences are unchanged; U10 notes the `asserted` set.
+- `UNKNOWN-EVALUATION-SPEC.md`: §5 carries the §7 ruling of PRESUMPTION-SCENARIOS as a ruling with its date and Meng's words (done); §5's "a presumption is a question not yet asked" (`:871`) is joined by "an assertion is an answer given"; U9's three absences are unchanged; U10 notes the `asserted` set.
 - `UNKNOWNS-BACKEND-CONTRACT.md`: its §6 gains a subsection "after the presumption-assertion design" from §8 here; it rules nothing and is not rewritten.
 - `RUNTIME-INPUT-STATE-SPEC.md`: marked superseded by this document and `UNKNOWN-EVALUATION-SPEC.md` §5; its four cells are DESIGN §22's and are kept as the reference for the interview layer.
 - `ladder-diagrams-2026/DESIGN.md`: §19 gains "an override from a request is an assertion (CONTRACT §2)"; §26.3 gains the `asserted` set; `types.ts:38` is cited as true until §7.
