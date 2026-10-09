@@ -944,11 +944,6 @@ checkClauseMatrix dec dHead =
       case mColTypes of
         Just colTypes0 | columnCountOk -> do
           colTypes <- traverse applySubst colTypes0
-          -- An input declared under another name for a number, a piece of
-          -- text or a date (DECLARE Age IS A NUMBER) is one, to the
-          -- coverage analysis: the synonyms are expanded for it, and only
-          -- for it, since the re-resolution below expands them itself.
-          colTypesExpanded <- traverse (expandSynonyms (8 :: Int)) colTypes
           -- Re-resolve each clause's patterns against the column types,
           -- 'quietly': the same patterns were already checked inside the
           -- desugared tree, so all diagnostics are discarded (re-emitting
@@ -978,7 +973,7 @@ checkClauseMatrix dec dHead =
               -- 'quietly' re-resolution does not record on the patterns.
               missingRows = do
                 rpatss <- traverse sequence rpatssM
-                rows <- catMaybes <$> traverse (coverageRow families colScruts colTypesExpanded) rpatss
+                rows <- catMaybes <$> traverse (coverageRow ei families colScruts colTypes) rpatss
                 uncoveredRows families (length colScruts) rows
           case missingRows of
             Just rows -> do
@@ -991,21 +986,6 @@ checkClauseMatrix dec dHead =
               pure (True, byNewName)
             Nothing -> pure (False, byNewName)
         _ -> pure (False, Nothing)
-
-    -- | A type under its synonyms, read off the entity information with
-    -- no diagnostic: 'L4.TypeCheck.Unify.tryExpandTypeSynonym' would add
-    -- an internal error for a name with no entry, such as a type from a
-    -- module that failed to import, on top of the error already reported.
-    expandSynonyms :: Int -> Type' Resolved -> Check (Type' Resolved)
-    expandSynonyms 0 ty = pure ty
-    expandSynonyms k ty = case ty of
-      TyApp _ n ts -> do
-        ei <- asks (.entityInfo)
-        case Map.lookup (getUnique n) ei of
-          Just (_, KnownType _ params (Just t)) ->
-            expandSynonyms (k - 1) (substituteType (Map.fromList (zipWith (\ p t' -> (getUnique p, t')) params ts)) t)
-          _ -> pure ty
-      _ -> pure ty
 
     -- | The first clause whose every pattern matches anything, when at least
     -- one of them does so because it is a new name rather than its input's
@@ -1158,9 +1138,9 @@ litKey = \ case
 -- | A clause's patterns as the coverage analysis sees them, column by column
 -- ('coveragePattern'): the outer 'Nothing' stands the group down, the inner
 -- one leaves the clause out.
-coverageRow :: Map Unique [(Resolved, Int)] -> [Resolved] -> [Type' Resolved] -> [Pattern Resolved] -> Maybe (Maybe [CoveragePattern])
-coverageRow families colScruts colTypes pats =
-  sequence <$> sequence (zipWith3 (\ s t p -> coveragePattern families s True (Just t) p) colScruts colTypes pats)
+coverageRow :: EntityInfo -> Map Unique [(Resolved, Int)] -> [Resolved] -> [Type' Resolved] -> [Pattern Resolved] -> Maybe (Maybe [CoveragePattern])
+coverageRow ei families colScruts colTypes pats =
+  sequence <$> sequence (zipWith3 (\ s t p -> coveragePattern ei families s True (Just t) p) colScruts colTypes pats)
 
 -- | What one pattern covers, read against its column's type.
 --
@@ -1190,14 +1170,17 @@ coverageRow families colScruts colTypes pats =
 --   input name compares the input with itself, so it matches every input,
 --   like the bare name.
 --
--- A top-level column is classified by its type after substitution and
--- synonym expansion (the caller's @colTypesExpanded@), never by the
--- pattern's annotation; a nested position has only its annotation, resolved
--- as far as the substitution goes ('checkClauseMatrix'), and an inference
--- variable left there is not primitive, so an EXACTLY under it stands the
--- group down.
+-- A top-level column is classified by its type after substitution, never by
+-- the pattern's annotation; a nested position has only its annotation,
+-- resolved as far as the substitution goes ('checkClauseMatrix'), and an
+-- inference variable left there is not primitive, so an EXACTLY under it
+-- stands the group down. Either way, an input or a field declared under
+-- another name for a number, a piece of text or a date (@DECLARE Age IS A
+-- NUMBER@) is one: the type is expanded through its synonyms
+-- ('expandSynonymsIn') before it is classified.
 coveragePattern
-  :: Map Unique [(Resolved, Int)]
+  :: EntityInfo
+  -> Map Unique [(Resolved, Int)]
   -> Resolved
   -- ^ the column's input, at every depth
   -> Bool
@@ -1207,10 +1190,10 @@ coveragePattern
   -- ^ the type at this position, where known
   -> Pattern Resolved
   -> Maybe (Maybe CoveragePattern)
-coveragePattern families input top colTy = \ case
+coveragePattern ei families input top colTy = \ case
   PatVar {}     -> Just (Just CovWild)
   PatApp _ c ps -> do
-    subs <- traverse (\ p -> coveragePattern families input False (annoType p) p) ps
+    subs <- traverse (\ p -> coveragePattern ei families input False (annoType p) p) ps
     pure (CovCon c <$> sequence subs)
   PatCons {}    -> Nothing
   PatLit _ l    -> Just (Just (CovLit (litKey l) l))
@@ -1222,12 +1205,25 @@ coveragePattern families input top colTy = \ case
       , Just (c, 0) <- List.find ((`sameResolved` r) . fst) fam
       -> Just (Just (CovCon c []))
     _ | any (`sameResolved` input) (toList e) -> Nothing
-      | Just ty <- colTy, isPrimitiveType ty -> Just Nothing
+      | Just ty <- colTy, isPrimitiveType (expandSynonymsIn ei (8 :: Int) ty) -> Just Nothing
       | otherwise -> Nothing
   where
     annoType p = case getAnno p ^. annInfo of
       Just (TypeInfo ty _) -> Just ty
       _ -> Nothing
+
+-- | A type under its synonyms, read off the entity information with no
+-- diagnostic: 'L4.TypeCheck.Unify.tryExpandTypeSynonym' would add an
+-- internal error for a name with no entry, such as a type from a module that
+-- failed to import, on top of the error already reported. At most @k@
+-- levels deep.
+expandSynonymsIn :: EntityInfo -> Int -> Type' Resolved -> Type' Resolved
+expandSynonymsIn _ 0 ty = ty
+expandSynonymsIn ei k ty = case ty of
+  TyApp _ n ts
+    | Just (_, KnownType _ params (Just t)) <- Map.lookup (getUnique n) ei
+    -> expandSynonymsIn ei (k - 1) (substituteType (Map.fromList (zipWith (\ p t' -> (getUnique p, t')) params ts)) t)
+  _ -> ty
 
 coverageToPattern :: CoveragePattern -> Pattern Resolved
 coverageToPattern = \ case

@@ -248,7 +248,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     ws `shouldBe` []
 
-  it "reads an input declared under another name for a number as a number input" $ do
+  it "reads an input or a field declared under another name for a number as a number" $ do
     let age cls = Text.unlines $
           [ "DECLARE Age IS A NUMBER"
           , ""
@@ -269,6 +269,19 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f 1              IS \"one\""
       ]
     missingClauses exactly `shouldBe` ["DECIDE `f` a IS"]
+    -- The same inside a pattern: a field declared under the other name.
+    nested <- clauseWarnings $ Text.unlines
+      [ "DECLARE Age IS A NUMBER"
+      , "DECLARE Person HAS age IS AN Age"
+      , ""
+      , "zero MEANS 0"
+      , ""
+      , "GIVEN p IS A Person"
+      , "GIVETH A STRING"
+      , "DECIDE h (Person (EXACTLY zero)) IS \"newborn\""
+      , "DECIDE h (Person 1)              IS \"one\""
+      ]
+    missingClauses nested `shouldBe` ["DECIDE `h` (Person `_`) IS"]
 
   it "leaves out a clause with an EXACTLY of a constant under a record's field" $ do
     -- The field's type is read off the pattern's annotation, resolved
