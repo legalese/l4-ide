@@ -118,6 +118,7 @@ Three spellings of "a birth year the caller may leave out", one rule each, same 
 A and B give the same answer and the same `presumed` list on every row; they differ in one refusal message.
 D does not parse and E does not check (`isTypicallyLiteral`, `TypeCheck.hs:2044`), so `NOTHING` is the only default a `MAYBE` can carry, and a `MAYBE` already has it.
 `TYPICALLY NOTHING` therefore changes no answer at the `l4 batch` wire, only a message.
+That is because a left-out `MAYBE`'s `NOTHING` is already a presumption there (T1b: listed under `presumed`, withheld under hard; `doc/tutorials/getting-started/l4-cli.md:438`), and what `TYPICALLY NOTHING` adds is one bit, that the field may be left out at a `WITH` inside the rules; D7.3 ruled it opt-in with that asymmetry in view ("Encoders annotate; callers over the wire do not have to", `SURFACE-SUGAR-CLUSTER-2026-09.md:86–88`).
 It does change behaviour elsewhere, measured after review: at `#EVAL`, a section `GIVEN year IS A MAYBE NUMBER` read by a `CONSIDER` is an assumed term and errors, where the same input with `TYPICALLY NOTHING` answers "unknown" (`sec-a.l4`, `sec-b.l4`); `l4 export docassemble` accepts the plain `MAYBE` rule and refuses the `TYPICALLY NOTHING` one ("unsupported TYPICALLY default"); and the published schema carries `"default": null` for it (`JsonSchema.hs:156–158`, `FunctionSchema.hs:359`).
 At a `WITH` it is D7.3's omission permit (§2.5).
 
@@ -144,7 +145,7 @@ Six ways to write "we may not know X; assume Y when we do not", as measured abov
 
 Rows identical except for a message: 1 and 3 at the wire; 4 and 5 at the `l4 batch` wire (the spec's §1 footgun is ironed out there).
 Rows that differ in the answer with no difference in `presumed`: 1 and 2.
-Rows where the keyword means two unrelated things: 3 (a wire no-op, a construction permit) against 4–6 (a presumption).
+Rows where the keyword means two unrelated things: 3 (the wire's `NOTHING` presumption, extended to a `WITH`) against 4–6 (a presumption).
 And on the client side, absent and `null` are two spellings of "no value" that differ in `presumed` and in hard mode (§2.2), which a client author has to learn.
 
 ## 4. Gaps, silent ones first
@@ -152,8 +153,9 @@ And on the client side, absent and `null` are two spellings of "no value" that d
 - **G1 (silent).** An author's fallback in a `CONSIDER` arm is a presumption the envelope never reports (§2.7).
   A rule author who writes `WHEN NOTHING THEN TRUE` has made exactly the presumption `TYPICALLY TRUE` makes, and a service client cannot tell.
 - **G2 (silent).** A stored presumption and a derivation that could rebut it never meet unless the author writes a check, and the check's output is a value, not a diagnostic (§2.4).
-- **G3 (silent).** `TYPICALLY NOTHING` reads as a presumption and is not one: at the batch wire it changes only a message (§2.6); at a `WITH` it is a permission to omit (§2.5); on a section input it makes `#EVAL` discharge rather than leave an assumed term; and docassemble refuses it.
+- **G3 (silent).** `TYPICALLY NOTHING` reads as a second presumption and is the wire's own `NOTHING` presumption extended to construction sites inside the rules (D7.3): at the batch wire it changes only a message (§2.6); at a `WITH` it permits omission (§2.5); on a section input it makes `#EVAL` discharge rather than leave an assumed term; and docassemble refuses it, which is a missing `NOTHING` arm in `lowerDefaultLit` (`Docassemble/Lower.hs:1456–1464`), not a design consequence.
   A `MAYBE` can carry no other default (§2.6, D and E).
+  Corrected 2026-10-09 after the bench skeptic for this question: the first version called it "a presumption that is not one".
 - **G5 (silent).** There is no presumption mode inside the rules: today's binary refuses a `WITH` that omits a defaulted field, in every mode, and #551's fills it, in every mode (§2.5); #551 lists such a fill under `presumed`, and nothing withholds it.
   Only the flag's absence from `l4 run --help` is loud.
 - **G4 (loud, wrong scope).** Hard mode on `l4 batch` and on the service's direct path refuses at decode, so a presumption at the end of a chain blocks every request that omits it, including those whose evaluation never reaches it (§2.3).
@@ -170,10 +172,9 @@ Given the measurements, the smallest changes that remove a spelling or make a si
    Route 2b shows why `l4 batch` refused it anyway: the refusal is the decoder's "Missing required field 'section presumed adult' in JSON object", so the section input had been lifted into the request record and met the decode-time check before the assumed-term behaviour could apply.
    Moving the refusal to force time gives the request's own decode the behaviour the evaluator already has.
    No syntax.
-2. **Retire `TYPICALLY` on a `MAYBE` (G3).** Either forbid it and let D7.3's construction permit attach to every `MAYBE` field, or keep D7.3 and say in the check error that `TYPICALLY NOTHING` is not a presumption.
-   The first amends two rulings: D7.3, under which the default is written where the field is declared and "never inferred from the type" (`SURFACE-SUGAR-CLUSTER-2026-09.md:71–74`), and R8 rule 3, under which a default is a module-scope expression, so `TYPICALLY (JUST 2000)` is ruled and merely not built (`IMPLICIT-PROPS-DESIGN.md:1096`; TYPICALLY spec `:65`).
-   The second keeps both rulings and documents the trap.
-   I would still take the first, because the measurements show the spelling buys nothing at the wire and costs a refused docassemble export; it amends two rulings and is Meng's call.
+2. **`TYPICALLY` on a `MAYBE` (G3): keep D7.3, and fix the exporter.** Either refuse it and let every `MAYBE` input or field be omitted at every supply site inside the rules (smucclaw#645 as filed, amending D7.3's "and only then" and "never inferred from the type", `SURFACE-SUGAR-CLUSTER-2026-09.md:71–74`, and R8 rule 3 for the `MAYBE` case, `IMPLICIT-PROPS-DESIGN.md:1096`), or keep D7.3 and say on the reference page that `TYPICALLY NOTHING` extends the wire's `NOTHING` presumption to construction sites.
+   The first version of this note recommended the first; the bench skeptic showed its premise wrong (G3 above) and that D7.3 was ruled with the measured asymmetry in view, so the recommendation is now the second, with `lowerDefaultLit`'s missing `NOTHING` arm fixed under either.
+   It is Meng's call (bench card C3).
 3. **Name the presumption arm (G1).** The one gap whose fix is a check rather than a change of semantics: an arm's value is a value, and nothing short of inspecting the arm can call it a presumption.
    The gap is a way to mark an expression as presumed so the envelope lists it and hard mode withholds it.
    Smallest form: an arm under `NOTHING` that returns a literal other than `NOTHING` is linted as "an unreported presumption; name a `TYPICALLY` input instead", which is route 2 today.
