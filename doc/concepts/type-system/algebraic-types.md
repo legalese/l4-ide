@@ -99,7 +99,7 @@ GIVETH A STRING
 L4 checks that a `CONSIDER` over an algebraic type covers all of its constructors. If a case is missing, the compiler emits a **warning**:
 
 ```l4
--- ⚠️ Warning: "The following branches still need to be considered: WHEN Rejected THEN"
+-- ⚠️ Warning: "The following branches still need to be considered: WHEN Rejected `_` THEN"
 CONSIDER status
 WHEN Pending THEN "..."
 WHEN Paid d a THEN "..."

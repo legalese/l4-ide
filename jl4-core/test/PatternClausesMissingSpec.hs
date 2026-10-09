@@ -21,6 +21,7 @@ spec :: Spec
 spec = do
   clauseSpec
   considerSpec
+  plainConsiderSpec
 
 clauseSpec :: Spec
 clauseSpec = describe "Multi-clause DECIDE: missing-case warning" $ do
@@ -1270,6 +1271,46 @@ considerSpec = describe "CONSIDER over numbers, text and EXACTLY" $ do
       , "    WHEN Entry 1 m THEN \"one\""
       ]
     missingArms ws `shouldBe` ["OTHERWISE"]
+
+-- | A CONSIDER with no number, text or EXACTLY in it, which main's own
+-- analysis checks ('L4.TypeCheck.considerWithoutLiterals').
+plainConsiderSpec :: Spec
+plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
+  let shape body = Text.unlines $
+        [ "DECLARE Shape IS ONE OF"
+        , "  Circle HAS r IS A NUMBER"
+        , "  Square HAS side IS A STRING"
+        , "  Dot"
+        , "DECLARE Box HAS content IS A Shape"
+        , ""
+        , "GIVEN s IS A Shape"
+        , "      b IS A Box"
+        , "GIVETH A STRING"
+        , "f s b MEANS"
+        ] <> body
+
+  it "writes a `_` for each field of a constructor no arm names, so the arm can be pasted" $ do
+    -- It wrote `WHEN Circle THEN`, which does not type-check pasted, while a
+    -- CONSIDER with a number in it, and unstable, write `WHEN Circle `_` THEN`.
+    ws <- considerWarnings $ shape
+      [ "  CONSIDER s"
+      , "    WHEN Dot THEN \"d\""
+      ]
+    missingArms ws `shouldBe` ["WHEN Circle `_` THEN", "WHEN Square `_` THEN"]
+    nested <- considerWarnings $ shape
+      [ "  CONSIDER b"
+      , "    WHEN Box Dot THEN \"d\""
+      ]
+    missingArms nested `shouldBe` ["WHEN Box (Circle `_`) THEN", "WHEN Box (Square `_`) THEN"]
+    -- 'warnings' fails the test on a type error, so this checks the pasted
+    -- arms type-check as well as that nothing is left.
+    pasted <- considerWarnings $ shape
+      [ "  CONSIDER s"
+      , "    WHEN Dot THEN \"d\""
+      , "    WHEN Circle `_` THEN \"c\""
+      , "    WHEN Square `_` THEN \"s\""
+      ]
+    pasted `shouldBe` []
 
 -- ----------------------------------------------------------------------------
 

@@ -2106,9 +2106,13 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   (scrutVar, pt) <- desugarBranches re rbranches
   let cl = buildConstructorLookup resolvedDecls <> builtinConstructorLookup
       bs = concretizeInfo cl pt
+      families = constructorFamilies resolvedDecls
+      arity c = fromMaybe 0 do
+        family <- Map.lookup (getUnique c) families
+        snd <$> List.find (sameResolved c . fst) family
 
   let redundant = redundantBranches $ annotateRefinement bs
-      missing = nubBy ((==) `on` fmap getUnique) $ expandToPattern scrutVar $ normalizeRefinement $ uncoverRefinement bs
+      missing = nubBy ((==) `on` fmap getUnique) $ expandToPattern arity scrutVar $ normalizeRefinement $ uncoverRefinement bs
 
   -- Skip pattern analysis warnings for primitive types (NUMBER, STRING, DATE)
   -- because the analysis is designed for algebraic data types with known constructors.
@@ -2897,8 +2901,10 @@ data ConsistentSet n
   | NotEqCons [n] [n]
   | NoInfo
 
-expandToPattern :: Resolved -> Nabla Resolved -> [BranchLhs Resolved]
-expandToPattern scrut = \ case
+-- | The missing branches, from what the arms leave open. The first argument
+-- is a constructor's number of fields.
+expandToPattern :: (Resolved -> Int) -> Resolved -> Nabla Resolved -> [BranchLhs Resolved]
+expandToPattern arity scrut = \ case
   Bottom -> []
   n@Consistent {} -> map patternToBranch (go scrut n)
  where
@@ -2923,8 +2929,10 @@ expandToPattern scrut = \ case
     cnstrs = toConsistentSet $ lookupConstraints scrutVar nabla
     go' = \ case
       EqCon c ns more -> map (PatApp emptyAnno c) (traverse (`go` nabla) ns) <> go' more
-      -- TODO: add underscores here, instead of []
-      NotEqCons _ns ncs -> map (\n' -> PatApp emptyAnno n' [] ) ncs
+      -- A constructor no arm names gets a `_` for each of its fields, as
+      -- 'coverageToPattern' writes one, so that the branch type-checks when
+      -- pasted: a bare @WHEN Circle@ for a constructor with a field does not.
+      NotEqCons _ns ncs -> map (\n' -> PatApp emptyAnno n' (replicate (arity n') (PatVar emptyAnno underscoreRef))) ncs
       NoInfo -> [PatVar emptyAnno underscoreRef]
 
 sameResolved :: Resolved -> Resolved -> Bool
