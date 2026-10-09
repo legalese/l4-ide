@@ -413,6 +413,24 @@ spec bin = do
     it "brackets a function call inside an AND" $
       batchAnswer bin bracket (rows "fff") "call under and" `shouldReturn` Bool False
 
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer as much as batch. Each expected value is what `l4 run`
+  -- gives on the fixture's own #EVAL. On build 90 the first three returned the
+  -- opposite answer with "status":"success", and the division failed to
+  -- re-parse (`a DIVIDED b`).
+  describe "l4 batch agrees with l4 run" $ do
+    let grouping = fixtureDir </> "batch-grouping.l4"
+        rows f   = fixtureDir </> ("batch-grouping-" ++ f ++ ".json")
+    it "keeps the brackets on an OR inside an AND" $
+      batchAnswer bin grouping (rows "tff") "or under and" `shouldReturn` Bool False
+    it "keeps the brackets on a NOT inside an OR" $
+      batchAnswer bin grouping (rows "ttf") "not under or" `shouldReturn` Bool True
+    it "keeps the brackets on an IMPLIES inside an AND" $
+      batchAnswer bin grouping (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "evaluates an exported division" $
+      batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
+        `shouldReturn` Number 2
+
 -- | Run one row through @l4 batch@ and return its result, failing the test
 -- unless the row's status is @success@.
 batchAnswer :: FilePath -> FilePath -> FilePath -> String -> IO Value
