@@ -1,0 +1,11 @@
+-- `l4 batch` re-prints a module and evaluates the printed text. A printer
+-- that renders `/` as `DIVIDED` without `BY` makes every exported division
+-- fail to re-parse.
+
+@export A division
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`divided` MEANS a / b
+
+#EVAL `divided` 6 3
