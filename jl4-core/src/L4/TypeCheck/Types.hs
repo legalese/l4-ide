@@ -2210,8 +2210,16 @@ instance ApplySubst CheckError where
 instance ApplySubst CheckErrorContext where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorContext) applySubst
 
+-- | The context is resolved lazily ('substituteInfVars'). It is the syntax
+-- that was being checked when the diagnostic was raised, as written, so it
+-- can be a whole definition, such as a CONSIDER of thousands of arms for a
+-- warning about that CONSIDER; 'applySubst' rebuilt all of it, for each
+-- diagnostic raised inside it, whether anything read it or not.
 instance ApplySubst CheckErrorWithContext where
-  applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorWithContext) applySubst
+  applySubst (MkCheckErrorWithContext e ctx) = do
+    e' <- applySubst e
+    s <- use #substitution
+    pure (MkCheckErrorWithContext e' (Optics.over (gplate @(Type' Resolved)) (substituteInfVars s) ctx))
 
 instance ApplySubst EntityInfo where
   applySubst = traverse (\(n, entity) -> (n, ) <$> applySubst entity)
