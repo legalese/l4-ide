@@ -2182,6 +2182,28 @@ instance ApplySubst (Type' Resolved) where
 instance ApplySubst (OptionallyNamedType Resolved) where
   applySubst (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn <$> applySubst t
 
+-- | The type 'applySubst' makes of a type, read off a snapshot of the
+-- substitution. Only the path compression 'applySubst' writes back is left
+-- out, and that changes no answer: it saves later lookups, and every reader
+-- of the substitution chases it to the end.
+--
+-- For a structure that is only read, this is the cheap way to resolve the
+-- types in it. 'applySubst' through 'gplate' rebuilds every node of the
+-- structure inside 'Check', annotations and tokens included, and holds the
+-- rebuilt nodes as closures until they are read; @'Optics.over' ('gplate'
+-- \@('Type'' 'Resolved')) ('substituteInfVars' s)@ rebuilds a node when it
+-- is read.
+substituteInfVars :: Substitution -> Type' Resolved -> Type' Resolved
+substituteInfVars s = go
+  where
+    go = \ case
+      Type ann       -> Type ann
+      TyApp ann n ts -> TyApp ann n (map go ts)
+      Fun ann onts t -> Fun ann (map goNamed onts) (go t)
+      Forall ann ns t -> Forall ann ns (go t)
+      InfVar ann rn i -> maybe (InfVar ann rn i) go (Map.lookup i s)
+    goNamed (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn (go t)
+
 instance ApplySubst CheckError where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckError) applySubst
 

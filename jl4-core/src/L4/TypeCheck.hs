@@ -116,7 +116,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.), gplate, traverseOf)
+import Optics ((%~), (^.), gplate)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -1594,10 +1594,14 @@ checkClauseMatrix dec dHead =
                     (rpat, _) <- checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty
                     -- The substitution this check extends is dropped with
                     -- the rest of its state, so the types the annotations
-                    -- of a nested pattern carry are resolved before it
-                    -- goes: 'clauseVerdict' reads them, and an inference
-                    -- variable left there stands the group down.
-                    traverseOf (gplate @(Type' Resolved)) applySubst rpat
+                    -- of a nested pattern carry are resolved against it
+                    -- before it goes: 'clauseVerdict' reads them, and an
+                    -- inference variable left there stands the group down.
+                    -- Each pattern has its own, so this is once per pattern,
+                    -- not once per group; a type is resolved as it is read
+                    -- ('substituteInfVars').
+                    subst <- use #substitution
+                    pure ((gplate @(Type' Resolved) %~ substituteInfVars subst) rpat)
           case traverse sequence rpatssM of
             Just rpatss
               | all (all patternInfoComplete) rpatss -> do
@@ -3608,10 +3612,13 @@ checkConsider ec ann e branches t = do
   resolvedTe <- applySubst te
   -- The arms' nested types, resolved as far as the substitution goes, for
   -- 'columnVerdict' to read, as 'checkClauseMatrix' resolves the clauses'.
-  armPatterns <- forM rbranches \ case
-    MkBranch _ (When _ p) _ -> Just <$> traverseOf (gplate @(Type' Resolved)) applySubst p
-    MkBranch _ (Otherwise {}) _ -> pure Nothing
-  let scrutineeName = case re of
+  -- Nothing here extends the substitution, so one snapshot serves every arm,
+  -- and an arm is resolved as 'columnVerdict' reads it ('substituteInfVars').
+  subst <- use #substitution
+  let armPatterns = flip map rbranches \ case
+        MkBranch _ (When _ p) _ -> Just ((gplate @(Type' Resolved) %~ substituteInfVars subst) p)
+        MkBranch _ (Otherwise {}) _ -> Nothing
+      scrutineeName = case re of
         Var _ x -> Just x
         _ -> Nothing
       mentionsScrutinee r = any (sameResolved r) (toList re)
