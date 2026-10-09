@@ -359,7 +359,7 @@ SEESAW, ruled 2026-10-09, makes a compound's breach report independent of operan
 Measured 2026-10-09 on the installed `l4` (pre-SEESAW), from the N12 skeptic's probes.
 P commits `v` = 1 at 20, Q commits `v` = 2 at 3, and R's guard reads `v` at 25: `a RAND b RAND c` reads 2 and `b RAND a RAND c` reads 1, because the winner is the last visible entry by log position (`Ledger.hs` ~183) and under `RAND` the log is in operand order; both writes precede the reader, so an as-of filter alone would change nothing.
 A named helper `gate` = `IF RECALL P's waived THEN FULFILLED ELSE Q MUST y WITHIN 3`, used at 0 and again after a `RECORD` at 4, re-serves the read from 0 at its second use and arms Q twice (due 3 and 7); written inline, the second read sees the record and only one Q is armed.
-That second result is a defect today, independent of this spec: `STATE-AS-LEDGER-SPEC.md` §4 defines a bare read as "the value as of this point in the deontic sequence".
+That second result happens today, independent of this spec, and follows a deliberate cache rule — a ledger read is re-served "per temporal scope" (`Machine.hs` ~1435 on `origin/unstable`, smucclaw#914 §2B), and the contract clock is not a scope — while `STATE-AS-LEDGER-SPEC.md` §4 defines a bare read as "the value as of this point in the deontic sequence".
 No goldened file reads a `RECALL` inside a contract: the six under `ok/ledger/` that `RECALL` contain no contract at all.
 
 **N3 — the window has to be on the contract clock, and the ledger's own clock cannot do it.**
