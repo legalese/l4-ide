@@ -277,6 +277,7 @@ test-suite jl4-core-test
     M5DeonticSequencingSpec
     BitemporalSubstrateSpec
     BitemporalRecallSpec
+    BreachClocksSpec
     TraceOrderingSpec
     StateGraphSpec
     DeonticStepSpec
