@@ -218,6 +218,17 @@ letRows k =
                     | (depth, i) <- zip [0 ..] (reverse [0 .. k - 1]) ]
     <> Text.replicate (2 + k) " " <> "r0\n"
 
+-- | @n@ LETs, each using the one before twice.
+letChain :: Int -> Text
+letChain n =
+  "GIVEN x IS A BOOLEAN\n      y IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE compliant IS\n"
+    <> "  LET a0 BE x\n  IN\n"
+    <> Text.concat
+         [ Text.replicate (3 + level) " " <> "LET a" <> Text.pack (show level) <> " BE a" <> Text.pack (show (level - 1)) <> " AND y OR a" <> Text.pack (show (level - 1)) <> "\n"
+             <> Text.replicate (3 + level) " " <> "IN\n"
+         | level <- [1 .. n - 1] ]
+    <> Text.replicate (3 + n) " " <> "a" <> Text.pack (show (n - 1)) <> "\n"
+
 -- | The same rows as a CONSIDER written by hand.
 considerRows :: Int -> Text
 considerRows k =
@@ -471,7 +482,7 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
 
     it "refuses a clause group one node over the budget, naming why" $
       case vizResult False (rowsGroup 600) of
-        Left e -> Ladder.prettyPrintVizError e `shouldSatisfy` Text.isInfixOf "more than 300 decision points"
+        Left e -> Ladder.prettyPrintVizError e `shouldSatisfy` Text.isInfixOf "more than 300 boxes"
         Right _ -> expectationFailure "a clause group over the budget was drawn"
 
     it "says a large clause group returning a number is not boolean, not that it is too large" $
@@ -486,6 +497,16 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
       case vizResult False (letRows 20) of
         Right body -> countLeaves body `shouldSatisfy` (> 1)
         Left e -> expectationFailure (show e)
+
+    -- A chain of LETs that each use the one before twice doubles for each LET
+    -- when written out, and the ladder is its conjunctive normal form, which
+    -- grows faster still (six LETs did not finish). Read through only while small.
+    it "reads a short chain of doubling LETs through" $
+      countLeaves (vizBody True (letChain 3)) `shouldSatisfy` (> 1)
+
+    it "leaves a long chain of doubling LETs as written, as one atom" $
+      for_ [5, 7, 13] \n ->
+        countLeaves (vizBody True (letChain n)) `shouldBe` 1
 
     it "does not hold a CONSIDER the drafter wrote to the clause-group budget" $
       vizResult False (considerRows 600) `shouldSatisfy` either (const False) (const True)

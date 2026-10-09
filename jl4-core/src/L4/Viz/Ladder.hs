@@ -75,7 +75,7 @@ prettyPrintVizError = \case
   InvalidDecideMustHaveBoolRetType ->
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
   ClauseGroupTooLarge budget ->
-    "These clauses expand to more than " <> Text.pack (show budget) <> " decision points, too many to draw as a ladder. Split the rule into smaller groups of clauses, or into named sub-rules."
+    "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Monad

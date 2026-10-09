@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4, letEnumJL4, handLetCompareJL4, rowsClauseGroupJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4, letEnumJL4, handLetCompareJL4, rowsClauseGroupJL4, letChainJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1777,10 +1777,21 @@ spec = describe "integration" do
         withServiceFromSources "rows-600" [("rule.l4", rowsClauseGroupJL4 600)] \baseUrl mgr -> do
           resp <- queryPlan' baseUrl mgr "rows-600" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
           statusCode' resp `shouldBe` 400
-          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 decision points"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
           ld <- getLadder baseUrl mgr "rows-600" "rule"
           statusCode' ld `shouldBe` 400
-          LBS.toStrict (responseBody ld) `shouldSatisfy` BS.isInfixOf "more than 300 decision points"
+          LBS.toStrict (responseBody ld) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+
+      -- Reading a drafter's LET through must never make an answer worse than leaving
+      -- it: a chain of LETs that each use the one before twice is read through only
+      -- while it is small, and is otherwise the one atom it was.
+      for_ [(3 :: Int, True), (5, False), (7, False)] \(n, readThrough) ->
+        it ("answers a chain of " <> show n <> " doubling LETs fast, " <> (if readThrough then "read through" else "as written")) do
+          withServiceFromSources "chain" [("rule.l4", letChainJL4 n)] \baseUrl mgr -> do
+            resp <- queryPlan' baseUrl mgr "chain" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+            statusCode' resp `shouldBe` 200
+            -- left as written, the one question is the LET itself, labelled with its text
+            BS.isInfixOf "LET" (LBS.toStrict (responseBody resp)) `shouldBe` not readThrough
 
       sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
       -- A LET the drafter wrote is read the same way: it must not be one opaque

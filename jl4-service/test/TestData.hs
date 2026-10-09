@@ -43,6 +43,7 @@ module TestData (
   handSingleJL4,
   clauseGroupNoGivethJL4,
   rowsClauseGroupJL4,
+  letChainJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -1278,3 +1279,16 @@ rowsClauseGroupJL4 k =
   "@export Rows\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
     <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS " <> (if even row then "TRUE" else "FALSE") | row <- [0 .. k - 1] ]
     <> "DECIDE rule n IS FALSE\n"
+
+-- | A drafter's chain of @n@ LETs that each use the one before twice. Written
+-- out it doubles for each LET, and its conjunctive normal form, which is what
+-- the ladder draws, grows faster than that.
+letChainJL4 :: Int -> Text
+letChainJL4 n =
+  "@export doubling let chain\nGIVEN x IS A BOOLEAN\n      y IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE rule IS\n"
+    <> "  LET a0 BE x\n  IN\n"
+    <> Text.concat
+         [ Text.replicate (3 + level) " " <> "LET a" <> Text.pack (show level) <> " BE a" <> Text.pack (show (level - 1)) <> " AND y OR a" <> Text.pack (show (level - 1)) <> "\n"
+             <> Text.replicate (3 + level) " " <> "IN\n"
+         | level <- [1 .. n - 1] ]
+    <> Text.replicate (3 + n) " " <> "a" <> Text.pack (show (n - 1)) <> "\n"

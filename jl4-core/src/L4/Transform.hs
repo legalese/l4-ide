@@ -191,16 +191,57 @@ inlineLocalBindingsWhere wanted = transformOf (gplate @(Expr Resolved)) step
 -- it.
 inlineLetsForViz :: Expr Resolved -> Either Int (Expr Resolved)
 inlineLetsForViz e
-  | size > letInliningNodeBudget = Left size
-  | otherwise                    = Right (joinGeneratedConsiders inlined)
+  | genSize > letInliningNodeBudget = Left genSize
+  | hasLetIn generated && estimatedFullSize generated > fromIntegral (genSize + userLetInliningNodeBudget) = Right (joinGeneratedConsiders generated)
+  | otherwise = Right (joinGeneratedConsiders full)
   where
-    inlined = inlineLocalBindingsWhere isLetIn (inlineGeneratedLets e)
-    isLetIn = \ case
+    -- The LETs the desugarer made, in linear time.
+    generated = inlineGeneratedLets e
+    -- Then the drafter's own. Reading one through copies its binding to every
+    -- place it is used, so a chain of LETs that each use the one before twice
+    -- is read through into a tree twice as large for each LET. The size is
+    -- estimated first, without building it ('estimatedFullSize'), because
+    -- the inliner walks the whole tree it builds; such a rule is left as it
+    -- was written (an opaque atom), as it was before LETs were read through.
+    full = inlineLocalBindingsWhere isLetIn generated
+    isLetIn x = case x of
       LetIn{} -> True
       _       -> False
-    -- Lazy on purpose: only the first 'letInliningNodeBudget' + 1 nodes are built.
-    size = length (take (letInliningNodeBudget + 1) (nodes inlined))
+    -- Lazy on purpose: only the first budget + 1 nodes are built.
+    genSize = length (take (letInliningNodeBudget + 1) (nodes generated))
     nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
+
+-- | The size, in expression nodes, that reading every @LET@ and @WHERE@ of an
+-- expression through would make it, worked out in time linear in the
+-- expression without building the result. A binding with parameters counts as
+-- one node where it is used.
+estimatedFullSize :: Expr Resolved -> Integer
+estimatedFullSize = go Map.empty
+  where
+    cap = 1000000000 :: Integer
+    go :: Map.Map Unique Integer -> Expr Resolved -> Integer
+    go env = \ case
+      App _ r [] | Just n <- Map.lookup (getUnique r) env -> n
+      LetIn _ ds body -> let env' = bind env ds in go env' body
+      Where _ body ds -> let env' = bind env ds in go env' body
+      e -> min cap (1 + sum (map (go env) (toListOf (gplate @(Expr Resolved)) e)))
+    bind env ds = foldl' step env ds
+      where
+        step m = \ case
+          LocalDecide _ (MkDecide _ _ (MkAppForm _ n [] _) rhs) -> Map.insert (getUnique n) (go m rhs) m
+          _ -> m
+
+-- | How many expression nodes reading a drafter's own @LET@s through may add
+-- before they are left as written. It is small because the ladder of a
+-- boolean expression is its conjunctive normal form, which can be exponentially
+-- larger than the expression, and building it is not bounded by the size of
+-- what is drawn: a chain of six LETs that each use the one before twice, 125
+-- nodes written out, did not finish. Measured: the chain of three (13 nodes)
+-- is read through, of four (29) is read through and falls back to the LET
+-- when its ladder passes 'clauseGroupLadderBudget', of five (61) is left as
+-- written.
+userLetInliningNodeBudget :: Int
+userLetInliningNodeBudget = 40
 
 -- | The size, in expression nodes, past which a @LET@ is not inlined for
 -- drawing. It bounds the work of drawing; 'clauseGroupLadderBudget' is the
