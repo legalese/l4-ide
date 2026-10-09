@@ -258,26 +258,28 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
     MkDecide ann tySig appFormAka expr -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- case view annPmMatrix ann of
-        -- A group's head is its first clause's, and its inputs are the
-        -- GIVEN's, located up in the signature ('L4.Parser.givenInputBinding'),
-        -- so the head's own region ends before it starts. Claim an @nlg
-        -- written directly above the first clause in the head form's region
-        -- instead, which a plain definition's head reaches by itself.
-        Just _ -> hoistNlgA (>>= claimFirstClauseNlgs) (addNlg appFormAka)
+        Just _ -> addNlgGroupHead appFormAka
         Nothing -> addNlg appFormAka
       -- Inside the body's region, which runs from the first clause's body to
       -- the last's, so that an annotation between two clauses is in reach.
       (expr', ann') <- hoistNlgA (\ m -> (,) <$> m <*> claimLaterClauseNlgs ann) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
 
--- | A group's @\@nlg@ written directly above its first clause belongs to the
--- group's head, as it would to a plain definition's: the head takes what is
--- left in the head form's region, which is where a plain definition's head
--- finds it. Its own region took nothing, being cut short by the inputs.
-claimFirstClauseNlgs :: HasNlg n => AppForm n -> NlgM (AppForm n)
-claimFirstClauseNlgs (MkAppForm aann hd ns maka) = do
-  hd' <- case addNlg hd of MkNlgA _ m -> m
-  pure (MkAppForm aann hd' ns maka)
+-- | The head form of a group of clauses: its head and its @AKA@. Its inputs
+-- are the @GIVEN@'s, copied into it with the @GIVEN@'s own location
+-- ('L4.Parser.givenInputBinding') and claimed there, so they are left alone
+-- here. Claiming them again made the head form's region start above the head,
+-- which left the head none of the annotations around it (an @\@nlg@ written
+-- above the first clause, a herald written on the head), and gave them to the
+-- first input instead. Without them the head claims what a plain
+-- definition's head claims, and an @\@nlg@ and a herald that are both the
+-- head's collide there, as they do on a plain definition's.
+addNlgGroupHead :: (HasSrcRange n, HasNlg n) => AppForm n -> NlgA (AppForm n)
+addNlgGroupHead a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- addNlg n
+    maka' <- traverse addNlg maka
+    pure $ MkAppForm ann n' ns maka'
 
 -- | In a group of clauses, an @\@nlg@ written above a later clause belongs to
 -- that clause's head ('PmMatrixClause' @clauseHead@). A run of bare names may

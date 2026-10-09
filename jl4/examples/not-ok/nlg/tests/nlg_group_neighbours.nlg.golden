@@ -1,0 +1,44 @@
+
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: nlg_group_neighbours.l4
+  Hidden: no
+  Range: 14:1-14:56
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message: Not attached to any valid syntax node.
+File: nlg_group_neighbours.l4
+  Hidden: no
+  Range: 22:8-22:13
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    More than one NLG annotation in language `en` attached to: three
+    An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags.
+    The following annotations would be attached:
+
+    * `outside, above the first clause %c%`
+    * `inside, on the head %c%`
+
+File: nlg_group_neighbours.l4
+  Hidden: no
+  Range: 28:8-28:12
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    More than one NLG annotation in language `en` attached to: four
+    An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags.
+    The following annotations would be attached:
+
+    * `outside, above the rule %c%`
+    * `inside, on the head %c%`
+
+File: nlg_group_neighbours.l4
+  Hidden: no
+  Range: 34:1-34:37
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message: Not attached to any valid syntax node.
