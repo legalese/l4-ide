@@ -26,6 +26,11 @@ If you already know what error you are looking at, use the table of contents bel
   - [Undefined field access](#undefined-field-access)
   - [Wrong number of inputs](#wrong-number-of-inputs)
   - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
+  - [Defaults that depend on one another](#defaults-that-depend-on-one-another)
+  - [A default that reads a section input](#a-default-that-reads-a-section-input)
+  - [A default that names another input of its own rule](#a-default-that-names-another-input-of-its-own-rule)
+  - [A default that means something else in a generated module](#a-default-that-means-something-else-in-a-generated-module)
+  - [A WITH given to a section input](#a-with-given-to-a-section-input)
   - [APPEND vs append](#append-vs-append)
   - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
   - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
@@ -503,6 +508,66 @@ or give every clause one pattern for each input the `GIVEN` names.
 A list of clauses with no `GIVEN` at all is allowed.
 L4 then works out the type of each input from the patterns and the clause bodies, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
 Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
+
+---
+
+### Defaults that depend on one another
+
+**Error message:** `These inputs' TYPICALLY defaults depend on one another in a circle:` followed by the inputs, or, for one that reads itself, `The TYPICALLY default of … reads … itself`.
+
+**What you wrote:** A [section `GIVEN`](../syntax/section-given.md) whose `TYPICALLY` default is an expression that reads the input it stands in for, directly (`a TYPICALLY (a PLUS 1)`), through a definition it calls, or through another input's default (`b TYPICALLY (c PLUS 1)` with `c TYPICALLY (b PLUS 1)`).
+
+**What went wrong:** A default is worked out from the other inputs it reads, so none in a circle can be worked out first.
+
+**How to fix it:** Make one default in the circle a plain value, or have it supply the input it would read (``(`double it` WITH base IS 10)`` reads nothing of `base`; `l4 batch` cannot run an export that also reads `base`, see the [limits at the boundary](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+
+---
+
+### A default that reads a section input
+
+**Error message:** `The TYPICALLY default of … reads the section input …`, or `… reads these section inputs, …` followed by the inputs.
+
+**What you wrote:** A `TYPICALLY` on a rule's own `GIVEN`, or on a record field, whose expression reads a [section `GIVEN`](../syntax/section-given.md), directly (`rate TYPICALLY (phi PLUS alpha)`) or through a definition it calls.
+
+**What went wrong:** A section `GIVEN`'s default is worked out once, from the values the whole evaluation was started with. A default on a rule's input or a record field is taken at each call or construction that leaves it out, so what it read there would depend on the call, and the same default could give different answers. Which should win is not settled, so the file is refused.
+
+**How to fix it:** Give the default to the section `GIVEN` instead. Or write one that reads only definitions that read no section input, or have it supply the input it would read (``(`double it` WITH alpha IS 1)`` reads nothing of `alpha`). See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+
+---
+
+### A default that names another input of its own rule
+
+**Error message:** `The TYPICALLY default of … names …, which is also the name of another input of the same rule, or another field of the same record.`, or `… names these, each also the name of …` followed by the names.
+
+**What you wrote:** A `TYPICALLY` on a rule's own `GIVEN`, or on a record field, whose expression is spelled like another input of the same rule or another field of the same record: `bonus TYPICALLY (salary DIVIDED BY 10)` beside the input `salary`, in a file that also defines something called `salary`. (Where nothing else is called that, the name is reported as not found.)
+
+**What went wrong:** A default is worked out outside the rule or record it is written on, where that rule's inputs and that record's fields are not known. So `salary` there is the file's definition, not the input, and the answer would use that value without a word.
+
+**How to fix it:** Rename the input, or the definition, so that they differ. Or write the name with its section (``(`Rates`.salary DIVIDED BY 10)``), which says which definition you mean. A default that needs another input belongs on a [section `GIVEN`](../syntax/section-given.md), whose default may read the section's other inputs. See [`TYPICALLY`](../types/TYPICALLY.md#a-default-that-is-worked-out).
+
+---
+
+### A default that means something else in a generated module
+
+**Error message:** `The TYPICALLY default of … names …, which is defined in a section and also at the top level of the file.`, or `… names these, each of which is defined …` followed by the names.
+
+**What you wrote:** A `TYPICALLY` on the `GIVEN` of an `@export`ed rule, or on a section `GIVEN` that an export reads, whose expression names a definition that is in a section and is also defined, under the same name, at the top level of the file.
+
+**What went wrong:** Where you wrote the default, the name means the section's definition. `l4 batch` and the decision service write the default out as text, in a module of their own at the top level, and read it again there, where the name means the file's. The same input would give two answers, and neither would say so.
+
+**How to fix it:** Write the name with its section, as the message shows it (``(`Rates`.phi PLUS 1)``), which means the same everywhere. Or give the two definitions different names. See [`TYPICALLY`](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service).
+
+---
+
+### A WITH given to a section input
+
+**Error message:** `This call gives … to …, which is an input of a section and not a rule`
+
+**What you wrote:** ``discount WITH `list price` IS 200``, where `discount` is a [section `GIVEN`](../syntax/section-given.md), not a rule.
+
+**What went wrong:** A `WITH` gives values to the evaluation of a rule, and an input is not a rule. An input's own value is worked out from the values the whole evaluation gives.
+
+**How to fix it:** Put the `WITH` on a rule that reads `discount` (`` `final price` WITH `list price` IS 200 ``), or drop it.
 
 ---
 

@@ -34,6 +34,13 @@ module TestData (
   declineLabelsJL4,
   twoDatesJL4,
   ruleDefaultJL4,
+  namedSiteDefaultJL4,
+  expressionDefaultJL4,
+  expressionAllDefaultJL4,
+  expressionSiteDefaultJL4,
+  expressionMultiargJL4,
+  expressionWrapperJL4,
+  constructorNamedDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
   sectionSecondJL4,
@@ -54,6 +61,8 @@ module TestData (
   heavyMainJL4,
   deepJL4,
   partialClausesJL4,
+  deonticFieldDefaultJL4,
+  deonticNestedFieldDefaultJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -758,6 +767,175 @@ GIVETH A BOOLEAN
 `may contract` MEANS `is adult` AND `has capacity`
 |]
 
+-- | A rule that takes a @TYPICALLY@ default at a NAMED site of its own, for a
+-- rule's input and for a record's field (W4, W5). The exported rule has an input
+-- called @rate@, the spelling of the input @scaled@ leaves out: @presumed@ must
+-- name the default @scaled@ took, under @scaled@, and not the request's @rate@.
+namedSiteDefaultJL4 :: Text
+namedSiteDefaultJL4 =
+  [i|
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default combine
+GIVEN n IS A NUMBER
+      rate IS A NUMBER
+      use IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+combine MEANS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS rate)'s timeout
+  ELSE 0
+|]
+
+-- | A section input whose @TYPICALLY@ is an expression that reads another section
+-- input (R8 rule 3, W7). A request that leaves @discount@ out has it worked out
+-- from the @list price@ the same request supplies, which the rule itself never
+-- names: only the default reads it.
+expressionDefaultJL4 :: Text
+expressionDefaultJL4 =
+  [i|
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+@export default final price
+GIVEN `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS discount TIMES 2
+|]
+
+-- | A @TYPICALLY@ that is an expression on a rule's input, on a section input
+-- that reads another and on a record's field, together.
+expressionAllDefaultJL4 :: Text
+expressionAllDefaultJL4 =
+  [i|
+GIVETH A NUMBER
+phi MEANS 8
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+  retries IS A NUMBER
+
+@export default final price
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+      cfg IS A Config
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS ((`list price` MINUS discount) TIMES rate) PLUS cfg's timeout
+|]
+
+-- | Expression defaults taken at a NAMED site inside the rules, each naming a
+-- definition. A default there may not read a section input
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3, decision 1), so it is one value
+-- wherever it is taken.
+expressionSiteDefaultJL4 :: Text
+expressionSiteDefaultJL4 =
+  [i|
+GIVETH A NUMBER
+phi MEANS 8
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+  retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default combine
+GIVEN n IS A NUMBER
+      use IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+combine MEANS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS 1)'s timeout
+  ELSE 0
+|]
+
+-- | Defaults that are named calls with SEVERAL arguments, on a section input and
+-- on the export's own input. Each is written out as source, in the wrapper the
+-- service generates for a request with an uncertain input and in the schema's
+-- @default@, and the second argument used to land on a line of its own there.
+expressionMultiargJL4 :: Text
+expressionMultiargJL4 =
+  [i|
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+combine MEANS a PLUS b
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER
+          discount IS A NUMBER TYPICALLY (combine WITH a IS `list price`, b IS 1)
+
+@export default final price
+GIVEN rate IS A NUMBER TYPICALLY (combine WITH a IS 2, b IS 3)
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS (`list price` MINUS discount) TIMES rate
+|]
+
+-- | Defaults whose value is a bare constructor (FALSE, an enum value), taken at
+-- a NAMED site inside the rules (W4, W5). A constructor is a name, and every use
+-- of it in a run used to share one cell, so a default that was never read was
+-- listed in @presumed@ as soon as the same constructor was evaluated later
+-- (review F1, 2026-10-03). With @x@ FALSE the AND stops at @a@, so @b@ is never
+-- read, although the rule goes on to evaluate FALSE; the second rule's @d@ is
+-- never read while the first's @b@ is, and they are the same constructor.
+constructorNamedDefaultJL4 :: Text
+constructorNamedDefaultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+both MEANS a AND b
+
+GIVEN a IS A BOOLEAN
+      d IS A BOOLEAN TYPICALLY FALSE
+GIVETH A NUMBER
+ignoreD MEANS 0
+
+GIVEN a IS A BOOLEAN
+      c IS A Colour TYPICALLY Red
+GIVETH A NUMBER
+ignoreC MEANS 0
+
+@export default short circuits
+GIVEN x IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`short circuits` MEANS IF (both WITH a IS x) THEN 1 ELSE 0
+
+@export default two of one constructor
+GIVEN x IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`two of one constructor` MEANS
+  IF (ignoreD WITH a IS x) EQUALS 0 THEN (both WITH a IS TRUE) ELSE TRUE
+
+@export default enum never mentioned
+GIVEN x IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A Colour
+`enum never mentioned` MEANS IF (ignoreC WITH a IS x) EQUALS 0 THEN Red ELSE Green
+|]
+
 -- | Record-field defaults, one of them an enum constructor, and an enum
 -- default on a rule GIVEN (W3, T1b). A request that leaves @timeout@ out of
 -- @cfg@ gets 30, and @presumed@ names it @cfg.timeout@.
@@ -1127,4 +1305,80 @@ GIVEN p IS A BOOLEAN
       q IS A BOOLEAN
 GIVETH A BOOLEAN
 gate MEANS p AND q
+|]
+
+-- | A deontic rule whose party record has a field with a @TYPICALLY@. The
+-- generated wrapper builds each event's party as SOURCE, which since W5 would
+-- fill an omitted field from its default (review silent F2, 2026-10-03).
+deonticFieldDefaultJL4 :: Text
+deonticFieldDefaultJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+-- | As 'deonticFieldDefaultJL4', with the defaulted field one level down: the
+-- party's @zhome@ is an @Address@ whose @floor@ has a @TYPICALLY@ (review
+-- rulings R2-2). The nested record is sent constructor-keyed, the shape the
+-- service's own answers use, and it is generated as source like the party. It
+-- is the party's alphabetically last field on purpose, because a field after
+-- it would be attached to the nested record by the generated @WITH@ (an older
+-- defect of the wrapper, not this fixture's business).
+deonticNestedFieldDefaultJL4 :: Text
+deonticNestedFieldDefaultJL4 =
+  [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    floor IS A NUMBER TYPICALLY 1
+
+DECLARE Driver HAS
+    name IS A STRING
+    zhome IS AN Address
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+-- | A section input whose default reads another section input, read by an export
+-- that also has an input a request can send @{}@ for, so that the request takes
+-- the generated-module path (W7 second review, silent S3).
+expressionWrapperJL4 :: Text
+expressionWrapperJL4 =
+  [i|
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+@export default final price
+GIVEN `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
 |]

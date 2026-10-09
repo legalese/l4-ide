@@ -408,6 +408,11 @@ data EvalState =
       -- ^ The defaults that took effect during this directive, in the order
       -- they were forced: W8's \"took its default\" event. Per directive,
       -- like 'notes' (swapped fresh by 'L4.EvaluateLazy.withFreshLedger').
+    , globalEnv :: !(IORef Environment)
+      -- ^ The module's own environment, with its imports', as 'evalModule' last
+      -- built it. A record field's default is an expression over what the
+      -- module declares (R8 rule 3), and the JSON decoder, which runs where no
+      -- lexical environment is to hand, evaluates it here.
     }
 
 -- | 'EvalState.presumed': the events in the order forced, and the ones seen,
@@ -456,6 +461,11 @@ data PresumedOrigin
   | FromDecode !Text
     -- ^ A field of a decode the RULES made, filled the same way; the text is
     -- the type that decode started from.
+  | FromNamedApp !Text
+    -- ^ An input or field a named application left out and the checker filled
+    -- from its @TYPICALLY@ ('DefaultFill'): W4 for a rule's inputs, W5 for a
+    -- record's fields. The text is the rule or record constructor the site
+    -- applies. The path is the one input or field.
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
 
@@ -1675,7 +1685,19 @@ forwardExpr env = \ case
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
               _ -> Nothing
-        rs <- traverse (`allocate_` env) es
+        rs <- traverse (allocateArgument env) es
+        -- An argument the checker added from a TYPICALLY default
+        -- ('DefaultFill') reports itself when it is first forced, like every
+        -- other default that takes effect ('registerPresumable'). It has a
+        -- cell of its own ('allocateArgument'), so what is registered is this
+        -- default and nothing else.
+        for_ (zip es rs) \ (e, rf) ->
+          for_ (exprDefaultFill e) \ fill ->
+            registerPresumable rf MkPresumed
+              { path       = [rawNameToText fill.binder]
+              , declaredAt = fill.declaredAt
+              , origin     = FromNamedApp (rawNameToText fill.owner)
+              }
         pushFrame (App1 rs expectedType)
         -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
         -- evaluation tracer records as the function being entered, so short-
@@ -4908,16 +4930,35 @@ renderPresumedPath = Text.concat . go True
       | atStart                 = s : go False ss
       | otherwise               = "." : s : go False ss
 
--- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
--- a number, a string, or a nullary constructor. 'Nothing' for anything else,
--- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
--- will need an environment here.
+-- | The value of a @TYPICALLY@ default that is a literal: a number, a string,
+-- or a nullary constructor. 'Nothing' for any other expression (R8 rule 3), which
+-- is evaluated in the module's environment instead ('allocateFieldDefault').
+--
+-- A bare name is a constructor only if the checker recorded it as one: it may
+-- as well be a definition (@timeout TYPICALLY phi@), which has no value until
+-- it is evaluated. Evaluating a constructor's name gives the constructor, so a
+-- name the checker recorded nothing about is safe to leave to the environment.
 typicallyLiteralValue :: Expr Resolved -> Maybe WHNF
 typicallyLiteralValue = \ case
   Lit _ (NumericLit _ r) -> Just (ValNumber r)
   Lit _ (StringLit _ t)  -> Just (ValString t)
-  App _ r []             -> Just (ValConstructor r [])
+  App _ r []
+    | isConstructorRef r -> Just (ValConstructor r [])
   _                      -> Nothing
+ where
+  isConstructorRef r = case TypeCheck.getName r of
+    MkName Anno {extra = Extension {resolvedInfo = Just (TypeInfo _ (Just Constructor))}} _ -> True
+    _ -> False
+
+-- | A cell holding a record field's default. A literal is a value from birth;
+-- any other expression is a thunk over the module's environment, a cell of its
+-- own for each field it fills, so that it is worked out when that field is
+-- first read and reported then ('registerPresumable').
+allocateFieldDefault :: Expr Resolved -> Maybe WHNF -> Machine Reference
+allocateFieldDefault _ (Just v) = allocateValue v
+allocateFieldDefault d Nothing = do
+  env <- readEvalRef (.globalEnv)
+  fst <$> allocateRecursive d (const env)
 
 -- | Convert Aeson Value to L4 WHNF using type information
 -- This function recursively handles nested structures: lists of records, records containing records, etc.
@@ -5072,7 +5113,7 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                         fieldType <- expandTypeSynonyms fieldType0
                         let given = suppliedField (KeyMap.lookup (Key.fromText fieldName) obj)
                             fieldAt  = at { fieldPath = at.fieldPath <> [fieldName] }
-                            mDefault = Map.lookup fieldName defaults >>= \ d -> (d,) <$> typicallyLiteralValue d
+                            mDefault = (\ d -> (d, typicallyLiteralValue d)) <$> Map.lookup fieldName defaults
                             decision = fillDecision presumeOn (isMaybeFieldTy fieldType) mDefault given
                         pure (fieldType, fieldAt, given, decision)
                       -- Where a field left out takes its default, a key that
@@ -5106,8 +5147,8 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                           -- A declared default, reported when it is forced,
                           -- not here: a field the rule never reads did not
                           -- shape the answer (T6).
-                          (UseDefault (d, v), _) -> do
-                            rf <- allocateValue v
+                          (UseDefault (d, mv), _) -> do
+                            rf <- allocateFieldDefault d mv
                             registerPresumable rf (presumedHere (rangeOf d))
                             pure rf
                           -- D7.3's NOTHING for a MAYBE left out: a presumption
@@ -6635,6 +6676,21 @@ preAllocate ns = do
   pairs <- traverse preAllocateRef ns
   pure (Map.fromList pairs)
 
+-- | Allocate the cell of one argument of an application.
+--
+-- A default the checker added ('DefaultFill') always gets a cell of its own,
+-- even when it is a bare constructor (@TRUE@, @NOTHING@, an enum value).
+-- 'allocate_' would hand such an argument the one cell every use of that
+-- constructor shares, and 'registerPresumable' would then mark that shared
+-- cell: every later force of @FALSE@ anywhere in the run would report the
+-- default, whether or not the rule read it, and two defaults that are the same
+-- constructor would take the one registry slot between them. A numeric or
+-- string default was never affected, because a literal always gets a cell.
+allocateArgument :: Environment -> Expr Resolved -> Machine Reference
+allocateArgument env e
+  | isJust (exprDefaultFill e) = fst <$> allocateRecursive e (const env)
+  | otherwise                  = allocate_ e env
+
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
 allocate_ (Var _ann n) env = do
   -- special case where we do not actually need to allocate
@@ -6662,6 +6718,7 @@ evalModule env (MkModule _ann _uri section) = do
   names <- scanSection section
   env' <- preAllocate names
   let combinedEnv = Map.union env' env
+  writeEvalRef (.globalEnv) combinedEnv
   directives <- evalSection combinedEnv section
   pure (env', directives)
 
@@ -6903,6 +6960,15 @@ evalDecide env (MkDecide _ann _tysig (MkAppForm _ n args _maka) expr) = do
   let
     v = ValClosure (MkGivenSig emptyAnno ((\ r -> MkOptionallyTypedName emptyAnno r Nothing Nothing) <$> args)) expr env
   updateTerm env n (WHNF v)
+  -- The function a root applies to its own values for what a binder's default
+  -- reads ('L4.Discharge.defaultThunkUnique') IS that default, and reports it
+  -- when it is first entered, which is when the argument it is passed as is
+  -- first forced. Any other function is not in the table.
+  defs <- asks (.presumableDefs)
+  unless (Map.null defs) $
+    for_ (Map.lookup (getUnique n) defs) \ p -> do
+      rf <- expectTerm env n
+      registerPresumable rf p
 
 -- We are assuming that the environment already contains an entry with an address for us.
 evalDeclare :: Environment -> Declare Resolved -> Machine ()

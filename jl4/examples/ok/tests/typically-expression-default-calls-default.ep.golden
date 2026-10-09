@@ -1,0 +1,35 @@
+-- A default that calls a rule, or builds a record, and leaves out an input or a
+-- field that has a default of its own takes that default there. The callee's
+-- default is checked first, in whatever order the file declares them, so the call
+-- finds it (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7, §4.3, silent review S9). It used to
+-- be refused for leaving the input out whenever the callee's default was an
+-- expression, and worked when it was a literal.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+-- the caller comes first in the file, the callee's default is an expression
+GIVEN m IS A NUMBER
+      n IS A NUMBER TYPICALLY (g WITH a IS 1)
+GIVETH A NUMBER
+f MEANS m PLUS n
+
+GIVEN a IS A NUMBER
+      p IS A NUMBER TYPICALLY (phi PLUS 0)
+GIVETH A NUMBER
+g MEANS a PLUS p
+
+#ASSERT (f WITH m IS 0) EQUALS 9
+#ASSERT (f WITH m IS 0, n IS 2) EQUALS 2
+
+-- the same through a record: `Outer`'s field default builds an `Inner` and leaves
+-- out its defaulted field
+DECLARE Outer HAS
+  w IS A NUMBER TYPICALLY ((Inner WITH v IS 1)'s u)
+  z IS A NUMBER
+
+DECLARE Inner HAS
+  u IS A NUMBER TYPICALLY (phi TIMES 1)
+  v IS A NUMBER
+
+#ASSERT (Outer WITH z IS 0)'s w EQUALS 8

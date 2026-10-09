@@ -1,0 +1,27 @@
+-- What a TYPICALLY default does NOT excuse (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- W4 and W5). Each error below is a use that the defaults of
+-- ok/typically-named-site.l4 and ok/typically-record-construction.l4 do not reach.
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 30
+      retries IS A NUMBER
+
+-- R8 rule 1: a POSITIONAL site supplies every input, defaulted or not.
+#EVAL scaled 10
+
+-- A named site still needs every input that has no default.
+#EVAL scaled WITH rate IS 1
+
+-- An input name the rule does not have is not read as a default taken: `rate`
+-- is left out and would be defaulted, but `rte` is still unknown.
+#EVAL scaled WITH base IS 10, rte IS 2
+
+-- The same for a record: a field with no default is required, and a
+-- positional construction supplies every field.
+required MEANS Config WITH timeout IS 1
+positional MEANS Config OF 1

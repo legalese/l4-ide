@@ -215,6 +215,44 @@ batchTyTypoJson      = fixtureDir </> "batch-typically-typo.json"
 batchTyRecordTypoJson  = fixtureDir </> "batch-typically-record-typo.json"
 batchTyRecordEmptyJson = fixtureDir </> "batch-typically-record-empty.json"
 
+-- | @TYPICALLY@ taken at a NAMED site inside the rules (W4, W5): the exported
+-- rule's own input has the spelling of the one the inner rule leaves out.
+batchTyNamed, batchTyNamedJson :: FilePath
+batchTyNamed     = fixtureDir </> "batch-typically-named.l4"
+batchTyNamedJson = fixtureDir </> "batch-typically-named.json"
+
+-- | The same, for defaults whose value is a bare constructor (TRUE, FALSE, an
+-- enum value), which share a cell with every other use of it unless the checker's
+-- added argument is given a cell of its own.
+batchTyCtors, batchTyCtorsJson :: FilePath
+batchTyCtors     = fixtureDir </> "batch-typically-named-constructors.l4"
+batchTyCtorsJson = fixtureDir </> "batch-typically-named-constructors.json"
+
+-- | The name @presumed@ gives a default taken at a named site: the rule's own,
+-- as declared, whatever the site called it.
+batchTyLabels, batchTyLabelsJson :: FilePath
+batchTyLabels     = fixtureDir </> "batch-typically-named-labels.l4"
+batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
+
+-- | @TYPICALLY@ that is an EXPRESSION (W7, R8 rule 3): on a rule's input, a
+-- section input and a record's field; taken from the case, and at a named site
+-- inside the rules; and a circle of defaults, which is no program.
+batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson, batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson, batchTySupplies, batchTySuppliesJson :: FilePath
+batchTyExpr         = fixtureDir </> "batch-typically-expression.l4"
+batchTyExprJson     = fixtureDir </> "batch-typically-expression.json"
+batchTyExprAll      = fixtureDir </> "batch-typically-expression-all.l4"
+batchTyExprAllJson  = fixtureDir </> "batch-typically-expression-all.json"
+batchTyExprSite     = fixtureDir </> "batch-typically-expression-site.l4"
+batchTyExprSiteJson = fixtureDir </> "batch-typically-expression-site.json"
+batchTyCycle        = fixtureDir </> "batch-typically-cycle.l4"
+batchTyCycleJson    = fixtureDir </> "batch-typically-cycle.json"
+batchTyReads        = fixtureDir </> "batch-typically-reads-input.l4"
+batchTyReadsJson    = fixtureDir </> "batch-typically-reads-input.json"
+batchTyMulti        = fixtureDir </> "batch-typically-multiarg.l4"
+batchTyMultiJson    = fixtureDir </> "batch-typically-multiarg.json"
+batchTySupplies     = fixtureDir </> "batch-typically-default-supplies.l4"
+batchTySuppliesJson = fixtureDir </> "batch-typically-default-supplies.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -406,6 +444,9 @@ coreFixtures =
   , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
+  , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
+  , batchTyExpr, batchTyExprJson, batchTyExprAll, batchTyExprAllJson, batchTyExprSite, batchTyExprSiteJson, batchTyCycle, batchTyCycleJson
+  , batchTyReads, batchTyReadsJson, batchTyMulti, batchTyMultiJson, batchTySupplies, batchTySuppliesJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -1838,6 +1879,212 @@ spec bin = do
       hrows <- decodeArray hout
       map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
       hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
+
+  -- W4 and W5: a rule's own defaulted input, and a record's defaulted field,
+  -- may be left out at a NAMED site. The default is taken inside the rules, so
+  -- no request could have supplied it: presumption does not withdraw it, soft or
+  -- hard. Under soft `presumed` keeps only what a request could have supplied
+  -- (T6b), as it does for a rule's own JSONDECODE; under hard the answer rests
+  -- on it and lists it under the application that took it (T4b).
+  describe "l4 batch: TYPICALLY at a named site (W4, W5)" $ do
+    -- Before: the module did not check ("you have not supplied these inputs:
+    -- rate", and `timeout`), so there was no row to run. The request's own
+    -- `rate` is 7 and is NOT what `scaled` takes: it takes its default 3.
+    it "takes the default under soft, and lists nothing: no request could have supplied it" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyNamed, "--inputs", batchTyNamedJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 60), presumedOf [])
+        , (Just (Number 0), presumedOf [])
+        ]
+
+    -- The positive control is the second row: `use` FALSE never reaches either
+    -- site, so nothing is listed. The report counts what the answer rests on.
+    it "takes the same defaults with --presumption hard, and lists them under the application" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyNamed, "--inputs", batchTyNamedJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0), presumedOf [])
+        ]
+
+  -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+  -- listed whenever the same constructor was evaluated anywhere later in the
+  -- run, and two such defaults shared one registry slot. Each case below is a
+  -- default that is NOT read, or a pair of which only one is, with a later use
+  -- of the same constructor to trip it. The numeric defaults above never could.
+  describe "l4 batch: a constructor default at a named site is listed only if the answer read it" $ do
+    -- Under hard, which is where `presumed` lists a default taken inside the
+    -- rules (the same default under soft is listed nowhere, so a wrong listing
+    -- could not show).
+    let rowsFor entry = do
+          Output code sout _ <-
+            runL4 bin [ "batch", batchTyCtors, "--inputs", batchTyCtorsJson
+                      , "--entrypoint", entry, "--presumption", "hard", "--format", "json" ]
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+
+    it "lists nothing while an AND stops before the default, and the default once it is read" $ do
+      rows <- rowsFor "short circuits"
+      rows `shouldBe`
+        [ (Just (Number 0), presumedOf [])
+        , (Just (Number 0), presumedOf ["WITH both: b"])
+        ]
+
+    it "lists nothing for an enum default the rule never mentions, though the rule evaluates that constructor" $ do
+      rows <- rowsFor "never mentioned"
+      rows `shouldBe`
+        [ (Just (String "Red"), presumedOf [])
+        , (Just (String "Red"), presumedOf [])
+        ]
+
+    it "lists the one of two defaults of the same constructor that was read, and not the other" $ do
+      rows <- rowsFor "two of one constructor"
+      rows `shouldBe`
+        [ (Just (Bool False), presumedOf ["WITH readsB: b"])
+        , (Just (Bool False), presumedOf ["WITH readsB: b"])
+        ]
+
+    it "lists nothing for a record's boolean field that the construction left out and nothing read" $ do
+      rows <- rowsFor "unread field"
+      rows `shouldBe`
+        [ (Just (Bool True), presumedOf [])
+        , (Just (Bool True), presumedOf [])
+        ]
+
+  -- Review m1, 2026-10-03: the entry named the rule by whatever the callee's
+  -- resolved name carried, so an AKA alias, the section a rule is declared in
+  -- and a mixfix rule's canonical pattern all leaked into it, and none of the
+  -- documentation's examples (`WITH scaled: rate`) matched a client's parse.
+  describe "l4 batch: a default taken at a named site is listed under the rule's own name" $ do
+    it "names the rule and the record as declared: not an alias, not a section path, not a mixfix pattern" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyLabels, "--inputs", batchTyLabelsJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ ( Just (Number 140)
+          , presumedOf ["WITH scaled: rate", "WITH scaled by: factor", "WITH Config: timeout"] )
+        ]
+
+  -- W7 (R8 rule 3): a default that is an expression is worked out from the
+  -- values the SAME case supplies. Before, a default had to be a literal, so none
+  -- of these modules checked.
+  describe "l4 batch: a section input's TYPICALLY that is an expression (W7)" $ do
+    -- `discount` is a tenth of the case's own `list price`: 200 - 20, then the
+    -- case's own 200 - 5, then 50 - 5.
+    it "works the default out from the case, and lists it by name" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExpr, "--inputs", batchTyExprJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 180), presumedOf ["discount"])
+        , (Just (Number 195), presumedOf [])
+        , (Just (Number 45),  presumedOf ["discount"])
+        ]
+
+    -- Under hard no default is used, an expression among them: the row that
+    -- leaves `discount` out is an error that names it.
+    it "uses no default under --presumption hard, and names what the row left out" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyExpr, "--inputs", batchTyExprJson
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows
+        `shouldBe` [Just (String "error"), Just (String "success"), Just (String "error")]
+      sout `shouldSatisfy` ("Missing required field 'discount'" `isInfixOf`)
+
+    -- Two defaults that read one another cannot be worked out: the module does
+    -- not check, so there is no row to run.
+    it "refuses a module whose defaults read one another, before any row" $ do
+      Output code sout serr <- runL4 bin ["batch", batchTyCycle, "--inputs", batchTyCycleJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      (sout <> serr) `shouldSatisfy` ("depend on one another in a circle" `isInfixOf`)
+
+  -- W7, decision 1 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3): a rule's input and a
+  -- record's field take an expression too, over definitions and constructors,
+  -- worked out where the call or the construction is. One that reads a section
+  -- input is refused.
+  describe "l4 batch: a rule's input and a record's field take an expression too (W7)" $ do
+    -- `discount` is a tenth of the case's own `list price`, `rate` is `phi` plus
+    -- one, `cfg.timeout` is twice `phi`: (200 - 20) * 9 + 16, then with the case's
+    -- own values (200 - 5) * 2 + 1, then (50 - 5) * 9 + 16.
+    it "works each default out from the case, and lists each by name" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExprAll, "--inputs", batchTyExprAllJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 1636), presumedOf ["discount", "rate", "cfg.timeout"])
+        , (Just (Number 391),  presumedOf [])
+        , (Just (Number 421),  presumedOf ["discount", "rate", "cfg.timeout"])
+        ]
+
+    it "uses none under --presumption hard, and names what the row left out" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyExprAll, "--inputs", batchTyExprAllJson
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required fields 'rate'" `isInfixOf`)
+
+    -- The default each site takes names `phi`, a definition, so it is one value
+    -- wherever it is taken: (8 + 1) * 10 + 8 * 2, then no site reached, then
+    -- (8 + 1) * 5 + 8 * 2.
+    -- A default that is a call with several arguments is written into the module
+    -- l4 batch generates. Its second argument used to land on a line of its own
+    -- there, the generated module did not parse, and every row failed, the row
+    -- that supplied both inputs too: (200 - 201) * 5, then 200 - 5 times 1.
+    it "works out a default that is a call with several arguments" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyMulti, "--inputs", batchTyMultiJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number (-5)), presumedOf ["discount", "rate"])
+        , (Just (Number 195),  presumedOf [])
+        ]
+
+    -- A default that SUPPLIES a section input it would read reads none of it, so
+    -- the input is not one of the export's, and the rows run.
+    it "runs an export whose input's default supplies a section input" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySupplies, "--inputs", batchTySuppliesJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 200), presumedOf ["rate"])
+        , (Just (Number 300), presumedOf [])
+        ]
+
+    -- A default on a rule's input that reads a section input is a check error,
+    -- so there is no row to run (decision 1): the message names both.
+    it "refuses a rule input's default that reads a section input, before any row" $ do
+      Output code sout serr <- runL4 bin ["batch", batchTyReads, "--inputs", batchTyReadsJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let out = sout <> serr
+      out `shouldSatisfy` ("The TYPICALLY default of `discount` reads the section input" `isInfixOf`)
+      out `shouldSatisfy` ("list price" `isInfixOf`)
+
+    it "takes an expression default at a named site, and lists it under hard" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExprSite, "--inputs", batchTyExprSiteJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      map resultAndPresumed <$> decodeArray sout >>= (`shouldBe`
+        [ (Just (Number 106), presumedOf [])
+        , (Just (Number 0),   presumedOf [])
+        , (Just (Number 61),  presumedOf [])
+        ])
+      Output hcode hout _ <-
+        runL4 bin [ "batch", batchTyExprSite, "--inputs", batchTyExprSiteJson
+                  , "--presumption", "hard", "--format", "json" ]
+      hcode `shouldBe` ExitSuccess
+      map resultAndPresumed <$> decodeArray hout >>= (`shouldBe`
+        [ (Just (Number 106), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0),   presumedOf [])
+        , (Just (Number 61),  presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        ])
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

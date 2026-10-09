@@ -302,7 +302,7 @@ A call to `is-eligible` for a person who qualifies returns:
 }
 ```
 
-`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; see [Default values with TYPICALLY](#default-values-with-typically) below.
+`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; see [Default values with TYPICALLY](#default-values-with-typically) below. A service can also be set to refuse an input that is left out instead of defaulting it (`"presumption": "hard"`); in that mode `presumed` also lists a default that the rules themselves took, for example `WITH scaled: rate` when a rule calls `scaled` and leaves out its `rate`. The `jl4-service` README gives the exact form.
 
 What `value` holds depends on what the rule gives back:
 
@@ -387,10 +387,11 @@ GIVETH A BOOLEAN
 DECIDE `may purchase alcohol` IF age >= 18
 ```
 
-Inside the file, a default on a field or on a rule's own input is **metadata
-only** — it does not change how the rule evaluates. At the boundary it does:
-`l4 batch` and the decision service use it for a fact a case leaves out, and say
-so under `presumed` (see
+Inside the file, a default on a field or on a rule's own input is taken by a
+call that names the rule's inputs, or by a construction that leaves the field
+out; a call or construction by position gives every value and takes none. At
+the boundary, `l4 batch` and the decision service use it for a fact a case
+leaves out, and say so under `presumed` (see
 [the TYPICALLY reference](../../reference/types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
 The generator prefills the field, and the exported JSON schema surfaces it as the
 `default` keyword and does not list the fact as required. Because a

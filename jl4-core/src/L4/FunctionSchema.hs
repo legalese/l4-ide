@@ -9,6 +9,7 @@ module L4.FunctionSchema (
   parametersFromDecide,
   parametersFromDecideWithErrors,
   typicallyToJson,
+  typicallyIsExpression,
 ) where
 
 import Base
@@ -21,6 +22,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
+import L4.Names (getName)
+import L4.Print (prettyLayout)
 import L4.Syntax
 import L4.TypeCheck.Environment (falseUnique, maybeUnique, nothingUnique, trueUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
@@ -342,16 +345,25 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       }
 
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
--- A default is a literal ('L4.TypeCheck.isTypicallyLiteral'): a number, a
--- string, or a nullary constructor. TRUE and FALSE are JSON booleans, NOTHING
--- is null, and any other nullary constructor is an enum value, which the wire
--- spells as its name. Anything else yields Nothing (no "default" key emitted).
+--
+-- A literal or a nullary constructor is its value: a number, a string, TRUE and
+-- FALSE as JSON booleans, NOTHING as null, and any other nullary constructor as
+-- the enum value the wire spells by its name.
+--
+-- Any other expression (R8 rule 3: a default is a module-scope expression) is
+-- given as its SOURCE TEXT, a JSON string, whatever the input's type
+-- (IMPLICIT-PROPS-DESIGN.md §11.5: "its default (as source text when it is an
+-- expression)"). That is the one place the published @default@ is not a value
+-- the input could take, so a client must not fill an input from it: the
+-- documentation says so, and 'typicallyIsExpression' tells the two apart.
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
-typicallyToJson = \case
-  Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
-  Lit _ (StringLit _ t) -> Just (Aeson.String t)
-  App _ r [] -> Just (nullaryToJson r)
-  _ -> Nothing
+typicallyToJson e
+  | typicallyIsExpression e = Just (Aeson.String (prettyLayout e))
+  | otherwise = case e of
+      Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
+      Lit _ (StringLit _ t) -> Just (Aeson.String t)
+      App _ r [] -> Just (nullaryToJson r)
+      _ -> Nothing
  where
   nullaryToJson r
     | getUnique r == trueUnique = Aeson.Bool True
@@ -360,6 +372,20 @@ typicallyToJson = \case
     -- the constructor's own name, as a request spells the value: a
     -- section-qualified reference (`Light`.Red) is still "Red"
     | otherwise = Aeson.String (unqualifiedRawNameToText (rawName (getActual r)))
+
+-- | A default that is an expression rather than a value the wire could carry:
+-- not a number or string literal and not a bare constructor. A bare name the
+-- checker recorded as something other than a constructor, such as a
+-- definition (@rate TYPICALLY phi@), is an expression; one it recorded nothing
+-- about is read as the constructor it was before expressions were allowed.
+typicallyIsExpression :: Expr Resolved -> Bool
+typicallyIsExpression = \case
+  Lit {} -> False
+  App _ r []
+    | MkName nameAnno _ <- getName r
+    , Just (TypeInfo _ (Just k)) <- Optics.view annInfo nameAnno -> k /= Constructor
+    | otherwise -> False
+  _ -> True
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool

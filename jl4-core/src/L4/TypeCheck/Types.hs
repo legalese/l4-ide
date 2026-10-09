@@ -95,6 +95,24 @@ data CheckState =
     -- 'prune', which all start from the same state, so the absolute value is
     -- meaningless and is never reset: 'prune' prefers the viable outcome with
     -- the fewest such choices when exactly one has the fewest.
+    , overloadedCallees :: !(Map Unique [Type' Resolved])
+    -- ^ For each callee THIS branch of the nondeterministic search chose from
+    -- among several candidates that were all still in the running
+    -- ('resolveTermFilteredIn'), the types of the OTHER candidates, so that a
+    -- named application of it can tell whether its name is an overload for the
+    -- inputs it names. A named site whose callee is an overload takes no
+    -- @TYPICALLY@ default ('L4.TypeCheck.supplyAppNamed'): R8 does not rule on
+    -- overloads, and letting a default decide which overload an under-specified
+    -- site means would change a site that was ambiguous into one that quietly
+    -- picks a rule and runs it on a presumed value (review silent F3,
+    -- 2026-10-03).
+    --
+    -- It is cleared before each named application resolves its callee and read
+    -- straight after ('L4.TypeCheck.inferExpr', @AppNamed@), so it describes
+    -- that site and no other (review silent N3). Why the types and not a flag:
+    -- whether another candidate is a rival depends on the site, since a record
+    -- field selector takes no named inputs and a bare definition takes only
+    -- section binders (review silent N2).
     }
   deriving stock (Generic)
 
@@ -153,6 +171,11 @@ data CheckError =
     -- Under R1 a @WITH@ may name a binder /in the callee's read-set/; there is
     -- nowhere to put a value for one outside it, so the override would silently
     -- do nothing. See 'L4.Discharge.unreadImplicitSupplies'.
+  | ImplicitSupplyToInput Resolved Resolved
+    -- ^ A @WITH@ site gave a value to a section input as though it were a rule:
+    -- @discount WITH \`list price\` IS 200@. An input has nothing for a @WITH@ to
+    -- reach; the value belongs on a rule that reads it. Arguments: the input
+    -- called, and the binder supplied. See 'L4.Discharge.implicitSuppliesToInputs'.
   | AmbiguousImplicitSupply Resolved Resolved
     -- ^ A @WITH@ site named a binder the callee reads under two or more
     -- same-spelled binders, and its own 'Unique' matched none of them, so there
@@ -312,14 +335,55 @@ data CheckError =
     -- record whose value is a constructor of @PartyT@. Arguments: the
     -- obligated/acting party, the action's own actor, the action name.
   | TypicallyValueNotALiteral Name
-    -- ^ The TYPICALLY default value must be a literal (a compile-time
-    -- constant): a number or string literal, or a nullary constructor.
+    -- ^ A TYPICALLY default that nothing evaluates, on a written @ASSUME@ or a
+    -- lambda's @GIVEN@, must be a literal: a number or string literal, or a
+    -- nullary constructor. Anywhere a default is evaluated it may be any
+    -- expression (R8 rule 3, W7).
+  | TypicallyCycle [Resolved]
+    -- ^ A section binder's @TYPICALLY@ default reads the binder itself, directly
+    -- or through another binder's default or a definition it calls (R8 rule 3,
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). Carries the binders on the cycle, in
+    -- declaration order, the first of which is where the error is reported.
+    -- See 'L4.Discharge.defaultCycles'.
+  | TypicallyReadsInput Resolved [Resolved]
+    -- ^ The @TYPICALLY@ default of a rule's input or a record's field reads a
+    -- section input, directly or through a definition it calls. Arguments: the
+    -- input or field the default is on, and the section inputs it reads, in
+    -- declaration order. A section input's own default is worked out once, from
+    -- the root's values; one of these is copied to each call or construction
+    -- that leaves it out, so what it reads would depend on the call, and R8
+    -- does not say where it is to be worked out. Refused rather than answered
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3, decision 1). See
+    -- 'L4.Discharge.inputDefaultReads'.
+  | TypicallyNamesSibling Resolved [Resolved]
+    -- ^ The @TYPICALLY@ default of a rule's input or a record's field names, by
+    -- spelling, another input of the same rule or another field of the same
+    -- record. Arguments: the input or field the default is on, and the names the
+    -- default uses (the occurrences, in order). A default is worked out outside
+    -- the rule or record, where its inputs and fields are not in scope, so such
+    -- a name means whatever else is called that, and the answer quietly uses it.
+    -- Refused (smucclaw\/l4-ide W7, silent review S1). See
+    -- 'L4.Discharge.inputDefaultCaptures'.
+  | TypicallyResolvedElsewhere Resolved [Resolved]
+    -- ^ The @TYPICALLY@ default of an exported rule's input, or of a section input
+    -- an export reads, names a definition that lives in a section and that is also
+    -- defined at the top level of the file under the same name. Arguments: the
+    -- input the default is on, and the names (each respelled under its section).
+    -- Where the default is written the name means the section's, but @l4 batch@
+    -- and the decision service write the default out as text in a module of their
+    -- own and read it again at the top level, where it means the file's, so one
+    -- input would give two answers. Refused (smucclaw\/l4-ide W7, silent review S6
+    -- and rulings review S1). See 'L4.Discharge.defaultsMeaningElsewhere'.
   | TypicallyRequiresType Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | TypicallyOnComputedField Name
+    -- ^ A TYPICALLY default was written on a computed field (one with a MEANS
+    -- clause). The field is derived, so a default would never be used
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1). Carries the field.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -778,6 +842,11 @@ instance HasSrcRange CheckErrorContext where
 
 instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
+  rangeOf (TypicallyOnComputedField n)      = rangeOf n
+  rangeOf (TypicallyCycle (b : _))          = rangeOf b
+  rangeOf (TypicallyReadsInput r _)         = rangeOf r
+  rangeOf (TypicallyNamesSibling owner ns)  = rangeOf (case ns of n : _ -> n; [] -> owner)
+  rangeOf (TypicallyResolvedElsewhere owner ns) = rangeOf (case ns of n : _ -> n; [] -> owner)
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
@@ -812,6 +881,7 @@ instance HasSrcRange CheckError where
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
+  rangeOf (ImplicitSupplyToInput _ b)       = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
   rangeOf (MisdeliveredImplicitSupply _ r _) = rangeOf r
   rangeOf (AmbiguousRootBinders r _ _)      = rangeOf r
@@ -891,6 +961,33 @@ data FunTypeSig = MkFunTypeSig
   -- Includes type variables.
   , mixfixInfo :: Maybe MixfixInfo
   -- ^ If this is a mixfix function, its pattern info. Nothing for prefix functions.
+  , pendingDefaults :: [PendingDefault]
+  -- ^ The @TYPICALLY@ defaults of this signature's inputs that could not be
+  -- checked while the signature was scanned, because the definitions they may
+  -- name are not in scope until every signature has been scanned. They are
+  -- checked once those are ('L4.TypeCheck.checkPendingDefaults'), and the
+  -- results put into 'rtysig'.
+  }
+  deriving (Show, Eq, Generic)
+  deriving anyclass (SOP.Generic, NFData)
+
+-- | A rule input's @TYPICALLY@ default whose check waits until the module's
+-- definitions are in scope (R8 rule 3: a default is a module-scope expression
+-- and may name a definition, though on a rule's input not a section binder:
+-- 'TypicallyReadsInput'). Only a plain literal is
+-- checked at once, which keeps every error a literal could raise where it was.
+data PendingDefault = MkPendingDefault
+  { input        :: Resolved
+    -- ^ The input, as the checked signature names it.
+  , inputName    :: Name
+    -- ^ The input, as written, for the checker's own messages.
+  , declaredType :: Type' Resolved
+    -- ^ The input's declared type, which the default is checked against.
+  , source       :: Expr Name
+    -- ^ The default, as written.
+  , sectionPath  :: [NonEmpty Text]
+    -- ^ The section stack where the rule is declared, so that a name in the
+    -- default resolves as it would at the declaration.
   }
   deriving (Show, Eq, Generic)
   deriving anyclass (SOP.Generic, NFData)
@@ -983,6 +1080,31 @@ lookupByFirstKeyword kw reg =
 lookupByCanonicalName :: RawName -> MixfixRegistry -> [FunTypeSig]
 lookupByCanonicalName cn reg = fromMaybe [] $ Map.lookup cn reg.byCanonicalName
 
+-- | The @TYPICALLY@ default of one rule input or record field, as the checker
+-- keeps it for the sites that leave it out.
+data InputDefault = MkInputDefault
+  { owner      :: !Name
+    -- ^ The rule or record constructor that declares the input or field, named
+    -- as its declaration writes it: not an @AKA@ alias, not section-qualified,
+    -- and a mixfix rule by the name it is declared with. This is the name the
+    -- evaluator's report gives for the default ('L4.Syntax.DefaultFill'), so it
+    -- must not depend on how a site spelled the callee.
+  , binder     :: !Name
+    -- ^ The input or field, as declared.
+  , declaredAt :: !(Maybe SrcRange)
+    -- ^ The @TYPICALLY@ that gave the value.
+  , value      :: !(Expr Resolved)
+    -- ^ The checked default: any expression over what the module declares (R8
+    -- rule 3), which a site that leaves the input out has copied into it
+    -- ('L4.TypeCheck.defaultValueAt').
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | The defaults a rule or a record constructor declares, keyed by its
+-- 'Unique', then by the 'Unique' of the input or field that carries each.
+type InputDefaults = Map Unique (Map Unique InputDefault)
+
 data CheckEnv =
   MkCheckEnv
     { moduleUri            :: !NormalizedUri
@@ -1026,6 +1148,13 @@ data CheckEnv =
     -- the spelling (R-X2, smucclaw\/l4-ide#956).
     --
     -- Reset across imports for the same reason 'sectionBinderNames' is.
+    , visibleInputDefaults :: !InputDefaults
+    -- ^ The @TYPICALLY@ defaults of every rule input and record field this
+    -- module can see, keyed by the rule or record constructor that declares
+    -- them. A named application ('L4.TypeCheck.supplyAppNamed') that leaves one
+    -- out reads the value from here instead of reporting it missing
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5). Unlike 'functionTypeSigs'
+    -- this accumulates: a @WHERE@ body can still see its enclosing rules'.
     , importedImplicitReaders :: !(Set Unique)
     -- ^ Definitions in IMPORTED modules whose read-set is non-empty: they take
     -- section binders as parameters once their own module is discharged, and
@@ -1122,8 +1251,8 @@ data ActionPatternPos
 -- 'RawName' and unioning it across modules could conflate same-named
 -- record types; the cost is error-message quality only (see the notes in
 -- the exhaustiveness design doc).
-unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> CheckEnv
-unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders =
+unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> InputDefaults -> CheckEnv
+unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders depInputDefaults =
   MkCheckEnv
     { moduleUri = accEnv.moduleUri
     , environment = Map.unionWith List.union accEnv.environment depEnvironment
@@ -1137,6 +1266,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , cyclicSynonyms = mempty
     , sectionBinderNames = mempty
     , sectionBinderDecls = mempty
+    , visibleInputDefaults = Map.union accEnv.visibleInputDefaults depInputDefaults
     , importedImplicitReaders =
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
@@ -1201,6 +1331,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , inputDefaults  :: !InputDefaults
+    -- ^ The @TYPICALLY@ defaults of every rule input and record field this
+    -- module declares, plus those it inherited from its dependencies, so a chain
+    -- of imports carries them all the way out. An importer merges this into
+    -- 'CheckEnv.visibleInputDefaults', which is what lets a named application of an
+    -- imported rule, or a construction of an imported record, leave a defaulted
+    -- input or field out (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5).
     , implicitReaders :: !(Set Unique)
     -- ^ Definitions with a non-empty read-set: this module's own, plus those
     -- it inherited from its dependencies, so a chain of imports carries them
@@ -1927,7 +2064,21 @@ resolveTermFilteredIn shadowing preambleErr p viab n kont = do
     [(_t, x)] -> x >>= kont
     xs ->
       let
-        kept = [ x | (t', x) <- xs, viab t' ]
+        keptT = [ (t', x) | (t', x) <- xs, viab t' ]
+        kept0 = map snd keptT
+        -- Several candidates remain in the running: remember, on each branch,
+        -- which one it chose and what the others were, so that a named site can
+        -- see whether its callee is an overload ('overloadedCallees'). A single
+        -- survivor is no overload. Which of the others count as rivals is the
+        -- site's to say, not this function's: it knows the inputs it names.
+        kept
+          | length kept0 > 1 = zipWith markOverloaded [0 :: Int ..] keptT
+          | otherwise        = kept0
+        markOverloaded i (_, cand) = do
+          chosen@(rn, _) <- cand
+          modifying #overloadedCallees
+            (Map.insert (getUnique rn) [ t' | (j, (t', _)) <- zip [0 :: Int ..] keptT, j /= i ])
+          pure chosen
         fallback = do
           v <- fresh (rawName n)
           n' <- setAnnResolvedType v Nothing n
@@ -2388,6 +2539,7 @@ extendEnv cis env =
     , cyclicSynonyms = e.cyclicSynonyms
     , sectionBinderNames = e.sectionBinderNames
     , sectionBinderDecls = e.sectionBinderDecls
+    , visibleInputDefaults = e.visibleInputDefaults
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation

@@ -1,0 +1,27 @@
+-- l4 batch over defaults that are EXPRESSIONS and are taken at a NAMED site
+-- inside the rules (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7). Each default names a
+-- definition, `phi`: a default on a rule's input or a record's field may not
+-- read a section input (§4.3, decision 1), so it is one value wherever it is
+-- taken. Under hard each one is listed under the application that took it, and
+-- only if the answer read it.
+
+GIVETH A NUMBER
+phi MEANS 8
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY (phi TIMES 2)
+  retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY (phi PLUS 1)
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default Combine
+GIVEN n IS A NUMBER
+      use IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS 1)'s timeout
+  ELSE 0

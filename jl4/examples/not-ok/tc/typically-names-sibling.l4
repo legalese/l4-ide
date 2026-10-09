@@ -1,0 +1,45 @@
+-- A default is worked out outside the rule or the record it is written on, where
+-- that rule's inputs and that record's fields are not known (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- W7, §4.3). A name in it that is spelled like one of them therefore means
+-- whatever else is called that, when something is, and the answer would use that
+-- value without a word. It is refused.
+
+GIVETH A NUMBER
+salary MEANS 50000
+
+GIVETH A NUMBER
+phi MEANS 8
+
+-- ERROR: `salary` here is the definition above, not the input beside it
+GIVEN salary IS A NUMBER
+      bonus IS A NUMBER TYPICALLY (salary DIVIDED BY 10)
+GIVETH A NUMBER
+`total pay` MEANS salary PLUS bonus
+
+-- ERROR: the same on a record's field
+DECLARE Pay HAS
+  salary IS A NUMBER
+  extra IS A NUMBER TYPICALLY (salary DIVIDED BY 10)
+
+-- No error: a name that is not an input of this rule
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (phi PLUS 1)
+GIVETH A NUMBER
+scaled MEANS base TIMES rate
+
+-- No error: the default binds the name itself, so it never reaches the module's
+-- scope
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY (LET base BE 2 IN base TIMES phi)
+GIVETH A NUMBER
+`scaled by a local` MEANS base TIMES rate
+
+-- No error: a name written with its section says which definition it means
+§ `Rates`
+    GIVETH A NUMBER
+    wage MEANS 1000
+
+    GIVEN wage IS A NUMBER
+          tip IS A NUMBER TYPICALLY (`Rates`.wage DIVIDED BY 10)
+    GIVETH A NUMBER
+    `pay with tip` MEANS wage PLUS tip

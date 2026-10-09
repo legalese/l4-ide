@@ -49,7 +49,7 @@ import L4.Annotation (getAnno)
 import L4.Syntax
 import L4.Names (filterGivenSigTo, getName, isSectionBinderElaboration, sectionGivenNames)
 import L4.TypeCheck.Environment (maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, typeHeads)
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -428,13 +428,25 @@ collectReferencedUniques =
 -- | The body of every module-level DECIDE (in any section), keyed by the
 -- 'Unique' of the name it defines. This is the call graph's edge table:
 -- 'transitiveReferencedUniques' follows a reference into its body.
+--
+-- A section binder's @TYPICALLY@ default is in it too, under the binder's own
+-- 'Unique': a default is an expression and reads what it names (R8 rule 3,
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md W7), so whatever reads the binder is charged
+-- with the default's own reads, which is the default's read-set joining the
+-- requirement of every root that may use it. Only the elaboration the checker
+-- made of a section @GIVEN@ counts: a written @ASSUME@'s default is not used
+-- (W6 is deferred), so it reads nothing.
 decideBodiesFromModule :: Module Resolved -> Map.Map Unique (Expr Resolved)
 decideBodiesFromModule (MkModule _ _ section) =
   Map.fromList (goSection section)
  where
-  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
-  goDecl = \case
+  goSection (MkSection _ _ _ mgiven decls) =
+    let binders = sectionGivenNames mgiven
+    in decls >>= goDecl binders
+  goDecl binders = \case
     Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) -> [(getUnique name, body)]
+    d@(Assume _ (MkAssume _ _ (MkAppForm _ name [] _) _ (Just dflt)))
+      | isSectionBinderElaboration binders d -> [(getUnique name, dflt)]
     Section _ sub -> goSection sub
     _ -> []
 
@@ -480,8 +492,29 @@ assumesReadBy
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [Assume Resolved]
-assumesReadBy mod' assumes (MkDecide _ _ _ body) =
-  let referencedUniques = transitiveReferencedUniques mod' body
+assumesReadBy mod' assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) _ body) =
+  -- The export's own inputs' defaults are read too, when a request leaves the
+  -- input out: a default that names a written ASSUME makes it an input of the
+  -- export, so a request can supply it and the answer can use it. A default on a
+  -- rule's input cannot read a section input (decision 1, 'TypicallyReadsInput'),
+  -- so what this adds is a written ASSUME; it was left out once on the ground that
+  -- there was nothing to add, and an ASSUME the default reads was then neither
+  -- published nor accepted, so the default could never be used (W7 second review,
+  -- rulings S4).
+  --
+  -- A SECTION input is left out of what a default adds, though the closure does
+  -- not subtract a WITH: a default that SUPPLIES the input it would read
+  -- (@rate TYPICALLY (`double it` WITH base IS 1)@) reads none of it, and making
+  -- it an input of the export would bind it to the row in @l4 batch@, where a WITH
+  -- to a bound input is not a supply and every row is refused.
+  let binders = sectionBinderUniques mod'
+      referencedUniques =
+        Set.union
+          (transitiveReferencedUniques mod' body)
+          (Set.filter (`Set.notMember` binders)
+             (Set.unions
+                (map (transitiveReferencedUniques mod')
+                   [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ])))
   in [ assume
      | (uniq, assume) <- Map.toList assumes
      , Set.member uniq referencedUniques
@@ -707,15 +740,53 @@ validateExportImplicitImports importedReaders entityInfo mod'
           { kind    = ImplicitCrossesImport fnName importedName
           , context = WhileCheckingDecide (getActual fnName) None
           }
-      | MkDecide _ _ (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
+      | MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ fnName _ _) body <- collectExportedDecides mod'
       , u <- take 1 (Set.toList
                        (Set.intersection
-                          (transitiveReferencedUniquesWith bodies body)
+                          (Set.unions
+                             (map (transitiveReferencedUniquesWith bodies)
+                                -- A request that leaves an input out takes its
+                                -- default, so what the default calls is reached
+                                -- from the export as much as the body is. So is
+                                -- the default of a field of a record an input
+                                -- carries: the decoder takes it when the request
+                                -- leaves the field out.
+                                (body
+                                   : [ d | MkOptionallyTypedName _ _ _ (Just d) <- otns ]
+                                   <> recordFieldDefaultsReachedBy mod'
+                                        [ ty | MkOptionallyTypedName _ _ (Just ty) _ <- otns ])))
                           importedReaders))
       , Just (importedName, _) <- [Map.lookup u entityInfo]
       ]
  where
   bodies = decideBodiesFromModule mod'
+
+-- | The @TYPICALLY@ defaults of the fields of the records that these types
+-- reach: the records this module declares whose names they mention, and in turn
+-- the records the types of those records' fields mention. A record declared in
+-- an imported module is not in the module's own declarations and is not walked.
+recordFieldDefaultsReachedBy :: Module Resolved -> [Type' Resolved] -> [Expr Resolved]
+recordFieldDefaultsReachedBy (MkModule _ _ sect) tys = go Set.empty (concatMap names tys)
+ where
+  names = map getUnique . typeHeads
+
+  records = Map.fromList (declared sect)
+  declared (MkSection _ _ _ _ decls) = concatMap fromDecl decls
+  fromDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ n _ _) decl) -> case decl of
+      RecordDecl _ _ tns -> [(getUnique n, tns)]
+      EnumDecl _ cds     -> [(getUnique n, concat [ tns | MkConDecl _ _ tns <- cds ])]
+      _                  -> []
+    Section _ s -> declared s
+    _           -> []
+
+  go _ [] = []
+  go seen (u : us)
+    | Set.member u seen = go seen us
+    | Just tns <- Map.lookup u records =
+        [ d | MkTypedName _ _ _ (Just d) _ <- tns ]
+          <> go (Set.insert u seen) (concat [ names ty | MkTypedName _ _ ty _ _ <- tns ] <> us)
+    | otherwise = go (Set.insert u seen) us
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]

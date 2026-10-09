@@ -1,0 +1,33 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-named-site.l4:14:1-43:
+  assertion satisfied
+typically-named-site.l4:16:1-54:
+  assertion satisfied
+typically-named-site.l4:17:1-54:
+  assertion satisfied
+typically-named-site.l4:18:1-29:
+  30
+typically-named-site.l4:35:1-43:
+  "plain red, no rush"
+typically-named-site.l4:36:1-76:
+  "plain green, rush"
+typically-named-site.l4:37:1-61:
+  "gloss red, no rush"
+typically-named-site.l4:44:1-23:
+  0
+typically-named-site.l4:45:1-23:
+  12
+typically-named-site.l4:54:1-28:
+  5
+typically-named-site.l4:55:1-39:
+  5
+typically-named-site.l4:66:1-37:
+  assertion satisfied
+typically-named-site.l4:82:1-36:
+  assertion satisfied
+typically-named-site.l4:83:1-63:
+  assertion satisfied
+typically-named-site.l4:84:1-93:
+  assertion satisfied

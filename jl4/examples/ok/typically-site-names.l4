@@ -1,0 +1,54 @@
+-- A named site takes a rule's TYPICALLY default unless the name is an OVERLOAD
+-- of that rule (not-ok/tc/typically-overloaded-site.l4). Three things that look
+-- like an overload and are not, because each is decided by the site alone:
+--
+--   1. a record field that shares the rule's name (a field takes no named inputs);
+--   2. a bare definition that shares the rule's name (it takes only a section
+--      GIVEN, and the site names an input of the rule);
+--   3. an earlier site that did have to choose between two overloads (the choice
+--      must not follow the rule to the sites below it).
+
+§ `A field of the same name`
+
+DECLARE Order HAS
+    discount IS A NUMBER
+
+GIVEN price IS A NUMBER
+      rate  IS A NUMBER TYPICALLY 0.1
+GIVETH A NUMBER
+discount MEANS price TIMES rate
+
+#EVAL discount WITH price IS 100                  -- 10: the rate takes its default
+#EVAL discount WITH price IS 100, rate IS 0.2     -- 20
+
+§ `A bare definition of the same name`
+
+fee MEANS 7
+
+GIVEN price IS A NUMBER
+      rate  IS A NUMBER TYPICALLY 0.2
+GIVETH A NUMBER
+fee MEANS price TIMES rate
+
+#EVAL fee WITH price IS 100                       -- 20
+#EVAL fee WITH price IS 100, rate IS 0.5          -- 50
+
+§ `Pricing`
+
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+§ `Other`
+
+GIVEN base   IS A STRING
+      factor IS A STRING
+GIVETH A STRING
+scaled MEANS base
+
+§ `Use`
+
+#EVAL scaled WITH base IS 10, rate IS 2           -- 20: chosen among the two, every input written
+#EVAL `Pricing`.scaled WITH base IS 10            -- 30: one candidate, so its default is taken
+#EVAL scaled WITH base IS 10, rate IS 5           -- 50: and the site above did not take the rule's default away
