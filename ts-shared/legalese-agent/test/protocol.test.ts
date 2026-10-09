@@ -234,6 +234,36 @@ describe('events', () => {
     assert.throws(() => parseCloudEvent({ seq: 0, ts: 1, type: 'stop' }))
   })
 
+  test('git-committed carries an optional one-line summary', () => {
+    const base = {
+      seq: 1,
+      ts: 1,
+      type: 'git-committed',
+      turnId: 't1',
+      sha: 'a'.repeat(40),
+      parent: 'b'.repeat(40),
+    }
+    // Optional: older harnesses don't send it.
+    assert.equal(
+      (parseCloudEvent(base) as { summary?: string }).summary,
+      undefined
+    )
+    const withSummary = parseCloudEvent({
+      ...base,
+      summary: 'Add a late fee rule to the tenancy contract',
+    })
+    assert.deepEqual(withSummary, {
+      ...base,
+      summary: 'Add a late fee rule to the tenancy contract',
+    })
+    assert.throws(() => parseCloudEvent({ ...base, summary: '' }), /summary/)
+    assert.throws(
+      () => parseCloudEvent({ ...base, summary: 'x'.repeat(201) }),
+      /summary/
+    )
+    assert.throws(() => parseCloudEvent({ ...base, summary: 7 }), /summary/)
+  })
+
   test('JSONL chunks: complete lines only, invalid lines skipped', () => {
     const a: CloudEvent = {
       seq: 1,

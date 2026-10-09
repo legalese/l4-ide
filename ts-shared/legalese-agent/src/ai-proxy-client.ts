@@ -415,6 +415,52 @@ export class AiProxyClient {
   }
 
   /**
+   * One stateless call to the summize pipeline (model
+   * `legalese-summize-4`, no conversationId, so no conversation file is
+   * created server-side) — the generic form of {@link summarizeTitle}.
+   * Returns the trimmed text, or `null` on any failure: no credential,
+   * an HTTP error, an empty answer, or `signal` aborting (callers pass
+   * `AbortSignal.timeout(…)` for a hard time limit). Never throws.
+   */
+  async summize(
+    messages: Array<{ role: 'system' | 'user'; content: string }>,
+    opts: { signal?: AbortSignal } = {}
+  ): Promise<string | null> {
+    try {
+      const url = `${this.getEndpoint().url}/v1/chat/completions`
+      const headers = await this.getAuthHeaders()
+      if (!headers.Authorization) return null
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify({ model: 'legalese-summize-4', messages }),
+        signal: opts.signal,
+      })
+      if (!res.ok || !res.body) {
+        await res.body?.cancel().catch(() => undefined)
+        return null
+      }
+      let text = ''
+      for await (const ev of parseSse(res.body)) {
+        if (ev.kind === 'text-delta') text += ev.text
+        if (ev.kind === 'error') return null
+        if (ev.kind === 'done') break
+      }
+      text = text.trim()
+      return text.length > 0 ? text : null
+    } catch (err) {
+      this.opts.logger.warn(
+        `summize failed: ${err instanceof Error ? err.name : 'error'}`
+      )
+      return null
+    }
+  }
+
+  /**
    * One-shot "intended use" description for a set of about-to-be-deployed
    * functions, using the same stateless summize pipeline as
    * {@link summarizeTitle} (no conversationId, so no junk conversation
