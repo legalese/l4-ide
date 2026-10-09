@@ -1312,6 +1312,34 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       ]
     pasted `shouldBe` []
 
+  it "lists every missing combination of a constructor's fields (smucclaw/l4-ide#1030)" $ do
+    -- Main's own analysis read a constructor's fields as one set of
+    -- constraints: with `WHEN faz qux qux` it asked for six of the eight
+    -- missing `faz` arms, and with those six added it said nothing, though
+    -- `faz bar qux` and `faz baz qux` were still missing and failed at run
+    -- time. A CONSIDER like this one is now read by the clauses' engine.
+    let foz arms = Text.unlines $
+          [ "DECLARE foo IS ONE OF"
+          , "  bar, baz, qux"
+          , ""
+          , "DECLARE foz IS ONE OF"
+          , "  fab, faz HAS bla IS A foo, blup IS A foo"
+          , ""
+          , "GIVEN a IS A foz"
+          , "GIVETH A NUMBER"
+          , "xx a MEANS"
+          , "  CONSIDER a"
+          , "    WHEN fab THEN 4"
+          ] <> [ "    WHEN faz " <> fields <> " THEN 2" | fields <- arms ]
+        asked = ["qux bar", "qux baz", "bar bar", "bar baz", "baz bar", "baz baz"]
+    one <- considerWarnings (foz ["qux qux"])
+    missingArms one `shouldBe`
+      ["WHEN faz bar `_` THEN", "WHEN faz baz `_` THEN", "WHEN faz qux bar THEN", "WHEN faz qux baz THEN"]
+    completed <- considerWarnings (foz ("qux qux" : asked))
+    missingArms completed `shouldBe` ["WHEN faz bar qux THEN", "WHEN faz baz qux THEN"]
+    full <- considerWarnings (foz ("qux qux" : asked <> ["bar qux", "baz qux"]))
+    full `shouldBe` []
+
 -- ----------------------------------------------------------------------------
 
 -- | Every warning of a module, as (range, rendered lines), the range as

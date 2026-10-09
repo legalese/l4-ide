@@ -2072,6 +2072,21 @@ builtinConstructorLookup =
 -- reads such an arm as matching anything, which called a reachable arm
 -- redundant after @WHEN EXACTLY Red@ and passed a CONSIDER whose only arm
 -- was @WHEN EXACTLY Red@.
+--
+-- A CONSIDER written by hand goes to the clauses' engine too, with or
+-- without a number in it, unless a value of its scrutinee's type can hold a
+-- MAYBE, a LIST or an EITHER ('holdsUnlistedType'), whose values that
+-- engine does not tell apart: there it would stand down, where main's own
+-- analysis still lists part of what is missing (HIGHLANDER, 2026-10-10,
+-- which named MAYBE and LIST; EITHER is assumed, not ruled, as it stands
+-- down the same way: @WHEN LEFT Basic@ over @EITHER Tier Tier@ was told
+-- @WHEN LEFT Gold@, and through the clauses' engine nothing). Main's own
+-- analysis lists a constructor's arguments as one set of constraints, so
+-- below a constructor whose arms name several combinations of arguments it
+-- listed some missing ones and not others: @WHEN faz qux qux@ alone asked
+-- for six of the eight missing @faz@ arms (smucclaw/l4-ide#1030). A CONSIDER
+-- generated from clauses keeps the routing above: its missing branches are
+-- the group's, which 'checkClauseMatrix' reports.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
@@ -2087,7 +2102,13 @@ checkConsider ec ann e branches t = do
         Just (PmConsider g _ _) -> g.clauseCount >= 2
         _ -> False
   rbranches <- traverse (checkBranch ec patternEc te t) branches
-  if any armHasLiteral rbranches
+  ei <- asks (.entityInfo)
+  resolvedDecls <- asks (Map.elems . (.declareDeclarations))
+  resolvedTe <- applySubst te
+  let byClauseEngine =
+        any armHasLiteral rbranches
+          || (isNothing generated && not (holdsUnlistedType ei resolvedDecls resolvedTe))
+  if byClauseEngine
     then considerWithLiterals generated leftToClauseMatrix re te rbranches
     else considerWithoutLiterals generated leftToClauseMatrix re te rbranches
   pure (Consider ann re rbranches)
@@ -2102,8 +2123,39 @@ checkConsider ec ann e branches t = do
       PatApp _ _ ps   -> any patternHasLiteral ps
       PatCons _ p1 p2 -> patternHasLiteral p1 || patternHasLiteral p2
 
+-- | Whether a value of this type can hold a value whose constructors the
+-- clauses' engine does not list ('constructorFamilies'): a MAYBE, a LIST or
+-- an EITHER, as the type itself, one of its arguments, or a field of a type
+-- this module declares, at any depth ('declareDeclarations', the
+-- declarations 'constructorFamilies' reads). Synonyms are expanded, and a
+-- type already on the way down is not read again, so a recursive type ends.
+holdsUnlistedType :: EntityInfo -> [DeclChecked (Declare Resolved)] -> Type' Resolved -> Bool
+holdsUnlistedType ei decls = go Set.empty
+  where
+    declared =
+      Map.fromList
+        [ (getUnique tr, td)
+        | d <- decls
+        , let MkDeclare _ _ (MkAppForm _ tr _ _) td = d.payload
+        ]
+    go seen ty = case expandSynonymsIn ei (8 :: Int) ty of
+      TyApp _ r ts
+        | getUnique r `elem` [maybeUnique, listUnique, eitherUnique] -> True
+        | any (go seen) ts -> True
+        | getUnique r `Set.member` seen -> False
+        | Just td <- Map.lookup (getUnique r) declared ->
+            any (go (Set.insert (getUnique r) seen)) (fieldTypes td)
+      _ -> False
+    fieldTypes = \ case
+      RecordDecl _ _ fields -> storedTypes fields
+      EnumDecl _ cds -> concat [ storedTypes fields | MkConDecl _ _ fields <- cds ]
+      SynonymDecl _ t -> [t]
+    storedTypes fields = [ t | MkTypedName _ _ t Nothing <- fields ]
+
 -- | Main's own analysis of a CONSIDER with no number, piece of text or
--- EXACTLY in it ('checkConsider').
+-- EXACTLY in it whose scrutinee can hold a MAYBE, a LIST or an EITHER
+-- ('holdsUnlistedType'), and of a CONSIDER generated from clauses with none
+-- of them ('checkConsider').
 considerWithoutLiterals :: Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
 considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
@@ -2141,7 +2193,8 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   unless (null redundant || isPrimitiveScrutinee || isJust generated) do
     addWarning $ PatternMatchRedundant redundant
 
--- | A CONSIDER with a number, a piece of text or an EXACTLY in it, analysed
+-- | A CONSIDER with a number, a piece of text or an EXACTLY in it, or one
+-- written by hand whose scrutinee holds no MAYBE, LIST or EITHER, analysed
 -- by the clauses' engine as a group of one column whose input is the
 -- scrutinee ('checkConsider'): each arm is read by 'coveragePattern', an arm
 -- it cannot count is left out and one it cannot read stands the analysis
