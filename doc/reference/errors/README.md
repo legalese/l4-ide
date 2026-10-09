@@ -771,7 +771,7 @@ The warning appears once at each such annotation.
 
 Definitions that share a name but are told apart by their types, such as `DECIDE show n IS n + 1` followed by `DECIDE show b IS b AND TRUE`, are separate definitions rather than one rule, and each keeps the annotations above it, so they draw no warning.
 
-**How to fix it:** Move the annotation to where the rule's own go, or remove it.
+**How to fix it:** Move the annotation to where the rule's own annotations go, or remove it.
 An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause if it has no `GIVEN`.
 An `@nlg` goes on the line above the first clause.
 
