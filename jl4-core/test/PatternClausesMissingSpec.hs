@@ -1216,7 +1216,10 @@ considerSpec = describe "CONSIDER over numbers, text and EXACTLY" $ do
       , "    WHEN 1.0 THEN \"one point zero\""
       , "    OTHERWISE \"other\""
       ]
-    map (mentions "one point zero") (filter (mentions "redundant") ws) `shouldBe` [True]
+    -- The redundant arm is the one written 1.0, and the warning says so:
+    -- printed through the generic printer it read `WHEN 1 THEN`, the other
+    -- arm.
+    map (mentions "WHEN 1.0 THEN \"one point zero\"") (filter (mentions "redundant") ws) `shouldBe` [True]
 
   it "lists the gap under a key as the arm spells the key" $ do
     ws <- considerWarnings $ Text.unlines

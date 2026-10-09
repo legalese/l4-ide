@@ -4307,7 +4307,7 @@ prettyCheckWarning = \ case
     [ "The following CONSIDER branch is redundant: "
     , ""
     ] <>
-    map (("  " <>) . prettyLayout) b
+    map (("  " <>) . prettyBranchAsWritten) b
     <> [ ""
     ]
   PatternMatchesMissing b ->
@@ -4350,13 +4350,6 @@ prettyCheckWarning = \ case
     , "Move these clauses above that one, or remove them."
     ]
 
--- | Render a missing CLAUSE of a multi-clause pattern-matching group as
--- valid, pasteable L4: a new DECIDE clause line ending at IS with no body.
--- The DECIDE form is always valid to paste because a group accepts
--- DECIDE-form and MEANS-form clauses interchangeably ('L4.Parser.pmClause').
--- Clause argument positions parse as 'L4.Parser.atomicPattern', so applied
--- constructors must be parenthesised: every column is rendered with
--- @nested=True@.
 -- | Render a synthesized missing branch of a CONSIDER as valid, pasteable
 -- L4, @WHEN … THEN@ or @OTHERWISE@, on one line: the pattern goes through
 -- 'prettyMissingPattern', which writes a number or a piece of text as the
@@ -4367,6 +4360,21 @@ prettyMissingBranchLhs = \ case
   When _ p    -> "WHEN " <> prettyMissingPattern False p <> " THEN"
   o@Otherwise {} -> prettyLayout o
 
+-- | A branch the drafter wrote, for a warning about it: the pattern through
+-- 'prettyMissingPattern', so that a number prints as the branch spells it,
+-- and the body through the generic printer. The generic printer would write
+-- the redundant @WHEN 1.0 THEN …@ after @WHEN 1 THEN …@ as @WHEN 1 THEN …@,
+-- naming the other branch.
+prettyBranchAsWritten :: Branch Resolved -> Text
+prettyBranchAsWritten (MkBranch _ lhs body) = prettyMissingBranchLhs lhs <> " " <> prettyLayout body
+
+-- | Render a missing CLAUSE of a multi-clause pattern-matching group as
+-- valid, pasteable L4: a new DECIDE clause line ending at IS with no body.
+-- The DECIDE form is always valid to paste because a group accepts
+-- DECIDE-form and MEANS-form clauses interchangeably ('L4.Parser.pmClause').
+-- Clause argument positions parse as 'L4.Parser.atomicPattern', so applied
+-- constructors must be parenthesised: every column is rendered with
+-- @nested=True@.
 prettyMissingClauseLhs :: Name -> [Pattern Resolved] -> Text
 prettyMissingClauseLhs headName row =
   "DECIDE " <> quotedName headName
