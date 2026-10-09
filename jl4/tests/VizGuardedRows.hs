@@ -203,6 +203,21 @@ rowsGroup k =
     <> Text.unlines [ "DECIDE compliant " <> Text.pack (show i) <> " IS " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. k - 1] ]
     <> "DECIDE compliant n IS FALSE\n"
 
+-- | A rule of @k@ clauses that returns a number.
+numberRows :: Int -> Text
+numberRows k =
+  "GIVEN n IS A NUMBER\nGIVETH A NUMBER\n"
+    <> Text.unlines [ "DECIDE compliant " <> Text.pack (show i) <> " IS " <> Text.pack (show (i + 1)) | i <- [0 .. k - 1] ]
+    <> "DECIDE compliant n IS 0\n"
+
+-- | @k@ rows, each TRUE or FALSE by turns, chained through LETs the drafter wrote.
+letRows :: Int -> Text
+letRows k =
+  "GIVEN n IS A NUMBER\nGIVETH A BOOLEAN\nDECIDE compliant n IS\n"
+    <> Text.unlines [ Text.replicate (2 + depth) " " <> "LET r" <> Text.pack (show i) <> " BE IF n EQUALS " <> Text.pack (show i) <> " THEN " <> (if even i then "TRUE" else "FALSE") <> " ELSE " <> (if i == k - 1 then "FALSE" else "r" <> Text.pack (show (i + 1))) <> " IN"
+                    | (depth, i) <- zip [0 ..] (reverse [0 .. k - 1]) ]
+    <> Text.replicate (2 + k) " " <> "r0\n"
+
 -- | The same rows as a CONSIDER written by hand.
 considerRows :: Int -> Text
 considerRows k =
@@ -458,6 +473,19 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
       case vizResult False (rowsGroup 600) of
         Left e -> Ladder.prettyPrintVizError e `shouldSatisfy` Text.isInfixOf "more than 300 decision points"
         Right _ -> expectationFailure "a clause group over the budget was drawn"
+
+    it "says a large clause group returning a number is not boolean, not that it is too large" $
+      vizResult False (numberRows 600) `shouldBe` Left Ladder.InvalidDecideMustHaveBoolRetType
+
+    it "draws a LET the drafter wrote that reads through into a ladder over the budget as it was written" $
+      case vizResult False (letRows 600) of
+        Right body -> countLeaves body `shouldBe` 1
+        Left e -> expectationFailure (show e)
+
+    it "reads a LET the drafter wrote through when the ladder is within the budget" $
+      case vizResult False (letRows 20) of
+        Right body -> countLeaves body `shouldSatisfy` (> 1)
+        Left e -> expectationFailure (show e)
 
     it "does not hold a CONSIDER the drafter wrote to the clause-group budget" $
       vizResult False (considerRows 600) `shouldSatisfy` either (const False) (const True)

@@ -218,6 +218,15 @@ letInliningNodeBudget = 20000
 clauseGroupLadderBudget :: Int
 clauseGroupLadderBudget = 300
 
+-- | Does this expression contain a @LET ... IN@?
+hasLetIn :: Expr Resolved -> Bool
+hasLetIn = any isLet . nodes
+  where
+    isLet = \ case
+      LetIn{} -> True
+      _       -> False
+    nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
+
 -- | Did the clause desugarer generate any of this expression?
 hasGeneratedClauses :: Expr Resolved -> Bool
 hasGeneratedClauses = any marked . nodes

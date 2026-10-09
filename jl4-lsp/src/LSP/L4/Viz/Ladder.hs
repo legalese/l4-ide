@@ -50,7 +50,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, se
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasLetIn, hasGeneratedClauses, clauseGroupLadderBudget, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -476,6 +476,10 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
 translateDecide :: Decide Resolved -> Viz V.FunDecl
 translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
   do
+    -- Asked before anything is read through: a rule that returns a number is not
+    -- too large to draw, it is not a ladder at all.
+    unlessM (hasBooleanType (getAnno body0)) $
+      throwError InvalidDecideMustHaveBoolRetType
     -- A rule written as DECIDE clauses (or with a LET) is drawn as the CONSIDER it stands for.
     let isClauseGroup = Transform.hasGeneratedClauses body0
     body <- case Transform.inlineLetsForViz body0 of
@@ -485,19 +489,23 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
       -- wrote is drawn as it was before it was read through.
       Left _ | isClauseGroup -> throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
              | otherwise     -> pure body0
-    unlessM (hasBooleanType (getAnno body)) $
-      throwError InvalidDecideMustHaveBoolRetType
 
     -- functionName, defsForInlining, maxId and typicallyDefaults are already
     -- set ('preparedState').
     let funName = mkPrettyVizName funResolved
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
-    vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
+    vizRead        <- translateExpr shouldSimplify (carameliseExpr body)
     -- The ladder of a rule written as clauses can be far larger than the clauses
     -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
-    when (isClauseGroup && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
-      throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
+    -- A LET the drafter wrote that reads through into a ladder that large is
+    -- drawn as it was before it was read through.
+    vizBody <-
+      if V.irExceeds Transform.clauseGroupLadderBudget vizRead
+        then if isClauseGroup
+          then throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
+          else if Transform.hasLetIn body0 then translateExpr shouldSimplify (carameliseExpr body0) else pure vizRead
+        else pure vizRead
     pure $ V.MkFunDecl
       vid
       -- didn't want a backtick'd name in the header
