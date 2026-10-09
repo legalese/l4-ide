@@ -714,11 +714,12 @@ So does an `EXACTLY` whose expression mentions the input it is matched against, 
 When there would be more than 64 clauses to list, a rule whose clauses name numbers or texts is told instead what the clauses without a number or a piece of text leave open; when every clause names one, that is the clause with every input's name alone, and a gap inside the table is not listed.
 A rule whose clauses name no number or text gets no missing-clause warning past that cap, and neither does one whose shorter list is also longer than 64 clauses; a clause that is never used is reported either way.
 A rule declared partial on purpose, with `@nonexhaustive` before its `GIVEN`, gets no missing-clause warning.
-A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down for a clause with a number, a piece of text or an `EXACTLY` in it, so `DECIDE f (EXACTLY someColour) IS 1` on its own, with `c IS A Colour`, gets no warning at all.
+A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down where the clause's does, for an `EXACTLY` it cannot read, so `DECIDE f (EXACTLY someColour) IS 1` on its own, with `c IS A Colour`, gets no warning at all.
 
-**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions. Whatever the type, a CONSIDER in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`), or is an `EXACTLY` pattern, gets no warning either way, and neither does one with more than 64 missing branches to list. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
-This applies to a `CONSIDER` written by hand.
-The same rule written as clauses, one `DECIDE` line per number or piece of text, is checked as described above, so the two spellings of one rule can differ in whether they warn.
+**Note:** A CONSIDER written by hand reads numbers, pieces of text and `EXACTLY` exactly as the clauses above do, so the two spellings of one rule warn alike.
+A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests OTHERWISE; a keyed gap inside a pattern is suggested as a WHEN, with the key as the branches spell it; a number repeated in another spelling is a redundant branch.
+BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions.
+Past 64 missing branches to list, a CONSIDER is told only what the branches without a number or a piece of text leave open, as clauses are, and gets no warning when that list is too long as well. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
 

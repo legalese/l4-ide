@@ -130,7 +130,11 @@ describe s MEANS
 
 Adding the missing constructor branch or an OTHERWISE catch-all silences the warning.
 
-**Primitive-type caveat:** the analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE. These types have effectively infinite value sets, so exhaustiveness cannot be decided by enumerating constructors. Matches on such values are never warned about — include an OTHERWISE branch to avoid runtime failures. BOOLEAN (just TRUE/FALSE) is checked normally, and so are the builtin container types MAYBE, EITHER, and LIST. Whatever the type, a CONSIDER in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`), or is an `EXACTLY` pattern, is not analysed at all.
+**Numbers, text and dates:** a NUMBER, a STRING or a DATE has no end of values, so a WHEN with a number or a piece of text, even nested (`WHEN JUST 1`), matches one value, and a CONSIDER over such a scrutinee is complete only with an OTHERWISE, which the warning suggests.
+`EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value; any other `EXACTLY` counts for nothing over a number, a piece of text or a date, and stops the check over any other type.
+A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is a redundant branch.
+A CONSIDER reads these exactly as a rule written as clauses does ([Non-exhaustive pattern match](../errors/README.md#non-exhaustive-pattern-match)), so the two spellings of one rule warn alike.
+BOOLEAN (just TRUE/FALSE) is checked normally, and so are the builtin container types MAYBE, EITHER, and LIST.
 
 The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
 

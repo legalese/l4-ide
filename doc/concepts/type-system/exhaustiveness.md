@@ -75,10 +75,10 @@ The payoff comes when a category grows. Add a fourth variant to `` `visa status`
 
 ## Caveats and Escape Hatches
 
-### Primitive types are not checked in a `CONSIDER`
+### Numbers, text and dates
 
-The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set.
-Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped in a hand-written `CONSIDER` — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
+The analysis works by enumerating constructors, and a `NUMBER`, a `STRING` or a `DATE` has none to enumerate: its values have no end.
+So a `WHEN` with a number or a piece of text matches one value, and a `CONSIDER` over such a scrutinee is complete only with an `OTHERWISE`, which the missing-case warning suggests:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -86,13 +86,16 @@ GIVETH A STRING
 `describe count` MEANS
     CONSIDER n
     WHEN 0 THEN "none"
-    OTHERWISE "some"    -- no warning either way; supply OTHERWISE yourself
+    WHEN 1 THEN "one"
+    -- warns: OTHERWISE
 ```
 
-`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. So are the builtin container types `MAYBE`, `EITHER` and `LIST`: a `CONSIDER` over a `MAYBE` with no `WHEN NOTHING` branch is warned about, and so is one over a `LIST` with no `WHEN EMPTY`. Whatever the type, the analysis stands down for a `CONSIDER` in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`, `WHEN "a" FOLLOWED BY rest`), or is an `EXACTLY` pattern: such a `CONSIDER` gets no warning either way, so give it an `OTHERWISE`.
+A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is reported as a redundant branch.
 
-A rule written as clauses, one `DECIDE` line per case, is different.
-A number or a piece of text in a clause matches one value of its input, and the input has no end of other values, so such a rule is complete only with a clause written with the input's name, and the missing-case warning suggests that clause:
+`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. So are the builtin container types `MAYBE`, `EITHER` and `LIST`: a `CONSIDER` over a `MAYBE` with no `WHEN NOTHING` branch is warned about, and so is one over a `LIST` with no `WHEN EMPTY`. A number or a piece of text nested in a pattern (`WHEN JUST 1`, `WHEN "a" FOLLOWED BY rest`) is read the same way.
+
+A rule written as clauses, one `DECIDE` line per case, is read the same way.
+A number or a piece of text in a clause matches one value of its input, so such a rule is complete only with a clause written with the input's name, and the missing-case warning suggests that clause:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -104,9 +107,9 @@ DECIDE `describe count` 1 IS "one"
 
 The enumeration inputs of the same rule are still analysed, and a clause that repeats a number (`1` after `1.0`) is reported as never used.
 A `DATE` input is matched through `EXACTLY` of a date, which the check cannot name, so such a clause counts for nothing and the clause with the input's name is suggested there too.
-So the same determination warns when written as clauses and does not when written as a `CONSIDER` over a number or a piece of text.
+The same holds in a `CONSIDER`, so the two spellings of one determination warn alike.
 
-The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the safety property is silently lost. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
+The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the check can only ask for an `OTHERWISE`; it cannot tell you which categories you left out. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
 
 The check applies wherever the `CONSIDER` appears — in a rule's main body and equally inside `WHERE`- or `LET`-bound local definitions.
 
@@ -148,7 +151,7 @@ The intended discipline: treat the warnings as a completeness report. A finished
 | ------------------------------------------------- | -------------------------------------------------------------------------- |
 | Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                        |
 | Unreachable branch                                | Compile-time warning that the branch is redundant                          |
-| `NUMBER` / `STRING` / `DATE` scrutinee            | `CONSIDER`: not analysed — values can't be enumerated                      |
+| `NUMBER` / `STRING` / `DATE` scrutinee            | Analysed; `OTHERWISE` is suggested when it is missing                      |
 | Clauses over a `NUMBER`, `STRING` or `DATE` input | Analysed; the clause with the input's name is suggested when it is missing |
 | `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
 | `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                           |
