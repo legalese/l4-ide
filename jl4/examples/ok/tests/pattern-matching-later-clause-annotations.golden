@@ -1,7 +1,9 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-pattern-matching-later-clause-annotations.l4:20:1-19:
+pattern-matching-later-clause-annotations.l4:22:1-19:
   "two"
-pattern-matching-later-clause-annotations.l4:33:1-26:
+pattern-matching-later-clause-annotations.l4:35:1-16:
+  2
+pattern-matching-later-clause-annotations.l4:48:1-26:
   2

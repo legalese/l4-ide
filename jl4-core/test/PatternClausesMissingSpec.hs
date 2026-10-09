@@ -399,16 +399,17 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ])
     map fst ws `shouldBe` [Just (5, 8, 5)]
 
-  -- A rule written as clauses takes its annotations from above its first
-  -- clause, and one above a later clause was used by nothing, mostly without
-  -- a word (refutation of legalese/l4-ide#545's review, round 3). The goldens
-  -- on main record no warnings, so the fixture
-  -- ok/pattern-matching-later-clause-annotations.l4 is pinned here.
-  it "warns at each @desc, @export and @nlg above a later clause, and not at the first clause's" $ do
+  -- A rule written as clauses reads the annotations above its first clause as
+  -- a plain definition's, and one written between two clauses was used by
+  -- nothing, mostly without a word (refutation of legalese/l4-ide#545's
+  -- review, round 3). The goldens on main record no warnings, so the fixtures
+  -- ok/pattern-matching-later-clause-annotations.l4 and
+  -- ok/pattern-matching-first-clause-annotations.l4 are pinned here.
+  it "warns at each @desc, @export and @nlg above a later clause, and not at the rule's own" $ do
     ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
-      [ "GIVEN n IS A NUMBER"
+      [ "@desc how many there are"
+      , "GIVEN n IS A NUMBER"
       , "GIVETH A STRING"
-      , "@desc how many there are"
       , "DECIDE `how many` 0 IS \"none\""
       , "@desc not used"
       , "DECIDE `how many` 1 IS \"one\""
@@ -423,6 +424,65 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "This @export is above the third clause of `how many`, where it is not used."
       , "This @nlg is above the fourth clause of `how many`, where it is not used."
       ]
+    -- Each says where that kind of annotation does go.
+    [ Text.strip l | (_, ls) <- ws, l <- ls, "A rule written as clauses takes its" `Text.isPrefixOf` Text.strip l ] `shouldBe`
+      [ "A rule written as clauses takes its @desc from above its GIVEN only."
+      , "A rule written as clauses takes its @export from above its GIVEN only."
+      , "A rule written as clauses takes its @nlg from the line above its first clause only."
+      ]
+
+  it "warns at each of several annotations stacked above a later clause" $ do
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE stacked 0 IS 1"
+      , "@desc stacked one"
+      , "@desc stacked two"
+      , "DECIDE stacked 1 IS 2"
+      , "@export stacked three"
+      , "@nlg stacked four"
+      , "DECIDE stacked other IS 3"
+      ])
+    map fst ws `shouldBe` [Just (4, 1, 4), Just (5, 1, 5), Just (7, 1, 7), Just (8, 1, 8)]
+    [ Text.strip l | (_, ls) <- ws, l <- ls, "This @" `Text.isPrefixOf` Text.strip l ] `shouldBe`
+      [ "This @desc is above the second clause of `stacked`, where it is not used."
+      , "This @desc is above the second clause of `stacked`, where it is not used."
+      , "This @export is above the third clause of `stacked`, where it is not used."
+      , "This @nlg is above the third clause of `stacked`, where it is not used."
+      ]
+
+  it "does not warn at the annotations above a group's first clause" $ do
+    -- As a plain definition with the same layout reads its own: an @export
+    -- above the GIVEN, and a @desc, or several, between the GIVETH and the
+    -- first clause, which belong to no later clause.
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "@export the steps of a number"
+      , "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "@desc one"
+      , "@desc two"
+      , "DECIDE steps 0 IS 1"
+      , "DECIDE steps 1 IS 2"
+      , ""
+      , "@desc above the GIVEN"
+      , "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "@export between the GIVETH and the first clause"
+      , "DECIDE hops 0 IS 1"
+      , "DECIDE hops 1 IS 2"
+      ])
+    ws `shouldBe` []
+
+  it "says the place above the first clause for a group with no GIVEN" $ do
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "DECIDE f 0 IS 1"
+      , "@desc late"
+      , "DECIDE f 1 IS 2"
+      , "DECIDE f other IS 3"
+      ])
+    map fst ws `shouldBe` [Just (2, 1, 2)]
+    [ Text.strip l | (_, ls) <- ws, l <- ls, "A rule written as clauses takes its" `Text.isPrefixOf` Text.strip l ] `shouldBe`
+      [ "A rule written as clauses takes its @desc from above its first clause only." ]
 
   it "does not warn about the annotations of overloads written one after another" $ do
     ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines

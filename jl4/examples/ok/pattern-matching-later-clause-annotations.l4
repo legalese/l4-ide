@@ -1,14 +1,16 @@
--- An annotation written above a later clause of a rule written as clauses is
--- not used: the rule takes its @desc, @export and @nlg from above its first
--- clause. Each one draws a warning at the annotation (refutation of
--- legalese/l4-ide#545's review, round 3). Overloads written one after
--- another use theirs and draw none (pattern-matching-overloads-own-annotations.l4).
+-- An annotation written between two clauses of a rule written as clauses is
+-- not used: the rule takes its @desc and @export from above its GIVEN, and its
+-- @nlg from the line above its first clause, as a rule written as one
+-- definition does (pattern-matching-first-clause-annotations.l4). Each one
+-- draws a warning at the annotation (refutation of legalese/l4-ide#545's
+-- review, round 3). Overloads written one after another use theirs and draw
+-- none (pattern-matching-overloads-own-annotations.l4).
 
 -- A group over numbers, with one of each above its second, third and fourth
--- clauses. The @desc above the first clause is the rule's own.
+-- clauses. The @desc above the GIVEN is the rule's own.
+@desc how many there are
 GIVEN n IS A NUMBER
 GIVETH A STRING
-@desc how many there are
 DECIDE `how many` 0 IS "none"
 @desc not used
 DECIDE `how many` 1 IS "one"
@@ -18,6 +20,19 @@ DECIDE `how many` 2 IS "two"
 DECIDE `how many` other IS "many"
 
 #EVAL `how many` 2   -- "two"
+
+-- Several annotations above one later clause: a warning at each.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE stacked 0 IS 1
+@desc stacked one
+@desc stacked two
+DECIDE stacked 1 IS 2
+@export stacked three
+@nlg stacked four
+DECIDE stacked other IS 3
+
+#EVAL stacked 1   -- 2
 
 -- A group over the values of a type, whose patterns are bare names, as the
 -- patterns of overloads are; this one stays a group, so its @export is not
