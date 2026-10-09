@@ -234,6 +234,17 @@
             "default": true,
             "description": "Master switch: expose the user's MCP servers to Legalese AI at all."
           },
+          "legaleseAi.cloudSessions.enabled": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Preview: run Legalese AI conversations as cloud sessions. Also needs `#legaleseAi.cloudSessions.apiUrl#`."
+          },
+          "legaleseAi.cloudSessions.apiUrl": {
+            "scope": "machine-overridable",
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Base URL of the Legalese Cloud Sessions API. Cloud sessions stay off while this is empty."
+          },
           "legaleseAi.permissions.askUser": {
             "type": "string",
             "enum": [
