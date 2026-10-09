@@ -46,3 +46,32 @@ DECIDE `colour code` Red IS 1
 DECIDE `colour code` Green IS 2
 
 #EVAL `colour code` Green   -- 2
+
+-- A stray annotation indented past the head of the clause below it is still
+-- written between two clauses: a warning at each.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+indented 0 MEANS 1
+  @desc indented stray
+indented 1 MEANS 2
+  @export indented export
+  @nlg indented nlg %n%
+indented other MEANS 3
+
+#EVAL indented 1   -- 2
+
+-- An annotation inside a WHERE of an earlier clause is inside that clause, not
+-- written between two: it is the local definition's, and draws no warning.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE helped 0 IS g 1
+  WHERE
+    @desc local helper of clause one
+    g x MEANS x + 1
+DECIDE helped 1 IS h 2
+  WHERE
+    @desc local helper of clause two
+    h y MEANS y + 2
+DECIDE helped other IS 2
+
+#EVAL helped 0   -- 2

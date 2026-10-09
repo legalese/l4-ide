@@ -47,3 +47,22 @@ pattern-matching-later-clause-annotations.l4:45:1-23:
     Move it there, or remove it.
 pattern-matching-later-clause-annotations.l4:48:1-26:
   2
+pattern-matching-later-clause-annotations.l4:55:3-23:
+  I found a problem while checking the definition of `indented`:
+    This @desc is above the second clause of `indented`, where it is not used.
+    A rule written as clauses takes its @desc from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:57:3-26:
+  I found a problem while checking the definition of `indented`:
+    This @export is above the third clause of `indented`, where it is not used.
+    A rule written as clauses takes its @export from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:58:3-24:
+  I found a problem while checking the definition of `indented`:
+    This @nlg is above the third clause of `indented`, where it is not used.
+    A rule written as clauses takes its @nlg from the line above its first clause only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:61:1-17:
+  2
+pattern-matching-later-clause-annotations.l4:77:1-15:
+  2

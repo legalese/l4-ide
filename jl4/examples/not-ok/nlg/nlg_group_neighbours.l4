@@ -27,8 +27,20 @@ GIVETH A NUMBER
 @nlg outside, above the rule %c%
 DECIDE four [inside, on the head %c%] c IS 1
 
+-- An @nlg inside a WHERE of a clause is not written between two clauses, so no
+-- later clause takes it. It is not attached either: a group's clause does not
+-- yet give the definitions in its WHERE their @nlg, which a rule written as
+-- one definition does (known, and unchanged).
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE five 0 IS g 1
+  WHERE
+    @nlg the helper of the first clause %x%
+    g x MEANS x + 1
+DECIDE five other IS 2
+
 GIVEN c IS A Colour
 GIVETH A NUMBER
-DECIDE five Red IS 1
-DECIDE five Green IS 2
+DECIDE six Red IS 1
+DECIDE six Green IS 2
 @nlg after the last rule of the file

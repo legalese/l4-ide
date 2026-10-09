@@ -291,26 +291,31 @@ claimLaterClauseNlgs :: Anno -> NlgM Anno
 claimLaterClauseNlgs ann = case view annPmMatrix ann of
   Just m | length m.clauses >= 2 -> do
     later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
-      case (prev.headRange, cl.headRange) of
-        (Just p, Just h) -> do
-          let headSpan = fromSrcRange h
-              prevLine = (fromSrcRange p).start.line
-          nlgs <- takeNlgCommentsWhere (\ w -> w.range.start.line > prevLine && aboveClauseHead headSpan w)
+      case betweenClauses prev cl of
+        Just between -> do
+          nlgs <- takeNlgCommentsWhere between
           hdAnn <- attachNlgsByLanguage cl.clauseHead (getAnno cl.clauseHead) nlgs
-          pure (MkPmMatrixClause cl.headRange cl.patterns (setAnno hdAnn cl.clauseHead) cl.clauseAka cl.clauseDescs (map (.payload) nlgs))
-        _ -> pure cl
+          pure (MkPmMatrixClause cl.headRange cl.patterns (setAnno hdAnn cl.clauseHead) cl.clauseAka cl.clauseDescs (map (.payload) nlgs) cl.bodyRange)
+        Nothing -> pure cl
     pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
   _ -> pure ann
 
--- | Does this annotation sit above a clause head: ending before it, and
--- starting no further right than it, so that nothing indented inside the
--- clause above (a @WHERE@'s definitions) is taken for it?
-aboveClauseHead :: SrcSpan -> WithSpan a -> Bool
-aboveClauseHead headSpan w =
-  let hs = headSpan.start
-      we = w.range.end
-  in (we.line < hs.line || (we.line == hs.line && we.column <= hs.column))
-       && w.range.start.column <= hs.column
+-- | Is this annotation written between two clauses: after everything of the
+-- clause above, its body and the definitions of a @WHERE@ in it included,
+-- and ending before the head of this one? Nothing inside the clause above is
+-- between the two, whatever its indentation, and nothing written after the
+-- clause above is inside it, whatever its indentation.
+--
+-- Nothing if either clause has no range to measure by.
+betweenClauses :: PmMatrixClause -> PmMatrixClause -> Maybe (WithSpan a -> Bool)
+betweenClauses prev cl = do
+  h <- cl.headRange
+  prevEnd <- (.end) . fromSrcRange <$> maybe prev.headRange Just prev.bodyRange
+  let hs = (fromSrcRange h).start
+  pure \ w ->
+    let we = w.range.end
+    in w.range.start >= prevEnd
+         && (we.line < hs.line || (we.line == hs.line && we.column <= hs.column))
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
@@ -1094,12 +1099,11 @@ claimLaterClauseDescs :: Anno -> State DescS Anno
 claimLaterClauseDescs ann = case view annPmMatrix ann of
   Just m | length m.clauses >= 2 -> do
     later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
-      case (prev.headRange, cl.headRange) of
-        (Just p, Just h) -> do
-          let prevLine = (fromSrcRange p).start.line
-          matches <- takeMatchingDescs (\ w -> w.range.start.line > prevLine && aboveClauseHead (fromSrcRange h) w)
-          pure (MkPmMatrixClause cl.headRange cl.patterns cl.clauseHead cl.clauseAka (map (.payload) matches) cl.clauseNlgs)
-        _ -> pure cl
+      case betweenClauses prev cl of
+        Just between -> do
+          matches <- takeMatchingDescs between
+          pure (MkPmMatrixClause cl.headRange cl.patterns cl.clauseHead cl.clauseAka (map (.payload) matches) cl.clauseNlgs cl.bodyRange)
+        Nothing -> pure cl
     pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
   _ -> pure ann
 

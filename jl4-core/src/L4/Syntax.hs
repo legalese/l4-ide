@@ -916,14 +916,19 @@ data PmMatrixClause = MkPmMatrixClause
   , clauseNlgs :: [Nlg]
     -- ^ every @\@nlg@ written between the clause above and a later clause, in
     -- source order; the one a separated overload uses is on @clauseHead@
+  , bodyRange :: Maybe SrcRange
+    -- ^ the range of the clause's body, with a @WHERE@'s definitions and
+    -- anything written inside them; an annotation after it and before the next
+    -- clause's head is written between the two clauses
+    -- ('L4.Parser.ResolveAnnotation')
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrixClause where
-  rnf (MkPmMatrixClause r ps h a d n) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n
+  rnf (MkPmMatrixClause r ps h a d n b) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n `seq` rnf b
 
 instance ToExpr PmMatrixClause where
-  toExpr (MkPmMatrixClause r ps h a d n) = toExpr (r, ps, h, a, (d, n))
+  toExpr (MkPmMatrixClause r ps h a d n b) = toExpr (r, ps, h, a, (d, n, b))
 
 -- | The source clause matrix of a multi-clause pattern-matching group,
 -- attached by the parser to the fused Decide's annotation BEFORE
@@ -1702,8 +1707,8 @@ deriving anyclass instance Serialise SrcRange
 -- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
 -- definitions), so their instances are written by hand, via tuples.
 instance Serialise PmMatrixClause where
-  encode (MkPmMatrixClause r ps h a d n) = encode (r, ps, h, a, (d, n))
-  decode = (\ (r, ps, h, a, (d, n)) -> MkPmMatrixClause r ps h a d n) <$> decode
+  encode (MkPmMatrixClause r ps h a d n b) = encode (r, ps, h, a, (d, n, b))
+  decode = (\ (r, ps, h, a, (d, n, b)) -> MkPmMatrixClause r ps h a d n b) <$> decode
 instance Serialise PmMatrix where
   encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
   decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode

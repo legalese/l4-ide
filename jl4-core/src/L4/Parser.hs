@@ -1233,6 +1233,7 @@ desugarPatternClauses sig rawToks firstC restCs =
               , clauseAka = pmAka c
               , clauseDescs = []
               , clauseNlgs = []
+              , bodyRange = rangeOf (pmBody c)
               }
           | c <- clauses
           ]
