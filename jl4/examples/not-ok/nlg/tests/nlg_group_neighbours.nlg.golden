@@ -37,14 +37,7 @@ File: nlg_group_neighbours.l4
 
 File: nlg_group_neighbours.l4
   Hidden: no
-  Range: 38:5-38:44
-  Source: parser
-  Severity: DiagnosticSeverity_Warning
-  Code: <none>
-  Message: Not attached to any valid syntax node.
-File: nlg_group_neighbours.l4
-  Hidden: no
-  Range: 46:1-46:37
+  Range: 45:1-45:37
   Source: parser
   Severity: DiagnosticSeverity_Warning
   Code: <none>

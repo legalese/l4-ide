@@ -28,9 +28,8 @@ GIVETH A NUMBER
 DECIDE four [inside, on the head %c%] c IS 1
 
 -- An @nlg inside a WHERE of a clause is not written between two clauses, so no
--- later clause takes it. It is not attached either: a group's clause does not
--- yet give the definitions in its WHERE their @nlg, which a rule written as
--- one definition does (known, and unchanged).
+-- later clause takes it: it is the helper's, here as in a rule written as one
+-- definition (it used to be reported as not attached).
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 DECIDE five 0 IS g 1

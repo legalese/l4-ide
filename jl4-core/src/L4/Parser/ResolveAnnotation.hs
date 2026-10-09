@@ -262,7 +262,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
         Nothing -> addNlg appFormAka
       -- Inside the body's region, which runs from the first clause's body to
       -- the last's, so that an annotation between two clauses is in reach.
-      (expr', ann') <- hoistNlgA (\ m -> (,) <$> m <*> claimLaterClauseNlgs ann) (addNlg expr)
+      -- The ones between two clauses are claimed first, before a name of the
+      -- clause below (a pattern, say) can take the one written above it.
+      (expr', ann') <- hoistNlgA (\ m -> do
+        ann'' <- claimLaterClauseNlgs ann
+        e <- m
+        pure (e, ann'')) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
 
 -- | The head form of a group of clauses: its head and its @AKA@. Its inputs
@@ -280,6 +285,20 @@ addNlgGroupHead a = extendNlgA a $ case a of
     n' <- addNlg n
     maka' <- traverse addNlg maka
     pure $ MkAppForm ann n' ns maka'
+
+-- | Is this the @LET@ that a group of clauses is lowered to, binding the clauses
+-- after the first ('L4.Parser.bindFallthrough')? Its declaration holds the
+-- LATER clauses and its body the first, so the usual descent, declarations
+-- before body, would visit the clauses last to first. The declaration has the
+-- range of the second clause's body, and its claim took the @\@desc@s written
+-- before it, among them the helper of the first clause's; the regions between
+-- neighbouring nodes, which an @\@nlg@ is claimed by, were empty for a
+-- declaration that precedes its body in the tree and follows it in the file.
+-- The descent into this @LET@ takes its body first.
+bindsLaterClauses :: [LocalDecl n] -> Bool
+bindsLaterClauses = any \ case
+  LocalDecide _ (MkDecide dann _ _ _) -> isJust (view annPmSynthetic dann)
+  LocalAssume{} -> False
 
 -- | In a group of clauses, an @\@nlg@ written above a later clause belongs to
 -- that clause's head ('PmMatrixClause' @clauseHead@). A run of bare names may
@@ -918,10 +937,17 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       e' <- addNlg e
       lcl' <- traverse addNlg lcl
       pure $ Where ann e' lcl'
-    LetIn ann lcl e -> do
-      lcl' <- traverse addNlg lcl
-      e' <- addNlg e
-      pure $ LetIn ann lcl' e'
+    -- The LET a group of clauses is lowered to binds the clauses after the
+    -- first, which are written after its body: source order is the body's.
+    LetIn ann lcl e
+      | bindsLaterClauses lcl -> do
+          e' <- addNlg e
+          lcl' <- traverse addNlg lcl
+          pure $ LetIn ann lcl' e'
+      | otherwise -> do
+          lcl' <- traverse addNlg lcl
+          e' <- addNlg e
+          pure $ LetIn ann lcl' e'
     Event ann e -> Event ann <$> addNlg e
     Fetch ann e -> Fetch ann <$> addNlg e
     Env ann e -> Env ann <$> addNlg e
@@ -1193,7 +1219,8 @@ instance HasDesc (Aka n) where
 --
 -- The descent is /structural and exhaustive/, mirroring 'HasRef' @(Expr n)@,
 -- and always in source order — a @WHERE@\'s body precedes its declarations, a
--- @LET@\'s declarations precede its body — so a desc is always claimed by the
+-- @LET@\'s declarations precede its body (but for the @LET@ a group of clauses
+-- is lowered to, 'bindsLaterClauses') — so a desc is always claimed by the
 -- nearest following declaration, exactly as at top level. Exhaustiveness is the
 -- point, and it is enforced by @-Wincomplete-patterns@: the first version of
 -- this instance handled only @Where@ and @LetIn@ at the top of a body and ended
@@ -1235,7 +1262,9 @@ instance HasDesc (Expr n) where
     Percent    ann e     -> Percent    ann <$> addDesc e
     List       ann es    -> List       ann <$> traverse addDesc es
     Where      ann b ds  -> Where      ann <$> addDesc b <*> traverse addDesc ds
-    LetIn      ann ds b  -> LetIn      ann <$> traverse addDesc ds <*> addDesc b
+    LetIn      ann ds b
+      | bindsLaterClauses ds -> (\ b' ds' -> LetIn ann ds' b') <$> addDesc b <*> traverse addDesc ds
+      | otherwise -> LetIn ann <$> traverse addDesc ds <*> addDesc b
     Event      ann e     -> Event      ann <$> addDesc e
     Fetch      ann e     -> Fetch      ann <$> addDesc e
     Env        ann e     -> Env        ann <$> addDesc e
