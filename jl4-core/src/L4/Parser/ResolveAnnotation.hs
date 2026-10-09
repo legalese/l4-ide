@@ -403,19 +403,25 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
 
 instance HasNlg Name where
   addNlg a = extendNlgA a $ case a of
-    MkName ann raw -> do
-      ann' <- liftNlgA $ do
-        nlgs <- takeNlgComments
-        case nlgs of
-          [nlg] -> do
-            pure $ setNlg nlg.payload ann
-          [] ->
-            pure ann
-          ns -> do
-            addWarning $ Ambiguous a ns
-            pure ann
+    MkName ann raw
+      -- A name with no location was made up by the desugarer (the CONSIDERs a
+      -- group of clauses is lowered to are full of them). Having no range, its
+      -- region is not bounded by its neighbours', so it would take every
+      -- annotation up to the end of the file, among them the next rule's own.
+      | Nothing <- rangeOf a -> pure a
+      | otherwise -> do
+          ann' <- liftNlgA $ do
+            nlgs <- takeNlgComments
+            case nlgs of
+              [nlg] -> do
+                pure $ setNlg nlg.payload ann
+              [] ->
+                pure ann
+              ns -> do
+                addWarning $ Ambiguous a ns
+                pure ann
 
-      pure $ MkName ann' raw
+          pure $ MkName ann' raw
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
   addNlg expr = extendNlgA expr $ case expr of
