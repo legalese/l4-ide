@@ -295,6 +295,15 @@ verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 
+-- Two read-through copies of a recursive WHERE local, one per call, with
+-- different arguments: two atoms, not one (smucclaw/l4-ide#1013).
+verifyRecursiveLocalCopiesFixture :: FilePath
+verifyRecursiveLocalCopiesFixture = fixtureDir </> "verify-recursive-local-copies.l4"
+
+-- A ledger read before and after a RECORD: two atoms, not one.
+verifyLedgerReadsFixture :: FilePath
+verifyLedgerReadsFixture = fixtureDir </> "verify-ledger-reads.l4"
+
 -- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
 -- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
 -- carries its own control; see its header.
@@ -397,6 +406,7 @@ coreFixtures =
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
   , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
@@ -2515,6 +2525,22 @@ spec bin = do
     it "terminates on recursive and mutually recursive local bindings" $ do
       Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
+
+    -- An atomId is the hash of a leaf's term (R3). Unfolding `f a` and `f b` makes
+    -- two copies of a recursive WHERE local that keep its one name; keyed by the
+    -- name alone they were one atom, and a satisfiable rule was reported
+    -- unsatisfiable. `same` is the control: its two copies are one proposition.
+    it "keeps two read-through copies of a recursive local apart, and joins two that are one" $ do
+      env <- jsonEnvelope bin ["verify", verifyRecursiveLocalCopiesFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "top" found `shouldBe` Just []
+      lookup "same" found `shouldBe` Just ["unsat"]
+
+    -- A RECALL is not a function of its operands, so two occurrences of one RECALL
+    -- term on either side of a RECORD are two atoms (C1's `fresh`).
+    it "does not join two ledger reads that a RECORD between them can tell apart" $ do
+      env <- jsonEnvelope bin ["verify", verifyLedgerReadsFixture, "--format", "json"]
+      lookup "top" (findingsByDecision env) `shouldBe` Just []
 
     -- Reading through calls. `the arrow is broken` asks for an exception and the
     -- offence it defeats at once; with calls as opaque leaves that was two

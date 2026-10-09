@@ -698,7 +698,7 @@ runMeasurement opts ladderInfo vizState =
     (boolExpr, labels, order) = VizQP.vizExprToBoolExpr body
     cache = VizQP.buildQueryPlanCache ladderInfo vizState
     paramsBy = VizQP.buildParamsByUnique ladderInfo
-    atomIds = QP.atomIdByUnique ladderInfo.funDecl.fnName.label paramsBy cache
+    atomIds = QP.atomIdByUnique ladderInfo.funDecl.fnName.label cache
     (expr', labels', order', rep) = coalesceByAtomId atomIds boolExpr labels order
     nClasses = length order'
 

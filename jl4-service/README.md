@@ -410,13 +410,42 @@ diagram calls its leaves.
 > apart from a `unique` binding key. `QueryPlanSpec`'s
 > `atom identity, across shapes` group pins both the containment and its exception.
 
-> **An atomId names a QUESTION, not a node.** It is a UUID5 over
-> `"function | label | refs"`, so two occurrences of one condition — which a
-> ladder in AND/OR normal form produces routinely, since reaching that form
+> **An atomId names a QUESTION, not a node.** It is a UUID5 over the function
+> name and the **term** the leaf stands for, so two occurrences of one condition —
+> which a ladder in AND/OR normal form produces routinely, since reaching that form
 > distributes OR over AND — carry the **same** `atomId` and different `unique`s.
 > That is intended: binding the atomId binds every occurrence at once, which is
 > what "the user answered that question" means. If you need to address a single
 > occurrence, bind its `unique` (as a decimal string) instead.
+>
+> Two leaves get one `atomId` exactly when they are the same term: the same
+> structure, naming the same things (WHERE-INLINING-SPEC §10.1, ruling R3). Two
+> leaves that merely **print** alike — two mixfix operators sharing a head keyword,
+> or an input and a rule of the same name — get two. A name counts by what it
+> refers to, never by its spelling or its position in the file.
+>
+> **How long an `atomId` lasts.** It survives a redeploy of the same source, and
+> an edit elsewhere in the module: adding or moving other rules, and renaming or
+> inserting section headings, do not change it. It changes when what the leaf
+> says changes, including a `WHERE` definition the leaf reads, since a leaf is
+> keyed by what it means and not by the name of a local it uses. It can also
+> change when a binder with the same name is added above one it names (the later
+> of the two is then told apart by its sections), when an imported module it
+> names changes, or on an L4 release that changes how terms are represented. A
+> `unique`, by contrast, changes whenever anything above it in the file does, so
+> store `atomId`s, not `unique`s.
+>
+> **One exception: a leaf whose value depends on when it is evaluated** — it
+> reads the ledger (`RECALL`), records to it, fetches or posts, or calls a rule
+> that does. Two occurrences of such a leaf can disagree in one evaluation, so
+> each gets its own `atomId`, numbered in drawing order within its decision. Such
+> an id moves when a leaf of that kind is added or removed earlier in the same
+> decision.
+>
+> **Every `atomId` changed once** (upstream `smucclaw/l4-ide#1013`), when it
+> stopped being a hash of the leaf's printed label and became the hash of its
+> term. An id saved from a build without that change names nothing in a build
+> with it; fetch the diagram again.
 >
 > This was broken until 2026-08-03 (upstream `smucclaw/l4-ide#935`): the two
 > surfaces minted ids in different namespaces, so a binding keyed by a ladder

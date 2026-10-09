@@ -443,18 +443,19 @@ queryPlanHandler' deployId fnName fnArgs = do
 -- the containment and the exception, over seven shapes including record
 -- projections, WHERE-expansion and the IMPLIES seam.
 --
--- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were UUID5
--- over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ rendered each
--- ref as its numeric @rootUnique@ over the atom's /direct/ ref set while
+-- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were once
+-- UUID5 over @"fn|label|refs=..."@, but the ladder rendered each ref as its
+-- numeric @rootUnique@ over the atom's /direct/ ref set while
 -- @L4.Decision.QueryPlan.atomIdByUnique@ rendered it as the ref's /label/ over
 -- the /transitive closure/, so they disagreed for every atom with a non-empty
 -- ref set — which is every ordinary leaf — and a binding keyed by a ladder
--- atomId was accepted with a 200 and did nothing at all. @jl4-lsp@ had always
--- reconciled them by calling @LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds@
--- before serving the ladder (see @LSP.L4.Actions@); jl4-service now does the
--- same in 'buildDecisionQueryCacheFromCompiled', so both surfaces and both
--- products agree. 'IntegrationSpec' pins it, including the end-to-end claim that
--- such a binding moves @determined@.
+-- atomId was accepted with a 200 and did nothing at all. Since R3
+-- (WHERE-INLINING-SPEC §10.1, smucclaw/l4-ide#1013) both are the hash of the
+-- leaf's C1 term key, which the ladder records once while drawing and the plan
+-- reads ("L4.Viz.AtomKey"), so they agree by construction; what is left of the
+-- reconciliation in 'buildDecisionQueryCacheFromCompiled' only names them under
+-- the function name this deployment serves. 'IntegrationSpec' pins it, including
+-- the end-to-end claim that such a binding moves @determined@.
 ladderHandler :: DeploymentId -> Text -> AppM VizExpr.RenderAsLadderInfo
 ladderHandler deployId fnName = do
   logger <- asks (.logger)

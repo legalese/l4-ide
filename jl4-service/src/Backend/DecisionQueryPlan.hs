@@ -232,6 +232,7 @@ buildDecisionQueryCacheFromCompiled nodeBudget funName compiled sourceText = do
                 inputRefs
           , compiled = bddCompiled
           , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+          , leafKeyByUnique = LadderViz.getLeafKeys vizState
           }
 
       -- Put the ladder's leaves into the SAME atomId namespace the query plan
@@ -246,15 +247,14 @@ buildDecisionQueryCacheFromCompiled nodeBudget funName compiled sourceText = do
       -- never had, so the IDE and the deployed service disagreed about what a
       -- question was called.
       --
-      -- The atomId map is derived from @funName@ — the name this deployment
-      -- serves the function under, and the same one 'queryPlan' will be handed —
-      -- rather than from the diagram's own @fnName@ label, so the two cannot
-      -- drift apart if a function is ever registered under something other than
-      -- its DECIDE name. @paramsByUnique@ is read off the ladder's params, which
-      -- the annotation does not touch, so it stays valid afterwards.
-      paramsByUnique = Map.fromList [(p.unique, p.label) | p <- ladderInfo.funDecl.params]
+      -- Both now hash the same thing, each leaf's C1 term key as the ladder
+      -- recorded it (R3, WHERE-INLINING-SPEC §10.1), so what is left to do here is
+      -- name them under @funName@ — the name this deployment serves the function
+      -- under, and the same one 'queryPlan' will be handed — rather than the
+      -- diagram's own @fnName@ label, so the two cannot drift apart if a function
+      -- is ever registered under something other than its DECIDE name.
       joinableLadder =
-        annotateLadderWithAtomIdsUsing (ladderAtomIds funName paramsByUnique core ladderInfo.funDecl.body) ladderInfo
+        annotateLadderWithAtomIdsUsing (ladderAtomIds funName core) ladderInfo
 
   pure
     CachedDecisionQuery

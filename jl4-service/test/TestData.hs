@@ -215,9 +215,8 @@ DECIDE compute_qualifies IF walks AND eats AND drinks
 --
 -- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes
 -- through 'L4.Viz.Ladder.leafFromExpr', which mints a fresh @unique@ per
--- occurrence. The two occurrences share a label and an input-ref closure, so
--- 'L4.Viz.Ladder.generateAtomId' gives them one atomId between them: one
--- question, two BDD variables.
+-- occurrence. The two occurrences are one term, so they share one C1 key and
+-- one atomId between them ("L4.Viz.AtomKey"): one question, two BDD variables.
 --
 -- Answering that question FALSE refutes both disjuncts and settles the whole
 -- decision — but only if the binding reaches both variables. That makes "did
