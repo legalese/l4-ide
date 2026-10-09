@@ -893,7 +893,7 @@ As ruled:
 - a node must be named to be addressable.
 
 So beside this section's "a presumption is a question not yet asked, not an answer": an assertion is an answer given, and the answer says so.
-Which nodes qualify in the first version, the wire spellings, lazy binding of left-out inputs, and a presumption on a named step are assumed or proposed in `presumption-assertion/CONTRACT.md` and are not part of this ruling (its §13 lists what is open).
+Which nodes qualify in the first version, the wire spellings, a left-out request input as an unknown at every surface, and a presumption on a named step are assumed or proposed in `presumption-assertion/CONTRACT.md` and are not part of this ruling (its §13 lists what is open).
 Nothing of it is built.
 
 ---

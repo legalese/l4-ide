@@ -223,10 +223,10 @@ Yscript, the one `l4 export` target not in the table (`dmn-md` shares DMN's note
 
 ### 6.3 After the presumption-assertion design (proposed 2026-10-09, not built)
 
-`presumption-assertion/CONTRACT.md` asks every surface above for three more things: accept an assertion on a named derived node (`assertions`), list the ones the answer forced (`asserted`, beside `presumed`), and bind a left-out input lazily so that an asserted node's inputs need not be sent.
+`presumption-assertion/CONTRACT.md` asks every surface above for three more things: accept an assertion on a named derived node (`assertions`), list the ones the answer forced (`asserted`, beside `presumed`), and treat a left-out request input as an unknown, the undetermined machinery of #553 and #554 applied at the request's decode, so that an asserted node's inputs need not be sent.
 Its §8 and §9 say what each surface and exporter does; this page will move those rows into the tables above when they land, as §9 says.
 Two of its rows are new silent cases to watch: OpenFisca cannot express `@nonassertable` and refuses `WHERE`, and has no fidelity report; DMN inlines `WHERE` locals, so an assertable one is lifted into its own decision and may switch a table's hit policy.
-The lazy binding it asks for extends TU-wire-b's direct-path item to `l4 batch` and every wrapper-path type, which is new scope and open for Meng (its §13).
+The unknown binding it asks for extends TU-wire-b's direct-path item to `l4 batch` and every wrapper-path type, which is new scope and open for Meng (its §13).
 
 ## 7. Silent failures, then loud ones
 

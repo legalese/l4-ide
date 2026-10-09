@@ -72,7 +72,8 @@ Hard applies none: a fact that was left out, and has a presumed value, is treate
 **This runs today**, as `l4 batch --presumption hard` and as `"presumption": "hard"` in a request to the decision service.
 What hard mode does when it meets a presumed fact is still being decided.
 Today, `l4 batch` and most requests to the service refuse as soon as they see that a presumed fact was left out, whether or not the rule would ever have needed it; the row above with `is adult` false is refused under hard, naming `has capacity`, although the rule never reaches it (`../PRESUMPTION-SCENARIOS.md` §2.3 measures this on a longer rule).
-The change this page assumes, proposed and not yet ruled, makes a left-out fact wait: the rule is refused only when it actually reaches the fact, and the refusal then names it.
+The change this page assumes, proposed and not yet ruled, treats a left-out fact as unknown and lets the rule run: if the answer would have rested on that fact, the answer comes back as "could not decide", naming the fact, which is what L4 already does inside a rule when it meets something it does not know.
+Under hard, a presumed fact that was left out counts as unknown in the same way.
 Until that is settled and built, read a hard-mode refusal as "this rule has a presumption somewhere", not as "your answer would have rested on one".
 
 ## Door number two: answering without saying which
@@ -160,7 +161,7 @@ If you want a step to be assertable, name it, once.
 
 One more thing the example above quietly depends on.
 Today, in `l4 batch` and most requests to the service, a fact left out of a request with no presumed value is refused before the rule runs, so the three facts under `unmarried` would have to be sent even though the rule never reaches them.
-The design changes that too, in soft and hard mode alike: a fact left out is refused only when the rule reaches it.
+The design changes that too, in soft and hard mode alike: a fact left out counts as unknown, and only an answer that would have rested on it comes back as "could not decide", naming it.
 That change is proposed and not yet ruled, and without it door number two cannot be kept shut.
 
 ## Steps a rule must work out for itself
@@ -254,15 +255,15 @@ Spreadsheet users take note: in a comma-separated values (CSV) file an empty cel
 
 ## Where each thing stands
 
-| you want to                                                                | how                                            | status                                                                                                |
-| -------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| presume a fact when nobody supplies it                                     | `TYPICALLY` on a fact                          | built                                                                                                 |
-| see what an answer rests on                                                | `presumed` in the answer                       | built                                                                                                 |
-| ask with no presumptions                                                   | `--presumption hard` / `"presumption": "hard"` | built; in `l4 batch` and most service requests it refuses before the rule runs, see "Two ways to ask" |
-| have a left-out fact refused only when the rule reaches it, in either mode | the design's lazy treatment of gaps            | proposed, not ruled                                                                                   |
-| pick door two in a picture                                                 | click the named step's box                     | built                                                                                                 |
-| pick door two in a request                                                 | `assertions` beside `arguments`                | ruled 2026-10-09; the key's spelling and the limits on which steps qualify are assumed; not built     |
-| see what was asserted                                                      | `asserted` in the answer                       | ruled 2026-10-09; not built                                                                           |
-| keep a conclusion from being asserted                                      | `@nonassertable` on the step                   | ruled 2026-10-09; not built                                                                           |
-| presume a named step                                                       | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                   |
-| say "the value is not known"                                               | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                      |
+| you want to                                                                                    | how                                            | status                                                                                                |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| presume a fact when nobody supplies it                                                         | `TYPICALLY` on a fact                          | built                                                                                                 |
+| see what an answer rests on                                                                    | `presumed` in the answer                       | built                                                                                                 |
+| ask with no presumptions                                                                       | `--presumption hard` / `"presumption": "hard"` | built; in `l4 batch` and most service requests it refuses before the rule runs, see "Two ways to ask" |
+| have a left-out fact count as unknown, so only an answer that rests on it comes back undecided | the design's treatment of gaps, in either mode | proposed, not ruled                                                                                   |
+| pick door two in a picture                                                                     | click the named step's box                     | built                                                                                                 |
+| pick door two in a request                                                                     | `assertions` beside `arguments`                | ruled 2026-10-09; the key's spelling and the limits on which steps qualify are assumed; not built     |
+| see what was asserted                                                                          | `asserted` in the answer                       | ruled 2026-10-09; not built                                                                           |
+| keep a conclusion from being asserted                                                          | `@nonassertable` on the step                   | ruled 2026-10-09; not built                                                                           |
+| presume a named step                                                                           | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                   |
+| say "the value is not known"                                                                   | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                      |
