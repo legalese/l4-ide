@@ -5,7 +5,7 @@ Every `file:line` below is at the commit that last changed this file; every prob
 The branch carries work first merged into unstable, one PR at a time, and each section below names its unstable source.
 The unstable commits named here are on unstable only: none of them is on this branch or on main.
 
-This branch, oldest first: `d0905e1d8` (the clauses, from #49), `d6594578b` (exact-print, from #130), `17e944423` (the missing-case warning, adapted from #185), `1a67532c7` (clause hygiene, from #569), `f02f0a6b7` (a merge of main), `ee407387b` (ruling M1), `b7c54a6cb` (generated names, printing, editor and render, from #581), `f2d938863` (the missing-case check's limits in the user documentation; this file rewritten for main), `36c549226` (`l4 run --json` reports an evaluation error in the drafter's terms), `6d0146f27` (ruling M2, from legalese/l4-ide#587), the round-2 review's `c8907bf66`, `21df62c92`, `526f70396`, `d0f4c7afa` and `232e14b1b`, the commit that wrote that review into this file (`b1002d9af`), the round-3 fixes `8e4c920ca`, `05559e4ec` and `2113516a1`, the commit that wrote those into this file (`0350c079b`), the second round-3 fix `67d0903c2`, `764671496` (the round-3 fixtures' goldens, made on main), the commit that wrote those into this file (`03bf38dc4`), `2dd411963` (a warning at an annotation above a later clause), the commit that wrote that into this file (`c09a64cd9`), `b42394622` (a group's annotations read as a plain definition's, and a warning at each later one), and the commit that wrote that into this file.
+This branch, oldest first: `d0905e1d8` (the clauses, from #49), `d6594578b` (exact-print, from #130), `17e944423` (the missing-case warning, adapted from #185), `1a67532c7` (clause hygiene, from #569), `f02f0a6b7` (a merge of main), `ee407387b` (ruling M1), `b7c54a6cb` (generated names, printing, editor and render, from #581), `f2d938863` (the missing-case check's limits in the user documentation; this file rewritten for main), `36c549226` (`l4 run --json` reports an evaluation error in the drafter's terms), `6d0146f27` (ruling M2, from legalese/l4-ide#587), the round-2 review's `c8907bf66`, `21df62c92`, `526f70396`, `d0f4c7afa` and `232e14b1b`, the commit that wrote that review into this file (`b1002d9af`), the round-3 fixes `8e4c920ca`, `05559e4ec` and `2113516a1`, the commit that wrote those into this file (`0350c079b`), the second round-3 fix `67d0903c2`, `764671496` (the round-3 fixtures' goldens, made on main), the commit that wrote those into this file (`03bf38dc4`), `2dd411963` (a warning at an annotation above a later clause), the commit that wrote that into this file (`c09a64cd9`), `b42394622` (a group's annotations read as a plain definition's, and a warning at each later one), the commit that wrote that into this file (`ce2b10bda`), the round-4 fixes `fb719cd6d` and `07a84815a`, and the commit that wrote those into this file.
 
 Source spec: `specs/done/PATTERN-MATCHING-SPEC.md`.
 Differences from the source spec, each probed on this branch:
@@ -42,8 +42,8 @@ In `jl4-core/src/L4/Parser.hs`:
 - `decidePatternMatch`, grouping and the commit test (`:757`); `pmClause`, one clause (`:827`).
 - `givenTermNames` (`:967`) and `givenTermParams` (`:972`).
 - `desugarPatternClauses`, which builds the fused `MkDecide` and records the clause matrix (`:984`).
-- `generatedName` (`:1057`), `givenInputBinding` (`:1066`), `scrutineeRef` (`:1074`), `rawTokensAnno` (`:1087`).
-- `matchClauses` (`:1115`), `clauseMatchesAnything` (`:1146`), `fallthroughName` (`:1153`), `clausesSrcAnno` (`:1174`), `bindFallthrough` (`:1183`), `generatedConsider` (`:1194`), `matchOne` (`:1200`), `matchLast` (`:1220`).
+- `generatedName` (`:1058`), `givenInputBinding` (`:1067`), `scrutineeRef` (`:1075`), `rawTokensAnno` (`:1088`).
+- `matchClauses` (`:1116`), `clauseMatchesAnything` (`:1147`), `fallthroughName` (`:1154`), `clausesSrcAnno` (`:1175`), `bindFallthrough` (`:1184`), `generatedConsider` (`:1195`), `matchOne` (`:1201`), `matchLast` (`:1221`).
 
 In `jl4-core/src/L4/Syntax.hs`: `isDistinguishablePat` (`:103`), `patAlwaysMatchesAs` (`:116`) and `isGeneratedName` (`:124`), shared by the parser, the checker, the printer and the editor.
 
@@ -93,7 +93,7 @@ The clauses after one in which every column matches without a test are bound too
 ## Tests and fixtures that pin it
 
 - `jl4-core/test/PatternMatchParserSpec.hs` (in `jl4-core-test`), eight cases: literal and variable clauses group into one `CONSIDER`-bodied `Decide`; `EMPTY`/`FOLLOWED BY` clauses group; a single literal clause desugars; a single variable clause is left alone; two different heads stay two `Decide`s; a group's range stops at its own lines and the file exact-prints unchanged; and two timing guards, for a run of one name and for definitions with different names (see "Review round 3").
-- `jl4-core/test/PatternClausesMissingSpec.hs`, 32 cases, and `jl4-core/test/MultiClausePrintSpec.hs`, both described below.
+- `jl4-core/test/PatternClausesMissingSpec.hs`, 34 cases, and `jl4-core/test/MultiClausePrintSpec.hs`, both described below.
 - `jl4/examples/ok/`: `pattern-matching.l4` (factorial, fib, list length, `from maybe`, a two-column decision table, nested `(JUST (JUST k))`), `pattern-matching-nullary.l4`, `pattern-matching-decision-table.l4`, `pattern-matching-clause-hygiene.l4`, `pattern-matching-one-clause-fallback.l4`, `pattern-matching-fallthrough-name.l4` and `pattern-matching-input-names.l4`, each with its four goldens under `tests/`.
 - `jl4/examples/not-ok/tc/`: `pattern-matching-clause-type-errors.l4` and `pattern-matching-clause-inputs.l4`.
 - `jl4/examples/lsp/hover/multi-clause-hover.l4`, with its positions in `jl4/tests/Hover.hs`.
@@ -117,8 +117,8 @@ This branch carries the parts that do not depend on unstable's coverage analysis
 
 Where it lives:
 
-- `jl4-core/src/L4/Syntax.hs`: `PmGroup` (`:535`) and `PmSynthetic` (`:549`: `PmConsider`, `PmFallthrough`, `PmUnreachable`), the `pmSynthetic` field of `Extension` (`:575`), `annPmSynthetic` (`:624`) and `setPmSynthetic` (`:627`); `PmMatrix` has `synthesizedScrutinees` (`:515`) and `catchAll` (`:520`).
-- `jl4-core/src/L4/Parser.hs`: `matchClauses` (`:1115`) marks every generated CONSIDER (`generatedConsider`, `:1194`) and binding of later clauses (`bindFallthrough`, `:1183`), and binds the clauses after a clause that matches every input instead of dropping them (`PmUnreachable`); `clauseMatchesAnything` (`:1146`); `givenTermParams` (`:972`).
+- `jl4-core/src/L4/Syntax.hs`: `PmGroup` (`:540`) and `PmSynthetic` (`:554`: `PmConsider`, `PmFallthrough`, `PmUnreachable`), the `pmSynthetic` field of `Extension` (`:580`), `annPmSynthetic` (`:629`) and `setPmSynthetic` (`:632`); `PmMatrix` has `synthesizedScrutinees` (`:520`) and `catchAll` (`:525`).
+- `jl4-core/src/L4/Parser.hs`: `matchClauses` (`:1116`) marks every generated CONSIDER (`generatedConsider`, `:1195`) and binding of later clauses (`bindFallthrough`, `:1184`), and binds the clauses after a clause that matches every input instead of dropping them (`PmUnreachable`); `clauseMatchesAnything` (`:1147`); `givenTermParams` (`:972`).
 - `jl4-core/src/L4/TypeCheck.hs`: `settleOneClause` (`:649`), `decideErrorContext` (`:674`), `isClausesBinding` (`:682`), `checkClausesLet` (`:816`, dispatched from `checkExpr` at `:1803`), `speculatively` (`:853`), `warnUnreachableClauses` (`:1084`); `checkConsider` (`:1889`) reads the mark; the messages (`:4090`, `:4185`).
 - `jl4-core/src/L4/TypeCheck/Types.hs`: `UnreachableClause` (`:120`), `PatternClauseUnreachable` (`:143`), `ExpectClauseInputContext` (`:181`).
 - `jl4-core/src/L4/EvaluateLazy/Exceptions.hs:110` and `Machine.hs` (`consideredClauses`, `:358`): the run-time message in clause terms.
@@ -158,8 +158,8 @@ Main's own CONSIDER analysis is not reused either: `normalizeRefinement` merges 
 
 Where it lives:
 
-- `jl4-core/src/L4/Syntax.hs`: `PmMatrixClause` and `PmMatrix` (`:478`, `:513`), the `pmMatrix` field of `Extension` (`:574`), `annPmMatrix` and `setPmMatrix` (`:618-622`).
-- `jl4-core/src/L4/Parser.hs:1032-1047`: `desugarPatternClauses` records the inputs and each clause's head range and patterns.
+- `jl4-core/src/L4/Syntax.hs`: `PmMatrixClause` and `PmMatrix` (`:478`, `:518`), the `pmMatrix` field of `Extension` (`:579`), `annPmMatrix` and `setPmMatrix` (`:623-627`).
+- `jl4-core/src/L4/Parser.hs:1032-1048`: `desugarPatternClauses` records the inputs and each clause's head range and patterns.
 - `jl4-core/src/L4/TypeCheck.hs`: `inferDecide` calls `checkClauseMatrix` after checking the body (`:625`); `checkClauseMatrix` (`:880`), `quietly` (`:1116`), `coveragePattern` (`:1133`), `constructorFamilies` (`:1153`), `uncoveredRows` (`:1188`), `maxMissingClauses` (`:1233`), `clauseMatrixFuel` (`:1237`), `patternHasOpaque` (`:1243`); the message (`:4068`) and `prettyMissingClauseLhs` (`:4122`).
 - `jl4-core/src/L4/TypeCheck/Types.hs:136`: the warning `PatternClausesMissing`, whose range (`:258`) is the hull of the clause heads.
 
@@ -181,7 +181,7 @@ Each is fail-open: the check gives up with no warning, and no diagnostic says th
 - There is no `@nonexhaustive`, so a group cannot be marked deliberately partial.
 - #185's DMN channel (`siClauseMatrixRanges`) is not carried: main has no DMN export.
 
-Tests: `jl4-core/test/PatternClausesMissingSpec.hs` (32 cases, matching warnings by severity and rendered text): 14 from `17e944423`, including the silences for numbers, lists, `MAYBE`, an enumeration from another file and the 64-row cap; eight for clause hygiene; three pinning the examples the reference page gives for a number anywhere, an `EXACTLY` pattern and the step limit, each with its control that warns; two for the clause after a new name (review round 2); and five for annotations between clauses (review round 3).
+Tests: `jl4-core/test/PatternClausesMissingSpec.hs` (34 cases, matching warnings by severity and rendered text): 14 from `17e944423`, including the silences for numbers, lists, `MAYBE`, an enumeration from another file and the 64-row cap; eight for clause hygiene; three pinning the examples the reference page gives for a number anywhere, an `EXACTLY` pattern and the step limit, each with its control that warns; two for the clause after a new name (review round 2); and seven for annotations between clauses (review round 3, and two of round 4).
 `jl4/tests-cli` "warns that a multi-clause DECIDE misses a case, and still succeeds" (fixture `tests-cli/fixtures/multi-clause-missing.l4`).
 
 ## Generated names, printing, editor and render (from #581)
@@ -270,7 +270,7 @@ Item 2, linear parsing.
 Every clause of a run the group parser turned down was then parsed as a definition of its own, where the group parser read the rest of the run again, so a file of n lines `f x MEANS i` took time quadratic in n.
 `decidePatternMatch` now records the positions of a run it turns down (`turnDownRun`, `Parser.hs:933`) and fails at once at any of them (`runTurnedDown`, `:939`); every suffix of a run turned down is turned down too.
 The body of a clause is parsed once per position (`clauseBody`, `:855`; `memoClauseBody`, `:895`), so an ordinary definition replays the body the group parser read.
-Both live in `ClauseMemo` (`:861`), a layer below megaparsec in `Parser` (`:68`) that backtracking does not undo, run by `runJl4Parser` (`:2697`).
+Both live in `ClauseMemo` (`:861`), a layer below megaparsec in `Parser` (`:68`) that backtracking does not undo, run by `runJl4Parser` (`:2698`).
 On unstable the same replay is `memoGroup` (legalese/l4-ide#582), which also serves bracketed groups; main has no `memoGroup`, so `ClauseMemo` holds only these two tables, and main has no switch to turn the memo off for a comparison run.
 Measured, `l4 check`: 1,000 lines took 29.5 s at `6d0146f27`; now 2,000 take 0.38 s and 4,000 take 0.73 s.
 `PatternMatchParserSpec` required 1,000 lines to parse in less than 8 times the wall-clock time of 250; since round 3 it compares CPU time for 250 and 2,000 lines.
@@ -284,7 +284,7 @@ Measured: Red / Gren / Blue checked clean at `6d0146f27` (`colour Blue` gives 2)
 
 Item 5, the clause wording after a reload.
 The evaluator words a value no clause matches from `pmSynthetic`, a mark on the annotations of the generated CONSIDERs, and jl4-service's `bundle.cbor` wrote every annotation as `()`.
-`Serialise Anno` (`Syntax.hs:1047`) now keeps `pmSynthetic` and nothing else; main serves the CBOR module after every restart, so this is the whole fix here.
+`Serialise Anno` (`Syntax.hs:1052`) now keeps `pmSynthetic` and nothing else; main serves the CBOR module after every restart, so this is the whole fix here.
 `SerialisationSpec` checks the module read back from the bundle and the service before and after a reload; both fail without the change.
 
 Item 6: the `l4 render` test in `jl4/tests-cli` drops carriage returns before matching two lines, for Windows.
@@ -300,7 +300,7 @@ A second refuter pass found that the L2 fix made the parse quadratic in the numb
 S1 and L1, the overloads' own annotations.
 `separateOverloads` gave the first definition the first `AKA` written on any clause, and the later definitions no `AKA`, no `@desc` or `@export`, and no `@nlg`.
 Measured at `b1002d9af`: `DECIDE f n IS n + 1` / `DECIDE f m AKA g IS m > 3` gave `g 5` 6, the first overload's answer, with no diagnostic; with an `AKA` on each, the second was not found; with an `@export` above the second, `l4 batch` said "no @export functions found in module"; an `@nlg` above it was "Not attached to any valid syntax node".
-Each clause now keeps its head as written, its `AKA` and the `@desc` or `@export` above it in the clause matrix (`PmMatrixClause`, `Syntax.hs:478`), and the annotation passes give a later clause of a group the `@desc` or `@export` and the `@nlg` above it (`claimLaterClauseDescs` and `claimLaterClauseNlgs`, `jl4-core/src/L4/Parser/ResolveAnnotation.hs:672` and `:240`; until `2dd411963` only for a run of bare names).
+Each clause now keeps its head as written, its `AKA` and the `@desc` or `@export` above it in the clause matrix (`PmMatrixClause`, `Syntax.hs:478`), and the annotation passes give a later clause of a group the `@desc` or `@export` and the `@nlg` above it (`claimLaterClauseDescs` and `claimLaterClauseNlgs`, `jl4-core/src/L4/Parser/ResolveAnnotation.hs:683` and `:240`; until `2dd411963` only for a run of bare names).
 `separateOverloads` gives each definition its own clause's head, `AKA` and annotations, and the printer writes each clause's own `AKA` (`writtenClauses`, `Print.hs:311`).
 Main's printer prints no `@desc` and no `@nlg` for any definition, and `l4 batch` finds its `@export` on the checked module before printing it, so the printer change here is the `AKA` alone; on unstable the printer writes the `@desc` too.
 Measured on this branch: `g 5` is TRUE under `l4 run`, `l4 batch` (through an exported rule that calls `g`) and the REPL; the two-`AKA` file gives 6 and TRUE; `l4 batch` finds the `@export` on the second overload, and then evaluates the first overload of that name (see the known limit below); the `@nlg` is attached.
@@ -312,16 +312,16 @@ Overloads reach `checkClauseMatrix` without a matrix, so theirs draw none.
 A refuter then found the warning wrong in three ways, fixed on unstable as `887dcb763` and here as `b42394622`.
 A1, the rule's own `@nlg`.
 An `@nlg` on the line above the first clause is the rule's, and the group did not use it.
-The reason, read in code and not measured: the group's head is the first clause's, and the annotation pass gives it a region that ends before the comment, because the inputs of the head form are the `GIVEN`'s, located up in the signature (`givenInputBinding`, `Parser.hs:1066`).
+The reason, read in code and not measured: the group's head is the first clause's, and the annotation pass gives it a region that ends before the comment, because the inputs of the head form are the `GIVEN`'s, located up in the signature (`givenInputBinding`, `Parser.hs:1067`).
 `HasNlg Decide` now claims it for the head in the head form's region (`claimFirstClauseNlgs`, `ResolveAnnotation.hs:229`, called at `:218`).
 Measured with a control build that skips that claim: `#EVAL code Green` renders "`code` with `Green`", where with the claim it renders "the code of `c` with `Green`".
 A2, the annotations above the first clause are not the second clause's.
 `claimLaterClauseDescs` matched every `@desc` and `@export` that ends before the later clause's head, so one the first clause had left (a `@desc` between the `GIVETH` and the first clause, which belongs to no rule) was counted as above the second clause and warned.
-It now takes only those that start after the line of the clause above (`ResolveAnnotation.hs:672`), as `claimLaterClauseNlgs` already did.
+It then took only those that start after the line of the clause above (`ResolveAnnotation.hs:683`), as `claimLaterClauseNlgs` already did; round 4 replaces that test (see below).
 Measured with a control build without that bound (and with A3's fix also disabled): a `@desc` between the `GIVETH` and the first clause of `steps` draws "This @desc is above the second clause of `steps`", and an `@export` between the `GIVETH` and the first clause of `hops` draws the same for `hops`.
 A3, one warning for each.
 `PmMatrixClause` held one `Desc`, so several `@desc` and `@export` lines stacked above a later clause were reduced to one and drew one warning between them.
-It holds `clauseDescs` and `clauseNlgs`, every one written between the clause above and this one, and `warnLaterClauseAnnotations` warns at each; a separated overload still keeps one `@desc`, as a definition does (`pickDesc`, `ResolveAnnotation.hs:800`).
+It holds `clauseDescs` and `clauseNlgs`, every one written between the clause above and this one, and `warnLaterClauseAnnotations` warns at each; a separated overload still keeps one `@desc`, as a definition does (`pickDesc`, `ResolveAnnotation.hs:810`).
 Measured with a control build that keeps only the first `@desc`: the stacked group draws three warnings, where each of the four annotations should draw one.
 The group now reads its `@desc` and `@export` as a plain `DECIDE` with the same layout does: one above the `GIVEN` is the rule's, and one between the `GIVETH` and the first clause is used by neither and draws no warning for either.
 A fourth finding, that a warning from an imported module shows in `l4 run`, needed no change: `l4 run` prints the diagnostics of every module in the run, each under its own `File:` line (measured on this branch with a module that imports a library with an `@desc` and an `@export` between clauses, and with one that imports a group missing a case).
@@ -361,3 +361,38 @@ The user documentation's claim that the warning naming a new name "holds for eve
 
 A difference from main remains, by the rule round 2 asked for: a parameter spelled like a constructor keeps a run a group.
 With `DECLARE Colour IS ONE OF Red, Green`, `DECIDE show Red IS Red + 1` / `DECIDE show b IS b AND TRUE` is a type error on this branch, where main reads two overloads (main's behaviour as the refuter measured it).
+
+## Review round 4 (the refutation of the later-clause warning's contract)
+
+A refuter probed the warning at `887dcb763` on unstable and found holes in what it claims to do.
+They were fixed on unstable first, on `fix/clause-group-round3` (`7c3c9857e`, `35c57a026`, `dc33afa39`, `3c7c616fd`), and what applies here is carried as `fb719cd6d` and `07a84815a`.
+
+S1, the rule after a group.
+After a rule written as clauses, an `@nlg` written above the next rule was swallowed when that rule had no `GIVEN`.
+Measured with a control build of this branch without the fix: in `ok/pattern-matching-annotations-after-group.l4`, `#EVAL two` (a plain rule with no `GIVEN`) renders "`two`" and `#EVAL four` (a group with none) renders "`four`", where with the fix they render "the second rule" and "the fourth rule with `Green`".
+The CONSIDERs and LETs a group is lowered to hold names that the parser made up (`generatedName`), which have no range, and a name with no range has no bound on the region it may claim, so it took every `@nlg` up to the next token that had one.
+`HasNlg Name` now claims nothing for a name with no range (`ResolveAnnotation.hs:416`).
+Unstable had a second cause that this branch does not: its `rawTokensAnno` kept the annotations after the last clause in the group's tokens, so the group's range ran over the next rule's `@nlg`; this branch's keeps them as trailing tokens (`d6594578b`).
+
+S2 and L1, one rule for "between two clauses".
+Which annotations counted as written above a later clause was decided by the clause head's line and column.
+An annotation indented past the head's column drew no warning (S2), and an annotation inside a `WHERE` of an earlier clause was taken by the next clause and warned about (L1).
+The clause matrix now keeps the range of each clause's body, `WHERE` included (`PmMatrixClause`, `Syntax.hs:478`, field `bodyRange`), and an annotation is between two clauses when it starts after the end of the clause above and ends before the head of this one (`betweenClauses`, `ResolveAnnotation.hs:266`, used by `claimLaterClauseDescs` and `claimLaterClauseNlgs`).
+Measured with a control build without that rule and without the S1 fix: the two new `PatternClausesMissingSpec` cases fail, and so does the json schema golden of `ok/pattern-matching-later-clause-annotations.l4`, because the indented `@export`, taken by no clause, then publishes the rule after the group (`helped`).
+An `@nlg` inside a `WHERE` of a clause is not attached ("Not attached to any valid syntax node"), where a rule written as one definition attaches it to the helper (measured on this branch).
+The last clause's already was not attached; an earlier clause's was taken by the next clause until this round.
+
+L5 and L2, not carried.
+On unstable the group's head form no longer claims the copies of the `GIVEN`'s inputs (`addNlgGroupHead`), so an `@nlg` above the first clause and a herald on the same head collide there as on a rule written as one definition, and an `@nlg` on a `GIVEN` item of a group is attached.
+That is not carried, for what it does here: measured in a build of this branch with that change, a rule written as clauses is claimed exactly as a plain rule is, and a plain rule's `@nlg` between its `GIVETH` and its `DECIDE` lands on the `GIVETH`'s type name (this branch has no `signatureBeforeKeyword`), so `#EVAL code Green` in `ok/pattern-matching-first-clause-annotations.l4` renders "`code` with `Green`" and round 3's A1 is lost.
+So this branch keeps `claimFirstClauseNlgs` (`ResolveAnnotation.hs:229`, called at `:218`), and two things stay as they were.
+A rule written as clauses reports an `@nlg` on a `GIVEN` item as "Not attached to any valid syntax node" where a rule written as one definition attaches it (L2; measured with `GIVEN c IS A Colour @nlg the colour %c%`).
+An `@nlg` above the first clause together with a herald on the head draws no collision for a rule written as clauses nor for a rule written as one definition (L5; measured, no diagnostic for either).
+
+L3, not applicable here.
+Unstable's printer writes a stray later-clause `@nlg` back as a herald, so the re-checked module reports "Not attached" in place of the check's warning.
+This branch's printer prints no `@nlg` for any definition, so a re-checked module has none.
+
+Tests: two `PatternClausesMissingSpec` cases, "warns at an annotation indented past the head of the clause below it" and "does not warn at an annotation inside a WHERE of an earlier clause" (34 cases in all), and these fixtures: `ok/pattern-matching-annotations-after-group.l4` (S1), the indented group and the `WHERE` group added to `ok/pattern-matching-later-clause-annotations.l4`, and `not-ok/nlg/nlg_group_neighbours.l4` (the `@nlg` in a `WHERE`, and one after the last rule of the file).
+They are unstable's fixtures, except that `nlg_group_neighbours.l4` is shorter here and one comment sentence of the first differs; unstable's `ok/pattern-matching-given-gloss.l4` is not carried, since it pins what is not carried.
+Each fails with its fix disabled: the after-group golden without the S1 fix, and the two cases with the S1 fix and the rule above both off (the same build).
