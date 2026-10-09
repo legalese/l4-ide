@@ -229,6 +229,59 @@ disjunction inside a field name, nobody audits it — not your reviewer, not you
 wizard. Lift the disjuncts out and let the scaffolding carry the words. Maine later amended the
 statute to use semicolons; the encoding would have forced the question on day one.
 
+### Oakhurst — _grouping_
+
+**The defect, seen a second way:** the same words in the same order, and nothing to say where the last "or" attaches.
+
+Follow the advice above and lift the disjuncts out, so that every activity and every destination is a leaf of its own, in the statute's own order.
+The drivers did not dispute that they handle perishable foods, so the list of goods is left out.
+What remains can be indented two ways:
+
+```l4
+DECIDE `exempt, as the drivers read it` IF
+        `canning`
+    ..  `processing`
+    ..  `preserving`
+    ..  `freezing`
+    ..  `drying`
+    ..  `marketing`
+    ..  `storing`
+    ..  `packing` ... "for"
+        ...     `shipment`
+            OR  `distribution`
+
+DECIDE `exempt, as the dairy read it` IF
+        `canning`
+    ..  `processing`
+    ..  `preserving`
+    ..  `freezing`
+    ..  `drying`
+    ..  `marketing`
+    ..  `storing`
+    ..  `packing` ... "for"
+        ...     `shipment`
+    OR  `distribution`
+```
+
+The two differ in one line: how far `OR distribution` is indented.
+Under `shipment`, distribution is a second destination for packing; back at the margin, it is a ninth activity of its own.
+
+![Oakhurst, as the drivers read it](figures/grouping-oakhurst-drivers.svg)
+
+![Oakhurst, as the dairy read it](figures/grouping-oakhurst-dairy.svg)
+
+Asked for every way a worker can be exempt, the two agree on eight and differ on the ninth: "packing for distribution" against "distribution".
+For a driver who distributes and does nothing else on the list, they disagree:
+
+```l4
+#EVAL `exempt, as the drivers read it` FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE   -- FALSE
+#EVAL `exempt, as the dairy read it`   FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE   -- TRUE
+```
+
+Overtime owed on the first reading; exempt on the second.
+Now type the last two lines at the margin, the way the statute is punctuated, and you are back in [the warning above](#l4-will-tell-you-when-you-have-not-decided): `AND` and `OR` share column 5.
+Ignore the warning and `AND` binds tighter, which gives the dairy's reading: the one the court declined to adopt, chosen by default and recorded nowhere.
+
 ### Rogers — _attachment_
 
 **The defect:** a comma that is _present_, scoping a trailing proviso further than one party
