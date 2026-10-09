@@ -118,6 +118,7 @@ A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is a redundant
 A CONSIDER reads these exactly as a rule written as clauses does ([Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits)), so the two spellings of one rule warn alike.
 One limit, which warns rather than stays silent: an `EXACTLY` of a name that a `WHERE` or a `LET` defines as the scrutinee itself (`WHEN EXACTLY y` in `CONSIDER x`, with `y MEANS x`) is read as a value the check cannot name, so the check asks for an `OTHERWISE` that would never be used; write that branch as `OTHERWISE`.
 BOOLEAN (just TRUE/FALSE) is checked normally; the builtin container types MAYBE, EITHER, and LIST are not yet analysed.
+A CONSIDER with no number, text or `EXACTLY` in it whose missing branches are too many for that check to list (more than 64, or more than 10000 steps to find them, the [limits](../functions/multi-clause-DECIDE.md#limits) at which a rule written as clauses with no number or text gets no warning) still warns: it is checked the older way instead, which lists some of the missing branches, not always all of them.
 
 The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
 

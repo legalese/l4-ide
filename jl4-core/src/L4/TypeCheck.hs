@@ -2086,9 +2086,16 @@ builtinConstructorLookup =
 -- analysis lists a constructor's arguments as one set of constraints, so
 -- below a constructor whose arms name several combinations of arguments it
 -- listed some missing ones and not others: @WHEN faz qux qux@ alone asked
--- for six of the eight missing @faz@ arms (smucclaw/l4-ide#1030). A CONSIDER
--- generated from clauses keeps the routing above: its missing branches are
--- the group's, which 'checkClauseMatrix' reports.
+-- for six of the eight missing @faz@ arms (smucclaw/l4-ide#1030). When the
+-- clauses' engine gives up on such a CONSIDER, as it does past
+-- 'maxMissingClauses' rows or 'clauseMatrixFuel' steps, main's own analysis
+-- reads it instead, so that it warns as it did before (assumed, not ruled,
+-- 2026-10-10): a record of three fields over six values with three arms
+-- has 208 missing values, of which main's own analysis lists 108 and the
+-- clauses' engine, giving up, none. A CONSIDER generated from
+-- clauses keeps the routing above: its missing branches are the group's,
+-- which 'checkClauseMatrix' reports, and past those limits the group gets
+-- no warning, as everywhere else.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
@@ -2107,12 +2114,12 @@ checkConsider ec ann e branches t = do
   ei <- asks (.entityInfo)
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
   resolvedTe <- applySubst te
-  let byClauseEngine =
-        any armHasLiteral rbranches
-          || (isNothing generated && not (holdsUnlistedType ei resolvedDecls resolvedTe))
-  if byClauseEngine
-    then considerWithLiterals generated leftToClauseMatrix re te rbranches
-    else considerWithoutLiterals generated leftToClauseMatrix re te rbranches
+  let withLiteral = any armHasLiteral rbranches
+      byHighlander = not withLiteral && isNothing generated && not (holdsUnlistedType ei resolvedDecls resolvedTe)
+      ownAnalysis = considerWithoutLiterals generated leftToClauseMatrix re te rbranches
+  if withLiteral || byHighlander
+    then considerWithLiterals (if byHighlander then Just ownAnalysis else Nothing) generated leftToClauseMatrix re te rbranches
+    else ownAnalysis
   pure (Consider ann re rbranches)
   where
     armHasLiteral (MkBranch _ lhs _) = case lhs of
@@ -2210,14 +2217,18 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
 -- 'coveragePattern', an arm it cannot count is left out and one it cannot
 -- read stands the analysis down, as for a clause, and the scrutinee stands
 -- in for the input, so an EXACTLY whose expression mentions a name the
--- scrutinee mentions stands it down too. A missing case is a WHEN, or OTHERWISE where the scrutinee
--- itself is left open. An arm is redundant when the arms above it match
--- everything it matches ('coveredBy'); an arm that matches anything
--- (OTHERWISE, a new name) is never reported, as unstable never reports one,
--- and the arms of a CONSIDER that a multi-clause group compiles to are
--- left to 'checkClauseMatrix', as below.
-considerWithLiterals :: Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
-considerWithLiterals generated leftToClauseMatrix re te rbranches = do
+-- scrutinee mentions stands it down too. A missing case is a WHEN, or
+-- OTHERWISE where the scrutinee itself is left open. An arm is redundant
+-- when the arms above it match everything it matches ('coveredBy'); an arm
+-- that matches anything (OTHERWISE, a new name) is never reported, as
+-- unstable never reports one, and the arms of a CONSIDER that a
+-- multi-clause group compiles to are left to 'checkClauseMatrix', as below.
+--
+-- When the missing-case analysis stands down or gives up, the first
+-- argument, if there is one, analyses the CONSIDER instead, and this one
+-- reports nothing.
+considerWithLiterals :: Maybe (Check ()) -> Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
+considerWithLiterals ifGivenUp generated leftToClauseMatrix re te rbranches = do
   ei <- asks (.entityInfo)
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
   resolvedTe <- applySubst te
@@ -2236,10 +2247,11 @@ considerWithLiterals generated leftToClauseMatrix re te rbranches = do
       mentionsScrutinee r = any (sameResolved r) (toList re)
       -- 'Nothing' stands the analysis down; @Just Nothing@ leaves the arm out
       arms = map (maybe (Just (Just CovWild)) (coveragePattern ei families scrutineeName mentionsScrutinee True (Just resolvedTe))) armPatterns
-      missing = case sequence arms of
-        Just rowsM ->
-          maybe [] (map missingArm) (uncoveredRows families 1 (any isNothing rowsM) [ [p] | Just p <- rowsM ])
-        Nothing -> []
+      -- 'Nothing' when the analysis stands down or gives up
+      uncovered = do
+        rowsM <- sequence arms
+        uncoveredRows families 1 (any isNothing rowsM) [ [p] | Just p <- rowsM ]
+      missing = maybe [] (map missingArm) uncovered
       missingArm = \ case
         [p] | not (isWildcard p) -> When emptyAnno (coverageToPattern p)
         _ -> Otherwise emptyAnno
@@ -2254,10 +2266,13 @@ considerWithLiterals generated leftToClauseMatrix re te rbranches = do
       isWildcard = \ case
         CovWild -> True
         _ -> False
-  unless (null missing || leftToClauseMatrix) do
-    addWarning $ PatternMatchesMissing missing
-  unless (null redundant || isJust generated) do
-    addWarning $ PatternMatchRedundant redundant
+  case (uncovered, ifGivenUp) of
+    (Nothing, Just instead) -> instead
+    _ -> do
+      unless (null missing || leftToClauseMatrix) do
+        addWarning $ PatternMatchesMissing missing
+      unless (null redundant || isJust generated) do
+        addWarning $ PatternMatchRedundant redundant
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do

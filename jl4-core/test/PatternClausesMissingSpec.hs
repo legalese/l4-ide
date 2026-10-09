@@ -1359,6 +1359,24 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       ]
     missingArms ws `shouldBe` ["WHEN Pair Basic Gold THEN", "WHEN Pair Gold `_` THEN"]
 
+  it "still warns when its missing branches are more than the clauses' engine lists" $ do
+    -- 208 missing values: past 64 rows the clauses' engine gives up, and
+    -- this CONSIDER fell silent (7236198ad). Main's own analysis reads it
+    -- instead, and warns as it did before HIGHLANDER.
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE E IS ONE OF e0, e1, e2, e3, e4, e5"
+      , "DECLARE Rec HAS f0 IS AN E, f1 IS AN E, f2 IS AN E"
+      , ""
+      , "GIVEN q IS A Rec"
+      , "GIVETH A STRING"
+      , "f q MEANS"
+      , "  CONSIDER q"
+      , "    WHEN Rec e2 e3 e4 THEN \"a0\""
+      , "    WHEN Rec q1_0 e4 e0 THEN \"a1\""
+      , "    WHEN Rec e1 e3 e3 THEN \"a2\""
+      ]
+    length (missingArms ws) `shouldSatisfy` (> 64)
+
 -- ----------------------------------------------------------------------------
 
 -- | Every warning of a module, as (range, rendered lines), the range as
