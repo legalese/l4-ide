@@ -973,8 +973,8 @@ checkClauseMatrix dec dHead =
               -- 'quietly' re-resolution does not record on the patterns.
               missingRows = do
                 rpatss <- traverse sequence rpatssM
-                rows <- catMaybes <$> traverse (coverageRow ei families colScruts colTypes) rpatss
-                uncoveredRows families (length colScruts) rows
+                rowsM <- traverse (coverageRow ei families colScruts colTypes) rpatss
+                uncoveredRows families (length colScruts) (any isNothing rowsM) (catMaybes rowsM)
           case missingRows of
             Just rows -> do
               case (rows, hullRange matrix) of
@@ -1288,15 +1288,24 @@ constructorFamilies decls =
 -- or text in it has only the first tier: the second would re-run the same
 -- rows.
 --
+-- When a clause was left out ('coveragePattern', @Just Nothing@), only the
+-- second tier is tried. The first could list a keyed gap that the clause
+-- left out covers: with @f 2 "b"@, @f (EXACTLY two) s@ and @f 1 s@ it would
+-- list @2 s@, and every @(2, s)@ meets the second clause. The second tier
+-- leaves every number and text position open, and each of its rows holds a
+-- value no clause matches: a left-out clause matches one value of its
+-- position for each value of the others, so putting there a value that no
+-- clause names and no left-out clause matches gives one.
+--
 -- 'Nothing' bails to no warning, in both tiers: a constructor whose type's
 -- constructors are unknown, an arity that disagrees with the declaration,
 -- more than 'maxMissingClauses' rows at any level (each intermediate row
 -- yields at least one final row, so the final list would be longer still),
 -- or more than 'clauseMatrixFuel' steps.
-uncoveredRows :: Map Unique [(Resolved, Int)] -> Int -> [[CoveragePattern]] -> Maybe [[CoveragePattern]]
-uncoveredRows families n rows0 =
-      run rows0
-  <|> (guard (any (any hasLit) rows0) *> run (filter (not . any hasLit) rows0))
+uncoveredRows :: Map Unique [(Resolved, Int)] -> Int -> Bool -> [[CoveragePattern]] -> Maybe [[CoveragePattern]]
+uncoveredRows families n leftOut rows0 =
+      (guard (not leftOut) *> run rows0)
+  <|> (guard (leftOut || any (any hasLit) rows0) *> run (filter (not . any hasLit) rows0))
   where
     run rows = evalStateT (go n rows) clauseMatrixFuel
 

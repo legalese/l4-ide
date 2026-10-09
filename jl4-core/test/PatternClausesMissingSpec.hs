@@ -269,7 +269,8 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f 1              IS \"one\""
       ]
     missingClauses exactly `shouldBe` ["DECIDE `f` a IS"]
-    -- The same inside a pattern: a field declared under the other name.
+    -- The same inside a pattern: a field declared under the other name. The
+    -- clause left out leaves only the coarse list, here the input's name.
     nested <- clauseWarnings $ Text.unlines
       [ "DECLARE Age IS A NUMBER"
       , "DECLARE Person HAS age IS AN Age"
@@ -281,7 +282,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE h (Person (EXACTLY zero)) IS \"newborn\""
       , "DECIDE h (Person 1)              IS \"one\""
       ]
-    missingClauses nested `shouldBe` ["DECIDE `h` (Person `_`) IS"]
+    missingClauses nested `shouldBe` ["DECIDE `h` p IS"]
 
   it "leaves out a clause with an EXACTLY of a constant under a record's field" $ do
     -- The field's type is read off the pattern's annotation, resolved
@@ -821,6 +822,36 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f n              Premium IS 2"
       ]
     missingClauses ws `shouldBe` ["DECIDE `f` n Basic IS"]
+
+  it "lists only the coarse clauses when a clause is left out, never a keyed gap it covers" $ do
+    -- The exact list would be `2 s` and `n s`, and the second clause matches
+    -- every (2, s): a clause pasted for `2 s` would never be used.
+    ws <- clauseWarnings $ Text.unlines
+      [ "two MEANS 2"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      s IS A STRING"
+      , "GIVETH A STRING"
+      , "DECIDE f 2 \"b\"         IS \"a\""
+      , "DECIDE f (EXACTLY two) s IS \"two\""
+      , "DECIDE f 1 s             IS \"one\""
+      ]
+    missingClauses ws `shouldBe` ["DECIDE `f` n s IS"]
+    -- The same when the EXACTLY names only the other inputs: the exact list
+    -- would include `"c" "c" Standard`, which the first clause matches.
+    other <- clauseWarnings $ Text.unlines
+      [ "DECLARE Plan IS ONE OF Standard, Plus, Gold"
+      , ""
+      , "GIVEN a IS A STRING"
+      , "      b IS A STRING"
+      , "      p IS A Plan"
+      , "GIVETH A NUMBER"
+      , "DECIDE g (EXACTLY b) (EXACTLY a) Standard IS 0"
+      , "DECIDE g a \"c\" Plus IS 1"
+      , "DECIDE g \"c\" \"a\" p IS 2"
+      , "DECIDE g a \"c\" Gold IS 3"
+      ]
+    missingClauses other `shouldBe` ["DECIDE `g` a b p IS"]
 
   it "suggests the input's name where every clause is EXACTLY of a constant" $ do
     ws <- clauseWarnings $ Text.unlines
