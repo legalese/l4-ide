@@ -473,6 +473,44 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ])
     ws `shouldBe` []
 
+  it "warns at an annotation indented past the head of the clause below it" $ do
+    -- Which clause an annotation is written above is decided by where the
+    -- clause above ends, not by the column it starts in.
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "indented 0 MEANS 1"
+      , "  @desc indented stray"
+      , "indented 1 MEANS 2"
+      , "  @export indented export"
+      , "  @nlg indented nlg %n%"
+      , "indented other MEANS 3"
+      ])
+    map fst ws `shouldBe` [Just (4, 3, 4), Just (6, 3, 6), Just (7, 3, 7)]
+    [ Text.strip l | (_, ls) <- ws, l <- ls, "This @" `Text.isPrefixOf` Text.strip l ] `shouldBe`
+      [ "This @desc is above the second clause of `indented`, where it is not used."
+      , "This @export is above the third clause of `indented`, where it is not used."
+      , "This @nlg is above the third clause of `indented`, where it is not used."
+      ]
+
+  it "does not warn at an annotation inside a WHERE of an earlier clause" $ do
+    -- It is inside that clause, whatever its indentation: the local
+    -- definition's, and not written between two clauses.
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE helped 0 IS g 1"
+      , "  WHERE"
+      , "    @desc local helper of clause one"
+      , "    g x MEANS x + 1"
+      , "DECIDE helped 1 IS h 2"
+      , "  WHERE"
+      , "    @nlg local helper of clause two %y%"
+      , "    h y MEANS y + 2"
+      , "DECIDE helped other IS 2"
+      ])
+    ws `shouldBe` []
+
   it "says the place above the first clause for a group with no GIVEN" $ do
     ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
       [ "DECIDE f 0 IS 1"
