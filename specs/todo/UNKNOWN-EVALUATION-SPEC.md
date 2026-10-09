@@ -961,7 +961,7 @@ Row 58, every corpus directive not stuck after build step 1, holds from step 2 o
 **Steps 4 to 7 are parked** (Meng, 2026-10-02, MOTHBALL): they are not planned until a user asks for them, and the build stops after step 3.
 Their text below, and the rulings whose full form lands in them, stay as recorded, so that a later build starts from the decisions already made; none is reversed.
 Where steps 1 to 3 carry an interim for such a ruling (step 3's step counter, its re-raising of an error or refusal under an unknown as `Stuck`, and `IF`, `BRANCH` and `CONSIDER` on a term staying `Stuck`), the interim is what ships.
-The decision followed a review that weighed this spec, none of whose §4 to §8 is built, against §2.6's census: 9 stuck results among the corpus's 7,211.
+The decision followed a review that weighed this spec, none of whose §4 to §8 was built then, against §2.6's census: 9 stuck results among the corpus's 7,211.
 
 1. **Two-valued fixes, no lift.** A `ValAssumed` scrutinee of a `CONSIDER` raises `Stuck`, naming it (§2.4); the selector path raises the same (§2.4, probe `p05-record.l4`); the right-operand misdiagnosis of `runBinOpEquals` is fixed (U6); and a bare assumed term as the result of an `#EVAL` is reported as `Stuck`, as `#ASSERT` already does (`EvaluateLazy.hs:306`; §2.4, probe `p17-bare.l4`).
    The last is covered by the rulings: U7b makes the default report today's "I needed to know the value of …", row 52 expects exactly that with exit 1, and the 2026-08-01 ruling makes `Stuck` exit 1 (`Run.hs:78-94`); only its timing was open, and it lands here so that the silent exit-0 path closes first.
@@ -1161,7 +1161,8 @@ The decision followed a review that weighed this spec, none of whose §4 to §8 
      K3's unknown is a string tag, never JSON `null`, which the wire already uses for other things.
    - One three-way parse, absent, `null` or `{}`, or a value, is shared by `/evaluation`, batch and MCP, and an MCP argument that fails to parse is rejected with -32602, never read as absent.
      W1's placeholders map back to their input's name and §4.8 provenance in `needs` and in the printed residual.
-     An empty CSV cell stays `null`, so it is Declined and never defaulted, while a column left out is absent and takes its default; the doc page says so.
+     ~~An empty CSV cell stays `null`, so it is Declined and never defaulted, while a column left out is absent and takes its default; the doc page says so.~~
+     _Superseded by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T3c (SOFTBOILED, ruled 2026-10-02): an empty CSV cell is absent, exactly as a missing column is, and `l4 batch` reads it so (`rowToJson`, `jl4/app/L4/Cli/Batch.hs`)._
    - MCP gets one extra tool per function for the residual report, with `required: []`, mirrored in WebMCP; `needs` gives both the L4 name and the wire key, and the residual prints unsanitised.
      `l4 batch --validate-only` warns on an absent or `null` input, without marking the row invalid.
      Whether a case that hits the resource limit stops failing the whole batch is not this step's to change; §9 (O5) makes it a service fix of its own.

@@ -189,7 +189,7 @@ A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer to
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
 **A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
-`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so it is refused by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation` refuses it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`); MCP and batch take it to the wrapper path instead (below). A type that is a synonym for a `MAYBE` is a `MAYBE`.
 For this rule:
 
 ```l4
@@ -214,7 +214,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
-Two kinds of request go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list, and every request to a `DEONTIC` function.
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every `/evaluation` request to a `DEONTIC` function; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
 On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
 A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
 If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
@@ -237,7 +237,7 @@ The default report is the only one so far: it shows an answer that is still wait
 Limits, measured 2026-10-02:
 
 - On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
-- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. This extends the early/late split above; it did not create it.
+- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused by `/evaluation`, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. MCP and batch take a top-level `null` to the wrapper path whatever else the request holds, so there a `BOOLEAN` sent as `null` is refused only if the rule reads it, even with no `{}` beside it (smucclaw/l4-ide#1021). This extends the early/late split above; it did not create it.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.

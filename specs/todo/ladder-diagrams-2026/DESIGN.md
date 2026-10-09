@@ -1,6 +1,6 @@
 # Ladder Diagrams 2026 — Design Document
 
-**Status:** Draft v1 (design-first; no code yet)
+**Status:** Draft v1, written design-first; much of it has since been built. §14 is the status board, and §22, §24's I-b and I-d, §25's "What was built", §26 and §27 each say what shipped.
 **Branch:** `mengwong/ladder-diagrams-3` · worktree `~/src/legalese/l4wt/ladder-diagrams-3`
 **Author of record:** Meng (design), drafted with Claude
 **Supersedes:** the Dagre + SvelteFlow layout path in `ts-shared/l4-ladder-visualizer`
@@ -1216,7 +1216,7 @@ ship a VS Code extension. Rode on the §13.1 `ladder-svg` split — **which is n
 
 ---
 
-## 25. IMPLIES — the seam between scope and requirement _(proposed; not built)_
+## 25. IMPLIES — the seam between scope and requirement _(proposed; partly built, see "What was built" and "Still open" below)_
 
 **The question (Meng, 2026-07-14):** _"do we draw implication as a new thing, or as a rung that
 fits into our current formalisms?"_
