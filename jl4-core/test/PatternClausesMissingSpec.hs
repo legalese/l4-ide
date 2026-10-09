@@ -18,7 +18,12 @@ import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import L4.TypeCheck.Types (CheckErrorWithContext, Severity (..))
 
 spec :: Spec
-spec = describe "Multi-clause DECIDE: missing-case warning" $ do
+spec = do
+  clauseSpec
+  considerSpec
+
+clauseSpec :: Spec
+clauseSpec = describe "Multi-clause DECIDE: missing-case warning" $ do
   it "warns when an enumeration value has no clause, naming the missing clause" $ do
     ws <- clauseWarnings $ Text.unlines
       [ "DECLARE Colour IS ONE OF Red, Green, Blue"
@@ -1148,6 +1153,121 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
 
 -- ----------------------------------------------------------------------------
 -- Helpers
+-- | A CONSIDER written by hand reads numbers, pieces of text and EXACTLY as
+-- the clauses of a group do (GANDER, 2026-10-09), so a rule warns alike
+-- written either way.
+considerSpec :: Spec
+considerSpec = describe "CONSIDER over numbers, text and EXACTLY" $ do
+  let colour body = Text.unlines $
+        [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+        , ""
+        , "someColour MEANS Red"
+        , ""
+        , "GIVEN c IS A Colour"
+        , "GIVETH A NUMBER"
+        , "f c MEANS"
+        , "  CONSIDER c"
+        ] <> body
+      number body = Text.unlines $
+        [ "zero MEANS 0"
+        , ""
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A STRING"
+        , "f n MEANS"
+        , "  CONSIDER n"
+        ] <> body
+
+  it "reaches an arm after EXACTLY of a value of the scrutinee's type" $ do
+    -- Main read `EXACTLY Red` as matching anything, and called the `Green`
+    -- arm redundant, though `f Green` is 2.
+    ws <- considerWarnings $ colour
+      [ "    WHEN EXACTLY Red THEN 1"
+      , "    WHEN Green THEN 2"
+      , "    OTHERWISE 3"
+      ]
+    ws `shouldBe` []
+
+  it "lists the values a CONSIDER whose only arm is EXACTLY of a value leaves out" $ do
+    -- Main passed it, and `f Green` failed at run time.
+    ws <- considerWarnings $ colour
+      [ "    WHEN EXACTLY Red THEN 1"
+      ]
+    missingArms ws `shouldBe` ["WHEN Green THEN", "WHEN Blue THEN"]
+
+  it "suggests OTHERWISE for a CONSIDER over numbers or texts with none" $ do
+    ws <- considerWarnings $ number
+      [ "    WHEN 0 THEN \"zero\""
+      , "    WHEN 1 THEN \"one\""
+      ]
+    missingArms ws `shouldBe` ["OTHERWISE"]
+    text <- considerWarnings $ Text.unlines
+      [ "GIVEN s IS A STRING"
+      , "GIVETH A NUMBER"
+      , "code s MEANS"
+      , "  CONSIDER s"
+      , "    WHEN \"red\" THEN 1"
+      , "    WHEN \"green\" THEN 2"
+      ]
+    missingArms text `shouldBe` ["OTHERWISE"]
+
+  it "reports a repeated number as a redundant arm" $ do
+    ws <- considerWarnings $ number
+      [ "    WHEN 1 THEN \"one\""
+      , "    WHEN 1.0 THEN \"one point zero\""
+      , "    OTHERWISE \"other\""
+      ]
+    map (mentions "one point zero") (filter (mentions "redundant") ws) `shouldBe` [True]
+
+  it "lists the gap under a key as the arm spells the key" $ do
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Premium"
+      , "DECLARE Rate HAS level IS A NUMBER"
+      , "                 tier IS A Tier"
+      , ""
+      , "GIVEN r IS A Rate"
+      , "GIVETH A NUMBER"
+      , "f r MEANS"
+      , "  CONSIDER r"
+      , "    WHEN Rate 1.50 Basic THEN 10"
+      , "    WHEN Rate 2 t THEN 20"
+      ]
+    missingArms ws `shouldBe` ["WHEN Rate 1.50 Premium THEN", "WHEN Rate `_` `_` THEN"]
+
+  it "counts EXACTLY of a constant over a number for nothing, and stands down over an enumeration" $ do
+    numberWs <- considerWarnings $ number
+      [ "    WHEN EXACTLY zero THEN \"zero\""
+      ]
+    missingArms numberWs `shouldBe` ["OTHERWISE"]
+    enumWs <- considerWarnings $ colour
+      [ "    WHEN EXACTLY someColour THEN 1"
+      ]
+    enumWs `shouldBe` []
+
+  it "stands down for an EXACTLY that mentions the scrutinee" $ do
+    ws <- considerWarnings $ number
+      [ "    WHEN EXACTLY (n PLUS 0) THEN \"any\""
+      , "    WHEN 0 THEN \"zero\""
+      ]
+    ws `shouldBe` []
+
+  it "lists only what the arms without a number leave open when an arm is left out" $ do
+    -- The full list would include `Entry 2 _`, which the second arm covers.
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Entry HAS amount IS A NUMBER"
+      , "                  memo IS A STRING"
+      , ""
+      , "two MEANS 2"
+      , ""
+      , "GIVEN e IS AN Entry"
+      , "GIVETH A STRING"
+      , "f e MEANS"
+      , "  CONSIDER e"
+      , "    WHEN Entry 2 \"b\" THEN \"a\""
+      , "    WHEN Entry (EXACTLY two) m THEN \"two\""
+      , "    WHEN Entry 1 m THEN \"one\""
+      ]
+    missingArms ws `shouldBe` ["OTHERWISE"]
+
 -- ----------------------------------------------------------------------------
 
 -- | Every warning of a module, as (range, rendered lines), the range as
@@ -1194,3 +1314,17 @@ mentions t = any (t `Text.isInfixOf`) . snd
 missingClauses :: [(Maybe (Int, Int, Int), [Text])] -> [Text]
 missingClauses ws =
   [ Text.strip l | (_, ls) <- ws, l <- ls, "DECIDE " `Text.isPrefixOf` Text.strip l ]
+
+-- | The warnings about a CONSIDER's missing or redundant arms.
+considerWarnings :: Text -> IO [(Maybe (Int, Int, Int), [Text])]
+considerWarnings src = filter isConsiderWarning <$> warnings src
+  where
+    isConsiderWarning w = mentions "still need to be considered" w || mentions "redundant" w
+
+-- | The suggested arms of the CONSIDER warnings, trimmed.
+missingArms :: [(Maybe (Int, Int, Int), [Text])] -> [Text]
+missingArms ws =
+  [ t
+  | w@(_, ls) <- ws, mentions "still need to be considered" w
+  , l <- ls, let t = Text.strip l, "WHEN " `Text.isPrefixOf` t || t == "OTHERWISE"
+  ]

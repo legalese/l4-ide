@@ -1140,7 +1140,7 @@ litKey = \ case
 -- one leaves the clause out.
 coverageRow :: EntityInfo -> Map Unique [(Resolved, Int)] -> [Resolved] -> [Type' Resolved] -> [Pattern Resolved] -> Maybe (Maybe [CoveragePattern])
 coverageRow ei families colScruts colTypes pats =
-  sequence <$> sequence (zipWith3 (\ s t p -> coveragePattern ei families s True (Just t) p) colScruts colTypes pats)
+  sequence <$> sequence (zipWith3 (\ s t p -> coveragePattern ei families (Just s) (`sameResolved` s) True (Just t) p) colScruts colTypes pats)
 
 -- | What one pattern covers, read against its column's type.
 --
@@ -1181,8 +1181,11 @@ coverageRow ei families colScruts colTypes pats =
 coveragePattern
   :: EntityInfo
   -> Map Unique [(Resolved, Int)]
-  -> Resolved
-  -- ^ the column's input, at every depth
+  -> Maybe Resolved
+  -- ^ the column's input, when it has a name
+  -> (Resolved -> Bool)
+  -- ^ whether a name an EXACTLY mentions is, or is part of, the column's
+  -- input, at every depth
   -> Bool
   -- ^ at the top level of the column, where the input's own name is the
   -- pattern's scrutinee
@@ -1190,21 +1193,21 @@ coveragePattern
   -- ^ the type at this position, where known
   -> Pattern Resolved
   -> Maybe (Maybe CoveragePattern)
-coveragePattern ei families input top colTy = \ case
+coveragePattern ei families input mentionsInput top colTy = \ case
   PatVar {}     -> Just (Just CovWild)
   PatApp _ c ps -> do
-    subs <- traverse (\ p -> coveragePattern ei families input False (annoType p) p) ps
+    subs <- traverse (\ p -> coveragePattern ei families input mentionsInput False (annoType p) p) ps
     pure (CovCon c <$> sequence subs)
   PatCons {}    -> Nothing
   PatLit _ l    -> Just (Just (CovLit (litKey l) l))
   PatExpr _ e   -> case e of
     Lit _ l -> Just (Just (CovLit (litKey l) l))
     Var _ r
-      | top, r `sameResolved` input -> Just (Just CovWild)
+      | top, Just i <- input, r `sameResolved` i -> Just (Just CovWild)
       | Just fam <- Map.lookup (getUnique r) families
       , Just (c, 0) <- List.find ((`sameResolved` r) . fst) fam
       -> Just (Just (CovCon c []))
-    _ | any (`sameResolved` input) (toList e) -> Nothing
+    _ | any mentionsInput (toList e) -> Nothing
       | Just ty <- colTy, isPrimitiveType (expandSynonymsIn ei (8 :: Int) ty) -> Just Nothing
       | otherwise -> Nothing
   where
@@ -1380,6 +1383,40 @@ uncoveredRows families n leftOut rows0 =
 -- @maxMissingSuggestions@).
 maxMissingClauses :: Int
 maxMissingClauses = 64
+
+-- | Whether every value a row matches is matched by one of the rows above
+-- it ('specialiseTo': the rows above, specialised to the row, leave nothing
+-- uncovered). 'Nothing' when 'uncoveredRows' gives up. When it answers only
+-- through its coarse tier, an empty answer still means covered, since the
+-- rows that tier keeps are a subset of the rows above.
+coveredBy :: Map Unique [(Resolved, Int)] -> [[CoveragePattern]] -> [CoveragePattern] -> Maybe Bool
+coveredBy families above row =
+  let (n, rows) = specialiseTo row above
+  in null <$> uncoveredRows families n False rows
+
+-- | The rows that can match some value a given row matches, restricted to
+-- the positions that row leaves open (Maranget's specialisation, one
+-- position at a time): where the row names a constructor, rows naming the
+-- same one or open there are kept, with its arguments as positions; where it
+-- names a number or a piece of text, rows naming the same key or open there
+-- are kept; where it is open, the position is kept, moved to the end. Also
+-- returns how many positions are kept.
+specialiseTo :: [CoveragePattern] -> [[CoveragePattern]] -> (Int, [[CoveragePattern]])
+specialiseTo = go 0
+  where
+    go n [] rows = (n, rows)
+    go n (q : qs) rows = case q of
+      CovWild       -> go (n + 1) qs [ rest <> [p] | p : rest <- rows ]
+      CovCon c ps   -> go n (ps <> qs) (mapMaybe (byCon c (length ps)) rows)
+      CovLit k _    -> go n qs (mapMaybe (byLit k) rows)
+    byCon c a = \ case
+      CovCon c' ps : rest | c `sameResolved` c' -> Just (ps <> rest)
+      CovWild : rest -> Just (replicate a CovWild <> rest)
+      _ -> Nothing
+    byLit k = \ case
+      CovLit k' _ : rest | k == k' -> Just rest
+      CovWild : rest -> Just rest
+      _ -> Nothing
 
 -- | Recursion steps 'uncoveredRows' may take before it gives up, per tier.
 clauseMatrixFuel :: Int
@@ -2023,6 +2060,14 @@ builtinConstructorLookup =
 -- inside any clause's body is checked like any other. (A one-clause group's
 -- warnings are only withdrawn once the matrix has answered; see
 -- 'settleOneClause'.)
+--
+-- A CONSIDER with a number, a piece of text or an EXACTLY in any arm is
+-- analysed by the clauses' engine instead, as a group of one column with the
+-- scrutinee as its input, so that a rule warns alike written either way
+-- (GANDER, 2026-10-09; 'considerWithLiterals'). Main's own analysis below
+-- reads such an arm as matching anything, which called a reachable arm
+-- redundant after @WHEN EXACTLY Red@ and passed a CONSIDER whose only arm
+-- was @WHEN EXACTLY Red@.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
@@ -2038,6 +2083,25 @@ checkConsider ec ann e branches t = do
         Just (PmConsider g _ _) -> g.clauseCount >= 2
         _ -> False
   rbranches <- traverse (checkBranch ec patternEc te t) branches
+  if any armHasLiteral rbranches
+    then considerWithLiterals generated leftToClauseMatrix re te rbranches
+    else considerWithoutLiterals generated leftToClauseMatrix re te rbranches
+  pure (Consider ann re rbranches)
+  where
+    armHasLiteral (MkBranch _ lhs _) = case lhs of
+      When _ p -> patternHasLiteral p
+      Otherwise {} -> False
+    patternHasLiteral = \ case
+      PatLit {}       -> True
+      PatExpr {}      -> True
+      PatVar {}       -> False
+      PatApp _ _ ps   -> any patternHasLiteral ps
+      PatCons _ p1 p2 -> patternHasLiteral p1 || patternHasLiteral p2
+
+-- | Main's own analysis of a CONSIDER with no number, piece of text or
+-- EXACTLY in it ('checkConsider').
+considerWithoutLiterals :: Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
+considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
   (scrutVar, pt) <- desugarBranches re rbranches
   let cl = buildConstructorLookup resolvedDecls <> builtinConstructorLookup
@@ -2069,7 +2133,57 @@ checkConsider ec ann e branches t = do
   unless (null redundant || isPrimitiveScrutinee || isJust generated) do
     addWarning $ PatternMatchRedundant redundant
 
-  pure (Consider ann re rbranches)
+-- | A CONSIDER with a number, a piece of text or an EXACTLY in it, analysed
+-- by the clauses' engine as a group of one column whose input is the
+-- scrutinee ('checkConsider'): each arm is read by 'coveragePattern', an arm
+-- it cannot count is left out and one it cannot read stands the analysis
+-- down, as for a clause, and the scrutinee stands in for the input, so an
+-- EXACTLY whose expression mentions a name the scrutinee mentions stands it
+-- down too. A missing case is a WHEN, or OTHERWISE where the scrutinee
+-- itself is left open. An arm is redundant when the arms above it match
+-- everything it matches ('coveredBy'); an arm that matches anything
+-- (OTHERWISE, a new name) is never reported, as unstable never reports one,
+-- and the arms of a CONSIDER that a multi-clause group compiles to are
+-- left to 'checkClauseMatrix', as below.
+considerWithLiterals :: Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
+considerWithLiterals generated leftToClauseMatrix re te rbranches = do
+  ei <- asks (.entityInfo)
+  resolvedDecls <- asks (Map.elems . (.declareDeclarations))
+  resolvedTe <- applySubst te
+  -- The arms' nested types, resolved as far as the substitution goes, for
+  -- 'coveragePattern' to read, as 'checkClauseMatrix' resolves the clauses'.
+  armPatterns <- forM rbranches \ case
+    MkBranch _ (When _ p) _ -> Just <$> traverseOf (gplate @(Type' Resolved)) applySubst p
+    MkBranch _ (Otherwise {}) _ -> pure Nothing
+  let families = constructorFamilies resolvedDecls
+      scrutineeName = case re of
+        Var _ x -> Just x
+        _ -> Nothing
+      mentionsScrutinee r = any (sameResolved r) (toList re)
+      -- 'Nothing' stands the analysis down; @Just Nothing@ leaves the arm out
+      arms = map (maybe (Just (Just CovWild)) (coveragePattern ei families scrutineeName mentionsScrutinee True (Just resolvedTe))) armPatterns
+      missing = case sequence arms of
+        Just rowsM ->
+          maybe [] (map missingArm) (uncoveredRows families 1 (any isNothing rowsM) [ [p] | Just p <- rowsM ])
+        Nothing -> []
+      missingArm = \ case
+        [p] | not (isWildcard p) -> When emptyAnno (coverageToPattern p)
+        _ -> Otherwise emptyAnno
+      redundant = case sequence arms of
+        Just rowsM ->
+          [ b
+          | (i, b, Just p) <- List.zip3 [0 ..] rbranches rowsM
+          , not (isWildcard p)
+          , coveredBy families [ [q] | Just q <- take i rowsM ] [p] == Just True
+          ]
+        Nothing -> []
+      isWildcard = \ case
+        CovWild -> True
+        _ -> False
+  unless (null missing || leftToClauseMatrix) do
+    addWarning $ PatternMatchesMissing missing
+  unless (null redundant || isJust generated) do
+    addWarning $ PatternMatchRedundant redundant
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
