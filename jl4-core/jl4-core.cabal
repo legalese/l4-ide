@@ -170,6 +170,7 @@ test-suite jl4-core-test
     NumberLiteralSpec
     DirectiveRenameSpec
     MultiClausePrintSpec
+    ConsiderScaleSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
