@@ -1065,8 +1065,6 @@ refuseEventRecordGaps mi mParty mAction events =
       FnObject [(c, v)] -> nested (path <> "." <> c) v
       _ -> []
 
--- | Direct AST evaluation (fast path) - for simple types without FnObject.
-
 -- | Direct AST evaluation (fast path), for a request with no @{}@ in it and
 -- no @null@ the decoder kept as a value ('requiresWrapperEvaluation');
 -- records, enums and lists included.
