@@ -1503,7 +1503,7 @@ speculatively m = MkCheck \ e s ->
 -- 'warnUnreachableClauses').
 --
 -- Every bail below is FAIL-OPEN to no-warning, the same contract as
--- 'analyzePatternMatch': no warning is better than a wrong one or a hang.
+-- 'literalTiers': no warning is better than a wrong one or a hang.
 checkClauseMatrix :: Decide Name -> FunTypeSig -> Check Bool
 checkClauseMatrix dec dHead =
   case view annPmMatrix (getAnno dec) of
@@ -3562,22 +3562,18 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 -- | Type-check a @CONSIDER@ and run the pattern-match analysis
 -- (missing branches, redundant branches) over its arms.
 --
--- The analysis is skipped wholesale in two situations:
---
--- * the scrutinee has a primitive type (NUMBER, STRING, DATE) — such types
---   have infinitely many literal values, so a constructor-based analysis is
---   meaningless for them;
---
--- * any arm contains a literal ('PatLit') or expression ('PatExpr') pattern
---   anywhere, including nested inside constructor patterns (@WHEN JUST 5@,
---   @WHEN EXACTLY red@, @WHEN 0 FOLLOWED BY ys@). These desugar to ZERO
---   guards, i.e. the guard model treats them as irrefutable match-alls, which
---   is wrong in both directions: a genuinely refutable literal arm would make
---   later arms look redundant (a blocking false positive on valid code), and
---   a partial literal match would be certified exhaustive (a false negative
---   that crashes at eval). Until the guard model learns opaque refutable
---   guards (see the design doc's deferred items), such CONSIDERs carry no
---   exhaustiveness or redundancy guarantee.
+-- Numbers, pieces of text and @EXACTLY@ are read as the clauses of a
+-- multi-clause group read them, so that a rule warns alike written either way
+-- (GANDER, 2026-10-09): each arm is classified ('columnVerdict') against the
+-- scrutinee's type, with the scrutinee as the input; a number or a piece of
+-- text is one value ('LitGuard'), and the analysis runs in the clauses' two
+-- tiers ('literalTiers'). An arm whose @EXACTLY@ the analysis cannot read
+-- counts for nothing over a number, a piece of text or a date, and stands the
+-- analysis down over any other type; an @EXACTLY@ whose expression mentions a
+-- name the scrutinee mentions stands it down too. A missing case over a
+-- number or a piece of text is suggested as @OTHERWISE@, a keyed one as
+-- @WHEN@ with the key as the arms spell it; a repeated key (@1@ after
+-- @1.0@) is a redundant arm.
 --
 -- A CONSIDER that 'L4.Parser.matchClauses' generated from the clauses of a
 -- multi-clause group ('PmConsider') is reported in the drafter's terms. A
@@ -3608,26 +3604,46 @@ checkConsider ec ann e branches t = do
   rbranches <- traverse (checkBranch ec patternEc te t) branches
   ei <- asks (.entityInfo)
   let cl = constructorsInScopeFromEntityInfo ei
-  (scrutVar, pt) <- desugarBranches re rbranches
-  let bs = concretizeInfo cl pt
-
-  let analysis  = analyzePatternMatch (constructorArity ei) scrutVar bs
-      missing   = maybe [] (.missingArms) analysis
-      redundant = maybe [] (.redundantArms) analysis
-
   -- We need to apply the current substitution to resolve any inference variables.
   resolvedTe <- applySubst te
-  inNonexhaustive <- asks (.inNonexhaustiveDecide)
-  let isPrimitiveScrutinee = isPrimitiveType resolvedTe
-      hasOpaquePatterns = any branchHasOpaquePattern rbranches
+  -- The arms' nested types, resolved as far as the substitution goes, for
+  -- 'columnVerdict' to read, as 'checkClauseMatrix' resolves the clauses'.
+  armPatterns <- forM rbranches \ case
+    MkBranch _ (When _ p) _ -> Just <$> traverseOf (gplate @(Type' Resolved)) applySubst p
+    MkBranch _ (Otherwise {}) _ -> pure Nothing
+  let scrutineeName = case re of
+        Var _ x -> Just x
+        _ -> Nothing
+      mentionsScrutinee r = any (sameResolved r) (toList re)
+      verdicts = map (maybe ClauseCounts (columnVerdict ei cl resolvedTe scrutineeName mentionsScrutinee)) armPatterns
+      counted = [ b | (b, ClauseCounts) <- zip rbranches verdicts ]
+  (scrutVar, pt) <- desugarBranches re counted
+  let spellings = literalSpellings [ p | MkBranch _ (When _ p) _ <- counted ]
+      render uncovered =
+        map respellArm $
+          nubOrdOn (fmap getUnique) $
+            concatMap (expandToPattern (constructorArity ei) scrutVar) uncovered
+      respellArm = \ case
+        When a p -> When a (respellLiterals spellings p)
+        o -> o
+      rankArm ranks = \ case
+        When _ p -> ranks p
+        Otherwise {} -> [maxBound]
+      analysis = do
+        guard (BailGroup `notElem` verdicts)
+        rows <- flattenPatTree pt
+        pure (literalTiers cl (ClauseCoversNothing `elem` verdicts) render rankArm rows)
+      (missing, redundant) = case analysis of
+        Just (Just (missingArms, redundantArms), _) -> (missingArms, redundantArms)
+        Just (Nothing, redundantArms) -> ([], redundantArms)
+        Nothing -> ([], [])
 
-  -- NOTE: 'hasOpaquePatterns' and 'isPrimitiveScrutinee' come first so that
-  -- the (lazy) analysis above is never forced when we bail out anyway.
+  inNonexhaustive <- asks (.inNonexhaustiveDecide)
   -- Inside an @nonexhaustive-decorated definition only the MISSING-branch warning
   -- is silenced; redundancy is a bug regardless of intended partiality.
-  unless (hasOpaquePatterns || isPrimitiveScrutinee || inNonexhaustive || leftToClauseMatrix || null missing) do
+  unless (inNonexhaustive || leftToClauseMatrix || null missing) do
     addWarning $ PatternMatchesMissing missing
-  unless (hasOpaquePatterns || isPrimitiveScrutinee || null redundant) do
+  unless (null redundant) do
     addWarning $ PatternMatchRedundant redundant
 
   -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
@@ -4239,24 +4255,6 @@ exactlyOneEditApart a b = case compare la lb of
           | otherwise = go (x : xs) ys True
         go _ _ _ = False
 
--- | Does this branch contain a pattern the guard model cannot reason about?
--- See the haddock on 'checkConsider'.
-branchHasOpaquePattern :: Branch Resolved -> Bool
-branchHasOpaquePattern (MkBranch _ lhs _) = case lhs of
-  When _ p     -> patternHasOpaque p
-  Otherwise {} -> False
-
--- | Does this pattern contain a literal or expression pattern anywhere?
--- 'checkConsider' stands down for one; the clauses of a multi-clause group
--- read them instead ('clauseVerdict', 'desugarPat').
-patternHasOpaque :: Pattern n -> Bool
-patternHasOpaque = \ case
-  PatLit {}       -> True
-  PatExpr {}      -> True
-  PatVar {}       -> False
-  PatApp _ _ ps   -> any patternHasOpaque ps
-  PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
-
 -- | What the missing-clause analysis makes of one clause of a multi-clause
 -- group, from its resolved patterns. In order of severity.
 data ClauseVerdict
@@ -4371,7 +4369,7 @@ columnVerdict ei ctorSets colTy mScrutR mentionsInput = \ case
 --
 -- Returns the missing rows when a tier's list fits, ordered, with the
 -- redundant branches (fail-open otherwise, the same contract as
--- 'analyzePatternMatch': no warning is better than a wrong one or a hang);
+-- 'analyzeGuardRows': no warning is better than a wrong one or a hang);
 -- and the redundant branches of whichever analysis ran, for when no list
 -- fits. The redundant branches come from the exact analysis when it ran,
 -- which sees every row; a branch the coarse analysis finds redundant is
@@ -5398,9 +5396,8 @@ desugarPat scrut' pat = do
         , Just _ <- view annInfo ann
         -> desugarPat scrut' (PatApp ann r [])
       -- Any other EXACTLY compares the input with a value this model cannot
-      -- name, so it gets no guard. 'checkConsider' stands down for such a
-      -- pattern, and 'clauseVerdict' drops the clause or the group before
-      -- it reaches here.
+      -- name, so it gets no guard: 'columnVerdict' drops the clause or arm,
+      -- or stands the analysis down, before it reaches here.
       _ -> pure []
     -- This wildcard fires only for a PatApp/PatCons whose anno lacks
     -- 'resolvedInfo'. That requires a RANGELESS anno: 'setAnnResolvedType'
@@ -5491,16 +5488,6 @@ IsNotEqLit n1 k1 `isConsistentWith` IsEqLit n2 k2 | n1 `sameResolved` n2 = k1 /=
 IsEqLit n1 k1 `isConsistentWith` IsNotEqLit n2 k2 | n1 `sameResolved` n2 = k1 /= k2
 _ `isConsistentWith` _ = True
 
--- | The result of the pattern-match analysis of one CONSIDER.
-data PatternMatchAnalysis = MkPatternMatchAnalysis
-  { missingArms   :: [BranchLhs Resolved]
-    -- ^ synthesized suggestions for the uncovered cases (empty = exhaustive,
-    -- or the suggestion cap was exceeded — see 'maxMissingSuggestions')
-  , redundantArms :: [Branch Resolved]
-    -- ^ arms that can never match (their guards contradict every value
-    -- still uncovered when they are reached)
-  }
-
 -- | Give up the whole analysis when the uncovered set exceeds this many
 -- alternatives. The uncovered set grows by at most (guards per branch) per
 -- branch before consistency pruning, so realistic matches stay tiny; only
@@ -5541,33 +5528,12 @@ maxMissingSuggestions = 64
 -- under-reporting missing arms. Each nabla is expanded to suggestions
 -- separately.
 --
--- Returns 'Nothing' when the analysis gives up: unexpected tree shape, or
--- the 'maxUncoveredNablas' cap tripped. No warning is better than a wrong
--- one or a hang.
-analyzePatternMatch
-  :: (Resolved -> Int)
-  -> Resolved
-  -> PatTree' [Resolved] Resolved
-  -> Maybe PatternMatchAnalysis
-analyzePatternMatch ctorArity scrut tree = do
-  branches <- flattenPatTree tree
-  (uncovered, redundant) <- analyzeGuardRows branches
-  let suggestions =
-        nubOrdOn (fmap getUnique) $
-          concatMap (expandToPattern ctorArity scrut) uncovered
-      capped = length (take (maxMissingSuggestions + 1) suggestions) > maxMissingSuggestions
-  pure MkPatternMatchAnalysis
-    { missingArms   = if capped then [] else suggestions
-    , redundantArms = redundant
-    }
-
--- | The residual-set fold itself, factored out of 'analyzePatternMatch' so
--- that the single-CONSIDER wrapper above and the clause-matrix path
--- ('checkClauseMatrix') share 'analyzeBranch', 'splitByGuards' and the
--- 'maxUncoveredNablas' cap. Returns the uncovered nablas and the redundant
--- branches (in source order); 'Nothing' when the cap trips — bail to
--- no-warning: fail-open, the same contract as 'analyzePatternMatch' (no
--- warning is better than a wrong one or a hang).
+--
+-- Shared by the clauses of a multi-clause group and a CONSIDER, through
+-- 'literalTiers'. Returns the uncovered nablas and the redundant branches
+-- (in source order); 'Nothing' when the 'maxUncoveredNablas' cap trips —
+-- bail to no-warning: fail-open (no warning is better than a wrong one or a
+-- hang).
 analyzeGuardRows
   :: [([Guard [Resolved] Resolved], Branch Resolved)]
   -> Maybe ([Nabla Resolved], [Branch Resolved])
