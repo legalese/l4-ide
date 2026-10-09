@@ -126,5 +126,6 @@ These are the limits a drafter meets; they are stated here because each would ot
 > The recommendation on the bench is that a history read which runs before a sibling that later writes a matching entry is caught at run time as an error naming both rules; the library example, loan first, keeps working.
 > Plain `RECALL` of black ink has no such check, and a party's `COMMIT` in the first side is visible to the second side even if it happened later in the trace.
 
-> **Pending elsewhere — SEESAW.**
-> When a compound breaches, the instant it reports is being ruled in another session; the "when did it fail" row follows that ruling.
+> **Ruled elsewhere — SEESAW (2026-10-09).**
+> A failure takes effect at its missed deadline, or at the moment the obligation was entered if that came later, and the run says so in a note when it does; a compound breaches at the earliest of its parts' instants for `RAND` and the latest for `ROR`.
+> The "when did it fail" row follows that ruling (`EVERY-EACH-QUANTIFIER-SPEC.md` §6.1.2, built on a local branch, not yet on `unstable`).
