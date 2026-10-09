@@ -89,6 +89,7 @@ import L4.Print (clauseBodies, prettyLayout, quotedName)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
+import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.TypeCheck.Types as X
 import L4.TypeCheck.Unify
 import L4.TypeCheck.With as X
@@ -2075,10 +2076,11 @@ builtinConstructorLookup =
 --
 -- A CONSIDER written by hand goes to the clauses' engine too, with or
 -- without a number in it, unless a value of its scrutinee's type can hold a
--- MAYBE, a LIST or an EITHER ('holdsUnlistedType'), whose values that
--- engine does not tell apart: there it would stand down, where main's own
--- analysis still lists part of what is missing (HIGHLANDER, 2026-10-10,
--- which named MAYBE and LIST; EITHER is assumed, not ruled, as it stands
+-- MAYBE, a LIST, an EITHER or a type declared in another module
+-- ('holdsUnlistedType'), whose values that engine does not tell apart:
+-- there it would stand down, where main's own analysis still lists part of
+-- what is missing (HIGHLANDER, 2026-10-10, which named MAYBE and LIST;
+-- EITHER and another module's types are assumed, not ruled, as they stand
 -- down the same way: @WHEN LEFT Basic@ over @EITHER Tier Tier@ was told
 -- @WHEN LEFT Gold@, and through the clauses' engine nothing). Main's own
 -- analysis lists a constructor's arguments as one set of constraints, so
@@ -2125,10 +2127,13 @@ checkConsider ec ann e branches t = do
 
 -- | Whether a value of this type can hold a value whose constructors the
 -- clauses' engine does not list ('constructorFamilies'): a MAYBE, a LIST or
--- an EITHER, as the type itself, one of its arguments, or a field of a type
--- this module declares, at any depth ('declareDeclarations', the
--- declarations 'constructorFamilies' reads). Synonyms are expanded, and a
--- type already on the way down is not read again, so a recursive type ends.
+-- an EITHER, or a type declared in another module, as the type itself, one
+-- of its arguments, or a field of a type this module declares, at any depth
+-- ('declareDeclarations', the declarations 'constructorFamilies' reads).
+-- The other builtin types are listed (BOOLEAN) or have no constructors. A
+-- type variable reads as another module's type, which keeps main's own
+-- analysis, as before. Synonyms are expanded, and a type already on the way
+-- down is not read again, so a recursive type ends.
 holdsUnlistedType :: EntityInfo -> [DeclChecked (Declare Resolved)] -> Type' Resolved -> Bool
 holdsUnlistedType ei decls = go Set.empty
   where
@@ -2145,6 +2150,7 @@ holdsUnlistedType ei decls = go Set.empty
         | getUnique r `Set.member` seen -> False
         | Just td <- Map.lookup (getUnique r) declared ->
             any (go (Set.insert (getUnique r) seen)) (fieldTypes td)
+        | otherwise -> (getUnique r).moduleUri /= builtinUri
       _ -> False
     fieldTypes = \ case
       RecordDecl _ _ fields -> storedTypes fields
@@ -2153,9 +2159,9 @@ holdsUnlistedType ei decls = go Set.empty
     storedTypes fields = [ t | MkTypedName _ _ t Nothing <- fields ]
 
 -- | Main's own analysis of a CONSIDER with no number, piece of text or
--- EXACTLY in it whose scrutinee can hold a MAYBE, a LIST or an EITHER
--- ('holdsUnlistedType'), and of a CONSIDER generated from clauses with none
--- of them ('checkConsider').
+-- EXACTLY in it whose scrutinee can hold a MAYBE, a LIST, an EITHER or a
+-- type declared in another module ('holdsUnlistedType'), and of a CONSIDER
+-- generated from clauses with none of them ('checkConsider').
 considerWithoutLiterals :: Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
 considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
@@ -2194,13 +2200,13 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
     addWarning $ PatternMatchRedundant redundant
 
 -- | A CONSIDER with a number, a piece of text or an EXACTLY in it, or one
--- written by hand whose scrutinee holds no MAYBE, LIST or EITHER, analysed
--- by the clauses' engine as a group of one column whose input is the
--- scrutinee ('checkConsider'): each arm is read by 'coveragePattern', an arm
--- it cannot count is left out and one it cannot read stands the analysis
--- down, as for a clause, and the scrutinee stands in for the input, so an
--- EXACTLY whose expression mentions a name the scrutinee mentions stands it
--- down too. A missing case is a WHEN, or OTHERWISE where the scrutinee
+-- written by hand whose scrutinee holds no MAYBE, LIST, EITHER or type of
+-- another module, analysed by the clauses' engine as a group of one column
+-- whose input is the scrutinee ('checkConsider'): each arm is read by
+-- 'coveragePattern', an arm it cannot count is left out and one it cannot
+-- read stands the analysis down, as for a clause, and the scrutinee stands
+-- in for the input, so an EXACTLY whose expression mentions a name the
+-- scrutinee mentions stands it down too. A missing case is a WHEN, or OTHERWISE where the scrutinee
 -- itself is left open. An arm is redundant when the arms above it match
 -- everything it matches ('coveredBy'); an arm that matches anything
 -- (OTHERWISE, a new name) is never reported, as unstable never reports one,
