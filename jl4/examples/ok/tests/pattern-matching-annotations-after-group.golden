@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-annotations-after-group.l4:37:1-16:
+  2
+pattern-matching-annotations-after-group.l4:38:1-10:
+  1
+pattern-matching-annotations-after-group.l4:39:1-18:
+  2
+pattern-matching-annotations-after-group.l4:40:1-17:
+  2
+pattern-matching-annotations-after-group.l4:41:1-17:
+  2
+pattern-matching-annotations-after-group.l4:42:1-16:
+  2

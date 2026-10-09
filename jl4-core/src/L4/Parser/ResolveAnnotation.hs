@@ -668,9 +668,15 @@ addNlgFieldName mTySpan a =
 -- | The shared body of both of 'Name'\'s claims.
 addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name
 addNlgNameWhere p a = extendNlgA a $ case a of
-  MkName ann raw -> do
-    ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgCommentsWhere p)
-    pure $ MkName ann' raw
+  MkName ann raw
+    -- A name with no location was made up by the desugarer (the CONSIDERs a
+    -- group of clauses is lowered to are full of them). Having no range, its
+    -- region is not bounded by its neighbours', so it would take every
+    -- annotation up to the end of the file, among them the next rule's own.
+    | Nothing <- rangeOf a -> pure a
+    | otherwise -> do
+        ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgCommentsWhere p)
+        pure $ MkName ann' raw
 
 -- | Does this annotation begin on a line strictly below where @e@ ends?
 startsBelow :: HasSrcRange e => e -> NlgWithSpan -> Bool

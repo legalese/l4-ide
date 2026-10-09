@@ -1270,14 +1270,26 @@ scrutineeRef s = App emptyAnno (generatedName (nameToText s)) []
 -- | Build an annotation whose single visible concrete-syntax node holds the
 -- given tokens verbatim (no holes). Used to make a fused pattern-matching
 -- 'Decide' exact-print back to its original multi-clause source.
+--
+-- The last clause's final lexeme also consumed the whitespace, comments and
+-- annotations after the group (up to the next definition's first token).
+-- They are kept as trailing tokens (a hidden node): exactprint still
+-- reproduces them, but they are outside the node's range, so the group's
+-- range stops at its last clause and does not run over the next
+-- definition's comments, @\@desc@, @\@export@ or @\@nlg@. (An @\@nlg@ the
+-- group's range ran over was not the next definition's to take, and went
+-- unused or to a node of the group's.)
 rawTokensAnno :: [PosToken] -> Anno
 rawTokensAnno toks =
   mkSimpleEpaAnno Epa
-    { original       = toks
-    , trailingTokens = []
+    { original       = reverse revBody
+    , trailingTokens = reverse revTrailing
     , payload        = ()
     , hiddenClusters = []
     }
+  where
+    (revTrailing, revBody) = span isTrailingTrivia (reverse toks)
+    isTrailingTrivia t = isSpaceToken t || isAnnotationToken t
 
 -- | Build a decision list from the clauses. The last clause is compiled without
 -- an OTHERWISE fallthrough so that a non-match becomes a runtime
