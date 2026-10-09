@@ -511,6 +511,19 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ])
     ws `shouldBe` []
 
+  it "does not move an annotation written after a clause's body to the next clause" $ do
+    -- On the line where the clause above ends it stays with that clause, as it
+    -- does after a rule written as one definition.
+    ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
+      [ "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE inline 0 IS 1 @desc inline after the first body"
+      , "DECIDE inline 1 IS 2 @nlg inline after the second body"
+      , "DECIDE inline 2 IS 3 @export inline after the third body"
+      , "DECIDE inline other IS 4"
+      ])
+    ws `shouldBe` []
+
   it "says the place above the first clause for a group with no GIVEN" $ do
     ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
       [ "DECIDE f 0 IS 1"
