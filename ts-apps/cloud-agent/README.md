@@ -22,8 +22,24 @@ Built with esbuild into one file, `dist/cloud-agent.cjs` (`npm run build`).
 | `interaction.ts`        | `UserInteraction` port: events out, `answer` commands in; no tool approvals (every tool is allowed)                                                                                                                                                                                                                                             |
 | `conversation-store.ts` | Keeps no transcript (the event log is the transcript); records the conversation id and title in `session.json`                                                                                                                                                                                                                                  |
 
-Later items add plugins (`RunnerPlugin` in `runner.ts`): git sync
-(`cloud-agent-git`) and the user's MCP servers (`cloud-agent-mcp`).
+Plugins (`RunnerPlugin` in `runner.ts`):
+
+- `git-sync.ts` (§9.1, §9.4): a "Seed" commit at start if the repo has none;
+  after each turn that changed files, a commit whose subject is a one-line
+  summary of the turn from ai-proxy's summize pipeline (hard 5 s limit; the
+  prompt's first line on a timeout, error or unusable answer), with
+  `Prompt: <first line>` as the body and a `Turn-Id: <turnId>` trailer, and
+  `git-committed { turnId, sha, parent, summary }`; `state/git/main.bundle`
+  rewritten (temp + rename) after every commit and at start; `apply-bundle`
+  merges `state/git/incoming/<ulid>.bundle` (`local ^main`) into `main`
+  (`local-merged` / `local-merge-conflict`, the merge aborted on conflict);
+  `rollback` restores the parent of the turn's commit and commits "Roll back: …"
+  (`rolled-back`); `git gc` on sleep. `tmp/` and its `tmp/deleted/` copies are
+  committed like the rest; if the Sessions API sweep cleared `tmp/` of an
+  abandoned session, the next start commits that ("Clear tmp of abandoned
+  session"). git runs with hooks and fsmonitor
+  disabled, `core.createObject=rename` and `gc.auto=0` (`git.ts`).
+- The user's MCP servers arrive with `cloud-agent-mcp`.
 
 ## Environment (cloud)
 

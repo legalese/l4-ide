@@ -9,6 +9,7 @@ import {
   fixedPermissionPolicy,
   type AiEndpoint,
   type AuthProvider,
+  type ChatServiceEvent,
   type L4Language,
   type Logger,
   type PermissionCategory,
@@ -36,6 +37,7 @@ import {
   DELETED_DIR,
   NodeWorkspace,
   TMP_DIR,
+  uriForPath,
 } from './node-workspace.js'
 import { SessionJson } from './session-file.js'
 
@@ -79,13 +81,26 @@ export interface RunnerContext {
   announceState(): void
   /** Tool sources the dispatcher advertises; plugins may add to it. */
   readonly providers: ToolProvider[]
+  /** Files changed behind the language server's back (a merge or a
+   *  rollback): absolute paths. */
+  filesChanged(fsPaths: string[]): Promise<void>
+  /** One stateless call to ai-proxy's summize pipeline
+   *  (`AiProxyClient.summize`): the text, or `null` on any failure or
+   *  when `signal` aborts. Never throws. */
+  summize(
+    messages: Array<{ role: 'system' | 'user'; content: string }>,
+    opts?: { signal?: AbortSignal }
+  ): Promise<string | null>
 }
 
 export interface TurnInfo {
   turnId: string
-  /** The user's prompt as sent (the commit message summary). */
+  /** The user's prompt as sent. */
   prompt: string
   conversationId?: string
+  /** The assistant's final reply for the turn (the text after its last
+   *  tool call), set once the turn has ended; `''` when it wrote none. */
+  reply?: string
 }
 
 /**
@@ -141,7 +156,11 @@ export interface RunnerOptions {
   auth: AuthProvider
   chain?: ChainControl
   workspace: Workspace
-  l4: L4Language & { dispose?(): Promise<void> }
+  l4: L4Language & {
+    dispose?(): Promise<void>
+    /** Forget open documents and re-read the given files (URIs). */
+    resync?(uris: string[]): Promise<void>
+  }
   aiEndpoint: AiEndpoint
   /** Built-in extra tool sources (the l4-rules MCP server). */
   providers?: ToolProvider[]
@@ -176,6 +195,7 @@ export class Runner {
   private readonly idleExitMs: number
   private readonly pollMs: number
 
+  private readonly reply = new ReplyCollector()
   private phase: Phase = 'new'
   private queue: CloudCommand[] = []
   private working: Promise<void> | null = null
@@ -218,14 +238,16 @@ export class Runner {
       interaction: this.interaction,
       providers: this.providers,
     })
+    const proxy = new AiProxyClient({
+      auth: opts.auth,
+      logger: opts.logger,
+      endpoint: () => opts.aiEndpoint,
+    })
+    this.interaction.onEvent((event) => this.reply.observe(event))
     this.chat = new ChatService({
       auth: opts.auth,
       store,
-      proxy: new AiProxyClient({
-        auth: opts.auth,
-        logger: opts.logger,
-        endpoint: () => opts.aiEndpoint,
-      }),
+      proxy,
       logger: opts.logger,
       dispatcher,
       interaction: this.interaction,
@@ -248,6 +270,10 @@ export class Runner {
       emit: (p) => this.events.emit(p),
       announceState: () => this.announceState(),
       providers: this.providers,
+      filesChanged: async (fsPaths) => {
+        await opts.l4.resync?.(fsPaths.map((p) => uriForPath(p)))
+      },
+      summize: (messages, o) => proxy.summize(messages, o),
     }
     this.stopped = new Promise((r) => (this.resolveStopped = r))
   }
@@ -612,6 +638,7 @@ export class Runner {
       .update({ lastActivity: this.now() })
       .catch((err) => logger.warn(`session.json update failed: ${String(err)}`))
     const started = this.now()
+    this.reply.begin()
     try {
       await this.chat.start({
         conversationId: this.conversationId,
@@ -637,6 +664,7 @@ export class Runner {
       logger.info(`turn ${cmd.turnId} finished in ${this.now() - started} ms`)
     }
     turn.conversationId = this.conversationId
+    turn.reply = this.reply.final()
     for (const p of this.plugins) {
       if (!p.afterTurn) continue
       try {
@@ -816,4 +844,38 @@ export function standingNote(turnId: string): string {
     `Files you delete from ${DATA_DIR}/ are first copied to ${DELETED_DIR}/t-${turnId}/<path> (this turn) — to restore one, read it there and write it back. ` +
     'Changes from earlier turns can also be undone by the user rolling back a turn.</cloud-session-note>'
   )
+}
+
+/** Longest reply text kept per turn (the commit summary reads the start). */
+const REPLY_KEEP_CHARS = 8_000
+
+/**
+ * Collects the assistant's final reply of a turn from the chat events:
+ * the text streamed after the last tool call (text before a tool round
+ * is interim narration). If the turn ends on a tool round, the last
+ * interim text stands in.
+ */
+export class ReplyCollector {
+  private current = ''
+  private previous = ''
+
+  begin(): void {
+    this.current = ''
+    this.previous = ''
+  }
+
+  observe(event: ChatServiceEvent): void {
+    if (event.kind === 'text-delta') {
+      if (this.current.length < REPLY_KEEP_CHARS) {
+        this.current = (this.current + event.text).slice(0, REPLY_KEEP_CHARS)
+      }
+    } else if (event.kind === 'tool-call' || event.kind === 'turn-spawn') {
+      if (this.current.trim()) this.previous = this.current
+      this.current = ''
+    }
+  }
+
+  final(): string {
+    return (this.current.trim() || this.previous.trim()).trim()
+  }
 }
