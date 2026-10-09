@@ -1,7 +1,7 @@
 # Presumptions at the end of a chain: what today's L4 can and cannot say
 
 **Status:** a design note with measurements, written 2026-10-09 and revised the same day after an Opus adversarial review (§9 says what it changed); nothing here is built.
-§7 records a ruling Meng made in chat; it is not yet written in its owning document, so by repo `CLAUDE.md` §4 it is not yet decided.
+§7 records a ruling Meng made in chat; it is written in its owning document, `UNKNOWN-EVALUATION-SPEC.md` §5, and so decided (repo `CLAUDE.md` §4).
 It answers Meng's question of 2026-10-09: write the Alice scenarios in plain L4 using only what the tree has, run them soft and hard, and report what the language cannot say, or says with a wrong or missing explanation.
 It also measures the footgun Meng named the same day: a `MAYBE` and a `TYPICALLY` are two mechanisms for one idea, and `TYPICALLY NOTHING` sits where they meet.
 
@@ -194,7 +194,7 @@ Given the measurements, the smallest changes that remove a spelling or make a si
 
 Meng, 2026-10-09: _"How about we do V5, and flip V4 with a nonassertable annotation."_
 Recorded here from chat.
-Its owning document is `UNKNOWN-EVALUATION-SPEC.md` (node valuation), and until the ruling is written there it is not decided (repo `CLAUDE.md` §4); that recording is owed in the revision that follows this note.
+Its owning document is `UNKNOWN-EVALUATION-SPEC.md`, whose §5 records it (2026-10-09, in the revision that carries `presumption-assertion/CONTRACT.md`), so it is decided (repo `CLAUDE.md` §4).
 The variants and guards the ruling names, from the same conversation: V0, the fold as a type (`v0-enum.l4`); V1, the node as a `MAYBE` input with the derivation as its fallback (`v1-node-input.l4`); V2, the node as a `TYPICALLY` input; V3, `TYPICALLY` on a conclusion, `unmarried MEANS single OR divorced OR widowed TYPICALLY TRUE` (`v3-typically-means.l4`: a parse error today; T1 rules only on a computed field of a record, so a `TYPICALLY` on a definition is unruled); V4, an annotation naming the assertable nodes; V5, every named node assertable with no syntax; V6, Governatori-style defeaters.
 Guard 1 is the `asserted` list in the envelope; Guard 2 is that the exported function's own result cannot be asserted.
 
