@@ -3,9 +3,8 @@
 -- is lowered to hold names that the parser made up; they used to take such an
 -- @nlg without a word (refutation of legalese/l4-ide#545's review, round 4).
 -- And an @nlg inside a WHERE of a clause is not written between two clauses,
--- so no later clause takes it. It is not attached either: a group's clause
--- does not yet give the definitions in its WHERE their @nlg, which a rule
--- written as one definition does (known, and unchanged).
+-- so no later clause takes it: it is the helper's, here as in a rule written as
+-- one definition (it used to be reported as not attached).
 DECLARE Colour IS ONE OF Red, Green
 
 GIVEN n IS A NUMBER

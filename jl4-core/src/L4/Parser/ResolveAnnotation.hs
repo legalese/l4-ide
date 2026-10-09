@@ -219,7 +219,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
         Nothing -> addNlg appFormAka
       -- Inside the body's region, which runs from the first clause's body to
       -- the last's, so that an annotation between two clauses is in reach.
-      (expr', ann') <- hoistNlgA (\ m -> (,) <$> m <*> claimLaterClauseNlgs ann) (addNlg expr)
+      -- The ones between two clauses are claimed first, before a name of the
+      -- clause below (a pattern, say) can take the one written above it.
+      (expr', ann') <- hoistNlgA (\ m -> do
+        ann'' <- claimLaterClauseNlgs ann
+        e <- m
+        pure (e, ann'')) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
 
 -- | A group's @\@nlg@ written directly above its first clause belongs to the
@@ -230,6 +235,17 @@ claimFirstClauseNlgs :: HasNlg n => AppForm n -> NlgM (AppForm n)
 claimFirstClauseNlgs (MkAppForm aann hd ns maka) = do
   hd' <- case addNlg hd of MkNlgA _ m -> m
   pure (MkAppForm aann hd' ns maka)
+
+-- | Is this the @LET@ that a group of clauses is lowered to, binding the clauses
+-- after the first ('L4.Parser.bindFallthrough')? Its declaration holds the
+-- LATER clauses and its body the first, so the usual descent, declarations
+-- before body, would visit the clauses last to first, against the order the
+-- regions between neighbouring nodes are taken in. The descent into this
+-- @LET@ takes its body first.
+bindsLaterClauses :: [LocalDecl n] -> Bool
+bindsLaterClauses = any \ case
+  LocalDecide _ (MkDecide dann _ _ _) -> isJust (view annPmSynthetic dann)
+  LocalAssume{} -> False
 
 -- | In a group of clauses, an @\@nlg@ written above a later clause belongs to
 -- that clause's head ('PmMatrixClause' @clauseHead@). A run of bare names may
@@ -549,10 +565,17 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       e' <- addNlg e
       lcl' <- traverse addNlg lcl
       pure $ Where ann e' lcl'
-    LetIn ann lcl e -> do
-      lcl' <- traverse addNlg lcl
-      e' <- addNlg e
-      pure $ LetIn ann lcl' e'
+    -- The LET a group of clauses is lowered to binds the clauses after the
+    -- first, which are written after its body: source order is the body's.
+    LetIn ann lcl e
+      | bindsLaterClauses lcl -> do
+          e' <- addNlg e
+          lcl' <- traverse addNlg lcl
+          pure $ LetIn ann lcl' e'
+      | otherwise -> do
+          lcl' <- traverse addNlg lcl
+          e' <- addNlg e
+          pure $ LetIn ann lcl' e'
     Event ann e -> Event ann <$> addNlg e
     Fetch ann e -> Fetch ann <$> addNlg e
     Env ann e -> Env ann <$> addNlg e
