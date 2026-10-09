@@ -467,7 +467,7 @@ WHEN Closed THEN "stopped"
 OTHERWISE "unknown"
 ```
 
-**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+**Note:** A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests OTHERWISE; a WHEN with a number or a piece of text, and `EXACTLY` of one or of a value of an enumeration, is read as that value, exactly as in a [rule written as clauses](#multi-clause-decide-does-not-cover-all-cases), and a number repeated in another spelling is a redundant branch. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
 
@@ -518,7 +518,7 @@ When a clause counts for nothing that way, the warning lists only what the claus
 A suggested number prints as the clauses spelled it, and a suggested piece of text as L4 writes it, with `"` and `\` escaped.
 A rule whose clauses match enumeration values only gets no warning when it would need more than 64 clauses listed, or more than 10000 steps to find them; when its clauses match numbers or texts, the warning lists instead only the clauses that the clauses without a number or a piece of text leave open, which, when every clause names a number or a text, is the clause with every input's name alone.
 [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits) gives an example of each.
-A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER over a number or a piece of text gives none, so the same rule warns when written as clauses and not when written as a CONSIDER.
+A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER reads numbers, texts and `EXACTLY` the same way, so the same rule warns alike written either way.
 See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
 
 ---

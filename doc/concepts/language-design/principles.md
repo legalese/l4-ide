@@ -139,7 +139,7 @@ WHEN Terminated THEN ...
 -- The compiler warns if a case is missing
 ```
 
-(The check applies to algebraic types with a known set of constructors; scrutinees of primitive types like NUMBER, STRING, or DATE are not checked, since their values can't be enumerated. See [Exhaustiveness](../type-system/exhaustiveness.md).)
+(The check applies to algebraic types with a known set of constructors; over a NUMBER, a STRING or a DATE, whose values can't be enumerated, it asks for an OTHERWISE. See [Exhaustiveness](../type-system/exhaustiveness.md).)
 
 **No implicit behavior:**
 

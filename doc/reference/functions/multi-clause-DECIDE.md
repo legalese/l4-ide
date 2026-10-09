@@ -102,7 +102,7 @@ In each argument position:
 - the name of the `GIVEN` input for that position matches anything, and needs no test;
 - any other name matches anything and stands for that argument inside its own clause, like `x` and `rest` above.
 
-A number or a piece of text in a clause is checked for missing cases, where the same value in a `CONSIDER` written by hand is not: see [Numbers and text](#limits) below.
+A number or a piece of text in a clause is checked for missing cases, as the same value in a `CONSIDER` written by hand is: see [Numbers and text](#limits) below.
 
 Clauses after the first are reached only when the earlier ones do not match, like the `OTHERWISE` above.
 
@@ -207,7 +207,7 @@ Any other `EXACTLY` (`EXACTLY someConstant`, `EXACTLY (m PLUS 1)` with `m` anoth
 The same holds inside a pattern: `DECIDE f (Box (EXACTLY zero)) IS 1` with `DECIDE f (Box 1) IS 2`, where `Box` has a number field, counts the first clause for nothing.
 A clause counted for nothing may still match some of the inputs the other clauses miss, so a group with one is told only what the clauses without a number or a piece of text leave open, with each input's name in its number and text positions: with `two MEANS 2`, the clauses `DECIDE f 2 "b" IS 1`, `DECIDE f (EXACTLY two) s IS 2` and `DECIDE f 1 s IS 3` list ``DECIDE `f` n s IS`` alone, not `f 2 s`, which the second clause covers.
 An `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, stops the check for the group on any input, since such a clause may match any number of the input's values.
-The same values in a `CONSIDER` written by hand draw no warning: a `CONSIDER` over a number or a piece of text is not checked, so a rule warns when written as clauses and not when written as the `CONSIDER` it compiles to.
+A `CONSIDER` written by hand reads numbers, texts and `EXACTLY` the same way, so a rule warns alike written as clauses or as a `CONSIDER`: a missing case over a number or a piece of text is suggested there as `OTHERWISE`.
 
 **Lists, `MAYBE` values and enumerations declared in another file are not read.**
 The check cannot tell such values apart, so where a missing case could be found only by telling them apart, the group gets no warning, not even for a number nested inside such a value: `DECIDE show NOTHING IS "none"` and `DECIDE show (JUST 0) IS "zero"` draw none, and neither do `DECIDE f (JUST 0) IS "zero"` and `DECIDE f (JUST n) IS "other"`.
