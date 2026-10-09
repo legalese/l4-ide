@@ -141,25 +141,33 @@ inlineLocalBindingsWhere wanted = transformOf (gplate @(Expr Resolved)) step
                   seen' = seen <> more
                in if seen' == seen then seen else grow seen'
 
--- | Undo the clause desugaring for a consumer that reads the expression's
--- structure (the ladder, the query plan): the @LET@s that bind "the clauses not
--- yet tried" ('PmFallthrough') are substituted into the CONSIDERs that refer to
--- them, so that a BOOLEAN rule written as DECIDE clauses is the same expression
--- as the nested CONSIDER a drafter would have written by hand. Nothing the
--- drafter wrote is touched: a @LET@ is inlined only if every binding in it is
--- one the desugarer generated.
+-- | Read the structure of a @LET ... IN@ for a consumer that draws one (the
+-- ladder, the query plan): the bindings are substituted into the expression
+-- that uses them, as 'inlineLocalBindings' does, so a rule written with a
+-- @LET@ is the same expression as the rule with the bindings written out. That
+-- includes the @LET@s the clause desugarer generates to bind "the clauses not
+-- yet tried" ('PmFallthrough'): a BOOLEAN rule written as DECIDE clauses is
+-- then the nested CONSIDER a drafter would have written by hand.
+--
+-- The nested CONSIDERs the desugarer generates for one input are then joined
+-- into one, as a drafter writes it: @CONSIDER c WHEN A THEN x OTHERWISE
+-- CONSIDER c WHEN B THEN y@ is @CONSIDER c WHEN A THEN x WHEN B THEN y@ (the
+-- first match wins in both). Only generated CONSIDERs on the same input are
+-- joined; a nested CONSIDER the drafter wrote is left alone.
 --
 -- A group of several inputs refers to the same later clauses from more than one
 -- branch, so inlining copies them, and a long group of many inputs would copy
 -- them exponentially. When the result is larger than 'clauseGroupNodeBudget'
--- nodes the expression is returned as it was; the caller then sees what it
--- saw before this pass existed.
-inlineClauseGroups :: Expr Resolved -> Expr Resolved
-inlineClauseGroups e
-  | withinBudget inlined = inlined
+-- nodes the expression is returned as it was.
+inlineLetsForViz :: Expr Resolved -> Expr Resolved
+inlineLetsForViz e
+  | withinBudget inlined = joinGeneratedConsiders inlined
   | otherwise            = e
   where
-    inlined = inlineLocalBindingsWhere isClauseLet e
+    inlined = inlineLocalBindingsWhere isLetIn e
+    isLetIn = \ case
+      LetIn{} -> True
+      _       -> False
     -- Lazy on purpose: only the first 'clauseGroupNodeBudget' + 1 nodes are built.
     withinBudget x = length (take (clauseGroupNodeBudget + 1) (nodes x)) <= clauseGroupNodeBudget
     nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
@@ -167,17 +175,26 @@ inlineClauseGroups e
 clauseGroupNodeBudget :: Int
 clauseGroupNodeBudget = 5000
 
-isClauseLet :: Expr Resolved -> Bool
-isClauseLet = \ case
-  LetIn _ ds _ -> not (null ds) && all generated ds
-  _            -> False
+-- | Join a generated CONSIDER whose last branch is an OTHERWISE holding another
+-- generated CONSIDER on the same input. Bottom-up, so a run of three joins.
+joinGeneratedConsiders :: Expr Resolved -> Expr Resolved
+joinGeneratedConsiders = transformOf (gplate @(Expr Resolved)) \ case
+  Consider ann s brs
+    | generated ann
+    , Just (front, MkBranch _ (Otherwise _) (Consider ann' s' brs')) <- unsnoc' brs
+    , generated ann'
+    , sameInput s s' -> Consider ann s (front <> brs')
+  e -> e
   where
-    generated = \ case
-      LocalDecide _ (MkDecide a _ _ _) -> case view annPmSynthetic a of
-        Just (PmFallthrough _) -> True
-        Just (PmUnreachable _) -> True
-        _                      -> False
-      LocalAssume{} -> False
+    generated a = case view annPmSynthetic a of
+      Just PmConsider{} -> True
+      _                 -> False
+    sameInput a b = case (a, b) of
+      (App _ r [], App _ r' []) -> getUnique r == getUnique r'
+      _                         -> False
+    unsnoc' xs = case xs of
+      [] -> Nothing
+      _  -> Just (init xs, last xs)
 
 -- | A definition that a call can be unfolded into: its parameters, in order, and
 -- its body.
@@ -252,11 +269,21 @@ unfoldOnce :: Map.Map Unique Unfoldable -> Expr Resolved -> Expr Resolved
 unfoldOnce m
   | Map.null m = id
   | otherwise  = transformOf (gplate @(Expr Resolved)) $ \ e -> case e of
-      App _ r args
+      App site r args
         | Just (MkUnfoldable ps body) <- Map.lookup (getUnique r) m
         , length args == length ps
-        -> substParams (zip ps args) body
+        -> withTypeOfSite site (substParams (zip ps args) body)
       _ -> e
+
+-- | A body put in place of a call has the type the call had. The call was
+-- checked against what its context expects, so that type is resolved; the
+-- body's own may still be an inference variable (a @LET x BE CONSIDER ...@ is
+-- inferred), which a consumer that reads types with no substitution (the
+-- ladder) cannot see through.
+withTypeOfSite :: Anno -> Expr Resolved -> Expr Resolved
+withTypeOfSite site e = case view annInfo site of
+  Just (TypeInfo ty _) -> e & annoOf % annInfo ?~ TypeInfo ty Nothing
+  _                    -> e
 
 -- | How many call sites 'unfoldOnce' would replace in this expression.
 unfoldableCallSites :: Map.Map Unique Unfoldable -> Expr Resolved -> Int

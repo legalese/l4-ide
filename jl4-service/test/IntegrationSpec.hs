@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4, letEnumJL4, handLetCompareJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1737,7 +1737,7 @@ spec = describe "integration" do
         statusCode' resp `shouldBe` 200
         lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
 
-    -- A rule written as DECIDE clauses is the same rule as the nested CONSIDER
+    -- A rule written as DECIDE clauses is the same rule as the CONSIDER
     -- it stands for, so its plan and its ladder must be the same: the same
     -- inputs, the same questions, the same nodes. Compared whole, modulo the
     -- numbering of nodes ('withoutNodeIds'), so that a clause group drawn as
@@ -1764,6 +1764,19 @@ spec = describe "integration" do
                   for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
                     (g, g `Text.isInfixOf` text) `shouldBe` (g, False)
       sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
+      -- A LET the drafter wrote is read the same way: it must not be one opaque
+      -- atom that asks nothing.
+      it "reads a LET as the CONSIDER it names: same inputs and questions" do
+        withServiceFromSources "let-enum" [("rule.l4", letEnumJL4)] \baseUrl mgr ->
+          withServiceFromSources "hw-let-enum" [("rule.l4", handLetCompareJL4)] \baseUrl' mgr' -> do
+            qpL <- queryPlan' baseUrl mgr "let-enum" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+            qpH <- queryPlan' baseUrl' mgr' "hw-let-enum" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+            statusCode' qpL `shouldBe` 200
+            let l = decodeObject (responseBody qpL)
+                h = decodeObject (responseBody qpH)
+            (withoutNodeIds <$> lookupKey "inputs" l) `shouldBe` (withoutNodeIds <$> lookupKey "inputs" h)
+            (withoutNodeIds <$> lookupKey "asks" l) `shouldBe` (withoutNodeIds <$> lookupKey "asks" h)
+            lookupArrayLength "asks" l `shouldSatisfy` maybe False (> 0)
       sameAsHandWritten "mixed" clauseGroupMixedJL4 handMixedJL4
       sameAsHandWritten "single" clauseGroupSingleJL4 handSingleJL4
       -- The hand-written CONSIDER without a GIVETH is itself refused (its type is an

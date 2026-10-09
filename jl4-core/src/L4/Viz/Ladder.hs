@@ -49,7 +49,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineClauseGroups)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz)
 import L4.Desugar
 import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -301,8 +301,8 @@ vizProgram verDocId decide = MkRenderAsLadderInfo verDocId <$> translateDecide d
 
 translateDecide :: Decide Resolved -> Viz FunDecl
 translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) = do
-  -- A rule written as DECIDE clauses is drawn as the nested CONSIDER it stands for.
-  let body = Transform.inlineClauseGroups body0
+  -- A rule written as DECIDE clauses (or with a LET) is drawn as the CONSIDER it stands for.
+  let body = Transform.inlineLetsForViz body0
   unlessM (hasBooleanType (getAnno body)) $
     throwError InvalidDecideMustHaveBoolRetType
 

@@ -35,6 +35,8 @@ module TestData (
   twoDatesJL4,
   clauseGroupEnumJL4,
   handEnumJL4,
+  letEnumJL4,
+  handLetCompareJL4,
   clauseGroupMixedJL4,
   handMixedJL4,
   clauseGroupSingleJL4,
@@ -1136,7 +1138,7 @@ GIVETH A BOOLEAN
 gate MEANS p AND q
 |]
 
--- | BOOLEAN rules written as multi-clause DECIDE groups, each beside the nested
+-- | BOOLEAN rules written as multi-clause DECIDE groups, each beside the
 -- CONSIDER a drafter would write by hand for the same rule. All are called
 -- @rule@, so that the two forms of a pair get the same atom ids and their
 -- query plans can be compared whole.
@@ -1170,10 +1172,26 @@ GIVETH A BOOLEAN
 DECIDE rule c IS
   CONSIDER c
     WHEN Red THEN TRUE
-    OTHERWISE CONSIDER c
-      WHEN Green THEN FALSE
-      OTHERWISE CONSIDER c
-        WHEN Blue THEN FALSE
+    WHEN Green THEN FALSE
+    WHEN Blue THEN FALSE
+|]
+
+-- | The same rule with the later clauses named in a LET, as a drafter might.
+letEnumJL4 :: Text
+letEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  LET rest BE CONSIDER c
+                WHEN Green THEN FALSE
+                WHEN Blue THEN TRUE
+  IN CONSIDER c
+       WHEN Red THEN TRUE
+       OTHERWISE rest
 |]
 
 -- | Two inputs, a literal pattern in the first clause, a bare name in the second.
@@ -1233,4 +1251,20 @@ GIVEN c IS A Colour
 DECIDE rule Red IS TRUE
 DECIDE rule Green IS FALSE
 DECIDE rule Blue IS FALSE
+|]
+
+-- | What 'letEnumJL4' stands for, flat.
+handLetCompareJL4 :: Text
+handLetCompareJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  CONSIDER c
+    WHEN Red THEN TRUE
+    WHEN Green THEN FALSE
+    WHEN Blue THEN TRUE
 |]

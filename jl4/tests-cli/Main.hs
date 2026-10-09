@@ -295,7 +295,7 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- five files prove the checker is capable of going red — and going red for the
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
-verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture :: FilePath
+verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -303,6 +303,7 @@ verifyDeadBranchFixture   = fixtureDir </> "verify-dead-branch.l4"
 verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
+verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -410,7 +411,7 @@ coreFixtures =
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
-  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
+  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
@@ -2516,6 +2517,17 @@ spec bin = do
     it "still finds a binder-level contradiction with --no-coalesce-atoms" $ do
       Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
       code `shouldBe` ExitFailure 1
+
+    -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
+    -- Before, it was skipped as not boolean; then its generated nesting made
+    -- the analysis report a dead limb that is only the clause that returns
+    -- FALSE, which the hand-written CONSIDER next to it does not.
+    it "analyses a clause group, and finds in it what it finds in the CONSIDER written by hand" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyClauseGroupFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"analysed\":2" `isInfixOf`)
+      sout `shouldSatisfy` ("\"skipped\":0" `isInfixOf`)
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
 
     it "records a non-boolean DECIDE as skipped, never as clean" $ do
       env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]

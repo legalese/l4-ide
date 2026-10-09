@@ -17,6 +17,7 @@ module VizGuardedRows (spec) where
 
 import Base
 import qualified Base.Text as Text
+import qualified Data.List as List
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..))
 import L4.Names (getName)
@@ -217,10 +218,34 @@ clauseGroupByHand =
   \DECIDE compliant c IS\n\
   \  CONSIDER c\n\
   \    WHEN Red THEN TRUE\n\
-  \    OTHERWISE CONSIDER c\n\
-  \      WHEN Green THEN FALSE\n\
-  \      OTHERWISE CONSIDER c\n\
-  \        WHEN Blue THEN FALSE\n"
+  \    WHEN Green THEN FALSE\n\
+  \    WHEN Blue THEN FALSE\n"
+
+-- | The rule with Blue TRUE, by hand and with the later clauses named in a LET.
+clauseGroupByHandTrue :: Text
+clauseGroupByHandTrue =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant c IS\n\
+  \  CONSIDER c\n\
+  \    WHEN Red THEN TRUE\n\
+  \    WHEN Green THEN FALSE\n\
+  \    WHEN Blue THEN TRUE\n"
+
+
+clauseGroupByLet :: Text
+clauseGroupByLet =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant c IS\n\
+  \  LET rest BE CONSIDER c\n\
+  \                WHEN Green THEN FALSE\n\
+  \                WHEN Blue THEN TRUE\n\
+  \  IN CONSIDER c\n\
+  \       WHEN Red THEN TRUE\n\
+  \       OTHERWISE rest\n"
 
 clauseGroupTwoInputs :: Text
 clauseGroupTwoInputs =
@@ -271,10 +296,8 @@ clauseGroupNoGivethByHand =
   \DECIDE compliant c IS\n\
   \  CONSIDER c\n\
   \    WHEN Red THEN TRUE\n\
-  \    OTHERWISE CONSIDER c\n\
-  \      WHEN Green THEN FALSE\n\
-  \      OTHERWISE CONSIDER c\n\
-  \        WHEN Blue THEN FALSE\n"
+  \    WHEN Green THEN FALSE\n\
+  \    WHEN Blue THEN FALSE\n"
 
 spec :: Spec
 spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)" $ do
@@ -387,27 +410,31 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
   describe "a BOOLEAN rule written as DECIDE clauses" $ do
     it "is the same ladder as its hand-written CONSIDER: several clauses" $ do
       let clauses = vizBody False clauseGroup
-          hand = vizBody False clauseGroupByHand
-      atomsOf clauses `shouldBe` atomsOf hand
-      countNots clauses `shouldBe` countNots hand
-      countOrs clauses `shouldBe` countOrs hand
-      countLeaves clauses `shouldBe` countLeaves hand
-      atomsOf clauses `shouldSatisfy` (not . null)
+      shapeOf clauses `shouldBe` shapeOf (vizBody False clauseGroupByHand)
+      -- an opaque atom is a leaf too, so say what the shape is
+      atomsOf clauses `shouldBe` ["c EQUALS Red"]
+
+    -- A LET the drafter wrote is read through, so it is no longer one opaque
+    -- leaf; its nesting is the drafter's own, so the shape is not compared.
+    it "reads a LET through: the same questions as the CONSIDER it names" $ do
+      let viaLet = vizBody False clauseGroupByLet
+          byHand = vizBody False clauseGroupByHandTrue
+      List.sort (List.nub (atomsOf viaLet)) `shouldBe` List.sort (List.nub (atomsOf byHand))
+      countLeaves viaLet `shouldSatisfy` (> 1)
 
     it "is the same ladder as its hand-written CONSIDER: two inputs" $ do
       let clauses = vizBody False clauseGroupTwoInputs
-          hand = vizBody False clauseGroupTwoInputsByHand
-      atomsOf clauses `shouldBe` atomsOf hand
-      countNots clauses `shouldBe` countNots hand
+      shapeOf clauses `shouldBe` shapeOf (vizBody False clauseGroupTwoInputsByHand)
+      length (atomsOf clauses) `shouldSatisfy` (> 1)
 
     it "is the same ladder as its hand-written CONSIDER: one clause" $
-      atomsOf (vizBody False clauseGroupOfOne) `shouldBe` atomsOf (vizBody False clauseGroupOfOneByHand)
+      shapeOf (vizBody False clauseGroupOfOne) `shouldBe` shapeOf (vizBody False clauseGroupOfOneByHand)
 
     it "is the same ladder as its hand-written CONSIDER: no GIVETH" $
-      atomsOf (vizBody False clauseGroupNoGiveth) `shouldBe` atomsOf (vizBody False clauseGroupNoGivethByHand)
+      shapeOf (vizBody False clauseGroupNoGiveth) `shouldBe` shapeOf (vizBody False clauseGroupNoGivethByHand)
 
     it "names nothing the desugarer made up" $
-      for_ [clauseGroup, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->
+      for_ [clauseGroup, clauseGroupByLet, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->
         for_ (atomsOf (vizBody False src)) \label ->
           for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
             (g, g `Text.isInfixOf` label) `shouldBe` (g, False)
@@ -446,6 +473,18 @@ atomsOf = \case
   V.Implies _ p q _ -> atomsOf p <> atomsOf q
   V.App _ _ es _ _ -> concatMap atomsOf es
   _ -> []
+
+-- | The shape of a ladder body: its connectives and its atoms' labels, without
+-- the numbers the visualizer gave its nodes.
+shapeOf :: V.IRExpr -> String
+shapeOf = \case
+  V.UBoolVar _ nm _ _ _ _ _ -> "atom " <> Text.unpack nm.label
+  V.And _ es -> "(and " <> unwords (map shapeOf es) <> ")"
+  V.Or _ es -> "(or " <> unwords (map shapeOf es) <> ")"
+  V.Not _ e -> "(not " <> shapeOf e <> ")"
+  V.Implies _ p q _ -> "(implies " <> shapeOf p <> " " <> shapeOf q <> ")"
+  V.App _ nm es _ _ -> "(app " <> Text.unpack nm.label <> " " <> unwords (map shapeOf es) <> ")"
+  other -> show (length (children other)) <> "-other"
 
 -- | Every atom occurrence, as (unique, label). Two occurrences of the SAME proposition
 -- must share a unique, or a binding on one will not move the other.
