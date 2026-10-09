@@ -384,7 +384,7 @@ C1 keys every term by its structure: "an input, a field path, a built-in operati
 A call to a rule the module defines is not an atom there; it is unfolded, so `older 18` leaves no trace of `older` (`:308-309`).
 The ladder keeps the call as a box, because that is what the reader wrote, but the call's expansion is that unfolding, and R3 gives each of its leaves the key it would have if the caller had written the argument in place.
 
-**Implemented** on branch `feat/r3-c1-atom-key` (smucclaw/l4-ide#1013), not yet merged when this was written.
+**Implemented** by legalese/l4-ide#598 (branch `feat/r3-c1-atom-key`, smucclaw/l4-ide#1013), not yet merged when this was written.
 _Changed:_ until then the `atomId` was a UUID5 over the function name, the leaf's **printed label**, and the labels of its transitive input references, which equals C1's term key only where printing is injective, and it is not everywhere (§10.6).
 
 The key is `L4.Viz.AtomKey.termKey` in `jl4-core`, and the `atomId` is a UUID5 over the function name and that key (`atomIdOfKey`).
@@ -405,12 +405,21 @@ Each of these was found by adversarial review of the design or of the built key,
 Both ladder builders key every leaf this way while they draw, including each leaf of an expansion over the substituted body, and record the key under the leaf's id (`getLeafKeys`); the query plan reads those keys (`leafKeyByUnique`) instead of computing ids of its own, so the diagram and the plan cannot disagree.
 A call box is the term `f a b`, so its key is the rule's path with its arguments' keys, as R3 says.
 
+> **R3a** (**ANSWERED 2026-10-09**, ruled by Meng). The four choices #598 made without a ruling stand as built.
+> (1) An `atomId` keeps the decision's name, so ids are scoped per diagram, although R3's text read literally names a proposition without it.
+> (2) Section names enter a binder path only where two binders would otherwise collide, so renaming or inserting a heading moves no id.
+> (3) `WHERE` and `LET` locals are put into keys, so a call to a local keys as its unfolding, unlike a call to a rule, which is a call box.
+> (4) A leaf that reads or writes the ledger or the network, or calls a rule of the module that does, is keyed per occurrence (C1's `fresh`); a bare reference to such a rule of no parameters is not, since it is evaluated once and shared.
+
+Ruling, 2026-10-09, asked inline in session `ladder-ref-trans` (offered as a bench, SOMMELIER, not built): all four as recommended; no conditions; Meng's note: "i think we can skip SOMMELIER if i just say i accept your recommendations".
+
 What it knowingly leaves, by kind of failure:
 
 - **Silent, and the safe direction: equal propositions can get two keys** where they are different terms, such as `a AND b` and `b AND a` inside one leaf.
   That says "two questions" where the truth is one, never the reverse (C1).
 - **An `atomId` is stable across recompiles and edits elsewhere in the module, not across everything.**
-  It moves when a same-named binder is added above it in the same scope, when an imported module it names changes, or on an L4 release that changes the AST, since the key is `show` of it.
+  It moves when a binder with the same name is added above one it names (the later of the two is then told apart by its sections), when an imported module it names changes, or on an L4 release that changes the AST, since the key is `show` of it.
+  A per-occurrence leaf (R3a (4)) is numbered in drawing order, so it also moves when such a leaf is added or removed earlier in the same decision.
 - **The planner still holds twins as two variables.**
   Two occurrences of one term share an `atomId`, and a binding by `atomId` reaches both, but the BDD does not know they are equal, so `X AND NOT X` over a compound `X` is undetermined rather than `FALSE`.
   `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here.
