@@ -154,7 +154,7 @@ The intended discipline: treat the warnings as a completeness report. A finished
 | `NUMBER` / `STRING` / `DATE` scrutinee            | Analysed; `OTHERWISE` is suggested when it is missing                      |
 | Clauses over a `NUMBER`, `STRING` or `DATE` input | Analysed; the clause with the input's name is suggested when it is missing |
 | `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
-| `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                           |
+| `MAYBE` / `EITHER` / `LIST` scrutinee             | Fully analysed                                                             |
 | `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                    |
 | `OTHERWISE`                                       | Completes the match, disables missing-case warnings                        |
 | Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero      |

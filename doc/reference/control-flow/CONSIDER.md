@@ -69,14 +69,14 @@ area s MEANS
 
 ### Using Wildcards
 
-Use `_` to ignore values:
+Use `` `_` ``, an underscore in backquotes, to ignore a value:
 
 ```l4
 GIVEN xs IS A LIST OF NUMBER
 firstElement xs MEANS
   CONSIDER xs
   WHEN EMPTY THEN 0
-  WHEN head FOLLOWED BY _ THEN head
+  WHEN head FOLLOWED BY `_` THEN head
 ```
 
 ## OTHERWISE
@@ -132,6 +132,7 @@ Adding the missing constructor branch or an OTHERWISE catch-all silences the war
 
 **Numbers, text and dates:** a NUMBER, a STRING or a DATE has no end of values, so a WHEN with a number or a piece of text, even nested (`WHEN JUST 1`), matches one value, and a CONSIDER over such a scrutinee is complete only with an OTHERWISE, which the warning suggests.
 `EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value; any other `EXACTLY` counts for nothing over a number, a piece of text or a date, and stops the check over any other type.
+An `EXACTLY` whose expression mentions the scrutinee itself, such as `WHEN EXACTLY (n PLUS 1)` in `CONSIDER n`, stops the check over any type, with no warning, since such a branch may match any number of the scrutinee's values.
 A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is a redundant branch.
 A CONSIDER reads these exactly as a rule written as clauses does ([Non-exhaustive pattern match](../errors/README.md#non-exhaustive-pattern-match)), so the two spellings of one rule warn alike.
 One limit, which warns rather than stays silent: an `EXACTLY` of a name that a `WHERE` or a `LET` defines as the scrutinee itself (`WHEN EXACTLY y` in `CONSIDER x`, with `y MEANS x`) is read as a value the check cannot name, so the check asks for an `OTHERWISE` that would never be used; write that branch as `OTHERWISE`.
