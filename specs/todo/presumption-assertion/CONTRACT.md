@@ -198,7 +198,7 @@ Steps 4 to 7 are parked under MOTHBALL (`:977`), so **the open item is un-parkin
 
 **How each surface gets there.** There is no expression that stands for an unknown (`Machine.hs:6329–6330`), so the placeholder is a generated `ASSUME`:
 
-- the wrapper path and `l4 batch` already generate `` ASSUME `x (not supplied)` `` for a left-out `BOOLEAN` (`CodeGen.hs:88–100`, W1); the dependency extends it to every type that is not a `MAYBE` (today a left-out `DATE`, `TIME` or `DATETIME` is the wrapper answering `NOTHING`, `Jl4.hs:1333`, `:1344`);
+- the wrapper path and `l4 batch` already generate `` ASSUME `x (not supplied)` `` for a left-out `BOOLEAN` (`CodeGen.hs:88–100`, W1); the dependency extends it to every type that is not a `MAYBE` (today a left-out `DATE`, `TIME` or `DATETIME` is refused by `wrapperDeclined`, `Jl4.hs:1333`, `:1344`);
 - the direct path has no request decode and refuses inside jl4-service's own fills (`Jl4.hs:543`, `:595`, `:678`; `requestRecord = Nothing` there, `:792`), so it synthesizes the same `ASSUME`, or falls back to the wrapper path, for a left-out input;
 - MCP is the flat path of the service and follows it.
 
