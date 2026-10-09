@@ -2130,26 +2130,30 @@ checkConsider ec ann e branches t = do
 -- an EITHER, or a type declared in another module, as the type itself, one
 -- of its arguments, or a field of a type this module declares, at any depth
 -- ('declareDeclarations', the declarations 'constructorFamilies' reads).
--- The other builtin types are listed (BOOLEAN) or have no constructors. A
--- type variable reads as another module's type, which keeps main's own
--- analysis, as before. Synonyms are expanded, and a type already on the way
--- down is not read again, so a recursive type ends.
+-- The other builtin types are listed (BOOLEAN) or have no constructors, and
+-- a type variable has none. A field is read as the use of its type
+-- instantiates it (@Pair Tier@'s fields are @Tier@s). Synonyms are
+-- expanded, and a type already on the way down is not read again, so a
+-- recursive type ends.
 holdsUnlistedType :: EntityInfo -> [DeclChecked (Declare Resolved)] -> Type' Resolved -> Bool
 holdsUnlistedType ei decls = go Set.empty
   where
     declared =
       Map.fromList
-        [ (getUnique tr, td)
+        [ (getUnique tr, (params, td))
         | d <- decls
-        , let MkDeclare _ _ (MkAppForm _ tr _ _) td = d.payload
+        , let MkDeclare _ _ (MkAppForm _ tr params _) td = d.payload
         ]
     go seen ty = case expandSynonymsIn ei (8 :: Int) ty of
       TyApp _ r ts
         | getUnique r `elem` [maybeUnique, listUnique, eitherUnique] -> True
         | any (go seen) ts -> True
         | getUnique r `Set.member` seen -> False
-        | Just td <- Map.lookup (getUnique r) declared ->
-            any (go (Set.insert (getUnique r) seen)) (fieldTypes td)
+        | Just (params, td) <- Map.lookup (getUnique r) declared ->
+            -- the fields as this use of the type instantiates them
+            let atThisUse = substituteType (Map.fromList (zip (map getUnique params) ts))
+            in any (go (Set.insert (getUnique r) seen) . atThisUse) (fieldTypes td)
+        | Just (_, KnownTypeVariable) <- Map.lookup (getUnique r) ei -> False
         | otherwise -> (getUnique r).moduleUri /= builtinUri
       _ -> False
     fieldTypes = \ case

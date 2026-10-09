@@ -1340,6 +1340,25 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
     full <- considerWarnings (foz ("qux qux" : asked <> ["bar qux", "baz qux"]))
     full `shouldBe` []
 
+  it "reads a field of a type with a parameter as the scrutinee's type fills it in" $ do
+    -- `Pair Tier` holds no MAYBE or LIST, so it is read by the clauses'
+    -- engine; read through `Pair`'s declaration, its fields were `a`, which
+    -- kept it on main's own analysis and its #1030 list.
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Gold"
+      , "GIVEN a IS A TYPE"
+      , "DECLARE Pair a HAS"
+      , "    left IS AN a"
+      , "    right IS AN a"
+      , ""
+      , "GIVEN p IS A Pair Tier"
+      , "GIVETH A NUMBER"
+      , "q p MEANS"
+      , "  CONSIDER p"
+      , "    WHEN Pair Basic Basic THEN 1"
+      ]
+    missingArms ws `shouldBe` ["WHEN Pair Basic Gold THEN", "WHEN Pair Gold `_` THEN"]
+
 -- ----------------------------------------------------------------------------
 
 -- | Every warning of a module, as (range, rendered lines), the range as
