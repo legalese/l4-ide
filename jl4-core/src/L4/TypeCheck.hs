@@ -7974,7 +7974,7 @@ prettyCheckWarning = \ case
     [ "The following CONSIDER branch is redundant: "
     , ""
     ] <>
-    map (("  " <>) . prettyLayout) b
+    map (("  " <>) . prettyBranchAsWritten) b
     <> [ ""
     ]
   PatternMatchesMissing b ->
@@ -8168,6 +8168,14 @@ prettyCheckWarning = \ case
           , ""
           , "  REFUSE \"<the reason>\""
           ] <> manual "doc/reference/control-flow/REFUSE.md."
+
+-- | A branch the drafter wrote, for a warning about it: the pattern through
+-- 'prettyMissingPattern', so that a number prints as the branch spells it,
+-- and the body through the generic printer. The generic printer would write
+-- the redundant @WHEN 1.0 THEN …@ after @WHEN 1 THEN …@ as @WHEN 1 THEN …@,
+-- naming the other branch.
+prettyBranchAsWritten :: Branch Resolved -> Text
+prettyBranchAsWritten (MkBranch _ lhs body) = prettyMissingBranchLhs lhs <> " " <> prettyLayout body
 
 -- | Render a synthesized missing branch as valid, pasteable L4 (the
 -- pattern rendering itself is 'prettyMissingPattern').

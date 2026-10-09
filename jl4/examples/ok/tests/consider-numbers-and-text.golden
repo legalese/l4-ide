@@ -32,7 +32,7 @@ consider-numbers-and-text.l4:69:3-74:22:
   I found a problem while checking the definition of `h`:
     The following CONSIDER branch is redundant: 
     
-      WHEN 1 THEN "one point zero"
+      WHEN 1.0 THEN "one point zero"
       WHEN 0.1 THEN "tenth again"
     
 consider-numbers-and-text.l4:81:3-83:26:
