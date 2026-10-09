@@ -90,14 +90,19 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 -- binding that applies one of its own parameters as a function (see
 -- 'unfoldableDecide').
 inlineLocalBindings :: Expr Resolved -> Expr Resolved
-inlineLocalBindings = transformOf (gplate @(Expr Resolved)) step
+inlineLocalBindings = inlineLocalBindingsWhere (const True)
+
+-- | 'inlineLocalBindings', but only at the @WHERE@ \/ @LET@ nodes the predicate
+-- accepts. Every other binding is left exactly as written.
+inlineLocalBindingsWhere :: (Expr Resolved -> Bool) -> Expr Resolved -> Expr Resolved
+inlineLocalBindingsWhere wanted = transformOf (gplate @(Expr Resolved)) step
   where
     -- `transformOf` is bottom-up, so an inner WHERE is already inlined by the time
     -- its enclosing one is considered.
     step :: Expr Resolved -> Expr Resolved
     step = \ case
-      Where ann body ds -> rebuild (\ b ds' -> Where ann b ds') body ds
-      LetIn ann ds body -> rebuild (\ b ds' -> LetIn ann ds' b) body ds
+      e@(Where ann body ds) | wanted e -> rebuild (\ b ds' -> Where ann b ds') body ds
+      e@(LetIn ann ds body) | wanted e -> rebuild (\ b ds' -> LetIn ann ds' b) body ds
       e                 -> e
 
     rebuild
@@ -135,6 +140,44 @@ inlineLocalBindings = transformOf (gplate @(Expr Resolved)) step
                                  (Map.restrictKeys usable seen)
                   seen' = seen <> more
                in if seen' == seen then seen else grow seen'
+
+-- | Undo the clause desugaring for a consumer that reads the expression's
+-- structure (the ladder, the query plan): the @LET@s that bind "the clauses not
+-- yet tried" ('PmFallthrough') are substituted into the CONSIDERs that refer to
+-- them, so that a BOOLEAN rule written as DECIDE clauses is the same expression
+-- as the nested CONSIDER a drafter would have written by hand. Nothing the
+-- drafter wrote is touched: a @LET@ is inlined only if every binding in it is
+-- one the desugarer generated.
+--
+-- A group of several inputs refers to the same later clauses from more than one
+-- branch, so inlining copies them, and a long group of many inputs would copy
+-- them exponentially. When the result is larger than 'clauseGroupNodeBudget'
+-- nodes the expression is returned as it was; the caller then sees what it
+-- saw before this pass existed.
+inlineClauseGroups :: Expr Resolved -> Expr Resolved
+inlineClauseGroups e
+  | withinBudget inlined = inlined
+  | otherwise            = e
+  where
+    inlined = inlineLocalBindingsWhere isClauseLet e
+    -- Lazy on purpose: only the first 'clauseGroupNodeBudget' + 1 nodes are built.
+    withinBudget x = length (take (clauseGroupNodeBudget + 1) (nodes x)) <= clauseGroupNodeBudget
+    nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
+
+clauseGroupNodeBudget :: Int
+clauseGroupNodeBudget = 5000
+
+isClauseLet :: Expr Resolved -> Bool
+isClauseLet = \ case
+  LetIn _ ds _ -> not (null ds) && all generated ds
+  _            -> False
+  where
+    generated = \ case
+      LocalDecide _ (MkDecide a _ _ _) -> case view annPmSynthetic a of
+        Just (PmFallthrough _) -> True
+        Just (PmUnreachable _) -> True
+        _                      -> False
+      LocalAssume{} -> False
 
 -- | A definition that a call can be unfolded into: its parameters, in order, and
 -- its body.

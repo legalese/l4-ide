@@ -49,7 +49,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, se
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
+import qualified L4.Transform as Transform (simplify, inlineClauseGroups, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -469,8 +469,10 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
 --
 -- Simple implementation: Translate Decide iff <= 1 Given
 translateDecide :: Decide Resolved -> Viz V.FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body) =
+translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
   do
+    -- A rule written as DECIDE clauses is drawn as the nested CONSIDER it stands for.
+    let body = Transform.inlineClauseGroups body0
     unlessM (hasBooleanType (getAnno body)) $
       throwError InvalidDecideMustHaveBoolRetType
 

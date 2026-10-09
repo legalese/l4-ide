@@ -2076,8 +2076,11 @@ setAnnResolvedType t k a = case rangeOf (getAnno a) of
   -- ('L4.Viz.Ladder.hasBooleanType'), so it is recorded ON the node and
   -- nowhere else: the position index and every diagnostic are as they were.
   Nothing
-    | isJust (Optics.view annPmSynthetic (getAnno a)) ->
-        pure $ a & annoOf % annInfo ?~ TypeInfo t k
+    | isJust (Optics.view annPmSynthetic (getAnno a)) -> do
+        -- With the substitution so far applied: a group with no GIVETH is
+        -- checked against a fresh type that its clauses have already fixed.
+        t' <- applySubst t
+        pure $ a & annoOf % annInfo ?~ TypeInfo t' k
     | otherwise -> pure a
 
 setAnnResolvedKind ::
