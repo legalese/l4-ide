@@ -4200,7 +4200,7 @@ prettyCheckWarning = \ case
     [ "The following branches still need to be considered:"
     , "" ]
     <>
-    map (("  " <>) . prettyLayout) b
+    map (("  " <>) . prettyMissingBranchLhs) b
     <> [ "" ]
   PatternClausesMissing _ headName clauseCount rows ->
     [ (if clauseCount == 1 then "This clause does not cover all cases." else "This multi-clause definition does not cover all cases.")
@@ -4243,6 +4243,16 @@ prettyCheckWarning = \ case
 -- Clause argument positions parse as 'L4.Parser.atomicPattern', so applied
 -- constructors must be parenthesised: every column is rendered with
 -- @nested=True@.
+-- | Render a synthesized missing branch of a CONSIDER as valid, pasteable
+-- L4, @WHEN … THEN@ or @OTHERWISE@, on one line: the pattern goes through
+-- 'prettyMissingPattern', which writes a number or a piece of text as the
+-- arms spell it, where the generic layout printer would write @1.50@ as
+-- @1.5@ and break a long pattern over lines.
+prettyMissingBranchLhs :: BranchLhs Resolved -> Text
+prettyMissingBranchLhs = \ case
+  When _ p    -> "WHEN " <> prettyMissingPattern False p <> " THEN"
+  o@Otherwise {} -> prettyLayout o
+
 prettyMissingClauseLhs :: Name -> [Pattern Resolved] -> Text
 prettyMissingClauseLhs headName row =
   "DECIDE " <> quotedName headName
