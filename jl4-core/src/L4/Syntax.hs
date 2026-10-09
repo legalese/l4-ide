@@ -692,9 +692,11 @@ data Opening n
 -- the continuation of:
 --
 --   * @THE JOIN@ — the instant its join fired: a plain @PARTY@ obligation's
---     completion, a barrier's last completion. Under @HENCE@ this is the
---     default, so naming it is emphasis; under @LEST@ the join did not fire,
---     and the checker refuses it.
+--     completion, a kept @SHANT@'s deadline, a barrier's last completion.
+--     Under @HENCE@ this is the default, so naming it is emphasis; under a
+--     @SHANT@'s @LEST@ it is the violating act, also the default; under any
+--     other @LEST@ the join did not fire, and the checker refuses it (§2.6
+--     card A3).
 --   * @THE DEADLINE@ — its deadline: the act's @WITHIN@, or under a barrier
 --     the @ONCE@ line's when one is written. Under @HENCE@ this is /the cure
 --     period runs from when performance fell due/; under @LEST@ it is the

@@ -591,7 +591,10 @@ run-after.l4:636:1-638:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       5
+    but was only entered at, and so failed at
+      8
   NOTE: This window closes at 5, before it opens at 38: the WITHIN counts from THE ARMING and the AFTER from the obligation's own clock, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+  NOTE: An obligation, MUST Deliver theLandlord, was entered at 8, after its own deadline of 5, so it could never be met in time: it fails at 8, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
 run-after.l4:645:27-32:
   I found a problem while checking the definition of `window of, two anchors`:
     In this action, `alice` refers to
@@ -620,7 +623,10 @@ run-after.l4:650:1-652:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       5
+    but was only entered at, and so failed at
+      8
   NOTE: This window closes at 5, before it opens at 38: the AFTER counts from THE JOIN and the WITHIN from THE ARMING, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+  NOTE: An obligation, MUST Deliver theLandlord, was entered at 8, after its own deadline of 5, so it could never be met in time: it fails at 8, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
 run-after.l4:659:28-33:
   I found a problem while checking the definition of `window before`:
     In this action, `buyer` refers to

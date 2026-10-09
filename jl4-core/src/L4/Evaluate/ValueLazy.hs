@@ -214,25 +214,63 @@ instance NFData RBinOp where
 -- deadline it missed; a declared breach carries whom @BREACH BY@ named (if
 -- anyone) and its @BECAUSE@ (if any). Nothing is deduplicated — the same party
 -- twice is two entries, and the two ways are visible in them.
+--
+-- Each entry also carries its 'Timing' (SEESAW, spec §6.1.2): when it took
+-- effect and when it came to light. A missed deadline has one from the moment
+-- it is built; a declared breach gets its own where it meets the clock of the
+-- hand-off that reached it ('L4.EvaluateLazy.Machine', the 'App1' frame), and
+-- has none when it is evaluated outside any run.
 data Failure a
-  = MissedDeadline a (RAction Resolved) Rational
-    -- ^ the party, the action it owed, the deadline it missed
-  | DeclaredBreach (Maybe a) (Maybe a)
-    -- ^ @BREACH [BY p] [BECAUSE r]@: the party named, if any; the reason, if any
+  = MissedDeadline a (RAction Resolved) Rational (Timing a)
+    -- ^ the party, the action it owed, the deadline it missed (a violated
+    -- prohibition's own stamp), and when it took effect and came to light
+  | DeclaredBreach (Maybe a) (Maybe a) (Maybe (Timing a))
+    -- ^ @BREACH [BY p] [BECAUSE r]@: the party named, if any; the reason, if
+    -- any; and its timing, once a run has given it one
   deriving stock (Generic, Show, Functor, Foldable, Traversable)
   deriving anyclass NFData
 
--- | The failures a breach names, in operand \/ roll order, with ONE of them
--- marked as the ANCHOR — the failure the breach's time comes from (the
--- earliest for @RAND@ and for a barrier, the latest for @ROR@; see the
--- @RBinOp2@ clause and 'barrierFinish' in the machine). The anchor is marked
--- by position rather than by an index, so it is always one of the entries and
--- the order is the drafter's: 'blameList' is @before ++ [anchor] ++ after@.
--- A single obligation's breach is @Blame [] f []@.
+-- | When a failure took effect, and when the machine saw it (SEESAW, spec
+-- §6.1.2; NORM-LOG-SPEC N3's two instants, applied to every failure).
+--
+-- The two differ whenever a miss comes to light late: a deadline of 5 that an
+-- event at 10 reveals took effect at 5 and was observed at 10. A compound is
+-- breached at its operands' EFFECTIVE instants (the earliest for @RAND@, the
+-- latest for @ROR@), never at the order its operands were evaluated in.
+data Timing a = Timing
+  { effective  :: Rational
+    -- ^ a missed deadline, but never earlier than the obligation's own
+    -- arming (an obligation armed after its deadline fails when it is
+    -- armed, and the run says so in a note); a violating act's stamp; a
+    -- declared breach's hand-off clock
+  , observed   :: Rational
+    -- ^ the stamp of the event on which the machine saw the failure — for
+    -- a declared breach with no such event, its hand-off clock
+  , revealedBy :: Maybe (a, a)
+    -- ^ that event's party and action, when an event revealed it
+  }
+  deriving stock (Generic, Show, Functor, Foldable, Traversable)
+  deriving anyclass NFData
+
+-- | The failures a breach names, in operand \/ roll order — the drafter's,
+-- never re-sorted — with the DECISIVE ones marked: the entries that fix the
+-- compound's effective instant (SEESAW, spec §6.1.2). For @RAND@ and a
+-- barrier that is the earliest effective instant, for @ROR@ the latest,
+-- worked out along the operand tree ('combineBlame'), so it does not depend
+-- on which operand is written first. Several entries are decisive when they
+-- took effect at the same instant.
+--
+-- One decisive entry is the 'anchor', marked by position so it is always one
+-- of the entries: a missed deadline in preference to a declared breach, then
+-- the one observed first, then the first in order. The scalars a breach
+-- prints and serialises describe it; 'alsoDecisive' holds the positions (in
+-- 'blameList') of the others. 'blameList' is @before ++ [anchor] ++ after@.
+-- A single obligation's breach is @Blame [] f [] []@.
 data Blame a = Blame
-  { before :: [Failure a]
-  , anchor :: Failure a
-  , after  :: [Failure a]
+  { before       :: [Failure a]
+  , anchor       :: Failure a
+  , after        :: [Failure a]
+  , alsoDecisive :: [Int]
   }
   deriving stock (Generic, Show, Functor, Foldable, Traversable)
   deriving anyclass NFData
@@ -242,11 +280,12 @@ data Blame a = Blame
 -- The two constructors say what KIND of failure the breach is anchored at:
 -- 'DeadlineMissed' carries the event that revealed the anchoring miss (its
 -- party, action and stamp) beside the blame; 'ExplicitBreach' is anchored at a
--- declared breach and carries no time. A compound breach — both operands of a
--- @RAND@\/@ROR@ lost, or several members of a barrier — keeps the anchor's
--- constructor and concatenates both sides' failures. A single obligation's
--- breach is the singleton, which prints and serializes exactly as the
--- one-party form did.
+-- declared breach. A compound breach — both operands of a @RAND@\/@ROR@ lost,
+-- or several members of a barrier — concatenates both sides' failures and is
+-- a 'DeadlineMissed' unless EVERY decisive entry is a declared breach
+-- ('breachOf'), so which constructor it gets does not depend on the order of
+-- the operands (SEESAW, spec §6.1.2). A single obligation's breach is the
+-- singleton, which prints and serializes exactly as the one-party form did.
 data ReasonForBreach a
   = DeadlineMissed a a Rational (Blame a)
     -- ^ revealing event's party, action and stamp; the failures, anchored at a
@@ -262,9 +301,17 @@ breachBlame = \ case
   DeadlineMissed _ _ _ b -> b
   ExplicitBreach b       -> b
 
+-- | The breach a blame describes: a 'DeadlineMissed' revealed by the anchor's
+-- own revealing event when the anchor is a missed deadline (which 'combineBlame'
+-- prefers whenever any decisive entry is one), else an 'ExplicitBreach'.
+breachOf :: Blame a -> ReasonForBreach a
+breachOf b = case b.anchor of
+  MissedDeadline _ _ _ t | Just (p, act) <- t.revealedBy -> DeadlineMissed p act t.observed b
+  _ -> ExplicitBreach b
+
 -- | A single failure, its own anchor.
 singleBlame :: Failure a -> Blame a
-singleBlame f = Blame [] f []
+singleBlame f = Blame [] f [] []
 
 -- | Every failure, in order: @before ++ [anchor] ++ after@.
 blameList :: Blame a -> NonEmpty (Failure a)
@@ -276,24 +323,127 @@ blameList b = case b.before of
 anchorIndex :: Blame a -> Int
 anchorIndex b = length b.before
 
+-- | The positions (in 'blameList', 0-based, ascending) of every decisive
+-- entry, the anchor's included.
+decisiveIndices :: Blame a -> [Int]
+decisiveIndices b = sort (anchorIndex b : b.alsoDecisive)
+
+-- | A failure's timing, if it has one yet.
+failureTiming :: Failure a -> Maybe (Timing a)
+failureTiming = \ case
+  MissedDeadline _ _ _ t -> Just t
+  DeclaredBreach _ _ mt  -> mt
+
+-- | When the breach took effect: its decisive entries' shared instant, if
+-- they have one.
+breachEffective :: Blame a -> Maybe Rational
+breachEffective b = (.effective) <$> failureTiming b.anchor
+
+-- | When the breach came to light: the earliest observation among its
+-- decisive entries — the first moment a reader of the trace could know the
+-- compound was lost.
+breachObserved :: Blame a -> Maybe Rational
+breachObserved b =
+  case mapMaybe (fmap (.observed) . failureTiming . (entries !!)) (decisiveIndices b) of
+    [] -> Nothing
+    ts -> Just (minimum ts)
+  where entries = toList (blameList b)
+
+-- | Fill in a declared breach's timing where it has none (SEESAW, spec
+-- §6.1.2). A timing already given is kept, so the instant a breach was first
+-- reached is not overwritten by an enclosing hand-off.
+fillDeclaredTiming :: Timing a -> Blame a -> Blame a
+fillDeclaredTiming t b = b
+  { before = map fill b.before, anchor = fill b.anchor, after = map fill b.after }
+  where
+    fill = \ case
+      DeclaredBreach mp mr Nothing -> DeclaredBreach mp mr (Just t)
+      f                            -> f
+
+-- | Does any declared breach in the blame still lack a timing?
+hasUntimed :: Blame a -> Bool
+hasUntimed = any untimed . blameList
+  where
+    untimed = \ case
+      DeclaredBreach _ _ Nothing -> True
+      _                          -> False
+
 -- | The party a failure names, if it names one.
 failureParty :: Failure a -> Maybe a
 failureParty = \ case
-  MissedDeadline p _ _ -> Just p
-  DeclaredBreach mp _  -> mp
+  MissedDeadline p _ _ _ -> Just p
+  DeclaredBreach mp _ _  -> mp
 
 -- | Every party the breach names, in order, WITH duplicates (no dedup, by
 -- ruling); entries that name nobody contribute nothing.
 blameParties :: Blame a -> [a]
 blameParties = mapMaybe failureParty . toList . blameList
 
--- | Two blames concatenated (left first), anchored at the LEFT's anchor.
-anchorLeft :: Blame a -> Blame a -> Blame a
-anchorLeft l r = l { after = l.after ++ toList (blameList r) }
+-- | Which operands of a compound decide when it was breached.
+data Decider = LeftDecides | RightDecides | BothDecide
+  deriving stock (Eq, Show)
 
--- | Two blames concatenated (left first), anchored at the RIGHT's anchor.
-anchorRight :: Blame a -> Blame a -> Blame a
-anchorRight l r = r { before = toList (blameList l) ++ r.before }
+-- | Two breached operands' blames, concatenated left first (the drafter's
+-- order), with the decisive entries the operator picks along the operand
+-- tree (SEESAW, spec §6.1.2): a @RAND@ (and a barrier) is lost at the
+-- EARLIER of its operands' effective instants, an @ROR@ at the LATER, and
+-- the entries that fix that instant are the deciding operand's own decisive
+-- entries — both operands' when the instants are equal. An operand with no
+-- instant (a declared breach evaluated outside any run) neither wins nor
+-- loses: both decide.
+--
+-- Commutative and associative in everything but the order of the list:
+-- swapping the operands decides the same entries.
+combineBlame :: RBinOp -> Blame a -> Blame a -> (Decider, Blame a)
+combineBlame op l r = (decider, rebuild)
+  where
+    decider = case (breachEffective l, breachEffective r) of
+      (Just el, Just er)
+        | el == er                 -> BothDecide
+        | (op == ValRAnd) == (el < er) -> LeftDecides
+        | otherwise                -> RightDecides
+      _                            -> BothDecide
+    ls = toList (blameList l)
+    rs = toList (blameList r)
+    entries = ls ++ rs
+    shift = length ls
+    decisive = case decider of
+      LeftDecides  -> decisiveIndices l
+      RightDecides -> map (+ shift) (decisiveIndices r)
+      BothDecide   -> decisiveIndices l ++ map (+ shift) (decisiveIndices r)
+    rebuild = reanchor (representative entries decisive) decisive entries
+
+-- | Several breaches' blames, concatenated in order, combined as a @RAND@: the
+-- barrier's verdict over the members that failed (SEESAW, spec §6.1.2).
+combineAll :: NonEmpty (Blame a) -> Blame a
+combineAll (b :| bs) = foldl' (\ acc x -> snd (combineBlame ValRAnd acc x)) b bs
+
+-- | The decisive entry a breach prints and serialises as its anchor: a missed
+-- deadline before a declared breach, then the earliest observed, then the
+-- first in order. Only a tie on all three falls to position, and the entries
+-- it then chooses between took effect at one instant and came to light at
+-- one instant.
+representative :: [Failure a] -> [Int] -> Int
+representative entries decisive = case sortOn key [ (i, f) | (i, f) <- zip [0 ..] entries, i `elem` decisive ] of
+  ((i, _) : _) -> i
+  []           -> 0
+  where
+    -- kind, then whether it has a time at all (an untimed one last), then
+    -- when it was observed, then position
+    key (i, f) = case f of
+      MissedDeadline _ _ _ t -> (0 :: Int, 0 :: Int, t.observed, i)
+      DeclaredBreach _ _ mt  -> (1, maybe 1 (const 0) mt, maybe 0 (.observed) mt, i)
+
+-- | The entries as a blame anchored at position @i@ (the first entry, should
+-- @i@ be out of range), with the other decisive positions recorded beside it.
+reanchor :: Int -> [Int] -> [Failure a] -> Blame a
+reanchor i decisive entries = case splitAt i entries of
+  (pre, f : post) -> Blame pre f post others
+  _ -> case entries of
+    f : post -> Blame [] f post (filter (/= 0) (nubOrd (sort decisive)))
+    []       -> error "reanchor: a blame names at least one failure"
+  where
+    others = filter (/= i) (nubOrd (sort decisive))
 
 data NullaryBuiltinFun
   = NullaryTodaySerial

@@ -39,6 +39,23 @@
 --       @{"type":"deadline_missed","party","action","deadline"}@ or
 --       @{"type":"explicit_breach","party","reason"}@ (@null@ where absent).
 --     - @anchor@: the index into @failures@ of the anchoring failure.
+--
+-- * When the breach happened (SEESAW, EVERY-EACH-QUANTIFIER-SPEC §6.1.2,
+--   built 2026-10-09), additive again:
+--
+--     - each failure object gains @effective@ (when it took effect: a missed
+--       deadline, never earlier than the obligation's own arming; a
+--       violating act's stamp; a declared breach's hand-off clock) and
+--       @observed@ (the stamp of the event that revealed it), both absent
+--       for a declared breach evaluated outside any run;
+--     - the breach gains the compound's @effective@ instant (the earliest of
+--       its operands' for @RAND@ and a barrier, the latest for @ROR@, worked
+--       out along the operand tree), its @observed@ instant (the earliest
+--       observation among the decisive failures), and @decisive@: the
+--       indices into @failures@ of the failures that fix the effective
+--       instant, in ascending order, the anchor's included. Several are
+--       decisive when they took effect at one instant; which operand was
+--       written first decides none of this.
 module L4.Evaluate.ValueLazyJSON () where
 
 import Base
@@ -108,17 +125,24 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValBreached reason)     = object ["breached" .= toJSON reason]
 
 instance ToJSON a => ToJSON (Failure a) where
-  toJSON (MissedDeadline party action deadline) = object
+  toJSON (MissedDeadline party action deadline t) = object $
     [ "type" .= ("deadline_missed" :: Text)
     , "party" .= party
     , "action" .= prettyLayout action
     , "deadline" .= (fromRational deadline :: Double)
-    ]
-  toJSON (DeclaredBreach mParty mReason) = object
+    ] <> timingFields t
+  toJSON (DeclaredBreach mParty mReason mt) = object $
     [ "type" .= ("explicit_breach" :: Text)
     , "party" .= mParty
     , "reason" .= mReason
-    ]
+    ] <> foldMap timingFields mt
+
+-- | A failure's two instants (SEESAW): see the module header.
+timingFields :: Timing a -> [Aeson.Types.Pair]
+timingFields t =
+  [ "effective" .= (fromRational t.effective :: Double)
+  , "observed" .= (fromRational t.observed :: Double)
+  ]
 
 instance ToJSON a => ToJSON (ReasonForBreach a) where
   -- Field labels follow the constructor:
@@ -133,14 +157,14 @@ instance ToJSON a => ToJSON (ReasonForBreach a) where
     , "timestamp" .= (fromRational stamp :: Double)
     ]
     <> case blame.anchor of
-      MissedDeadline party action deadline ->
+      MissedDeadline party action deadline _ ->
         [ "obligatedParty" .= party
         , "obligationAction" .= prettyLayout action
         , "deadline" .= (fromRational deadline :: Double)
         ]
       -- unreachable by construction (a DeadlineMissed is anchored at a
       -- missed deadline); still a well-formed object rather than a crash
-      DeclaredBreach mParty mReason ->
+      DeclaredBreach mParty mReason _ ->
         [ "obligatedParty" .= mParty
         , "reason" .= mReason
         ]
@@ -148,12 +172,12 @@ instance ToJSON a => ToJSON (ReasonForBreach a) where
   toJSON (ExplicitBreach blame) = object $
     [ "type" .= ("explicit_breach" :: Text) ]
     <> case blame.anchor of
-      DeclaredBreach mParty mReason ->
+      DeclaredBreach mParty mReason _ ->
         [ "party" .= mParty
         , "reason" .= mReason
         ]
       -- unreachable by construction, as above
-      MissedDeadline party action deadline ->
+      MissedDeadline party action deadline _ ->
         [ "party" .= party
         , "obligationAction" .= prettyLayout action
         , "deadline" .= (fromRational deadline :: Double)
@@ -167,4 +191,7 @@ blameFields partiesKey blame =
   [ partiesKey .= blameParties blame
   , "failures" .= NE.toList (blameList blame)
   , "anchor" .= anchorIndex blame
+  , "decisive" .= decisiveIndices blame
   ]
+  <> maybe [] (\ e -> [ "effective" .= (fromRational e :: Double) ]) (breachEffective blame)
+  <> maybe [] (\ o -> [ "observed" .= (fromRational o :: Double) ]) (breachObserved blame)

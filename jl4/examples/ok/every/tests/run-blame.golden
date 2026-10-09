@@ -15,6 +15,12 @@ run-blame.l4:49:1-51:20:
       MUST Sign t
     before their deadline, which was at
       14
+    and at the same instant
+      Tenant OF "Carol"
+        who had to do obligatory action
+          MUST Sign t
+        before their deadline, which was at
+          14
     and the breach names, in order
       Tenant OF "Bob"
         who had to do obligatory action
@@ -40,6 +46,12 @@ run-blame.l4:63:1-65:20:
       MUST Sign t
     before their deadline, which was at
       14
+    and at the same instant
+      Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign t
+        before their deadline, which was at
+          14
     and the breach names, in order
       Tenant OF "Carol"
         who had to do obligatory action
@@ -125,6 +137,12 @@ run-blame.l4:120:1-121:20:
       MUST Sign alice
     before their deadline, which was at
       14
+    and at the same instant
+      Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign bob
+        before their deadline, which was at
+          14
     and the breach names, in order
       Tenant OF "Alice"
         who had to do obligatory action
@@ -164,6 +182,12 @@ run-blame.l4:133:1-134:20:
       MUST Sign alice
     before their deadline, which was at
       14
+    and at the same instant
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Refund alice
+        before their deadline, which was at
+          14
     and the breach names, in order
       Tenant OF "Alice"
         who had to do obligatory action

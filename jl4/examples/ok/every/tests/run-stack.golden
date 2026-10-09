@@ -243,28 +243,28 @@ run-stack.l4:298:1-301:50:
       MUST Refund theLandlord
     before their deadline, which was at
       19
-run-stack.l4:314:27-32:
+run-stack.l4:315:27-32:
   I found a problem while checking the definition of `both anchored`:
     In this action, `alice` refers to
     
       alice (at run-stack.l4:42:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:315:44-55:
+run-stack.l4:316:44-55:
   I found a problem while checking the definition of `both anchored`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:316:38-41:
+run-stack.l4:317:38-41:
   I found a problem while checking the definition of `both anchored`:
     In this action, `bob` refers to
     
       bob (at run-stack.l4:43:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:319:1-321:20:
+run-stack.l4:320:1-322:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -273,11 +273,11 @@ run-stack.l4:319:1-321:20:
     at
       20
     surpassed the deadline of party
-      Landlord OF "Ms Ng"
+      Tenant OF "Bob"
     who had to do obligatory action
-      MUST Deliver theLandlord
+      MUST Sign bob
     before their deadline, which was at
-      15
+      7
     and the breach names, in order
       Landlord OF "Ms Ng"
         who had to do obligatory action
