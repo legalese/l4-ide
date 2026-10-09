@@ -1378,7 +1378,10 @@ clausesSrcAnno (c : _) = fixAnnoSrcRange (mkHoleAnnoFor (pmBody c))
 -- source range (see 'clausesSrcAnno').
 bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
 bindFallthrough mark ftName ftAnno ftExpr body =
-  LetIn emptyAnno
+  -- The LET carries the binding's mark too, so that the checker, which cannot
+  -- give a node with no range a type (and this one has none, see
+  -- 'clausesSrcAnno'), still records the group's result type on it.
+  LetIn (setPmSynthetic mark emptyAnno)
     [ LocalDecide emptyAnno
         (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
     ]
