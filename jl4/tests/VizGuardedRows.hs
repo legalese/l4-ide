@@ -195,6 +195,23 @@ branchNumeric =
 -- spec
 ------------------------------------------------------------------------
 
+-- | A BOOLEAN rule as several DECIDE clauses (the desugarer's LET plus CONSIDER).
+clauseGroup :: Text
+clauseGroup =
+  "DECLARE Colour IS ONE OF Red, Green, Blue\n\
+  \GIVEN c IS A Colour\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant Red IS TRUE\n\
+  \DECIDE compliant Green IS FALSE\n\
+  \DECIDE compliant Blue IS FALSE\n"
+
+-- | The same as ONE clause: just the desugarer's CONSIDER.
+clauseGroupOfOne :: Text
+clauseGroupOfOne =
+  "GIVEN b IS A MAYBE BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant (JUST b) IS b\n"
+
 spec :: Spec
 spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)" $ do
   -- The whole chain collapses to the guard itself. Note simplify=False: this is our
@@ -296,6 +313,18 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
   -- raw L4 expression. Pin that it does not eat the chain on the way past.
   it "survives simplify=True" $
     atomsOf (vizBody True ifTrueFalse) `shouldBe` ["c"]
+
+  -- A BOOLEAN rule written as DECIDE clauses is compiled to a CONSIDER (and a
+  -- LET for the clauses not yet tried) that have no source range, and the
+  -- checker used to record a result type only on a node that has one. The
+  -- DECIDE's body then had no type, and 'hasBooleanType' refused the rule as
+  -- "not a boolean".
+  describe "a BOOLEAN rule written as DECIDE clauses" $ do
+    it "is visualised: a group of several clauses" $
+      countLeaves (vizBody False clauseGroup) `shouldSatisfy` (> 0)
+
+    it "is visualised: a group of one clause" $
+      countLeaves (vizBody False clauseGroupOfOne) `shouldSatisfy` (> 0)
 
 ------------------------------------------------------------------------
 -- helpers

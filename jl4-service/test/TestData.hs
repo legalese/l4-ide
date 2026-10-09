@@ -33,6 +33,8 @@ module TestData (
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
+  clauseGroupBooleanJL4,
+  clauseGroupSingleJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -1127,4 +1129,34 @@ GIVEN p IS A BOOLEAN
       q IS A BOOLEAN
 GIVETH A BOOLEAN
 gate MEANS p AND q
+|]
+
+-- | A BOOLEAN rule written as a multi-clause DECIDE group.
+--
+-- The desugarer compiles the clauses to a CONSIDER (and a LET for the clauses
+-- not yet tried) that carry no source range, and the checker used to record a
+-- result type only on a node that has one. 'L4.Viz.Ladder.hasBooleanType' read
+-- no type off the body, so @\/query-plan@ and @\/ladder@ answered 400 for a
+-- rule that is plainly boolean.
+clauseGroupBooleanJL4 :: Text
+clauseGroupBooleanJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE warm Red IS TRUE
+DECIDE warm Green IS FALSE
+DECIDE warm Blue IS FALSE
+|]
+
+-- | The same, as a group of ONE clause: no LET, just the generated CONSIDER.
+clauseGroupSingleJL4 :: Text
+clauseGroupSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN b IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE single (JUST b) IS b
 |]

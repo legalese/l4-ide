@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupBooleanJL4, clauseGroupSingleJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1736,6 +1736,24 @@ spec = describe "integration" do
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 200
         lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
+
+    it "answers query-plan and ladder for a BOOLEAN rule written as a clause group" do
+      withServiceFromSources "qp-clauses" [("warm.l4", clauseGroupBooleanJL4)] \baseUrl mgr -> do
+        resp <- queryPlan' baseUrl mgr "qp-clauses" "warm"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        statusCode' resp `shouldBe` 200
+        lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
+        ldResp <- getLadder baseUrl mgr "qp-clauses" "warm"
+        statusCode' ldResp `shouldBe` 200
+
+    it "answers query-plan and ladder for a clause group of one clause" do
+      withServiceFromSources "qp-clause-one" [("single.l4", clauseGroupSingleJL4)] \baseUrl mgr -> do
+        resp <- queryPlan' baseUrl mgr "qp-clause-one" "single"
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        statusCode' resp `shouldBe` 200
+        lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
+        ldResp <- getLadder baseUrl mgr "qp-clause-one" "single"
+        statusCode' ldResp `shouldBe` 200
 
     it "and evaluation still works across that restart" do
       -- The control. /evaluation needs no type annotations, so it kept working
