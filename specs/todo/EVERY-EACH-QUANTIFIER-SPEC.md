@@ -34,8 +34,10 @@
 >   — There is now a filter and a barrier/fork runtime (§11.0.1); it is not shaped like §4.1's
 >   `BarrierObligation`, and §11.1's `BarrierRuntime` record is still a design sketch, not a type in
 >   the tree.
-> - **Rulings so far:** the EVERY bench — nineteen cards marked 2026-09-21, eighteen settled and B3
->   reopened (§2.6); R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
+> - **Rulings so far:** **SEESAW, when a compound breach happened and which failures decided it —
+>   RULED 2026-10-09 and BUILT on `lang/seesaw`, with §2.6's A2 and A3 (§6.1.2, witness
+>   `jl4/examples/ok/breach-clocks.l4`)**; the EVERY bench — nineteen cards marked 2026-09-21,
+>   eighteen settled then and B3 settled by SEESAW (§2.6); R-T1–R-T6 (§2.2.7.8, 2026-09-06); the pattern spelling (§2.4, 2026-09-07);
 >   **R-Q1–R-Q7 (§2.5, 2026-09-07)**; **R-Q7A–R-Q7C, the anchor's spelling (§5.1.1, 2026-09-07;
 >   BUILT 2026-09-15 on `every/anchors`, witness `jl4/examples/ok/every/run-anchors.l4`; the
 >   mechanism and the build decisions are recorded under §5.1.1 and §11.0.1)**; **§5.2's `LEST`
@@ -1409,7 +1411,8 @@ branch was in the merge queue at the time):
 one spelling were put to Meng as a bench of **nineteen** cards (artifact "EVERY Rulings Bench",
 2026-09-19). He marked all nineteen on 2026-09-21. Four marks asked for worked L4 before
 committing (B3, B4, B5, W); those were run on a post-wave, post-#403 binary and answered on
-2026-09-21 and 2026-09-22 — B4, B5 and W were then confirmed, and B3 was **reopened** (below). The
+2026-09-21 and 2026-09-22 — B4, B5 and W were then confirmed, and B3 was **reopened**, then settled
+on 2026-10-09 by SEESAW (below). The
 anchor-slot cards' evidence is the dossier `EVERY-EACH-ANCHOR-SLOT-BENCH-2026-09-15.md`, beside
 this file.
 
@@ -1417,27 +1420,27 @@ this file.
 **ratified**; a ruling that changes the tree is **ruled, not built**, and names what would make it
 true. Nothing below describes a planned state as present.
 
-| card | the question                                                                                         | ruling (2026-09-21)                                                                                                                                                                                                 | tree                                                                                                                                                                                   | detail             |
-| ---- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| A1   | the stalled-chain bound — 1,000 hand-offs in a row that fail to advance the deadline, then a refusal | keep 1,000, hard-coded                                                                                                                                                                                              | **ratified**                                                                                                                                                                           | §5.2.1             |
-| A2   | a `LEST` clock earlier than the failed obligation's own arming                                       | apply the floor: the clock is `max(missed deadline, the failed obligation's arming)`; the barrier path's sentinel anchor takes the same floor                                                                       | **ruled, not built**: `clockAt` and `barrierFail`, `README.md`'s anchored-deadline paragraph, a witness in `run-lest.l4`                                                               | §5.2.1             |
-| A3   | a kept `SHANT`'s `HENCE` clock, and `THE JOIN` under it (= anchor-slot card B8)                      | move to the window's end: a kept `SHANT` (and a lapsed `MAY` routed to `HENCE`) achieves at its deadline; under `LEST` a `SHANT`'s `THE JOIN` is the violating stamp; `MUST`/`DO`/`MAY` under `LEST` keep refusal 2 | **ruled, not built**: `run-anchors.golden` `kept, the join` 33 → 13, `Barrier2`'s `tLast`, `README.md`, `Syntax.hs`; the unanchored `SHANT`-`HENCE` clock's blast radius is unmeasured | §5.2.1, §5.1.1.1   |
-| A4   | both `WITHIN`s written and a member never acts: the act layer (19) or the state layer (15)?          | the earliest deadline missed on EITHER layer — 15 in the witness, and a looser act `WITHIN` can no longer delay the reparation                                                                                      | **ruled, not built**: compare the state deadline at each member expiry; `run-lest.l4` gains the probe; lts-diagrams-2's `JoinFailed` clock for that shape moves                        | §5.2.1             |
-| A5   | an empty cast under an anchored `ONCE`-line deadline already past at the arming                      | keep: it takes the join path and routes to `LEST`                                                                                                                                                                   | **ratified**                                                                                                                                                                           | §5.1.1.1           |
-| A6   | notes are one per distinct sentence per directive — should the note carry a count?                   | keep: the fact, not the count                                                                                                                                                                                       | **ratified**                                                                                                                                                                           | §5.1.2.0           |
-| A7   | the decision service does not carry notes                                                            | add an optional `notes: [string]` to `ResponseWithReason`                                                                                                                                                           | **ruled, not built**: the field, the swagger, the generated TypeScript client, one service golden                                                                                      | §5.1.2.0           |
-| A8   | a negative `AFTER` offset is accepted silently                                                       | refuse a literal negative offset at check time, on both edges; report a computed negative one as a run-time note                                                                                                    | **ruled, not built**: one checker rule, one `not-ok` fixture, one note                                                                                                                 | §5.1.2.0           |
-| A9   | a `RECORD` inside a `LEST` continuation is stamped with the root evaluation clock                    | keep: `at=` is transaction time; contract time, if wanted, is a value the rule records                                                                                                                              | **ratified**                                                                                                                                                                           | §5.2.1             |
-| B    | may an empty cast be silent? (a barrier over nobody creates a duty on a vacuous join)                | a run-time note through the notes channel, for the barrier; the fork stays silent                                                                                                                                   | **ruled, not built**: one note at `barrierJoined`'s empty-cast branch; the three `nobody` witnesses gain a `NOTE` line. §10.3's static warning is NOT what was ruled                   | §10.3              |
-| B1   | are `THE JOIN`/`THE DEADLINE`/`THE ARMING` values, or syntax reachable only after `OF`?              | values, lexically scoped; a continuation handed on as a value is re-anchored at hand-off (built) and receives outer points by argument; refusals 1, 3 and 4 of §5.1.1.1 ratified                                    | **ruled, not built** (large): a `Lifecycle` expression constructor; `Anchor` collapses to `Maybe Expr`; `THE ARMING` bound only where absent                                           | §5.1.3, dossier B1 |
-| B3   | measuring a deadline from ANOTHER rule's point: ledger idiom, by-name syntax, or neither now?        | marked (c), neither now — then **REOPENED 2026-09-22** (below)                                                                                                                                                      | **open**                                                                                                                                                                               | below              |
-| B4   | when is the `OF` expression evaluated, and what if it has no value?                                  | freeze for binders and every anchor B3 leaves in scope; `MAYBE` in the slot stays refused; the language supplies no default; "pending" recorded as the general slot's semantics                                     | **ratified** for the freeze and refusal 5; **sequenced behind B1**, see below                                                                                                          | §5.1.3, dossier B4 |
-| B5   | when a referenced rule fires more than once, which occurrence does a reference denote?               | per instance for binders (built); a look-up carries a mandatory selector, scoped to occurrences at or after the referring obligation's arming                                                                       | **ratified** for binders — witness `ok/every/run-anchor-instances.l4`; the look-up half has no channel to apply to until B3 is settled                                                 | dossier B5         |
-| B6   | the day-counting convention, and whether the calendar is the library's                               | the language states s 50(a)'s rule for both edges; months, business days and holidays are the library's; a day sort is T1's                                                                                         | **ratified** and documented (`doc/reference/regulative/README.md`, "Counting days", measured: `WITHIN 14 OF 10` is due on day 24)                                                      | dossier B6         |
-| B7   | does W3's decline of `THE OPENING` stand, and on what reason?                                        | the mark stands; the reason is retracted; the measurement is amended                                                                                                                                                | **recorded** in §5.1.3                                                                                                                                                                 | §5.1.3             |
-| B9   | a barrier's `THE DEADLINE` with no `ONCE`-line `WITHIN`; what an empty cast binds                    | ratify: the latest member act deadline, as a running maximum; an empty cast joined at its arming. Meng: _"Documentation needs to be updated to teach and explain this."_                                            | **ratified**; taught in `doc/reference/regulative/EVERY.md` (a table and the reason)                                                                                                   | §5.1.1.1           |
-| W    | `WHOSE`                                                                                              | the positional form, now; the opened-field surface backlogged                                                                                                                                                       | **built**                                                                                                                                                                              | §13.6.1, §13.6.2   |
-| S    | `LEST BREACH BY EVERY t`                                                                             | **deferred** — until a fork's `LEST` wants "everyone who failed" as a value. Meng: _"i am thinking about a user persona who doesn't know the default."_                                                             | nothing to build                                                                                                                                                                       | §2.2.7.5 point 4   |
+| card | the question                                                                                         | ruling (2026-09-21)                                                                                                                                                                                                                                               | tree                                                                                                                                                                                                                                      | detail             |
+| ---- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| A1   | the stalled-chain bound — 1,000 hand-offs in a row that fail to advance the deadline, then a refusal | keep 1,000, hard-coded                                                                                                                                                                                                                                            | **ratified**                                                                                                                                                                                                                              | §5.2.1             |
+| A2   | a `LEST` clock earlier than the failed obligation's own arming                                       | apply the floor: the clock is `max(missed deadline, the failed obligation's arming)`; the barrier path's sentinel anchor takes the same floor                                                                                                                     | **built** 2026-10-09 with SEESAW (§6.1.2): `clockAt`'s successor `clockR` in `Machine.hs`; the barrier sentinel inherits it; and a run-time note whenever the floor engages (Meng, with SEESAW); witness `breach-clocks.l4` §4            | §5.2.1             |
+| A3   | a kept `SHANT`'s `HENCE` clock, and `THE JOIN` under it (= anchor-slot card B8)                      | move to the window's end: a kept `SHANT` (and a lapsed `MAY` routed to `HENCE`) achieves at its deadline; under `LEST` a `SHANT`'s `THE JOIN` is the violating stamp; `MUST`/`DO`/`MAY` under `LEST` keep refusal 2                                               | **built** 2026-10-09 with SEESAW (§6.1.2): the kept `SHANT`'s `HENCE` clock and `THE JOIN` are its window's end; `THE JOIN` under a `SHANT`'s `LEST` is the violating act, and the checker admits it there; witness `breach-clocks.l4` §5 | §5.2.1, §5.1.1.1   |
+| A4   | both `WITHIN`s written and a member never acts: the act layer (19) or the state layer (15)?          | the earliest deadline missed on EITHER layer — 15 in the witness, and a looser act `WITHIN` can no longer delay the reparation                                                                                                                                    | **ruled, not built**: compare the state deadline at each member expiry; `run-lest.l4` gains the probe; lts-diagrams-2's `JoinFailed` clock for that shape moves                                                                           | §5.2.1             |
+| A5   | an empty cast under an anchored `ONCE`-line deadline already past at the arming                      | keep: it takes the join path and routes to `LEST`                                                                                                                                                                                                                 | **ratified**                                                                                                                                                                                                                              | §5.1.1.1           |
+| A6   | notes are one per distinct sentence per directive — should the note carry a count?                   | keep: the fact, not the count                                                                                                                                                                                                                                     | **ratified**                                                                                                                                                                                                                              | §5.1.2.0           |
+| A7   | the decision service does not carry notes                                                            | add an optional `notes: [string]` to `ResponseWithReason`                                                                                                                                                                                                         | **ruled, not built**: the field, the swagger, the generated TypeScript client, one service golden                                                                                                                                         | §5.1.2.0           |
+| A8   | a negative `AFTER` offset is accepted silently                                                       | refuse a literal negative offset at check time, on both edges; report a computed negative one as a run-time note                                                                                                                                                  | **ruled, not built**: one checker rule, one `not-ok` fixture, one note                                                                                                                                                                    | §5.1.2.0           |
+| A9   | a `RECORD` inside a `LEST` continuation is stamped with the root evaluation clock                    | keep: `at=` is transaction time; contract time, if wanted, is a value the rule records                                                                                                                                                                            | **ratified**                                                                                                                                                                                                                              | §5.2.1             |
+| B    | may an empty cast be silent? (a barrier over nobody creates a duty on a vacuous join)                | a run-time note through the notes channel, for the barrier; the fork stays silent                                                                                                                                                                                 | **ruled, not built**: one note at `barrierJoined`'s empty-cast branch; the three `nobody` witnesses gain a `NOTE` line. §10.3's static warning is NOT what was ruled                                                                      | §10.3              |
+| B1   | are `THE JOIN`/`THE DEADLINE`/`THE ARMING` values, or syntax reachable only after `OF`?              | values, lexically scoped; a continuation handed on as a value is re-anchored at hand-off (built) and receives outer points by argument; refusals 1, 3 and 4 of §5.1.1.1 ratified                                                                                  | **ruled, not built** (large): a `Lifecycle` expression constructor; `Anchor` collapses to `Maybe Expr`; `THE ARMING` bound only where absent                                                                                              | §5.1.3, dossier B1 |
+| B3   | measuring a deadline from ANOTHER rule's point: ledger idiom, by-name syntax, or neither now?        | **SEESAW, RULED 2026-10-09**: a compound is breached at its operands' EFFECTIVE instants, combined along the operand tree (earliest for `RAND`, latest for `ROR`), and the failures that fix that instant are its decisive entries — no tie is broken by position | **built** 2026-10-09 (§6.1.2); B3's own question — measuring from another rule's point — stays (c), neither now                                                                                                                           | below              |
+| B4   | when is the `OF` expression evaluated, and what if it has no value?                                  | freeze for binders and every anchor B3 leaves in scope; `MAYBE` in the slot stays refused; the language supplies no default; "pending" recorded as the general slot's semantics                                                                                   | **ratified** for the freeze and refusal 5; **sequenced behind B1**, see below                                                                                                                                                             | §5.1.3, dossier B4 |
+| B5   | when a referenced rule fires more than once, which occurrence does a reference denote?               | per instance for binders (built); a look-up carries a mandatory selector, scoped to occurrences at or after the referring obligation's arming                                                                                                                     | **ratified** for binders — witness `ok/every/run-anchor-instances.l4`; the look-up half has no channel to apply to until B3 is settled                                                                                                    | dossier B5         |
+| B6   | the day-counting convention, and whether the calendar is the library's                               | the language states s 50(a)'s rule for both edges; months, business days and holidays are the library's; a day sort is T1's                                                                                                                                       | **ratified** and documented (`doc/reference/regulative/README.md`, "Counting days", measured: `WITHIN 14 OF 10` is due on day 24)                                                                                                         | dossier B6         |
+| B7   | does W3's decline of `THE OPENING` stand, and on what reason?                                        | the mark stands; the reason is retracted; the measurement is amended                                                                                                                                                                                              | **recorded** in §5.1.3                                                                                                                                                                                                                    | §5.1.3             |
+| B9   | a barrier's `THE DEADLINE` with no `ONCE`-line `WITHIN`; what an empty cast binds                    | ratify: the latest member act deadline, as a running maximum; an empty cast joined at its arming. Meng: _"Documentation needs to be updated to teach and explain this."_                                                                                          | **ratified**; taught in `doc/reference/regulative/EVERY.md` (a table and the reason)                                                                                                                                                      | §5.1.1.1           |
+| W    | `WHOSE`                                                                                              | the positional form, now; the opened-field surface backlogged                                                                                                                                                                                                     | **built**                                                                                                                                                                                                                                 | §13.6.1, §13.6.2   |
+| S    | `LEST BREACH BY EVERY t`                                                                             | **deferred** — until a fork's `LEST` wants "everyone who failed" as a value. Meng: _"i am thinking about a user persona who doesn't know the default."_                                                                                                           | nothing to build                                                                                                                                                                                                                          | §2.2.7.5 point 4   |
 
 **B4 depends on B1, measured.** B4 rules that the drafter, not the language, writes the default for
 an anchor that may have no value. The natural default is the arming — and on 2026-09-21
@@ -1449,22 +1452,13 @@ an ordinary expression (`fromMaybe 0 (RECALL …)`, where `0` is the epoch, not 
 B4 recorded now, and the anchor-slot doc page waits for B1 rather than teach the literal-`0`
 workaround.
 
-**B3 reopened: `RAND` and `ROR` are not commutative in their anchor.** Meng, 2026-09-21: _"the
-RAND and ROR operators ought to be commutative, don't you think?"_ Measured the same day, with two
-independent obligations and nobody acting: when one event reveals both misses, `a RAND b` reports
-deadline 5 and `b RAND a` reports 9 — a stamp tie falls to the left operand (§6.1.1). With distinct
-revealing stamps both orders agree, and the blame LIST's order is the drafter's by the ruling of
-2026-09-15. The consumers of the anchor rather than the list are the printed headline, the deontic
-step log's `bsDeadline`/`bsBlame`, and `failureTime` (`Machine.hs`, barrier failure ordering); no
-trace was built that reaches the last with a tied compound, so the demonstrated harm is in what is
-reported, not in a verdict. The ledger half of B3's hazard is not live in the corpus (no file
-combines a ledger write, a `RECALL` and a compound). Meng then asked (2026-09-22) whether a tie
-needs breaking at all now that blame is a list; the answer proposed is that it does not — take the
-compound's clock from the WHOLE list (the earliest missed deadline for `RAND`, the latest for
-`ROR`), which is commutative by construction and leaves the anchor only its printing job. **Not
-ruled.** It needs a rule for the compound's constructor too, which `rebase` takes from the anchor
-today. B3's own answer — no cross-rule channel until reads can be ordered by the trace — is
-unchanged by this and is recorded as reopened only because the question it raised is open.
+**B3 settled by SEESAW.** Meng, 2026-09-21: _"the RAND and ROR operators ought to be commutative,
+don't you think?"_; 2026-09-22: _"do we need to break a tie? i thought we switched blame from
+singular to NonEmtpy List"_; 2026-10-09, firing SEESAW: _"re N3, surely we should warn/error
+loudly about the impossible to satisfy obligation"_. The ruling and its build are §6.1.2. B3's own
+question — a deadline measured from another rule's point — keeps its mark (c), neither now: no
+cross-rule channel until reads can be ordered by the trace (§6.1.2's last paragraph says why that
+ordering is still not available).
 
 ## 3. Semantics Overview
 
@@ -1948,16 +1942,11 @@ MIDDLE obligation's arming, not the outermost rule's (witness: `of the arming`, 
 down, which is where the phrase is written, and the doc page now says so; whether a deeper
 continuation should be able to reach the outermost arming is open, and would need a way to name a
 non-nearest obligation (R-Q7B's note; §5.1.3's direction). For a kept `SHANT` the join is the
-event that revealed the deadline had passed — the hand-off clock, `Machine.hs` `reofferResolve` —
-not the deadline itself, so `OF THE JOIN` there is today's unanchored clock said out loud and `OF
-THE DEADLINE` is the way to count from the discharge (witness: `kept, the join`, 30 + 3 = 33;
-`kept, the deadline`, 10 + 3 = 13; the doc page states it). Binding `join` to the deadline on that
-path instead was not done: it would part `OF THE JOIN` from the unanchored default. §5.2's track
-(BUILT 2026-09-16, §5.2.1) moved the unanchored default under `LEST` — for the single-party path
-and the barrier together, through one reference — and left this `HENCE` alone, so `OF THE JOIN` and
-the unanchored clock still coincide here; whether both should move to the deadline is recorded in
-§5.2.1 as open to Meng's ruling — RULED 2026-09-21 (§2.6, A3): for a kept `SHANT` both move to the
-window's end. Not built.
+window's end, and so is the unanchored clock of its `HENCE`: RULED 2026-09-21 (§2.6, A3) and BUILT
+2026-10-09 with SEESAW (§6.1.2), so `OF THE JOIN` and `OF THE DEADLINE` there name one instant
+(witness: `run-anchors.l4` `kept, the join`, 10 + 3 = 13, and `kept, the deadline`, 13), unless the
+prohibition was entered after its own deadline, when the clock is its entry. Under a `SHANT`'s
+`LEST` the join is the violating act, and the checker admits `OF THE JOIN` there.
 
 **Threading, chosen: bindings in the continuation's environment, rebound into its value.** At
 every hand-off the machine builds a `Lifecycle` (`ContractFrame.hs:404`: the join instant under
@@ -3020,16 +3009,12 @@ returns. (The brief's path `doc/reference/ledger` does not exist; the ledger's p
   carries the deadline it missed (`:1764`; `EVERY.md`'s "dated at the event that revealed"). §3.4's
   last paragraph says dating the failure to the deadline would change that stamp and the goldens
   that print it; that is a separate change and no ruling asks for it.
-- **A kept `SHANT`'s `HENCE`.** Its clock and its `THE JOIN` are still the revealing event's stamp
-  (`clockAt True`, `:1723`; §5.1.1.1's "For a kept `SHANT` the join is the event that revealed the
-  deadline had passed"; `README.md`'s kept-prohibition sentence; witness `run-anchors.l4` `kept,
-the join`, 33). §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q7 says a `HENCE`
+- **A kept `SHANT`'s `HENCE`** — moved 2026-10-09 (§2.6 A3, built with SEESAW, §6.1.2): its clock
+  and its `THE JOIN` are the window's end. The rest of this bullet is the record of why it was not
+  moved on 2026-09-16. §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q7 says a `HENCE`
   counts from the join's firing, so a reading under which that `HENCE` should count from the
   window's end (10 + 3 = 13, what `OF THE DEADLINE` gives today) is available; the ruling of §5.2
-  is about `LEST`, and this track did not move a `HENCE`. **RULED 2026-09-21 (§2.6, A3): move it to the window's end.** Not built; recorded here
-  as the next item on this axis. If moved: `run-anchors.golden` `kept, the join` 33 → 13,
-  `README.md`'s sentence, `Syntax.hs`'s `THE JOIN` bullet, and a `SHANT` barrier's join time
-  (`Barrier2`'s `tLast` becomes the window's end).
+  is about `LEST`, and this track did not move a `HENCE`.
 - **The layer a never-completing member fails on, when both `WITHIN`s are written.** With
   `EVERY Tenant t … WITHIN 14 … ONCE ALL HAVE WITHIN 10 … LEST … WITHIN 5` and one tenant who never
   signs, the machine fails the barrier on the ACT layer — Bob's missed 14 — and the reparation is
@@ -3075,12 +3060,10 @@ the join`, 33). §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q
   `BREACHED` at 21 reporting **15**, five days before either of Bob's obligations was entered;
   with `WITHIN 30` the residual at 21 reads `WITHIN 14`. Literal to R-Q5 (t_ref = the deadline)
   and not a wrong answer under it, but a consequence nothing had written down. **RULED 2026-09-21
-  (§2.6, A2): apply the floor.** Not built. The question was whether a `LEST`'s clock should be `max(missed deadline, the failed obligation's
-arming)` when the anchored deadline predates the arming. No code change; `README.md`'s
-  anchored-deadline paragraph now states the literal behaviour and that the question is open. If
-  moved: `clockAt` (`Machine.hs:1723` on round 1) takes `max deadline time'`, no corpus golden
-  moves (no corpus file has an unanchored `LEST` under a past-anchored obligation), and the
-  barrier path's sentinel anchor needs the same floor.
+  (§2.6, A2): apply the floor. BUILT 2026-10-09 with SEESAW (§6.1.2):** the clock is `max(missed
+deadline, the failed obligation's arming)`, the barrier's sentinel inherits it, and the run notes
+  the obligation entered after its own deadline. Here Bob's first obligation fails at 20, when it
+  was entered, and its `LEST` is due at 30.
 
 - Which member a barrier anchors at (the stack settled it); `AFTER`/`BEFORE` (built by the next
   track on 2026-09-16, §5.1.2's build block; under a `LEST` the window counts from this section's
@@ -3215,8 +3198,8 @@ Round 2: four findings raised, none refuted by both checkers, all four applied
 - R2-2 (fresh-attack): a `LEST` under an anchored `WITHIN` already past at arming counts from a
   deadline earlier than the failed obligation's own entry (`WITHIN 5 OF 0` entered at 20, its
   `LEST` with `WITHIN 10` due at 15); literal to R-Q5, written nowhere. Recorded under "What is
-  NOT moved" as open to Meng (the `max(deadline, arming)` floor — ruled 2026-09-21, apply it, §2.6 A2), and stated in `README.md`'s
-  anchored-deadline paragraph. No code change.
+  NOT moved" as open to Meng (the `max(deadline, arming)` floor — ruled 2026-09-21, apply it, §2.6
+  A2; built 2026-10-09, §6.1.2).
 
 ### 5.3 Temporal Forking (MAY Exercise)
 
@@ -3259,6 +3242,9 @@ computeBlame bo tr =
 - Blame: {C}, not {A, B, C}
 
 #### 6.1.1 BUILT 2026-09-15 (R-T3) — on `every/blame-set`; witness `jl4/examples/ok/every/run-blame.l4`
+
+> How a compound picks its anchor, and its constructor, is §6.1.2 since 2026-10-09; what this
+> section says about `rebase` and the operand tie-break is the record of the 2026-09-15 build.
 
 The sketch above is a design record and is left as it was written: `BarrierObligation`,
 `computeBlame` and `Set Party` do not exist in the tree. What the tree has, and what each decision
@@ -3565,6 +3551,71 @@ listed, the no-`LEST` staggered anchor, the un-deduplicated `alice RAND alice` a
 the list-typed party as the LEFT operand of a `RAND` under a `GIVETH`. Round 2 moved
 `run-blame.golden` and `deontic-breach-semantics.golden` once more (the print header) and added
 `not-ok/tc/breach-by-list-needs-party-type.{golden,ep.golden,nlg.golden,schema.golden}`.
+
+#### 6.1.2 RULED and BUILT 2026-10-09 (SEESAW) — when a breach happened, and which failures decided it
+
+**The ruling.** Meng fired SEESAW on 2026-10-09, with one amendment: _"re N3, surely we should warn/error loudly about the impossible to satisfy obligation"_.
+The question was B3's reopening (§2.6): `RAND` and `ROR` were not commutative in what they reported.
+Branch `lang/seesaw`; witness `jl4/examples/ok/breach-clocks.l4`, every case written both ways round.
+
+**What was wrong, measured on `unstable` before the build.**
+A compound took its time and its kind from ONE operand's breach, chosen by the operands' REVEALING stamps; a tie fell to the left operand for `RAND` and the right for `ROR`, and a declared breach (which carried no time) tied with everything.
+So one event that revealed two misses made `a RAND b` report deadline 5 and `b RAND a` report 9; with `(P≤1 ROR Q≤10) RAND R≤5` and one event at 11, one order reported 10 and the other 5; and a missed deadline beside a `LEST BREACH` at the same deadline printed a DEADLINE MISSED headline one way round and `BREACH BY Q … BY P` the other, with the wire's `type` flipping with it.
+A barrier, meanwhile, ordered its members' failures by deadline, so a barrier and the equivalent `RAND` named different anchors for the same two misses.
+
+**The rule.**
+
+1. **Every failure carries two instants** (`Timing`, `ValueLazy.hs`).
+   _Effective_ is when it took effect; _observed_ is the stamp of the event the machine saw it on (NORM-LOG-SPEC N3's two instants, applied to every failure).
+
+   | failure                                                              | effective                                                    | observed                                      |
+   | -------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------- |
+   | a missed `MUST`/`DO`                                                 | max(deadline, the obligation's own arming) — card A2's floor | the revealing event                           |
+   | a violated `SHANT`                                                   | the violating act                                            | the violating act                             |
+   | a declared `BREACH`, reached through a `LEST` of a `MUST`/`DO`/`MAY` | the hand-off clock: max(deadline, arming)                    | the re-offered event that revealed the miss   |
+   | a declared `BREACH`, through a `SHANT`'s `LEST`                      | the violating act                                            | the same                                      |
+   | a declared `BREACH`, through a `HENCE` after an act                  | the act                                                      | the same                                      |
+   | a declared `BREACH`, through a kept `SHANT`'s `HENCE`                | the window's end, floored at the arming — card A3            | the re-offered event                          |
+   | a declared `BREACH`, through a barrier's `HENCE`                     | the last completion, the join (`t_last`)                     | the same                                      |
+   | a declared `BREACH`, through a barrier's `LEST`                      | the failing member's instant, as in the rows above           | the event that revealed that member's failure |
+   | a declared `BREACH` at the top of a run                              | the start of the run                                         | the same                                      |
+   | a barrier's state layer missed with no `LEST`                        | the `ONCE` line's deadline                                   | the late last completion                      |
+
+   A declared breach gets its instants where every contract value meets its `[time, events]` — the `App1` frame — from the clock of the hand-off that reached it, forced, on a fresh value, and only when it has none: a `BREACH` shared by two continuations is one cached thunk reached at two clocks, and each reach keeps its own (the shared-thunk case of NORM-LOG-SPEC N7; witness §7).
+   Its observation is the head of the stream it was handed when that head is a re-offered copy, which is exactly the event that revealed the miss or the discharge; otherwise the clock itself.
+
+2. **A compound is combined along its operand tree** (`combineBlame`): a `RAND` is lost at the EARLIER of its operands' effective instants, an `ROR` at the LATER, and a barrier is a `RAND` over the members that failed (`combineAll`).
+   The entries that fix that instant are the **decisive** ones: the deciding operand's own decisive entries, or both operands' when the instants are equal.
+   This is commutative and associative in everything but the order of the list, which stays the drafter's (the no-dedup ruling of 2026-09-15).
+   Combining the flat list instead is wrong under nesting: `(P≤1 ROR Q≤10) RAND R≤5` would come out at 1, when P's miss lost nothing while Q could still act (the first review's objection, below).
+
+3. **The anchor is one decisive entry, chosen by kind, then time, then position**: a missed deadline before a declared breach, then the earliest observed, then the first in order.
+   The compound is a `DeadlineMissed` unless every decisive entry is a declared breach (`breachOf`), so the kind no longer depends on the operands' order.
+   The other decisive entries are recorded beside the anchor (`alsoDecisive`).
+
+4. **An obligation entered after its own deadline** fails (lapses, is kept) at its entry, not before it existed, and **the run says so in a note** (`armedAfterDeadlineNote`) — Meng's amendment.
+   It cannot be refused when the file is checked, since the deadline is a value the run computes, and an error would stop the trace and leave the drafter's own `LEST` unevaluated; so it runs, and the note names the obligation, its entry, its deadline and, when the `WITHIN` counts `OF THE ARMING` inside a continuation, that cause.
+   `THE DEADLINE` in its continuation is still the deadline as written; only the clock moves.
+
+**What it reports.** `l4 run` prints a single failure exactly as before, and adds two things only where they apply: `and at the same instant` with the other decisive entries, and `but was only entered at, and so failed at` when the floor engaged.
+`l4 batch` adds `effective` and `observed` to each failure object and to the breach, and `decisive`, the ascending positions of the decisive failures in `failures`; nothing is removed (`ValueLazyJSON.hs`'s header).
+The deontic step log reports a breached join's `winner` as the deciding side, `both` on a tie, and `tieBreak` is always false.
+
+**What it does not promise.**
+
+- **Verdicts.** The report is independent of operand order for operands that only make and miss deadlines. It is not when one operand reads what the other records: a compound runs its left operand over the whole trace before the right one starts, so with `a` = `P MUST x WITHIN 5 HENCE RECORD waived` and `b` = `IF RECALL P's waived THEN FULFILLED ELSE Q MUST y WITHIN 3`, P acting at 4, `a RAND b` is `FULFILLED` (b reads at 0 a record written at 4) and `b RAND a` is `BREACHED`; extending such a trace can turn `BREACHED` into `FULFILLED`. That is NORM-LOG-SPEC N10 (trigger word METRONOME, pending in session `ledger`); its option B catches the red-ink case, not this black-ink one, which needs `RECORD` to carry the contract clock beside `at=` (card A9 keeps transaction time today). Two more order effects on black ink, both independent of this ruling, are measured in NORM-LOG-SPEC §7 (draft PR #499): which of two earlier records a `RECALL` sees, and a named helper's `RECALL` re-served from the cache.
+- **An `ROR`'s right operand.** Once the left is fulfilled the right is not run further, so a `RECORD` it would have made is not made, and the ledger depends on the order.
+- **A tie on everything.** When two decisive failures are of one kind and were observed at one instant, the first in order is the anchor, so the first lines of the report name it; the decisive set and the instants are the same either way round.
+- **The decision service.** `jl4-service`'s breach object mirrors the MLIR runtime's byte for byte (`deonticBreachToWire`), so it does not yet carry `effective`, `observed` or `decisive`; adding them is a change to both.
+
+**Ruled, not built: the fulfilment instant.** A fulfilled compound gets a time by the dual rule: a `RAND` is fulfilled at the LATER of its operands' fulfilments, an `ROR` at the EARLIER, a barrier at its last member; a single obligation at its act, a kept `SHANT` or lapsed `MAY` at its window's end.
+`ValFulfilled` is nullary, and giving it a time touches 30 sites in 8 modules (19 in `Machine.hs`) while nothing reads it yet: its first reader is NORM-LOG-SPEC N1's join outcomes. It is built with that reader.
+
+**Assumed, not ruled.** The design reviewed below collapsed `ReasonForBreach` to one constructor. The build keeps the two, and derives which one a breach is from its decisive entries (`breachOf`), which is what the reviewed wire rule says (`type` = `explicit_breach` iff every decisive entry is declared); the printers, the LTS marking and the service needed no new shape. Revert by collapsing them if a reader needs the per-entry kind in the type.
+
+**How it was reviewed.** Two adversarial reviews before the build, each with probes on the `unstable` binary of the day.
+The first (2026-09-28) rejected the proposal as then worded — take the compound's clock from the whole flat list, earliest missed deadline for `RAND`, latest for `ROR` — on three measured counts: wrong under nesting, wrong for an obligation entered after its deadline (`WITHIN 3 OF THE ARMING` under a `HENCE` that fires at 4, where `THE ARMING` is the enclosing obligation's), and the constructor tie survives a time on `BREACH`. It proposed the two instants, the tree, the decisive set.
+The second, a concurrency review (2026-09-29), accepted that algebra on four conditions, all built: card A3 lands with it (an idle `WAIT UNTIL 6` before `WAIT UNTIL 10` flipped a kept `SHANT`'s follow-up from pending to breached), the decisive set is built up the tree, the observed instant comes from the decisive entries, and the clock at `App1` is forced (its own partial build peeked it and got `run-blame.l4` §8 wrong). It measured that the obligation's own arming is reachable where the miss is found (`Machine.hs`, the `armed` field), which settled the first review's open worry.
 
 ### 6.2 Causal Blame Analysis
 
