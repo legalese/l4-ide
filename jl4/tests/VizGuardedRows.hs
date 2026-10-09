@@ -17,7 +17,6 @@ module VizGuardedRows (spec) where
 
 import Base
 import qualified Base.Text as Text
-import qualified Data.List as List
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..))
 import L4.Names (getName)
@@ -261,19 +260,7 @@ clauseGroupByHand =
   \    WHEN Green THEN FALSE\n\
   \    WHEN Blue THEN FALSE\n"
 
--- | The rule with Blue TRUE, by hand and with the later clauses named in a LET.
-clauseGroupByHandTrue :: Text
-clauseGroupByHandTrue =
-  colourDecl <>
-  "GIVEN c IS A Colour\n\
-  \GIVETH A BOOLEAN\n\
-  \DECIDE compliant c IS\n\
-  \  CONSIDER c\n\
-  \    WHEN Red THEN TRUE\n\
-  \    WHEN Green THEN FALSE\n\
-  \    WHEN Blue THEN TRUE\n"
-
-
+-- | A rule the drafter wrote with a LET (the later cases named), not clauses.
 clauseGroupByLet :: Text
 clauseGroupByLet =
   colourDecl <>
@@ -286,6 +273,16 @@ clauseGroupByLet =
   \  IN CONSIDER c\n\
   \       WHEN Red THEN TRUE\n\
   \       OTHERWISE rest\n"
+
+-- | A clause group whose first clause's result is a LET the drafter wrote.
+clauseGroupLetResult :: Text
+clauseGroupLetResult =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant Red b IS LET both BE b AND b IN both\n\
+  \DECIDE compliant c b IS FALSE\n"
 
 clauseGroupTwoInputs :: Text
 clauseGroupTwoInputs =
@@ -454,13 +451,20 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
       -- an opaque atom is a leaf too, so say what the shape is
       atomsOf clauses `shouldBe` ["c EQUALS Red"]
 
-    -- A LET the drafter wrote is read through, so it is no longer one opaque
-    -- leaf; its nesting is the drafter's own, so the shape is not compared.
-    it "reads a LET through: the same questions as the CONSIDER it names" $ do
-      let viaLet = vizBody False clauseGroupByLet
-          byHand = vizBody False clauseGroupByHandTrue
-      List.sort (List.nub (atomsOf viaLet)) `shouldBe` List.sort (List.nub (atomsOf byHand))
-      countLeaves viaLet `shouldSatisfy` (> 1)
+    -- Only the LETs the desugarer generated are read through. A LET the
+    -- drafter wrote is drawn as it was before clauses were read through: one
+    -- leaf, whatever it holds.
+    it "leaves a LET the drafter wrote as written: one atom" $
+      countLeaves (vizBody False clauseGroupByLet) `shouldBe` 1
+
+    -- A clause whose result is a LET: the group around it is still read through,
+    -- and the LET inside the clause is the drafter's, so it stays one leaf.
+    it "reads a clause group through whose clause result is a LET the drafter wrote" $
+      case vizResult False clauseGroupLetResult of
+        Right body -> do
+          atomsOf body `shouldSatisfy` ("c EQUALS Red" `elem`)
+          countLeaves body `shouldSatisfy` (> 1)
+        Left e -> expectationFailure (show e)
 
     it "is the same ladder as its hand-written CONSIDER: two inputs" $ do
       let clauses = vizBody False clauseGroupTwoInputs
@@ -488,31 +492,26 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
     it "says a large clause group returning a number is not boolean, not that it is too large" $
       vizResult False (numberRows 600) `shouldBe` Left Ladder.InvalidDecideMustHaveBoolRetType
 
-    it "draws a LET the drafter wrote that reads through into a ladder over the budget as it was written" $
-      case vizResult False (letRows 600) of
-        Right body -> countLeaves body `shouldBe` 1
-        Left e -> expectationFailure (show e)
-
-    it "reads a LET the drafter wrote through when the ladder is within the budget" $
-      case vizResult False (letRows 20) of
-        Right body -> countLeaves body `shouldSatisfy` (> 1)
-        Left e -> expectationFailure (show e)
+    -- Rows chained through LETs the drafter wrote are not read through, of
+    -- any length: the LET is the one atom it was.
+    it "draws a chain of LETs the drafter wrote as written, one atom, of any size" $
+      for_ [20, 600] \k ->
+        case vizResult False (letRows k) of
+          Right body -> countLeaves body `shouldBe` 1
+          Left e -> expectationFailure (show e)
 
     -- A chain of LETs that each use the one before twice doubles for each LET
     -- when written out, and the ladder is its conjunctive normal form, which
-    -- grows faster still (six LETs did not finish). Read through only while small.
-    it "reads a short chain of doubling LETs through" $
-      countLeaves (vizBody True (letChain 3)) `shouldSatisfy` (> 1)
-
-    it "leaves a long chain of doubling LETs as written, as one atom" $
-      for_ [5, 7, 13] \n ->
+    -- grows faster still (six LETs did not finish). It is never read through.
+    it "draws a chain of doubling LETs the drafter wrote as written, one atom" $
+      for_ [3, 5, 7, 13] \n ->
         countLeaves (vizBody True (letChain n)) `shouldBe` 1
 
     it "does not hold a CONSIDER the drafter wrote to the clause-group budget" $
       vizResult False (considerRows 600) `shouldSatisfy` either (const False) (const True)
 
     it "names nothing the desugarer made up" $
-      for_ [clauseGroup, clauseGroupByLet, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->
+      for_ [clauseGroup, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->
         for_ (atomsOf (vizBody False src)) \label ->
           for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
             (g, g `Text.isInfixOf` label) `shouldBe` (g, False)

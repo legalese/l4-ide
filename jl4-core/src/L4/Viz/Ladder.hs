@@ -49,7 +49,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasLetIn, hasGeneratedClauses, clauseGroupLadderBudget)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget)
 import L4.Desugar
 import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -309,13 +309,13 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
   -- too large to draw, it is not a ladder at all.
   unlessM (hasBooleanType (getAnno body0)) $
     throwError InvalidDecideMustHaveBoolRetType
-  -- A rule written as DECIDE clauses (or with a LET) is drawn as the CONSIDER it stands for.
+  -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
   let isClauseGroup = Transform.hasGeneratedClauses body0
   body <- case Transform.inlineLetsForViz body0 of
     Right inlined -> pure inlined
     -- Too big to read through. Clauses are refused, for a plan of any size
-    -- they would be drawn as one leaf that asks nothing; a LET the drafter
-    -- wrote is drawn as it was before it was read through.
+    -- they would be drawn as one leaf that asks nothing. Anything else is
+    -- drawn as written: a LET the drafter wrote is never read through.
     Left _ | isClauseGroup -> throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
            | otherwise     -> pure body0
 
@@ -332,17 +332,12 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
   assign #typicallyDefaults (collectTypicallyDefaults givenSig mod')
   shouldSimplify <- getShouldSimplify
   vid <- getFresh
-  vizRead <- translateExpr shouldSimplify (carameliseExpr body)
+  vizBody <- translateExpr shouldSimplify (carameliseExpr body)
   -- The ladder of a rule written as clauses can be far larger than the clauses
   -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
-  -- A LET the drafter wrote that reads through into a ladder that large is
-  -- drawn as it was before it was read through.
-  vizBody <-
-    if VizExpr.irExceeds Transform.clauseGroupLadderBudget vizRead
-      then if isClauseGroup
-        then throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
-        else if Transform.hasLetIn body0 then translateExpr shouldSimplify (carameliseExpr body0) else pure vizRead
-      else pure vizRead
+  -- A rule that was not written as clauses is drawn as it always was.
+  when (isClauseGroup && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+    throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
   pure $ MkFunDecl vid funName (paramNamesFromGivens givenSig appArgs) vizBody
   where
     paramNamesFromGivens :: GivenSig Resolved -> [Resolved] -> [VizExpr.Name]

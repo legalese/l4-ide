@@ -36,12 +36,12 @@ module TestData (
   clauseGroupEnumJL4,
   handEnumJL4,
   letEnumJL4,
-  handLetCompareJL4,
   clauseGroupMixedJL4,
   handMixedJL4,
   clauseGroupSingleJL4,
   handSingleJL4,
   clauseGroupNoGivethJL4,
+  clauseGroupLetResultJL4,
   rowsClauseGroupJL4,
   letChainJL4,
   ruleDefaultJL4,
@@ -1178,7 +1178,8 @@ DECIDE rule c IS
     WHEN Blue THEN FALSE
 |]
 
--- | The same rule with the later clauses named in a LET, as a drafter might.
+-- | The same rule with the later clauses named in a LET the drafter wrote (not
+-- clauses, so read as written).
 letEnumJL4 :: Text
 letEnumJL4 =
   [i|
@@ -1255,20 +1256,18 @@ DECIDE rule Green IS FALSE
 DECIDE rule Blue IS FALSE
 |]
 
--- | What 'letEnumJL4' stands for, flat.
-handLetCompareJL4 :: Text
-handLetCompareJL4 =
+-- | A BOOLEAN group whose first clause's result is a LET the drafter wrote.
+clauseGroupLetResultJL4 :: Text
+clauseGroupLetResultJL4 =
   [i|
 DECLARE Colour IS ONE OF Red, Green, Blue
 
-@export Whether a colour is warm
+@export Whether a colour is warm and the flag is set
 GIVEN c IS A Colour
+      b IS A BOOLEAN
 GIVETH A BOOLEAN
-DECIDE rule c IS
-  CONSIDER c
-    WHEN Red THEN TRUE
-    WHEN Green THEN FALSE
-    WHEN Blue THEN TRUE
+DECIDE rule Red b IS LET both BE b AND b IN both
+DECIDE rule c b IS FALSE
 |]
 
 -- | A numeric rule of @k@ clauses, each TRUE or FALSE by turns, then a
