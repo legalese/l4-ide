@@ -1666,31 +1666,8 @@ checkClauseMatrix dec dHead =
           _ -> pure ()
 
     -- | The clauses that count ('clauseVerdict'), with their resolved
-    -- patterns.
-    --
-    -- Two tiers. The first analyses every clause and lists every gap
-    -- exactly: a number or a piece of text is one value of its column, and
-    -- a column of them has no end of other values, so a clause written with
-    -- the input's name is the only one that covers the rest, and the gap it
-    -- leaves renders as that name ('expandToPatterns'). When that list is
-    -- longer than the cap, or the nablas outgrow theirs, the second tier
-    -- re-analyses the clauses WITHOUT a number or text (Maranget's own
-    -- witness for a column whose values cannot all be named): its rows are
-    -- not an exact partition, but each is needed and pasting them completes
-    -- the group. A group of literal clauses alone leaves no row to analyse,
-    -- and then everything is uncovered: one row, every column open. So a
-    -- column of literals with no catch-all always warns. A group with no
-    -- number or text in it has only the first tier.
-    --
-    -- When a clause was left out ('ClauseCoversNothing'), only the second
-    -- tier is reported. The first could list a keyed gap that the clause
-    -- left out covers: with @f 2 "b"@, @f (EXACTLY two) s@ and @f 1 s@ it
-    -- would list @2 s@, and every @(2, s)@ meets the second clause. The
-    -- second tier leaves every number and text position open, and each of
-    -- its rows holds an input that no clause matches: a left-out clause
-    -- matches one value of its position for each value of the others, so
-    -- putting there a value that no clause names and no left-out clause
-    -- matches gives one.
+    -- patterns, analysed in two tiers ('literalTiers'); a column the missing
+    -- values leave open renders as its input's name.
     analyseResolvedRows :: PmMatrix -> EntityInfo -> Bool -> [(PmMatrixClause, [Pattern Resolved])] -> Check (Bool, [Int])
     analyseResolvedRows matrix ei leftOut counted = do
       -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
@@ -1703,16 +1680,9 @@ checkClauseMatrix dec dHead =
           pure (concat gss, rowLeaf cl)
       let ctorSets = constructorsInScopeFromEntityInfo ei
           arity = constructorArity ei
-          -- 'Nothing' when the 'maxUncoveredNablas' cap trips.
-          analyse = \ case
-            -- No clause matches anything: nothing is covered. (Zero rows
-            -- must not reach 'foldr1'.)
-            [] -> Just ([Consistent Set.empty], [])
-            rs ->
-              let tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rs ]
-              in flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
+          spellings = literalSpellings (concatMap snd counted)
           render uncovered =
-            map (map respell) $
+            map (map (respellLiterals spellings)) $
             nubOrdOn (map (fmap getUnique)) $
               concatMap
                 (\ nabla ->
@@ -1723,77 +1693,7 @@ checkClauseMatrix dec dHead =
                      | scrutR <- colScruts
                      ])
                 uncovered
-          -- A key renders with the first spelling the clauses give it, tokens
-          -- and all ('literalAsWritten'): @1.50@ as @1.50@, not @1.5@.
-          spellings =
-            Map.fromListWith (\ _ firstSpelling -> firstSpelling)
-              [ (litKey l, l) | (_, rpats) <- counted, l <- concatMap patLits rpats ]
-          patLits = \ case
-            PatLit _ l          -> [l]
-            PatExpr _ (Lit _ l) -> [l]
-            PatApp _ _ ps       -> concatMap patLits ps
-            PatCons _ p1 p2     -> patLits p1 <> patLits p2
-            PatVar {}           -> []
-            PatExpr {}          -> []
-          respell = \ case
-            PatLit a l      -> PatLit a (Map.findWithDefault l (litKey l) spellings)
-            PatApp a c ps   -> PatApp a c (map respell ps)
-            PatCons a p1 p2 -> PatCons a (respell p1) (respell p2)
-            p               -> p
-          overCap missingRows =
-            length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
-          exact = analyse rows
-          -- Only a group with a number or a piece of text in it, or with a
-          -- clause left out, has a second tier: for any other, it would
-          -- re-run the same rows.
-          coarse = do
-            guard (leftOut || any (any isLitGuard . fst) rows)
-            analyse (filter (not . any isLitGuard . fst) rows)
-          -- The rows to report: the exact ones when they fit, else the
-          -- coarse ones when they fit, else none (fail-open, the same
-          -- contract as 'analyzePatternMatch': no warning is better than a
-          -- wrong one or a hang). The redundant clauses come from the exact
-          -- analysis when it ran, which sees every clause; a clause the
-          -- coarse analysis finds redundant is covered by a subset of the
-          -- clauses above it, so that verdict holds too.
-          fit (uncovered, redundant) =
-            let missingRows = render uncovered
-            in if overCap missingRows then Nothing else Just (pasteOrder missingRows, redundant)
-          -- The rows in the order main's analysis lists them: column by
-          -- column, and through a nested pattern in the order it is written,
-          -- a constructor by its place in its type's declaration, a number
-          -- or a piece of text by the order in which the clauses first name
-          -- it, and the input's name after both (@1 Gold@, @2 Gold@,
-          -- @level Gold@). That is also an order they can be pasted in: where
-          -- two rows first differ, the upper one names a constructor, a
-          -- number or a text, which the lower one names differently or
-          -- leaves open, so no row is covered by a row above it.
-          pasteOrder = List.sortOn (concatMap patRanks)
-          patRanks = \ case
-            PatApp _ c ps   -> ctorRank (getUnique c) : concatMap patRanks ps
-            PatCons _ h t   -> ctorRank consUnique : patRanks h <> patRanks t
-            PatLit _ l      -> [keyRank (litKey l)]
-            PatVar {}       -> [maxBound]
-            PatExpr {}      -> [maxBound]
-          ctorRank u = Map.findWithDefault 0 u ctorIndex
-          -- A constructor's place in its type: the order the constructor
-          -- sets list them, which is the order they were declared in, and
-          -- TRUE before FALSE, as main lists them.
-          ctorIndex =
-            Map.fromList $
-              [ (getUnique c, i) | cs <- Map.elems ctorSets, (i, c) <- zip [0 :: Int ..] cs ]
-                <> [(trueUnique, 0), (falseUnique, 1)]
-          keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
-          keyRank k = fromMaybe (length keyOrder) (List.elemIndex k keyOrder)
-          verdict = case guard (not leftOut) *> exact >>= fit of
-            Just v -> Just v
-            Nothing -> do
-              (missingRows, redundant2) <- coarse >>= fit
-              pure (missingRows, maybe redundant2 snd exact)
-          -- When neither tier's list fits, the missing-clause warning is
-          -- withheld, and the clauses never used are still reported, from
-          -- whichever analysis ran (the exact one when it did).
-          redundantAnyway = maybe [] snd (exact <|> coarse)
+          (verdict, redundantAnyway) = literalTiers ctorSets leftOut render concatMap rows
           -- A redundant leaf is identified by its anno, which is its
           -- clause's head range ('rowLeaf').
           redundantIndices redundant =
@@ -4404,16 +4304,23 @@ data ClauseVerdict
 -- group down.
 clauseVerdict :: EntityInfo -> Map Unique [Resolved] -> [Type' Resolved] -> [Resolved] -> [Pattern Resolved] -> ClauseVerdict
 clauseVerdict ei ctorSets colTypes colScruts pats =
-  maximum (ClauseCounts : zipWith3 top colTypes colScruts pats)
+  maximum (ClauseCounts : zipWith3 (\ colTy scrutR -> columnVerdict ei ctorSets colTy (Just scrutR) (`sameResolved` scrutR)) colTypes colScruts pats)
+
+-- | 'clauseVerdict' for one pattern, matched against an input of the given
+-- type. The input's own name, when it has one, is read at the top as
+-- matching every input; an @EXACTLY@ whose expression mentions a name for
+-- which the predicate holds depends on the input, and stands the analysis
+-- down.
+columnVerdict :: EntityInfo -> Map Unique [Resolved] -> Type' Resolved -> Maybe Resolved -> (Resolved -> Bool) -> Pattern Resolved -> ClauseVerdict
+columnVerdict ei ctorSets colTy mScrutR mentionsInput = \ case
+  PatExpr _ (Var _ r) | Just scrutR <- mScrutR, r `sameResolved` scrutR -> ClauseCounts
+  p -> nested (Just colTy) p
   where
-    top colTy scrutR = \ case
-      PatExpr _ (Var _ r) | r `sameResolved` scrutR -> ClauseCounts
-      p -> nested scrutR (Just colTy) p
-    nested scrutR mty = \ case
+    nested mty = \ case
       PatVar {}           -> ClauseCounts
       PatLit {}           -> ClauseCounts
-      PatApp _ _ ps       -> maximum (ClauseCounts : map (\ p -> nested scrutR (annoType p) p) ps)
-      PatCons _ p1 p2     -> max (nested scrutR (annoType p1) p1) (nested scrutR (annoType p2) p2)
+      PatApp _ _ ps       -> maximum (ClauseCounts : map (\ p -> nested (annoType p) p) ps)
+      PatCons _ p1 p2     -> max (nested (annoType p1) p1) (nested (annoType p2) p2)
       PatExpr _ (Lit {})  -> ClauseCounts
       PatExpr a (Var _ r)
         | Just (_, KnownTerm cty Constructor) <- Map.lookup (getUnique r) ei
@@ -4421,7 +4328,7 @@ clauseVerdict ei ctorSets colTypes colScruts pats =
         , Map.member tyUnique ctorSets
         -> if isJust (view annInfo a) then ClauseCounts else BailGroup
       PatExpr _ e
-        | any (sameResolved scrutR) (toList e) -> BailGroup
+        | any mentionsInput (toList e) -> BailGroup
         | Just ty <- mty, isPrimitiveType (expandSynonyms (8 :: Int) ty) -> ClauseCoversNothing
         | otherwise -> BailGroup
     annoType p = case view annInfo (getAnno p) of
@@ -4433,6 +4340,139 @@ clauseVerdict ei ctorSets colTypes colScruts pats =
         | Just (_, KnownType _ params (Just body)) <- Map.lookup (getUnique r) ei
         -> expandSynonyms (k - 1) (substituteType (Map.fromList (zipWith (\ p t -> (getUnique p, t)) params ts)) body)
       _ -> ty
+
+-- | The missing-case analysis over guard rows that may test numbers and
+-- texts, shared by the clauses of a multi-clause group ('checkClauseMatrix')
+-- and a CONSIDER written by hand ('checkConsider'). The caller says how the
+-- values a tier leaves uncovered render as missing rows, and how a row is
+-- ranked from the ranks of its patterns ('missingPatternRanks').
+--
+-- Two tiers. The first analyses every row and lists every gap exactly: a
+-- number or a piece of text is one value of its position, and a position of
+-- them has no end of other values, so only a row that leaves the position
+-- open covers the rest, and the gap that remains renders as open there
+-- ('expandToPatterns'). When that list is longer than the cap, or the
+-- nablas outgrow theirs, the second tier re-analyses the rows WITHOUT a
+-- number or text (Maranget's own witness for a position whose values cannot
+-- all be named): its rows are not an exact partition, but each is needed and
+-- pasting them completes the match. Rows of literals alone leave no row to
+-- analyse, and then everything is uncovered: one row, every position open.
+-- So a position of literals with no catch-all always warns. Rows with no
+-- number or text in them have only the first tier.
+--
+-- When a row was left out ('ClauseCoversNothing'), only the second tier is
+-- reported. The first could list a keyed gap that the row left out covers:
+-- with @f 2 "b"@, @f (EXACTLY two) s@ and @f 1 s@ it would list @2 s@, and
+-- every @(2, s)@ meets the second clause. The second tier leaves every number
+-- and text position open, and each of its rows holds a value that no row
+-- matches: a left-out row matches one value of its position for each value
+-- of the others, so putting there a value that no row names and no left-out
+-- row matches gives one.
+--
+-- Returns the missing rows when a tier's list fits, ordered, with the
+-- redundant branches (fail-open otherwise, the same contract as
+-- 'analyzePatternMatch': no warning is better than a wrong one or a hang);
+-- and the redundant branches of whichever analysis ran, for when no list
+-- fits. The redundant branches come from the exact analysis when it ran,
+-- which sees every row; a branch the coarse analysis finds redundant is
+-- covered by a subset of the rows above it, so that verdict holds too.
+literalTiers
+  :: Map Unique [Resolved]
+  -- ^ the constructor sets ('constructorsInScopeFromEntityInfo')
+  -> Bool
+  -- ^ whether a row was left out
+  -> ([Nabla Resolved] -> [r])
+  -- ^ the missing rows one tier's uncovered values render as
+  -> ((Pattern Resolved -> [Int]) -> r -> [Int])
+  -- ^ a missing row's rank, from its patterns' ranks
+  -> [([Guard Info Resolved], Branch Resolved)]
+  -> (Maybe ([r], [Branch Resolved]), [Branch Resolved])
+literalTiers ctorSets leftOut render rankRow rows = (verdict, redundantAnyway)
+  where
+    -- 'Nothing' when the 'maxUncoveredNablas' cap trips.
+    analyse = \ case
+      -- No row matches anything: nothing is covered. (Zero rows must not
+      -- reach 'foldr1'.)
+      [] -> Just ([Consistent Set.empty], [])
+      rs ->
+        let tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rs ]
+        in flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
+    exact = analyse rows
+    -- Only rows with a number or a piece of text in them, or with a row
+    -- left out, have a second tier: for any other, it would re-run the same
+    -- rows.
+    coarse = do
+      guard (leftOut || any (any isLitGuard . fst) rows)
+      analyse (filter (not . any isLitGuard . fst) rows)
+    fit (uncovered, redundant) =
+      let missingRows = render uncovered
+          overCap = length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
+      in if overCap then Nothing else Just (List.sortOn (rankRow (missingPatternRanks ctorSets keyOrder)) missingRows, redundant)
+    keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
+    verdict = case guard (not leftOut) *> exact >>= fit of
+      Just v -> Just v
+      Nothing -> do
+        (missingRows, redundant2) <- coarse >>= fit
+        pure (missingRows, maybe redundant2 snd exact)
+    -- When neither tier's list fits, the missing warning is withheld, and
+    -- the branches never used are still reported, from whichever analysis
+    -- ran (the exact one when it did).
+    redundantAnyway = maybe [] snd (exact <|> coarse)
+
+-- | A missing pattern's rank, for listing missing rows in the order main's
+-- analysis lists them: through the pattern in the order it is written, a
+-- constructor by its place in its type's declaration, a number or a piece of
+-- text by the order in which the rows first name it (the keys, in that
+-- order), and an open position after both (@1 Gold@, @2 Gold@, @level Gold@).
+-- That is also an order the rows can be pasted in: where two rows first
+-- differ, the upper one names a constructor, a number or a text, which the
+-- lower one names differently or leaves open, so no row is covered by a row
+-- above it.
+missingPatternRanks :: Map Unique [Resolved] -> [LitKey] -> Pattern Resolved -> [Int]
+missingPatternRanks ctorSets keyOrder = ranks
+  where
+    ranks = \ case
+      PatApp _ c ps   -> ctorRank (getUnique c) : concatMap ranks ps
+      PatCons _ h t   -> ctorRank consUnique : ranks h <> ranks t
+      PatLit _ l      -> [keyRank (litKey l)]
+      PatVar {}       -> [maxBound]
+      PatExpr {}      -> [maxBound]
+    ctorRank u = Map.findWithDefault 0 u ctorIndex
+    -- A constructor's place in its type: the order the constructor sets list
+    -- them, which is the order they were declared in, and TRUE before FALSE,
+    -- as main lists them.
+    ctorIndex =
+      Map.fromList $
+        [ (getUnique c, i) | cs <- Map.elems ctorSets, (i, c) <- zip [0 :: Int ..] cs ]
+          <> [(trueUnique, 0), (falseUnique, 1)]
+    keyRank k = fromMaybe (length keyOrder) (List.elemIndex k keyOrder)
+
+-- | The first spelling the patterns give each number or piece of text, with
+-- its tokens, so that a suggested key prints as written ('literalAsWritten'):
+-- @1.50@ as @1.50@, not @1.5@.
+literalSpellings :: [Pattern Resolved] -> Map LitKey Lit
+literalSpellings pats =
+  Map.fromListWith (\ _ firstSpelling -> firstSpelling)
+    [ (litKey l, l) | l <- concatMap patLits pats ]
+  where
+    patLits = \ case
+      PatLit _ l          -> [l]
+      PatExpr _ (Lit _ l) -> [l]
+      PatApp _ _ ps       -> concatMap patLits ps
+      PatCons _ p1 p2     -> patLits p1 <> patLits p2
+      PatVar {}           -> []
+      PatExpr {}          -> []
+
+-- | A suggested pattern with each key in its first spelling
+-- ('literalSpellings').
+respellLiterals :: Map LitKey Lit -> Pattern Resolved -> Pattern Resolved
+respellLiterals spellings = respell
+  where
+    respell = \ case
+      PatLit a l      -> PatLit a (Map.findWithDefault l (litKey l) spellings)
+      PatApp a c ps   -> PatApp a c (map respell ps)
+      PatCons a p1 p2 -> PatCons a (respell p1) (respell p2)
+      p               -> p
 
 -- | A guard that pins the scrutinee to a number or a piece of text.
 isLitGuard :: Guard i n -> Bool
