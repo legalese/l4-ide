@@ -353,7 +353,7 @@ Open for Meng, each a ruling and not a slice:
 - **§5.4, un-parking UES §8 step 6's two dependencies** (placeholders for every non-`MAYBE` input, lazy binding on the direct path), which MOTHBALL parked: already ruled in substance (U7b, row 55), breaking per §11, and stacked on #556.
 - **§3's narrowing** of the ruling's "every named derived node" to nullary, main-module, uniquely named nodes for the first version.
 - **§7**: a presumption on a named step; no ruling reaches it.
-- **Retiring `TYPICALLY` on a `MAYBE`**, amending D7.3 and R8 rule 3 (PRESUMPTION-SCENARIOS §5.2); no corpus uses, two service test fixtures, one refused docassemble export.
+- **`TYPICALLY` on a `MAYBE`**: keep D7.3 (recommended after the bench skeptic corrected the premise: `TYPICALLY NOTHING` is the wire's `NOTHING` presumption extended to a `WITH`), or retire it as smucclaw#645 asks, amending D7.3 and R8 rule 3; under either, `lowerDefaultLit` gains a `NOTHING` arm (PRESUMPTION-SCENARIOS §5.2, bench card C3).
 - **The reserved spellings** of §4.1 and `assertable` of §4.3.
 - **DMN lifting an assertable `WHERE` local into its own decision** (§8), against leaving such nodes unassertable there.
 
