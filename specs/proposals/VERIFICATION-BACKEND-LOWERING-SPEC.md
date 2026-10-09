@@ -263,8 +263,8 @@ to the binder is still the module-level `ASSUME` the desugaring left there."_ A 
 root. So a directive over a section binder is still stuck, which is exactly the handle B needs.
 
 **Load-bearing consequence — one pinned CLI behaviour changes, and only one.** `l4 run` today
-**exits non-zero** on a stuck `#ASSERT`: `evalDirectiveCrashed` maps `Assertion (Errored _)` to
-`True` (`jl4/app/L4/Cli/Run.hs:136-158`), a stuck assert reports `Errored (Stuck _)`, and
+**exits non-zero** on a stuck `#ASSERT`: `evalDirectiveFailsRun` maps `Assertion (Errored _)` to
+`True` (`jl4/app/L4/Cli/Run.hs:141-162`), a stuck assert reports `Errored (Stuck _)`, and
 `jl4/tests-cli/Main.hs` pins it — _"fails the run when an #ASSERT is stuck on a bare assumed
 BOOLEAN"_. Under B, a file carrying proof obligations would fail `l4 run`, which would push authors
 into keeping obligations in separate files from tests. So B adds a fourth assertion outcome,

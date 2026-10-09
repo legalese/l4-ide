@@ -2,8 +2,10 @@
 # Run every .l4 module in an encoding and print, per module, the numbers that matter:
 # error diagnostics, assertions satisfied, assertions failed, assertions refused.
 #
-# Why not trust the exit code: `l4 run` exits 0 when an #ASSERT fails AND when it
-# refuses. An encoding that "ran green" by exit code can be carrying either.
+# Why not trust the exit code: `l4 run` exits 0 when an #ASSERT refuses, an l4
+# built before legalese/l4-ide#518 exits 0 when one fails too, and no exit code
+# says which assertion failed or how many ran. An encoding that "ran green" by
+# exit code can be carrying any of those.
 #
 # Why read the line AFTER "Message:": l4 prints some outcomes on the Message line
 # itself ("Message:  assertion failed") and others on the next one:

@@ -4,9 +4,10 @@
 # Prints PASS / FAIL / SKIP per claim. SKIP is used when an optional tool is
 # absent, so the harness always runs to the end and always says why.
 #
-# NOTE: `l4 run` exits 0 on a FAILING #ASSERT -- it prints the failure at
-# DiagnosticSeverity_Error and carries on. So every gate below greps for that
-# string. Never use `&&` here; it is a false green.
+# NOTE: an `l4` built before legalese/l4-ide#518 exits 0 on a FAILING #ASSERT -- it
+# prints the failure at DiagnosticSeverity_Error and carries on. So every gate
+# below greps for that string, which is right on every binary. Never use `&&`
+# here; on an older binary it is a false green.
 #
 # NOTE: claim 11 runs `cabal test`, which BUILDS. Concurrent `cabal`
 # invocations inside a single worktree corrupt each other -- the symptom is a
