@@ -3,7 +3,7 @@
 > **Status (2026-09-28): a tutorial draft and a measurement, not a ruling.**
 > Asked for in Meng's note on ruling N9 of `NORM-LOG-SPEC.md`, left on the rulings bench on 2026-09-28 without a mark: "let's try a "userspace-only" alternative to this new primitive; try writing a tutorial for how a user could synthesize the waiver using existing syntax and semantics; if that's easy enough to teach, we can be conservative and not create a WAIVE primitive. Perhaps that "primitive" becomes a lib function in prelude or elsewhere."
 > **Unlike the norm-log how-to, every line of L4 on this page runs today.**
-> The two contracts are `jl4/experiments/norm-log-waiver/waiver-userspace.l4` and `waiver-untimed.l4`; both were run on 2026-09-28 with the installed `l4` (built 2026-09-28 07:49) and, for the timed file, also on the norm-log probe's snapshot binary, with identical results.
+> The contracts are in `jl4/experiments/norm-log-waiver/`: `waiver-userspace.l4` and `waiver-untimed.l4`, and, added 2026-10-09 from the N9 card's skeptic, `waiver-two-defaults.l4` (trap 4) and `waiver-targeted.l4` (the version to teach). The first two both were run on 2026-09-28 with the installed `l4` (built 2026-09-28 07:49) and, for the timed file, also on the norm-log probe's snapshot binary, with identical results.
 > The verdict is in the last section.
 
 ---
@@ -84,10 +84,10 @@ Measured:
 | W3 late, borrows at 30, waived at 40            | blocked  | blocked |
 | W4 late, fine paid at 21, borrows at 30         | allowed  | allowed |
 
-## Why every act carries a time, and the three traps
+## Why every act carries a time, and the four traps
 
 Every action above carries a number that is its own time (`payFine t`, `waive t`, `borrow 2 t`).
-That is not decoration; each of the three traps below returns a wrong answer with exit code 0.
+That is not decoration; each of the four traps below returns a wrong answer with exit code 0.
 
 **Trap 1 — without times, a later waiver unlocks an earlier borrow.**
 The first version of this tutorial (`waiver-untimed.l4`) recorded `waived` as `TRUE` with no time.
@@ -105,21 +105,31 @@ W6 is W1 with the borrowing rule written first (`borrowing RAND waiverPower RAND
 It is **allowed**: the borrowing rule ran over the whole trace before the loan had recorded anything, so it saw an empty ledger.
 Order the operands so that every writer precedes every reader.
 
+**Trap 4 — a waiver that names nothing waives everything.**
+Found by the N9 card's skeptic on 2026-10-09 and re-run here.
+`waived at` and `cured at` above name no default, so with two loans (`waiver-two-defaults.l4`) a waiver of the first late book at 25 also clears the second, late at 60, and a borrow at 70 is **allowed**; without the waiver it is blocked.
+A waiver given at 5, before any default exists, likewise clears a default at 14 (whether an advance waiver should count is a legal question; the idiom should make it a choice, not an accident).
+The fix is in the idiom: each waiver and each cure names the book it answers (`waive b t`, `RECORD `cured` IS Mark b t`), and the guard reads every default with `RECALL ALL` and asks whether **some** default is still continuing (`waiver-targeted.l4`: one of two defaults waived blocks, both waived allows).
+That is the version to teach.
+
 ## Verdict: teachable, but not yet safe to teach
 
-The pattern is short and uses nothing exotic: a `RECORD` in the `LEST`, a `MAY` that `COMMIT`s, and a guard that `RECALL`s and compares.
-As a prelude function it would be the `happened by` helper plus a documented idiom for the waiver power; the cell names would still be the drafter's, since a function cannot take a cell name as an argument today.
+The pattern uses nothing exotic: a `RECORD` in the `LEST`, a `MAY` that `COMMIT`s, and a guard that `RECALL ALL`s and compares; the targeted version is about 45 lines.
+A prelude helper has little to do. Today it would be the time comparison, and once N12's as-of `RECALL` lands even that goes, because a guard's read is already as of its own instant.
+A generic library function ("is some default continuing?") would need a variable to name a cell, and today a cell is a literal: the parser lowers it to a string key (`Parser.hs` ~2806 on `origin/unstable` @ `a8ec02a81`, "data (a key), not a variable reference"), while the type checker and evaluator already treat it as a `STRING` expression — so the limit is the parser's alone.
 
-But the three traps are all silent, and a tutorial that has to warn about three silent traps is teaching around missing features rather than a pattern.
-Each trap goes away with a ruling already made or pending, **not** with a waiver primitive:
+But the traps are all silent, and a tutorial that has to warn about silent traps is teaching around missing features rather than a pattern.
+Three go away with rulings made or pending, and the fourth with the targeted idiom, **not** with a waiver primitive:
 
-| trap                        | goes away with                                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 2, party-asserted time      | N4 (answered): a name for the contract clock's instant, so ``COMMIT `waived at` IS THE INSTANT`` needs no argument |
-| 1, whole-log `RECALL`       | the same name, compared in the guard; or an as-of read on the contract clock for black ink                         |
-| 3, reader before writer     | N10 (open): lockstep evaluation of operands, or at least the run-time refusal                                      |
-| Step 1's cooperating author | the norm log itself (N1–N8), which records the failure and the cure without the loan's author                      |
+| trap                        | goes away with                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1, a later waiver is read   | N12 (open): a `RECALL` inside a contract reads as of its own instant, and the latest by instant, not by log position                       |
+| 2, party-asserted time      | N4 (answered, spelling not chosen): a name for the contract instant, so ``COMMIT `waived at` IS THE INSTANT`` takes no time from the party |
+| 3, reader before writer     | not cured: N12 rule (4) and N10's run-time check make it a loud error; N10's lockstep option would make it right                           |
+| 4, untargeted waiver        | the targeted idiom today (`waiver-targeted.l4`); for reads of the norm log, N2's address with argument patterns                            |
+| Step 1's cooperating author | the norm log itself (N1–N8), which records the failure and the cure without the loan's author                                              |
 
 So the evidence supports Meng's conservative instinct.
-A `WAIVE` primitive is not what makes waiver hard; the contract-clock name and operand order are.
-With those two in place, waiver is a `MAY` that `COMMIT`s its instant, read by a guard against the norm log, and it belongs in the prelude or a library as an idiom, not in the grammar.
+A `WAIVE` primitive is not what makes waiver hard; the contract instant, as-of reads and operand order are, and naming the target is a habit the idiom can teach.
+With those in place, waiver is a `MAY` that `COMMIT`s what it waives at its instant, read by a guard against the norm log, and it belongs on an idiom page, not in the grammar.
+One honest caveat: a primitive would name its target by construction (`HOMOICONICITY-SPEC.md`'s `WAIVE` takes the obligation), where the idiom relies on the drafter; but that `WAIVE` takes a live obligation, and the norm log needs the pardon of a failure already incurred, which it does not cover.
