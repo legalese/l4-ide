@@ -1506,8 +1506,11 @@ checkClauseMatrix dec dHead =
     -- which clauses are missing, or never used, is a question to ask once
     -- they do. Saying it is settled also withdraws a one-clause group's
     -- CONSIDER warnings ('settleOneClause').
-    Just _ | givenMisnamesInputs dec -> pure True
+    Just matrix | givenMisnamesInputs dec -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
+      pure True
     Just matrix -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
       recordInputPatterns matrix
       (answered, redundant, byNewName) <- analyseMatrix matrix
       warnUnreachableClauses matrix (getName dHead.rappForm) redundant byNewName
@@ -1787,6 +1790,21 @@ checkClauseMatrix dec dHead =
 -- A redundant clause is unreachable because the group tries its clauses in
 -- order and the first match wins, so this is the same finding as a redundant
 -- WHEN branch, in the terms the drafter wrote.
+-- | One warning for each @\@desc@, @\@export@ or @\@nlg@ written above a later
+-- clause of a group, which uses none of them: the parser keeps them on the
+-- clause ('PmMatrixClause' @clauseDesc@, and the @\@nlg@ on @clauseHead@), for
+-- a run that turns out to be overloads ('separateOverloads'), whose
+-- definitions do use them. A group takes its annotations from above its first
+-- clause, which the parser gives to the definition itself.
+warnLaterClauseAnnotations :: PmMatrix -> Name -> Check ()
+warnLaterClauseAnnotations matrix headName =
+  for_ (zip [2 ..] (drop 1 matrix.clauses)) \ (k, cl) -> do
+    for_ cl.clauseDesc \ d -> for_ (rangeOf d) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k (if (Export.parseDescText (getDesc d)).flags.isExport then "@export" else "@desc"))
+    let hd = getAnno cl.clauseHead
+    for_ (maybeToList (view annNlg hd) <> view annNlgAlts hd) \ nlg -> for_ (rangeOf nlg) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k "@nlg")
+
 warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Maybe (Int, [Name]) -> Check ()
 warnUnreachableClauses matrix headName redundant newNameCatchAll = do
   let n = length matrix.clauses
@@ -7725,6 +7743,15 @@ prettyCheckWarning = \ case
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
     ]
+  ClauseAnnotationUnused _ headName k annotation ->
+    [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."
+    , "A rule written as clauses takes its @desc, @export and @nlg from above its first clause only."
+    , "Move it above the first clause, or remove it."
+    ]
+    where
+      whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
+        w : _ | k >= 1 -> "the " <> w <> " clause"
+        _ -> "clause " <> Text.textShow k
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
     , ""

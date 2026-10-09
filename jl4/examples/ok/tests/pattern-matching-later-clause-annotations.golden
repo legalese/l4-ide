@@ -1,0 +1,27 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-later-clause-annotations.l4:13:1-15:
+  I found a problem while checking the definition of `how many`:
+    This @desc is above the second clause of `how many`, where it is not used.
+    A rule written as clauses takes its @desc, @export and @nlg from above its first clause only.
+    Move it above the first clause, or remove it.
+pattern-matching-later-clause-annotations.l4:15:1-24:
+  I found a problem while checking the definition of `how many`:
+    This @export is above the third clause of `how many`, where it is not used.
+    A rule written as clauses takes its @desc, @export and @nlg from above its first clause only.
+    Move it above the first clause, or remove it.
+pattern-matching-later-clause-annotations.l4:17:1-17:
+  I found a problem while checking the definition of `how many`:
+    This @nlg is above the fourth clause of `how many`, where it is not used.
+    A rule written as clauses takes its @desc, @export and @nlg from above its first clause only.
+    Move it above the first clause, or remove it.
+pattern-matching-later-clause-annotations.l4:20:1-19:
+  "two"
+pattern-matching-later-clause-annotations.l4:30:1-23:
+  I found a problem while checking the definition of `colour code`:
+    This @export is above the second clause of `colour code`, where it is not used.
+    A rule written as clauses takes its @desc, @export and @nlg from above its first clause only.
+    Move it above the first clause, or remove it.
+pattern-matching-later-clause-annotations.l4:33:1-26:
+  2

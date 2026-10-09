@@ -33,6 +33,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
   - [Clause that is never used](#clause-that-is-never-used)
+  - [Annotation above a later clause](#annotation-above-a-later-clause)
   - [ASSUME is being retired](#assume-is-being-retired)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
@@ -739,6 +740,38 @@ A third form, "Every input it matches is already matched by a clause above it", 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
 **How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
+
+---
+
+### Annotation above a later clause
+
+**Warning message:**
+
+```
+This @export is above the second clause of `colour code`, where it is not used.
+A rule written as clauses takes its @desc, @export and @nlg from above its first clause only.
+Move it above the first clause, or remove it.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `colour code` Red IS 1
+@export the green code
+DECIDE `colour code` Green IS 2
+```
+
+**What went wrong:** A rule written as clauses is one rule, and its annotations are written once, above its first clause.
+An `@export` above a later clause does not publish the rule, a `@desc` there does not describe it, and an `@nlg` there is not used when the rule is put into words.
+The warning appears once at each such annotation.
+
+Definitions that share a name but are told apart by their types, such as `DECIDE show n IS n + 1` followed by `DECIDE show b IS b AND TRUE`, are separate definitions rather than one rule, and each keeps the annotations above it, so they draw no warning.
+
+**How to fix it:** Move the annotation above the first clause, for example above the rule's `GIVEN`, or remove it.
 
 ---
 

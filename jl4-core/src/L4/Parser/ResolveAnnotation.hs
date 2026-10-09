@@ -259,18 +259,18 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
       appFormAka' <- addNlg appFormAka
       -- Inside the body's region, which runs from the first clause's body to
       -- the last's, so that an annotation between two clauses is in reach.
-      (expr', ann') <- hoistNlgA (\ m -> (,) <$> m <*> claimRunClauseNlgs ann) (addNlg expr)
+      (expr', ann') <- hoistNlgA (\ m -> (,) <$> m <*> claimLaterClauseNlgs ann) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
 
--- | In a run of clauses whose patterns are all bare names ('isRunOfBareNames'),
--- an @\@nlg@ written above a later clause belongs to that clause's head
--- ('PmMatrixClause' @clauseHead@): the run may be overloads, each with its
--- own annotations ('L4.TypeCheck.separateOverloads'). Nothing else in the
--- group's tree is a node it could attach to, so it used to be left over and
--- reported as not attached.
-claimRunClauseNlgs :: Anno -> NlgM Anno
-claimRunClauseNlgs ann = case view annPmMatrix ann of
-  Just m | isRunOfBareNames m -> do
+-- | In a group of clauses, an @\@nlg@ written above a later clause belongs to
+-- that clause's head ('PmMatrixClause' @clauseHead@). A run of bare names may
+-- be overloads, each with its own annotations
+-- ('L4.TypeCheck.separateOverloads'); a group that stays a group warns about
+-- it ('L4.TypeCheck.checkClauseMatrix'). Nothing else in the group's tree is
+-- a node it could attach to.
+claimLaterClauseNlgs :: Anno -> NlgM Anno
+claimLaterClauseNlgs ann = case view annPmMatrix ann of
+  Just m | length m.clauses >= 2 -> do
     later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
       case (prev.headRange, cl.headRange) of
         (Just p, Just h) -> do
@@ -1050,21 +1050,22 @@ instance HasDesc (Decide n) where
     -- This ensures @export annotations are claimed by Decide before
     -- parameters in the tySig can consume them.
     ann0 <- attachLeadingDesc dec ann
-    -- Then the descs above the later clauses of a run of bare names, before
-    -- the body, whose generated bindings would otherwise claim them.
-    ann' <- claimRunClauseDescs ann0
+    -- Then the descs above the later clauses of a group, before the body,
+    -- whose generated bindings would otherwise claim them.
+    ann' <- claimLaterClauseDescs ann0
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     expr' <- addDesc expr
     pure $ MkDecide ann' tySig' app' expr'
 
--- | In a run of clauses whose patterns are all bare names ('isRunOfBareNames'),
--- an @\@desc@ or @\@export@ written above a later clause belongs to that
--- clause ('PmMatrixClause' @clauseDesc@): the run may be overloads, each with
--- its own annotations ('L4.TypeCheck.separateOverloads').
-claimRunClauseDescs :: Anno -> State DescS Anno
-claimRunClauseDescs ann = case view annPmMatrix ann of
-  Just m | isRunOfBareNames m -> do
+-- | In a group of clauses, an @\@desc@ or @\@export@ written above a later
+-- clause belongs to that clause ('PmMatrixClause' @clauseDesc@): a run of bare
+-- names may be overloads, each with its own annotations
+-- ('L4.TypeCheck.separateOverloads'), and a group that stays a group warns
+-- about it ('L4.TypeCheck.checkClauseMatrix').
+claimLaterClauseDescs :: Anno -> State DescS Anno
+claimLaterClauseDescs ann = case view annPmMatrix ann of
+  Just m | length m.clauses >= 2 -> do
     later <- for (drop 1 m.clauses) \ cl -> case cl.headRange of
       Just h -> do
         matches <- takeMatchingDescs (aboveClauseHead (fromSrcRange h))

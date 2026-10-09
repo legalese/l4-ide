@@ -1,0 +1,33 @@
+-- An annotation written above a later clause of a rule written as clauses is
+-- not used: the rule takes its @desc, @export and @nlg from above its first
+-- clause. Each one draws a warning at the annotation (refutation of
+-- legalese/l4-ide#545's review, round 3). Overloads written one after
+-- another use theirs and draw none (pattern-matching-overloads-own-annotations.l4).
+
+-- A group over numbers, with one of each above its second, third and fourth
+-- clauses. The @desc above the first clause is the rule's own.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+@desc how many there are
+DECIDE `how many` 0 IS "none"
+@desc not used
+DECIDE `how many` 1 IS "one"
+@export not used either
+DECIDE `how many` 2 IS "two"
+@nlg many things
+DECIDE `how many` other IS "many"
+
+#EVAL `how many` 2   -- "two"
+
+-- A group over the values of a type, whose patterns are bare names, as the
+-- patterns of overloads are; this one stays a group, so its @export is not
+-- used and the rule is not published.
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `colour code` Red IS 1
+@export the green code
+DECIDE `colour code` Green IS 2
+
+#EVAL `colour code` Green   -- 2

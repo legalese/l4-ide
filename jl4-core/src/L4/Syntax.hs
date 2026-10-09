@@ -889,7 +889,8 @@ moduleTopDecls = lens
 -- name as written, its @AKA@, and the @\@desc@ (or @\@export@) written
 -- above it. A run that the checker turns back into separate definitions
 -- ('L4.TypeCheck.separateOverloads') gives each definition its own clause's
--- head, @AKA@ and annotations; a group keeps those of its first clause.
+-- head, @AKA@ and annotations; a group keeps those of its first clause, and
+-- warns about any above a later one ('L4.TypeCheck.checkClauseMatrix').
 --
 -- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
 -- generic traversals): the stored patterns transitively contain @Expr Name@
@@ -904,13 +905,12 @@ data PmMatrixClause = MkPmMatrixClause
   , patterns  :: [Pattern Name]
   , clauseHead :: Name
     -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
-    -- clause of a run of bare names is attached to it
-    -- ('L4.Parser.ResolveAnnotation')
+    -- clause is attached to it ('L4.Parser.ResolveAnnotation')
   , clauseAka :: Maybe (Aka Name)
   , clauseDesc :: Maybe Desc
-    -- ^ the @\@desc@ or @\@export@ written above a later clause of a run of
-    -- bare names ('L4.Parser.ResolveAnnotation'); the first clause's is on
-    -- the group's own annotation
+    -- ^ the @\@desc@ or @\@export@ written above a later clause
+    -- ('L4.Parser.ResolveAnnotation'); the first clause's is on the group's
+    -- own annotation
   }
   deriving stock (Eq, Ord, Show)
 
@@ -943,17 +943,6 @@ data PmMatrix = MkPmMatrix
     -- never tried
   }
   deriving stock (Eq, Ord, Show)
-
--- | Is this a group of two or more clauses whose every pattern is a bare
--- name? Such a run may turn out to be overloads rather than one rule, which
--- only resolving the names tells ('L4.TypeCheck.separateOverloads'), so each
--- of its clauses keeps its own annotations ('PmMatrixClause').
-isRunOfBareNames :: PmMatrix -> Bool
-isRunOfBareNames m = length m.clauses >= 2 && all (all isBare . (.patterns)) m.clauses
-  where
-    isBare = \ case
-      PatApp _ _ [] -> True
-      _ -> False
 
 instance NFData PmMatrix where
   rnf (MkPmMatrix s syn cs ca) = rnf s `seq` rnf syn `seq` rnf cs `seq` rnf ca
