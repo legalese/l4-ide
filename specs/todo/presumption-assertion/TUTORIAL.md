@@ -1,9 +1,10 @@
 # Telling a rule what you know, and letting it presume the rest
 
-**Status:** a draft of a future page under `doc/tutorials/`, written 2026-10-09 and revised the same day after an adversarial review, against a design that is not yet built.
+**Status:** a draft of a future page under `doc/tutorials/`, written 2026-10-09 and revised the same day after two adversarial reviews, against a design that is not yet built.
 It sits under `specs/todo/` until the behaviour it teaches lands; each section below says what runs today and what does not.
 The design it teaches is `CONTRACT.md`, beside this file, and the measurements behind both are `../PRESUMPTION-SCENARIOS.md`.
 Nothing on this page describes shipped behaviour unless the section says so.
+For reviewers: the mentions of rulings, dates and specification files are here so the page can be checked against the design, and they come out when the page moves to `doc/`, where the reader has never heard of them.
 This page assumes you have read [Your First L4 File](../../../doc/tutorials/getting-started/first-l4-file.md) and nothing else.
 
 ---
@@ -12,8 +13,8 @@ This page assumes you have read [Your First L4 File](../../../doc/tutorials/gett
 
 When the law deals with an adult, it starts from the position that the person can decide things for themselves.
 It does not stop to prove that every time.
-It presumes it, and lets the presumption be knocked down: if it is shown that the person cannot understand or weigh the decision, different rules take over.
-(The Mental Capacity Acts of England and of Singapore both open with that presumption.)
+It presumes it, and lets the presumption be knocked down: if it is shown that an impairment of the mind leaves the person unable to understand, retain, weigh or communicate the decision, different rules take over.
+(The Mental Capacity Acts of England and Wales and of Singapore both open with that presumption.)
 
 L4 has a word for that kind of assumption.
 Here is a small rule a form might use to decide whether Alex can answer for himself or whether it should ask a guardian instead:
@@ -38,8 +39,9 @@ The rule still works if you tell it `has capacity` is false.
 It just does not need to be told when the ordinary case holds.
 
 **This runs today.** The `l4 batch` tool asks a rule many questions at once, one per row of a file.
+Each question is written in JavaScript Object Notation (**JSON**), the plain text format that web programs exchange: the name on the left of each colon is called a **key**, and the value is on the right.
 Asked with only `is adult`, the rule answers `true` and tells you what the answer rests on.
-This is the line it prints, with the question repeated under `input`:
+This is what it prints, one line per question, with the question repeated under `input` (the line is shown here folded for width):
 
 ```json
 {
@@ -69,8 +71,8 @@ Hard applies none: a fact that was left out, and has a presumed value, is treate
 
 **This runs today**, as `l4 batch --presumption hard` and as `"presumption": "hard"` in a request to the decision service.
 What hard mode does when it meets a presumed fact is still being decided.
-Today, `l4 batch` and most service requests refuse as soon as they see that a presumed fact was left out, whether or not the rule would ever have needed it; the row above with `is adult` false is refused under hard, naming `has capacity`, although the rule never reaches it (`../PRESUMPTION-SCENARIOS.md` §2.3 measures this on a longer rule).
-The change this page assumes, proposed and not yet ruled, makes hard mode wait: it refuses only when the rule actually reaches the presumed fact, and then names it.
+Today, `l4 batch` and most requests to the service refuse as soon as they see that a presumed fact was left out, whether or not the rule would ever have needed it; the row above with `is adult` false is refused under hard, naming `has capacity`, although the rule never reaches it (`../PRESUMPTION-SCENARIOS.md` §2.3 measures this on a longer rule).
+The change this page assumes, proposed and not yet ruled, makes a left-out fact wait: the rule is refused only when it actually reaches the fact, and the refusal then names it.
 Until that is settled and built, read a hard-mode refusal as "this rule has a presumption somewhere", not as "your answer would have rested on one".
 
 ## Door number two: answering without saying which
@@ -78,9 +80,10 @@ Until that is settled and built, read a hard-mode refusal as "this rule has a pr
 L4 can draw a rule as a **ladder diagram**, the picture electricians use for control circuits.
 Each yes-or-no fact is a switch, facts that must all hold sit in a row, facts of which any one will do sit in parallel, and the rule's answer is whether current can get from one side of the picture to the other.
 The L4 editor shows it as the rule's decision graph.
-The same tool can print the rule as a text outline instead, and that is what is quoted below, since a page cannot carry the live picture.
+The `l4 render` tool can print the same rule as a text outline instead, and that is what is quoted below, since a page cannot carry the live picture.
 
-Here is a rule that wants to know Alex's marital status:
+Here is a rule that wants to know Alex's marital status.
+The `WHERE` at the end lets a rule name a step of its own working, for use inside that rule only:
 
 ```l4
 @export
@@ -136,7 +139,7 @@ The key `assertions` is the spelling the design assumes; it is not yet ruled:
 and the answer would say what it rested on, in a list beside `presumed`:
 
 ```json
-{ "result": { "value": true }, "asserted": ["unmarried"] }
+{ "result": { "value": true }, "presumed": [], "asserted": ["unmarried"] }
 ```
 
 Three things to know about this, once it lands.
@@ -150,22 +153,24 @@ The rule takes your word for `unmarried` and does not consult the three, exactly
 The answer lists `unmarried` under `asserted`, so nobody can miss that it was told, not worked out.
 (Whether the rule should instead complain about the contradiction is a question the design puts off, as the ladder's design did before it.)
 
-Third, only a step with a name can be asserted, and in this first version only a step that takes no inputs of its own.
+Third, only a step with a name can be asserted.
 `single OR divorced OR widowed` written out in the middle of a rule has no door to point at; giving it the name `unmarried` is what makes one.
-If you want a step to be assertable, name it.
+The design assumes, and has not yet had ruled, that in this first version the step must also take no inputs of its own, be written in the same file as the rule, and be the only step of that name in the file.
+If you want a step to be assertable, name it, once.
 
 One more thing the example above quietly depends on.
-Today, a fact left out of a request with no presumed value is refused before the rule runs, so the three facts under `unmarried` would have to be sent even though the rule never reaches them.
-The design changes that too: a fact left out is refused only when the rule reaches it.
-Without that change, door number two cannot be kept shut.
+Today, in `l4 batch` and most requests to the service, a fact left out of a request with no presumed value is refused before the rule runs, so the three facts under `unmarried` would have to be sent even though the rule never reaches them.
+The design changes that too, in soft and hard mode alike: a fact left out is refused only when the rule reaches it.
+That change is proposed and not yet ruled, and without it door number two cannot be kept shut.
 
 ## Steps a rule must work out for itself
 
 Some named steps are the rule's conclusion, or close to it, and it would be wrong to let whoever is asking simply assert them.
 A rule that works out whether an offence is made out should not take "made out: yes" from the person asking.
-(In a courtroom the law does let one person say exactly that, by pleading guilty, and surrounds it with safeguards about who may say it and how; that is a question of who is asking, which is for the people running the service to control, not for the rule.)
+(In a courtroom the law does let one person say exactly that, by pleading guilty, and surrounds it with safeguards: who may say it, and that what they admit really amounts to the offence.
+The first is a question of who is asking, which is for the people running the service to control; the second is the contradiction check this design puts off.)
 
-The design is open by default: any named step may be asserted unless the rule's author says otherwise.
+The design is open by default: a named step may be asserted unless the rule's author says otherwise.
 The author says otherwise with one annotation on the step:
 
 ```l4
@@ -174,7 +179,7 @@ The author says otherwise with one annotation on the step:
 ```
 
 A request that asserts `offence made out` would then be refused by name, before the rule runs: this step is a conclusion, and can only be worked out.
-The rule's own final answer can never be asserted, with or without the annotation.
+The rule's own final answer can never be asserted in L4's own evaluators, with or without the annotation.
 
 **Not built yet.** Nothing today refuses an assertion, because nothing today accepts one.
 Open by default, with this annotation as the opt-out, is what Meng ruled in chat on 2026-10-09 (`../PRESUMPTION-SCENARIOS.md` §7); by this repository's rules it counts as decided once it is written into the specification that owns it, which is still owed.
@@ -192,21 +197,13 @@ The author of the rule may also want to presume something about a named step, no
 **What works today** is to make the presumption a fact of its own, and read it only where the other facts run out.
 Here Alex's date of birth may be missing.
 `MAYBE DATE` says so: the field holds either a date, written `JUST` the date, or no date at all, written `NOTHING`.
-`CONSIDER` looks at which of the two it is and takes the matching branch:
+`CONSIDER` looks at which of the two it is and takes the matching branch.
+`DATE_YEAR` picks the year out of a date, and `MINUS` and `AT LEAST` read as they sound, so the rule counts age in whole years; the exact-birthday version is in the measurements file, and gives the same answers for Alex:
 
 ```l4
 DECLARE Person HAS
   name      IS A STRING
   birthdate IS A MAYBE DATE
-
-GIVEN birth IS A DATE
-      asat  IS A DATE
-GIVETH A NUMBER
-`age at` MEANS
-  IF    DATE_MONTH asat GREATER THAN DATE_MONTH birth
-     OR (DATE_MONTH asat EQUALS DATE_MONTH birth AND DATE_DAY asat AT LEAST DATE_DAY birth)
-  THEN DATE_YEAR asat MINUS DATE_YEAR birth
-  ELSE DATE_YEAR asat MINUS DATE_YEAR birth MINUS 1
 
 @export
 GIVEN alex IS A Person
@@ -215,7 +212,7 @@ GIVEN alex IS A Person
 GIVETH A BOOLEAN
 `adult` MEANS
   CONSIDER alex's birthdate
-    WHEN JUST b  THEN `age at` b asat AT LEAST 21
+    WHEN JUST b  THEN DATE_YEAR asat MINUS DATE_YEAR b AT LEAST 21
     WHEN NOTHING THEN `presumed adult`
 ```
 
@@ -235,7 +232,7 @@ Name the presumption as a fact, and it is reported.
 ```
 
 meaning: work it out from the three facts when they decide it, presume `TRUE` when they do not, and take an assertion over both.
-This does not parse today, and no ruling covers it either way (the nearest, T1 in the TYPICALLY specification, is about a computed field inside a `DECLARE`).
+This does not parse today, and no ruling covers it either way (the nearest, T1 in the TYPICALLY specification, is about a field of a record that has a `MEANS` of its own).
 `CONTRACT.md` §7 sets out what it would mean.
 Until then, the form above is the way to say it.
 
@@ -244,27 +241,28 @@ Until then, the form above is the way to say it.
 One last distinction, because it decides what a rule does with a missing fact.
 
 Leaving a fact out of a request means you did not say.
-Sending it as no value at all, which the JavaScript Object Notation (JSON) that requests are written in spells **`null`**, means you are saying the value is not known.
+Sending it as no value at all, which JSON spells [**`null`**](https://en.wikipedia.org/wiki/JSON), means you are saying the value is not known.
 L4 treats the two differently.
 A fact left out is a gap: under soft it may be filled by a presumption, and under hard it is refused.
 A fact sent as `null` is a statement.
-On a fact that is allowed to have no value, a `MAYBE` like Alex's birthdate, the rule goes on with "no date", and nothing is presumed.
-On any other fact, `null` is refused by name, because the rule needs a value and you have said you do not have one; `l4 batch` prints `Field 'is adult' is null, which means the value is not known: supply a value`.
+On a fact that is allowed to have no value, a `MAYBE` like Alex's birthdate, the rule goes on with "no date": the date itself is not presumed, and whatever the rule presumes next, such as `presumed adult`, is listed as usual.
+On any other fact, in `l4 batch` and in a single request to the service, `null` is refused by name, because the rule needs a value and you have said you do not have one; `l4 batch` prints `Field 'is adult' is null, which means the value is not known: supply a value`.
+(Two other ways of asking the service do not refuse it yet, and that difference is a known defect, smucclaw/l4-ide#1021.)
 
 **This runs today**, and the rows in `../PRESUMPTION-SCENARIOS.md` §2.2 and §2.6 show the columns side by side.
 Spreadsheet users take note: in a comma-separated values (CSV) file an empty cell is a gap, not a `null`, so a CSV cannot say "the value is not known" at all.
 
 ## Where each thing stands
 
-| you want to                                      | how                                            | status                                                                     |
-| ------------------------------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------- |
-| presume a fact when nobody supplies it           | `TYPICALLY` on a fact                          | built                                                                      |
-| see what an answer rests on                      | `presumed` in the answer                       | built                                                                      |
-| ask with no presumptions                         | `--presumption hard` / `"presumption": "hard"` | built; refuses before the rule runs, see "Two ways to ask"                 |
-| have hard mode refuse only what the rule reaches | lazy binding of left-out facts                 | proposed, not ruled                                                        |
-| pick door two in a picture                       | click the named step's box                     | built                                                                      |
-| pick door two in a request                       | `assertions` beside `arguments`                | ruled in chat 2026-10-09 (recording owed); key spelling assumed; not built |
-| see what was asserted                            | `asserted` in the answer                       | same                                                                       |
-| keep a conclusion from being asserted            | `@nonassertable` on the step                   | same                                                                       |
-| presume a named step                             | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                        |
-| say "the value is not known"                     | send `null`                                    | built, except from CSV                                                     |
+| you want to                                                                | how                                            | status                                                                                                                     |
+| -------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| presume a fact when nobody supplies it                                     | `TYPICALLY` on a fact                          | built                                                                                                                      |
+| see what an answer rests on                                                | `presumed` in the answer                       | built                                                                                                                      |
+| ask with no presumptions                                                   | `--presumption hard` / `"presumption": "hard"` | built; in `l4 batch` and most service requests it refuses before the rule runs, see "Two ways to ask"                      |
+| have a left-out fact refused only when the rule reaches it, in either mode | the design's lazy treatment of gaps            | proposed, not ruled                                                                                                        |
+| pick door two in a picture                                                 | click the named step's box                     | built                                                                                                                      |
+| pick door two in a request                                                 | `assertions` beside `arguments`                | ruled in chat 2026-10-09 (recording owed); the key's spelling and the limits on which steps qualify are assumed; not built |
+| see what was asserted                                                      | `asserted` in the answer                       | ruled in chat 2026-10-09 (recording owed); not built                                                                       |
+| keep a conclusion from being asserted                                      | `@nonassertable` on the step                   | ruled in chat 2026-10-09 (recording owed); not built                                                                       |
+| presume a named step                                                       | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                                        |
+| say "the value is not known"                                               | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                                           |
