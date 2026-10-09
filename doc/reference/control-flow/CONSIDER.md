@@ -134,6 +134,7 @@ Adding the missing constructor branch or an OTHERWISE catch-all silences the war
 `EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value; any other `EXACTLY` counts for nothing over a number, a piece of text or a date, and stops the check over any other type.
 A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is a redundant branch.
 A CONSIDER reads these exactly as a rule written as clauses does ([Non-exhaustive pattern match](../errors/README.md#non-exhaustive-pattern-match)), so the two spellings of one rule warn alike.
+One limit, which warns rather than stays silent: an `EXACTLY` of a name that a `WHERE` or a `LET` defines as the scrutinee itself (`WHEN EXACTLY y` in `CONSIDER x`, with `y MEANS x`) is read as a value the check cannot name, so the check asks for an `OTHERWISE` that would never be used; write that branch as `OTHERWISE`.
 BOOLEAN (just TRUE/FALSE) is checked normally, and so are the builtin container types MAYBE, EITHER, and LIST.
 
 The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
