@@ -108,7 +108,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.))
+import Optics ((%~), (^.), gplate, traverseOf)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -961,7 +961,14 @@ checkClauseMatrix dec dHead =
               forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
                 if patIsColumnWildcard scrutR pat
                   then pure (Just (PatVar (getAnno pat) scrutR))
-                  else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+                  else quietly do
+                    (rpat, _) <- checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty
+                    -- The substitution this check extends is dropped with
+                    -- the rest of its state, so the types the annotations
+                    -- of a nested pattern carry are resolved before it
+                    -- goes: 'coveragePattern' reads them, and an inference
+                    -- variable left there stands the group down.
+                    traverseOf (gplate @(Type' Resolved)) applySubst rpat
           resolvedDecls <- asks (Map.elems . (.declareDeclarations))
           let families = constructorFamilies resolvedDecls
               byNewName = traverse sequence rpatssM >>= newNameCatchAll matrix
@@ -1185,10 +1192,10 @@ coverageRow families colScruts colTypes pats =
 --
 -- A top-level column is classified by its type after substitution and
 -- synonym expansion (the caller's @colTypesExpanded@), never by the
--- pattern's annotation, which the
--- 'quietly' re-resolution leaves unsubstituted; a nested position has only
--- its annotation, and an inference variable there is not primitive, so an
--- EXACTLY under it stands the group down.
+-- pattern's annotation; a nested position has only its annotation, resolved
+-- as far as the substitution goes ('checkClauseMatrix'), and an inference
+-- variable left there is not primitive, so an EXACTLY under it stands the
+-- group down.
 coveragePattern
   :: Map Unique [(Resolved, Int)]
   -> Resolved

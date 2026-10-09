@@ -270,10 +270,11 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       ]
     missingClauses exactly `shouldBe` ["DECIDE `f` a IS"]
 
-  it "stands down for an EXACTLY of a constant under a record's field" $ do
-    -- The field's type is read off the pattern's annotation, which the
-    -- re-resolution leaves as an inference variable, so the EXACTLY is not
-    -- read as one of a number's endless values; the group gets no warning.
+  it "leaves out a clause with an EXACTLY of a constant under a record's field" $ do
+    -- The field's type is read off the pattern's annotation, resolved
+    -- through the substitution of the re-resolution, so the EXACTLY is one
+    -- of a number's endless values there, as at the top level: the clause
+    -- counts for nothing, and every box is still open for Premium.
     ws <- clauseWarnings $ Text.unlines
       [ "DECLARE Tier IS ONE OF Basic, Premium"
       , "DECLARE Box HAS n IS A NUMBER"
@@ -286,7 +287,7 @@ spec = describe "Multi-clause DECIDE: missing-case warning" $ do
       , "DECIDE f (Box (EXACTLY zero)) Premium IS 1"
       , "DECIDE f (Box n)              Basic   IS 2"
       ]
-    ws `shouldBe` []
+    missingClauses ws `shouldBe` ["DECIDE `f` (Box `_`) Premium IS"]
 
   it "stands down for EXACTLY over an enumeration declared in another file" $ do
     ws <- filter isClauseWarning <$> warningsWith
