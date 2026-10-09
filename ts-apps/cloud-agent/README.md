@@ -77,6 +77,35 @@ tail -f /tmp/cs/sessions/$SID/state/events/1.jsonl
 `abort`, `stop`, …). Files the agent writes land in
 `/tmp/cs/sessions/$SID/repo/` (`data/`, `tmp/`).
 
+## Image
+
+`docker/Dockerfile` (base `node:24-trixie-slim`, plus `git`, `tini`,
+`ca-certificates`, `libgmp10`, `libffi8`, `zlib1g`, the linux-arm64 `jl4-lsp`
+at `/app/bin/jl4-lsp` and the bundle at `/app/cloud-agent.cjs`; user
+`1000:1000`; entry point `tini -- /app/entrypoint`). `docker/entrypoint.sh`
+ignores its arguments, validates `SESSION_ID`, `AGENT_KEY`, `AI_PROXY_URL`,
+`MCP_URL`, `AUTH_URL`, `LOG_LEVEL` (and keeps the Fargate
+`ECS_CONTAINER_METADATA_URI_V4`), drops every other variable, writes the git
+config into `HOME=/home/agent` and execs the harness. `docker/smoke.sh <image>`
+checks the image offline (contents, a rejected environment, and a start that
+parks without network).
+
+`.github/workflows/cloud-agent-image.yml` builds `jl4-lsp` for linux-arm64,
+bundles and tests the harness, builds the image on an arm64 runner, runs the
+smoke test, pushes `legalese-cloud-agent:<git sha>` to ECR and writes the
+digest to SSM `/cloud-sessions/<env>/image-digest` (rolling back = writing the
+previous digest). It runs on pushes to `main` that touch the harness, its core,
+`jl4-lsp` or `jl4-core`, and manually (optionally without publishing).
+
+To build locally (Docker with arm64 support):
+
+```sh
+npm run build
+cp "$(cabal list-bin exe:jl4-lsp)" bin/jl4-lsp   # a linux-arm64 build
+docker buildx build --platform linux/arm64 -f docker/Dockerfile -t cloud-agent:dev --load .
+docker/smoke.sh cloud-agent:dev
+```
+
 ## Tests
 
 `npm test` (fake language server, fake ai-proxy, temp dirs). Set
