@@ -288,6 +288,7 @@ test-suite jl4-core-test
     ApiStateGraphLensSpec
     SmartPunctuationSpec
     TimezoneTimeoutSpec
+    ConsiderScaleSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

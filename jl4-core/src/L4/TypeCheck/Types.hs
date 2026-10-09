@@ -8,7 +8,7 @@ import Base
 import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
-import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
+import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
@@ -2182,14 +2182,76 @@ instance ApplySubst (Type' Resolved) where
 instance ApplySubst (OptionallyNamedType Resolved) where
   applySubst (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn <$> applySubst t
 
+-- | The type 'applySubst' makes of a type, read off a snapshot of the
+-- substitution. Only the path compression 'applySubst' writes back is left
+-- out, and that changes no answer: it saves later lookups, and every reader
+-- of the substitution chases it to the end.
+--
+-- For a structure that is only read, this is the cheap way to resolve the
+-- types in it. 'applySubst' through 'gplate' rebuilds every node of the
+-- structure inside 'Check', annotations and tokens included, and holds the
+-- rebuilt nodes as closures until they are read; @'Optics.over' ('gplate'
+-- \@('Type'' 'Resolved')) ('substituteInfVars' s)@ rebuilds a node when it
+-- is read.
+substituteInfVars :: Substitution -> Type' Resolved -> Type' Resolved
+substituteInfVars s = go
+  where
+    go = \ case
+      Type ann       -> Type ann
+      TyApp ann n ts -> TyApp ann n (map go ts)
+      Fun ann onts t -> Fun ann (map goNamed onts) (go t)
+      Forall ann ns t -> Forall ann ns (go t)
+      InfVar ann rn i -> maybe (InfVar ann rn i) go (Map.lookup i s)
+    goNamed (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn (go t)
+
 instance ApplySubst CheckError where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckError) applySubst
 
 instance ApplySubst CheckErrorContext where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorContext) applySubst
 
+-- | The context is resolved lazily ('substituteInfVars'), and only when it
+-- holds a type the substitution changes ('contextChanges'); otherwise it is
+-- kept as it is. It is the syntax that was being checked when the
+-- diagnostic was raised, as written, so it can be a whole definition, such
+-- as a CONSIDER of thousands of arms for a warning about that CONSIDER, and
+-- each level of it holds the levels inside it. 'applySubst' rebuilt all of
+-- it, for each diagnostic raised inside it, whether anything read it or
+-- not; rebuilt lazily, it is still rebuilt in full where the diagnostics
+-- are forced, as the language server's rules force them, and a copy per
+-- level made a CONSIDER nested 600 deep, warned about at the innermost
+-- level, peak at 390 MB. Kept, it is shared.
 instance ApplySubst CheckErrorWithContext where
-  applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorWithContext) applySubst
+  applySubst (MkCheckErrorWithContext e ctx) = do
+    e' <- applySubst e
+    s <- use #substitution
+    let ctx'
+          | contextChanges s ctx = Optics.over (gplate @(Type' Resolved)) (substituteInfVars s) ctx
+          | otherwise = ctx
+    pure (MkCheckErrorWithContext e' ctx')
+
+-- | Whether 'substituteInfVars' changes a type in this context. A context is
+-- syntax as written, over 'Name's, so a 'Type'' 'Resolved' can only sit in
+-- an annotation's extras (its 'resolvedInfo', or the names of a resolved
+-- annotation); each annotation's extras are searched, and the syntax around
+-- them is walked only as far as its annotations, never into their tokens,
+-- which are most of it.
+contextChanges :: Substitution -> CheckErrorContext -> Bool
+contextChanges s =
+  Optics.anyOf (gplate @Anno) \ (a :: Anno) ->
+    Optics.anyOf (gplate @(Type' Resolved) @Extension) (substitutionChanges s) (Optics.view annoExtra a)
+
+-- | Whether 'substituteInfVars' changes this type: whether it mentions an
+-- inference variable the substitution binds.
+substitutionChanges :: Substitution -> Type' Resolved -> Bool
+substitutionChanges s = go
+  where
+    go = \ case
+      Type _         -> False
+      TyApp _ _ ts   -> any go ts
+      Fun _ onts t   -> any (go . optionallyNamedTypeType) onts || go t
+      Forall _ _ t   -> go t
+      InfVar _ _ i   -> Map.member i s
 
 instance ApplySubst EntityInfo where
   applySubst = traverse (\(n, entity) -> (n, ) <$> applySubst entity)

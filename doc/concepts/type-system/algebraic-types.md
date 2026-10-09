@@ -99,7 +99,7 @@ GIVETH A STRING
 L4 checks that a `CONSIDER` over an algebraic type covers all of its constructors. If a case is missing, the compiler emits a **warning**:
 
 ```l4
--- ⚠️ Warning: "The following branches still need to be considered: WHEN Rejected THEN"
+-- ⚠️ Warning: "The following branches still need to be considered: WHEN Rejected `_` THEN"
 CONSIDER status
 WHEN Pending THEN "..."
 WHEN Paid d a THEN "..."
@@ -107,7 +107,7 @@ WHEN Paid d a THEN "..."
 
 The checker also warns about **redundant** branches that can never be reached. Two caveats:
 
-- The check applies to algebraic types with a known, finite set of constructors. Scrutinees of primitive types (`NUMBER`, `STRING`, `DATE`) are not checked, because their values cannot be enumerated.
+- The check enumerates constructors, so it can list the missing ones only for algebraic types with a known, finite set of them. Over a `NUMBER`, a `STRING` or a `DATE`, whose values cannot be enumerated, it can only ask for an `OTHERWISE`.
 - A missing case is a warning, not a hard error — the program still compiles and runs.
 
 See [Exhaustiveness](exhaustiveness.md) for why this check matters legally, and why it is a warning rather than an error.

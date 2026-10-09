@@ -682,9 +682,44 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `label` Suspended IS
 ```
 
-When the rule has only one clause, the first line reads "This clause does not cover all cases." instead. The check works out the missing clauses only when no pattern in the rule contains a number or a piece of text, even nested as in `(JUST 1)`, or is an `EXACTLY` pattern, and gives up when there would be more than 64 of them to list. A rule of several clauses then gets no warning. A rule of one clause gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover, but that warning has the same two limits: `DECIDE f (JUST 1) IS 1` on its own gets no warning at all.
+When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
 
-**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions. Whatever the type, a CONSIDER in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`), or is an `EXACTLY` pattern, gets no warning either way, and neither does one with more than 64 missing branches to list. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+A number or a piece of text in a clause matches one value of its input, and there is no end of the other values.
+So a rule whose clauses match particular numbers or texts is complete only with a clause written with the input's name, and the warning suggests that clause:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE describe 0 IS "zero"
+DECIDE describe 1 IS "one"
+```
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `describe` n IS
+```
+
+The other inputs of the same rule are still analysed: a table keyed by a number and a `Tier` that has no clause for `Gold` is told so, for the keyed rows first, in the order the clauses first name the keys, and then for every other number.
+The same goes for a number or a piece of text nested inside a pattern, as in `(JUST 1)` or `(Box 0)`: the clause for the other values is suggested with `` `_` `` in that place.
+A suggested number is written as the first clause that names it spells it (`1.50`, `1_000`, every digit of `0.1234567890123456789`), and a suggested piece of text as L4 writes it, every printable character as it is (`"São Paulo"`) and a character that does not print escaped (`"tab\there"`).
+An input declared under another name for a number, a piece of text or a date (`DECLARE Money IS A NUMBER`) is one to the check.
+`EXACTLY` of a number, a piece of text, or a value of an enumeration is read as that value, and `EXACTLY` of the input's own name matches every input, as the bare name does.
+Any other `EXACTLY`, such as `EXACTLY someConstant`, or `EXACTLY (m PLUS 1)` with `m` another input, compares the input with a value the check cannot name.
+Where that input is a number, a piece of text or a date, at the top of the clause or inside a pattern as in `(Box (EXACTLY zero))`, the clause counts for nothing: it matches one value of the input for each value of the other inputs, and only the clause with the input's name covers the rest, which covers that one too.
+Such a clause may still match some of the inputs the other clauses miss, so the warning then lists only what the clauses without a number or a piece of text leave open, with each input's name in its number and text positions; for a rule keyed only on numbers and texts, that is the one clause with every input's name.
+With `two MEANS 2`, the clauses `DECIDE f 2 "b" IS 1`, `DECIDE f (EXACTLY two) s IS 2` and `DECIDE f 1 s IS 3` list ``DECIDE `f` n s IS`` alone, not `f 2 s`, which the second clause covers.
+Where it is anything else, such as an enumeration or a record, it stops the check for the rule.
+So does an `EXACTLY` whose expression mentions the input it is matched against, as `EXACTLY (n PLUS 0)` does for `n`, since such a clause may match any number of that input's values.
+When there would be more than 64 clauses to list, a rule whose clauses name numbers or texts is told instead what the clauses without a number or a piece of text leave open; when every clause names one, that is the clause with every input's name alone, and a gap inside the table is not listed.
+A rule whose clauses name no number or text gets no missing-clause warning past that cap, and neither does one whose shorter list is also longer than 64 clauses; a clause that is never used is reported either way.
+A rule declared partial on purpose, with `@nonexhaustive` before its `GIVEN`, gets no missing-clause warning.
+A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down where the clause's does, for an `EXACTLY` it cannot read, so `DECIDE f (EXACTLY someColour) IS 1` on its own, with `c IS A Colour`, gets no warning at all.
+
+**Note:** A CONSIDER written by hand reads numbers, pieces of text and `EXACTLY` exactly as the clauses above do, so the two spellings of one rule warn alike.
+A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests OTHERWISE; a keyed gap inside a pattern is suggested as a WHEN, with the key as the branches spell it; a number repeated in another spelling is a redundant branch.
+BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions.
+Past 64 missing branches to list, a CONSIDER is told only what the branches without a number or a piece of text leave open, as clauses are, and gets no warning when that list is too long as well. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
 
@@ -735,7 +770,9 @@ This form is given in rules that match numbers or text too.
 It is not given when a pattern of the rule does not fit its input's type, and not for a new name inside a larger pattern: after `(JUST Gren)`, a clause for `(JUST Blue)` gets the third form below instead.
 When the new name is very close to a value that no clause matches, as `Gren` is to `Green`, a hint at the pattern says so as well.
 
-A third form, "Every input it matches is already matched by a clause above it", is for a clause that repeats an earlier one, or that is covered by a larger pattern above it. It is only given when no pattern in the rule contains a number or a piece of text, or is an `EXACTLY` pattern: in a table keyed by amounts or codes, a repeated clause draws no warning. (`TRUE` and `FALSE` are not numbers or text; a table keyed by them is checked.)
+A third form, "Every input it matches is already matched by a clause above it", is for a clause that repeats an earlier one, or that is covered by a larger pattern above it.
+It is given for numbers and text too: `1` and `1.0` are the same number, so `DECIDE h 1 IS "one"` followed by `DECIDE h 1.0 IS "one point zero"` draws it, and so does a repeated code in a table keyed by text, or a clause after `EXACTLY n` where `n` is the input's own name.
+It is not given when the check stands down for an `EXACTLY` it cannot read (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)).
 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 

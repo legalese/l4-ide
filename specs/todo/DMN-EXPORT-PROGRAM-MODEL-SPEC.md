@@ -5119,8 +5119,14 @@ separate list from the CONSIDER-matched `siMissingRanges` so neither silently mi
 double-reports), so the probe below now reports `D-PARTIAL` **Blocking** and fails
 `--fail-on blocking` while still emitting its two-rule table. Only n ≥ 2 groups are analysed at
 matrix level (n = 1 already warns via the ordinary CONSIDER path); `@nonexhaustive` on the group
-silences it (R4); literal/expression patterns, column-count mismatches, un-resolvable patterns and
+silences it (R4); column-count mismatches, un-resolvable patterns and
 cap overflows all bail **fail-open to no-warning**, the same contract as `analyzePatternMatch`.
+Literal patterns no longer bail (2026-10-09, review of legalese/l4-ide#545 round 2 item 4): a number or a piece of text is one value of a column with no end of values, so a literal group with no catch-all is always incomplete and warns with the GIVEN-name clause.
+Past the 64-row cap the warning lists instead what the literal-free clauses leave open (one all-wildcard row when every clause has a literal), so such a group falls silent only when that shorter list is over the cap too; a clause found never used is reported past the cap as well.
+Only an `EXACTLY` that is neither a literal, a value of the column's type, nor the column's own name still bails, and only in a column that is not a number, a text or a date (an enumeration, a record; a synonym of NUMBER, STRING or DATE is expanded first); in a column of numbers, texts or dates, nested or not, that clause is left out of the analysis, and the group's warning is then the coarse list alone, since the exact one could name a keyed gap the left-out clause covers (`f 2 "b"` / `f (EXACTLY two) s` / `f 1 s` would list `2 s`; refutation of `99b1936cf`, 2026-10-09).
+An `EXACTLY` whose expression mentions its own column's input bails in any column: what it matches depends on that input, so leaving it out would report a gap that is not there.
+One that mentions only other inputs matches one value of its column per value of theirs, and is left out like a constant (the rule main adopted in `46a26e355`; unstable's first fix bailed on any input, and was narrowed to it).
+The DMN exporter's `D-PARTIAL` for a literal group with no catch-all is **not** new: before this change `Dmn/Analysis.hs` raised it for a suppressed analysis with no OTHERWISE arm, and after it for the checker's missing clauses, with the same XML and exit code and only the reason text changed (fit verification of 2026-10-09 on the two-group probe `dm1-literal-group.l4`: the two `.dmn` files compare identical byte for byte, both runs exit 1 with "1 blocking … D-PARTIAL"; no `DmnExport.hs` case pins the reason text).
 
 **The probe is now a committed regression pair** — `jl4/examples/ok/pattern-matching-partial-matrix.l4`
 (+ goldens) for the `l4 check` half, and two `DmnExport.hs` cases (`D-PARTIAL` Blocking with `L1`,
@@ -5157,7 +5163,8 @@ of the first build:
   "already warns via the ordinary CONSIDER path"; measured 2026-10-06 that warning had no location
   (`1:1`) and named a `WHEN` branch the drafter never wrote. A one-clause group now gets
   `PatternClausesMissing` at its head, worded "This clause does not cover all cases". Where the
-  matrix gives up (a literal pattern, or more than 64 missing clauses), a one-clause group keeps the
+  matrix gives up (an `EXACTLY` it cannot read, or more than 64 missing clauses even after the
+  coarse tier; until 2026-10-09 any literal pattern too), a one-clause group keeps the
   `CONSIDER` warning it had, now at its head (`settleOneClause`): the first build dropped it, and
   the review found one-clause groups that checked silently. A group of two clauses or more is
   silent there, as it was.
@@ -5173,9 +5180,10 @@ of the first build:
   binding and failed at run time. The parser records the first such clause in
   `PmMatrix.catchAll`, and the checker warns `PatternClauseUnreachable` at the first clause after
   it. The matrix analysis's redundant rows, computed and discarded until now, are reported the same
-  way (a clause after a fresh-name pattern, a repeated clause), when the analysis runs: not when a
-  pattern is a literal. A program whose unreachable clause is ill-typed used to run and now fails
-  `l4 check`; that is the point of checking it.
+  way (a clause after a fresh-name pattern, a repeated clause, and since 2026-10-09 a repeated
+  number or text), when the analysis runs: not when an `EXACTLY` it cannot read stands the group
+  down (until 2026-10-09, not when any pattern was a literal). A program whose unreachable clause
+  is ill-typed used to run and now fails `l4 check`; that is the point of checking it.
 - **Clause order, locations and names.** `checkClausesLet` checks the `LET` a group is compiled to
   in source order (each clause before the binding of the clauses after it) and gives the binding the
   group's result type, so the first clause settles what the signature left open and a wrong type is

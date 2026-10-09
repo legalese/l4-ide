@@ -1,13 +1,14 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-pattern-matching-one-clause-fallback.l4:14:8-35:
+pattern-matching-one-clause-fallback.l4:22:8-35:
   I found a problem while checking the definition of `one clause with a literal`:
-    The following branches still need to be considered:
+    This clause does not cover all cases. The following clauses are still needed:
     
-      WHEN NOTHING THEN
+      DECIDE `one clause with a literal` 1 NOTHING IS
+      DECIDE `one clause with a literal` n m IS
     
-pattern-matching-one-clause-fallback.l4:24:8-34:
+pattern-matching-one-clause-fallback.l4:32:8-34:
   I found a problem while checking the definition of `one clause three columns`:
     The following branches still need to be considered:
     
@@ -37,7 +38,7 @@ pattern-matching-one-clause-fallback.l4:24:8-34:
       WHEN JUST B24 THEN
       WHEN JUST B25 THEN
     
-pattern-matching-one-clause-fallback.l4:24:8-34:
+pattern-matching-one-clause-fallback.l4:32:8-34:
   I found a problem while checking the definition of `one clause three columns`:
     The following branches still need to be considered:
     
@@ -67,7 +68,7 @@ pattern-matching-one-clause-fallback.l4:24:8-34:
       WHEN JUST B24 THEN
       WHEN JUST B25 THEN
     
-pattern-matching-one-clause-fallback.l4:24:8-34:
+pattern-matching-one-clause-fallback.l4:32:8-34:
   I found a problem while checking the definition of `one clause three columns`:
     The following branches still need to be considered:
     
@@ -97,35 +98,11 @@ pattern-matching-one-clause-fallback.l4:24:8-34:
       WHEN JUST B24 THEN
       WHEN JUST B25 THEN
     
-pattern-matching-one-clause-fallback.l4:30:8-32:
+pattern-matching-one-clause-fallback.l4:38:8-32:
   I found a problem while checking the definition of `one clause two columns`:
     This clause does not cover all cases. The following clauses are still needed:
     
       DECIDE `one clause two columns` NOTHING y IS
-      DECIDE `one clause two columns` (JUST B02) y IS
-      DECIDE `one clause two columns` (JUST B03) y IS
-      DECIDE `one clause two columns` (JUST B04) y IS
-      DECIDE `one clause two columns` (JUST B05) y IS
-      DECIDE `one clause two columns` (JUST B06) y IS
-      DECIDE `one clause two columns` (JUST B07) y IS
-      DECIDE `one clause two columns` (JUST B08) y IS
-      DECIDE `one clause two columns` (JUST B09) y IS
-      DECIDE `one clause two columns` (JUST B10) y IS
-      DECIDE `one clause two columns` (JUST B11) y IS
-      DECIDE `one clause two columns` (JUST B12) y IS
-      DECIDE `one clause two columns` (JUST B13) y IS
-      DECIDE `one clause two columns` (JUST B14) y IS
-      DECIDE `one clause two columns` (JUST B15) y IS
-      DECIDE `one clause two columns` (JUST B16) y IS
-      DECIDE `one clause two columns` (JUST B17) y IS
-      DECIDE `one clause two columns` (JUST B18) y IS
-      DECIDE `one clause two columns` (JUST B19) y IS
-      DECIDE `one clause two columns` (JUST B20) y IS
-      DECIDE `one clause two columns` (JUST B21) y IS
-      DECIDE `one clause two columns` (JUST B22) y IS
-      DECIDE `one clause two columns` (JUST B23) y IS
-      DECIDE `one clause two columns` (JUST B24) y IS
-      DECIDE `one clause two columns` (JUST B25) y IS
       DECIDE `one clause two columns` (JUST B01) NOTHING IS
       DECIDE `one clause two columns` (JUST B01) (JUST B02) IS
       DECIDE `one clause two columns` (JUST B01) (JUST B03) IS
@@ -151,10 +128,49 @@ pattern-matching-one-clause-fallback.l4:30:8-32:
       DECIDE `one clause two columns` (JUST B01) (JUST B23) IS
       DECIDE `one clause two columns` (JUST B01) (JUST B24) IS
       DECIDE `one clause two columns` (JUST B01) (JUST B25) IS
+      DECIDE `one clause two columns` (JUST B02) y IS
+      DECIDE `one clause two columns` (JUST B03) y IS
+      DECIDE `one clause two columns` (JUST B04) y IS
+      DECIDE `one clause two columns` (JUST B05) y IS
+      DECIDE `one clause two columns` (JUST B06) y IS
+      DECIDE `one clause two columns` (JUST B07) y IS
+      DECIDE `one clause two columns` (JUST B08) y IS
+      DECIDE `one clause two columns` (JUST B09) y IS
+      DECIDE `one clause two columns` (JUST B10) y IS
+      DECIDE `one clause two columns` (JUST B11) y IS
+      DECIDE `one clause two columns` (JUST B12) y IS
+      DECIDE `one clause two columns` (JUST B13) y IS
+      DECIDE `one clause two columns` (JUST B14) y IS
+      DECIDE `one clause two columns` (JUST B15) y IS
+      DECIDE `one clause two columns` (JUST B16) y IS
+      DECIDE `one clause two columns` (JUST B17) y IS
+      DECIDE `one clause two columns` (JUST B18) y IS
+      DECIDE `one clause two columns` (JUST B19) y IS
+      DECIDE `one clause two columns` (JUST B20) y IS
+      DECIDE `one clause two columns` (JUST B21) y IS
+      DECIDE `one clause two columns` (JUST B22) y IS
+      DECIDE `one clause two columns` (JUST B23) y IS
+      DECIDE `one clause two columns` (JUST B24) y IS
+      DECIDE `one clause two columns` (JUST B25) y IS
     
-pattern-matching-one-clause-fallback.l4:32:1-45:
+pattern-matching-one-clause-fallback.l4:49:8-33:
+  I found a problem while checking the definition of `one clause four columns`:
+    This clause does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `one clause four columns` n x y z IS
+    
+pattern-matching-one-clause-fallback.l4:58:8-35:
+  I found a problem while checking the definition of `two clauses three columns`:
+    This clause of `two clauses three columns` is never used.
+    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
+    Remove it, or change its patterns.
+pattern-matching-one-clause-fallback.l4:60:1-45:
   5
-pattern-matching-one-clause-fallback.l4:33:1-66:
+pattern-matching-one-clause-fallback.l4:61:1-66:
   1
-pattern-matching-one-clause-fallback.l4:34:1-53:
+pattern-matching-one-clause-fallback.l4:62:1-53:
+  1
+pattern-matching-one-clause-fallback.l4:63:1-67:
+  1
+pattern-matching-one-clause-fallback.l4:64:1-67:
   1
