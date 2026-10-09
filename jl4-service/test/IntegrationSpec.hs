@@ -1785,13 +1785,17 @@ spec = describe "integration" do
       -- Reading a drafter's LET through must never make an answer worse than leaving
       -- it: a chain of LETs that each use the one before twice is read through only
       -- while it is small, and is otherwise the one atom it was.
-      for_ [(3 :: Int, True), (5, False), (7, False)] \(n, readThrough) ->
-        it ("answers a chain of " <> show n <> " doubling LETs fast, " <> (if readThrough then "read through" else "as written")) do
+      for_ [(3 :: Int, True), (5, False), (6, False), (7, False), (10, False), (15, False)] \(n, readThrough) ->
+        it ("answers a chain of " <> show n <> " doubling LETs fast on /query-plan and /ladder, " <> (if readThrough then "read through" else "as written")) do
           withServiceFromSources "chain" [("rule.l4", letChainJL4 n)] \baseUrl mgr -> do
             resp <- queryPlan' baseUrl mgr "chain" "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
             statusCode' resp `shouldBe` 200
             -- left as written, the one question is the LET itself, labelled with its text
             BS.isInfixOf "LET" (LBS.toStrict (responseBody resp)) `shouldBe` not readThrough
+            ld <- getLadder baseUrl mgr "chain" "rule"
+            statusCode' ld `shouldBe` 200
+            -- the plan embeds the ladder the route serves
+            lookupKey "ladder" (decodeObject (responseBody resp)) `shouldBe` (Aeson.decode (responseBody ld) :: Maybe Aeson.Value)
 
       sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
       -- A LET the drafter wrote is read the same way: it must not be one opaque
