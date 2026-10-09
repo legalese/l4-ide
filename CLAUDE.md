@@ -254,6 +254,7 @@ runs prettier only over changed files (a whole-repo `--check` in a fresh worktre
 uninstalled `@repo/prettier-config`, which is an install gap and not a formatting defect), checks
 every commit carries its `Claude-Session:` trailer, and tells you when `L4/Print.hs` is in the diff
 that §3.2.1's evaluation differential is now owed by hand.
+Three probes run only when the diff touches what they guard: parse time at 1,000 against 4,000 lines when `jl4-core/src/L4/Parser*` changes, the same `jl4-service` calls before and after a restart from `bundle.cbor` when `jl4-service/` changes, and a warning for CLI tests that compare output without dropping `'\r'` when `jl4/tests-cli/` changes (`specs/todo/MAIN-PRE-REVIEW.md` §6).
 
 **A green run is not a green CI** — the script says so at the end, and lists what it did not run.
 See §3.3.
