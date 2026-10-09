@@ -907,18 +907,23 @@ data PmMatrixClause = MkPmMatrixClause
     -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
     -- clause is attached to it ('L4.Parser.ResolveAnnotation')
   , clauseAka :: Maybe (Aka Name)
-  , clauseDesc :: Maybe Desc
-    -- ^ the @\@desc@ or @\@export@ written above a later clause
-    -- ('L4.Parser.ResolveAnnotation'); the first clause's is on the group's
-    -- own annotation
+  , clauseDescs :: [Desc]
+    -- ^ every @\@desc@ and @\@export@ written between the clause above and a
+    -- later clause, in source order ('L4.Parser.ResolveAnnotation'); a
+    -- separated overload keeps one of them, as a definition does
+    -- ('L4.Parser.ResolveAnnotation.pickDesc'). The first clause's are the
+    -- group's own, as a plain definition's are.
+  , clauseNlgs :: [Nlg]
+    -- ^ every @\@nlg@ written between the clause above and a later clause, in
+    -- source order; the one a separated overload uses is on @clauseHead@
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrixClause where
-  rnf (MkPmMatrixClause r ps h a d) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d
+  rnf (MkPmMatrixClause r ps h a d n) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n
 
 instance ToExpr PmMatrixClause where
-  toExpr (MkPmMatrixClause r ps h a d) = toExpr (r, ps, h, a, d)
+  toExpr (MkPmMatrixClause r ps h a d n) = toExpr (r, ps, h, a, (d, n))
 
 -- | The source clause matrix of a multi-clause pattern-matching group,
 -- attached by the parser to the fused Decide's annotation BEFORE
@@ -1697,8 +1702,8 @@ deriving anyclass instance Serialise SrcRange
 -- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
 -- definitions), so their instances are written by hand, via tuples.
 instance Serialise PmMatrixClause where
-  encode (MkPmMatrixClause r ps h a d) = encode (r, ps, h, a, d)
-  decode = (\ (r, ps, h, a, d) -> MkPmMatrixClause r ps h a d) <$> decode
+  encode (MkPmMatrixClause r ps h a d n) = encode (r, ps, h, a, (d, n))
+  decode = (\ (r, ps, h, a, (d, n)) -> MkPmMatrixClause r ps h a d n) <$> decode
 instance Serialise PmMatrix where
   encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
   decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode

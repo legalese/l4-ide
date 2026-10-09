@@ -89,6 +89,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
+import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
@@ -487,9 +488,10 @@ separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
     rangedAnno r = mkAnno [mkHoleWithSrcRangeHint r]
 
     -- A later definition carries what was written for its own clause: the
-    -- @\@desc@ or @\@export@ above it ('PmMatrixClause' @clauseDesc@); its
+    -- @\@desc@ or @\@export@ above it, one of them if there are several, as
+    -- a definition keeps ('PmMatrixClause' @clauseDescs@, 'pickDesc'); its
     -- head, with any @\@nlg@ above it, and its @AKA@ come with the clause.
-    clauseAnno cl b = maybe id setDesc cl.clauseDesc (rangedAnno (clauseSpan cl b))
+    clauseAnno cl b = maybe id setDesc (pickDesc cl.clauseDescs) (rangedAnno (clauseSpan cl b))
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
@@ -1790,20 +1792,21 @@ checkClauseMatrix dec dHead =
 -- A redundant clause is unreachable because the group tries its clauses in
 -- order and the first match wins, so this is the same finding as a redundant
 -- WHEN branch, in the terms the drafter wrote.
--- | One warning for each @\@desc@, @\@export@ or @\@nlg@ written above a later
--- clause of a group, which uses none of them: the parser keeps them on the
--- clause ('PmMatrixClause' @clauseDesc@, and the @\@nlg@ on @clauseHead@), for
--- a run that turns out to be overloads ('separateOverloads'), whose
--- definitions do use them. A group takes its annotations from above its first
--- clause, which the parser gives to the definition itself.
+-- | One warning for each @\@desc@, @\@export@ or @\@nlg@ written between two
+-- clauses of a group, which uses none of them: the parser keeps them on the
+-- later clause ('PmMatrixClause' @clauseDescs@ and @clauseNlgs@), for a run
+-- that turns out to be overloads ('separateOverloads'), whose definitions do
+-- use them. A group's own are those above its first clause, which the parser
+-- reads as a plain definition's.
 warnLaterClauseAnnotations :: PmMatrix -> Name -> Check ()
 warnLaterClauseAnnotations matrix headName =
   for_ (zip [2 ..] (drop 1 matrix.clauses)) \ (k, cl) -> do
-    for_ cl.clauseDesc \ d -> for_ (rangeOf d) \ r ->
-      addWarning (ClauseAnnotationUnused r headName k (if (Export.parseDescText (getDesc d)).flags.isExport then "@export" else "@desc"))
-    let hd = getAnno cl.clauseHead
-    for_ (maybeToList (view annNlg hd) <> view annNlgAlts hd) \ nlg -> for_ (rangeOf nlg) \ r ->
-      addWarning (ClauseAnnotationUnused r headName k "@nlg")
+    for_ cl.clauseDescs \ d -> for_ (rangeOf d) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k (if (Export.parseDescText (getDesc d)).flags.isExport then "@export" else "@desc") hasGiven)
+    for_ cl.clauseNlgs \ nlg -> for_ (rangeOf nlg) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k "@nlg" hasGiven)
+  where
+    hasGiven = not matrix.synthesizedScrutinees
 
 warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Maybe (Int, [Name]) -> Check ()
 warnUnreachableClauses matrix headName redundant newNameCatchAll = do
@@ -7743,12 +7746,16 @@ prettyCheckWarning = \ case
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
     ]
-  ClauseAnnotationUnused _ headName k annotation ->
+  ClauseAnnotationUnused _ headName k annotation hasGiven ->
     [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."
-    , "A rule written as clauses takes its @desc, @export and @nlg from above its first clause only."
-    , "Move it above the first clause, or remove it."
+    , "A rule written as clauses takes its " <> annotation <> " from " <> place <> " only."
+    , "Move it there, or remove it."
     ]
     where
+      place
+        | annotation == "@nlg" = "the line above its first clause"
+        | hasGiven = "above its GIVEN"
+        | otherwise = "above its first clause"
       whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
         w : _ | k >= 1 -> "the " <> w <> " clause"
         _ -> "clause " <> Text.textShow k

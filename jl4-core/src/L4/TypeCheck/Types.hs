@@ -397,12 +397,14 @@ data CheckWarning
     -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
     -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
     -- range, the group's head name for display, and why.
-  | ClauseAnnotationUnused SrcRange Name Int Text
-    -- ^ An @\@desc@, @\@export@ or @\@nlg@ written above a later clause of a
+  | ClauseAnnotationUnused SrcRange Name Int Text Bool
+    -- ^ An @\@desc@, @\@export@ or @\@nlg@ written between two clauses of a
     -- multi-clause group, which takes its annotations from above its first
     -- clause only ('L4.TypeCheck.checkClauseMatrix'). Carries the
-    -- annotation's range, the group's head name, the clause's number
-    -- (counting from 1) and the annotation as written (@\@export@, say).
+    -- annotation's range, the group's head name, the later clause's number
+    -- (counting from 1), the annotation as written (@\@export@, say), and
+    -- whether the group has a GIVEN, which is where its @\@desc@ and
+    -- @\@export@ go.
   | FixityIgnoredNonBinary RawName (Maybe SrcRange)
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
@@ -824,7 +826,7 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
-  rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _)) = Just r
+  rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead

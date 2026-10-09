@@ -1231,7 +1231,8 @@ desugarPatternClauses sig rawToks firstC restCs =
               , patterns  = pmPats c
               , clauseHead = pmHead c
               , clauseAka = pmAka c
-              , clauseDesc = Nothing
+              , clauseDescs = []
+              , clauseNlgs = []
               }
           | c <- clauses
           ]

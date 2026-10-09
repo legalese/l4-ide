@@ -717,11 +717,11 @@ writtenClauses ann (MkAppForm _ hd _ _) expr = do
   pure
     [ vcatHard $
         -- What was written for each clause alone ('PmMatrixClause'): its
-        -- @AKA@, and for a later clause the @\@desc@ or @\@export@ above it
-        -- and its head as written (with any @\@nlg@ on it). A run of bare
+        -- @AKA@, and for a later clause the @\@desc@s and @\@export@s above
+        -- it and its head as written (with any @\@nlg@ on it). A run of bare
         -- names that the checker separates into overloads gives each its
         -- own, so a printed module must keep them with their clauses.
-        [ "@desc" <+> pretty (Text.strip (getDesc d)) | i > 0, Just d <- [cl.clauseDesc] ]
+        [ "@desc" <+> pretty (Text.strip (getDesc d)) | i > 0, d <- cl.clauseDescs ]
         <>
         [ "DECIDE" <+> (if i == 0 then printWithLayout hd else printWithLayout cl.clauseHead)
             <> foldMap ((space <>) . parensIfNeeded) pats

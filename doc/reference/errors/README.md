@@ -749,8 +749,8 @@ A clause that is never used is still checked against the rule's `GIVEN` and `GIV
 
 ```
 This @export is above the second clause of `colour code`, where it is not used.
-A rule written as clauses takes its @desc, @export and @nlg from above its first clause only.
-Move it above the first clause, or remove it.
+A rule written as clauses takes its @export from above its GIVEN only.
+Move it there, or remove it.
 ```
 
 **What you wrote:**
@@ -765,13 +765,15 @@ DECIDE `colour code` Red IS 1
 DECIDE `colour code` Green IS 2
 ```
 
-**What went wrong:** A rule written as clauses is one rule, and its annotations are written once, above its first clause.
-An `@export` above a later clause does not publish the rule, a `@desc` there does not describe it, and an `@nlg` there is not used when the rule is put into words.
+**What went wrong:** A rule written as clauses is one rule, and its annotations are written once, where a rule written as one definition has them.
+An `@export` between two clauses does not publish the rule, a `@desc` there does not describe it, and an `@nlg` there is not used when the rule is put into words.
 The warning appears once at each such annotation.
 
 Definitions that share a name but are told apart by their types, such as `DECIDE show n IS n + 1` followed by `DECIDE show b IS b AND TRUE`, are separate definitions rather than one rule, and each keeps the annotations above it, so they draw no warning.
 
-**How to fix it:** Move the annotation above the first clause, for example above the rule's `GIVEN`, or remove it.
+**How to fix it:** Move the annotation to where the rule's own go, or remove it.
+An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause if it has no `GIVEN`.
+An `@nlg` goes on the line above the first clause.
 
 ---
 
