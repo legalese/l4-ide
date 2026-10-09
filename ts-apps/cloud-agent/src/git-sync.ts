@@ -21,15 +21,111 @@ export const TURN_ID_TRAILER = 'Turn-Id'
 /** `git gc` gets at most this long on sleep. */
 const GC_TIMEOUT_MS = 60_000
 
-/** First line of a prompt, for a commit subject. */
-export function commitSubject(text: string, fallback: string): string {
-  const line =
+/** Commit subjects are capped at this many characters. */
+export const SUBJECT_MAX = 72
+/** The commit summary gets at most this long (a hard limit). */
+export const SUMMARY_TIMEOUT_MS = 5_000
+/** How much of the turn the summary request carries. */
+const SUMMARY_PROMPT_CHARS = 500
+const SUMMARY_REPLY_CHARS = 1_000
+const SUMMARY_MAX_PATHS = 30
+/** The `Prompt:` line in a commit body is capped at this length. */
+const PROMPT_LINE_MAX = 300
+
+/** C0/C1 control characters (and DEL). */
+const CONTROL_RE = /\p{Cc}/gu
+const QUOTES = '"\'`“”‘’«»'
+
+function firstLine(text: string): string {
+  return (
     text
-      .split('\n')
-      .map((l) => l.trim())
+      .split(/\r?\n|[\u2028\u2029]/)
+      .map((l) => l.replace(CONTROL_RE, ' ').replace(/\s+/g, ' ').trim())
       .find((l) => l.length > 0) ?? ''
-  if (!line) return fallback
-  return line.length > 72 ? line.slice(0, 71) + '…' : line
+  )
+}
+
+function cap(line: string, max: number): string {
+  return line.length > max ? line.slice(0, max - 1).trimEnd() + '…' : line
+}
+
+/** First line of a prompt, for a commit subject (the fallback when no
+ *  summary can be generated). */
+export function commitSubject(text: string, fallback: string): string {
+  const line = firstLine(text)
+  return line ? cap(line, SUBJECT_MAX) : fallback
+}
+
+/**
+ * Turn a model's answer into a commit subject: its first non-empty
+ * line, control characters stripped, list markers / "Subject:" labels /
+ * a wrapping pair of quotes / trailing periods removed, capped at
+ * {@link SUBJECT_MAX}. `null` when nothing usable is left.
+ */
+export function sanitizeSubject(raw: string): string | null {
+  let line = firstLine(raw)
+  line = line
+    .replace(/^(?:[-*•]\s+|#+\s+)/, '')
+    .replace(/^(?:commit\s+(?:subject|message)|subject)\s*:\s*/i, '')
+  // Trailing periods and a wrapping pair of quotes, in whatever order
+  // they nest. Quotes inside the line are left alone.
+  for (let i = 0; i < 4; i++) {
+    let next = line.replace(/[.。]+$/, '').trim()
+    if (
+      next.length >= 2 &&
+      QUOTES.includes(next[0]!) &&
+      QUOTES.includes(next[next.length - 1]!)
+    ) {
+      next = next.slice(1, -1).trim()
+    }
+    if (next === line) break
+    line = next
+  }
+  if (line.length < 3) return null
+  return cap(line, SUBJECT_MAX)
+}
+
+/** A staged change: `A` added, `M` modified, `D` deleted (others as git
+ *  reports them). */
+export interface ChangedPath {
+  status: string
+  path: string
+}
+
+/** The summize request for a turn's commit subject. */
+export function summaryMessages(
+  turn: { prompt: string; reply?: string },
+  changes: ChangedPath[]
+): Array<{ role: 'system' | 'user'; content: string }> {
+  const clip = (text: string, max: number): string => {
+    const t = text.trim()
+    return t.length > max ? t.slice(0, max) + '…' : t
+  }
+  const lines = changes
+    .slice(0, SUMMARY_MAX_PATHS)
+    .map((c) => `${c.status} ${cap(c.path.replace(CONTROL_RE, ' '), 200)}`)
+  if (changes.length > SUMMARY_MAX_PATHS) {
+    lines.push(`(and ${changes.length - SUMMARY_MAX_PATHS} more)`)
+  }
+  return [
+    {
+      role: 'system',
+      content:
+        'You write git commit subject lines. You are given what a user asked ' +
+        "an AI assistant, the assistant's final reply, and the files the " +
+        'assistant changed. Answer with ONE line that says what changed: ' +
+        `imperative mood (like "Add …" or "Fix …"), at most ${SUBJECT_MAX} ` +
+        'characters, no quotes, no trailing period, no explanation.',
+    },
+    {
+      role: 'user',
+      content:
+        `User request:\n${clip(turn.prompt, SUMMARY_PROMPT_CHARS) || '(empty)'}\n\n` +
+        `Assistant's final reply:\n${clip(turn.reply ?? '', SUMMARY_REPLY_CHARS) || '(none)'}\n\n` +
+        `Changed files (A added, M modified, D deleted):\n${lines.join('\n')}\n\n` +
+        'Commit subject:',
+    },
+  ]
 }
 
 /**
@@ -39,10 +135,13 @@ export function commitSubject(text: string, fallback: string): string {
  * - **Start.** `git init -b main` if there's no repository (dev mode;
  *   the Sessions API pre-creates it), a "Seed" commit if there are no
  *   commits, then `state/git/main.bundle`.
- * - **Per turn.** If the turn changed anything: `git add -A`, commit
- *   with the prompt's first line and a `Turn-Id: <turnId>` trailer,
- *   rewrite `main.bundle` (temp file + rename), emit
- *   `git-committed { turnId, sha, parent }`.
+ * - **Per turn.** If the turn changed anything: `git add -A`, then a
+ *   commit whose subject is a one-line summary of the turn from
+ *   ai-proxy's summize pipeline (≤ 5 s; on a timeout, error or unusable
+ *   answer: the prompt's first line), whose body is
+ *   `Prompt: <first line of the prompt>`, with a `Turn-Id: <turnId>`
+ *   trailer. Then rewrite `main.bundle` (temp file + rename) and emit
+ *   `git-committed { turnId, sha, parent, summary }`.
  * - **`apply-bundle { file }`** (queued, so it runs between turns):
  *   fetch `state/git/incoming/<file>` (a `local ^main` bundle) into
  *   `refs/incoming/<ulid>`, merge it into `main`, rewrite the bundle,
@@ -65,7 +164,14 @@ export class GitSync implements RunnerPlugin {
   /** Turns rolled back since the last prompt. */
   private rolledBack: string[] = []
 
-  constructor(private readonly baseEnv: NodeJS.ProcessEnv) {}
+  private readonly summaryTimeoutMs: number
+
+  constructor(
+    private readonly baseEnv: NodeJS.ProcessEnv,
+    opts: { summaryTimeoutMs?: number } = {}
+  ) {
+    this.summaryTimeoutMs = opts.summaryTimeoutMs ?? SUMMARY_TIMEOUT_MS
+  }
 
   private get bundlePath(): string {
     return path.join(this.ctx.stateDir, 'git', 'main.bundle')
@@ -157,9 +263,13 @@ export class GitSync implements RunnerPlugin {
   }
 
   async afterTurn(turn: TurnInfo): Promise<void> {
+    const promptLine = cap(firstLine(turn.prompt), PROMPT_LINE_MAX)
     const committed = await this.commitChanges(
-      commitSubject(turn.prompt, `Turn ${turn.turnId}`),
-      turn.turnId
+      (changes) => this.turnSubject(turn, changes),
+      {
+        turnId: turn.turnId,
+        ...(promptLine ? { body: `Prompt: ${promptLine}` } : {}),
+      }
     )
     if (!committed) return
     this.ctx.emit({
@@ -167,7 +277,43 @@ export class GitSync implements RunnerPlugin {
       turnId: turn.turnId,
       sha: committed.sha,
       parent: committed.parent,
+      summary: committed.subject,
     })
+  }
+
+  /**
+   * The subject for a turn's commit: a one-line summary from summize,
+   * or — on a timeout, an error or an unusable answer — the prompt's
+   * first line. Never throws and never takes longer than the timeout.
+   */
+  private async turnSubject(
+    turn: TurnInfo,
+    changes: ChangedPath[]
+  ): Promise<string> {
+    const fallback = commitSubject(turn.prompt, `Turn ${turn.turnId}`)
+    const started = Date.now()
+    let timer: NodeJS.Timeout | undefined
+    let subject: string | null = null
+    try {
+      const raw = await Promise.race([
+        this.ctx.summize(summaryMessages(turn, changes), {
+          signal: AbortSignal.timeout(this.summaryTimeoutMs),
+        }),
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), this.summaryTimeoutMs)
+        }),
+      ])
+      subject = raw ? sanitizeSubject(raw) : null
+    } catch {
+      subject = null
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+    // The summary is content: only how it went is logged.
+    this.ctx.logger.info(
+      `git: commit summary ${subject ? 'generated' : 'unavailable, using the prompt'} (${Date.now() - started} ms)`
+    )
+    return subject ?? fallback
   }
 
   /**
@@ -227,23 +373,55 @@ export class GitSync implements RunnerPlugin {
 
   // ── Operations ─────────────────────────────────────────────────────
 
-  /** Commit everything that changed; `null` when nothing did. */
+  /**
+   * Commit everything that changed; `null` when nothing did. `subject`
+   * may be computed from the staged changes (it is only asked for when
+   * there is something to commit). The message is the subject, then
+   * `body`, then the `Turn-Id` trailer, each its own paragraph.
+   */
   private async commitChanges(
-    subject: string,
-    turnId?: string
-  ): Promise<{ sha: string; parent: string } | null> {
+    subject: string | ((changes: ChangedPath[]) => Promise<string>),
+    opts: { turnId?: string; body?: string } = {}
+  ): Promise<{ sha: string; parent: string; subject: string } | null> {
     await this.git.ok(['add', '-A'])
     const diff = await this.git.run(['diff', '--cached', '--quiet'])
     if (diff.code === 0) return null
     const parent = await this.git.head()
-    const message = turnId
-      ? `${subject}\n\n${TURN_ID_TRAILER}: ${turnId}\n`
-      : `${subject}\n`
+    const line =
+      typeof subject === 'string'
+        ? subject
+        : await subject(await this.stagedChanges().catch(() => []))
+    const message =
+      [
+        line,
+        ...(opts.body ? [opts.body] : []),
+        ...(opts.turnId ? [`${TURN_ID_TRAILER}: ${opts.turnId}`] : []),
+      ].join('\n\n') + '\n'
     await this.git.ok(['commit', '-q', '-F', '-'], { input: message })
     const sha = await this.git.head()
     if (!sha || !parent) throw new Error('git: commit produced no HEAD')
     await this.writeBundle()
-    return { sha, parent }
+    return { sha, parent, subject: line }
+  }
+
+  /** What is staged, as `A`/`M`/`D` + path (renames shown as D + A). */
+  private async stagedChanges(): Promise<ChangedPath[]> {
+    const r = await this.git.run([
+      'diff',
+      '--cached',
+      '--name-status',
+      '--no-renames',
+      '-z',
+    ])
+    if (r.code !== 0) return []
+    const parts = r.stdout.split('\0')
+    const out: ChangedPath[] = []
+    for (let i = 0; i + 1 < parts.length; i += 2) {
+      const status = parts[i]!.trim().charAt(0)
+      const file = parts[i + 1]!
+      if (status && file) out.push({ status, path: file })
+    }
+    return out
   }
 
   /** `state/git/main.bundle`: a full bundle of main, temp file + rename. */

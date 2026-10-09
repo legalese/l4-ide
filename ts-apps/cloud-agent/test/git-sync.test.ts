@@ -4,7 +4,12 @@ import { execFileSync } from 'node:child_process'
 import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import type { CloudEventPayload } from '@repo/legalese-agent/protocol'
-import { GitSync, commitSubject } from '../src/git-sync.js'
+import {
+  GitSync,
+  commitSubject,
+  sanitizeSubject,
+  summaryMessages,
+} from '../src/git-sync.js'
 import type { RunnerContext } from '../src/runner.js'
 import { HOST_PATH, MemoryLogger, SID, StubL4, tempDir } from './helpers.js'
 
@@ -35,8 +40,16 @@ describe('GitSync', () => {
   let changed: string[][]
   let ctx: RunnerContext
   let logger: MemoryLogger
+  /** The fake summize pipeline; `null` = no summary (the default). */
+  let summize: RunnerContext['summize']
+  let summizeCalls: Array<{
+    messages: Array<{ role: string; content: string }>
+    signal?: AbortSignal
+  }>
 
   beforeEach(async () => {
+    summize = async () => null
+    summizeCalls = []
     ;({ dir, cleanup } = await tempDir())
     const sessionDir = path.join(dir, 'sessions', SID)
     repo = path.join(sessionDir, 'repo')
@@ -58,6 +71,10 @@ describe('GitSync', () => {
       providers: [],
       filesChanged: async (paths) => {
         changed.push(paths)
+      },
+      summize: (messages, o) => {
+        summizeCalls.push({ messages, signal: o?.signal })
+        return summize(messages, o)
       },
     }
   })
@@ -106,10 +123,21 @@ describe('GitSync', () => {
       prompt: '\n  Write a rule\nwith details',
     })
     const sha = sh(repo, 'rev-parse', 'HEAD')
+    // No summary available: the prompt's first line is the subject.
     assert.deepEqual(events, [
-      { type: 'git-committed', turnId: 'turn-1', sha, parent: seed },
+      {
+        type: 'git-committed',
+        turnId: 'turn-1',
+        sha,
+        parent: seed,
+        summary: 'Write a rule',
+      },
     ])
     assert.equal(sh(repo, 'log', '-1', '--format=%s'), 'Write a rule')
+    assert.equal(
+      sh(repo, 'log', '-1', '--format=%B'),
+      'Write a rule\n\nPrompt: Write a rule\n\nTurn-Id: turn-1'
+    )
     assert.equal(
       sh(repo, 'log', '-1', '--format=%(trailers:key=Turn-Id,valueonly)'),
       'turn-1'
@@ -117,9 +145,120 @@ describe('GitSync', () => {
     // The bundle follows.
     const client = cloneBundle()
     assert.equal(sh(client, 'rev-parse', 'HEAD'), sha)
-    // No changes, no commit.
+    // No changes, no commit — and no summary is asked for.
+    const asked = summizeCalls.length
     await g.afterTurn({ turnId: 'turn-2', prompt: 'nothing' })
     assert.equal(events.length, 1)
+    assert.equal(summizeCalls.length, asked)
+  })
+
+  test('uses the summize summary as the subject, with the prompt in the body', async () => {
+    const g = git()
+    await write('data/old.l4', 'old\n')
+    await write('data/gone.l4', 'gone\n')
+    await g.start(ctx)
+    const seed = sh(repo, 'rev-parse', 'HEAD')
+    await write('data/new.l4', 'new\n')
+    await write('data/old.l4', 'changed\n')
+    await rm(path.join(repo, 'data', 'gone.l4'))
+    // A chatty answer: quotes, a trailing period, a second line.
+    summize = async () =>
+      '  "Add a late fee rule to the tenancy contract."\n\nThis subject describes the change.'
+    await g.afterTurn({
+      turnId: 'turn-1',
+      prompt: 'Please add a late fee of 5%\nand keep the rest as it is',
+      reply: 'I added the late fee rule and removed the unused file.',
+    })
+    const sha = sh(repo, 'rev-parse', 'HEAD')
+    const subject = 'Add a late fee rule to the tenancy contract'
+    assert.equal(
+      sh(repo, 'log', '-1', '--format=%B'),
+      `${subject}\n\nPrompt: Please add a late fee of 5%\n\nTurn-Id: turn-1`
+    )
+    // Only Turn-Id is a trailer; the prompt line is body text.
+    assert.equal(
+      sh(repo, 'log', '-1', '--format=%(trailers:only,unfold)'),
+      'Turn-Id: turn-1'
+    )
+    assert.deepEqual(events, [
+      {
+        type: 'git-committed',
+        turnId: 'turn-1',
+        sha,
+        parent: seed,
+        summary: subject,
+      },
+    ])
+    // What the pipeline was given: prompt, reply, paths with status.
+    assert.equal(summizeCalls.length, 1)
+    const [system, user] = summizeCalls[0]!.messages
+    assert.equal(system!.role, 'system')
+    assert.match(system!.content, /imperative mood/)
+    assert.match(system!.content, /at most 72 characters/)
+    assert.match(
+      user!.content,
+      /Please add a late fee of 5%\nand keep the rest/
+    )
+    assert.match(user!.content, /I added the late fee rule/)
+    assert.match(user!.content, /^A data\/new\.l4$/m)
+    assert.match(user!.content, /^M data\/old\.l4$/m)
+    assert.match(user!.content, /^D data\/gone\.l4$/m)
+    assert.ok(summizeCalls[0]!.signal instanceof AbortSignal)
+    // Rolling back names the summary.
+    await g.handleCommand({ id: 1, ts: 1, type: 'rollback', turnId: 'turn-1' })
+    assert.equal(sh(repo, 'log', '-1', '--format=%s'), `Roll back: ${subject}`)
+    assert.equal(await read('data/gone.l4'), 'gone\n')
+    // The summary never reaches the logs.
+    assert.ok(!logger.lines.some((l) => l.message.includes('late fee')))
+    assert.ok(logger.has('info', /commit summary generated/))
+  })
+
+  for (const [name, answer] of [
+    ['an error', () => Promise.reject(new Error('boom'))],
+    ['no answer', async () => null],
+    ['an empty answer', async () => '   \n  '],
+    ['an unusable answer', async () => '"."'],
+  ] as Array<[string, RunnerContext['summize']]>) {
+    test(`falls back to the prompt's first line on ${name}`, async () => {
+      const g = git()
+      await g.start(ctx)
+      await write('a.l4', 'x\n')
+      summize = answer
+      await g.afterTurn({ turnId: 't1', prompt: 'Draft the clause\nmore' })
+      assert.equal(
+        sh(repo, 'log', '-1', '--format=%B'),
+        'Draft the clause\n\nPrompt: Draft the clause\n\nTurn-Id: t1'
+      )
+      assert.equal(
+        (events[0] as { summary?: string }).summary,
+        'Draft the clause'
+      )
+      assert.ok(logger.has('info', /commit summary unavailable/))
+    })
+  }
+
+  test('a summary that never arrives costs at most the timeout', async () => {
+    const g = new GitSync({ PATH: HOST_PATH }, { summaryTimeoutMs: 80 })
+    await g.start(ctx)
+    await write('a.l4', 'x\n')
+    // Ignores its signal and never settles.
+    summize = () => new Promise<string | null>(() => undefined)
+    const started = Date.now()
+    await g.afterTurn({ turnId: 't1', prompt: 'Slow one' })
+    assert.ok(Date.now() - started < 3_000)
+    assert.equal(sh(repo, 'log', '-1', '--format=%s'), 'Slow one')
+    assert.equal(events.length, 1)
+    // The request was told to stop.
+    await new Promise((r) => setTimeout(r, 60))
+    assert.equal(summizeCalls[0]!.signal?.aborted, true)
+  })
+
+  test('an empty prompt still commits, without a Prompt line', async () => {
+    const g = git()
+    await g.start(ctx)
+    await write('a.l4', 'x\n')
+    await g.afterTurn({ turnId: 't9', prompt: '  \n ' })
+    assert.equal(sh(repo, 'log', '-1', '--format=%B'), 'Turn t9\n\nTurn-Id: t9')
   })
 
   test('never runs repository hooks', async () => {
@@ -329,5 +468,74 @@ describe('commitSubject', () => {
     assert.equal(commitSubject('\n\n  hi there \nmore', 'x'), 'hi there')
     assert.equal(commitSubject('   ', 'fallback'), 'fallback')
     assert.equal(commitSubject('a'.repeat(100), 'x').length, 72)
+    assert.equal(commitSubject('tab\there\u0007 bell', 'x'), 'tab here bell')
+  })
+})
+
+describe('sanitizeSubject', () => {
+  test('one clean line: no quotes, labels, control characters or period', () => {
+    for (const [raw, want] of [
+      ['Add the late fee rule', 'Add the late fee rule'],
+      ['  "Add the late fee rule."  ', 'Add the late fee rule'],
+      ['`Add the late fee rule`.', 'Add the late fee rule'],
+      ['“Fix the date check”', 'Fix the date check'],
+      ['\n\nSubject: Fix the date check\nBody text', 'Fix the date check'],
+      ['Commit message: "Fix the date check."', 'Fix the date check'],
+      ['- Fix the date check', 'Fix the date check'],
+      ['## Fix the date check', 'Fix the date check'],
+      ['Fix\tthe\u0000 date\u001b[0m   check', 'Fix the date [0m check'],
+      ['Fix the date check\r\nSecond line', 'Fix the date check'],
+      ['Fix the date check\u2028Second line', 'Fix the date check'],
+      // Quotes inside the line stay.
+      ["Rename `x` to 'y'", "Rename `x` to 'y'"],
+      ['Say "hello" in the greeting rule.', 'Say "hello" in the greeting rule'],
+    ] as const) {
+      assert.equal(sanitizeSubject(raw), want, JSON.stringify(raw))
+    }
+  })
+
+  test('caps at 72 characters', () => {
+    const long = sanitizeSubject('Add ' + 'very '.repeat(30) + 'long subject')
+    assert.equal(long!.length <= 72, true)
+    assert.match(long!, /…$/)
+    assert.equal(sanitizeSubject('x'.repeat(72)), 'x'.repeat(72))
+  })
+
+  test('nothing usable gives null', () => {
+    for (const raw of [
+      '',
+      '   ',
+      '\n\n',
+      '""',
+      '.',
+      '"."',
+      '\u0000\u0001',
+      'ok',
+    ]) {
+      assert.equal(sanitizeSubject(raw), null, JSON.stringify(raw))
+    }
+  })
+})
+
+describe('summaryMessages', () => {
+  test('truncates the prompt and reply and caps the path list', () => {
+    const changes = Array.from({ length: 45 }, (_, i) => ({
+      status: i % 3 === 0 ? 'A' : i % 3 === 1 ? 'M' : 'D',
+      path: `data/f${i}.l4`,
+    }))
+    const [, user] = summaryMessages(
+      { prompt: 'p'.repeat(2_000), reply: 'r'.repeat(5_000) },
+      changes
+    )
+    const text = user!.content
+    assert.ok(text.includes('p'.repeat(500) + '…'))
+    assert.ok(!text.includes('p'.repeat(501)))
+    assert.ok(text.includes('r'.repeat(1_000) + '…'))
+    assert.ok(!text.includes('r'.repeat(1_001)))
+    assert.equal((text.match(/^[AMD] data\/f\d+\.l4$/gm) ?? []).length, 30)
+    assert.match(text, /\(and 15 more\)/)
+    // No reply (an aborted turn) is said so.
+    const [, bare] = summaryMessages({ prompt: 'x' }, changes.slice(0, 1))
+    assert.match(bare!.content, /final reply:\n\(none\)/)
   })
 })

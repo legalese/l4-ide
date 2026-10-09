@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
+import { execFileSync } from 'node:child_process'
 import * as assert from 'node:assert/strict'
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
@@ -8,6 +9,7 @@ import { initSessionFolder, sendCommand } from '../src/dev.js'
 import { NodeWorkspace } from '../src/node-workspace.js'
 import { GitSync } from '../src/git-sync.js'
 import {
+  ReplyCollector,
   Runner,
   type ChainControl,
   type ExitReason,
@@ -607,10 +609,16 @@ describe('Runner', () => {
   test('commits each turn and rolls it back through commands (git plugin)', async () => {
     proxy.scripts.push([
       metadata('conv5'),
+      chunk({ content: 'Let me create it.' }),
       toolCall('c1', 'fs__create_file', { path: 'data/rule.l4' }),
       chunk({}, 'tool_calls'),
     ])
     proxy.scripts.push([chunk({ content: 'Created.' }), chunk({}, 'stop')])
+    // The summize pipeline writes titles and commit subjects.
+    proxy.summize = (body) =>
+      JSON.stringify(body).includes('Commit subject:')
+        ? '"Create the rule file."'
+        : 'A title'
     const runner = build({
       plugins: [new GitSync({ PATH: HOST_PATH })],
     })
@@ -644,5 +652,62 @@ describe('Runner', () => {
     assert.ok(
       (await readFile(path.join(stateDir, 'git', 'main.bundle'))).length > 0
     )
+    // The commit is labelled with the generated summary, in git and in
+    // the event; the rollback names it.
+    const committed = (await readEvents(stateDir)).find(
+      (e) => e.type === 'git-committed'
+    ) as { summary?: string }
+    assert.equal(committed.summary, 'Create the rule file')
+    const log = execFileSync('git', ['log', '--format=%s', '-2'], {
+      cwd: path.join(sessionDir, 'repo'),
+      encoding: 'utf8',
+      env: { PATH: HOST_PATH },
+    }).trim()
+    assert.equal(log, 'Roll back: Create the rule file\nCreate the rule file')
+    // One stateless request with the session header: the user's own
+    // prompt (not the standing note), the final reply (not the interim
+    // text before the tool call) and the changed paths.
+    const asks = proxy
+      .summizeRequests()
+      .filter((r) => JSON.stringify(r.body).includes('Commit subject:'))
+    assert.equal(asks.length, 1)
+    assert.equal(asks[0]!.headers['x-legalese-session'], SID)
+    assert.equal(asks[0]!.body.conversationId, undefined)
+    const ask = (asks[0]!.body.messages as Array<{ content: string }>)[1]!
+      .content
+    assert.match(ask, /User request:\nCreate a rule\n/)
+    assert.ok(!ask.includes('cloud-session-note'))
+    assert.match(ask, /final reply:\nCreated\.\n/)
+    assert.ok(!ask.includes('Let me create it'))
+    assert.match(ask, /^A data\/rule\.l4$/m)
+  })
+})
+
+describe('ReplyCollector', () => {
+  test('keeps the text after the last tool call', () => {
+    const c = new ReplyCollector()
+    c.begin()
+    c.observe({ kind: 'text-delta', conversationId: 'c', text: 'Let me ' })
+    c.observe({ kind: 'text-delta', conversationId: 'c', text: 'look.' })
+    c.observe({
+      kind: 'tool-call',
+      conversationId: 'c',
+      callId: 'x',
+      name: 'fs__read_file',
+      argsJson: '{}',
+      status: 'running',
+    })
+    // The turn may end on a tool round: the interim text stands in.
+    assert.equal(c.final(), 'Let me look.')
+    c.observe({ kind: 'text-delta', conversationId: 'c', text: ' Done: ' })
+    c.observe({ kind: 'thinking-delta', conversationId: 'c', text: 'hmm' })
+    c.observe({ kind: 'text-delta', conversationId: 'c', text: 'two rules.' })
+    assert.equal(c.final(), 'Done: two rules.')
+    // A queued message starts a new reply.
+    c.observe({ kind: 'turn-spawn', conversationId: 'c', subTurnId: 't_q1' })
+    c.observe({ kind: 'text-delta', conversationId: 'c', text: 'Also done.' })
+    assert.equal(c.final(), 'Also done.')
+    c.begin()
+    assert.equal(c.final(), '')
   })
 })

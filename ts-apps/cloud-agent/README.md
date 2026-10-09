@@ -25,8 +25,11 @@ Built with esbuild into one file, `dist/cloud-agent.cjs` (`npm run build`).
 Plugins (`RunnerPlugin` in `runner.ts`):
 
 - `git-sync.ts` (§9.1, §9.4): a "Seed" commit at start if the repo has none;
-  after each turn that changed files, a commit with a `Turn-Id: <turnId>`
-  trailer and `git-committed { turnId, sha, parent }`; `state/git/main.bundle`
+  after each turn that changed files, a commit whose subject is a one-line
+  summary of the turn from ai-proxy's summize pipeline (hard 5 s limit; the
+  prompt's first line on a timeout, error or unusable answer), with
+  `Prompt: <first line>` as the body and a `Turn-Id: <turnId>` trailer, and
+  `git-committed { turnId, sha, parent, summary }`; `state/git/main.bundle`
   rewritten (temp + rename) after every commit and at start; `apply-bundle`
   merges `state/git/incoming/<ulid>.bundle` (`local ^main`) into `main`
   (`local-merged` / `local-merge-conflict`, the merge aborted on conflict);

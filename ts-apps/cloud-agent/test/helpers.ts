@@ -149,6 +149,9 @@ export interface ProxyRequest {
 export class FakeAiProxy {
   readonly requests: ProxyRequest[] = []
   readonly scripts: Array<string[] | { status: number; body: unknown }> = []
+  /** The summize pipeline's answer (titles, commit summaries); `null`
+   *  answers 503. */
+  summize: (body: Record<string, unknown>) => string | null = () => 'A title'
   /** Resolves a held response when set (to test waiting). */
   hold: Promise<void> | null = null
   private server: Server | null = null
@@ -163,7 +166,13 @@ export class FakeAiProxy {
           const body = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>
           this.requests.push({ url: req.url ?? '', headers: req.headers, body })
           if (body.model === 'legalese-summize-4') {
-            return this.sse(res, [chunk({ content: 'A title' }, 'stop')])
+            const answer = this.summize(body)
+            if (answer === null) {
+              res.writeHead(503, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: { message: 'unavailable' } }))
+              return
+            }
+            return this.sse(res, [chunk({ content: answer }, 'stop')])
           }
           if (this.hold) await this.hold
           const next = this.scripts.shift()
@@ -184,6 +193,10 @@ export class FakeAiProxy {
     await new Promise<void>((r) => this.server!.listen(0, '127.0.0.1', r))
     const { port } = this.server.address() as AddressInfo
     return `http://127.0.0.1:${port}`
+  }
+
+  summizeRequests(): ProxyRequest[] {
+    return this.requests.filter((r) => r.body.model === 'legalese-summize-4')
   }
 
   chatRequests(): ProxyRequest[] {
