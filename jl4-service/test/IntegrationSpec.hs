@@ -23,7 +23,7 @@ import Control.Monad (forM_, guard, unless)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (bracket, try)
-import Data.Foldable (toList)
+import Data.Foldable (for_, toList)
 import qualified Data.List as List
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Aeson as Aeson
@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupBooleanJL4, clauseGroupSingleJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1737,23 +1737,39 @@ spec = describe "integration" do
         statusCode' resp `shouldBe` 200
         lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
 
-    it "answers query-plan and ladder for a BOOLEAN rule written as a clause group" do
-      withServiceFromSources "qp-clauses" [("warm.l4", clauseGroupBooleanJL4)] \baseUrl mgr -> do
-        resp <- queryPlan' baseUrl mgr "qp-clauses" "warm"
-          (Aeson.object ["arguments" Aeson..= Aeson.object []])
-        statusCode' resp `shouldBe` 200
-        lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
-        ldResp <- getLadder baseUrl mgr "qp-clauses" "warm"
-        statusCode' ldResp `shouldBe` 200
-
-    it "answers query-plan and ladder for a clause group of one clause" do
-      withServiceFromSources "qp-clause-one" [("single.l4", clauseGroupSingleJL4)] \baseUrl mgr -> do
-        resp <- queryPlan' baseUrl mgr "qp-clause-one" "single"
-          (Aeson.object ["arguments" Aeson..= Aeson.object []])
-        statusCode' resp `shouldBe` 200
-        lookupKey "ladder" (decodeObject (responseBody resp)) `shouldNotBe` Just Aeson.Null
-        ldResp <- getLadder baseUrl mgr "qp-clause-one" "single"
-        statusCode' ldResp `shouldBe` 200
+    -- A rule written as DECIDE clauses is the same rule as the nested CONSIDER
+    -- it stands for, so its plan and its ladder must be the same: the same
+    -- inputs, the same questions, the same nodes. Compared whole, modulo the
+    -- numbering of nodes ('withoutNodeIds'), so that a clause group drawn as
+    -- one leaf that asks nothing (or one that names a generated binding) fails.
+    describe "a BOOLEAN rule written as DECIDE clauses" do
+      let sameAsHandWritten :: Text -> Text -> Text -> SpecWith ()
+          sameAsHandWritten name clauses hand =
+            it (Text.unpack ("has the plan and the ladder of its hand-written CONSIDER: " <> name)) do
+              withServiceFromSources ("cg-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hw-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cg-" <> name) "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+                  qpH <- queryPlan' baseUrl' mgr' ("hw-" <> name) "rule" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+                  statusCode' qpC `shouldBe` 200
+                  statusCode' qpH `shouldBe` 200
+                  ldC <- getLadder baseUrl mgr ("cg-" <> name) "rule"
+                  statusCode' ldC `shouldBe` 200
+                  let planC = withoutNodeIds <$> (Aeson.decode (responseBody qpC) :: Maybe Aeson.Value)
+                      planH = withoutNodeIds <$> (Aeson.decode (responseBody qpH) :: Maybe Aeson.Value)
+                  planC `shouldBe` planH
+                  -- the plan asks something
+                  lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+                  -- and no name the desugarer made up reaches a label, an ask or an input
+                  let text = Text.pack (show (responseBody qpC)) <> Text.pack (show (responseBody ldC))
+                  for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
+                    (g, g `Text.isInfixOf` text) `shouldBe` (g, False)
+      sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAsHandWritten "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAsHandWritten "single" clauseGroupSingleJL4 handSingleJL4
+      -- The hand-written CONSIDER without a GIVETH is itself refused (its type is an
+      -- inference variable the service never resolves), so the group without one is
+      -- compared with the hand-written rule that has one.
+      sameAsHandWritten "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
 
     it "and evaluation still works across that restart" do
       -- The control. /evaluation needs no type annotations, so it kept working
@@ -3770,3 +3786,14 @@ testOptions = Options
   , instanceToken = Nothing
   , maxLadderNodes = 10000
   }
+
+-- | A JSON answer without the numbers the visualizer gave its nodes: the
+-- @id@ and @unique@ fields, the per-node @impact@ table keyed by them, and the
+-- document version. What is left is the shape of the answer and its atom ids.
+withoutNodeIds :: Aeson.Value -> Aeson.Value
+withoutNodeIds = \case
+  Aeson.Object o ->
+    Aeson.Object (Aeson.KeyMap.map withoutNodeIds
+      (Aeson.KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique", "impact", "verDocId"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutNodeIds xs)
+  v -> v

@@ -33,8 +33,13 @@ module TestData (
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
-  clauseGroupBooleanJL4,
+  clauseGroupEnumJL4,
+  handEnumJL4,
+  clauseGroupMixedJL4,
+  handMixedJL4,
   clauseGroupSingleJL4,
+  handSingleJL4,
+  clauseGroupNoGivethJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -1131,32 +1136,101 @@ GIVETH A BOOLEAN
 gate MEANS p AND q
 |]
 
--- | A BOOLEAN rule written as a multi-clause DECIDE group.
+-- | BOOLEAN rules written as multi-clause DECIDE groups, each beside the nested
+-- CONSIDER a drafter would write by hand for the same rule. All are called
+-- @rule@, so that the two forms of a pair get the same atom ids and their
+-- query plans can be compared whole.
 --
--- The desugarer compiles the clauses to a CONSIDER (and a LET for the clauses
--- not yet tried) that carry no source range, and the checker used to record a
--- result type only on a node that has one. 'L4.Viz.Ladder.hasBooleanType' read
--- no type off the body, so @\/query-plan@ and @\/ladder@ answered 400 for a
--- rule that is plainly boolean.
-clauseGroupBooleanJL4 :: Text
-clauseGroupBooleanJL4 =
+-- The desugarer compiles clauses to a CONSIDER (and a LET for the clauses not
+-- yet tried) that carry no source range. The checker used to record a result
+-- type only on a node that has one, so the ladder refused the rule as "not a
+-- boolean"; then the ladder drew the generated LET as one leaf, and the plan
+-- asked nothing.
+clauseGroupEnumJL4 :: Text
+clauseGroupEnumJL4 =
   [i|
 DECLARE Colour IS ONE OF Red, Green, Blue
 
 @export Whether a colour is warm
 GIVEN c IS A Colour
 GIVETH A BOOLEAN
-DECIDE warm Red IS TRUE
-DECIDE warm Green IS FALSE
-DECIDE warm Blue IS FALSE
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
 |]
 
--- | The same, as a group of ONE clause: no LET, just the generated CONSIDER.
+handEnumJL4 :: Text
+handEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  CONSIDER c
+    WHEN Red THEN TRUE
+    OTHERWISE CONSIDER c
+      WHEN Green THEN FALSE
+      OTHERWISE CONSIDER c
+        WHEN Blue THEN FALSE
+|]
+
+-- | Two inputs, a literal pattern in the first clause, a bare name in the second.
+clauseGroupMixedJL4 :: Text
+clauseGroupMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule 0 b IS FALSE
+DECIDE rule n b IS b AND n GREATER THAN 5
+|]
+
+handMixedJL4 :: Text
+handMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule n b IS
+  CONSIDER n
+    WHEN 0 THEN FALSE
+    OTHERWISE b AND n GREATER THAN 5
+|]
+
+-- | A group of ONE clause: no LET, just the generated CONSIDER.
 clauseGroupSingleJL4 :: Text
 clauseGroupSingleJL4 =
   [i|
 @export Whether the optional flag is set
-GIVEN b IS A MAYBE BOOLEAN
+GIVEN m IS A MAYBE BOOLEAN
 GIVETH A BOOLEAN
-DECIDE single (JUST b) IS b
+DECIDE rule (JUST b) IS b
+|]
+
+handSingleJL4 :: Text
+handSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule m IS
+  CONSIDER m
+    WHEN JUST b THEN b
+|]
+
+-- | A BOOLEAN group with no GIVETH: the type is inferred, not declared.
+clauseGroupNoGivethJL4 :: Text
+clauseGroupNoGivethJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
 |]

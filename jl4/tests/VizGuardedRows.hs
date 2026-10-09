@@ -195,22 +195,86 @@ branchNumeric =
 -- spec
 ------------------------------------------------------------------------
 
+colourDecl :: Text
+colourDecl = "DECLARE Colour IS ONE OF Red, Green, Blue\n"
+
 -- | A BOOLEAN rule as several DECIDE clauses (the desugarer's LET plus CONSIDER).
 clauseGroup :: Text
 clauseGroup =
-  "DECLARE Colour IS ONE OF Red, Green, Blue\n\
-  \GIVEN c IS A Colour\n\
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
   \GIVETH A BOOLEAN\n\
   \DECIDE compliant Red IS TRUE\n\
   \DECIDE compliant Green IS FALSE\n\
   \DECIDE compliant Blue IS FALSE\n"
 
+-- | The same rule, as the nested CONSIDER a drafter would write.
+clauseGroupByHand :: Text
+clauseGroupByHand =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant c IS\n\
+  \  CONSIDER c\n\
+  \    WHEN Red THEN TRUE\n\
+  \    OTHERWISE CONSIDER c\n\
+  \      WHEN Green THEN FALSE\n\
+  \      OTHERWISE CONSIDER c\n\
+  \        WHEN Blue THEN FALSE\n"
+
+clauseGroupTwoInputs :: Text
+clauseGroupTwoInputs =
+  "GIVEN n IS A NUMBER\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant 0 b IS FALSE\n\
+  \DECIDE compliant n b IS b AND n GREATER THAN 5\n"
+
+clauseGroupTwoInputsByHand :: Text
+clauseGroupTwoInputsByHand =
+  "GIVEN n IS A NUMBER\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant n b IS\n\
+  \  CONSIDER n\n\
+  \    WHEN 0 THEN FALSE\n\
+  \    OTHERWISE b AND n GREATER THAN 5\n"
+
 -- | The same as ONE clause: just the desugarer's CONSIDER.
 clauseGroupOfOne :: Text
 clauseGroupOfOne =
-  "GIVEN b IS A MAYBE BOOLEAN\n\
+  "GIVEN m IS A MAYBE BOOLEAN\n\
   \GIVETH A BOOLEAN\n\
   \DECIDE compliant (JUST b) IS b\n"
+
+clauseGroupOfOneByHand :: Text
+clauseGroupOfOneByHand =
+  "GIVEN m IS A MAYBE BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant m IS\n\
+  \  CONSIDER m\n\
+  \    WHEN JUST b THEN b\n"
+
+-- | No GIVETH: the result type is inferred, not declared.
+clauseGroupNoGiveth :: Text
+clauseGroupNoGiveth =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \DECIDE compliant Red IS TRUE\n\
+  \DECIDE compliant Green IS FALSE\n\
+  \DECIDE compliant Blue IS FALSE\n"
+
+clauseGroupNoGivethByHand :: Text
+clauseGroupNoGivethByHand =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \DECIDE compliant c IS\n\
+  \  CONSIDER c\n\
+  \    WHEN Red THEN TRUE\n\
+  \    OTHERWISE CONSIDER c\n\
+  \      WHEN Green THEN FALSE\n\
+  \      OTHERWISE CONSIDER c\n\
+  \        WHEN Blue THEN FALSE\n"
 
 spec :: Spec
 spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)" $ do
@@ -315,16 +379,38 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
     atomsOf (vizBody True ifTrueFalse) `shouldBe` ["c"]
 
   -- A BOOLEAN rule written as DECIDE clauses is compiled to a CONSIDER (and a
-  -- LET for the clauses not yet tried) that have no source range, and the
-  -- checker used to record a result type only on a node that has one. The
-  -- DECIDE's body then had no type, and 'hasBooleanType' refused the rule as
-  -- "not a boolean".
+  -- LET for the clauses not yet tried) that have no source range. The checker
+  -- used to record a result type only on a node that has one, so the rule was
+  -- refused as "not a boolean"; and the LET, once accepted, was drawn as one
+  -- leaf naming a binding the drafter never wrote. The rule is the same rule
+  -- as the nested CONSIDER it stands for, and is drawn as that.
   describe "a BOOLEAN rule written as DECIDE clauses" $ do
-    it "is visualised: a group of several clauses" $
-      countLeaves (vizBody False clauseGroup) `shouldSatisfy` (> 0)
+    it "is the same ladder as its hand-written CONSIDER: several clauses" $ do
+      let clauses = vizBody False clauseGroup
+          hand = vizBody False clauseGroupByHand
+      atomsOf clauses `shouldBe` atomsOf hand
+      countNots clauses `shouldBe` countNots hand
+      countOrs clauses `shouldBe` countOrs hand
+      countLeaves clauses `shouldBe` countLeaves hand
+      atomsOf clauses `shouldSatisfy` (not . null)
 
-    it "is visualised: a group of one clause" $
-      countLeaves (vizBody False clauseGroupOfOne) `shouldSatisfy` (> 0)
+    it "is the same ladder as its hand-written CONSIDER: two inputs" $ do
+      let clauses = vizBody False clauseGroupTwoInputs
+          hand = vizBody False clauseGroupTwoInputsByHand
+      atomsOf clauses `shouldBe` atomsOf hand
+      countNots clauses `shouldBe` countNots hand
+
+    it "is the same ladder as its hand-written CONSIDER: one clause" $
+      atomsOf (vizBody False clauseGroupOfOne) `shouldBe` atomsOf (vizBody False clauseGroupOfOneByHand)
+
+    it "is the same ladder as its hand-written CONSIDER: no GIVETH" $
+      atomsOf (vizBody False clauseGroupNoGiveth) `shouldBe` atomsOf (vizBody False clauseGroupNoGivethByHand)
+
+    it "names nothing the desugarer made up" $
+      for_ [clauseGroup, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->
+        for_ (atomsOf (vizBody False src)) \label ->
+          for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
+            (g, g `Text.isInfixOf` label) `shouldBe` (g, False)
 
 ------------------------------------------------------------------------
 -- helpers
