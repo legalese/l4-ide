@@ -1,0 +1,11 @@
+-- A default naming something that is not in scope is reported once, as that:
+-- `zzz` is not defined. It used to be reported a second time as "must be a
+-- literal", which was a misleading way to say it (p10 of
+-- TYPICALLY-ONE-BEHAVIOUR-SPEC.md), on a rule's input and on a record's field.
+
+GIVEN x IS A NUMBER TYPICALLY zzz
+GIVETH A NUMBER
+f MEANS x
+
+DECLARE Gauge HAS
+  level IS A NUMBER TYPICALLY yyy

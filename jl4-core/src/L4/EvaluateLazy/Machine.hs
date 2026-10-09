@@ -456,6 +456,11 @@ data PresumedOrigin
   | FromDecode !Text
     -- ^ A field of a decode the RULES made, filled the same way; the text is
     -- the type that decode started from.
+  | FromNamedApp !Text
+    -- ^ An input or field a named application left out and the checker filled
+    -- from its @TYPICALLY@ ('DefaultFill'): W4 for a rule's inputs, W5 for a
+    -- record's fields. The text is the rule or record constructor the site
+    -- applies. The path is the one input or field.
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
 
@@ -1675,7 +1680,19 @@ forwardExpr env = \ case
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
               _ -> Nothing
-        rs <- traverse (`allocate_` env) es
+        rs <- traverse (allocateArgument env) es
+        -- An argument the checker added from a TYPICALLY default
+        -- ('DefaultFill') reports itself when it is first forced, like every
+        -- other default that takes effect ('registerPresumable'). It has a
+        -- cell of its own ('allocateArgument'), so what is registered is this
+        -- default and nothing else.
+        for_ (zip es rs) \ (e, rf) ->
+          for_ (exprDefaultFill e) \ fill ->
+            registerPresumable rf MkPresumed
+              { path       = [rawNameToText fill.binder]
+              , declaredAt = fill.declaredAt
+              , origin     = FromNamedApp (rawNameToText fill.owner)
+              }
         pushFrame (App1 rs expectedType)
         -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
         -- evaluation tracer records as the function being entered, so short-
@@ -6634,6 +6651,21 @@ preAllocate :: [Resolved] -> Machine Environment
 preAllocate ns = do
   pairs <- traverse preAllocateRef ns
   pure (Map.fromList pairs)
+
+-- | Allocate the cell of one argument of an application.
+--
+-- A default the checker added ('DefaultFill') always gets a cell of its own,
+-- even when it is a bare constructor (@TRUE@, @NOTHING@, an enum value).
+-- 'allocate_' would hand such an argument the one cell every use of that
+-- constructor shares, and 'registerPresumable' would then mark that shared
+-- cell: every later force of @FALSE@ anywhere in the run would report the
+-- default, whether or not the rule read it, and two defaults that are the same
+-- constructor would take the one registry slot between them. A numeric or
+-- string default was never affected, because a literal always gets a cell.
+allocateArgument :: Environment -> Expr Resolved -> Machine Reference
+allocateArgument env e
+  | isJust (exprDefaultFill e) = fst <$> allocateRecursive e (const env)
+  | otherwise                  = allocate_ e env
 
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
 allocate_ (Var _ann n) env = do

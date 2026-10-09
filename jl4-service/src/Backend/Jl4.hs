@@ -964,6 +964,8 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     (inputDefaults compiled.compiledModule compiled.compiledDecide)
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
+  refuseEventRecordGaps (buildModuleInfo compiled.compiledAllDeclares) mPartyType mActionType traceEvents
+
   -- Convert input parameters to JSON
   inputJson <- paramsToJson plan.wpArguments
 
@@ -983,6 +985,85 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
         (wrapperPresumed presumption plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
+
+-- | Refuse an event whose party or action record leaves out a field that has a
+-- @TYPICALLY@ default (W5, T4b; review silent F2, 2026-10-03).
+--
+-- The wrapper turns each event's record into SOURCE
+-- (@`event party 0` MEANS Driver WITH name IS "Alice"@, 'Backend.CodeGen.prepareEvents'),
+-- and since W5 the checker fills a field a construction leaves out from its
+-- @TYPICALLY@. That would make a request's own record take a default the request
+-- could have supplied, under @"presumption": "hard"@ as well, and list it as a
+-- default "no request could supply": the answer changes (the event no longer
+-- matches the party it names) and the switch that exists to withdraw such
+-- defaults does nothing. Before W5 the omission failed to check, loudly.
+--
+-- So an event's record keeps what it always had: every field is written. A
+-- record nested inside it is generated as source too, and is held to the same
+-- (review rulings R2-2). The request's arguments are not affected, because
+-- their records are decoded from JSON, where the switch applies.
+--
+-- This is a stop-gap and not T1's reading: T1 says a field absent in JSON takes
+-- its default under soft and is refused under hard. Soft cannot take it here
+-- yet, because the deontic machinery reads a party without forcing it, so a
+-- default taken there would be used and never listed in @presumed@. _Decided by
+-- Claude overnight 2026-10-03, pending Meng's review._ Owed: decode the event
+-- records as the arguments are, so that soft takes a default and lists it as
+-- @events[0].party.licence@, and hard refuses it.
+refuseEventRecordGaps
+  :: Monad m
+  => ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
+refuseEventRecordGaps mi mParty mAction events =
+  unless (null gaps) $
+    throwError $ InterpreterError $ Text.intercalate "\n"
+      [ "Missing required field '" <> path <> "." <> field <> "' (" <> con <> "): "
+          <> "an event's record is part of the request, so it never takes the field's TYPICALLY default. "
+          <> "Give every field of it."
+      | (path, con, field) <- gaps
+      ]
+  where
+    -- constructor name -> its fields that have a TYPICALLY
+    defaultedFields :: Map Text [Text]
+    defaultedFields = Map.fromList
+      [ (rawNameToText (rawName (getActual ctor)), [ f | (f, _, Just _) <- fields ])
+      | (ctor, fields) <- Map.elems mi.miRecords
+      ]
+
+    gaps =
+      [ (path, con, field)
+      | (i, ev) <- zip [0 :: Int ..] events
+      , (label, mType, lit) <- [("party", mParty, ev.party), ("action", mAction, ev.action)]
+      , (path, con, given) <- recordsIn ("events[" <> Text.textShow i <> "]." <> label) mType lit
+      , field <- Map.findWithDefault [] con defaultedFields
+      , field `notElem` given
+      ]
+
+    -- Every record 'Backend.CodeGen.fnLiteralToL4ExprWithType' and
+    -- 'Backend.CodeGen.fnLiteralToL4Expr' turn into @Con WITH field IS value, ...@
+    -- in this literal, with the path the request wrote it at and the fields it
+    -- gives. With the type name known the top level is a record of that type
+    -- (any object); without it, a one-key object whose value is an object names
+    -- the constructor itself.
+    --
+    -- A record INSIDE it is generated as source too, so it fills a field it
+    -- leaves out from the field's TYPICALLY exactly as the top level would
+    -- (review rulings R2-2): the walk follows the codegen's own cases, a
+    -- constructor-keyed object, an array, or a constructor applied to one
+    -- argument, down to the leaves. Below the top level the type name is never
+    -- known, so a nested record is always constructor-keyed.
+    recordsIn :: Text -> Maybe Text -> FnLiteral -> [(Text, Text, [Text])]
+    recordsIn path (Just t) (FnObject fs@(_ : _)) = (path, t, map fst fs) : inFields path fs
+    recordsIn path Nothing  (FnObject [(c, FnObject fs)]) = (path, c, map fst fs) : inFields path fs
+    recordsIn path _        lit = nested path lit
+
+    inFields path fs = concat [ nested (path <> "." <> k) v | (k, v) <- fs ]
+
+    nested :: Text -> FnLiteral -> [(Text, Text, [Text])]
+    nested path = \case
+      FnArray xs -> concat [ nested (path <> "[" <> Text.textShow i <> "]") x | (i, x) <- zip [0 :: Int ..] xs ]
+      FnObject [(c, FnObject fs)] -> (path <> "." <> c, c, map fst fs) : inFields (path <> "." <> c) fs
+      FnObject [(c, v)] -> nested (path <> "." <> c) v
+      _ -> []
 
 -- | Direct AST evaluation (fast path), for a request with no @{}@ in it and
 -- no @null@ the decoder kept as a value ('requiresWrapperEvaluation');

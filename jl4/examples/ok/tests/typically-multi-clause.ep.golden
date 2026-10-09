@@ -1,0 +1,67 @@
+-- A TYPICALLY default meeting a multi-clause group (several DECIDE clauses of
+-- one rule) and CONSIDER. Every answer below was worked out by hand.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER
+
+-- (a) A multi-clause group whose GIVEN carries literal defaults. A named call
+-- leaves them out.
+GIVEN c    IS A Colour
+      rate IS A NUMBER TYPICALLY 3
+      mult IS A NUMBER TYPICALLY 6
+GIVETH A NUMBER
+DECIDE `price of` Red   rate mult IS rate TIMES 10
+DECIDE `price of` Green rate mult IS rate TIMES mult
+DECIDE `price of` Blue  rate mult IS 0
+
+#EVAL `price of` WITH c IS Red
+#EVAL `price of` WITH c IS Green
+#EVAL `price of` WITH c IS Green, rate IS 5
+#EVAL `price of` WITH c IS Blue
+
+-- (b) A default reached inside a CONSIDER branch the drafter wrote.
+GIVEN x IS A Colour
+GIVETH A NUMBER
+`via consider` MEANS
+  CONSIDER x
+  WHEN Red   THEN `price of` WITH c IS Green
+  WHEN Green THEN (Paint WITH coats IS 1)'s coats PLUS 100
+  OTHERWISE 0
+
+#EVAL `via consider` Red
+#EVAL `via consider` Green
+#EVAL `via consider` Blue
+
+-- (c) A named site and a construction inside the clauses of a group.
+GIVEN k IS A Colour
+GIVETH A NUMBER
+DECIDE `grouped` Red   IS `price of` WITH c IS Green
+DECIDE `grouped` Green IS
+  CONSIDER (Paint WITH coats IS 2)'s colour
+  WHEN Red THEN 7
+  OTHERWISE 8
+DECIDE `grouped` Blue  IS `price of` WITH c IS Red, rate IS 1
+
+#EVAL `grouped` Red
+#EVAL `grouped` Green
+#EVAL `grouped` Blue
+
+-- (d) A group with no GIVEN for its columns, one clause matching anything
+-- first, then an unreachable clause that takes a default.
+GIVETH A NUMBER
+DECIDE `no given` Red   IS `price of` WITH c IS Green
+DECIDE `no given` other IS 1
+DECIDE `no given` Blue  IS `price of` WITH c IS Red
+
+#EVAL `no given` Red
+#EVAL `no given` Blue
+
+-- (e) A one-clause group with a default; it misses NOTHING.
+GIVEN m  IS A MAYBE NUMBER
+      r2 IS A NUMBER TYPICALLY 4
+GIVETH A NUMBER
+DECIDE `one clause` (JUST x) r2 IS x PLUS r2
+
+#EVAL `one clause` WITH m IS JUST 1

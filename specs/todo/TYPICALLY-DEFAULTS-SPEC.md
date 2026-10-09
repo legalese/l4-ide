@@ -3,9 +3,10 @@
 **Status:** PARTIALLY LANDED (re-audited 2026-10-01 on `unstable` at `f9a504b77`).
 `TYPICALLY` is lexed, parsed and type-checked: literal values only, an explicit type required, rejected on a `TYPE` binder (`jl4-core/src/L4/TypeCheck.hs:1724-1767`, `jl4/examples/ok/typically-basic.l4`).
 **On a section `GIVEN` it is operational:** an unsupplied section binder takes its default, once per evaluation at the root, and an explicit `WITH` wins (`6c25d5771`, 2026-09-05; `jl4-core/src/L4/Discharge.hs:281-294`, `fillInDefault`; `doc/reference/types/TYPICALLY.md`).
-**Everywhere else it is metadata only:** a rule's own `GIVEN`, a `DECLARE` field and an `ASSUME` keep their default without using it, and the PEVAL/PASSERT presumptive evaluation this spec proposes below is not implemented.
+**On a rule's own `GIVEN` and on a `DECLARE` field it is operational at a named site:** a `WITH` call that leaves the input out, and a `WITH` construction that leaves the field out, take the default (W4 and W5 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2, 2026-10-03, on `feat/typically-w4w5`, not yet merged); a call or construction by position still gives every input.
+**An `ASSUME` still keeps its default without using it** (W6 is deferred), and the PEVAL/PASSERT presumptive evaluation this spec proposes below is not implemented.
 Reintroduced by `27cd4770` (`feat(l4): reintroduce TYPICALLY as metadata-only default values`), hardened by `d6aca898`; the December 2025 revert history is retained beneath for the record.
-Ruling R8 (`IMPLICIT-PROPS-DESIGN.md` §11.5, 2026-09-04) gives `TYPICALLY` one behaviour everywhere; what remains to build is `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (PR #525).
+Ruling R8 (`IMPLICIT-PROPS-DESIGN.md` §11.5, 2026-09-04) gives `TYPICALLY` one behaviour everywhere; what remains to build is `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (PR #525; its status header says what is built).
 `CATALA-EXPORT-SPEC.md` R10 operationalises the metadata externally, as Catala `context` variables.
 **Related:** `BOOLEAN-MINIMIZATION-SPEC.md`
 

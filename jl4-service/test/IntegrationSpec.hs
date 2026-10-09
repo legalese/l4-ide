@@ -19,7 +19,7 @@ import Types
 import L4.FunctionSchema (Parameters (..))
 
 import Control.Concurrent.Async (concurrently, forConcurrently)
-import Control.Monad (forM_, guard, unless)
+import Control.Monad (forM_, guard, unless, when)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (bracket, try)
@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -677,6 +677,63 @@ spec = describe "integration" do
           (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
         expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
 
+    -- W4, W5: a default the RULES take at a named site is not the request's to
+    -- supply, so it is taken in both presumption modes. Under soft `presumed`
+    -- keeps what a request could have supplied (T6b), as for a rule's own
+    -- JSONDECODE, so it lists nothing; under hard the answer rests on it and
+    -- lists it under the application that took it (T4b), on both paths. The
+    -- request's own `rate` is 7; `scaled` still takes its 3.
+    it "takes a default a named site inside the rules took in both modes, and lists it under hard, on both paths" do
+      withServiceFromSources "ty-named" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
+        let used = ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= True]
+            presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        soft <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= False : used))
+        expectAnswer soft (FnLitInt 60) []
+        hardRun <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= False : used))
+        expectAnswer hardRun (FnLitInt 60) presumedHere
+        -- a {} on the unread flag sends the request down the wrapper path
+        wrapped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrapped (FnLitInt 60) []
+        wrappedHard <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrappedHard (FnLitInt 60) presumedHere
+        -- The positive control: `use` FALSE never reaches either site.
+        skipped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer skipped (FnLitInt 0) []
+
+    -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+    -- listed whenever the same constructor was evaluated later in the run. Each
+    -- case is a default that is NOT read (or a pair of which only one is), with a
+    -- later use of the same constructor to trip it, on both paths.
+    it "lists a constructor default a named site took only if the answer read it, on both paths" do
+      withServiceFromSources "ty-ctor" [("ctor.l4", constructorNamedDefaultJL4)] \baseUrl mgr -> do
+        -- under hard, which is where `presumed` lists a default taken inside the
+        -- rules: under soft it lists none, so a wrong listing could not show
+        let flag = "unused flag" Aeson..= False
+            run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (hard (extra <> [flag]))
+            runWrapped fn extra = evalFunction baseUrl mgr "ty-ctor" fn
+              (hard (extra <> ["unused flag" Aeson..= uncertain]))
+        -- x FALSE: the AND stops at `a`; x TRUE: `b` is read
+        stops <- run "short circuits" ["x" Aeson..= False]
+        expectAnswer stops (FnLitInt 0) []
+        reads' <- run "short circuits" ["x" Aeson..= True]
+        expectAnswer reads' (FnLitInt 0) ["WITH both: b"]
+        stopsWrapped <- runWrapped "short circuits" ["x" Aeson..= False]
+        expectAnswer stopsWrapped (FnLitInt 0) []
+        readsWrapped <- runWrapped "short circuits" ["x" Aeson..= True]
+        expectAnswer readsWrapped (FnLitInt 0) ["WITH both: b"]
+        -- two defaults that are the same constructor: `ignoreD`'s `d` is never
+        -- read, `both`'s `b` is, and only `b` is listed
+        pair <- run "two of one constructor" ["x" Aeson..= True]
+        expectAnswer pair (FnLitBool False) ["WITH both: b"]
+        -- an enum default the rule never mentions, then that enum's constructor
+        enumNever <- run "enum never mentioned" ["x" Aeson..= True]
+        expectAnswer enumNever (FnLitString "Red") []
+
     it "lets a supplied value win, and presumes nothing" do
       withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "ty-supplied" "may contract"
@@ -902,6 +959,74 @@ spec = describe "integration" do
             , "events" Aeson..= ([] :: [Aeson.Value])
             ])
         assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
+
+    -- Review F2, 2026-10-03: the wrapper turns an event's party record into
+    -- SOURCE, which since W5 filled a field it left out from its TYPICALLY, under
+    -- "presumption": "hard" as well, and listed it as a default no request could
+    -- supply. The event no longer matched the party it named. An event's record
+    -- is part of the request, so it keeps what it had: every field is written.
+    -- (Decided by Claude overnight 2026-10-03, pending Meng's review.)
+    it "refuses an event whose record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event" [("seatbelt.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+        let driver = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("drive" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= driver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            nameOnly = Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+            whole    = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            message = "Missing required field 'events[0].party.licence' (Driver)"
+        softGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" nameOnly)
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "hard" nameOnly)
+        expectError hardGap message
+        -- the positive control: the same request with the field written is answered,
+        -- and nothing is presumed
+        written <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" whole)
+        assertSuccess written \r -> r.presumed `shouldBe` []
+        -- the argument's own record is decoded from JSON, where the switch applies:
+        -- soft takes the default, hard refuses it. (Whether `presumed` lists the
+        -- default is not asserted: the deontic machinery reads a party without
+        -- forcing it, the known gap of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md 4.2.)
+        let argRequest presumption = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= nameOnly]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= ([] :: [Aeson.Value])
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+        argSoft <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "soft")
+        assertSuccess argSoft \_ -> pure ()
+        argHard <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "hard")
+        expectError argHard "Missing required field 'driver.licence'"
+
+    -- Review rulings R2-2: the refusal above looked only at the top level of
+    -- an event's record. A record nested in it is generated as source too, so a
+    -- field it left out was filled from its TYPICALLY, in both modes, and the
+    -- event stopped matching its party with status success.
+    it "refuses an event whose nested record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event-nested" [("seatbelt.l4", deonticNestedFieldDefaultJL4)] \baseUrl mgr -> do
+        let address fields = Aeson.object ["Address" Aeson..= Aeson.object fields]
+            zip5 = "zip" Aeson..= (5 :: Int)
+            floor2 = "floor" Aeson..= (2 :: Int)
+            driverWith home = Aeson.object ["name" Aeson..= ("Alice" :: Text), "zhome" Aeson..= home]
+            -- an argument's record is decoded from plain JSON, an event's is generated
+            -- as source and sent constructor-keyed, the shape the service's answers use
+            plainDriver = driverWith (Aeson.object [zip5, floor2])
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= plainDriver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            message = "Missing required field 'events[0].party.zhome.Address.floor' (Address)"
+        softGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5])))
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "hard" (driverWith (address [zip5])))
+        expectError hardGap message
+        -- the positive control: the same request with the nested field written is answered
+        written <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5, floor2])))
+        assertSuccess written \r -> r.presumed `shouldBe` []
 
     -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
     -- an input or a field left out takes its default, a name that matches
@@ -3569,7 +3694,8 @@ mcpToolText body = do
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
 assertSuccess resp check = do
-  statusCode' resp `shouldBe` 200
+  when (statusCode' resp /= 200) $
+    expectationFailure ("expected status 200 but got " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
   case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r

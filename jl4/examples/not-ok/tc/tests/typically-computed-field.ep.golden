@@ -1,0 +1,12 @@
+-- A TYPICALLY on a computed field, one with a MEANS clause, is an error
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1). The field's value always comes from its
+-- MEANS expression, so a default could never be taken. It used to be accepted as
+-- metadata that did nothing; now that a TYPICALLY on any other field is a
+-- default a construction takes, the exception is refused.
+
+DECLARE Widget HAS
+  price IS A NUMBER TYPICALLY 10
+  taxed IS A NUMBER TYPICALLY 11
+    MEANS price * 1.09
+  total IS A NUMBER
+    MEANS taxed + 1
