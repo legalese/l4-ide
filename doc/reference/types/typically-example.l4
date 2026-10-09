@@ -1,4 +1,9 @@
--- TYPICALLY: default values, recorded but not applied (rebuttable presumptions)
+-- TYPICALLY: default values (rebuttable presumptions)
+--
+-- What a default means is in doc/reference/types/TYPICALLY.md. Each part below
+-- is one of that page's examples, and the #ASSERTs check the answers it quotes.
+-- One behaviour: a name that nothing supplies takes its default, wherever it is
+-- declared. A value that is supplied wins.
 
 -- Fields of a record, with defaults
 DECLARE Person HAS
@@ -14,8 +19,45 @@ GIVEN
 GIVETH A BOOLEAN
 DECIDE `may purchase alcohol` IF age >= 18
 
--- Defaults change nothing when the rule is run: every input is still required.
+-- Given by position, a rule gets every input, defaulted or not.
 #EVAL `may purchase alcohol` 21 FALSE
+
+-- Given by name, an input with a default may be left out: `married` takes FALSE.
+#EVAL `may purchase alcohol` WITH age IS 21
+#ASSERT (`may purchase alcohol` WITH age IS 21) EQUALS TRUE
+
+-- A record built by name may leave out a field with a default.
+GIVETH A Person
+`a new person` MEANS Person WITH name IS "Alex"
+
+#EVAL `a new person`'s jurisdiction
+#ASSERT `a new person`'s jurisdiction EQUALS "Singapore"
+
+-- The same on a rule whose inputs are numbers: the call that names its inputs
+-- takes the default for the one it leaves out, and a value it gives wins.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+#ASSERT (scaled WITH base IS 10) EQUALS 30
+#ASSERT (scaled WITH base IS 10, rate IS 2) EQUALS 20
+
+-- A field whose default is an enumeration's constructor, and a field that is a
+-- MAYBE with the default NOTHING.
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER
+      note   IS A MAYBE STRING TYPICALLY NOTHING
+
+GIVETH A Paint
+fresh MEANS Paint WITH coats IS 2
+
+#EVAL fresh's colour
+#ASSERT fresh's colour EQUALS Red
+#ASSERT fresh's note EQUALS NOTHING
 
 -- A section GIVEN with a default: one name for every rule in the section
 § `Part 3 -- Capacity`
@@ -27,3 +69,50 @@ DECIDE `contract is binding` IF
   AND `governing law` EQUALS "Singapore"
 
 #CHECK `contract is binding`
+#ASSERT `contract is binding`
+#ASSERT NOT (`contract is binding` WITH `person has capacity` IS FALSE)
+
+-- A section GIVEN's default is used by every rule that reads the name and is
+-- given no value for it; a WITH is an override, for that call and everything
+-- under it.
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+#ASSERT doubled EQUALS 6
+#ASSERT (doubled WITH `the rate` IS 5) EQUALS 10
+
+-- One calculation can see two values for one name: the first `inner` takes the
+-- default, the second is given 100.
+§ `Overriding`
+    GIVEN r IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+inner MEANS r
+
+GIVETH A NUMBER
+outer MEANS inner PLUS (inner WITH r IS 100)
+
+#ASSERT outer EQUALS 103
+
+-- A default may be worked out. It can name a definition or another section GIVEN,
+-- and a compound expression is written in parentheses.
+§ `Part 4 -- Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)
+
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS discount
+
+-- 90: the default for `discount` is a tenth of the 100 ...
+#EVAL `final price`
+#ASSERT `final price` EQUALS 90
+
+-- ... and 180 here, because it is a tenth of the 200 the call gives.
+#EVAL `final price` WITH `list price` IS 200
+#ASSERT (`final price` WITH `list price` IS 200) EQUALS 180
+
+-- A value the call gives for `discount` wins over the default.
+#ASSERT (`final price` WITH `list price` IS 200, discount IS 5) EQUALS 195

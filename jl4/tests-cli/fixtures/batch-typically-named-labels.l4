@@ -1,0 +1,34 @@
+-- The name `presumed` gives a default taken at a named site is the rule's (or
+-- record's) own name as its declaration writes it, whatever the site called it
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T6b, review m1, 2026-10-03). Three things used
+-- to leak into it: an AKA alias, the section a rule is declared in, and a mixfix
+-- rule's canonical pattern. `scaled` is called by its own name, by its alias and
+-- by its section-qualified name; the answer lists it once, as `scaled`.
+
+§ `Pricing`
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 30
+      retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled AKA rescaled MEANS rate TIMES base
+
+GIVEN base IS A NUMBER
+      factor IS A NUMBER TYPICALLY 2
+GIVETH A NUMBER
+base `scaled by` factor MEANS base TIMES factor
+
+§ `Use`
+
+@export default Combine
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE combine IS
+  (scaled WITH base IS n)
+    PLUS (rescaled WITH base IS n)
+    PLUS (`Pricing`.scaled WITH base IS n)
+    PLUS (`scaled by` WITH base IS n)
+    PLUS (Config WITH retries IS n)'s timeout

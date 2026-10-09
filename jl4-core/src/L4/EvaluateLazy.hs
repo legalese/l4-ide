@@ -55,7 +55,7 @@ module L4.EvaluateLazy
 where
 
 import Base
-import L4.Discharge (dischargeModuleWith, sectionBinders, Binder (..))
+import L4.Discharge (dischargeModuleWith, defaultThunkUnique, sectionBinders, Binder (..))
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Set as Set
@@ -885,7 +885,7 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
   -- one that nothing supplies stays an assumed term.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig rootFills m0 imported st0
+  let st = withDefaultsKnown evalConfig rootFills m imported st0
   r <- try (withAllocationLimit evalConfig.allocationLimit (runEval st (evalModuleAndDirectivesWith runDirective env m)))
   case r of
     Left exc -> do
@@ -925,6 +925,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   unknownReached <- newIORef []
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
+  globalEnv  <- newIORef emptyEnvironment
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
@@ -934,6 +935,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
     , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    , globalEnv
     }
 
 -- | Tell a run where defaults come from: the section binders of the evaluated
@@ -949,17 +951,22 @@ withDefaultsKnown evalConfig rootFills m imported st =
   binderDefaults
     | evalConfig.presumeDefaults =
       Map.fromList
-        [ ( u
-          , MkPresumed
-              { path       = [rawNameToText (rawName (getActual b.resolved))]
-              , declaredAt = rangeOf d
-              , origin     = FromSectionBinder
-              }
-          )
+        [ (u', p)
         | (u, b) <- Map.toList (sectionBinders m)
         , Just d <- [b.typically]
+        , let p = MkPresumed
+                { path       = [rawNameToText (rawName (getActual b.resolved))]
+                , declaredAt = rangeOf d
+                , origin     = FromSectionBinder
+                }
+          -- the binder's own definition, and the function a root applies to
+          -- its values when the default reads other binders
+          -- ('L4.Discharge.defaultThunkUnique'): whichever is forced reports
+          -- the default
+        , u' <- [u, defaultThunkUnique moduleUri b]
         ]
     | otherwise = Map.empty
+  MkModule _ moduleUri _ = m
 
 -- | Every @DECLARE@ in a module, in any section.
 moduleDeclares :: Module Resolved -> [Declare Resolved]
@@ -996,6 +1003,17 @@ recordFieldDefaults decls = Map.fromList
 -- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
 -- naming the type the rules decoded.
 --
+-- A default a named application of the rules took (W4, W5) is the same kind of
+-- default, so it is treated the same way: listed only when presumption is hard,
+-- as @WITH rule: input@, and kept out under soft. T6b names these sites ("W4's
+-- named sites and constructions emit W8's event themselves ... @presumed@ keeps
+-- only those whose binder or JSON path is part of the request"), and the binder
+-- of an input a rule leaves out at its own call is part of no request. Under
+-- hard T4b's "rests on presumed x" applies, as it does to a rule's own
+-- @JSONDECODE@. (Decided by Claude overnight 2026-10-03, pending Meng's
+-- review: listing it in both modes is a one-line change, dropping the guard on
+-- the 'FromNamedApp' case below.) The trace still carries every event.
+--
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
 requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
@@ -1005,6 +1023,16 @@ requestPresumed presume fieldName inputs events =
   entry p = case (p.origin, p.path) of
     (FromDecode root, path)
       | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+      | otherwise   -> Nothing
+    -- A default a named application of the RULES took (W4, W5): no request
+    -- could supply it, so the switch does not withdraw it, and under hard the
+    -- answer rests on it. Its binder is the callee's, not an input of the
+    -- request, so it must not fall through to the case below in either mode,
+    -- where a binder that shares an input's spelling would be listed as that
+    -- input. Written @WITH scaled: rate@ (the application, then the input), as
+    -- a rules' own decode is written @JSONDECODE T: path@.
+    (FromNamedApp callee, path)
+      | not presume -> Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
       | otherwise   -> Nothing
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
@@ -1142,7 +1170,7 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
+  let st = withDefaultsKnown evalConfig noRootFills m [] st0
   r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
     Left exc -> do

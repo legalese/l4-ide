@@ -1,0 +1,59 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-cycle.l4
+  Hidden: no
+  Range: 7:11-7:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `a` reads `a` itself,
+    directly or through a definition it calls. A default is worked out from
+    the other inputs, so it cannot depend on the one it stands in for.
+
+    Remove the self-reference, or give the default a value that does not read it.
+
+File: typically-cycle.l4
+  Hidden: no
+  Range: 11:11-11:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    These inputs' TYPICALLY defaults depend on one another in a circle:
+
+      `b`
+      `c`
+
+    Each default is worked out from the other inputs it reads, so none of them
+    can be worked out first. Break the circle by making one default a plain value.
+
+File: typically-cycle.l4
+  Hidden: no
+  Range: 16:11-16:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY default of `d` reads `d` itself,
+    directly or through a definition it calls. A default is worked out from
+    the other inputs, so it cannot depend on the one it stands in for.
+
+    Remove the self-reference, or give the default a value that does not read it.
+
+File: typically-cycle.l4
+  Hidden: no
+  Range: 23:11-23:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    These inputs' TYPICALLY defaults depend on one another in a circle:
+
+      `e`
+      `f`
+      `g`
+
+    Each default is worked out from the other inputs it reads, so none of them
+    can be worked out first. Break the circle by making one default a plain value.

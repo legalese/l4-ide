@@ -228,9 +228,9 @@ The proposal is to give constitutive `AND`/`OR`/`NOT`/`IMPLIES` the same structu
 
 ### 3.6 The four-cell input model (`RUNTIME-INPUT-STATE-SPEC.md`)
 
-`WithDefault a = Either (Maybe a) (Maybe a)`: `Left Nothing` not asked and no default; `Left (Just v)` not asked, `TYPICALLY v`; `Right Nothing` asked, "I don't know"; `Right (Just v)` asked and answered (`RUNTIME-INPUT-STATE-SPEC.md:62-72`).
-Its status header still reads "BLOCKED (December 2025) — depends on TYPICALLY"; `TYPICALLY` has since landed for section `GIVEN`s, so the header is stale.
-The ladder adopted the model as a provenance axis (DESIGN §22) and keeps `Left` as its own map, `ViewSpec.defaults`, beneath `valuation`, with `respectDefaults` to withdraw presumptions (`ViewSpec.defaults` and `ViewSpec.respectDefaults` in `ts-shared/ladder-core/src/types.ts`).
+`WithDefault a = Either (Maybe a) (Maybe a)`: `Left Nothing` not asked and no default; `Left (Just v)` not asked, `TYPICALLY v`; `Right Nothing` asked, "I don't know"; `Right (Just v)` asked and answered (`RUNTIME-INPUT-STATE-SPEC.md`, "The Four-State Model").
+Its status header says which cells are built: the boundary decides them in `L4.Presumption.fillDecision`, and the types and the API the spec sketches are not.
+The ladder adopted the model as a provenance axis (DESIGN §22) and keeps `Left` as its own map, `ViewSpec.defaults`, beneath `valuation`, with `respectDefaults` to withdraw presumptions (`ts-shared/ladder-core/src/types.ts:248-277`).
 
 ### 3.7 The ladder's seam constrains the algebra (DESIGN §25f)
 

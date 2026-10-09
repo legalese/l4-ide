@@ -1,0 +1,10 @@
+-- Two section inputs whose defaults read one another: not a program l4 batch
+-- can run (R8 rule 3), so it is refused before any row.
+
+§ `Pair`
+    GIVEN b IS A NUMBER TYPICALLY (c PLUS 1)
+          c IS A NUMBER TYPICALLY (b PLUS 1)
+
+@export default Total
+GIVETH A NUMBER
+total MEANS b PLUS c

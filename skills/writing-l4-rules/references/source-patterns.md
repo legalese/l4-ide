@@ -50,6 +50,15 @@ most needed. If you add an entry to an area file, add its line here in the same 
   spelling to use instead. Write new inputs as a record parameter or a section `GIVEN`; see
   [entry 11.7](source-patterns/11-when-the-encoding-cannot-answer.md#e11-7) for migrating an old one.
 
+- **`TYPICALLY` is a default.** A section `GIVEN` that carries one needs no value from the caller. A
+  `WITH` call that names a rule's inputs may leave out an input that carries one, and a `WITH`
+  construction may leave out a record field that carries one; the call or the construction takes the
+  default. A call or construction by **position** still gives every input and field. A default may be
+  a literal, a name or an expression in parentheses over what the file declares (a definition, and on
+  a section `GIVEN` another section `GIVEN`); one that reads its own input is a check error, and so is
+  one on a rule's input or a record field that reads a section `GIVEN`.
+  [Entry 7.4](source-patterns/07-presumptions-and-defaults.md#e7-4) says what to write.
+
 **Proposed, not landed (2026-09-04). Do not write these.**
 
 - Supplying an `ASSUME`d name from inside the file, at a directive or at a call in a body.
@@ -61,7 +70,6 @@ most needed. If you add an entry to an area file, add its line here in the same 
   ``#EVAL `tax on` 100 WITH rate IS 0.2``: name every input, or none.
 - Discharge — the compiler working out which inputs an entry point actually reads and asking for
   exactly those.
-- `TYPICALLY` as a default the caller may omit. Today it is metadata: the input is still required.
 - A dedicated `SUBJECT TO` / `NOTWITHSTANDING` construct. **Neither is a keyword** — there is no
   token for either in the lexer.
   [Entry 2.2](source-patterns/02-conditions-and-logic.md#e2-2) says what to write instead.
@@ -188,7 +196,7 @@ wanting a savings provision to reach past a `REFUSE`, the `REFUSE` was wrong.**
 - **7.1** ["shall be deemed to be", "shall be treated as"](source-patterns/07-presumptions-and-defaults.md#e7-1)
 - **7.2** ["unless the contrary is shown", "until the contrary is proved"](source-patterns/07-presumptions-and-defaults.md#e7-2)
 - **7.3** ["in the absence of agreement", "unless otherwise agreed" — a value the parties may displace](source-patterns/07-presumptions-and-defaults.md#e7-3)
-- **7.4** [`TYPICALLY` — what it does today, and what it does not](source-patterns/07-presumptions-and-defaults.md#e7-4)
+- **7.4** [`TYPICALLY` — a usual value, taken when a call or a construction leaves it out](source-patterns/07-presumptions-and-defaults.md#e7-4)
 - **7.5** ["no presumption shall arise" — a definition carrier, not a boolean](source-patterns/07-presumptions-and-defaults.md#e7-5)
 - **7.6** ["no will shall be revoked by any presumption" — abolishing a doctrine](source-patterns/07-presumptions-and-defaults.md#e7-6)
 - **7.7** ["may be varied by the will", "subject to any contrary direction" — the default a whole rule sits under](source-patterns/07-presumptions-and-defaults.md#e7-7)

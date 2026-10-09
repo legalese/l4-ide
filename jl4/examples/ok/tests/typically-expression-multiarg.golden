@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-expression-multiarg.l4:32:1-28:
+  assertion satisfied
+typically-expression-multiarg.l4:33:1-26:
+  assertion satisfied
+typically-expression-multiarg.l4:35:1-47:
+  assertion satisfied
+typically-expression-multiarg.l4:36:1-42:
+  assertion satisfied
+typically-expression-multiarg.l4:37:1-53:
+  assertion satisfied

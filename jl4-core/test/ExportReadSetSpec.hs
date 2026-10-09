@@ -12,13 +12,19 @@ module ExportReadSetSpec (spec) where
 import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.API.VirtualFS (checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions)
 import L4.FunctionSchema (Parameters(..), Parameter(..), parametersFromDecide)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
+import L4.Syntax (Resolved, getActual, rawName, unqualifiedRawNameToText)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
+
+-- | A resolved name as the author wrote it, without its section.
+nameOf :: Resolved -> Text
+nameOf = unqualifiedRawNameToText . rawName . getActual
 
 -- | The parameter names of the single export in a source snippet.
 exportParamNames :: Text -> Either [Text] [Text]
@@ -161,3 +167,276 @@ spec = do
         Right ps -> do
           ps.required `shouldBe` ["x"]
           Map.keys ps.parameterMap `shouldBe` ["x"]
+
+  -- R8 rule 3 (W7): a default is an expression, and whatever reads the input
+  -- is charged with what the default reads, so a request can supply it.
+  describe "export read-set through a TYPICALLY default" $ do
+    let binderReadsBinder = Text.unlines
+          [ "§ `Pricing`"
+          , "    GIVEN `list price` IS A NUMBER"
+          , "          discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)"
+          , ""
+          , "@export final"
+          , "GIVETH A NUMBER"
+          , "`final price` MEANS discount TIMES 2"
+          ]
+        inputDefaultReadsAssume = Text.unlines
+          [ "ASSUME k IS A NUMBER"
+          , ""
+          , "@export scaled"
+          , "GIVEN base IS A NUMBER"
+          , "      rate IS A NUMBER TYPICALLY (k PLUS 1)"
+          , "GIVETH A NUMBER"
+          , "scaled MEANS base TIMES rate"
+          ]
+        defaultSuppliesInput = Text.unlines
+          [ "§ `Supplied`"
+          , "    GIVEN base IS A NUMBER TYPICALLY 4"
+          , ""
+          , "GIVETH A NUMBER"
+          , "`double it` MEANS base TIMES 2"
+          , ""
+          , "@export scaled"
+          , "GIVEN rate IS A NUMBER TYPICALLY (`double it` WITH base IS 1)"
+          , "GIVETH A NUMBER"
+          , "scaled MEANS rate TIMES 100"
+          ]
+        suppliedDefault = Text.unlines
+          [ "§ `Supplied`"
+          , "    GIVEN base IS A NUMBER TYPICALLY 4"
+          , "          doubled IS A NUMBER TYPICALLY (`double it` WITH base IS 10)"
+          , ""
+          , "GIVETH A NUMBER"
+          , "`double it` MEANS base TIMES 2"
+          , ""
+          , "@export read"
+          , "GIVETH A NUMBER"
+          , "`read it` MEANS doubled"
+          ]
+
+    it "lists a section input that only another input's default reads" $ do
+      exportParamNames binderReadsBinder `shouldBe` Right ["list price", "discount"]
+
+    -- The export's closure follows references and does not subtract what a WITH
+    -- supplies, as it never has for a body: `base` is listed although the default
+    -- supplies it for itself. That over-asks and is loud, and is not W7's to
+    -- change; `ok/typically-expression.l4` pins that it is no cycle.
+    it "lists an input a default supplies for itself, as it does for a body" $ do
+      exportParamNames suppliedDefault `shouldBe` Right ["base", "doubled"]
+
+    -- A request that leaves `rate` out takes its default, which reads the written
+    -- ASSUME `k`, so `k` is an input of the export and a request can supply it. It
+    -- was left out of the schema, and a request that sent it was refused as an
+    -- unknown parameter (W7 second review, rulings S4).
+    it "lists a written ASSUME that an export's own input's default reads" $ do
+      exportParamNames inputDefaultReadsAssume `shouldBe` Right ["base", "rate", "k"]
+
+    -- The export's closure follows what an export's own input's default calls for a
+    -- written ASSUME, and not for a section input: the default gives `base` itself,
+    -- so `base` is no input of the export. Binding it to the row in l4 batch would
+    -- make the WITH in the default a WITH to a bound input, which is refused.
+    it "does not list a section input that an export's own input's default supplies" $ do
+      exportParamNames defaultSuppliesInput `shouldBe` Right ["rate"]
+
+    it "publishes an expression default as its source text, and a literal as its value" $ do
+      case exportSchema binderReadsBinder of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps -> do
+          fmap (.parameterDefault) (Map.lookup "discount" ps.parameterMap)
+            `shouldBe` Just (Just (Aeson.String "`list price` DIVIDED BY 10"))
+          ps.required `shouldBe` ["list price"]
+      case exportSchema (Text.unlines
+             [ "@export f"
+             , "GIVEN n IS A NUMBER TYPICALLY 3"
+             , "GIVETH A NUMBER"
+             , "f MEANS n"
+             ]) of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps ->
+          fmap (.parameterDefault) (Map.lookup "n" ps.parameterMap)
+            `shouldBe` Just (Just (Aeson.Number 3))
+
+    -- A call with several arguments is one line, comma-separated, so that it
+    -- reads as source wherever it is written out; it used to put each argument on
+    -- a line of its own, with the column padding that goes with it.
+    it "publishes a default that is a call with several arguments on one line" $ do
+      case exportSchema (Text.unlines
+             [ "GIVEN a IS A NUMBER"
+             , "      b IS A NUMBER"
+             , "GIVETH A NUMBER"
+             , "combine MEANS a PLUS b"
+             , ""
+             , "§ `Pricing`"
+             , "    GIVEN `list price` IS A NUMBER"
+             , "          discount IS A NUMBER TYPICALLY (combine WITH a IS `list price`, b IS 1)"
+             , ""
+             , "@export final"
+             , "GIVETH A NUMBER"
+             , "`final price` MEANS discount TIMES 2"
+             ]) of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right ps ->
+          fmap (.parameterDefault) (Map.lookup "discount" ps.parameterMap)
+            `shouldBe` Just (Just (Aeson.String "combine WITH a IS `list price`, b IS 1"))
+
+    it "reports a default that reads its own input as a check error" $ do
+      let src = Text.unlines
+            [ "§ `Loop`"
+            , "    GIVEN a IS A NUMBER TYPICALLY (b PLUS 1)"
+            , "          b IS A NUMBER TYPICALLY (a PLUS 1)"
+            ]
+      case checkWithImports emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right r ->
+          [ length bs | MkCheckErrorWithContext{kind = TypicallyCycle bs} <- r.tcdErrors ]
+            `shouldBe` [2]
+
+    -- W7, decision 1 (§4.3 of the spec): a rule's own input takes an expression
+    -- too, but not one that reads a section input, so a section input is never
+    -- an input of an export merely because an export's own input's default
+    -- reads it: the module is refused instead.
+    describe "a rule input's or a field's default that reads a section input" $ do
+      let readsOf src =
+            case checkWithImports emptyVFS src of
+              Left errs -> fail $ "Fatal: " ++ show errs
+              Right r ->
+                pure [ (nameOf owner, map nameOf bs)
+                     | MkCheckErrorWithContext{kind = TypicallyReadsInput owner bs} <- r.tcdErrors ]
+          ruleInput = Text.unlines
+            [ "§ `Rates`"
+            , "    GIVEN alpha IS A NUMBER"
+            , ""
+            , "@export scaled"
+            , "GIVEN base IS A NUMBER"
+            , "      rate IS A NUMBER TYPICALLY (alpha PLUS 1)"
+            , "GIVETH A NUMBER"
+            , "scaled MEANS base TIMES rate"
+            ]
+          throughDefinition = Text.unlines
+            [ "§ `Rates`"
+            , "    GIVEN alpha IS A NUMBER"
+            , ""
+            , "GIVETH A NUMBER"
+            , "`alpha plus one` MEANS alpha PLUS 1"
+            , ""
+            , "DECLARE Config HAS"
+            , "  timeout IS A NUMBER TYPICALLY `alpha plus one`"
+            , "  retries IS A NUMBER"
+            ]
+          control = Text.unlines
+            [ "GIVETH A NUMBER"
+            , "phi MEANS 8"
+            , ""
+            , "§ `Rates`"
+            , "    GIVEN alpha IS A NUMBER"
+            , "          beta IS A NUMBER TYPICALLY (alpha PLUS 1)"
+            , ""
+            , "@export scaled"
+            , "GIVEN base IS A NUMBER"
+            , "      rate IS A NUMBER TYPICALLY (phi PLUS 1)"
+            , "GIVETH A NUMBER"
+            , "scaled MEANS base TIMES rate"
+            ]
+      it "is refused, naming the input and what it reads" $ do
+        rs <- readsOf ruleInput
+        rs `shouldBe` [("rate", ["alpha"])]
+      it "is refused through a definition, for a record's field too" $ do
+        rs <- readsOf throughDefinition
+        rs `shouldBe` [("timeout", ["alpha"])]
+      -- Positive control: a default that reads only a definition that reads no
+      -- section input, and a section input's own default that reads another,
+      -- raise nothing, so the two above are what the check can see.
+      it "raises nothing for a default that reads no section input" $ do
+        rs <- readsOf control
+        rs `shouldBe` []
+
+    -- W7 second review, rulings S5 and silent S8: the refusal of an export that
+    -- reaches an imported reader ('validateExportImplicitImports') reads the body
+    -- and the export's own inputs' defaults, and now the defaults of the fields of
+    -- the records those inputs carry, because the decoder takes one when a request
+    -- leaves the field out.
+    describe "a record field's default that reaches an imported reader" $ do
+      let lib = Text.unlines
+            [ "§ `Rates`"
+            , "    GIVEN `the rate` IS A NUMBER TYPICALLY 0.05"
+            , ""
+            , "GIVEN amount IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`scaled by the rate` amount MEANS amount TIMES `the rate`"
+            , ""
+            , "GIVEN amount IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`doubled` amount MEANS amount TIMES 2"
+            ]
+          vfs = vfsFromList [("rates", lib)]
+          crossings src =
+            case checkWithImports vfs src of
+              Left errs -> fail $ "Fatal: " ++ show errs
+              Right r ->
+                pure [ (nameOf fn, unqualifiedRawNameToText (rawName imported))
+                     | MkCheckErrorWithContext{kind = ImplicitCrossesImport fn imported} <- r.tcdErrors ]
+          exportTaking reader = Text.unlines
+            [ "IMPORT rates"
+            , ""
+            , "DECLARE Config HAS"
+            , "  markup IS A NUMBER TYPICALLY (" <> reader <> " 100)"
+            , "  retries IS A NUMBER"
+            , ""
+            , "@export cost"
+            , "GIVEN amount IS A NUMBER"
+            , "      cfg IS A Config"
+            , "GIVETH A NUMBER"
+            , "`cost with config` MEANS amount PLUS cfg's markup"
+            ]
+          -- the record sits in a field of another record the export takes
+          nested = Text.unlines
+            [ "IMPORT rates"
+            , ""
+            , "DECLARE Config HAS"
+            , "  markup IS A NUMBER TYPICALLY (`scaled by the rate` 100)"
+            , "  retries IS A NUMBER"
+            , ""
+            , "DECLARE Wrapper HAS"
+            , "  inner IS A Config"
+            , ""
+            , "@export cost"
+            , "GIVEN amount IS A NUMBER"
+            , "      w IS A Wrapper"
+            , "GIVETH A NUMBER"
+            , "`cost with wrapper` MEANS amount PLUS w's inner's markup"
+            ]
+      it "is refused, naming the export and the reader" $ do
+        cs <- crossings (exportTaking "`scaled by the rate`")
+        cs `shouldBe` [("cost with config", "scaled by the rate")]
+      it "is refused when the record is nested in another the export takes" $ do
+        cs <- crossings nested
+        cs `shouldBe` [("cost with wrapper", "scaled by the rate")]
+      -- Positive control: the same shape with an imported rule that reads no section
+      -- input is not a reader, and raises nothing.
+      it "raises nothing for a default that names an imported rule that reads no input" $ do
+        cs <- crossings (exportTaking "`doubled`")
+        cs `shouldBe` []
+      -- The same control for an export's own input's default, which F7 refuses when it
+      -- reaches a reader: a rule that reads no input is not one.
+      it "raises nothing for an export input's default that names an imported rule that reads no input" $ do
+        cs <- crossings (Text.unlines
+          [ "IMPORT rates"
+          , ""
+          , "@export cost"
+          , "GIVEN amount IS A NUMBER"
+          , "      markup IS A NUMBER TYPICALLY (`doubled` 100)"
+          , "GIVETH A NUMBER"
+          , "`cost with markup` MEANS amount PLUS markup"
+          ])
+        cs `shouldBe` []
+      it "is refused for an export input's default that names an imported reader" $ do
+        cs <- crossings (Text.unlines
+          [ "IMPORT rates"
+          , ""
+          , "@export cost"
+          , "GIVEN amount IS A NUMBER"
+          , "      markup IS A NUMBER TYPICALLY (`scaled by the rate` 100)"
+          , "GIVETH A NUMBER"
+          , "`cost with markup` MEANS amount PLUS markup"
+          ])
+        cs `shouldBe` [("cost with markup", "scaled by the rate")]

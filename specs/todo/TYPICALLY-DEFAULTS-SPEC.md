@@ -1,12 +1,19 @@
 # Specification: TYPICALLY Keyword for Default Values
 
-**Status:** PARTIALLY LANDED (re-audited 2026-10-01 on `unstable` at `f9a504b77`).
-`TYPICALLY` is lexed, parsed and type-checked: literal values only, an explicit type required, rejected on a `TYPE` binder (`jl4-core/src/L4/TypeCheck.hs:1724-1767`, `jl4/examples/ok/typically-basic.l4`).
-**On a section `GIVEN` it is operational:** an unsupplied section binder takes its default, once per evaluation at the root, and an explicit `WITH` wins (`6c25d5771`, 2026-09-05; `jl4-core/src/L4/Discharge.hs:281-294`, `fillInDefault`; `doc/reference/types/TYPICALLY.md`).
-**Everywhere else it is metadata only:** a rule's own `GIVEN`, a `DECLARE` field and an `ASSUME` keep their default without using it, and the PEVAL/PASSERT presumptive evaluation this spec proposes below is not implemented.
+**Status:** PARTIALLY LANDED (re-audited 2026-10-04 on `feat/typically-w10`, which stacks W2 to W7 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` on `unstable`; those are not merged into `unstable`, by the local refs of that day, so what they built is on that branch and not on `unstable`).
+What the tree does is recorded in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, whose header and §4 say what is built; this spec is the December 2025 design, kept for its reasoning.
+`TYPICALLY` is lexed, parsed and type-checked: an explicit type is required, and it is rejected on a `TYPE` binder (`checkTypically`, `checkTypicallyLiteral` and `rejectTypicallyOnType` in `jl4-core/src/L4/TypeCheck.hs`; `jl4/examples/not-ok/tc/typically-requires-type.l4` and `typically-on-type.l4`).
+A default is a literal, a bare name, or an expression in parentheses, on a section `GIVEN`, a rule's own `GIVEN` and a record field (W7); an `ASSUME` and a lambda's `GIVEN` take a literal only.
+**One behaviour:** a name that nothing supplies takes its default, wherever it is declared and whichever tool evaluates it.
+On a section `GIVEN` that has been so since `6c25d5771` (2026-09-05; `jl4-core/src/L4/Discharge.hs`, `fillInDefault`); a call that names a rule's inputs and a construction that names a record's fields take it too (W4, W5); and so do `l4 batch` and `jl4-service` for a case that leaves the fact out (W2, W3).
+`doc/reference/types/TYPICALLY.md` describes that behaviour for a reader.
+**An `ASSUME` still keeps its default without using it** (W6 is deferred, by Meng's word of 2026-10-02: `ASSUME` is being deprecated).
+The PEVAL/PASSERT presumptive evaluation this spec proposes below is not implemented: neither name occurs in `jl4-core/src` or `jl4/app`.
+The part of the idea that exists is the caller's switch between a soft evaluation that takes defaults and a hard one that does not (`l4 batch --presumption soft|hard`, and `"presumption"` in a service request; T3c and T4 of the one-behaviour spec), not directives in the module.
+**The body below, from the Executive Summary down, is the December 2025 design, not a description of the tree.**
+Where it says a default is "metadata" or must be "a literal", R8 (`IMPLICIT-PROPS-DESIGN.md` §11.5) and `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` supersede it.
 Reintroduced by `27cd4770` (`feat(l4): reintroduce TYPICALLY as metadata-only default values`), hardened by `d6aca898`; the December 2025 revert history is retained beneath for the record.
-Ruling R8 (`IMPLICIT-PROPS-DESIGN.md` §11.5, 2026-09-04) gives `TYPICALLY` one behaviour everywhere; what remains to build is `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (PR #525).
-`CATALA-EXPORT-SPEC.md` R10 operationalises the metadata externally, as Catala `context` variables.
+`CATALA-EXPORT-SPEC.md` R10 operationalises the default externally, as Catala `context` variables.
 **Related:** `BOOLEAN-MINIMIZATION-SPEC.md`
 
 > **⚠️ HISTORY: FIRST IMPLEMENTATION REVERTED (December 2025)**

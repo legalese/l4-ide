@@ -195,54 +195,77 @@ is", and entry [3.1](03-quantities-and-calculation.md#e3-1) for the neighbouring
 
 <a id="e7-4"></a>
 
-## 7.4 `TYPICALLY` — what it does today, and what it does not
+## 7.4 `TYPICALLY` — a usual value, taken when a call or a construction leaves it out
 
 **If the source says** nothing at all. `TYPICALLY` is not a translation of a drafting phrase; it is
 an annotation you add to record the usual value of an input, for the benefit of whoever has to fill
-the form.
+the form, and for a call that leaves the input out.
 
-**It is doing**, today, exactly one thing: **carrying metadata**. It stores a default on a `DECLARE`
-field, a rule `GIVEN` parameter or an `ASSUME`, and an exported schema reports that value as the
-field's default while still listing the field as required.
+**It is doing** three things. A **section `GIVEN`** that carries one is used by every rule that reads
+it and is given no value. A **rule's own `GIVEN`** that carries one may be left out of a `WITH` call
+that names the rule's inputs, and a **record field** that carries one may be left out of a `WITH`
+construction: the call or the construction takes the default. And at the boundary (`l4 batch`, the
+service) a case that leaves the fact out takes it and says so under `presumed`; an exported schema
+lists such an input as optional, with its default.
 
-**Write** it beside the type, and keep supplying the value:
+**Write** it beside the type, and leave the field out where the usual value is what the source means:
 
 ```l4
 DECLARE `Employment terms` HAS
     `days of notice the contract requires` IS A NUMBER TYPICALLY 28
     `the employee is under duress`         IS A BOOLEAN TYPICALLY FALSE
+    `the employee`                         IS A STRING
 
--- TYPICALLY records the usual value; it does not supply it. Every field is
--- still written out at the construction site.
-`the standard terms` MEANS `Employment terms` WITH
-    `days of notice the contract requires` IS 28
-    `the employee is under duress`         IS FALSE
+GIVETH A `Employment terms`
+`the standard terms` MEANS `Employment terms` WITH `the employee` IS "Alex"
 ```
 
-**Not** a value you may omit. Leave the annotated field out of the construction and the file is
-rejected:
+Asked for the notice, ``#EVAL `the standard terms`'s `days of notice the contract requires` `` gives `28`.
 
+**Not** a way to leave something out by position. `` `Employment terms` OF "Alex" `` is rejected: a
+construction or call by position gives every input. A field with **no** `TYPICALLY` is still
+required at a `WITH` construction, and a misspelt name is still an error.
+
+**Not** a `TYPICALLY` on a field with a `MEANS` clause. A computed field's value always comes from
+its `MEANS`, so a default could never be used, and the checker says so.
+
+**A default may be worked out.** After `TYPICALLY` write a literal, a bare name, or an expression in
+parentheses over what the file declares: a definition, a constructor, or a section `GIVEN`.
+
+```l4
+GIVETH A NUMBER
+`the standard notice` MEANS 28
+
+§ `Notice`
+    GIVEN `days of notice` IS A NUMBER TYPICALLY `the standard notice`
+          `days to respond` IS A NUMBER TYPICALLY (`days of notice` DIVIDED BY 2)
+
+GIVETH A NUMBER
+`the response deadline` MEANS `days to respond`
 ```
-In this use of
 
-  `Employment terms` (defined at …)
+`` #EVAL `the response deadline` `` gives `14`, and with ``WITH `days of notice` IS 60`` it gives `30`: a
+section `GIVEN`'s default is worked out from the values the whole evaluation was started with, so a
+`WITH` on one input reaches the default that reads it. A rule's own input or a record field takes its
+default as if it were written at the call: it may name definitions and constructors, but not a section
+`GIVEN` (directly or through a definition), which is a check error, and not that rule's other inputs: a name
+spelled like one is a check error even where the file defines something called that.
+Put a default that reads an input on the section `GIVEN`. A section `GIVEN`'s default that reads
+itself, directly or through other defaults, is a check error. A written `ASSUME` and a lambda's
+`GIVEN` still take only a literal.
 
-you have not supplied these inputs:
+**Not** a way to state what an instrument supplies and a party may displace. That is a fallback the
+provision will cite, which the parties set in the record, so write it as in [7.3](#e7-3): a named
+definition plus `fromMaybe`. `TYPICALLY` records what a form presumes when a fact is not given.
 
-  `days of notice the contract requires` of type NUMBER
-```
+**Not** a way to show that an answer rests on a presumption inside the file. `#EVAL` does not list the
+defaults it took. `l4 batch` and the service list, under `presumed`, a default a case left out and the
+answer read; a default the rules take themselves, as here, is listed there only under
+`--presumption hard` (`"presumption": "hard"` on the service), as `WITH the rule: the input`.
 
-_Proposed, not landed (2026-09-04): `TYPICALLY` becoming a real default — a value the caller may
-omit, honoured once at the entry point, listed as optional in the schema. Until then it is metadata
-and the input is required. Do not write a rule that relies on the default being applied._
-
-For a default the rules actually **apply**, write it out as in [7.3](#e7-3): a named definition plus
-`fromMaybe`. That works today and reads better in the source, because the fallback gets a name a
-provision can cite.
-
-**See** the corpus example `jl4/examples/ok/typically-basic.l4`, which exercises `TYPICALLY` on
-record fields, rule `GIVEN` parameters and `ASSUME` declarations, and whose own header line says
-"metadata-only default values".
+**See** the corpus examples `jl4/examples/ok/typically-named-site.l4` (a rule's inputs) and
+`jl4/examples/ok/typically-record-construction.l4` (a record's fields), and `jl4/examples/ok/typically-basic.l4`
+for the annotation on record fields, rule `GIVEN` inputs and `ASSUME` declarations.
 
 <a id="e7-5"></a>
 
