@@ -541,7 +541,7 @@ There is no message for this one. The file checks, the editor is clean, the rule
 
 Stated plainly, so nothing here is a surprise later. Each was measured on the version of L4 this page documents.
 
-**A rule that reads a section `GIVEN` cannot be run to an answer until the fact is filled in.** Nothing is broken, and the file is not wrong. Checking the file passes — `l4 check` prints `Check succeeded.` and the editor shows no error — and `#CHECK` still reports what kind of thing the rule gives. It is only asking for the answer, with `#EVAL`, that stops, and it stops by saying exactly what it is waiting for:
+**A rule whose answer depends on a section `GIVEN` cannot be run to an answer until the fact is filled in.** Nothing is broken, and the file is not wrong. Checking the file passes — `l4 check` prints `Check succeeded.` and the editor shows no error — and `#CHECK` still reports what kind of thing the rule gives. It is only asking for the answer, with `#EVAL`, that stops, and it stops by saying exactly what it is waiting for:
 
 ```
 I could not continue evaluating, because I needed to know the value of

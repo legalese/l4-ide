@@ -25,6 +25,8 @@ module TestData (
   sectionBooleanJL4,
   deonticBooleanJL4,
   considerBooleanJL4,
+  decidedAnywayJL4,
+  bareInputJL4,
   deonticConsiderJL4,
   maybeInputsJL4,
   timeInputsJL4,
@@ -534,6 +536,18 @@ fee MEANS
     CONSIDER `is member`
     WHEN TRUE THEN 0
     OTHERWISE amount
+|]
+
+-- | A rule that reads a BOOLEAN input whose value cannot change its answer:
+-- from UNKNOWN-EVALUATION-SPEC §8 step 3, a missing one is no reason to stop.
+decidedAnywayJL4 :: Text
+decidedAnywayJL4 =
+  [i|
+@export default eligible
+GIVEN `has criminal record` IS A BOOLEAN
+      `unused flag`         IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible MEANS `has criminal record` OR TRUE
 |]
 
 -- | 'deonticBooleanJL4' with the branch written as a CONSIDER and an
@@ -1100,4 +1114,17 @@ GIVEN c IS A Colour
 GIVETH A NUMBER
 DECIDE price Red   IS 1
 DECIDE price Green IS 2
+|]
+
+-- | A rule whose answer, when its second input is TRUE, is its first input
+-- itself: @p AND TRUE@ is @p@. On the wrapper path (a @{}@ in the request) that
+-- answer sits inside the wrapper's JUST.
+bareInputJL4 :: Text
+bareInputJL4 =
+  [i|
+@export default gate
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+gate MEANS p AND q
 |]

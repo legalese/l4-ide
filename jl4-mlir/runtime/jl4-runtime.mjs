@@ -496,6 +496,54 @@ export class DeonticInputError extends Error {
   }
 }
 
+/**
+ * A required input the request leaves out, or sends as null, or a record
+ * input with a required field left out or null, or a list input with a
+ * null element. jl4-service refuses each with a 422 naming the first such
+ * input in parameter order, "Parameter 'y': missing required parameter",
+ * and so does the runtime ('refuseMissingInputs'); a MAYBE input or field,
+ * which the schema does not list as required, may be left out and is
+ * NOTHING. Before, each was marshalled as 0, so `{"x": true}` to `x AND y`
+ * answered FALSE. For a field or element sent as null the service's
+ * message is its JSON decoder's instead ("Expected JSON boolean but got:
+ * Null"); the status is the same.
+ */
+export class MissingInputError extends Error {
+  constructor(parameter) {
+    super("Parameter '" + parameter + "': missing required parameter");
+    this.name = "MissingInputError";
+    this.parameter = parameter;
+  }
+}
+
+/**
+ * The HTTP status and body for an evaluation that threw, and whether the
+ * worker's wasm state may be inconsistent after it. A missing input gets
+ * jl4-service's own 422 body, byte for byte: an 'InterpreterError' under
+ * the 'Error' tag, with the report every response states (U7b). A
+ * malformed deontic request is a 400 and a memory cap a 413, each with a
+ * plain error body; anything else is a 500. Only the last two are fatal.
+ */
+export function evaluationErrorResponse(err) {
+  if (err instanceof MissingInputError) {
+    return {
+      status: 422,
+      body: aesonStringify({
+        contents: { contents: err.message, tag: "InterpreterError" },
+        report: "default",
+        tag: "Error",
+      }),
+      fatal: false,
+    };
+  }
+  const body = JSON.stringify({ error: String(err.message || err) });
+  if (err instanceof DeonticInputError)
+    return { status: 400, body, fatal: false };
+  if (err instanceof MemoryLimitError)
+    return { status: 413, body, fatal: true };
+  return { status: 500, body, fatal: true };
+}
+
 // ===========================================================================
 // M6 — deontic interpreter. Walks 'schema.deonticContract' against the
 // request's startTime + events stream, returning a wire-shaped value
@@ -3289,6 +3337,45 @@ export function createRuntime(opts) {
     };
   }
 
+  // A required input that does not supply what its schema requires is
+  // refused, naming the first in parameter order, as jl4-service refuses it
+  // ('MissingInputError').
+  function refuseMissingInputs(meta, args) {
+    const props = meta.parameters.properties || {};
+    const order = meta.paramOrder || Object.keys(props);
+    const required = new Set(meta.parameters.required || order);
+    for (const pn of order) {
+      const v = args == null ? undefined : args[pn];
+      if (required.has(pn) && !suppliesRequired(v, props[pn]))
+        throw new MissingInputError(pn);
+    }
+  }
+
+  // Whether a value is there, and so is everything inside it its schema
+  // requires: a record's required fields, a list's elements. A MAYBE field
+  // may be left out. A value of another shape than its schema's is left to
+  // the marshaller, as before.
+  function suppliesRequired(value, schema) {
+    if (value === undefined || value === null) return false;
+    if (!schema) return true;
+    if (
+      schema.type === "object" &&
+      schema.properties &&
+      typeof value === "object"
+    ) {
+      const order = schema.propertyOrder || Object.keys(schema.properties);
+      const required = new Set(schema.required || order);
+      return order.every(
+        (name) =>
+          !required.has(name) ||
+          suppliesRequired(value[name], schema.properties[name]),
+      );
+    }
+    if (schema.type === "array" && Array.isArray(value))
+      return value.every((v) => suppliesRequired(v, schema.items || {}));
+    return true;
+  }
+
   // ---- High-level helper: marshal args, call an exported function,
   //      decode the return per the schema's return type. ----
   function invokeFunction(instance, meta, args) {
@@ -3300,6 +3387,7 @@ export function createRuntime(opts) {
     if (meta.isDeontic) {
       return invokeDeontic(meta, args);
     }
+    refuseMissingInputs(meta, args);
     const props = meta.parameters.properties || {};
     const order = meta.paramOrder || Object.keys(props);
     const required = new Set(meta.parameters.required || order);
@@ -3468,6 +3556,7 @@ export function createRuntime(opts) {
   // route to `<fn>$trace` without duplicating the marshalling pipeline.
   function invokeFunctionRaw(instance, meta, args, wasmSymbol) {
     resetHeap();
+    refuseMissingInputs(meta, args);
     const props = meta.parameters.properties || {};
     const order = meta.paramOrder || Object.keys(props);
     const required = new Set(meta.parameters.required || order);
@@ -4112,9 +4201,9 @@ export function createRuntime(opts) {
 // until later slices replace this with a real instrumented trace.
 //
 // `wrapEvaluationEnvelope({value, reasoning})` builds the
-// `{contents: {result: {value}, reasoning?}, tag}` envelope `jl4-service`
-// returns, with `tag = TraceResponse` whenever `reasoning` is non-empty
-// (matching `responseTag` in jl4-service's Api.hs).
+// `{contents: {result: {value}, reasoning?}, report, tag}` envelope
+// `jl4-service` returns, with `tag = TraceResponse` whenever `reasoning` is
+// non-empty (matching `responseTag` in jl4-service's Api.hs).
 // ---------------------------------------------------------------------------
 
 export function isEmptyReasoning(r) {
@@ -4596,9 +4685,12 @@ export function synthesizeArgEvalTree(value, schema, _opts) {
 }
 
 // Build the wire envelope matching jl4-service's `SimpleResponse` ToJSON
-// instance: `{tag, contents}` where `contents` is `ResponseWithReason` (so
-// `{result, reasoning?}`). The tag flips to "TraceResponse" whenever
-// `reasoning` is non-empty (= `responseTag` in Backend/Api.hs).
+// instance: `{tag, contents, report}` where `contents` is
+// `ResponseWithReason` (so `{result, reasoning?}`). The tag flips to
+// "TraceResponse" whenever `reasoning` is non-empty (= `responseTag` in
+// Backend/Api.hs). Every response states its report, as the service's do
+// (UNKNOWN-EVALUATION-SPEC U7b); WASM evaluates only fully supplied inputs,
+// so it is always the default one.
 export function wrapEvaluationEnvelope({ value, reasoning }) {
   const result = { value };
   const contents =
@@ -4609,5 +4701,5 @@ export function wrapEvaluationEnvelope({ value, reasoning }) {
     reasoning && !isEmptyReasoning(reasoning)
       ? "TraceResponse"
       : "SimpleResponse";
-  return { contents, tag };
+  return { contents, report: "default", tag };
 }

@@ -109,6 +109,16 @@ assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
 evalAssumedFixture :: FilePath
 evalAssumedFixture = fixtureDir </> "eval-assumed.l4"
 
+-- | Typechecks cleanly; one @#EVAL@ decided whatever its input is, and one
+-- that waits on two.
+evalUndeterminedFixture :: FilePath
+evalUndeterminedFixture = fixtureDir </> "eval-undetermined.l4"
+
+evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture :: FilePath
+evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
+evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
+evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -228,6 +238,12 @@ decodeArray sout =
     Left err         -> do
       expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
       error "unreachable"
+
+-- | A JSON array field's elements, if the field is an array.
+arrayField :: Value -> String -> Maybe [Value]
+arrayField v k = case objField v k of
+  Just (Array a) -> Just (toList a)
+  _              -> Nothing
 
 -- | Count non-blank lines (each NDJSON row is one line).
 nonBlankLines :: String -> Int
@@ -406,6 +422,8 @@ coreFixtures =
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB, batchClausesCatchAll
+  , evalUndeterminedFixture
+  , evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture
   ]
 
 spec :: FilePath -> Spec
@@ -543,15 +561,23 @@ spec bin = do
       env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
       case objField env "results" of
-        Just (Array v) -> do
-          length v `shouldBe` 2
-          mapM_ (\r -> do
-                   objField r "kind"  `shouldBe` Just (String "assertion")
-                   objField r "value" `shouldBe` Just Null
-                   case objField r "error" of
-                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
-                     other -> expectationFailure ("Expected an error string, got " ++ show other))
-                (toList v)
+        Just (Array v) -> case toList v of
+          [raised, waiting] -> do
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+              other -> expectationFailure ("Expected an error string, got " ++ show other)
+            -- One stuck on an input nobody supplied did not raise an error: it
+            -- is undetermined, still an assertion, and says what it waits on
+            -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3).
+            objField waiting "kind"  `shouldBe` Just (String "assertion")
+            objField waiting "value" `shouldBe` Just Null
+            objField waiting "error" `shouldBe` Nothing
+            case objField waiting "undetermined" of
+              Just und -> arrayField und "needs" `shouldBe` Just [String "x"]
+              other    -> expectationFailure ("Expected an undetermined field, got " ++ show other)
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "still typechecks the raising fixture — l4 check succeeds on it" $
@@ -624,18 +650,54 @@ spec bin = do
     it "fails the run when an #EVAL's result is a bare assumed term" $
       expectFail bin ["run", evalAssumedFixture]
 
-    it "reports a bare assumed #EVAL result as stuck, never as a value" $ do
+    it "reports a bare assumed #EVAL result as undetermined, never as a value" $ do
       env <- jsonEnvelope bin ["run", evalAssumedFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
       case objField env "results" of
         Just (Array v) -> case toList v of
           [r] -> do
-            objField r "kind"  `shouldBe` Just (String "error")
-            -- an #EVAL's exception is carried in "value", as for every crash
-            case objField r "value" of
+            -- its own kind, from build step 3 (UNKNOWN-EVALUATION-SPEC row 52)
+            objField r "kind"  `shouldBe` Just (String "undetermined")
+            objField r "value" `shouldBe` Just Null
+            arrayField r "needs" `shouldBe` Just [String "x"]
+            case objField r "message" of
               Just (String e) -> e `shouldSatisfy` ("assumed term" `T.isInfixOf`)
-              other -> expectationFailure ("Expected the exception text, got " ++ show other)
+              other -> expectationFailure ("Expected the default report's text, got " ++ show other)
           other -> expectationFailure ("Expected 1 result, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Found in review of the step-3 rebase: reading the term an unknown
+    -- stands for followed a name bound to itself (or to a cycle of names)
+    -- without spending any of its budget, so these never answered. The run is
+    -- killed after 20 s, which fails the test where an in-process test would
+    -- hang the suite.
+    describe "a name that is bound to itself, under an unknown" $
+      mapM_
+        (\(label, fixture, needed) ->
+          it ("answers, naming the unknown it is stuck on: " ++ label) $ do
+            r <- runL4Within 20 bin ["run", fixture, "--json"]
+            case r of
+              Nothing -> expectationFailure "l4 run did not answer within 20 s"
+              Just out -> do
+                out.outExit `shouldBe` ExitFailure 1
+                out.outStdout `shouldSatisfy` (("\"" ++ needed ++ "\"") `isInfixOf`))
+        [ ("a rule that is its own value", evalAliasLoopFixture, "f")
+        , ("the same inside a list", evalAliasLoopListFixture, "x")
+        , ("two names bound to each other", evalAliasCycleFixture, "f")
+        ]
+
+    -- A residual: two inputs, both named, in the order evaluation reached
+    -- them, and the run fails (§4.12 row 23).
+    it "names every input an undetermined #EVAL waits on, and fails the run" $ do
+      env <- jsonEnvelope bin ["run", evalUndeterminedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [decided, waiting] -> do
+            objField decided "kind"  `shouldBe` Just (String "value")
+            objField waiting "kind"  `shouldBe` Just (String "undetermined")
+            arrayField waiting "needs" `shouldBe` Just [String "x", String "y"]
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "falls through from a bare positional argument (backward-compat)" $

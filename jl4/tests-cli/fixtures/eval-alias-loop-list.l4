@@ -1,0 +1,8 @@
+-- A name bound to itself, or to a cycle of names, under an assumed input.
+-- Reading the term for the unknown must stop, not follow the names for ever.
+ASSUME x IS A LIST OF NUMBER
+
+GIVETH A NUMBER
+DECIDE loop IS loop
+
+#EVAL x EQUALS LIST loop

@@ -10,6 +10,7 @@ module L4.EvaluateLazy.Exceptions
 , prettyRefusal
 , maximumStackSize
 , maximumFrameDepth
+, maximumUnknownSteps
 )
 where
 
@@ -78,7 +79,15 @@ data UserEvalException =
   | StackOverflow
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
-  | Stuck Resolved -- ^ stores the term we got stuck on
+  | Stuck (NonEmpty Term)
+    -- ^ what evaluation needed and nobody supplied: each input, or field of
+    -- one, once, in the order evaluation reached it (UNKNOWN-EVALUATION-SPEC
+    -- §4.7.4's default report names every one, U7b)
+  | RanOutOfSteps
+    -- ^ evaluation over an unknown took more steps than the limit allows
+    -- (§4.5, build step 3). Never reported as such: the connective whose
+    -- right operand ran out, or the directive boundary, rewrites it into
+    -- 'Stuck' naming the inputs that started the count.
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -161,12 +170,40 @@ prettyUserEvalException = \ case
     <> [ "During the evaluation of the operation:"
        , prettyLayout op
        ]
-  Stuck r ->
+  Stuck (t :| []) ->
     [ "I could not continue evaluating, because I needed to know the value of" ]
-    <> indentMany r
+    <> indentStuckName t
     <> [ "but it is an assumed term." ]
+  -- Several names: the same message, in the plural (decided by Claude
+  -- overnight 2026-10-03, pending Meng's review; UNKNOWN-EVALUATION-SPEC §8
+  -- step 3). The one-name message above is unchanged, so every page that
+  -- quotes it stays true.
+  Stuck ts ->
+    [ "I could not continue evaluating, because I needed to know the values of" ]
+    <> concatMap indentStuckName (toList ts)
+    <> [ "but they are assumed terms." ]
+  RanOutOfSteps ->
+    [ "I gave up evaluating: working this out over an unknown took more than "
+      <> Text.textShow maximumUnknownSteps <> " steps." ]
   UserError msg ->
     [ msg ]
+
+-- | A name a 'Stuck' carries, as its message prints it. An input prints
+-- exactly as it always has, so the one-input message is unchanged.
+indentStuckName :: Term -> [Text]
+indentStuckName = \ case
+  TInput r _ -> indentMany r
+  t          -> indentMany t
+
+-- | The step limit of UNKNOWN-EVALUATION-SPEC §4.5: once a site has received
+-- a term, evaluation may take this many more machine steps before it gives
+-- up. Set from §7's measurement on build step 3's branch (2026-10-03): the
+-- most any directive of the workload took was 59; a machine step allocates
+-- about 290 bytes, so this many is about 73 MB, under the service's default
+-- 256 MB per evaluation, and takes about 10 ms. Build step 5, whose joins can
+-- take far more, measures it again.
+maximumUnknownSteps :: Int
+maximumUnknownSteps = 250_000
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

@@ -15,6 +15,11 @@ module L4.EvaluateLazy.Machine
 , tryEval
 , traceEval
 , raiseException
+-- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
+, tickUnknownSteps
+, resetUnknownSteps
+, reachedUnknowns
+, unknownNames
 , withPoppedFrame
 , newUnique
 , getTemporalContext
@@ -212,6 +217,11 @@ data Frame =
   | ConnectiveLeft Connective (Maybe ConnRight) {- -}
     -- ^ the left operand of a built-in connective (NOT's only one) is being
     -- evaluated; the right operand is still to come, if there is one
+  | ConnectiveRight Connective Term {- -}
+    -- ^ the right operand of a connective whose left operand is the term
+    -- (UNKNOWN-EVALUATION-SPEC §4.3): combined with it by the connective's
+    -- table, and the frame through which an error, a refusal or running out
+    -- of steps in the right operand unwinds as 'Stuck' (§8 step 3)
   | ConsiderWhen1 (Maybe PmGroup) Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
@@ -231,9 +241,12 @@ data Frame =
     -- way; 'PatApp1' did not, which is why @Pay (EXACTLY t) (EXACTLY theLandlord)@
     -- reported @theLandlord is not in scope@ while
     -- @Pay (EXACTLY theLandlord) payee@ worked.
-  | EqConstructor1 {- -} Reference [(Reference, Reference)]
-  | EqConstructor2 WHNF {- -} [(Reference, Reference)]
-  | EqConstructor3 {- -} [(Reference, Reference)]
+  | EqConstructor1 (Maybe Term) {- -} Reference [(Reference, Reference)]
+  | EqConstructor2 (Maybe Term) WHNF {- -} [(Reference, Reference)]
+  | EqConstructor3 (Maybe Term) {- -} [(Reference, Reference)]
+    -- ^ the 'Maybe Term' in the three is what the components compared so far
+    -- came to when one of them was a term: the equalities are combined left
+    -- to right by the @AND@ table (§8 step 3)
   | UnaryBuiltin0 UnaryBuiltinFun (Maybe (Type' Resolved)) -- Added type for type-directed decoding
   | BinBuiltin1 BinOp Reference
   | BinBuiltin2 BinOp WHNF
@@ -336,6 +349,14 @@ data EvalState =
       -- silent nullity is how a party loses a deadline it believed it had
       -- met; the second is the empty window a run reveals. Nothing here is
       -- an error: the value stands.
+    , unknownSteps :: !(IORef Int)
+      -- ^ UNKNOWN-EVALUATION-SPEC §4.5's step counter (C4): negative until a
+      -- site of §4.3's table first receives a term in this directive, then
+      -- the machine steps still allowed. Reset per directive.
+    , unknownReached :: !(IORef [Term])
+      -- ^ every input, or field of one, that reached a §4.3 site in this
+      -- directive, first first: what a directive that runs out of steps is
+      -- Stuck on (§8 step 3). Reset per directive.
     , deonticLog :: !(Maybe DeonticLog)
       -- ^ LTS-VISUALISER §4.3 (P2b): the deontic step log, OPTIONAL and off
       -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
@@ -891,7 +912,65 @@ raiseException e = do
   traceEval (Exit (Left e))
   withPoppedFrame \ case
     Nothing -> liftIO (Control.Exception.throwIO e)
-    Just f  -> unwindFrame f >> raiseException e
+    Just f  -> unwindFrame f >> raiseException (rewriteUnwinding f e)
+
+-- | What an exception becomes as it unwinds through a frame. Only the frames
+-- that hold a term on the left of what is still being evaluated change it
+-- (UNKNOWN-EVALUATION-SPEC §8 step 3): an error, a refusal or running out of
+-- steps there becomes 'Stuck' naming the left's inputs, and the right's too
+-- if it was itself 'Stuck'. The two-valued run would have stopped at the left
+-- operand, Stuck on those inputs, so this is that answer, naming every input
+-- it waits on (U7b) rather than the first. Until build step 5 builds the
+-- guarded leaves this is U13's interim for a refusal, and assumed, not ruled,
+-- for the other two. It rewrites the exception; it never catches it and
+-- resumes. A built-in's 'RuntimeTypeError', which is how one reports an
+-- argument it cannot take (FETCH of a string that is no https URL), is
+-- rewritten the same way; the machine's own invariant failures, the other
+-- internal errors, propagate as they are.
+rewriteUnwinding :: Frame -> EvalException -> EvalException
+rewriteUnwinding f e = case speculativeLeft f of
+  Nothing -> e
+  Just p  -> case e of
+    UserEvalException (Stuck ns) -> stuckException (termNames p <> toList ns)
+    UserEvalException _          -> stuckException (termNames p)
+    RefusalException _           -> stuckException (termNames p)
+    InternalEvalException (RuntimeTypeError _) -> stuckException (termNames p)
+    InternalEvalException _      -> e
+  where
+    stuckException ns = case nubTerms ns of
+      (n : rest) -> UserEvalException (Stuck (n :| rest))
+      []         -> e
+
+-- | The term on the left of a frame through which what is being evaluated is
+-- speculative (§8 step 3): the right operand of a connective whose left is a
+-- term, or the remaining fields of a structural equality that has already
+-- met one. The two-valued run would have stopped at that term, so what is
+-- evaluated under such a frame is evaluated only because the term might
+-- turn out to need it.
+speculativeLeft :: Frame -> Maybe Term
+speculativeLeft = \ case
+  ConnectiveRight _ p    -> Just p
+  EqConstructor1 acc _ _ -> acc
+  EqConstructor2 acc _ _ -> acc
+  EqConstructor3 acc _   -> acc
+  _                      -> Nothing
+
+-- | An effect on the outside world, a ledger write, an HTTP request or a
+-- read of the process environment, does not happen under a speculative
+-- frame ('speculativeLeft'): the two-valued run would not have reached it
+-- unless the term on that frame's left came out so. It is Stuck on that
+-- term's inputs instead, which unwinding through the frame reports as it
+-- reports any error there.
+refuseEffectUnderUnknown :: Eval ()
+refuseEffectUnderUnknown = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  case mapMaybe speculativeLeft stack.frames of
+    p : _ -> stuckOn (termNamesNE p)
+    []    -> pure ()
+
+-- | Each term once, first occurrence first.
+nubTerms :: [Term] -> [Term]
+nubTerms = foldr (\ x acc -> x : filter (/= x) acc) []
 
 -- | Interpret the state-restoring effects of a frame while unwinding on an
 -- exception. Most frames are pure control flow and need nothing, but:
@@ -957,6 +1036,7 @@ unwindFrame = \ case
   ReadCell2 {}                  -> pure ()
   App1 {}                       -> pure ()
   ConnectiveLeft {}             -> pure ()
+  ConnectiveRight {}            -> pure ()
   IfThenElse1 {}                -> pure ()
   ConsiderWhen1 {}              -> pure ()
   PatNil0 {}                    -> pure ()
@@ -1023,21 +1103,91 @@ internalException = raiseException . InternalEvalException
 userException :: UserEvalException -> Eval a
 userException = raiseException . UserEvalException
 
-stuckOnAssumed :: Resolved -> Eval a
-stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
+stuckOnAssumed :: Resolved -> Maybe (Type' Resolved) -> Eval a
+stuckOnAssumed assumedResolved ty = userException (Stuck (TInput assumedResolved ty :| []))
+
+-- | A site of §4.3's table has received a term: start the step counter if
+-- it has not started in this directive (C4), and note the inputs the term
+-- reads.
+noteTerm :: Term -> Eval ()
+noteTerm t = do
+  stepsRef <- asks (.unknownSteps)
+  steps <- liftIO (readIORef stepsRef)
+  when (steps < 0) (liftIO (writeIORef stepsRef maximumUnknownSteps))
+  reachedRef <- asks (.unknownReached)
+  liftIO (modifyIORef' reachedRef (\ ns -> ns <> filter (`notElem` ns) (termNames t)))
+
+-- | One machine step: counted once the counter has started, and running out
+-- raises 'RanOutOfSteps' (§4.5).
+tickUnknownSteps :: Eval ()
+tickUnknownSteps = do
+  stepsRef <- asks (.unknownSteps)
+  steps <- liftIO (readIORef stepsRef)
+  if steps < 0
+    then pure ()
+    else if steps == 0
+      then userException RanOutOfSteps
+      else liftIO (writeIORef stepsRef (steps - 1))
+{-# INLINE tickUnknownSteps #-}
+
+-- | Start a directive with the counter stopped and nothing reached.
+resetUnknownSteps :: Eval ()
+resetUnknownSteps = do
+  stepsRef <- asks (.unknownSteps)
+  liftIO (writeIORef stepsRef (-1))
+  reachedRef <- asks (.unknownReached)
+  liftIO (writeIORef reachedRef [])
+
+-- | The inputs that reached a §4.3 site in this directive.
+reachedUnknowns :: Eval [Term]
+reachedUnknowns = liftIO . readIORef =<< asks (.unknownReached)
+
+-- | Stuck on what an unknown value waits on.
+stuckOn :: NonEmpty Term -> Eval a
+stuckOn = userException . Stuck
+
+-- | The names an unknown value waits on: the input itself, or every input
+-- (and field of one) a term reads. 'Nothing' for a determined value.
+unknownNames :: WHNF -> Maybe (NonEmpty Term)
+unknownNames = \ case
+  ValAssumed r ty -> Just (TInput r ty :| [])
+  ValTerm t       -> case termNames t of
+    (n : rest) -> Just (n :| rest)
+    []         -> Nothing
+  _               -> Nothing
+
+-- | The term an unknown value is: an input, or a term. 'Nothing' for a
+-- determined value.
+unknownTerm :: WHNF -> Maybe Term
+unknownTerm = \ case
+  ValAssumed r ty -> Just (TInput r ty)
+  ValTerm t       -> Just t
+  _               -> Nothing
+
+-- | The value a term is: a bare input stays the input it always was.
+termValue :: Term -> WHNF
+termValue = \ case
+  TInput r ty -> ValAssumed r ty
+  t           -> ValTerm t
 
 -- | REFUSE: stop evaluation with the author's reason.
 --
 -- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
 -- 'EvalException' anywhere in the tree, and it is used only at the directive
 -- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
--- rethrows). There is no user-facing catch construct, so nothing between a
--- 'Refuse' and the directive that demanded it can observe the refusal or turn
--- it into a value: not a CONSIDER arm, not a boolean connective, not a
--- WHERE\/LET binding. THIS IS AN INVARIANT, not an accident of the current
--- code: a static refusal analysis is only sound while it holds. Anything that
--- adds a second @try@ (a TRY\/RECOVER construct, a service-level resume)
--- breaks it, and would also have to reckon with 'unwindFrame'\'s docstring.
+-- rethrows). There is no user-facing catch construct, and A REFUSAL IS NEVER
+-- TURNED INTO A VALUE: not by a CONSIDER arm, not by a boolean connective, not
+-- by a WHERE\/LET binding. One frame does observe a refusal as it unwinds: the
+-- right operand of a connective whose left operand is unknown
+-- ('ConnectiveRight', and structural equality's 'EqConstructor' frames) turns
+-- it into 'Stuck' on that left operand ('rewriteUnwinding';
+-- UNKNOWN-EVALUATION-SPEC U13's interim), which is still no value and still
+-- ends the directive. THIS IS AN INVARIANT, not an accident of the current
+-- code: a static refusal analysis is only sound while it holds. A frame may
+-- observe a refusal; nothing may resume evaluation with a value in its place.
+-- Anything that adds a second @try@ (a TRY\/RECOVER construct, a service-level
+-- resume) breaks it, and would also have to reckon with 'unwindFrame'\'s
+-- docstring.
 refuseWith :: Refusal -> Eval a
 refuseWith = raiseException . RefusalException
 
@@ -1213,6 +1363,7 @@ writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
 -- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
 tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
 tellEventRouted route ev = do
+  refuseEffectUnderUnknown
   noteLedgerWrite -- a write POISONS the current force span (T6+ledger): write-once
   store <- asks (.envLedger)
   case route of
@@ -1841,8 +1992,19 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         continueRef arg1
       ValFulfilled -> continueBackward ValFulfilled
       ValBreached r -> continueBackward (ValBreached r)
-      ValAssumed r ->
-        stuckOnAssumed r -- TODO: we can do better here
+      -- An assumed function applied is a term (§4.2), keyed by the function
+      -- and its arguments' values, read without forcing anything; an
+      -- argument that cannot be read so leaves the call Stuck on the
+      -- function, as it always was (§8 step 3).
+      ValAssumed g gty -> do
+        margs <- traverse refTerm rs
+        case sequence margs of
+          Just args -> do
+            let t = TCall (TInput g gty) args
+            noteTerm t
+            continueBackward (ValTerm t)
+          Nothing -> stuckOnAssumed g gty
+      ValTerm t -> stuckOn (termNamesNE t)
       res -> internalException (RuntimeTypeError $ "expected a function but found: " <> prettyLayout res)
   -- Evaluate thunk under overridden system time (serial number)
   Just (EvalAsOfSystemTime1 thunkRef _env) -> do
@@ -1882,12 +2044,16 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       ValBool True -> continueExpr env e2
       ValBool False -> continueExpr env e3
 
-      ValAssumed r -> stuckOnAssumed r
+      -- An unknown condition, a bare input or a term, is Stuck on what it
+      -- waits on until build step 5 builds joins (§4.3, §8 step 3).
+      _ | Just ns <- unknownNames val -> stuckOn ns
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
   Just (ConnectiveLeft conn right) ->
     connectiveLeft conn right val
+  Just (ConnectiveRight conn p) ->
+    connectiveRight conn p val
   Just (ConsiderWhen1 _clauses _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
@@ -1899,8 +2065,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     case val of
       ValNil ->
         continueBackward (ValEnvironment Map.empty)
-      ValAssumed r ->
-        patternMetUnknown r
+      _ | Just ns <- unknownNames val ->
+        patternMetUnknown ns
       _ ->
         patternMatchFailure
   Just (PatCons0 p1 env p2) -> do
@@ -1908,8 +2074,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       ValCons rf1 rf2 -> do
         pushFrame (PatCons1 rf2 env p2)
         continuePattern rf1 env p1
-      ValAssumed r ->
-        patternMetUnknown r
+      _ | Just ns <- unknownNames val ->
+        patternMetUnknown ns
       _ ->
         patternMatchFailure
   Just (PatCons1 rf2 env p2) -> do
@@ -1942,8 +2108,19 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
                     continuePattern r env p
             else internalException $ RuntimeTypeError
               "pattern for constructor has the wrong number of arguments"
-      ValAssumed r ->
-        patternMetUnknown r
+      _ | Just t <- unknownTerm val -> do
+        -- A record's generated selector applied to an unknown record gives
+        -- the field-path term, @d's age@ (§4.2, U5b); any other match on an
+        -- unknown is what 'patternMetUnknown' says.
+        projection <- selectorProjection n ps
+        case projection of
+          Just (field, fieldTy) -> do
+            -- the selector's own CONSIDER, whose answer this is
+            _ <- withPoppedFrame pure
+            let path = TField t field fieldTy
+            noteTerm path
+            continueBackward (ValTerm path)
+          Nothing -> patternMetUnknown (termNamesNE t)
       _ ->
         patternMatchFailure
   Just (PatApp1 ambient envs rps) ->
@@ -1971,9 +2148,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     -- ('runBinOpEquals' does on either side, U6), unless a sub-pattern still
     -- to be matched already clashes ('metUnknown').
     let compareLit = pushFrame PatLit2 >> runBinOpEquals lit val
-        unknown = \ case
-          ValAssumed _ -> True
-          _            -> False
+        unknown = isJust . unknownTerm
     if unknown lit || unknown val
       then metUnknown >>= \ case
         BranchClashes  -> patternMatchFailure
@@ -1984,25 +2159,35 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       -- NOTE: in future, we may give the pattern that was matched a name, potentially
       ValBool True -> continueBackward $ ValEnvironment emptyEnvironment
       ValBool False -> patternMatchFailure
+      -- the comparison is a term: a CONSIDER on a term, Stuck until build
+      -- step 5 (§8 step 3)
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected a boolean but found: " <> prettyLayout val <> " while matching literal pattern"
-  Just (EqConstructor1 rf rfs) -> do
-    pushFrame (EqConstructor2 val rfs)
+  Just (EqConstructor1 acc rf rfs) -> do
+    pushFrame (EqConstructor2 acc val rfs)
     continueRef rf
-  Just (EqConstructor2 val1 rfs) -> do
-    pushFrame (EqConstructor3 rfs)
+  Just (EqConstructor2 acc val1 rfs) -> do
+    pushFrame (EqConstructor3 acc rfs)
     runBinOpEquals val1 val
-  Just (EqConstructor3 rfs) ->
-    case boolView val of
-      Just False -> continueBackward $ valBool False
-      Just True ->
-        case rfs of
-          [] -> continueBackward $ valBool True
-          ((r1, r2) : rfs') -> do
-            pushFrame (EqConstructor1 r2 rfs')
-            continueRef r1
-      Nothing -> internalException $ RuntimeTypeError $
+  Just (EqConstructor3 acc rfs) ->
+    -- The component equalities combine left to right by the AND table
+    -- (§8 step 3): a FALSE decides, a TRUE leaves what came before, and a
+    -- term is conjoined to it.
+    case val of
+      ValBool False -> continueBackward $ valBool False
+      ValBool True  -> nextComponent acc
+      _ | Just t <- unknownTerm val -> do
+          noteTerm t
+          nextComponent (Just (maybe t (\ p -> TConn ConnAnd p t) acc))
+      _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when testing equality"
+    where
+      nextComponent acc' = case rfs of
+        [] -> continueBackward (maybe (valBool True) termValue acc')
+        ((r1, r2) : rfs') -> do
+          pushFrame (EqConstructor1 acc' r2 rfs')
+          continueRef r1
   Just (UnaryBuiltin0 fn mTy) -> do
     runBuiltin val fn mTy
   -- Ternary builtin handling: got 1st arg value, need to eval 2nd
@@ -2135,8 +2320,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
             pushFrame (JsonEncodeListFrame acc nextTailRef False)
             continueRef headRef
           -- a list whose rest is unknown
-          ValAssumed r ->
-            stuckOnAssumed r
+          v | Just ns <- unknownNames v ->
+            stuckOn ns
           _ ->
             -- Should not happen - tail should be ValNil or ValCons
             internalException $ RuntimeTypeError "Expected list (ValNil or ValCons) for tail"
@@ -2555,6 +2740,9 @@ backwardContractFrame val = \ case
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) named PartyMismatch)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, norm = named, ..} events
+      -- whether the event's party is the obligation's depends on an
+      -- unknown: Stuck on it, never a type error (§8 step 3)
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
   Contract11 ActionDoesn'tmatch {} ->
@@ -2663,6 +2851,8 @@ backwardContractFrame val = \ case
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm GuardFailed)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
+      -- a PROVIDED that depends on an unknown: Stuck on it (§8 step 3)
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
   ResolveParty ResolvePartyFrame {..} -> do
@@ -2692,7 +2882,7 @@ backwardContractFrame val = \ case
       ValCons hd tl -> do
         pushCFrame (QuantCast QuantCastFrame {candidate = hd, rest = tl, ..})
         continueRef hd
-      ValAssumed r -> stuckOnAssumed r
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
   -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the
@@ -2705,7 +2895,7 @@ backwardContractFrame val = \ case
       Nothing -> pure True
       Just c  -> case val of
         ValConstructor n _ -> pure (n `sameResolved` c)
-        ValAssumed r       -> stuckOnAssumed r
+        _ | Just ns <- unknownNames val -> stuckOn ns
         _                  -> pure False
     if not admitted
       then quantNext QuantRollFrame {..} rest
@@ -2719,6 +2909,8 @@ backwardContractFrame val = \ case
     case boolView val of
       Just True  -> quantNext QuantRollFrame {acc = (candidate, candidateV) : acc, ..} rest
       Just False -> quantNext QuantRollFrame {..} rest
+      -- a WHO filter that depends on an unknown: Stuck on it (§8 step 3)
+      Nothing | Just ns <- unknownNames val -> stuckOn ns
       Nothing    -> internalException $ RuntimeTypeError $
         "expected BOOLEAN from the WHO filter of EVERY but found: " <> prettyLayout val
   -- EVERY, the barrier: one member's result. NOTE: a barrier member never
@@ -4394,9 +4586,9 @@ patternMatchFailure = withPoppedFrame $ \ case
 -- to clash, with every sub-pattern the match would reach before it already
 -- known to match; then the branch cannot match whatever the unknown is, and
 -- the match fails exactly as for any mismatch ('metUnknown').
-patternMetUnknown :: Resolved -> Machine Config
-patternMetUnknown r = metUnknown >>= \ case
-  BranchMayMatch -> stuckOnAssumed r
+patternMetUnknown :: NonEmpty Term -> Machine Config
+patternMetUnknown ns = metUnknown >>= \ case
+  BranchMayMatch -> stuckOn ns
   BranchClashes  -> patternMatchFailure
 
 -- | What a pattern that met an unknown is to do. The literal patterns
@@ -4546,20 +4738,20 @@ expect3 = \ case
 expectNumber :: WHNF -> Machine Rational
 expectNumber = \ case
   ValNumber f -> pure f
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   v -> internalException $ RuntimeTypeError $ "expected a NUMBER but got: " <> prettyLayout v
 
 expectString :: WHNF -> Machine Text
 expectString = \ case
   ValString f -> pure f
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   v -> internalException $ RuntimeTypeError $ "expected a STRING but got: " <> prettyLayout v
 
 expectDateValue :: WHNF -> Machine Time.Day
 expectDateValue = \ case
   ValDate d -> pure d
   ValNumber serial -> pure (Time.utctDay (serialToUTCTime serial))
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   v -> internalException $ RuntimeTypeError $ "expected a DATE but got: " <> prettyLayout v
 
 expectInteger :: BinOp -> Rational -> Machine Integer
@@ -4647,7 +4839,7 @@ encodeValueToJson = \case
       "Internal error: Constructor encoding should be handled in runBuiltin, not encodeValueToJson: " <>
       nameToText (TypeCheck.getName conRef)
   -- an unknown cannot be encoded, and it is not an internal error either
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
     escapeJson :: Text -> Text
@@ -5109,6 +5301,7 @@ runPost urlVal headersVal bodyVal = do
               queryOptions = map (\p -> let (k,v) = Text.breakOn "=" p in k =: Text.drop 1 v) params
               req_options = mconcat (headerOptions <> queryOptions)
 
+          refuseEffectUnderUnknown
           res <- liftIO $ Req.runReq Req.defaultHttpConfig $ do
             Req.req Req.POST reqWithPath (Req.ReqBodyLbs $ LBS.fromStrict $ TE.encodeUtf8 body) Req.lbsResponse req_options
           continueBackward $ ValString (TE.decodeUtf8 . LBS.toStrict $ Req.responseBody res)
@@ -5151,8 +5344,8 @@ coerceToString val = case val of
     | otherwise ->
         incompatible
   -- an unknown is not of the wrong type: name it
-  ValAssumed r ->
-    stuckOnAssumed r
+  _ | Just ns <- unknownNames val ->
+    stuckOn ns
   _ ->
     incompatible
   where
@@ -5293,6 +5486,7 @@ runBuiltin es op mTy = do
                   params = if Text.null options then [] else Text.splitOn "&" (Text.drop 1 options)
                   req_options =
                     mconcat (map (\p -> let (k,v) = Text.breakOn "=" p in k =: Text.drop 1 v) params)
+              refuseEffectUnderUnknown
               res <- liftIO $ Req.runReq Req.defaultHttpConfig $ do
                 Req.req Req.GET reqWithPath Req.NoReqBody Req.lbsResponse req_options
               continueBackward $ ValString (TE.decodeUtf8 . LBS.toStrict $ Req.responseBody res)
@@ -5303,6 +5497,7 @@ runBuiltin es op mTy = do
 #endif
     UnaryEnv -> do
       varName <- expectString es
+      refuseEffectUnderUnknown
       maybeValue <- liftIO $ lookupEnv (Text.unpack varName)
       case maybeValue of
         Just value -> do
@@ -5622,11 +5817,40 @@ runBinOp BinOpCharAt     (ValString text) (ValNumber idx) =
 runBinOp BinOpWhenLast startVal predicateVal = startWhenLast startVal predicateVal
 runBinOp BinOpWhenNext startVal predicateVal = startWhenNext startVal predicateVal
 runBinOp BinOpValueAt dateVal attrVal = startValueAt dateVal attrVal
-runBinOp _op         (ValAssumed r) _e2                          = stuckOnAssumed r
-runBinOp _op         _e1 (ValAssumed r)                          = stuckOnAssumed r
+runBinOp op          v1 v2
+  | isJust (unknownTerm v1) || isJust (unknownTerm v2)           = binOpOnUnknown op v1 v2
 runBinOp _           _                _                          = internalException (RuntimeTypeError "running bin op with invalid operation / value combination")
 
+-- | A built-in operation with an unknown operand (UNKNOWN-EVALUATION-SPEC
+-- §4.3, §4.6): the total arithmetic and the comparisons build their term,
+-- keyed by their operands; every other operation is Stuck on the unknown,
+-- as it always was. A partial operation (DIVIDED BY, MODULO, TO THE POWER
+-- OF) stays Stuck until build step 5 can emit its definedness guard, and the
+-- string operations, the iterators and the temporal switches are not lifted
+-- at this step (assumed, not ruled; §8 step 3).
+binOpOnUnknown :: BinOp -> WHNF -> WHNF -> Machine Config
+binOpOnUnknown op v1 v2
+  | op `elem` [BinOpPlus, BinOpMinus, BinOpTimes, BinOpLeq, BinOpGeq, BinOpLt, BinOpGt] = do
+      mt1 <- valueTerm v1
+      mt2 <- valueTerm v2
+      case (mt1, mt2) of
+        (Just a, Just b) -> do
+          let t = TBin op a b
+          noteTerm t
+          continueBackward (ValTerm t)
+        _ -> stuckOnOperands v1 v2
+  | otherwise = stuckOnOperands v1 v2
+
+-- | Stuck on whatever the two operands wait on, the left's first.
+stuckOnOperands :: WHNF -> WHNF -> Machine a
+stuckOnOperands v1 v2 =
+  case nubTerms (foldMap toList (unknownNames v1) <> foldMap toList (unknownNames v2)) of
+    (n : rest) -> stuckOn (n :| rest)
+    []         -> internalException (RuntimeTypeError "an operation on an unknown found no unknown")
+
 runBinOpEquals :: WHNF -> WHNF -> Machine Config
+runBinOpEquals v1 v2
+  | isJust (unknownTerm v1) || isJust (unknownTerm v2) = equalsOnUnknown v1 v2
 runBinOpEquals (ValNumber num1)        (ValNumber num2) = continueBackward $ valBool $ num1 == num2
 runBinOpEquals (ValString str1)        (ValString str2) = continueBackward $ valBool $ str1 == str2
 runBinOpEquals (ValDate d1)            (ValDate d2) = continueBackward $ valBool $ d1 == d2
@@ -5634,7 +5858,7 @@ runBinOpEquals (ValTime t1)            (ValTime t2) = continueBackward $ valBool
 runBinOpEquals (ValDateTime u1 _)      (ValDateTime u2 _) = continueBackward $ valBool $ u1 == u2
 runBinOpEquals ValNil                  ValNil           = continueBackward $ valBool True
 runBinOpEquals (ValCons r1 rs1)        (ValCons r2 rs2) = do
-  pushFrame (EqConstructor1 r2 [(rs1, rs2)])
+  pushFrame (EqConstructor1 Nothing r2 [(rs1, rs2)])
   continueRef r1
 runBinOpEquals ValNil                  (ValCons _ _)   = continueBackward $ ValBool False
 runBinOpEquals (ValCons _ _)           ValNil           = continueBackward $ ValBool False
@@ -5646,18 +5870,342 @@ runBinOpEquals (ValConstructor n1 rs1) (ValConstructor n2 rs2)
       case pairs of
         [] -> continueBackward $ ValBool True
         ((r1, r2) : rss) -> do
-          pushFrame (EqConstructor1 r2 rss)
+          pushFrame (EqConstructor1 Nothing r2 rss)
           continueRef r1
   | otherwise                                           = continueBackward $ ValBool False
 -- TODO: we probably also want to check ValObligations for equality
-runBinOpEquals (ValAssumed r)          _                = stuckOnAssumed r
--- An unknown on the right is as unknown as one on the left (U6): name it,
--- rather than blame its type. Only where the left operand is of a type that
--- equality supports; a function, an obligation or an unapplied constructor on
--- the left is still the unsupported-type error it always was.
-runBinOpEquals v1                      (ValAssumed r)
-  | supportsEquality v1                                 = stuckOnAssumed r
 runBinOpEquals v1                       v2              = userException (EqualityOnUnsupportedType v1 v2)
+
+-- | @EQUALS@ with an unknown on either side (UNKNOWN-EVALUATION-SPEC §4.6).
+--
+-- The same keyed term on both sides is @TRUE@ when its type supports
+-- equality (the identity rule, U6, U6b, C1), and the unsupported-type error
+-- when that type is a function or a @CONTRACT@; a type that only contains
+-- one, or is not known, is Stuck on the term, which is what it was before.
+-- Otherwise an equality over @BOOLEAN@s is the biconditional, a connective
+-- and not an atom, and any other equality is a comparison atom keyed by its
+-- two sides. A side that cannot be read without forcing anything, or a
+-- determined side of a type equality does not support, keeps the answer it
+-- had before this step: Stuck on the unknown, or the unsupported-type error
+-- for a function on the left.
+equalsOnUnknown :: WHNF -> WHNF -> Machine Config
+equalsOnUnknown v1 v2 = do
+  mt1 <- valueTerm v1
+  mt2 <- valueTerm v2
+  case (mt1, mt2) of
+    (Just a, Just b)
+      | a == b -> termEqualityType a >>= \ case
+          EqualitySupported   -> do
+            noteTerm a
+            continueBackward (valBool True)
+          EqualityUnsupported -> userException (EqualityOnUnsupportedType v1 v2)
+          EqualityExcluded    -> stuckOn (termNamesNE a)
+      | otherwise -> do
+          ta <- termEqualityType a
+          tb <- termEqualityType b
+          case (ta, tb) of
+            (EqualityUnsupported, _) -> userException (EqualityOnUnsupportedType v1 v2)
+            (_, EqualityUnsupported) -> userException (EqualityOnUnsupportedType v1 v2)
+            (EqualitySupported, EqualitySupported) -> do
+              booleans <- (||) <$> isBooleanTerm a <*> isBooleanTerm b
+              let t = if booleans
+                        then biconditional (asTruth a) (asTruth b)
+                        else Unknown (TBin BinOpEquals a b)
+              case t of
+                Known bool -> continueBackward (valBool bool)
+                Unknown u  -> do
+                  noteTerm u
+                  continueBackward (termValue u)
+            _ -> stuckOnOperands v1 v2
+    _ | isJust (unknownTerm v1) -> stuckOnOperands v1 v2
+      | supportsEquality v1      -> stuckOnOperands v1 v2
+      | otherwise                -> userException (EqualityOnUnsupportedType v1 v2)
+
+-- | A Boolean that is known, or a term (§4.3's table, over values that are
+-- already in hand).
+data Truth = Known Bool | Unknown Term
+
+asTruth :: Term -> Truth
+asTruth t = case t of
+  TCon c [] | getUnique c == getUnique TypeCheck.trueRef  -> Known True
+            | getUnique c == getUnique TypeCheck.falseRef -> Known False
+  _ -> Unknown t
+
+andTruth, orTruth :: Truth -> Truth -> Truth
+andTruth (Known False) _           = Known False
+andTruth (Known True)  r           = r
+andTruth (Unknown _)   (Known False) = Known False
+andTruth (Unknown p)   (Known True)  = Unknown p
+andTruth (Unknown p)   (Unknown q)   = Unknown (TConn ConnAnd p q)
+orTruth (Known True)   _           = Known True
+orTruth (Known False)  r           = r
+orTruth (Unknown _)    (Known True)  = Known True
+orTruth (Unknown p)    (Known False) = Unknown p
+orTruth (Unknown p)    (Unknown q)   = Unknown (TConn ConnOr p q)
+
+notTruth :: Truth -> Truth
+notTruth (Known b)   = Known (not b)
+notTruth (Unknown p) = Unknown (TNot p)
+
+-- | @a EQUALS b@ over @BOOLEAN@s: @(a AND b) OR (NOT a AND NOT b)@ (§4.6).
+biconditional :: Truth -> Truth -> Truth
+biconditional a b = orTruth (andTruth a b) (andTruth (notTruth a) (notTruth b))
+
+-- | Whether a term is a @BOOLEAN@, as far as its form or its declared type
+-- says.
+isBooleanTerm :: Term -> Machine Bool
+isBooleanTerm = \ case
+  TCon c [] -> pure (getUnique c == getUnique TypeCheck.trueRef || getUnique c == getUnique TypeCheck.falseRef)
+  TNot{}    -> pure True
+  TConn{}   -> pure True
+  TBin op _ _ -> pure (op `elem` [BinOpEquals, BinOpLeq, BinOpGeq, BinOpLt, BinOpGt])
+  TInput _ ty    -> pure (maybe False isBooleanType ty)
+  TField _ _ ty  -> pure (maybe False isBooleanType ty)
+  TCall (TInput _ (Just fty)) args -> pure (maybe False isBooleanType (callResultType fty (length args)))
+  _ -> pure False
+  where
+    isBooleanType = \ case
+      TyApp _ r [] -> getUnique r == TypeCheck.booleanUnique
+      _            -> False
+
+-- | The type an assumed function's result has once it is given this many
+-- arguments, if it takes that many.
+callResultType :: Type' Resolved -> Int -> Maybe (Type' Resolved)
+callResultType ty n = case ty of
+  Forall _ _ t -> callResultType t n
+  Fun _ ps r
+    | length ps == n -> Just r
+    | length ps > n  -> Just (Fun emptyAnno (drop n ps) r)
+  _ -> Nothing
+
+-- | What equality can say about two copies of one keyed term (§4.6, U6b).
+data EqualityType
+  = EqualitySupported
+    -- ^ no function or @CONTRACT@ anywhere inside: the identity rule applies
+  | EqualityUnsupported
+    -- ^ a function or a @CONTRACT@ itself: the unsupported-type error
+  | EqualityExcluded
+    -- ^ one inside, or a type that is not known: the term stays unknown
+
+termEqualityType :: Term -> Machine EqualityType
+termEqualityType = \ case
+  TInput _ ty    -> equalityType ty
+  TField _ _ ty  -> equalityType ty
+  TCall (TInput _ (Just fty)) args -> do
+    fty' <- expandTypeHead fty
+    equalityType (callResultType fty' (length args))
+  TCall{}        -> pure EqualityExcluded
+  TBin{}         -> pure EqualitySupported
+  TNot{}         -> pure EqualitySupported
+  TConn{}        -> pure EqualitySupported
+  TNumber{}      -> pure EqualitySupported
+  TString{}      -> pure EqualitySupported
+  TDate{}        -> pure EqualitySupported
+  TTime{}        -> pure EqualitySupported
+  TDateTime{}    -> pure EqualitySupported
+  TNil           -> pure EqualitySupported
+  TCons a b      -> worst <$> traverse termEqualityType [a, b]
+  TCon _ ts      -> worst <$> traverse termEqualityType ts
+  where
+    worst ts
+      | any isUnsupported ts = EqualityUnsupported
+      | all isSupported ts   = EqualitySupported
+      | otherwise            = EqualityExcluded
+    isUnsupported = \ case EqualityUnsupported -> True; _ -> False
+    isSupported   = \ case EqualitySupported -> True; _ -> False
+
+-- | The declared type's verdict: a function or @CONTRACT@ type itself is
+-- unsupported; a type with one anywhere inside, through declared records, or
+-- a type variable, an inference variable or a type the module does not
+-- describe, is excluded; anything else is supported. A synonym is read as
+-- the type it names, at the top and inside ('expandTypeHead'), so @f@ of a
+-- synonym @Fn@ for a function type is a function. @typeHasFunctionComponent@
+-- (in the DMN exporter) walks the same structure.
+equalityType :: Maybe (Type' Resolved) -> Machine EqualityType
+equalityType = \ case
+  Nothing -> pure EqualityExcluded
+  Just ty0 -> expandTypeHead ty0 >>= \ ty -> case ty of
+    Fun{} -> pure EqualityUnsupported
+    TyApp _ r _ | getUnique r == TypeCheck.contractUnique -> pure EqualityUnsupported
+    _ -> do
+      ok <- functionFree Set.empty ty
+      pure (if ok then EqualitySupported else EqualityExcluded)
+  where
+    functionFree seen ty0 = expandTypeHead ty0 >>= \ case
+      TyApp _ r ts
+        | u `elem` primitives -> pure True
+        | u `elem` [TypeCheck.listUnique, TypeCheck.maybeUnique, TypeCheck.eitherUnique] ->
+            allM (functionFree seen) ts
+        | u == TypeCheck.contractUnique -> pure False
+        | Set.member u seen -> pure True
+        | otherwise -> typeComponents u >>= \ case
+            Nothing    -> pure False
+            Just comps -> allM (functionFree (Set.insert u seen)) comps
+        where u = getUnique r
+      _ -> pure False
+    primitives =
+      [ TypeCheck.numberUnique, TypeCheck.stringUnique, TypeCheck.booleanUnique
+      , TypeCheck.dateUnique, TypeCheck.timeUnique, TypeCheck.datetimeUnique ]
+    allM f = foldr (\ x acc -> f x >>= \ b -> if b then acc else pure False) (pure True)
+
+-- | The field types of a declared type with no parameters, read from its
+-- constructors; 'Nothing' if the module does not describe it so. A synonym
+-- is not such a type: 'expandTypeHead' reads it as the type it names first.
+typeComponents :: Unique -> Machine (Maybe [Type' Resolved])
+typeComponents u = do
+  entityInfo <- getEntityInfo
+  case Map.lookup u entityInfo of
+    Just (_, TypeCheck.KnownType 0 _ Nothing) ->
+      let fields =
+            [ map (\ (MkOptionallyNamedType _ _ t) -> t) ps
+            | (_, (_, TypeCheck.KnownTerm (Fun _ ps (TyApp _ r [])) Constructor)) <- Map.toList entityInfo
+            , getUnique r == u
+            ]
+      in pure (Just (concat fields))
+    _ -> pure Nothing
+
+-- | A type with any synonym at its head replaced by the type it names, as
+-- the type checker's @tryExpandTypeSynonym@ does, until the head is not a
+-- synonym: @Fn@, declared @IS FUNCTION FROM NUMBER TO NUMBER@, is that
+-- function type. A synonym in a declaration cycle is installed without a
+-- body and does not expand; the fuel bounds a cycle that arrives otherwise.
+expandTypeHead :: Type' Resolved -> Machine (Type' Resolved)
+expandTypeHead ty0 = do
+  entityInfo <- getEntityInfo
+  let go :: Int -> Type' Resolved -> Type' Resolved
+      go fuel ty = case ty of
+        TyApp _ r args
+          | fuel > 0
+          , Just (_, TypeCheck.KnownType _ params (Just body)) <- Map.lookup (getUnique r) entityInfo ->
+              go (fuel - 1) (TypeCheck.substituteType (Map.fromList (zipWith (\ p a -> (getUnique p, a)) params args)) body)
+        _ -> ty
+  pure (go 100 ty0)
+
+-- | The type of a constructor's i-th field, as its declaration gives it.
+constructorFieldType :: Resolved -> Int -> Machine (Maybe (Type' Resolved))
+constructorFieldType con i = do
+  entityInfo <- getEntityInfo
+  pure case Map.lookup (getUnique con) entityInfo of
+    Just (_, TypeCheck.KnownTerm ty Constructor) -> fieldOf ty
+    _ -> Nothing
+  where
+    fieldOf = \ case
+      Forall _ _ t -> fieldOf t
+      Fun _ ps _   -> case drop i ps of
+        (MkOptionallyNamedType _ _ t : _) -> Just t
+        []                                -> Nothing
+      _ -> Nothing
+
+-- | Whether the match in progress is a record's generated selector (built by
+-- 'evalConDecl'): its own one-branch CONSIDER, with no source position, that
+-- matches the constructor and answers with one of the fields it binds. If so,
+-- and the constructor is the only one its type has, that field's name and
+-- declared type. A type with several constructors gets no field path: an
+-- unknown of it may be one without the field, whose selector has no branch
+-- for it, so @s's radius@ for a @Shape@ that may be a @Square@ stays Stuck on
+-- @s@, as it was before this step.
+selectorProjection :: Resolved -> [Pattern Resolved] -> Machine (Maybe (Resolved, Maybe (Type' Resolved)))
+selectorProjection con ps = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  case stack.frames of
+    (ConsiderWhen1 _ _ (App ann body []) [] _ : _)
+      | isNothing ann.range
+      , Just vars <- traverse patVar ps
+      , Just i <- elemIndex (getUnique body) (map getUnique vars) -> do
+          sole <- isSoleConstructor con
+          if sole
+            then do
+              ty <- constructorFieldType con i
+              pure (Just (body, ty))
+            else pure Nothing
+    _ -> pure Nothing
+  where
+    patVar = \ case
+      PatVar _ v -> Just v
+      _          -> Nothing
+
+-- | Whether a constructor is the only one the type it builds has, as the
+-- module's entity information describes that type. 'False' when the
+-- constructor or its type is not described.
+isSoleConstructor :: Resolved -> Machine Bool
+isSoleConstructor con = do
+  entityInfo <- getEntityInfo
+  pure case Map.lookup (getUnique con) entityInfo >>= builds . snd of
+    Nothing -> False
+    Just u  -> length [ () | (_, e) <- Map.elems entityInfo, builds e == Just u ] == 1
+  where
+    builds = \ case
+      TypeCheck.KnownTerm ty Constructor -> resultHead ty
+      _                                  -> Nothing
+    resultHead = \ case
+      Forall _ _ t          -> resultHead t
+      Fun _ _ (TyApp _ r _) -> Just (getUnique r)
+      TyApp _ r _           -> Just (getUnique r)
+      _                     -> Nothing
+
+-- | The names a term waits on, non-empty.
+termNamesNE :: Term -> NonEmpty Term
+termNamesNE t = case termNames t of
+  (n : rest) -> n :| rest
+  []         -> t :| []
+
+-- | The term a value stands for, read without forcing anything (§8 step 3):
+-- its determined parts must already be values, or unevaluated literals, or
+-- names bound to either, and the whole no larger than a bound. 'Nothing' for
+-- a value that cannot be read so, or that no term describes, a function.
+valueTerm :: WHNF -> Machine (Maybe Term)
+valueTerm v = do
+  budget <- liftIO (newIORef termReadBound)
+  readValueTerm budget v
+
+-- | The term a reference's value stands for, read the same way.
+refTerm :: Reference -> Machine (Maybe Term)
+refTerm r = do
+  budget <- liftIO (newIORef termReadBound)
+  readRefTerm budget r
+
+-- | How many steps 'valueTerm' takes before it gives up: one for each value
+-- node it reads and one for each alias (a name bound to a name) it follows,
+-- so that a cycle of aliases, @one IS two@ and @two IS one@, ends too.
+termReadBound :: Int
+termReadBound = 1000
+
+readValueTerm :: IORef Int -> WHNF -> Machine (Maybe Term)
+readValueTerm budget v = do
+  left <- liftIO (readIORef budget)
+  if left <= 0
+    then pure Nothing
+    else do
+      liftIO (writeIORef budget (left - 1))
+      case v of
+        ValAssumed r ty    -> pure (Just (TInput r ty))
+        ValTerm t          -> pure (Just t)
+        ValNumber q        -> pure (Just (TNumber q))
+        ValString s        -> pure (Just (TString s))
+        ValDate d          -> pure (Just (TDate d))
+        ValTime t          -> pure (Just (TTime t))
+        ValDateTime u tz   -> pure (Just (TDateTime u tz))
+        ValNil             -> pure (Just TNil)
+        ValCons r1 r2      -> do
+          a <- readRefTerm budget r1
+          b <- readRefTerm budget r2
+          pure (TCons <$> a <*> b)
+        ValConstructor c rs -> fmap (TCon c) . sequence <$> traverse (readRefTerm budget) rs
+        _ -> pure Nothing
+
+readRefTerm :: IORef Int -> Reference -> Machine (Maybe Term)
+readRefTerm budget r = do
+  left <- liftIO (readIORef budget)
+  if left <= 0 then pure Nothing else readThunk r >>= \ case
+    WHNF v -> readValueTerm budget v
+    Unevaluated _ (Lit _ lit) _ -> readValueTerm budget =<< runLit lit
+    Unevaluated _ (App _ n []) env | Just r' <- Map.lookup (getUnique n) env -> hop r'
+    Unevaluated _ (Var _ n) env    | Just r' <- Map.lookup (getUnique n) env -> hop r'
+    _ -> pure Nothing
+  where
+    hop r' = do
+      liftIO (modifyIORef' budget (subtract 1))
+      readRefTerm budget r'
 
 -- | The value forms 'runBinOpEquals' compares, when both sides have one.
 supportsEquality :: WHNF -> Bool
@@ -5678,7 +6226,7 @@ infinityDay = Time.fromGregorian 9999 12 31
 -- | A temporal iterator's predicate returned something other than a BOOLEAN.
 -- An unknown is not of the wrong type: name it.
 iteratorNotBoolean :: Text -> WHNF -> Machine a
-iteratorNotBoolean _    (ValAssumed r) = stuckOnAssumed r
+iteratorNotBoolean _    v | Just ns <- unknownNames v = stuckOn ns
 iteratorNotBoolean what _              =
   userException $ UserError (what <> " expects predicate returning BOOLEAN")
 
@@ -6323,12 +6871,14 @@ evalLocalDecl env (LocalAssume _ann assume) =
 
 -- We are assuming that the environment already contains an entry with an address for us.
 evalAssume :: Environment -> Assume Resolved -> Machine ()
-evalAssume env (MkAssume _ann _tysig (MkAppForm _ n []   _maka) _ _) =
-  updateTerm env n (WHNF (ValAssumed n))
+evalAssume env (MkAssume _ann _tysig (MkAppForm _ n []   _maka) mty _) =
+  updateTerm env n (WHNF (ValAssumed n mty))
 evalAssume env (MkAssume _ann _tysig (MkAppForm _ n _args _maka) _ _) = do
   -- TODO: we should create a given here yielding an assumed, but we currently cannot do that easily,
   -- because we do not have Assumed as an expression, and we also cannot embed values into expressions.
-  updateTerm env n (WHNF (ValAssumed n))
+  -- Its declared type is its result's, not a function's, so it is not
+  -- carried (§4.6: no type counts as excluded from the identity rule).
+  updateTerm env n (WHNF (ValAssumed n Nothing))
 
 -- NOTE (T6): writes module-eval-time closures/ValAssumed/Unevaluated bodies,
 -- not force results — deliberately unfingerprinted.
@@ -6567,10 +7117,10 @@ initialEnvironment = do
   everBetweenRef <- allocateValue (ValTernaryBuiltinFun TernaryEverBetween)
   alwaysBetweenRef <- allocateValue (ValTernaryBuiltinFun TernaryAlwaysBetween)
   -- Temporal context switching entry (handled specially by the evaluator)
-  evalAsOfSystemTimeRef <- allocateValue (ValAssumed TypeCheck.evalAsOfSystemTimeRef)
-  evalUnderValidTimeRef <- allocateValue (ValAssumed TypeCheck.evalUnderValidTimeRef)
-  evalUnderRulesEffectiveAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEffectiveAtRef)
-  evalUnderRulesEncodedAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEncodedAtRef)
+  evalAsOfSystemTimeRef <- allocateValue (ValAssumed TypeCheck.evalAsOfSystemTimeRef Nothing)
+  evalUnderValidTimeRef <- allocateValue (ValAssumed TypeCheck.evalUnderValidTimeRef Nothing)
+  evalUnderRulesEffectiveAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEffectiveAtRef Nothing)
+  evalUnderRulesEncodedAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEncodedAtRef Nothing)
   fulfilRef <- allocateValue ValFulfilled
   neverMatchesPartyRef <- allocateValue ValNeverMatchesParty
   neverMatchesActRef <- allocateValue ValNeverMatchesAct
@@ -7302,14 +7852,49 @@ connectiveLeft conn right val =
         (ConnAnd,     False) -> continueBackward (valBool False)
         (ConnOr,      True)  -> continueBackward (valBool True)
         (ConnImplies, False) -> continueBackward (valBool True)
-        _ -> case right of
-          Just (ConnRightExpr e env) -> continueExpr env e
-          Just (ConnRightRef r)      -> autoApplyDischargedImport r
-          Nothing -> internalException $ RuntimeTypeError $
-            connectiveName conn <> " has no right operand"
-    ValAssumed r -> stuckOnAssumed r
+        _ -> continueRight
+    -- The left operand is unknown (§4.3): NOT builds its node; the others
+    -- evaluate the right operand in a frame of their own, which combines it
+    -- with the left by the connective's table ('connectiveRight').
+    _ | Just p <- unknownTerm val -> do
+      noteTerm p
+      case conn of
+        ConnNot -> continueBackward (ValTerm (TNot p))
+        _       -> do
+          pushFrame (ConnectiveRight conn p)
+          continueRight
     _ -> internalException $ RuntimeTypeError $
       "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating " <> connectiveName conn
+  where
+    continueRight = case right of
+      Just (ConnRightExpr e env) -> continueExpr env e
+      Just (ConnRightRef r)      -> autoApplyDischargedImport r
+      Nothing -> internalException $ RuntimeTypeError $
+        connectiveName conn <> " has no right operand"
+
+-- | The right operand of a connective whose left operand is the term @p@ has
+-- arrived: §4.3's table for an unknown left operand. A known right operand
+-- that decides the connective decides it, as @x AND FALSE@ is @FALSE@; one
+-- that does not leaves @p@, as @x AND TRUE@ is @x@; an unknown one builds the
+-- connective's node. @IMPLIES@ builds its node whatever the right operand
+-- is, so that the seam between a rule's scope and its requirement survives
+-- (§4.2).
+connectiveRight :: Connective -> Term -> WHNF -> Machine Config
+connectiveRight conn p val = case (conn, val) of
+  (ConnAnd, ValBool False) -> continueBackward (valBool False)
+  (ConnAnd, ValBool True)  -> continueBackward (termValue p)
+  (ConnOr,  ValBool True)  -> continueBackward (valBool True)
+  (ConnOr,  ValBool False) -> continueBackward (termValue p)
+  (ConnImplies, ValBool b) -> continueBackward (ValTerm (TConn ConnImplies p (boolTerm b)))
+  _ | Just q <- unknownTerm val -> do
+        noteTerm q
+        continueBackward (ValTerm (TConn conn p q))
+  _ -> internalException $ RuntimeTypeError $
+    "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating " <> connectiveName conn
+
+-- | @TRUE@ or @FALSE@ as a term.
+boolTerm :: Bool -> Term
+boolTerm b = TCon (if b then TypeCheck.trueRef else TypeCheck.falseRef) []
 
 -- | The built-in connective a name stands for, if it is one.
 builtinConnective :: Unique -> Maybe Connective

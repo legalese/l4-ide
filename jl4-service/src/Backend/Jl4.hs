@@ -1104,6 +1104,8 @@ handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule presum
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
   Eval.Reduction (Eval.ReducedRefused ref) -> throwError $ EvaluatorRefused ref.message presumed
   Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  Eval.Reduction o@(Eval.ReducedUndetermined _) -> throwError $ InterpreterError $ Eval.prettyReductionOutcome o
   Eval.Reduction (Eval.Reduced val) -> do
     r <- nfToFnLiteral ei val
     pure $ ResponseWithReason
@@ -1319,10 +1321,20 @@ handleEvalResult
 handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule presumed = do
   answer <- case (genCode.answerShape, result) of
     (WrappedInJust, Eval.Reduction (Eval.Reduced envelope)) ->
-      Eval.Reduction . Eval.Reduced <$> openEnvelope envelope
+      openEnvelope envelope >>= \ case
+        -- a bare unknown input inside the JUST is undetermined, as on the direct
+        -- path (UNKNOWN-EVALUATION-SPEC §2.5; decided by Claude 2026-10-07,
+        -- pending Meng's review)
+        Eval.MkNF (Eval.ValAssumed r ty) ->
+          throwError $ InterpreterError $ unInputFieldsIn $ Eval.prettyReductionOutcome $
+            Eval.ReducedUndetermined (Eval.TInput r ty :| [])
+        inner -> pure (Eval.Reduction (Eval.Reduced inner))
     -- the wrapper names an input's field @x (input)@: say @x@, as the direct path does
     (_, Eval.Reduction (Eval.ReducedErrored evalExc)) ->
       throwError $ InterpreterError $ unInputFieldsIn $ Text.unlines (Eval.prettyEvalException evalExc)
+    -- an input still waited on was a 'Stuck' error before step 3 and said so the same way
+    (_, Eval.Reduction o@(Eval.ReducedUndetermined _)) ->
+      throwError $ InterpreterError $ unInputFieldsIn $ Eval.prettyReductionOutcome o
     _ -> pure result
   handleEvalResultDirect ei answer trace traceLevel includeGraphViz mModule presumed
   where
@@ -1652,8 +1664,12 @@ valueToFnLiteral ei = \case
         FnObject
           [ (name, FnArray lits)
           ]
-  Eval.ValAssumed var ->
+  Eval.ValAssumed var _ ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+  -- a result that holds a term is undetermined, not a value, so this is only
+  -- for completeness
+  Eval.ValTerm t ->
+    throwError $ InterpreterError $ "#EVAL produced an unknown: " <> prettyLayout t
 
 -- | A constructor's name, as a JSON payload should carry it.
 --

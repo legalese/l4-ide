@@ -1,6 +1,6 @@
 # Specification: Evaluating with unknowns — connectives as an algebra, not as `IF`
 
-**Status:** proposed (2026-10-01); build step 1 of §8 is built (2026-10-02), its two regulative sites under LOUDHAILER and the rest in the change that wrote this line; build step 2 is built (2026-10-03).
+**Status:** proposed (2026-10-01); build step 1 of §8 is built (2026-10-02), its two regulative sites under LOUDHAILER and the rest in the change that wrote this line; build steps 2 and 3 are built (2026-10-03).
 On 2026-10-02 Meng authorised build steps 1 to 3 (STABILISERS), not landed, and parked steps 4 to 7 until a user asks for them (MOTHBALL, §8).
 Nothing else in this document is in the tree.
 §4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day, and §4.11 (the correspondence with the established designs) and D1 were added later that day; the seven rulings of the bench "Symbolic Evaluation Conflicts" on §4.13 were recorded in §9 and applied to §4 the same evening.
@@ -189,7 +189,7 @@ The shipped library carries only the three eliminators `holds`, `naf`, `presumed
 The spec's open question 2, whether the lift ships, is answered by U12 (§9).
 
 **Why this is not the answer for canon.**
-A rewrite of `BOOLEAN` to `DefBool` and `AND` to `kand` would turn every connective into an ordinary function call, and every consumer that recognises connectives would lose them: the ladder renders `kand` as an opaque box, and the planner's translation makes any function call one atom (`jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs:164-166`, read).
+A rewrite of `BOOLEAN` to `DefBool` and `AND` to `kand` would turn every connective into an ordinary function call, and every consumer that recognises connectives would lose them: the ladder renders `kand` as an opaque box, and the planner's translation makes any function call one atom (the `VizExpr.App` arm of `vizExprToBoolExpr` in `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs`, read).
 It is also a second copy of every encoding, which drifts.
 The pattern is the right _semantics_ in the wrong _layer_.
 
@@ -203,9 +203,9 @@ The spec sits under `specs/done/` with the status header "📋 Draft", so neithe
 ### 3.3 The planner (`jl4-query-plan`)
 
 `BoolExpr` (`BooleanDecisionQuery.hs:27-45`) is `BTrue | BFalse | BVar | BNot | BAnd | BOr | BImplies`, compiled to a hash-consed decision diagram.
-`QueryOutcome.determined :: Maybe Bool` and `Verdict = Undetermined | Holds | Fails | Complies | InBreach | NotApplicable` (`QueryPlan.hs:127-133`, `BooleanDecisionQuery.hs:210-224`).
-Its input is the ladder's static tree, so it decides `x OR NOT x` correctly, which no truth-table semantics can, but it sees only what the ladder drew: a call such as `age >= 18`, or a call to a sub-rule, is one opaque atom keyed by `nm.unique` (`QueryPlan.hs:164-166`).
-For a call whose arguments are all `BOOLEAN`, which the ladder draws as an application, that `nm.unique` is a fresh ladder node id (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs:425-432`, `uniq = vid.id`), and any other call, a comparison among them, is a leaf with a fresh id of its own (`leafFromExpr`, `:497-501`), so two calls to one function are two atoms either way.
+`QueryOutcome.determined :: Maybe Bool` and `Verdict = Undetermined | Holds | Fails | Complies | InBreach | NotApplicable` (`QueryOutcome` in `jl4-query-plan/src/L4/Decision/QueryPlan.hs`, `Verdict` in `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs`).
+Its input is the ladder's static tree, so it decides `x OR NOT x` correctly, which no truth-table semantics can, but it sees only what the ladder drew: a call such as `age >= 18`, or a call to a sub-rule, is one opaque atom keyed by `nm.unique` (the `VizExpr.UBoolVar` and `VizExpr.App` arms of `vizExprToBoolExpr`).
+For a call whose arguments are all `BOOLEAN`, which the ladder draws as an application, that `nm.unique` is a fresh ladder node id (the `App` case of `translateGo` in `jl4-lsp/src/LSP/L4/Viz/Ladder.hs`, `uniq = vid.id`), and any other call, a comparison among them, is a leaf with a fresh id of its own (`leafFromExpr`, which takes `tempUniqueTODO`), so two calls to one function are two atoms either way.
 **Package direction:** `jl4-query-plan` depends on `jl4-core` (its `.cabal` `build-depends`), so the evaluator cannot use the diagram without moving it (ruling U3).
 
 ### 3.4 The ladder's own evaluator, in TypeScript
@@ -230,7 +230,7 @@ The proposal is to give constitutive `AND`/`OR`/`NOT`/`IMPLIES` the same structu
 
 `WithDefault a = Either (Maybe a) (Maybe a)`: `Left Nothing` not asked and no default; `Left (Just v)` not asked, `TYPICALLY v`; `Right Nothing` asked, "I don't know"; `Right (Just v)` asked and answered (`RUNTIME-INPUT-STATE-SPEC.md:62-72`).
 Its status header still reads "BLOCKED (December 2025) — depends on TYPICALLY"; `TYPICALLY` has since landed for section `GIVEN`s, so the header is stale.
-The ladder adopted the model as a provenance axis (DESIGN §22) and keeps `Left` as its own map, `ViewSpec.defaults`, beneath `valuation`, with `respectDefaults` to withdraw presumptions (`ts-shared/ladder-core/src/types.ts:248-277`).
+The ladder adopted the model as a provenance axis (DESIGN §22) and keeps `Left` as its own map, `ViewSpec.defaults`, beneath `valuation`, with `respectDefaults` to withdraw presumptions (`ViewSpec.defaults` and `ViewSpec.respectDefaults` in `ts-shared/ladder-core/src/types.ts`).
 
 ### 3.7 The ladder's seam constrains the algebra (DESIGN §25f)
 
@@ -593,7 +593,7 @@ The ranking U7b asks for, against the 2026-08-01 ruling: that ruling covers only
 That a failed assertion exits 0 is not part of it; the same comment calls it a deliberate asymmetry and says "Only the crash was ruled on; widening this to assertions is a separate decision" (`:83-86`).
 So the ranking rests on the distinction `l4 run` already draws between `Fails` and `Errored`: a failed assertion is an answer the author did not want, and an undetermined directive is no answer at all.
 Every consumer of an evaluation outcome gets an explicit arm for the residual outcome and for the scope-pending outcome (C5), with no wildcard arm: the API, diagnostics, the `l4 run` exit code, the LSP inspector and rules, and Catala (U1b).
-The tree has more consumers than U1b lists, and each needs the same arms, together with arms for the guarded-leaf outcomes (U11b, U13): `l4 batch` (`Batch.hs:383-388` and `:392-396`, whose two wildcards together would score an undetermined row "success"), the service (`Backend/Jl4.hs:697-698`, `:863-864`), the REPL (`jl4-repl/app/Main.hs:656-658`, `:770-772`), the ladder's `l4/evalApp` (`jl4-lsp/src/LSP/L4/Actions.hs:145-163`), the LTS what-if and list views (`jl4-core/src/L4/Lts/WhatIf.hs:728-734`, `Lts/List.hs:181-187`), and the assertion classifier's own wildcards (`EvaluateLazy.hs:307`, `:319`), which would score a residual "assertion failed", exit 0.
+The tree has more consumers than U1b lists, and each needs the same arms, together with arms for the guarded-leaf outcomes (U11b, U13): `l4 batch` (`Batch.hs:383-388` and `:392-396`, whose two wildcards together would score an undetermined row "success"), the service (`Backend/Jl4.hs:697-698`, `:863-864`), the REPL (`jl4-repl/app/Main.hs:656-658`, `:770-772`), the ladder's `l4/evalApp` (`evalApp` in `jl4-lsp/src/LSP/L4/Actions.hs`, through `evalResultToLadderEvalAppResult`), the LTS what-if and list views (`jl4-core/src/L4/Lts/WhatIf.hs:728-734`, `Lts/List.hs:181-187`), and the assertion classifier's own wildcards (`EvaluateLazy.hs:307`, `:319`), which would score a residual "assertion failed", exit 0.
 
 ### 4.8 Provenance: what an unknown remembers
 
@@ -890,7 +890,7 @@ The caller chooses the report of §4.7.4:
 - `l4 run` and `l4 batch`: the default report, unless a flag names the K3 or the residual report; the flag names a report, not a mode.
 - The service: the report is its own route, as `/query-plan` is, or an unknown key is rejected; every response states its report.
   A residual response is `{"determined": null, "residual": "<L4 source>", "needs": [...], "verdict": "Undetermined"}`.
-  `determined` and `verdict` are the planner's vocabulary (§3.3); `needs` is new, since the planner's own field is `stillNeeded :: [QueryAtom]` (`jl4-query-plan/src/L4/Decision/QueryPlan.hs:191`).
+  `determined` and `verdict` are the planner's vocabulary (§3.3); `needs` is new, since the planner's own field is `stillNeeded :: [QueryAtom]` (`QueryPlanResponse` in `jl4-query-plan/src/L4/Decision/QueryPlan.hs`).
 - MCP: a separate tool or a listed capability, never a reserved argument.
 - No new directive.
   A `#EXPLORE` would make the module decide, and it would be a directive every exporter has to learn to ignore.
@@ -918,8 +918,9 @@ W1's own description gives the assumed term "for a non-`MAYBE` input", so the ex
 The service's generated wrapper and `l4 batch` both evaluate `CONSIDER decodeArgs inputJson WHEN RIGHT args THEN` the call wrapped in `JUST` (`jl4-service/src/Backend/CodeGen.hs:268` at `6ed297629`, `:340` since #530, and `:350-351`; `jl4/app/L4/Cli/Batch.hs:689-691`), so the root of the `#EVAL` is a `MAYBE`, not the exported function's result.
 The boundary decision of §4.7.2 reads a Boolean root and C5 reads "the directive's expression, or the body of the function it calls", so on those paths neither fires: a residual the boundary would decide stays undetermined, and a scope-pending `TRUE` is never reported; on the service a single `{}` sends a request down that path (§2.5).
 Because a determined result that holds any term but a bare input is undetermined from step 3 (§8 step 3), an `l4 batch` or service-wrapper row whose answer is a residual inside the `JUST` is undetermined from step 3, not "success"; step 6, which applies the report to the function's own result, makes that output more precise.
-A function whose result reduces to a bare input, such as `x AND TRUE`, which §4.3's table returns as `x`, is `JUST x` on the wrapper and prints as that value, while the direct path reports it undetermined (step 1's bare-result arm, row 52), so the two paths disagree from step 3 until step 6.
-That is loud today, since the service raises "#EVAL produced ASSUME" on it (`Backend/Jl4.hs:1161`), and step 6's unwrap applies the root bare-result rule to the function's own result.
+A function whose result reduces to a bare input, such as `x AND TRUE`, which §4.3's table returns as `x`, is `JUST x` on the wrapper and prints as that value, while the direct path reports it undetermined (step 1's bare-result arm, row 52).
+The service closes that gap on its wrapper path (decided by Claude 2026-10-07, pending Meng's review): `handleEvalResult` turns a bare unknown inside the `JUST` into the undetermined outcome, so `p AND TRUE` with `{"p":{}}` answers the `422` that names `p`, where it used to raise "#EVAL produced ASSUME"; the integration test "names the input when a wrapper-path answer is the bare missing input" pins it.
+`l4 batch` does not reach the case: its decoder refuses a `{}` input before evaluation (probed 2026-10-07: `Field 'p' is {}, which means the value is not known`), until step 6 lets an unknown through; step 6's unwrap applies the root bare-result rule to the function's own result.
 §8 step 6 states how this is closed, as an assumption.
 
 ---
@@ -1052,6 +1053,9 @@ The decision followed a review that weighed this spec, none of whose §4 to §8 
      `l4 batch` runs every row, never stopping on an undetermined one, and exits 1 at the end when any row is undetermined, so `finish` (`Batch.hs:265`) gains that condition beside today's "error" rows (`:378`).
    - Every outcome consumer listed in §4.7.4 gets an explicit arm for the undetermined outcome, with no wildcard, and renders it exactly as today's `Stuck`, `l4 batch` excepted.
    - U7b's batch and service obligations apply from this step, since lifting reaches them here: `l4 batch` gives an undetermined row the status "undetermined", which is not an error and never trips stop-on-error, where today's two wildcards (`Batch.hs:388`, `:396`) would score a residual result "success"; and the service states its report on every response, as `"report": "default"` until step 6 adds the others.
+     WASM-served responses state it too, from `wrapEvaluationEnvelope` in `jl4-mlir/runtime/jl4-runtime.mjs`, which `wasm-worker` serves, and from `jl4-mlir run`: they answer the same evaluation API, so a client sees one envelope whichever engine answered, and WASM evaluates only fully supplied inputs, so its report is always the default one (decided by Claude overnight 2026-10-04, pending Meng's review).
+     That holds because the runtime refuses a required input that is missing or null, or a record input missing a required field, or a list input with a null element, with the service's own 422 and body, `Parameter 'y': missing required parameter`; before, it read one as 0, so `{"x": true}` to `x AND y` answered FALSE where the service refuses it (decided by Claude overnight 2026-10-04, pending Meng's review).
+     For a field or element sent as null the service's message is its JSON decoder's, `Expected JSON boolean but got: Null`; the status is the same.
 
    _Assumed, not ruled:_
 
@@ -1069,6 +1073,35 @@ The decision followed a review that weighed this spec, none of whose §4 to §8 
    - `ValAssumed`'s declared type: `Nothing`, a type variable and an unsolved inference variable count as excluded from the identity rule, and `typeHasFunctionComponent` is given the module's own component map, since reused as it stands it answers `False` for all three.
    - The default report keeps its single-input message byte-identical, so every page that quotes it stays true, and lists several names deduplicated, in evaluation order; `l4 run --json` gives the outcome a new kind, "undetermined", with a `needs` array.
    - A term in a trace prints as L4 source through `prettyLayout` from this step, and `↯ stuck` stays only at sites that still raise.
+   - As built (assumed, not ruled, each found while building): terms are built for `PLUS`, `MINUS`, `TIMES`, `EQUALS` and the four comparisons only; every other built-in on a term keeps `Stuck`, today's answer.
+     A determined operand is read for its key without forcing anything, from cells already evaluated, unevaluated literals and names bound to either, up to 1,000 steps, one for each node read and each name followed, so that a cycle of names, `loop IS loop`, ends too; one that cannot be read so leaves the site `Stuck`, so `g n` with `n` a computed argument is `Stuck` on `g`.
+     An equality over a type the identity rule excludes is `Stuck`, not the `fresh` atom of §4.6, since `fresh` arrives with step 5.
+     A record's generated selector is recognised by its own one-branch `CONSIDER` with no source position, which is how the field path is built without changing the trace of a known record's field.
+     A `StackOverflow` in the right operand under a term is an error there, and is rewritten to `Stuck` like any other.
+     A batch row with an error and an undetermined result is "error"; one with an undetermined result and a refusal is "undetermined".
+     A term prints with every compound operand bracketed, and an undetermined result's JSON `needs` gives each name as plain text, a field path as `d's age`.
+   - Decided by Claude overnight 2026-10-03, pending Meng's review, each in its own commit on the step-3 branch: several names print in the plural, "the values of … but they are assumed terms", the one-name message unchanged; and an undetermined `#ASSERT` keeps JSON kind "assertion", with its `needs` and message under `"undetermined"`, where this step's text above gives kind "undetermined" on every surface.
+   - Decided by Claude overnight 2026-10-04, pending Meng's review, in the commit "service: an MCP evaluation error is the HTTP error body, report included", whose message does not carry the label: every evaluator error's MCP tool text is now the HTTP error body, `{"contents":{"contents":"…","tag":"InterpreterError"},"report":"default","tag":"Error"}`, where it was prose, so that an undetermined one states its report. The alternative: keep the prose, and append the report to it as a trailing line.
+
+   **Built** 2026-10-03: rows 1, 2, 3, 5, 6, 10, 11, 12, 13, 15 (without its count clause), 17, 18, 23, 24, 35, 37, 39, 40, 42, 44, 45, 46, 47, 48, 49, 50, 66, 69, 75, 76, 77 and 85, the step-3 halves of rows 34, 70, 83 and 84, rows 60 and 67, and rows 4, 62 and 63 as undetermined, in `jl4/examples/ok/unknown-inputs-lifted.l4` and `jl4/tests-cli/fixtures/eval-undetermined.l4`; the interims, the undetermined outcome on every consumer, the batch status, the service's and WASM's `"report"`.
+   Measured: §7's items 2 and 3 on this branch against step 2's build (`71a6af063`; the step-2 review's commits since change only comments under `jl4-core/src`), over 674 corpus, `doc` and library files and 148 partial-input variants of the exported calls in 28 of them (`gen.py` in the session scratchpad; most corpus directives call through a record or a multi-line `WITH` it does not parse, so the workload is small): no determined result moved and no exit code changed; 151 directives started the counter; the most steps any took was 59 and the largest term was 13 nodes; a machine step allocates about 290 bytes and runs at about 25 million a second.
+   The limit is 250,000 steps, about 73 MB of allocation and 10 ms, under the service's default 256 MB per evaluation and 60 s (C4 (4)), and a thousand times the workload's largest; its positive control, `x OR (`count up from` 0 EQUALS 20000)`, takes 540,033 steps, is `TRUE` with no limit and `Stuck` naming `x` with it, and row 67's `LIST n, `count up from` 0` prints its value.
+   Goldens moved: `lazytrace-exception` (decides `FALSE`, as §6 says) and `unknown-inputs-two-valued` (row 35's field path), beside the new file's.
+   Row 58, by §2.6's census against step 2's build over 724 files: 7,441 results on each side, no exit code changed, and every result that differs was stuck before: 76 now undetermined with the same text, 12 decided and 12 naming a second input, a field path or the unsupported-equality error, all in this step's test files and step 1's field reads.
+   The §3.2.1 differential: 436 of 437 printed files give the same results, the other being `ok/every/run-blame.l4`, whose message quotes its own source location, as at step 2.
+   `jl4-test`'s wall clock: 1,007 s for 3,790 examples, against 988 s for 3,784 on step 2's build, back to back on a shared machine at a load of about 6 (§7 item 4).
+   Parity over CI's nine files: 120 values byte-identical and, of the traces, 25 byte-identical and 95 differing, every cell as on step 2's final build (`6220a3cac`); without the WASM report, every value was only value-equal and every trace differed, from that one key.
+   **What review changed** (step-3 review, 2026-10-04; tests in `jl4-core/test/UnknownInputsSpec.hs`, each run against a mutation it catches):
+
+   - A field of an unknown was a field path whatever its type, so for `s IS A Shape`, `Shape IS ONE OF Circle HAS radius …, Square HAS side …`, `s's radius EQUALS s's radius` was satisfied, where every Square makes it an error. The path is now built only for a type with one constructor; otherwise the match is Stuck on `s`, as at step 2.
+   - The identity rule read a type synonym as a type with no constructors, so `f EQUALS f` for `f IS A Fn`, `Fn IS FUNCTION FROM NUMBER TO NUMBER`, was satisfied, where every supplied `f` makes it the unsupported-equality error. Synonyms are now expanded, at the top and in every component.
+   - An effect in a speculative right operand happened: `x AND (RECORD `wrote` IS FALSE)` answered FALSE with the write, and a FETCH or POST there was attempted. A ledger write, the HTTP request of a FETCH or POST, and ENV now raise Stuck on the speculative frame's left instead (`refuseEffectUnderUnknown`), and a built-in's `RuntimeTypeError` there is rewritten like any error; the machine's invariant failures still propagate, assumed, not ruled. The FETCH and POST guards are not exercised by a test, since one that reached them would make a request if they regressed.
+   - WASM read a missing input as 0, and the service's MCP evaluation error, the batch schema and the errors page each lacked the report or misdescribed an undetermined case; see the line beside U7b above, and the commits.
+   - The JSON of an undetermined result is one shape, `"undetermined": {"needs", "message"}`, in the core encoding `l4 batch` writes and in the API, whose "success" is null for it, as `l4 run --json` already had it; the core `#EVAL`'s object under its own key is assumed, not ruled. Each need is spelled as L4 source, so a path with spaces can be split (decided by Claude overnight 2026-10-04, pending Meng's review).
+   - The diagnostics and the LSP rules name every outcome, with no wildcard.
+   - The step rate above was questioned, at 5 to 8 million a second, and re-measured: fifty run-outs of 250,000 steps take 0.42 s more user time than fifty short calls at a load of 4.6, about 30 million a second; one run-out per file is within the 0.3 s start-up's noise, which is where the lower figure came from.
+
+   Census after review, over the review's 809 corpus, `doc` and library files: against step 2's build (`71a6af063`, whose evaluation `6220a3cac` does not change), 7,686 results on each side, no exit code changed, and each of the 95 results that differ was stuck on step 2, 83 still undetermined and 12 decided; against step 3 before review, 2 differ, both a need now quoted.
 
    **Documentation in the same PR** (repo `CLAUDE.md` §6, §7): a paragraph on an unknown left operand in the reference pages for `AND`, `OR` and `IMPLIES`, since `doc/reference/operators/AND.md:76-78` describes only a known one; and every page that quotes the `Stuck` message whose example now names a second input or decides (`grep -rn 'it is an assumed term\|I needed to know the value of' doc skills` finds 28 lines in 14 files, four of the files in `skills/writing-l4-rules/references/source-patterns/`; it counts every line that quotes the message, and which of their examples change is for this step to find), with the `l4-plugin` bundle regenerated by `etc/build-plugin-bundle.mjs` when a skill changes (repo `CLAUDE.md` §1.0).
 
@@ -1140,17 +1173,17 @@ The decision followed a review that weighed this spec, none of whose §4 to §8 
 7. **The two TypeScript evaluators** (U10, U10b).
    The shared L4 cases run through the Haskell evaluator and the visualizer's `eval.ts` as each step makes their Haskell answer final: rows 49, 50 and 69 from step 3, rows 4 and 7 from step 4, and row 19 from step 5.
    Row 69 is U10's "`FALSE AND` a call that errors", which this list had dropped.
-   `eval.ts` is replaced by a call after step 6, which keeps U10's ruled timing, but the call goes to the language server's `l4/evalApp` (`jl4-lsp/src/LSP/L4/Actions.hs:134`), and to the browser build's WASM shim, which does not handle `l4/evalApp` today (`ts-apps/jl4-web/src/lib/wasm/wasm-message-transports.ts`), not to step 6's routes; so building it waits on the outcomes of steps 3 to 5, not on step 6.
+   `eval.ts` is replaced by a call after step 6, which keeps U10's ruled timing, but the call goes to the language server's `l4/evalApp` (`evalApp` in `jl4-lsp/src/LSP/L4/Actions.hs`), and to the browser build's WASM shim, which does not handle `l4/evalApp` today (`ts-apps/jl4-web/src/lib/wasm/wasm-message-transports.ts`), not to step 6's routes; so building it waits on the outcomes of steps 3 to 5, not on step 6.
    `ladder-core`'s `nodeValue` (`layout.ts:209-268`) is kept permanently, held to the Haskell evaluator on the connective cases with each call's engine value fed in as a pin, with the tautology case (it stays `Undetermined`) and the error case (it has no error value) listed as known divergences; the `IMPLIES` case expects value `TRUE` and verdict `Undetermined` against `verdictFor` and both `verdictOf`s, extending `verdict.test.ts`, whose existing case at `:84-90` asserts the verdict only, on a hand-built tree.
    _Assumed, not ruled:_
    - The ladder users see is `LadderFlow`, mounted by the VS Code webview and jl4-web (`ts-apps/webview/src/routes/+page.svelte:22`, `ts-apps/jl4-web/src/routes/+page.svelte:43`), whose only evaluator is `eval.ts` (`ladder.svelte.ts:460`); it replaces `Evaluator.eval` with a value function exported from `ladder-core`, `nodeValue` over the ladder's tree, with engine pins on call nodes only.
      A compound leaf stays askable, so row 5, which the translator draws as one opaque leaf, is not a connective case; `LadderSvg` and `LadderModel` are left alone.
-   - `l4/evalApp` already types its arguments and its value as `UBoolValue` on the Haskell side (`jl4-lsp/src/LSP/L4/Viz/CustomProtocol.hs:31`, `:39`); the TypeScript schema (`ts-shared/viz-expr/eval-on-backend.ts:12`, `:36`) and `toBoolExpr`'s `UnknownV -> error "impossible for now"` (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs:598`) change, and the request returns a tagged outcome.
+   - `l4/evalApp` already types its arguments and its value as `UBoolValue` on the Haskell side (`EvalAppRequestParams.args` and `EvalAppResult.value` in `jl4-lsp/src/LSP/L4/Viz/CustomProtocol.hs`); the TypeScript schema (`EvalAppRequestParams` and `EvalAppResult` in `ts-shared/viz-expr/eval-on-backend.ts`) and `toBoolExpr`'s `UnknownV -> error "impossible for now"` (in `toBoolExpr` in `jl4-lsp/src/LSP/L4/Viz/Ladder.hs`) change, and the request returns a tagged outcome.
      Children are walked left to right, and no call is sent for a call node the short circuit skips; a failed call pins `UnknownV` with the error text and never aborts the recompute; answered section `GIVEN` leaves go on the call as `WITH` bindings.
    - A `jl4-test` spec emits each shared case's ladder tree, as JSON, with its Haskell outcomes, into one committed fixture, and fails when the committed copy differs; the `node:test` and `vitest` suites read that fixture.
      From step 4, `nodeValue` is compared with the K3 report on the connective cases, with row 7's divergence recorded against the default report only.
      `charge-generator` and `regcf-wizard`, which draw the service's ladders with `ladder-core`, are left as they are; their pins are not engine values.
-     No shipped ladder, the webview's or jl4-web's, exposes `respectDefaults`, so the call carries no presumption toggle; the standalone playground does (`ts-shared/ladder-svg/standalone/playground.ts:78`, `:392`).
+     No shipped ladder, the webview's or jl4-web's, exposes `respectDefaults`, so the call carries no presumption toggle; the standalone playground does (the `respectDefaults` toggle in `ts-shared/ladder-svg/standalone/playground.ts`).
 
 ---
 
@@ -1354,6 +1387,10 @@ The choices made overnight to keep steps 1 to 3 buildable follow the rulings; ea
 
 - A skipped connective operand is left out of a text trace and of the service's reasoning, as the `IF`'s untaken arm was, and is drawn, under its source text, only as GraphViz's stub when `showUnevaluated` is on, which no shipped renderer turns on (§4.4, §8 step 2).
   The alternative is a child marked as not evaluated in every trace, which needs a trace node that has no value, and its jl4-mlir mirror (step 2).
+- The default report names several inputs in the plural: "I could not continue evaluating, because I needed to know the values of", one name a line, "but they are assumed terms."; one input keeps today's message byte for byte (§8 step 3).
+  The alternative keeps the one-input wording and lists the names under it (step 3).
+- An undetermined `#ASSERT` keeps JSON kind "assertion" in `l4 run --json`, as a refused one does, with `"undetermined": {"needs": […], "message": …}`, so a consumer counting assertions still counts it; an undetermined `#EVAL` gets kind "undetermined" (§8 step 3).
+  The alternative is kind "undetermined" for both, which is §8 step 3's own wording (step 3).
 
 ---
 
@@ -1373,5 +1410,5 @@ The choices made overnight to keep steps 1 to 3 buildable follow the rulings; ea
 - What the Track B audit contributed and was not re-derived here: the hand trace by which C3 (2), read literally, leaves row 59 a bare "gave up" (§4.5), which the review of 2026-10-02 re-traced and confirmed; the reading of `UpdateThunk` behind §4.5's rule that a value carrying a `gave-up` is never written back; and that the batch request's `knownOutcomeStyle` and `unknownOutcomeStyle` follow Oracle Intelligent Advisor's Batch Assess shape (§8 step 6), which is the audit's reading of Oracle's documentation.
 - Predictions about lifted behaviour that no probe can check before the lift exists: that a residual reaching `EqConstructor3` or a temporal iterator would raise an internal or misleading error (§4.3), that a right operand diverging under a term would hang without step 3's interim counter, that the wrapper's `JUST` keeps the boundary decision and C5 from firing (§6), and that `Batch.hs:388` and `:396`'s wildcards would score an undetermined row "success".
   The iterators' misreport of a bare unknown is not a prediction: it is probed today (`c01`, `c02`).
-- Whether the static refusal analysis named by the comment at `Machine.hs:838-849` stays sound once a frame may observe a refusal, under U13's interim or its leaf, was not checked, nor whether that analysis is the DMN exporter's `D-REFUSE`; it is for step 3, which restates that comment.
+- The static refusal analysis the comment at `refuseWith` (`Machine.hs:838-849` when this was written) names is the DMN exporter's `D-REFUSE`, over `analyzeSafety` (`jl4-core/src/L4/Dmn/Lower.hs:610`): it certifies that no `REFUSE` is reachable, and step 3's interim only ever replaces a refusal with `Stuck`, so a decide it certifies still never refuses (read, not tested). Whether U13's leaf, at step 5, keeps it sound is not checked.
 - Whether §2's probes of 2026-10-01 ran on the store build `jl4-0.1-b69f17a4`, as the probes of 2026-10-02 did, was not recorded; `~/.cabal/bin/l4` points at that build, and was relinked to it on 2026-10-02.

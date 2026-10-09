@@ -2,10 +2,7 @@ Parsing successful
 Typechecking successful
 Evaluation successful
 lazytrace-exception.l4:11:1-66:
-  I could not continue evaluating, because I needed to know the value of
-    something
-  but it is an assumed term.
-  
+  FALSE
   ─────
   ┌ and OF (LIST TRUE, (FALSE OR TRUE), TRUE, something, FALSE)
   │┌ LIST TRUE, (FALSE OR TRUE), TRUE, something, FALSE
@@ -19,10 +16,13 @@ lazytrace-exception.l4:11:1-66:
   │││├ TRUE FOLLOWED BY (LIST something, FALSE)
   ││││┌ LIST something, FALSE
   ││││├ something FOLLOWED BY (LIST FALSE)
-  ││││└ LIST something, ...
-  │││└ LIST TRUE, something, ...
-  ││└ LIST TRUE, TRUE, something, ...
-  │└ LIST TRUE, TRUE, TRUE, something, ...
+  │││││┌ LIST FALSE
+  │││││├ FALSE FOLLOWED BY (LIST )
+  │││││└ LIST FALSE, ...
+  ││││└ LIST something, FALSE, ...
+  │││└ LIST TRUE, something, FALSE, ...
+  ││└ LIST TRUE, TRUE, something, FALSE, ...
+  │└ LIST TRUE, TRUE, TRUE, something, FALSE, ...
   │┌ and
   │└ <function>
   ├ CONSIDER list
@@ -58,7 +58,17 @@ lazytrace-exception.l4:11:1-66:
   ├ x AND (and OF xs)
   │┌ x
   │└ something
-  └ ↯ stuck
+  │┌ and OF xs
+  ││┌ and
+  ││└ <function>
+  │├ CONSIDER list
+  ││   WHEN EMPTY THEN TRUE
+  ││   WHEN x FOLLOWED BY xs THEN x AND (and OF xs)
+  │├ x AND (and OF xs)
+  ││┌ x
+  ││└ FALSE
+  │└ FALSE
+  └ FALSE
 lazytrace-exception.l4:20:1-52:
   Division by zero in the operation:
   DIVIDED BY
