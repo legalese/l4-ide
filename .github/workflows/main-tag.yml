@@ -346,6 +346,50 @@ jobs:
           retention-days: 90
 
   # ============================================
+  # Build the cloud agent bundle
+  # ============================================
+
+  # The headless Legalese AI harness for cloud sessions. This repository only
+  # publishes it (with jl4-lsp-linux-arm64) as release assets; the image is
+  # built and rolled out from jl4-auth-proxy (rollout-cloud-agent.yml).
+  build-cloud-agent:
+    name: Build cloud agent bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and test the harness
+        run: |
+          npx turbo build --filter=cloud-agent
+          npm test --workspace=cloud-agent
+
+      - name: Hash the bundle
+        working-directory: ts-apps/cloud-agent/dist
+        run: |
+          sha256sum cloud-agent.cjs | awk '{print $1}' > cloud-agent.cjs.sha256
+          echo "cloud-agent.cjs SHA256: $(cat cloud-agent.cjs.sha256)"
+          ls -lh
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: cloud-agent
+          path: |
+            ts-apps/cloud-agent/dist/cloud-agent.cjs
+            ts-apps/cloud-agent/dist/cloud-agent.cjs.sha256
+          retention-days: 90
+
+  # ============================================
   # Build WASM
   # ============================================
 
@@ -630,6 +674,7 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - build-cloud-agent
     steps:
       - uses: actions/checkout@v5
         with:
@@ -661,6 +706,15 @@ jobs:
             cp artifacts/jl4-service-linux-x64/jl4-service.sha256 release-artifacts/jl4-service-linux-x64.sha256
             echo "jl4-service SHA256: $(cat release-artifacts/jl4-service-linux-x64.sha256)"
           fi
+
+          # Collect the cloud agent bundle and its language server (linux-arm64),
+          # each with a SHA256, for jl4-auth-proxy's rollout-cloud-agent.yml
+          cp artifacts/cloud-agent/cloud-agent.cjs release-artifacts/cloud-agent.cjs
+          cp artifacts/cloud-agent/cloud-agent.cjs.sha256 release-artifacts/cloud-agent.cjs.sha256
+          cp artifacts/jl4-lsp-linux-arm64/jl4-lsp release-artifacts/jl4-lsp-linux-arm64
+          sha256sum release-artifacts/jl4-lsp-linux-arm64 | awk '{print $1}' > release-artifacts/jl4-lsp-linux-arm64.sha256
+          echo "cloud-agent.cjs SHA256: $(cat release-artifacts/cloud-agent.cjs.sha256)"
+          echo "jl4-lsp-linux-arm64 SHA256: $(cat release-artifacts/jl4-lsp-linux-arm64.sha256)"
 
           echo "Release artifacts:"
           ls -la release-artifacts/
@@ -695,7 +749,8 @@ jobs:
           Artifacts included:
           - VSCode extensions (platform-specific, cross-platform, universal)
           - WASM binaries (jl4-core.wasm, jl4-core.mjs)
-          - jl4-service binary (linux-x64) with SHA256"
+          - jl4-service binary (linux-x64) with SHA256
+          - Cloud agent bundle and jl4-lsp (linux-arm64) with SHA256"
           git push origin "${{ steps.tag-name.outputs.tag }}"
 
       - name: Upload artifacts to tag
@@ -726,6 +781,15 @@ jobs:
             |------|-------------|
             | `jl4-service-linux-x64` | Decision service binary for Linux x86_64 |
             | `jl4-service-linux-x64.sha256` | SHA256 hash for binary verification |
+
+            ### Cloud agent (Legalese AI cloud sessions)
+
+            | File | Description |
+            |------|-------------|
+            | `cloud-agent.cjs` | Headless Legalese AI harness bundle (Node.js 24) |
+            | `cloud-agent.cjs.sha256` | SHA256 hash for bundle verification |
+            | `jl4-lsp-linux-arm64` | Language server for Linux ARM64, used by the harness image |
+            | `jl4-lsp-linux-arm64.sha256` | SHA256 hash for binary verification |
 
             ### WASM Binaries
 
@@ -765,6 +829,7 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - build-cloud-agent
       - create-tag
     if: always()
     steps:
@@ -783,4 +848,5 @@ jobs:
           echo "| Cross Platform | ${{ needs.package-vscode-cross-platform.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Universal | ${{ needs.package-vscode-universal.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.build-wasm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Agent Bundle | ${{ needs.build-cloud-agent.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git Tag | ${{ needs.create-tag.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
