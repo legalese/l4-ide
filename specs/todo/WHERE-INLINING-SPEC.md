@@ -422,7 +422,8 @@ What it knowingly leaves, by kind of failure:
   A per-occurrence leaf (R3a (4)) is numbered in drawing order, so it also moves when such a leaf is added or removed earlier in the same decision.
 - **The planner still holds twins as two variables.**
   Two occurrences of one term share an `atomId`, and a binding by `atomId` reaches both, but the BDD does not know they are equal, so `X AND NOT X` over a compound `X` is undetermined rather than `FALSE`.
-  `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here.
+  `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here (smucclaw/l4-ide#1032).
+- **Silent, and the unsafe direction, pre-existing: `carameliseExpr` resets an `INERT`'s AND/OR context under a comparison**, so two comparisons that evaluate differently are drawn as one term and share an `atomId` (smucclaw/l4-ide#1031).
 
 ### 10.2 What was measured before building (2026-10-05)
 
