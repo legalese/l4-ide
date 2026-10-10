@@ -2614,6 +2614,9 @@ spec bin = do
       let found = findingsByDecision env
       lookup "`either spelling contradicts`" found `shouldBe` Just ["unsat"]
       lookup "`two people`" found `shouldBe` Just []
+      lookup "`computed, projection first`" found `shouldBe` Just ["unsat"]
+      lookup "`computed, projection only`" found `shouldBe` Just ["unsat"]
+      lookup "`ledger by projection`" found `shouldBe` Just []
 
     -- Reading through calls. `the arrow is broken` asks for an exception and the
     -- offence it defeats at once; with calls as opaque leaves that was two

@@ -464,6 +464,67 @@ spec = describe "an atomId is the hash of its leaf's term (R3, smucclaw/l4-ide#1
       -- a call to a rule is a call box (R3), not the field its body reads
       (ls !! 3).atomId `shouldNotBe` (ls !! 0).atomId
 
+    it "a computed field: projection, selector and named selector are one atom, and each opens" $ do
+      let src = T.unlines
+            [ "DECLARE Person HAS age IS A NUMBER"
+            , "                   adult IS A BOOLEAN MEANS age >= 18"
+            , ""
+            , "GIVEN p IS A Person"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `computed spellings` IF p's adult AND adult p AND (adult WITH `_self` IS p)"
+            ]
+      (fd, _) <- draw expanded "computed-field" src "`computed spellings`"
+      let direct = directLeaves fd.body
+          inside = [lf | lf <- allLeaves fd.body, lf `notElem` direct]
+      length direct `shouldBe` 3
+      length (nub (map (.atomId) direct)) `shouldBe` 1
+      -- each spelling reads the field through to its MEANS, onto one atom
+      length inside `shouldBe` 3
+      length (nub (map (.atomId) inside)) `shouldBe` 1
+
+    it "a rule named like a computed field is not a field read" $ do
+      -- The checker stamps ComputedSelector on any rule named like a computed
+      -- field of a record in the module (found by adversarial review).
+      let src field = T.unlines
+            [ "DECLARE Employee HAS salary IS A NUMBER"
+            , "                     " <> field <> " IS A NUMBER MEANS salary * 0.1"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE bonus n IS n * 2"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `big bonus` IF bonus n > 3"
+            ]
+      -- Read as a field read, the leaf named the input `n.bonus`, a field of a
+      -- NUMBER. (Its atomId cannot be compared with a module without the field:
+      -- the field's own function then takes the short binder path `bonus`, and
+      -- the rule an ordinal.)
+      (fd, st) <- draw plain "misstamp" (src "bonus") "`big bonus`"
+      let refs = Ladder.getAtomInputRefs st
+      length (directLeaves fd.body) `shouldBe` 1
+      [ref | lf <- directLeaves fd.body, ref <- Set.toList (IntMap.findWithDefault mempty lf.unique refs), not (null ref.path)]
+        `shouldBe` []
+
+    it "a selector written with its section names the input its projection names" $ do
+      let src = T.unlines
+            [ "§ `Alpha`"
+            , "DECLARE R HAS w IS A NUMBER"
+            , ""
+            , "§ `Beta`"
+            , "GIVEN r IS AN R"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE qualified IF (`Alpha`.w OF r) > 3 OR (r's w) > 3"
+            ]
+      (fd, st) <- draw plain "qualified" src "qualified"
+      let ls = directLeaves fd.body
+          refsOf lf = IntMap.findWithDefault mempty lf.unique (Ladder.getAtomInputRefs st)
+      length ls `shouldBe` 2
+      length (nub (map (.atomId) ls)) `shouldBe` 1
+      refsOf (ls !! 0) `shouldBe` refsOf (ls !! 1)
+      map (.path) (Set.toList (refsOf (ls !! 0))) `shouldBe` [["w"]]
+
     it "both spellings name the same input for the query plan" $ do
       (ls, st) <- leavesOf "`age either way`"
       let refs = Ladder.getAtomInputRefs st

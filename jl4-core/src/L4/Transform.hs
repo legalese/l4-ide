@@ -167,6 +167,7 @@ callees :: Expr Resolved -> Set.Set Unique
 callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
   App _ r _        -> Set.singleton (getUnique r)
   AppNamed _ r _ _ -> Set.singleton (getUnique r)
+  Proj _ _ r       -> Set.singleton (getUnique r)
   _                -> Set.empty
 
 -- | A call's head and its arguments in parameter order.
@@ -178,6 +179,13 @@ callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
 -- called by name is unfolded, counted and inlined exactly as one called
 -- positionally (smucclaw/l4-ide#1033), and "L4.Viz.AtomKey" keys the two alike
 -- through it too.
+--
+-- A projection, @e's f@, is the selector @f@ applied to @e@: that is what it
+-- means, since the evaluator desugars it so (@L4.EvaluateLazy.Machine@, the
+-- 'Proj' case), so a computed field read by projection is unfolded as one read
+-- by its selector is. Without it, once smucclaw/l4-ide#1033's R3b keyed the two
+-- spellings alike, @l4 verify@ read the field through only when the selector
+-- spelling happened to come first (found by adversarial review).
 --
 -- 'Nothing' for anything else: a named call the checker has not ordered, and one
 -- that supplies a section binder (a negative entry, 'implicitSupplyIndex'), whose
@@ -201,6 +209,7 @@ callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
 positionalCall :: Expr Resolved -> Maybe (Resolved, [Expr Resolved])
 positionalCall = \ case
   App _ r args -> Just (r, args)
+  Proj _ e r -> Just (r, [e])
   AppNamed _ r nes (Just order)
     | not (null nes)
     , not (any (\ (MkNamedExpr _ n _) -> isOutOfScope n) nes)
@@ -241,7 +250,8 @@ closeUnder m0 = go (Map.size m0) m0
 -- | One round of beta reduction. Every call @App _ r args@ whose callee is in the
 -- map /and whose argument count equals the callee's parameter count/ is replaced
 -- by the callee's body with each argument put in place of its parameter. A call
--- with named arguments is read as its positional call first ('positionalCall').
+-- with named arguments, or a projection, is read as its positional call first
+-- ('positionalCall').
 --
 -- The arity check is the guard, and it is load-bearing: a reference at another
 -- arity (a helper passed as a value) is not a call and is left alone.
