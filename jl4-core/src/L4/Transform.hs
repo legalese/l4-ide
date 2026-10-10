@@ -183,6 +183,14 @@ callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
 -- that supplies a section binder (a negative entry, 'implicitSupplyIndex'), whose
 -- callee reads a name that is not among its parameters, so substituting for the
 -- parameters alone would not be the call.
+--
+-- The test cannot see the callee's arity. Today every named call names every
+-- parameter (the checker raises @IncompleteAppNamed@ otherwise), but if one may
+-- omit a defaulted parameter (TYPICALLY-ONE-BEHAVIOUR-SPEC row W4), a call
+-- supplying the first n of more parameters passes it. The unfolding passes stay
+-- right, since each compares the argument count with the callee's parameters;
+-- "L4.Viz.AtomKey" does not, and would key such a call as the shorter positional
+-- call (found by adversarial review).
 positionalCall :: Expr Resolved -> Maybe (Resolved, [Expr Resolved])
 positionalCall = \ case
   App _ r args -> Just (r, args)

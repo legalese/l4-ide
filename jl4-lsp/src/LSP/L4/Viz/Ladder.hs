@@ -500,8 +500,10 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
       | cfg.expandCalls = toListOf (gplate @Unique) cfg.module'
       | otherwise = toListOf (gplate @Unique) body
 
--- | The type variables (@GIVEN a IS A TYPE@) of each top-level definition that
--- has any, by the Unique.unique a call refers to it by.
+-- | The type variables (@GIVEN a IS A TYPE@) of each definition that has any, by
+-- the Unique.unique a call refers to it by: every definition of the module,
+-- @WHERE@-local ones included, as 'defsForInliningOf' takes them, since a call
+-- to a local is expanded too.
 typeVariablesOf :: Module Resolved -> IntMap (Set Unique)
 typeVariablesOf = Map.fromList . foldTopLevelDecides (foldDecides one)
   where
@@ -889,9 +891,9 @@ node whose type is one of its type variables says so: in
 that rule with BOOLEAN arguments drew its @IF@ as ONE opaque leaf, keyed apart
 from the inputs it reads (smucclaw/l4-ide#1033).
 
-What each type variable stands for is read off the call, by matching: each
-parameter's type, as annotated where the body refers to it, against its
-argument's type, and the body's type against the call's. The first match for a
+What each type variable stands for is read off the call, by matching: the
+body's type against the call's, then each parameter's type, as annotated where
+the body refers to it, against its argument's type. The first match for a
 variable wins; the checker has already made them agree. Every type in the body
 is then rewritten, annotations included, so the body reads as it would have if
 the rule had been written at those types. A variable no match reaches is left as

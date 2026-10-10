@@ -1,0 +1,21 @@
+-- A call written with named arguments is read through like a positional one
+-- (smucclaw/l4-ide#1033). `named and negated` asks for `big` of n and for n not
+-- to be above 3 at once, which only reading the call through can see; base left
+-- the named call an opaque atom and reported nothing. `named and narrower` is the
+-- control: n above 3 but not above 4 is satisfiable.
+
+GIVEN k IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `big` k IF k > 3
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `named and negated` IF
+      (`big` WITH k IS n)
+  AND NOT n > 3
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `named and narrower` IF
+      (`big` WITH k IS n)
+  AND NOT n > 4
