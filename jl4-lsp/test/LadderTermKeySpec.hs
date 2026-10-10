@@ -110,6 +110,29 @@ leavesWith deep = go
 idsOf :: T.Text -> [Leaf] -> [T.Text]
 idsOf l ls = nub [lf.atomId | lf <- ls, lf.label == l]
 
+-- | Calls written with named arguments, all-BOOLEAN and not, in and out of
+-- order: both ladders draw them as the positional calls they stand for
+-- (smucclaw/l4-ide#1033).
+namedCalls :: T.Text
+namedCalls = T.unlines
+  [ "GIVEN p IS A BOOLEAN"
+  , "      q IS A BOOLEAN"
+  , "DECIDE limb p q IF p AND NOT q"
+  , ""
+  , "GIVEN k IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE big k IF k > 3"
+  , ""
+  , "GIVEN a IS A BOOLEAN"
+  , "      b IS A BOOLEAN"
+  , "      n IS A NUMBER"
+  , "DECIDE `named calls` a b n IF"
+  , "      (limb WITH q IS b, p IS a)"
+  , "  AND limb a b"
+  , "  AND (big WITH k IS n)"
+  , "  AND big n"
+  ]
+
 -- | The module the mixfix head-keyword collision was found in
 -- (jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4).
 mixfixSharedHead :: T.Text
@@ -349,14 +372,14 @@ spec = describe "an atomId is the hash of its leaf's term (R3, smucclaw/l4-ide#1
     length (nub (map (.atomId) pinned)) `shouldBe` 1
 
   it "the query plan names every one of its atoms exactly as the diagram does" $ do
-    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves)] \(stem, src) -> do
+    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves), ("named-calls", namedCalls)] \(stem, src) -> do
       (verId, tc) <- checkSource ("plan-" <> stem) src
       forM_ [plain, expanded] \opts ->
         forM_ (drawAll opts verId tc) \(fd, st) ->
           planDisagreements fd st `shouldBe` []
 
   it "the browser's ladder (jl4-core) names every atom as the IDE's does" $ do
-    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves)] \(stem, src) -> do
+    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves), ("named-calls", namedCalls)] \(stem, src) -> do
       (verId, tc) <- checkSource ("core-" <> stem) src
       let MkModule _ uri _ = tc.module'
           drawn = drawAll plain verId tc

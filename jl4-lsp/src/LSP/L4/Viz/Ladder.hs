@@ -48,12 +48,13 @@ import Control.Monad.Extra (unlessM)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified L4.TypeCheck as TC
+import L4.TypeCheck.Types (substituteType)
 import L4.Viz.Ladder (InputRef(..), collectTypicallyDefaults, seamLabel)
 import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
+import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindings, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -183,6 +184,10 @@ data VizState = MkVizState
   -- own WHERE definitions inlined into it; 'Nothing' for a definition whose
   -- body keeps a local binding after that (see 'expandCall'). Each entry is
   -- computed at most once per decision, and only for a rule that is called.
+  , typeVariables :: IntMap (Set Unique)
+  -- ^ Unique.unique -> the type variables (@GIVEN a IS A TYPE@) of each
+  -- definition of 'defsForInlining' that has any; absent for every other one.
+  -- A call's expansion puts in the types the call is at ('instantiateTypes').
   , leafExprs :: IntMap (Expr Resolved)
   -- ^ Leaf variable id -> the source expression the leaf stands for. Lets a
   -- consumer ask what a leaf MEANS: `l4 verify` reads a call leaf through to the
@@ -236,6 +241,7 @@ mkInitialVizState cfg =
     , appExprMakers = Map.empty
     , defsForInlining = Map.empty
     , expansionBodies = Map.empty
+    , typeVariables = Map.empty
     , leafExprs = Map.empty
     , callLeafTargets = Map.empty
     , atomDeps = Map.empty
@@ -287,6 +293,18 @@ prepEvalAppMaker vid = \ case
           \V.EvalAppRequestParams{args} ->
             Where emptyAnno
               (App appAnno appResolved $ map toBoolExpr args)
+              localDecls
+    #appExprMakers %= Map.insert vid.id maker
+  -- A named call's arguments are drawn in the order they were written (see
+  -- 'translateGo'), so the values come back in that order, each for its name.
+  AppNamed appAnno appResolved nes order -> do
+    localDecls <- getLocalDecls
+    let maker =
+          \V.EvalAppRequestParams{args} ->
+            Where emptyAnno
+              (AppNamed appAnno appResolved
+                (zipWith (\(MkNamedExpr a n _) v -> MkNamedExpr a n (toBoolExpr v)) nes args)
+                order)
               localDecls
     #appExprMakers %= Map.insert vid.id maker
   _ -> pure ()
@@ -454,6 +472,7 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     { functionName = (mkPrettyVizName funResolved).label
     , defsForInlining = defs
     , expansionBodies = Map.map expansionBodyOf defs
+    , typeVariables = Map.restrictKeys (typeVariablesOf cfg.module') (Map.keysSet defs)
     -- A leaf's variable is keyed by an Int. A bare reference to one of this
     -- module's names uses the name's unique; every other leaf gets a fresh id
     -- from 'getFresh'. Those were once two counters that both started near zero,
@@ -480,6 +499,19 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     seedFrom
       | cfg.expandCalls = toListOf (gplate @Unique) cfg.module'
       | otherwise = toListOf (gplate @Unique) body
+
+-- | The type variables (@GIVEN a IS A TYPE@) of each definition that has any, by
+-- the Unique.unique a call refers to it by: every definition of the module,
+-- @WHERE@-local ones included, as 'defsForInliningOf' takes them, since a call
+-- to a local is expanded too.
+typeVariablesOf :: Module Resolved -> IntMap (Set Unique)
+typeVariablesOf = Map.fromList . foldTopLevelDecides (foldDecides one)
+  where
+    one (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n _ _) _) =
+      [ ((getUnique n).unique, vars)
+      | let vars = Set.fromList [getUnique v | MkOptionallyTypedName _ v (Just (Type _)) _ <- otns]
+      , not (Set.null vars)
+      ]
 
 ------------------------------------------------------
 -- translateDecide, translateExpr
@@ -636,7 +668,36 @@ translateGo = go
             -- TODO: Check how exactly a function of no args, as opposed to a var, would be represented?
             -- There was some discussion of this at a meeting, but can't remember exactly what was said
 
-        App appAnno fnResolved args -> do
+        App appAnno fnResolved args -> call e appAnno fnResolved args
+
+        -- A call with named arguments that 'Transform.positionalCall' reads as a
+        -- positional call is drawn as that call (smucclaw/l4-ide#1033): R3 keys
+        -- the two alike, and its expansion is the positional call's. Its label
+        -- and its argument boxes keep the order the arguments were written in.
+        AppNamed appAnno fnResolved nes _
+          | isJust (Transform.positionalCall e) ->
+              call e appAnno fnResolved [x | MkNamedExpr _ _ x <- nes]
+
+        -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@,
+        -- @BRANCH@, @CONSIDER@ -- is ladder structure, not a leaf. Shared with the
+        -- core visualiser via "L4.Viz.GuardedRows"; this module and
+        -- "L4.Viz.Ladder" carry near-identical copies of 'translateExpr', so the
+        -- expansion lives in neither. Every bail-out lands on 'leafFromExpr', i.e.
+        -- the pre-existing behaviour.
+        _ -> do
+          isBool <- hasBooleanType (getAnno e)
+          case GR.normaliseGuarded e of
+            Just rows
+              | isBool
+              , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
+                  GR.guardedToLadder getFresh (go CtxNone) rows
+            _ -> leafFromExpr e
+
+    -- A call @e@, whose arguments in the order they are drawn are @args@: a box
+    -- over its arguments when the call and every argument are BOOLEAN, with the
+    -- called rule's body as its expansion; otherwise a leaf ('leafFromExpr').
+    call :: Expr Resolved -> Anno -> Resolved -> [Expr Resolved] -> Viz IRExpr
+    call e appAnno fnResolved args = do
           fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
           -- for now, only translating App of boolean functions to V.App
           if fnOfAppIsFnFromBooleansToBoolean
@@ -657,21 +718,6 @@ translateGo = go
               pure (V.App vid vname args' atomId expansion)
             else
               leafFromExpr e
-
-        -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@,
-        -- @BRANCH@, @CONSIDER@ -- is ladder structure, not a leaf. Shared with the
-        -- core visualiser via "L4.Viz.GuardedRows"; this module and
-        -- "L4.Viz.Ladder" carry near-identical copies of 'translateExpr', so the
-        -- expansion lives in neither. Every bail-out lands on 'leafFromExpr', i.e.
-        -- the pre-existing behaviour.
-        _ -> do
-          isBool <- hasBooleanType (getAnno e)
-          case GR.normaliseGuarded e of
-            Just rows
-              | isBool
-              , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
-                  GR.guardedToLadder getFresh (go CtxNone) rows
-            _ -> leafFromExpr e
 
 scanAnd :: Expr Resolved -> [Expr Resolved]
 scanAnd (And _ e1 e2) =
@@ -726,19 +772,21 @@ leafFromExpr expr = do
   #leafExprs %= Map.insert uniq expr
   -- A call with arguments to a rule defined in this module can be expanded in
   -- place: 'inlineExprs' substitutes the arguments for the parameters. The leaf
-  -- keeps its fresh id, so remember which rule it calls.
-  canInline <- case expr of
-    App _ (Ref _ callee _) (_ : _) -> do
+  -- keeps its fresh id, so remember which rule it calls. A call with named
+  -- arguments is such a call when 'Transform.positionalCall' can read it.
+  let calleeOf = case Transform.positionalCall expr of
+        Just (Ref _ callee _, _ : _) -> Just callee
+        _ -> Nothing
+  canInline <- case calleeOf of
+    Just callee -> do
       known <- hasDefForInlining callee
       when known $ #callLeafTargets %= Map.insert uniq callee.unique
       pure known
-    _ -> pure defaultUBoolVarCanInline
+    Nothing -> pure defaultUBoolVarCanInline
   expansion <-
-    if canInline
-      then case expr of
-        App _ (Ref _ callee _) _ -> expandCall callee expr
-        _ -> pure Nothing
-      else pure Nothing
+    case calleeOf of
+      Just callee | canInline -> expandCall callee expr
+      _ -> pure Nothing
   atomId <- keyLeaf uniq expr
   let label = prettyLayout expr
   pure $
@@ -796,12 +844,13 @@ expandCall callee call = do
   known <- hasDefForInlining callee
   bodies <- use #expansionBodies
   spent <- use #expansionNodes
-  let reduced = case (call, join (Map.lookup callee.unique bodies)) of
-        (App _ _ args, Just (ps, body))
-          | length args == length ps -> Just (Transform.substParams (zip ps args) body)
+  typeVars <- use #typeVariables
+  let reduced = case (Transform.positionalCall call, join (Map.lookup callee.unique bodies)) of
+        (Just (_, args), Just (ps, body))
+          | length args == length ps -> Just (zip ps args, body)
         _ -> Nothing
   case reduced of
-    Just body
+    Just (actuals, body0)
       | cfg.expandCalls
       , known
       , callee.unique `notElem` env.expansionStack ->
@@ -813,6 +862,10 @@ expandCall callee call = do
                 assign #expansionOverBudget True
                 pure Nothing
             | otherwise -> do
+                instantiated <- case Map.lookup callee.unique typeVars of
+                  Just vars -> instantiateTypes vars call actuals body0
+                  Nothing -> pure body0
+                let body = Transform.substParams actuals instantiated
                 -- A definition's body is stored desugared (@AND@ as a function
                 -- application); resugar it as 'translateDecide' does the caller's.
                 let sweet = carameliseExpr body
@@ -825,6 +878,83 @@ expandCall callee call = do
                 when (total > expansionNodeBudget) $ assign #expansionOverBudget True
                 pure (Just ir)
     _ -> pure Nothing
+
+{- | A polymorphic definition's body, with the types its call is at put in for
+its type variables.
+
+The body is annotated as the checker saw it, in the definition's own scope, so a
+node whose type is one of its type variables says so: in
+@`whichever applies` cond x y MEANS IF cond THEN x ELSE y@ under
+@GIVEN a IS A TYPE@, the @IF@ is of type @a@. Putting a call's arguments in for
+@x@ and @y@ does not change that annotation, and the guarded-chain case of
+'translateGo' draws an @IF@ as structure only when it is BOOLEAN, so a call of
+that rule with BOOLEAN arguments drew its @IF@ as ONE opaque leaf, keyed apart
+from the inputs it reads (smucclaw/l4-ide#1033).
+
+What each type variable stands for is read off the call, by matching: the
+body's type against the call's, then each parameter's type, as annotated where
+the body refers to it, against its argument's type. The first match for a
+variable wins; the checker has already made them agree. Every type in the body
+is then rewritten, annotations included, so the body reads as it would have if
+the rule had been written at those types. A variable no match reaches is left as
+it is, which is what drawing did before.
+-}
+instantiateTypes :: Set Unique -> Expr Resolved -> [(Unique, Expr Resolved)] -> Expr Resolved -> Viz (Expr Resolved)
+instantiateTypes vars call actuals body = do
+  cfg <- getVizCfg
+  pure (instantiateTypesWith (expanderOf cfg) vars call actuals body)
+
+-- | The checker's final substitution, which resolves an annotation's inference
+-- variables.
+expanderOf :: VizConfig -> Type' Resolved -> Type' Resolved
+expanderOf cfg = TC.applyFinalSubstitution cfg.substitution cfg.moduleUri
+
+-- | 'instantiateTypes', given the final substitution.
+--
+-- Annotations are read, and rewritten, through the final substitution, since
+-- the type an annotation holds may be an inference variable that only it
+-- resolves. A type written in the syntax (a lambda's @GIVEN z IS AN a@) gets the
+-- type variables put in and nothing else: an untyped lambda's parameter keeps its
+-- inference variable there, as it does in the caller, so the two key alike
+-- ('L4.Viz.AtomKey' erases its counter); resolved, it printed and keyed as the
+-- type the author never wrote (found by adversarial review).
+instantiateTypesWith :: (Type' Resolved -> Type' Resolved) -> Set Unique -> Expr Resolved -> [(Unique, Expr Resolved)] -> Expr Resolved -> Expr Resolved
+instantiateTypesWith expand vars call actuals body
+  | DataMap.null theta = body
+  | otherwise =
+      over (gplate @Anno) (over annInfo instantiateInfo)
+        (over (gplate @(Type' Resolved)) (substituteType theta) body)
+  where
+    paramUses =
+      [ (getAnno ref, getAnno actual)
+      | ref@(App _ r []) <- toListOf (cosmosOf (gplate @(Expr Resolved))) body
+      , Just actual <- [lookup (getUnique r) actuals]
+      ]
+    theta = foldl' (\m (p, a) -> DataMap.union m (matchType p a)) DataMap.empty
+      [ (p, a)
+      | (pAnno, aAnno) <- (getAnno body, getAnno call) : paramUses
+      , Just p <- [annoType pAnno]
+      , Just a <- [annoType aAnno]
+      ]
+
+    annoType :: Anno -> Maybe (Type' Resolved)
+    annoType a = case a ^. annInfo of
+      Just (TypeInfo ty _) -> Just (expand ty)
+      _ -> Nothing
+
+    instantiateInfo = \case
+      Just (TypeInfo ty k) -> Just (TypeInfo (substituteType theta (expand ty)) k)
+      i -> i
+
+    matchType :: Type' Resolved -> Type' Resolved -> DataMap.Map Unique (Type' Resolved)
+    matchType p a = case (p, a) of
+      (TyApp _ r [], _) | getUnique r `Set.member` vars -> DataMap.singleton (getUnique r) a
+      (TyApp _ r ps, TyApp _ r' qs)
+        | getUnique r == getUnique r', length ps == length qs -> DataMap.unions (zipWith matchType ps qs)
+      (Fun _ ps r, Fun _ qs r')
+        | length ps == length qs ->
+            DataMap.unions (matchType r r' : zipWith (\(MkOptionallyNamedType _ _ x) (MkOptionallyNamedType _ _ y) -> matchType x y) ps qs)
+      _ -> DataMap.empty
 
 -- | Does a @WHERE@ or @LET … IN@ survive anywhere in this expression?
 bindsLocally :: Expr Resolved -> Bool
@@ -986,7 +1116,7 @@ inlineExprs vs = foldr (inlineExpr vs)
 inlineExpr :: VizState -> Int -> Decide Resolved -> Decide Resolved
 inlineExpr vs target =
   case Map.lookup definition vs.defsForInlining of
-    Just (u, unfoldable) -> over decideBody (Transform.unfoldOnce (DataMap.singleton u (withLocalsInlined unfoldable)))
+    Just (u, Transform.MkUnfoldable ps rhs) -> over decideBody (transformOf (gplate @(Expr Resolved)) (unfold u ps (withLocalsInlined rhs)))
     Nothing -> id
   where
     definition = Map.findWithDefault target target vs.callLeafTargets
@@ -996,4 +1126,18 @@ inlineExpr vs target =
     -- calls' copies of one local would be drawn as one proposition (found by
     -- adversarial review of smucclaw/l4-ide#1013). A local that cannot be
     -- inlined (a recursive one) still comes along as it is.
-    withLocalsInlined (Transform.MkUnfoldable ps rhs) = Transform.MkUnfoldable ps (Transform.inlineLocalBindings rhs)
+    withLocalsInlined = Transform.inlineLocalBindings
+    -- 'Transform.unfoldOnce' with one definition, except that a polymorphic
+    -- one's types are instantiated at each call, as 'expandCall' does: unfolded
+    -- without, a polymorphic callee's IF was one box after the expand gesture
+    -- though its expansion had drawn it as structure (found by adversarial review).
+    unfold u ps body e = case Transform.positionalCall e of
+      Just (r, args)
+        | getUnique r == u
+        , length args == length ps ->
+            let actuals = zip ps args
+                typed = case Map.lookup definition vs.typeVariables of
+                  Just vars -> instantiateTypesWith (expanderOf vs.cfg) vars e actuals body
+                  Nothing -> body
+             in Transform.substParams actuals typed
+      _ -> e

@@ -329,11 +329,12 @@ verifyLedgerReadsFixture = fixtureDir </> "verify-ledger-reads.l4"
 -- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
 -- carries its own control; see its header.
 verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture :: FilePath
-verifyUnfoldRecursiveFixture :: FilePath
+verifyUnfoldRecursiveFixture, verifyUnfoldNamedCallsFixture :: FilePath
 verifyUnfoldCallsFixture     = fixtureDir </> "verify-unfold-calls.l4"
 verifyUnfoldImportsFixture   = fixtureDir </> "verify-unfold-imports.l4"
 verifyUnfoldRulesFixture     = fixtureDir </> "verify-unfold-rules.l4"
 verifyUnfoldRecursiveFixture = fixtureDir </> "verify-unfold-recursive.l4"
+verifyUnfoldNamedCallsFixture = fixtureDir </> "verify-unfold-named-calls.l4"
 
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
@@ -428,7 +429,7 @@ coreFixtures =
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
-  , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
+  , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
@@ -2633,6 +2634,14 @@ spec bin = do
       case objField env "summary" >>= (`objField` "callsReadThrough") of
         Just (Number n) -> n `shouldSatisfy` (> 0)
         other -> expectationFailure ("expected summary.callsReadThrough, got " ++ show other)
+
+    -- A call written with named arguments is read through like a positional one
+    -- (smucclaw/l4-ide#1033); before, it stayed an opaque atom.
+    it "reads through a call written with named arguments" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldNamedCallsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`named and negated`" found `shouldBe` Just ["unsat"]
+      lookup "`named and narrower`" found `shouldBe` Just []
 
     -- Across an import, where the rules' return types are INFERRED: the imported
     -- bodies must be zonked with their own module's substitution before they can
