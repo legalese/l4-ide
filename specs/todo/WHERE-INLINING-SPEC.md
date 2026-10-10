@@ -376,7 +376,7 @@ How a panel and a NOT's bubble are drawn was ruled the same day and is recorded 
 > A call box's key is the called rule together with the C1 keys of its arguments.
 > An expansion's leaves are keyed in the **caller's** context after substitution: the called rule's body, with the call's arguments in place of its parameters, is keyed as if the caller had written it.
 > So the `a` inlined from `limb a b` is the caller's own `a`, `limb a b` and `limb c d` share no atom, and two copies of `limb a b` share every atom.
-> The `atomId` is that key's implementation; today's printed-label `atomId` (below) is interim, and wherever it differs from the C1 key that is a defect, not behaviour (smucclaw/l4-ide#1013).
+> The `atomId` is that key's implementation; the printed-label `atomId` in place when this was ruled was interim, and wherever it differed from the C1 key that was a defect, not behaviour (smucclaw/l4-ide#1013).
 
 Ruling, 2026-10-07, asked inline in session `ladder-ref-trans`: option "C1's term key", over "the printed label, as built" and "no sharing across copies"; condition: the key stays stable across recompiles and the ladder and the query plan agree on it (#935); Meng's note: "seems like we should be prioritizing correctness over ease of implementation".
 What prompted the rule is Meng's question of 2026-10-05, quoted above ("clicking in one term should toggle all instances to match"), and its basis is the evaluator's identity ruling, C1 of `UNKNOWN-EVALUATION-SPEC.md` (bench card C1, accepted by Meng 2026-10-01, recorded at `:1171`), of which R3 is the ladder's projection.
@@ -384,9 +384,46 @@ C1 keys every term by its structure: "an input, a field path, a built-in operati
 A call to a rule the module defines is not an atom there; it is unfolded, so `older 18` leaves no trace of `older` (`:308-309`).
 The ladder keeps the call as a box, because that is what the reader wrote, but the call's expansion is that unfolding, and R3 gives each of its leaves the key it would have if the caller had written the argument in place.
 
-The implementation is not yet exact.
-The ladder's `atomId` is a UUID5 over the function name, the leaf's **printed label**, and the labels of its transitive input references (`atomIdByUnique` and `atomIdsOfLabels`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:206-275`).
-That equals C1's term key only where printing is injective, and it is not everywhere (§10.6).
+**Implemented** by legalese/l4-ide#598 (branch `feat/r3-c1-atom-key`, smucclaw/l4-ide#1013), not yet merged when this was written.
+_Changed:_ until then the `atomId` was a UUID5 over the function name, the leaf's **printed label**, and the labels of its transitive input references, which equals C1's term key only where printing is injective, and it is not everywhere (§10.6).
+
+The key is `L4.Viz.AtomKey.termKey` in `jl4-core`, and the `atomId` is a UUID5 over the function name and that key (`atomIdOfKey`).
+`termKey` strips every annotation from the leaf's expression and renames every name, so two keys are equal exactly when the two terms are structurally equal after renaming:
+
+- a binder defined inside the leaf (a quantifier or lambda variable, a pattern variable) is named by its scope, de Bruijn style, so alpha-equivalent leaves share a key, and so do two copies of one lambda that substitution put into one leaf;
+- a free name of the module becomes its binder path, from `mkKeyEnv`: the top-level declaration and the name, qualified by the named sections around it only where an earlier binder took that path, and by a source-order ordinal only where that is taken too, so renaming or inserting a section heading moves no id; binders that only ever occur inside one leaf get no path;
+- a free name of another module, or a builtin, keeps that module's own number for it, beside the module's file name, numbered apart where two modules share one.
+
+A `WHERE` or `LET` local is not a name of its own in the key: the leaf's own local bindings, and the decision's `WHERE` locals it reads, are put in before keying (`inlineLocalBindings`), as a callee's are before its expansion is drawn, so a caller's `total GREATER THAN 3 WHERE total MEANS n PLUS 1` and the same text in a callee key alike.
+A local that cannot be put in (a recursive one) stays in the term with its definition, so two unfolded copies of it with different arguments stay apart; keyed by name, they were one atom, and `l4 verify` reported a satisfiable rule unsatisfiable.
+A leaf whose value depends on when it is evaluated, because it reads or writes the ledger or the network or calls a rule of the module that does, is keyed per occurrence instead, numbered in drawing order (C1's `fresh`): C1 keys a built-in by its term because it is a function of its operands, and a `RECALL` is not, so two occurrences either side of a `RECORD` can be FALSE and TRUE in one evaluation.
+Keyed by term, they were one atom, and `l4 verify` reported such a rule unsatisfiable; it now also keeps these apart across the meanings it reads through (`getFreshLeaves`).
+Before showing the term, the key also drops an inference variable's counter (an untyped lambda parameter's type carries one, and it moves when anything checked earlier changes) and writes a call whose arguments are all named as the positional call.
+It puts back the one thing the term does not carry: the type a `JSONDECODE` decodes into, which the evaluator reads off the node's annotation.
+Each of these was found by adversarial review of the design or of the built key, and each has a test (`AtomKeySpec`, `LadderTermKeySpec`, `LadderCallExpansionSpec`, and `l4-cli-test`'s `verify-recursive-local-copies.l4`).
+
+Both ladder builders key every leaf this way while they draw, including each leaf of an expansion over the substituted body, and record the key under the leaf's id (`getLeafKeys`); the query plan reads those keys (`leafKeyByUnique`) instead of computing ids of its own, so the diagram and the plan cannot disagree.
+A call box is the term `f a b`, so its key is the rule's path with its arguments' keys, as R3 says.
+
+> **R3a** (**ANSWERED 2026-10-09**, ruled by Meng). The four choices #598 made without a ruling stand as built.
+> (1) An `atomId` keeps the decision's name, so ids are scoped per diagram, although R3's text read literally names a proposition without it.
+> (2) Section names enter a binder path only where two binders would otherwise collide, so renaming or inserting a heading moves no id.
+> (3) `WHERE` and `LET` locals are put into keys, so a call to a local keys as its unfolding, unlike a call to a rule, which is a call box.
+> (4) A leaf that reads or writes the ledger or the network, or calls a rule of the module that does, is keyed per occurrence (C1's `fresh`); a bare reference to such a rule of no parameters is not, since it is evaluated once and shared.
+
+Ruling, 2026-10-09, asked inline in session `ladder-ref-trans` (offered as a bench, SOMMELIER, not built): all four as recommended; no conditions; Meng's note: "i think we can skip SOMMELIER if i just say i accept your recommendations".
+
+What it knowingly leaves, by kind of failure:
+
+- **Silent, and the safe direction: equal propositions can get two keys** where they are different terms, such as `a AND b` and `b AND a` inside one leaf.
+  That says "two questions" where the truth is one, never the reverse (C1).
+- **An `atomId` is stable across recompiles and edits elsewhere in the module, not across everything.**
+  It moves when a binder with the same name is added above one it names (the later of the two is then told apart by its sections), when an imported module it names changes, or on an L4 release that changes the AST, since the key is `show` of it.
+  A per-occurrence leaf (R3a (4)) is numbered in drawing order, so it also moves when such a leaf is added or removed earlier in the same decision.
+- **The planner still holds twins as two variables.**
+  Two occurrences of one term share an `atomId`, and a binding by `atomId` reaches both, but the BDD does not know they are equal, so `X AND NOT X` over a compound `X` is undetermined rather than `FALSE`.
+  `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here (smucclaw/l4-ide#1032).
+- **Silent, and the unsafe direction, pre-existing: `carameliseExpr` resets an `INERT`'s AND/OR context under a comparison**, so two comparisons that evaluate differently are drawn as one term and share an `atomId` (smucclaw/l4-ide#1031).
 
 ### 10.2 What was measured before building (2026-10-05)
 
@@ -437,6 +474,8 @@ Making it opt-in was a choice made on this branch for cost (§10.5), not a rulin
 The query plan's variables keep exactly the ids they had.
 Every other leaf, an `App`'s arguments and every leaf inside an expansion, is named by the same function over the same dependency closure (`atomIdsOfLabels`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:228`), with its references rendered against the plan's own labels.
 An inlined leaf that **is** a plan variable, such as the caller's `a` inlined from `limb a b`, carries that variable's unique and so gets its id.
+_Changed (smucclaw/l4-ide#1013):_ the one namespace is now that of §10.1's term key: every leaf's id is the hash of the key the ladder recorded for it, and `atomIdsOfLabels` is gone.
+The caller's `a` inlined from `limb a b` gets the caller's id because it is the same term.
 Expansion leaves are not added to the plan's variables: `vizExprToBoolExpr` makes a call one variable and descends into neither its arguments nor its expansion.
 
 **The rest of the server.**
@@ -483,6 +522,7 @@ The server half went through three adversarial reviews before `afffcb6e5`; these
   A first fix rendered references with the extra leaves' labels added, and then the call `limb OF the season is open, a` had one `atomId` drawn directly and another inside `wrap a`'s expansion (measured 2026-10-05).
   References now render against the plan's labels only.
   The cost is stated in the code: a reference to a module rule that is not a plan variable renders by its unique, so it is never taken for a caller input that shadows it, but its `atomId` moves when a line is added above (`jl4-query-plan/src/L4/Decision/QueryPlan.hs:223-227`); the stability test covers leaves whose references are inputs.
+  _Changed (smucclaw/l4-ide#1013):_ that cost is gone; the term key names a module rule by its path, and `LadderCallExpansionSpec` pins the rule's `atomId` across a line added above.
 - **`l4/queryPlan` stopped drawing again.**
   It ran every deepening pass and translated every expansion on each request, which the webview sends on every change to the bindings, only for the plan to discard the expansions: 536 ms per request against 9 ms after, on a module with 254 expansions (`afffcb6e5`'s message).
 - **Service parity.**
@@ -525,9 +565,11 @@ With the mixfix labels of §10.6 and the folded-call conduction fix of `ladder-d
   Guarded by `VisualiseExpansionOptInSpec.hs` (the fixture above, with and without expansions; it failed with the stamping reverted) and by a `LadderModel` test on the captured shape.
   **Still open in `jl4-service`**, whose compiled module carries no registry: there a mixfix call still prints its head keyword only, so the service and the IDE give such a call different labels and `atomId`s, and two calls sharing a head keyword still share one.
   This is the clearest case of the printed key falling short of C1's term key, and under R3 it is a defect (smucclaw/l4-ide#1013).
+  _Changed (smucclaw/l4-ide#1013):_ the `atomId` half is closed everywhere, the service included, since the term key names each operator by its own definition (`LadderTermKeySpec`); the service's LABELS still print the head keyword only.
 - **The printed label is not C1's term key.**
   R3 requires the ladder's `atomId` to move onto C1's key (smucclaw/l4-ide#1013); the alignment point is #556 (UNKNOWN-EVALUATION step 3, stacked on #554, #553 and #541), which keys atoms by evaluated term in `jl4-core`; steps 4 to 7 of that spec are parked (MOTHBALL, #538).
-  Not done yet.
+  _Changed (smucclaw/l4-ide#1013):_ done for the ladder (§10.1), without waiting for #556, whose `Term` compares names by `Unique` and so cannot be the stable key as it stands.
+  Owed when #556 lands: a test that the ladder's key and #556's `Term` agree where both are defined, which is only partly (an evaluator term exists only for what evaluation reached), and the name function shared between them, so the two cannot drift.
 - **`hasDefForInlining` still compares against `cfg.moduleUri`** (`Ladder.hs:338`), the URI derived from the document id a caller passes, which is the pitfall §9.6 names; the `App []` case beside it already uses the typechecker's own URI (`Ladder.hs:584-588`).
   A caller that passes a synthetic document id would get no `canInline` and no expansions.
   No caller that turns expansions on does that today; not fixed here.

@@ -163,6 +163,7 @@ test-suite jl4-lsp-test
     ImportUriSpec
     LadderAtomIdSpec
     LadderCallExpansionSpec
+    LadderTermKeySpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     SmartPunctuationActionsSpec
@@ -173,11 +174,13 @@ test-suite jl4-lsp-test
   build-depends:
     aeson,
     bytestring,
+    containers,
     directory,
     filepath,
     hspec,
     jl4-core,
     jl4-lsp,
+    jl4-query-plan,
     lsp-types,
     mtl,
     text

@@ -105,9 +105,9 @@ DECIDE d IF presumed OR a OR b
 -- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes through
 -- 'L4.Viz.Ladder.leafFromExpr', which mints a FRESH unique per occurrence — unlike
 -- a bare @Ref@, which reuses the resolved name's unique and so is shared. Both
--- occurrences carry the same label and the same input-ref closure, so
--- 'L4.Viz.Ladder.generateAtomId' gives them the SAME atomId. One question, two BDD
--- variables: the shape 'atomIdentityTests' exists to pin.
+-- occurrences are the same term, so they carry the same C1 key and the SAME
+-- atomId ("L4.Viz.AtomKey", R3). One question, two BDD variables: the shape
+-- 'atomIdentityTests' exists to pin.
 --
 -- The decision is arranged so that answering that one question DETERMINES the
 -- outcome, but only if both variables are bound: @n > 5@ false refutes both
@@ -219,7 +219,7 @@ svcQP = svcQPNamed "test"
 -- | Run a jl4-service query plan under a given function name.
 --
 -- The name is not decoration: it is the first component of every atomId
--- ('L4.Viz.Ladder.generateAtomId'), so any test that compares atomIds across
+-- ('L4.Viz.AtomKey.atomIdOfKey'), so any test that compares atomIds across
 -- surfaces must pass the name the ladder was built under. 'DataPlane' does this
 -- by construction — @requireDecisionQueryCache@ and @queryPlan@ are handed the
 -- same @fnName@ — which 'svcQP' (fixed at @"test"@) does not model.
@@ -253,6 +253,34 @@ ladderAtomIdsOf info = go info.funDecl.body
     VizExpr.TrueE{} -> []
     VizExpr.FalseE{} -> []
     VizExpr.InertE{} -> []
+
+-- | Every leaf's @atomId@ with its @unique@, in traversal order.
+ladderAtomsOf :: VizExpr.RenderAsLadderInfo -> [(Text, Int)]
+ladderAtomsOf info = go info.funDecl.body
+ where
+  go :: VizExpr.IRExpr -> [(Text, Int)]
+  go = \case
+    VizExpr.And _ xs -> concatMap go xs
+    VizExpr.Or _ xs -> concatMap go xs
+    VizExpr.Not _ x -> go x
+    VizExpr.Implies _ scope requirement _ -> go scope <> go requirement
+    VizExpr.UBoolVar _ nm _ _ aid _ _ -> [(aid, nm.unique)]
+    VizExpr.App _ nm args aid _ -> (aid, nm.unique) : concatMap go args
+    VizExpr.TrueE{} -> []
+    VizExpr.FalseE{} -> []
+    VizExpr.InertE{} -> []
+
+-- | The atomIds that name TWINS: one question held by two or more different
+-- uniques, so two variables to the planner. A bare name drawn twice is not a
+-- twin: both copies carry the name's own unique, one variable. Picking "any
+-- atomId drawn twice" used to work only because of how the ids happened to
+-- sort; under 'Transform.simplify' the bare inputs are drawn twice too.
+twinsOf :: [(Text, Int)] -> [Text]
+twinsOf atoms =
+  [ a
+  | (a, us) <- Map.toList (Map.fromListWith (<>) [(a, [u]) | (a, u) <- atoms])
+  , length (List.nub us) >= 2
+  ]
 
 -- | A UUID in the 8-4-4-4-12 shape 'L4.Crypto.UUID5' emits.
 looksLikeUuid :: Text -> Bool
@@ -297,10 +325,10 @@ spec = do
 --
 -- FACE 2. 'L4.Decision.QueryPlan.queryPlan' inverted its @unique -> atomId@ map
 -- with @Map.fromList@, which is last-wins. Twin atoms — two occurrences of one
--- compound leaf, which share an atomId by construction because 'generateAtomId'
--- is a function of (function, label, refs) — collapsed to whichever unique came
--- last, so answering that question bound one occurrence and left the other
--- unknown forever.
+-- compound leaf, which share an atomId by construction because the atomId is a
+-- function of (function, term) — collapsed to whichever unique came last, so
+-- answering that question bound one occurrence and left the other unknown
+-- forever.
 --
 -- Both faces are about the SAME invariant, which is what these tests state
 -- directly: an atomId names a question, a question may have more than one
@@ -328,9 +356,7 @@ atomIdentityTests = do
     -- Guards the two tests below: if a future change to leafFromExpr or to
     -- L4.Transform.simplify stops producing twins, they would pass vacuously.
     cache <- serviceCache "twins" twinLeavesL4
-    let ids = ladderAtomIdsOf cache.ladderInfo
-        dupes = [a | (a : _ : _) <- List.group (List.sort ids)]
-    dupes `shouldSatisfy` (not . null)
+    twinsOf (ladderAtomsOf cache.ladderInfo) `shouldSatisfy` (not . null)
     twinAtomIdOf (svcQPNamed "twins" cache []).ranked `shouldSatisfy` Maybe.isJust
 
   it "binding a twin by the query plan's own atomId binds EVERY occurrence" do
@@ -347,9 +373,8 @@ atomIdentityTests = do
   it "binding a twin by the LADDER's atomId binds EVERY occurrence" do
     -- The two faces composed: this is what the wizard actually does.
     cache <- serviceCache "twins" twinLeavesL4
-    let ids = ladderAtomIdsOf cache.ladderInfo
-    twinId <- case [a | (a : _ : _) <- List.group (List.sort ids)] of
-      [] -> fail "the ladder carries no duplicated atomId"
+    twinId <- case twinsOf (ladderAtomsOf cache.ladderInfo) of
+      [] -> fail "the ladder carries no twin atomId"
       (t : _) -> pure t
     (svcQPNamed "twins" cache [(twinId, False)]).determined `shouldBe` Just False
 
@@ -387,8 +412,8 @@ atomIdentityTests = do
     -- Both under the name the service serves it by: the diagram's own label is
     -- backticked, and the name is the first component of every atomId.
     cache <- serviceCache "app leaf" appOfBooleansL4
-    (info, vizState, params) <- lspCache "app leaf" appOfBooleansL4
-    let lspMap = LspQP.ladderAtomIds "app leaf" params (LspQP.buildQueryPlanCache info vizState) info.funDecl.body
+    (info, vizState, _params) <- lspCache "app leaf" appOfBooleansL4
+    let lspMap = LspQP.ladderAtomIds "app leaf" (LspQP.buildQueryPlanCache info vizState)
         annotated = LspQP.annotateLadderWithAtomIdsUsing lspMap info
         svcIds = List.sort (List.nub (ladderAtomIdsOf cache.ladderInfo))
     -- the App, its two arguments, and c
@@ -891,16 +916,18 @@ atomIdentityShapeTests = do
 
   -- The only atomIds committed anywhere in this repo are the four in
   -- `ts-shared/ladder-core/test/fixtures/may-purchase-alcohol.viz.json`, a viz
-  -- payload captured from a live jl4-lsp. They are the ANNOTATED ids, so this
-  -- change must leave them exactly where they are; if it ever moves them, the TS
-  -- consumer test breaks in a repo that this suite cannot see.
+  -- payload captured from a live jl4-lsp. They are the ANNOTATED ids, and a TS
+  -- consumer in another repo pins the same ones, so a change that moves them
+  -- moves them for that consumer too. They moved ONCE, deliberately, when an
+  -- atomId became the hash of the leaf's term rather than its label (R3,
+  -- smucclaw/l4-ide#1013), and the fixture was restamped in the same change.
   it "the atomIds committed in the ladder-core TS fixture are unmoved" do
     src <- Text.pack <$> readFile "../jl4/examples/ok/typically-basic.l4"
     (info, vizState, _params) <- lspCache "may purchase alcohol" src
     let annotated = List.sort (List.nub (ladderAtomIdsOf (LspQP.annotateLadderWithAtomIds info vizState)))
     annotated
-      `shouldBe` [ "6326bf0e-555f-51cc-8c60-8f958d7825c5"
-                 , "a5cd464e-b7c1-5e50-9afd-6965842b9386"
-                 , "e5ac8240-0124-50f5-a0be-b3fdd4cee33b"
-                 , "f94522fa-cdea-5274-944d-99fdb5ba24c8"
+      `shouldBe` [ "1f16a3a2-04ab-5e47-beac-2edc43bc018b"
+                 , "31806918-91b5-52b8-8f6c-6377ddf004b8"
+                 , "efc7987f-7c3e-5014-a6bd-5a920f58b0a2"
+                 , "fd87912b-51cf-54b8-8cb3-2f22eca57468"
                  ]

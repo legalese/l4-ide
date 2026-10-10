@@ -1814,15 +1814,16 @@ spec = describe "integration" do
       -- Was a characterisation test pinning the disagreement, with a note to
       -- invert it when the two surfaces were reconciled. This is that inversion.
       --
-      -- The gap: L4.Viz.Ladder.generateAtomId hashes each input ref as its
-      -- numeric rootUnique over the atom's DIRECT ref set, while
-      -- L4.Decision.QueryPlan.atomIdByUnique hashes it as the ref's LABEL over
+      -- The gap, then: the ladder hashed each input ref as its numeric
+      -- rootUnique over the atom's DIRECT ref set, while
+      -- L4.Decision.QueryPlan.atomIdByUnique hashed it as the ref's LABEL over
       -- the TRANSITIVE closure. The ids therefore disagreed for every atom with
       -- a non-empty ref set — which is every ordinary leaf — so a client could
       -- not join `ladder` leaves to `impactByAtomId`, and a binding keyed by a
       -- ladder atomId was accepted with a 200 and quietly did nothing.
-      -- jl4-lsp had always reconciled the two with annotateLadderWithAtomIds;
-      -- jl4-service now does the same, in buildDecisionQueryCacheFromCompiled.
+      -- Both now hash the leaf's C1 term key, which the ladder records once and
+      -- the plan reads (R3, smucclaw/l4-ide#1013), so they agree by construction;
+      -- this test is what says so.
       withServiceFromSources "ladder-atomids" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         qpResp <- queryPlan' baseUrl mgr "ladder-atomids" "compute_qualifies"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
@@ -1872,10 +1873,17 @@ spec = describe "integration" do
       withServiceFromSources "ladder-atomid-binds" [("twins.l4", twinLeavesJL4)] \baseUrl mgr -> do
         ladResp <- getLadder baseUrl mgr "ladder-atomid-binds" "twins"
         statusCode' ladResp `shouldBe` 200
-        let ids = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
-              Just (Aeson.Object fd) -> ladderAtomIds fd
+        -- A twin is one atomId held by two different uniques; a bare input
+        -- drawn twice keeps its one unique and is not one (and under
+        -- simplification the inputs are drawn twice too).
+        let atoms = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
+              Just (Aeson.Object fd) -> ladderLeafAtoms fd
               _ -> []
-            twins = [a | (a : _ : _) <- List.group (List.sort ids)]
+            twins =
+              [ a
+              | (a, us) <- Map.toList (Map.fromListWith (<>) [(a, [u]) | (a, u) <- atoms])
+              , length (List.nub us) >= 2
+              ]
         -- Guard: without a genuine twin the binding assertion would pass for the
         -- wrong reason.
         twinId <- case twins of
@@ -3712,6 +3720,20 @@ ladderAtomLabels = List.sort . ladderLeafField "name"
 -- | The @atomId@s embedded in the ladder's leaves.
 ladderAtomIds :: Aeson.Object -> [Text]
 ladderAtomIds = ladderLeafField "atomId"
+
+-- | Each leaf's @atomId@ with its @unique@ (@name.unique@).
+ladderLeafAtoms :: Aeson.Object -> [(Text, Int)]
+ladderLeafAtoms fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [(Text, Int)]
+  go (Aeson.Object o) =
+    let here = case (Aeson.KeyMap.lookup "atomId" o, Aeson.KeyMap.lookup "name" o) of
+          (Just (Aeson.String a), Just (Aeson.Object nm))
+            | Just (Aeson.Number n) <- Aeson.KeyMap.lookup "unique" nm -> [(a, round n)]
+          _ -> []
+     in here <> concatMap go (Aeson.KeyMap.elems o)
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []
 
 -- | Decode a JSON response body as an Aeson Object.
 decodeObject :: LBS.ByteString -> Maybe Aeson.Object
