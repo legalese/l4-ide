@@ -619,6 +619,9 @@ In `` `whichever applies` cond x y MEANS IF cond THEN x ELSE y `` under `GIVEN a
 `instantiateTypes` (`LSP.L4.Viz.Ladder`) reads what each type variable stands for off the call, matching the body's type against the call's and each parameter's type, as annotated where the body uses it, against its argument's, and puts that in for every type in the body: annotations through the checker's final substitution, types written in the syntax as written.
 The expand gesture (`l4/inlineExprs`) instantiates the same way.
 
+**Measured over the corpus** (2026-10-11, `l4 verify` on every `.l4` under `jl4/examples`, `jl4-core/libraries` and `doc`, base `def9a5e41` against the branch at `b569edfa6`): 843 of 844 files give byte-identical output; the 844th, `ok/pattern-matching-literal-clauses.l4`, finishes on neither (base at 600 s, the branch at 180 s).
+So no corpus file's findings move; what moves is drawing, in the IDE.
+
 **Adversarial review** (four lanes, each with probe binaries built from base and from the branch) found five defects in the first build, all fixed with a test each: the expand gesture did not instantiate, so it drew the `IF` the panel had opened as one box; an untyped lambda's parameter type was resolved in the callee's copy only, which keyed it apart from the caller's identical lambda; jl4-core's copy of the ladder still drew a named all-BOOLEAN call as one leaf; panel titles kept the printer's line breaks; and ill-typed named calls opened onto meanings the checker had refused.
 
 **What it knowingly leaves**, by kind of failure:
