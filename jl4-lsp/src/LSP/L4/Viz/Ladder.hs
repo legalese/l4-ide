@@ -54,7 +54,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings, positionalCall)
+import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindings, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -899,25 +899,50 @@ it is, which is what drawing did before.
 -}
 instantiateTypes :: Set Unique -> Expr Resolved -> [(Unique, Expr Resolved)] -> Expr Resolved -> Viz (Expr Resolved)
 instantiateTypes vars call actuals body = do
-  let paramUses =
-        [ (getAnno ref, getAnno actual)
-        | ref@(App _ r []) <- toListOf (cosmosOf (gplate @(Expr Resolved))) body
-        , Just actual <- [lookup (getUnique r) actuals]
-        ]
-  pairs <- traverse (\(p, a) -> (,) <$> annoType p <*> annoType a) ((getAnno body, getAnno call) : paramUses)
-  let theta = foldl' (\m (p, a) -> DataMap.union m (matchType p a)) DataMap.empty
-        [(p, a) | (Just p, Just a) <- pairs]
-  if DataMap.null theta
-    then pure body
-    else do
-      cfg <- getVizCfg
-      let expand = TC.applyFinalSubstitution cfg.substitution cfg.moduleUri
-      pure (over (gplate @(Type' Resolved)) (substituteType theta . expand) body)
+  cfg <- getVizCfg
+  pure (instantiateTypesWith (expanderOf cfg) vars call actuals body)
+
+-- | The checker's final substitution, which resolves an annotation's inference
+-- variables.
+expanderOf :: VizConfig -> Type' Resolved -> Type' Resolved
+expanderOf cfg = TC.applyFinalSubstitution cfg.substitution cfg.moduleUri
+
+-- | 'instantiateTypes', given the final substitution.
+--
+-- Annotations are read, and rewritten, through the final substitution, since
+-- the type an annotation holds may be an inference variable that only it
+-- resolves. A type written in the syntax (a lambda's @GIVEN z IS AN a@) gets the
+-- type variables put in and nothing else: an untyped lambda's parameter keeps its
+-- inference variable there, as it does in the caller, so the two key alike
+-- ('L4.Viz.AtomKey' erases its counter); resolved, it printed and keyed as the
+-- type the author never wrote (found by adversarial review).
+instantiateTypesWith :: (Type' Resolved -> Type' Resolved) -> Set Unique -> Expr Resolved -> [(Unique, Expr Resolved)] -> Expr Resolved -> Expr Resolved
+instantiateTypesWith expand vars call actuals body
+  | DataMap.null theta = body
+  | otherwise =
+      over (gplate @Anno) (over annInfo instantiateInfo)
+        (over (gplate @(Type' Resolved)) (substituteType theta) body)
   where
-    annoType :: Anno -> Viz (Maybe (Type' Resolved))
-    annoType = \case
-      Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just <$> getExpandedType ty
-      _ -> pure Nothing
+    paramUses =
+      [ (getAnno ref, getAnno actual)
+      | ref@(App _ r []) <- toListOf (cosmosOf (gplate @(Expr Resolved))) body
+      , Just actual <- [lookup (getUnique r) actuals]
+      ]
+    theta = foldl' (\m (p, a) -> DataMap.union m (matchType p a)) DataMap.empty
+      [ (p, a)
+      | (pAnno, aAnno) <- (getAnno body, getAnno call) : paramUses
+      , Just p <- [annoType pAnno]
+      , Just a <- [annoType aAnno]
+      ]
+
+    annoType :: Anno -> Maybe (Type' Resolved)
+    annoType a = case a ^. annInfo of
+      Just (TypeInfo ty _) -> Just (expand ty)
+      _ -> Nothing
+
+    instantiateInfo = \case
+      Just (TypeInfo ty k) -> Just (TypeInfo (substituteType theta (expand ty)) k)
+      i -> i
 
     matchType :: Type' Resolved -> Type' Resolved -> DataMap.Map Unique (Type' Resolved)
     matchType p a = case (p, a) of
@@ -1089,7 +1114,7 @@ inlineExprs vs = foldr (inlineExpr vs)
 inlineExpr :: VizState -> Int -> Decide Resolved -> Decide Resolved
 inlineExpr vs target =
   case Map.lookup definition vs.defsForInlining of
-    Just (u, unfoldable) -> over decideBody (Transform.unfoldOnce (DataMap.singleton u (withLocalsInlined unfoldable)))
+    Just (u, Transform.MkUnfoldable ps rhs) -> over decideBody (transformOf (gplate @(Expr Resolved)) (unfold u ps (withLocalsInlined rhs)))
     Nothing -> id
   where
     definition = Map.findWithDefault target target vs.callLeafTargets
@@ -1099,4 +1124,18 @@ inlineExpr vs target =
     -- calls' copies of one local would be drawn as one proposition (found by
     -- adversarial review of smucclaw/l4-ide#1013). A local that cannot be
     -- inlined (a recursive one) still comes along as it is.
-    withLocalsInlined (Transform.MkUnfoldable ps rhs) = Transform.MkUnfoldable ps (Transform.inlineLocalBindings rhs)
+    withLocalsInlined = Transform.inlineLocalBindings
+    -- 'Transform.unfoldOnce' with one definition, except that a polymorphic
+    -- one's types are instantiated at each call, as 'expandCall' does: unfolded
+    -- without, a polymorphic callee's IF was one box after the expand gesture
+    -- though its expansion had drawn it as structure (found by adversarial review).
+    unfold u ps body e = case Transform.positionalCall e of
+      Just (r, args)
+        | getUnique r == u
+        , length args == length ps ->
+            let actuals = zip ps args
+                typed = case Map.lookup definition vs.typeVariables of
+                  Just vars -> instantiateTypesWith (expanderOf vs.cfg) vars e actuals body
+                  Nothing -> body
+             in Transform.substParams actuals typed
+      _ -> e

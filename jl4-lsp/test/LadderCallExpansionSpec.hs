@@ -10,7 +10,7 @@
 module LadderCallExpansionSpec (spec) where
 
 import Control.Exception (evaluate)
-import Data.List (nub)
+import Data.List (nub, (\\))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Maybe (isJust)
@@ -658,6 +658,72 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       x <- expansionOf callLabel r.funDecl
       xPoly <- expansionOf callLabel rPoly.funDecl
       map fst (allLeaves xPoly) `shouldBe` map fst (allLeaves x)
+
+    it "an untyped lambda in a polymorphic body keys as the caller's identical lambda" $ do
+      -- The lambda's parameter type is an inference variable in the syntax, in the
+      -- callee and in the caller alike; resolving it in the callee's copy only
+      -- printed and keyed it as NUMBER (found by adversarial review).
+      let lambdaSrc = T.unlines
+            [ "GIVEN f  IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , "      xs IS A LIST OF NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`every number` f xs MEANS"
+            , "  CONSIDER xs"
+            , "  WHEN EMPTY THEN TRUE"
+            , "  WHEN h FOLLOWED BY t THEN f h AND `every number` f t"
+            , ""
+            , "GIVEN a    IS A TYPE"
+            , "      cond IS A BOOLEAN"
+            , "      nums IS A LIST OF NUMBER"
+            , "      x    IS AN a"
+            , "      y    IS AN a"
+            , "GIVETH AN a"
+            , "`pick` cond nums x y MEANS IF cond AND `every number` (GIVEN n YIELD n > 0) nums THEN x ELSE y"
+            , ""
+            , "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "      r IS A BOOLEAN"
+            , "      ns IS A LIST OF NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `caller` IF"
+            , "      (`pick` p ns q r)"
+            , "  OR  (`every number` (GIVEN n YIELD n > 0) ns)"
+            ]
+          everyNumber = T.isPrefixOf "`every number`" . fst
+      r <- render "poly-lambda" lambdaSrc "caller"
+      let direct = filter everyNumber (directLeaves r.funDecl.body)
+          inside = filter everyNumber (allLeaves r.funDecl.body) \\ direct
+      direct `shouldSatisfy` ((== 1) . length)
+      inside `shouldSatisfy` (not . null)
+      nub inside `shouldBe` direct
+
+    it "l4/inlineExprs on a polymorphic call draws what its expansion drew" $ do
+      let colourSrc = T.unlines
+            [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      k IS A Colour"
+            , "      x IS AN a"
+            , "      y IS AN a"
+            , "GIVETH AN a"
+            , "`by colour` k x y MEANS IF k EQUALS Red THEN x ELSE y"
+            , ""
+            , "GIVEN k IS A Colour"
+            , "      p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `caller` IF `by colour` k p q"
+            ]
+      r <- render "poly-inline" colourSrc "caller"
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      x <- case [x | V.UBoolVar _ _ _ True _ _ (Just x) <- universeIR r.funDecl.body] of
+        [x] -> pure x
+        other -> fail ("expected one expanded call, found " <> show (length other))
+      length (allLeaves x) `shouldSatisfy` (> 1)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure (show e)
+        Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
 
   it "the wire omits `expansion` when a leaf has none" $ do
     r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
