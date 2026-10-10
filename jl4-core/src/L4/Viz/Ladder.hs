@@ -51,7 +51,7 @@ import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
 import L4.Viz.GuardedRows (guardedToLadder, hasEffectfulNode, normaliseGuarded, GuardedRows (..))
-import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful)
+import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful, fieldReads)
 
 ------------------------------------------------------
 -- Errors
@@ -596,10 +596,16 @@ freeInputRefsExpanded visited expr = do
                 Nothing -> pure (Set.singleton r)
                 Just body -> freeInputRefsExpanded (Set.insert r.rootUnique visited) body
 
+-- | The inputs a leaf reads. A field read written as its selector applied
+-- (@adult p@, @age p > 18@) is read as the projection it stands for first
+-- ('L4.Viz.AtomKey.fieldReads'), so it names the same input as @p's adult@ does, as it
+-- is keyed alike (smucclaw/l4-ide#1033, gap 3).
 freeInputRefs :: Expr Resolved -> Set InputRef
-freeInputRefs expr =
+freeInputRefs expr0 =
   refsFromVars expr <> refsFromProjections expr
   where
+    expr = fieldReads expr0
+
     refsFromVars :: Expr Resolved -> Set InputRef
     refsFromVars =
       foldMapOf (Optics.gplate @(Expr Resolved)) $ \case

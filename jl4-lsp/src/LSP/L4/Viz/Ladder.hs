@@ -50,7 +50,7 @@ import qualified Language.LSP.Protocol.Types as LSP
 import qualified L4.TypeCheck as TC
 import L4.TypeCheck.Types (substituteType)
 import L4.Viz.Ladder (InputRef(..), collectTypicallyDefaults, seamLabel)
-import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful)
+import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful, fieldReads)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
@@ -1027,10 +1027,16 @@ keyLeaf uniq expr = do
 -- Crude dependency tracking
 ------------------------------------------------------
 
+-- | The inputs a leaf reads. A field read written as its selector applied
+-- (@adult p@, @age p > 18@) is read as the projection it stands for first
+-- ('L4.Viz.AtomKey.fieldReads'), so it names the same input as @p's adult@ does, as it
+-- is keyed alike (smucclaw/l4-ide#1033, gap 3).
 freeInputRefs :: Expr Resolved -> Set InputRef
-freeInputRefs expr =
+freeInputRefs expr0 =
   refsFromVars expr <> refsFromProjections expr
  where
+  expr = fieldReads expr0
+
   refsFromVars :: Expr Resolved -> Set InputRef
   refsFromVars =
     foldMapOf (Optics.gplate @(Expr Resolved)) $ \case

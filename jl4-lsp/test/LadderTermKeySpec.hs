@@ -464,6 +464,14 @@ spec = describe "an atomId is the hash of its leaf's term (R3, smucclaw/l4-ide#1
       -- a call to a rule is a call box (R3), not the field its body reads
       (ls !! 3).atomId `shouldNotBe` (ls !! 0).atomId
 
+    it "both spellings name the same input for the query plan" $ do
+      (ls, st) <- leavesOf "`age either way`"
+      let refs = Ladder.getAtomInputRefs st
+          refsOf lf = IntMap.findWithDefault mempty lf.unique refs
+      length ls `shouldBe` 2
+      refsOf (ls !! 1) `shouldBe` refsOf (ls !! 0)
+      map (.path) (foldMap (\lf -> Set.toList (refsOf lf)) ls) `shouldSatisfy` all (== ["age"])
+
   -- Every name a leaf mentions must reach 'AtomKey.mkKeyEnv'. One it misses
   -- falls back to its unique: still a distinct key, but one that moves on an
   -- edit above, which is the failure this whole change exists to remove.
