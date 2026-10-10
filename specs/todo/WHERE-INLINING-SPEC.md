@@ -434,8 +434,20 @@ Two choices made without a ruling, each in a commit of its own:
 - **The planner's inputs.** Both ladders collect a leaf's input references after `fieldReads`, so `age p > 18` names the input `p's age`, as `p's age > 18` does; before, it named no input at all, since only a variable or a projection directly under the leaf was collected.
 
 `l4 verify` coalesces atoms by `atomId`, so it now sees `p's adult AND NOT adult p` as unsatisfiable (`verify-field-reads.l4`; base: two atoms, no finding).
-Measured over the corpus (844 files, `l4 verify` on base and on the branch): every file that finished on both sides gives the same output, except two whose import error messages name the worktree, so no corpus file mixed the two spellings where `verify` could see it.
 This makes the ladder's key and #556's `Term` agree on field reads; the general agreement test §10.6 calls owed is still owed.
+
+What adversarial review changed (one reviewer with probe binaries; no false merge found in the fold):
+
+- **A projection is its selector applied everywhere, not only in the key.** Coalesced atoms are read through by their first occurrence, and the unfolding passes knew only calls, so `l4 verify` lost a computed field's meaning whenever the projection came first. `Transform.positionalCall` (§10.7) now reads `e's f` as `f e`, as the evaluator does: a computed field is read through whichever way it is written, which also finds the contradiction when the projection is the only spelling (base never did), and a computed field's projection opens in the IDE with the same expansion as its selector call. Assumed, not ruled.
+- **A selector called by name** (``adult WITH `_self` IS p``) is folded too, read through `positionalCall`.
+- **The checker's `ComputedSelector` stamp is not trusted alone.** It goes on any rule named like a computed field of a record in the module (`scanFunSigDecide`), so `bonus n` over a NUMBER was folded into `n's bonus`; the fold now also requires the function's one parameter to be `_self`, the shape `makeComputedDecide` synthesises.
+- **A section-qualified selector** (`` `Alpha`.w OF r ``) names the input `r.w`, as `r's w` does.
+- **Pre-existing, on base too, the unsafe direction:** a rule that reads the ledger, called by projection either side of a `RECORD`, was one atom, since `isEffectful` knew only calls, and `l4 verify` reported a satisfiable rule unsatisfiable. A projection is now checked like a call.
+
+What it knowingly leaves, by kind of failure:
+
+- **Silent, the safe direction:** a projection over an ordinary rule, `` p's `is adult` ``, and the rule applied, `` `is adult` p ``, are still two atoms (the fold reads only selectors), and a selector passed as a value does not merge with the lambda that reads the field.
+- **Pre-existing, outside the ladder:** the checker's over-broad `ComputedSelector` stamp is still read as it is by the DMN and document exporters, semantic tokens and shadowing; correcting it is a change of its own.
 
 What it knowingly leaves, by kind of failure:
 
