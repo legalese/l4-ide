@@ -907,12 +907,32 @@ plainStep clock ev scrutiny norm outcome = MkDeonticStep
 -- active trace records the pops, mirroring the historical behaviour),
 -- interpreting the state-restoring frames along the way ('unwindFrame'),
 -- and then throw an IO exception.
+--
+-- Each frame is popped and unwound under 'uninterruptibleMask_', as one step.
+-- An allocation limit or a timeout that landed between the pop and
+-- 'unwindFrame' lost the frame: 'runEval' only unwinds the frames still on the
+-- stack, so an 'UpdateThunk' popped but not yet unwound left its thunk
+-- blackholed, which for an imported thunk is smucclaw/l4-ide#1020 again.
+-- Between frames the mask is off, so a limit landing there finds the next
+-- frame still on the stack, and 'runEval' unwinds it. The mask is only on this
+-- exception path, so evaluation that raises nothing pays nothing.
 raiseException :: EvalException -> Eval a
-raiseException e = do
-  traceEval (Exit (Left e))
-  withPoppedFrame \ case
-    Nothing -> liftIO (Control.Exception.throwIO e)
-    Just f  -> unwindFrame f >> raiseException (rewriteUnwinding f e)
+raiseException e0 = loop e0
+ where
+  -- 'Exit' before every 'Pop', as when this called itself once per frame:
+  -- the trace builder closes a node on 'Pop' and drops one without a result.
+  -- Neither touches a frame, so both stay outside the mask.
+  -- What a frame turns the exception into ('rewriteUnwinding') goes on to the
+  -- next frame, so the exception thrown at the bottom is the rewritten one.
+  loop e = do
+    traceEval (Exit (Left e))
+    r <- case unwindOne e of MkEval g -> MkEval (uninterruptibleMask_ . g)
+    case r of
+      Nothing -> liftIO (Control.Exception.throwIO e)
+      Just e' -> loop e'
+  unwindOne e = withPoppedFrame \ case
+    Nothing -> pure Nothing
+    Just f  -> unwindFrame f >> pure (Just (rewriteUnwinding f e))
 
 -- | What an exception becomes as it unwinds through a frame. Only the frames
 -- that hold a term on the left of what is still being evaluated change it
