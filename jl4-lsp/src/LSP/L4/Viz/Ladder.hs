@@ -53,7 +53,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings)
+import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, unfoldOnce, substParams, inlineLocalBindings, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -287,6 +287,18 @@ prepEvalAppMaker vid = \ case
           \V.EvalAppRequestParams{args} ->
             Where emptyAnno
               (App appAnno appResolved $ map toBoolExpr args)
+              localDecls
+    #appExprMakers %= Map.insert vid.id maker
+  -- A named call's arguments are drawn in the order they were written (see
+  -- 'translateGo'), so the values come back in that order, each for its name.
+  AppNamed appAnno appResolved nes order -> do
+    localDecls <- getLocalDecls
+    let maker =
+          \V.EvalAppRequestParams{args} ->
+            Where emptyAnno
+              (AppNamed appAnno appResolved
+                (zipWith (\(MkNamedExpr a n _) v -> MkNamedExpr a n (toBoolExpr v)) nes args)
+                order)
               localDecls
     #appExprMakers %= Map.insert vid.id maker
   _ -> pure ()
@@ -636,7 +648,36 @@ translateGo = go
             -- TODO: Check how exactly a function of no args, as opposed to a var, would be represented?
             -- There was some discussion of this at a meeting, but can't remember exactly what was said
 
-        App appAnno fnResolved args -> do
+        App appAnno fnResolved args -> call e appAnno fnResolved args
+
+        -- A call with named arguments that 'Transform.positionalCall' reads as a
+        -- positional call is drawn as that call (smucclaw/l4-ide#1033): R3 keys
+        -- the two alike, and its expansion is the positional call's. Its label
+        -- and its argument boxes keep the order the arguments were written in.
+        AppNamed appAnno fnResolved nes _
+          | isJust (Transform.positionalCall e) ->
+              call e appAnno fnResolved [x | MkNamedExpr _ _ x <- nes]
+
+        -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@,
+        -- @BRANCH@, @CONSIDER@ -- is ladder structure, not a leaf. Shared with the
+        -- core visualiser via "L4.Viz.GuardedRows"; this module and
+        -- "L4.Viz.Ladder" carry near-identical copies of 'translateExpr', so the
+        -- expansion lives in neither. Every bail-out lands on 'leafFromExpr', i.e.
+        -- the pre-existing behaviour.
+        _ -> do
+          isBool <- hasBooleanType (getAnno e)
+          case GR.normaliseGuarded e of
+            Just rows
+              | isBool
+              , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
+                  GR.guardedToLadder getFresh (go CtxNone) rows
+            _ -> leafFromExpr e
+
+    -- A call @e@, whose arguments in the order they are drawn are @args@: a box
+    -- over its arguments when the call and every argument are BOOLEAN, with the
+    -- called rule's body as its expansion; otherwise a leaf ('leafFromExpr').
+    call :: Expr Resolved -> Anno -> Resolved -> [Expr Resolved] -> Viz IRExpr
+    call e appAnno fnResolved args = do
           fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
           -- for now, only translating App of boolean functions to V.App
           if fnOfAppIsFnFromBooleansToBoolean
@@ -657,21 +698,6 @@ translateGo = go
               pure (V.App vid vname args' atomId expansion)
             else
               leafFromExpr e
-
-        -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@,
-        -- @BRANCH@, @CONSIDER@ -- is ladder structure, not a leaf. Shared with the
-        -- core visualiser via "L4.Viz.GuardedRows"; this module and
-        -- "L4.Viz.Ladder" carry near-identical copies of 'translateExpr', so the
-        -- expansion lives in neither. Every bail-out lands on 'leafFromExpr', i.e.
-        -- the pre-existing behaviour.
-        _ -> do
-          isBool <- hasBooleanType (getAnno e)
-          case GR.normaliseGuarded e of
-            Just rows
-              | isBool
-              , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
-                  GR.guardedToLadder getFresh (go CtxNone) rows
-            _ -> leafFromExpr e
 
 scanAnd :: Expr Resolved -> [Expr Resolved]
 scanAnd (And _ e1 e2) =
@@ -726,19 +752,21 @@ leafFromExpr expr = do
   #leafExprs %= Map.insert uniq expr
   -- A call with arguments to a rule defined in this module can be expanded in
   -- place: 'inlineExprs' substitutes the arguments for the parameters. The leaf
-  -- keeps its fresh id, so remember which rule it calls.
-  canInline <- case expr of
-    App _ (Ref _ callee _) (_ : _) -> do
+  -- keeps its fresh id, so remember which rule it calls. A call with named
+  -- arguments is such a call when 'Transform.positionalCall' can read it.
+  let calleeOf = case Transform.positionalCall expr of
+        Just (Ref _ callee _, _ : _) -> Just callee
+        _ -> Nothing
+  canInline <- case calleeOf of
+    Just callee -> do
       known <- hasDefForInlining callee
       when known $ #callLeafTargets %= Map.insert uniq callee.unique
       pure known
-    _ -> pure defaultUBoolVarCanInline
+    Nothing -> pure defaultUBoolVarCanInline
   expansion <-
-    if canInline
-      then case expr of
-        App _ (Ref _ callee _) _ -> expandCall callee expr
-        _ -> pure Nothing
-      else pure Nothing
+    case calleeOf of
+      Just callee | canInline -> expandCall callee expr
+      _ -> pure Nothing
   atomId <- keyLeaf uniq expr
   let label = prettyLayout expr
   pure $
@@ -796,8 +824,8 @@ expandCall callee call = do
   known <- hasDefForInlining callee
   bodies <- use #expansionBodies
   spent <- use #expansionNodes
-  let reduced = case (call, join (Map.lookup callee.unique bodies)) of
-        (App _ _ args, Just (ps, body))
+  let reduced = case (Transform.positionalCall call, join (Map.lookup callee.unique bodies)) of
+        (Just (_, args), Just (ps, body))
           | length args == length ps -> Just (Transform.substParams (zip ps args) body)
         _ -> Nothing
   case reduced of

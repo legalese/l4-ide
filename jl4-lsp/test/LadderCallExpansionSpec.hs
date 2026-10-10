@@ -531,6 +531,93 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
     -- first in reading order did not eat the budget
     map (isJust . snd) (calls r.funDecl.body) `shouldBe` [True, True]
 
+  describe "a call with named arguments is expanded as its positional call (smucclaw/l4-ide#1033, gap 1)" $ do
+    let big = T.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `caller` IF"
+          , "      `big` WITH k IS n"
+          , "  AND `big` n"
+          , ""
+          , "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `named alone` IF `big` WITH k IS n"
+          , ""
+          , "GIVEN k IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `big` k IF k > 3"
+          ]
+
+    it "the issue's repro: both spellings open, onto the same atoms" $ do
+      r <- render "named-big" big "caller"
+      named <- expansionOf "big WITH k IS n" r.funDecl
+      positional <- expansionOf "big OF n" r.funDecl
+      allLeaves named `shouldBe` allLeaves positional
+      length (allLeaves named) `shouldBe` 1
+      -- and the two call boxes are one atom, as R3 already keyed them
+      atomIdsOf "big WITH k IS n" (directLeaves r.funDecl.body)
+        `shouldBe` atomIdsOf "big OF n" (directLeaves r.funDecl.body)
+
+    it "written alone, a named call opens" $ do
+      r <- render "named-alone" big "`named alone`"
+      x <- expansionOf "big WITH k IS n" r.funDecl
+      length (allLeaves x) `shouldBe` 1
+
+    it "an all-BOOLEAN named call, arguments out of order: each is put in for the parameter it names" $ do
+      let src = caller [] "named limb" ["a", "b"]
+            [ "      `limb` WITH q IS b, p IS a"
+            , "  AND a"
+            , "  AND b"
+            ]
+      r <- render "named-limb" src "`named limb`"
+      case [(nm.label, args, x) | V.App _ nm args _ x <- topConjuncts r.funDecl.body] of
+        [(label, args, Just x)] -> do
+          label `shouldSatisfy` ("limb WITH" `T.isPrefixOf`)
+          -- the argument boxes are drawn as written: q's first
+          map fst (concatMap directLeaves args) `shouldBe` ["b", "a"]
+          -- the expansion is p AND q with p := a and q := b, each the caller's own
+          map fst (allLeaves x) `shouldBe` ["a", "b"]
+          map snd (allLeaves x) `shouldBe` (atomIdsOf "a" (directLeaves r.funDecl.body) <> atomIdsOf "b" (directLeaves r.funDecl.body))
+        other -> expectationFailure ("expected one expanded limb call, found " <> show (length other))
+
+    it "a named call and the positional call it stands for share their atomId; the swapped call does not" $ do
+      let src = caller [] "named and swapped" ["a", "b"]
+            [ "      `limb` WITH q IS b, p IS a"
+            , "  AND `limb` a b"
+            , "  AND `limb` WITH q IS a, p IS b"
+            ]
+      r <- render "named-swapped" src "`named and swapped`"
+      case [(nm.label, i) | V.App _ nm _ i _ <- topConjuncts r.funDecl.body] of
+        [(_, named), (_, positional), (_, swapped)] -> do
+          named `shouldBe` positional
+          swapped `shouldNotBe` positional
+        other -> expectationFailure ("expected three calls, found " <> show (length other))
+
+    it "l4/inlineExprs unfolds a named call leaf" $ do
+      r <- render "named-inline" big "`named alone`"
+      x <- expansionOf "big WITH k IS n" r.funDecl
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure (show e)
+        Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
+
+    it "a WHERE helper called by name is keyed as its unfolding, as one called positionally is" $ do
+      let src spelling = T.unlines
+            [ "GIVEN x IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `local helper` x IF " <> spelling <> " OR x > 3"
+            , "  WHERE"
+            , "    GIVEN r IS A NUMBER"
+            , "    `helper` r MEANS r > 3"
+            ]
+      -- parenthesised: a WITH argument runs to the end of the line, OR included
+      rNamed <- render "named-local" (src "(`helper` WITH r IS x)") "`local helper`"
+      rPositional <- render "positional-local" (src "(`helper` x)") "`local helper`"
+      let ids rr = nub (map snd (directLeaves rr.funDecl.body))
+      ids rNamed `shouldSatisfy` ((== 1) . length)
+      ids rNamed `shouldBe` ids rPositional
+
   it "the wire omits `expansion` when a leaf has none" $ do
     r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
     let direct = [e | e@(V.UBoolVar _ nm _ _ _ _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
