@@ -23,6 +23,7 @@
 module NlgAttachmentSpec (spec) where
 
 import Base
+import qualified Base.Text as Text
 
 import L4.Annotation (getAnno)
 import L4.Nlg (simpleLinearizer)
@@ -465,3 +466,166 @@ spec = describe "which node an @nlg attaches to" $ do
         \DECIDE f other IS 3\n"
       attachments m `shouldBe` []
       [ () | NotAttached{} <- ws ] `shouldBe` []
+
+  -- A TYPICALLY default is a value the author supplies, not a thing the author
+  -- describes, and nothing reads an annotation on it. It used to be traversed
+  -- like any other child, so it advertised a span (cutting the field's name off
+  -- from the line below) and, when it was a name, claimed what trailed it. The
+  -- annotation then attached to a node nothing renders, or to the NEXT field,
+  -- and nothing was reported (smucclaw/l4-ide#994, #997).
+  --
+  -- The property is metamorphic and does not depend on the shape: adding or
+  -- removing the TYPICALLY clause must not change where any annotation lands,
+  -- or what is reported.
+  --
+  -- Cases marked (a guard) were already right before the default stopped being
+  -- traversed, and pass on the old binary too. They stay because they pin what
+  -- must not move. The others fail there, some only behind one kind of default
+  -- (a gloss trailing a name default), which is what shows the property is not
+  -- vacuous.
+  --
+  -- The herald-at-the-margin cases under the LAST field are the third kind:
+  -- the old traversal got them right by accident (the default's span cut the
+  -- field's name off from the line below), so the fix owed them a column test
+  -- (smucclaw/l4-ide#976) instead.
+  describe "a TYPICALLY default takes no annotation" $ do
+    let defaults =
+          [ ("a number",   "NUMBER",  "100")
+          , ("a string",   "STRING",  "\"x\"")
+          , ("TRUE",       "BOOLEAN", "TRUE")
+          , ("an enum constructor", "Colour", "Red")
+          ]
+        enums = "DECLARE Colour IS ONE OF Red, Green\n\n"
+        -- {T} is the type, {D} the default clause, present or absent.
+        fill ty clause template =
+          enums <> Text.replace "{T}" ty (Text.replace "{D}" clause template)
+        unreported ws = length [ () | NotAttached{} <- ws ] + length [ () | Ambiguous{} <- ws ]
+
+        sameWithAndWithout label template expected =
+          forM_ defaults $ \(kind, ty, dflt) ->
+            it (label <> ", behind " <> Text.unpack kind) $ do
+              (withDefault, wsWith) <- parsed (fill ty (" TYPICALLY " <> dflt) template)
+              (bare, wsWithout) <- parsed (fill ty "" template)
+              attachments withDefault `shouldBe` attachments bare
+              unreported wsWith `shouldBe` unreported wsWithout
+              -- The control is not vacuous: the shape lands where it says.
+              expected (attachments bare) ty
+
+    describe "on a record field" $ do
+      sameWithAndWithout "an own-line gloss under it, another field after it"
+        "DECLARE Rec HAS\n    base IS A {T}{D}\n    @nlg the base\n    other IS A {T}\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an own-line gloss under the last field"
+        "DECLARE Rec HAS\n    other IS A {T}\n    base IS A {T}{D}\n    @nlg the base\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "a gloss trailing it (the TYPE's, as for a field with no default)"
+        "DECLARE Rec HAS\n    base IS A {T}{D} @nlg the base\n    other IS A {T}\n"
+        (\ got ty -> got `shouldBe` [(ty, "the base")])
+      sameWithAndWithout "a gloss before the type (a guard)"
+        "DECLARE Rec HAS\n    base [the base] IS A {T}{D}\n    other IS A {T}\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an own-line gloss under a constructor's field"
+        "DECLARE Shape IS ONE OF\n    Dot\n    Disc HAS\n        base IS A {T}{D}\n        @nlg the base\n        other IS A {T}\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      -- The last field takes only what is indented past the DECLARE keyword,
+      -- as the last input of a GIVEN list does. A herald at the margin is the
+      -- NEXT declaration's.
+      sameWithAndWithout "a herald at the margin under the last field, for the rule after it"
+        "DECLARE Rec HAS\n    base IS A {T}{D}\n\n@nlg the answer\nDECIDE `answer` IS 42\n"
+        (\ got _ -> got `shouldBe` [("answer", "the answer")])
+      sameWithAndWithout "a herald at the margin under the last field, for the DECLARE after it"
+        "DECLARE Rec HAS\n    base IS A {T}{D}\n\n@nlg an employee\nDECLARE Emp HAS\n    salary IS A NUMBER\n"
+        (\ got _ -> got `shouldBe` [("Emp", "an employee")])
+      sameWithAndWithout "a herald at the margin under a constructor's last field, for the rule after it"
+        "DECLARE Shape IS ONE OF\n    Dot\n    Disc HAS\n        base IS A {T}{D}\n\n@nlg the answer\nDECIDE `answer` IS 42\n"
+        (\ got _ -> got `shouldBe` [("answer", "the answer")])
+      sameWithAndWithout "an indented gloss under the last field AND a herald at the margin for the rule"
+        "DECLARE Rec HAS\n    base IS A {T}{D}\n    @nlg the base\n\n@nlg the answer\nDECIDE `answer` IS 42\n"
+        (\ got _ -> got `shouldBe` [("base", "the base"), ("answer", "the answer")])
+
+    describe "on a GIVEN input" $ do
+      sameWithAndWithout "a gloss trailing it, another input after it"
+        "GIVEN base IS A {T}{D} @nlg the base\n      other IS A {T}\nGIVETH A BOOLEAN\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an own-line gloss under it, another input after it (a guard)"
+        "GIVEN base IS A {T}{D}\n      @nlg the base\n      other IS A {T}\nGIVETH A BOOLEAN\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an indented own-line gloss under the last input (a guard)"
+        "GIVEN other IS A {T}\n      base IS A {T}{D}\n      @nlg the base\nGIVETH A BOOLEAN\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "a rule's gloss at the GIVEN column, which is the rule's (a guard)"
+        "GIVEN base IS A {T}{D}\n@nlg the rule\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("r", "the rule")])
+
+    -- The one shape where a default still matters. A gloss at the GIVEN column
+    -- written between an input's type and a TYPICALLY on the next line is
+    -- INSIDE the input, so the rule below cannot have it and neither can the
+    -- input. With no default the same line is after the list, and the rule's.
+    -- It is reported, not guessed at.
+    it "reports a rule's gloss written between an input's type and its default on the next line" $ do
+      (m, ws) <- parsed
+        "GIVEN other IS A NUMBER\n\
+        \      base IS A NUMBER\n\
+        \@nlg the rule\n\
+        \      TYPICALLY 5\n\
+        \DECIDE `r` IF TRUE\n"
+      attachments m `shouldBe` []
+      length [ () | NotAttached{} <- ws ] `shouldBe` 1
+      (m', _) <- parsed
+        "GIVEN other IS A NUMBER\n\
+        \      base IS A NUMBER\n\
+        \@nlg the rule\n\
+        \DECIDE `r` IF TRUE\n"
+      attachments m' `shouldBe` [("r", "the rule")]
+
+    -- ASSUME is one declaration, so a herald at the margin under it is the NEXT
+    -- declaration's and one indented past it is its own, the column test of
+    -- the other two lists; and its default takes nothing.
+    describe "on an ASSUME" $ do
+      sameWithAndWithout "a gloss trailing it"
+        "ASSUME `the input` IS A {T}{D} @nlg the assumed input\n"
+        (\ got _ -> got `shouldBe` [("the input", "the assumed input")])
+      sameWithAndWithout "an own-line herald at the margin under it, which is the rule's"
+        "ASSUME `the input` IS A {T}{D}\n@nlg the output rule\nDECIDE `out` IS `the input`\n"
+        (\ got _ -> got `shouldBe` [("out", "the output rule")])
+      sameWithAndWithout "an indented own-line gloss under it, which is the assumption's"
+        "ASSUME `the input` IS A {T}{D}\n    @nlg the assumed input\nDECIDE `out` IS `the input`\n"
+        (\ got _ -> got `shouldBe` [("the input", "the assumed input")])
+      sameWithAndWithout "a gloss trailing a default on the line below"
+        "ASSUME base IS A {T}\n       {D} @nlg the base\n\nDECIDE `r` IS 1\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+
+  -- A constructor's field list is a column like a record's, so a herald below
+  -- the last field is that FIELD's. The constructor's own herald therefore goes
+  -- between its name and `HAS`, and the one written above a constructor is
+  -- the previous constructor's (`gotchas.md`, "A constructor that has fields").
+  describe "a constructor that has fields" $ do
+    it "takes the herald written between its name and HAS" $ do
+      (m, ws) <- parsed
+        "DECLARE Penalty IS ONE OF\n\
+        \    NoPenalty\n\
+        \    Custodial\n\
+        \        @nlg a custodial penalty\n\
+        \        HAS years IS A NUMBER\n\
+        \        @nlg the term in years\n"
+      attachments m
+        `shouldBe` [("Custodial", "a custodial penalty"), ("years", "the term in years")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "leaves a herald below its field list to the last field" $ do
+      (m, _) <- parsed
+        "DECLARE Penalty IS ONE OF\n\
+        \    NoPenalty\n\
+        \    Custodial\n\
+        \        HAS years IS A NUMBER\n\
+        \        @nlg the term in years\n"
+      attachments m `shouldBe` [("years", "the term in years")]
+
+    it "leaves a herald above it to the constructor before" $ do
+      (m, _) <- parsed
+        "DECLARE Penalty IS ONE OF\n\
+        \    NoPenalty\n\
+        \    @nlg a custodial penalty\n\
+        \    Custodial\n\
+        \        HAS years IS A NUMBER\n"
+      attachments m `shouldBe` [("NoPenalty", "a custodial penalty")]

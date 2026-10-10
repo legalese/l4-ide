@@ -438,9 +438,11 @@ GIVETH A NUMBER
 ```
 
 `l4 check` is clean here — no diagnostic at all.
-`l4 nlg` on ``#EVAL `f of` (Teacher WITH name IS "Alice")`` prints `` `f of` with `Teacher` where the only one is Alice ``: the rule is its bare name, and "the only one" has been captured BACKWARD by the record's last field, `name`, which it now labels (confirmed with `l4 ast`).
-The capture reaches as far back as an `IMPORT` statement when nothing closer offers a slot.
-It only fails loudly (`Not attached to any valid syntax node`) in the rarer case where nothing at all precedes it to capture — which is why one real encoding shipped ~230 heralds with twelve of them silently dead and only found out via a `check`-clean corpus, because the loud case never fired for eleven of the twelve (smucclaw/l4-ide#976).
+On an `l4` older than the fix for smucclaw/l4-ide#997, `l4 nlg` on ``#EVAL `f of` (Teacher WITH name IS "Alice")`` printed `` `f of` with `Teacher` where the only one is Alice ``: the rule is its bare name, and "the only one" has been captured BACKWARD by the record's last field, `name`, which it now labels (confirmed with `l4 ast`).
+A newer `l4` gives the record's last field a column test (below), so this exact case is now reported (`Not attached to any valid syntax node`) and `name` renders as itself.
+The capture is still silent when what precedes the herald is something else that ends in a name: an `IMPORT`, an enum, a type synonym, an opaque type, or a rule whose body ends in a name; it reaches as far back as the `IMPORT` when nothing closer does.
+After a rule whose body ends in a literal it warns "Not attached".
+It only failed loudly in the rarer case where nothing at all preceded it to capture — which is why one real encoding shipped ~230 heralds with twelve of them silently dead and only found out via a `check`-clean corpus, because the loud case never fired for eleven of the twelve (smucclaw/l4-ide#976).
 Move the herald to after `GIVETH`, and it attaches correctly regardless of what precedes it — after a `DECLARE`, after another bare rule, or first in the file.
 
 **So do not trust `l4 check`'s silence as evidence a herald attached.** The only real check is `l4
@@ -477,7 +479,11 @@ The column is all it reads, and three consequences are silent:
   Write the rule's sentence at the `GIVEN` keyword's column, or between `GIVETH` and the head at any indentation; above the head but indented past `GIVEN`, with no `GIVETH`, it is still the last parameter's.
 
 A trailing gloss and an own-line one on the same parameter, in the same language, collide: L4 warns and drops both.
-A gloss trailing a `TYPICALLY` default reaches the parameter when the default is a number or a string; when the default is a name such as `FALSE`, `EMPTY` or `NOTHING`, that name takes it, silently (smucclaw/l4-ide#994), so put it on the line below.
+A `TYPICALLY` default takes no annotation, so a gloss trailing it describes the parameter whatever the default is.
+An `l4` older than smucclaw/l4-ide#994 let a default that is a name such as `FALSE`, `EMPTY` or `NOTHING` take the gloss, silently; against one of those, put the gloss on the line below.
+One shape is reported rather than read: a gloss at the `GIVEN` column written between a parameter's type and a `TYPICALLY` on the next line is inside the parameter, so it warns "Not attached" instead of becoming the rule's sentence.
+An `ASSUME` has the same column test: an `@nlg` indented under it, or trailing it or its `TYPICALLY` default, is its own, and one at the margin is the next declaration's.
+An `l4` older than smucclaw/l4-ide#994 let an `ASSUME` with no default take a herald at the margin below it, and lose a gloss trailing a default that is a name.
 In a rule whose head has a pattern argument (`DECIDE fib 0 IS 0` — one clause is enough), no `@nlg` attaches anywhere, in the `GIVEN`, on the head or above it; each one warns "Not attached" (smucclaw/l4-ide#996).
 
 Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed, and became the rule's sentence when none did (colliding, with a warning, if the rule had a sentence of its own).
@@ -496,9 +502,30 @@ DECLARE Payslip
 `l4 nlg` prints ``where `base` is 100 and the bonus is 5``: the first annotation describes `NUMBER`, so `base` renders bare, and the second describes `bonus`.
 Never end an `@nlg` line with a `--` comment: the annotation runs to the end of the line, and the comment becomes part of the prose.
 
-Field lists have no column test, which leaves two silent traps.
-An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`, as in the `Teacher` example above, which is smucclaw/l4-ide#976.
-And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
+**The last field takes a herald from a line below only when it is indented past where the `DECLARE` starts**, as the last input of a `GIVEN` list does.
+One at that column or to its left is the NEXT declaration's, as it is anywhere else in a file, and a field before the last is bounded by the field after it.
+So indent the fields: a field written at the margin, or on the `DECLARE`'s own line, takes no herald from a line below.
+It holds for the last field of the last constructor of an enum too.
+An `l4` older than the fix for smucclaw/l4-ide#997 had no such test: a record's last field took an `@nlg` between it and the next rule at any column, silently, whenever no `GIVEN` or `GIVETH` sat between them — including a herald written above the rule's own `GIVEN`, as in the `Teacher` example above (smucclaw/l4-ide#976).
+A last field with a literal `TYPICALLY` default escaped that only because its default cut its name off.
+
+A field with a `TYPICALLY` default is a field like any other: the default takes no annotation, so a herald below it describes the field and one trailing the line reaches its type (smucclaw/l4-ide#997).
+Before that fix the herald went to the next field, or was dropped silently when the default was a name such as `TRUE` or an enum constructor; an `l4` older than it still does that, so a `BOOLEAN TYPICALLY TRUE` field glossed on the line below renders bare there.
+
+**A constructor that has fields takes its own herald BETWEEN its name and `HAS`.**
+The field list is a column (above), so a herald below the last field is that field's, not the constructor's, and a herald above the constructor name is the previous constructor's.
+Put `HAS` on a continuation line to make room:
+
+```l4
+DECLARE Penalty IS ONE OF
+    NoPenalty
+    Custodial
+        @nlg a custodial penalty
+        HAS years IS A NUMBER
+        @nlg the term in years
+```
+
+A herald written below `years` alone describes `years`, and both below it collide on `years` with a warning.
 
 > **A corpus written before 2026-09-19 will not reflect any of this.** Until `#433` merged, an
 > own-line herald under a `GIVEN` was captured by the signature and the rule rendered as a bare

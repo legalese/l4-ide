@@ -1,0 +1,86 @@
+-- A TYPICALLY default takes no @nlg annotation (smucclaw/l4-ide#994, #997).
+--
+-- It is a value the author supplies, not a thing the author describes, so a
+-- gloss near it describes the field or the input, exactly where it would
+-- without the default. Before the fix a gloss under a record field with a
+-- default went to the NEXT field, and one behind a default that is a name
+-- (TRUE, an enum constructor) was attached to that name and vanished, with no
+-- diagnostic.
+--
+-- Every shape below is written twice, with a default and without, and the two
+-- sentences in the .nlg.golden are the same.
+
+IMPORT prelude
+
+DECLARE Colour IS ONE OF Red, Green
+
+-- Record fields. The gloss is on the line below the field, whatever the
+-- default is, and whether or not another field follows.
+
+DECLARE `With defaults` HAS
+    flag IS A BOOLEAN TYPICALLY TRUE
+    @nlg the flag
+    colour IS A Colour TYPICALLY Red
+    @nlg the colour
+    bonus IS A NUMBER TYPICALLY 5
+    @nlg the bonus
+    label IS A STRING TYPICALLY "x"
+    @nlg the label
+
+DECLARE `Without defaults` HAS
+    flag IS A BOOLEAN
+    @nlg the flag
+    colour IS A Colour
+    @nlg the colour
+    bonus IS A NUMBER
+    @nlg the bonus
+    label IS A STRING
+    @nlg the label
+
+GIVEN w IS A `With defaults`
+GIVETH A BOOLEAN
+DECIDE `fields with defaults` IF w's flag AND w's colour EQUALS Red
+
+GIVEN w IS A `Without defaults`
+GIVETH A BOOLEAN
+DECIDE `fields without defaults` IF w's flag AND w's colour EQUALS Red
+
+#EVAL `fields with defaults` (`With defaults` WITH flag IS TRUE, colour IS Red, bonus IS 5, label IS "x")
+#EVAL `fields without defaults` (`Without defaults` WITH flag IS TRUE, colour IS Red, bonus IS 5, label IS "x")
+
+-- GIVEN inputs. The gloss trails the line, and this includes a default that
+-- is a name, which used to take it.
+
+GIVEN flag   IS A BOOLEAN TYPICALLY TRUE @nlg the flag
+      colour IS A Colour  TYPICALLY Red  @nlg the colour
+      bonus  IS A NUMBER  TYPICALLY 5    @nlg the bonus
+GIVETH A BOOLEAN
+DECIDE `trailing glosses, with defaults` IF flag AND colour EQUALS Red AND bonus GREATER THAN 0
+
+GIVEN flag   IS A BOOLEAN @nlg the flag
+      colour IS A Colour  @nlg the colour
+      bonus  IS A NUMBER  @nlg the bonus
+GIVETH A BOOLEAN
+DECIDE `trailing glosses, without defaults` IF flag AND colour EQUALS Red AND bonus GREATER THAN 0
+
+#EVAL `trailing glosses, with defaults` WITH flag IS TRUE, colour IS Red, bonus IS 5
+#EVAL `trailing glosses, without defaults` WITH flag IS TRUE, colour IS Red, bonus IS 5
+
+-- GIVEN inputs again, with the gloss on the line below.
+
+GIVEN flag   IS A BOOLEAN TYPICALLY TRUE
+      @nlg the flag
+      colour IS A Colour  TYPICALLY Red
+      @nlg the colour
+GIVETH A BOOLEAN
+DECIDE `own-line glosses, with defaults` IF flag AND colour EQUALS Red
+
+GIVEN flag   IS A BOOLEAN
+      @nlg the flag
+      colour IS A Colour
+      @nlg the colour
+GIVETH A BOOLEAN
+DECIDE `own-line glosses, without defaults` IF flag AND colour EQUALS Red
+
+#EVAL `own-line glosses, with defaults` WITH flag IS TRUE, colour IS Red
+#EVAL `own-line glosses, without defaults` WITH flag IS TRUE, colour IS Red
