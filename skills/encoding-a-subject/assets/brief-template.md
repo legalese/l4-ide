@@ -51,7 +51,9 @@ Name anything deliberately left out, and why.⟩
 
 ## Rules that matter
 
-- **Encode isomorphically.** A reader holding the source beside your module checks it line by line. Cite the section or regulation on every rule (`@ref` or a comment).
+- **Encode isomorphically.** A reader holding the source beside your module checks it line by line.
+  Cite the section or regulation on every rule with an `@ref` line.
+  ⟨If the source is kept as a plain-text file, add: "Quote it on `-- src:N | text` lines and put source locators on the `@ref`, as `references/source-locators.md` in the `encoding-a-subject` skill describes; `assets/srcrefs.py` checks them."⟩
 - **Each vintage is its own answer, not one merged answer.** Where the law has vintages, the vintage is an input. Where a vintage is silent, the answer is that it is silent — never a number borrowed from another vintage.
 - **Where the sources do not answer, `REFUSE "…"`** — never `FALSE`, never `0`, never a plausible default. A gap is a finding, not a bug.
 - **An assertion that fails is a finding.** Never edit an expected value to match what the code computed. Report it.
