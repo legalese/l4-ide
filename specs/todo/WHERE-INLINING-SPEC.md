@@ -405,7 +405,7 @@ A `WHERE` or `LET` local is not a name of its own in the key: the leaf's own loc
 A local that cannot be put in (a recursive one) stays in the term with its definition, so two unfolded copies of it with different arguments stay apart; keyed by name, they were one atom, and `l4 verify` reported a satisfiable rule unsatisfiable.
 A leaf whose value depends on when it is evaluated, because it reads or writes the ledger or the network or calls a rule of the module that does, is keyed per occurrence instead, numbered in drawing order (C1's `fresh`): C1 keys a built-in by its term because it is a function of its operands, and a `RECALL` is not, so two occurrences either side of a `RECORD` can be FALSE and TRUE in one evaluation.
 Keyed by term, they were one atom, and `l4 verify` reported such a rule unsatisfiable; it now also keeps these apart across the meanings it reads through (`getFreshLeaves`).
-Before showing the term, the key also drops an inference variable's counter (an untyped lambda parameter's type carries one, and it moves when anything checked earlier changes) and writes a call whose arguments are all named as the positional call.
+Before showing the term, the key also drops an inference variable's counter (an untyped lambda parameter's type carries one, and it moves when anything checked earlier changes), writes a call whose arguments are all named as the positional call, and writes a record field read written as its selector applied, `adult p`, as the projection `p's adult` (R3b).
 It puts back the one thing the term does not carry: the type a `JSONDECODE` decodes into, which the evaluator reads off the node's annotation.
 Each of these was found by adversarial review of the design or of the built key, and each has a test (`AtomKeySpec`, `LadderTermKeySpec`, `LadderCallExpansionSpec`, and `l4-cli-test`'s `verify-recursive-local-copies.l4`).
 
@@ -419,6 +419,23 @@ A call box is the term `f a b`, so its key is the rule's path with its arguments
 > (4) A leaf that reads or writes the ledger or the network, or calls a rule of the module that does, is keyed per occurrence (C1's `fresh`); a bare reference to such a rule of no parameters is not, since it is evaluated once and shared.
 
 Ruling, 2026-10-09, asked inline in session `ladder-ref-trans` (offered as a bench, SOMMELIER, not built): all four as recommended; no conditions; Meng's note: "i think we can skip SOMMELIER if i just say i accept your recommendations".
+
+> **R3b** (**ANSWERED 2026-10-11**, ruled by Meng). A record field read written as its selector applied, `adult p`, is the same proposition as the projection `p's adult`, and the two carry one `atomId`.
+> The projection is sugar for the record accessor function applied to the record.
+
+Ruling, 2026-10-11, given inline in session `functions-in-ladder-diagrams` when the choice was put by smucclaw/l4-ide#1033 (gap 3: "Whether the key should fold the projection into the selector is a ruling, not a defect to patch."): fold them; no conditions; Meng's note: "DUSTPAN with adversarial review. after that please try to fix the third item -- record accessor function desugaring".
+It is what the evaluator already does: it desugars `p's adult` to the selector applied to `p` (the `Proj` case of `L4.EvaluateLazy.Machine`), and a selector applied to an unknown record gives the field-read term `TField` whichever way it was written (`Machine.hs:2120`), so on the evaluator's side the two were already one term, and R3, structural, was the only thing keeping them apart.
+
+Built on branch `mengwong/ladder-record-accessor`; not merged when this was written.
+`L4.Viz.AtomKey.fieldReads` rewrites a selector applied to exactly one argument into the projection before the annotations are stripped, since they are what says a name is a selector: the checker stamps the reference, or the definition it refers to, `Selector` or `ComputedSelector`.
+Two choices made without a ruling, each in a commit of its own:
+
+- **The direction.** Both spellings are keyed as the projection, not as the selector applied. That is the evaluator's term for both (`TField`), and it leaves the `atomId` of every `p's adult` where it was; only a leaf written with the selector applied moves.
+- **The planner's inputs.** Both ladders collect a leaf's input references after `fieldReads`, so `age p > 18` names the input `p's age`, as `p's age > 18` does; before, it named no input at all, since only a variable or a projection directly under the leaf was collected.
+
+`l4 verify` coalesces atoms by `atomId`, so it now sees `p's adult AND NOT adult p` as unsatisfiable (`verify-field-reads.l4`; base: two atoms, no finding).
+Measured over the corpus (844 files, `l4 verify` on base and on the branch): every file that finished on both sides gives the same output, except two whose import error messages name the worktree, so no corpus file mixed the two spellings where `verify` could see it.
+This makes the ladder's key and #556's `Term` agree on field reads; the general agreement test §10.6 calls owed is still owed.
 
 What it knowingly leaves, by kind of failure:
 
