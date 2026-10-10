@@ -602,6 +602,38 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
         Left e -> expectationFailure (show e)
         Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
 
+    it "a named call the checker rejected stays a closed leaf" $ do
+      -- The IDE draws a module with type errors in it. The checker recovers from
+      -- a misspelt or repeated argument name, and from a named call to a rule of
+      -- no parameters, with an order that can look complete; such a call opened
+      -- onto a meaning the checker refused (found by adversarial review).
+      let src = T.unlines
+            [ "GIVEN a IS A BOOLEAN"
+            , "      b IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `asym` IF a AND (NOT b)"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `nullary` IF TRUE AND FALSE"
+            , ""
+            , "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `rejected` IF"
+            , "      (`asym` WITH b IS q, aa IS p)"
+            , "  AND (`asym` WITH b IS q, b IS p)"
+            , "  AND (`nullary` WITH zz IS p)"
+            , "  AND (`asym` WITH b IS q, a IS p)"
+            ]
+      r <- render "named-rejected" src "rejected"
+      -- every named call is drawn; only the last, which the checker accepted,
+      -- is a call, and opens
+      let drawn = flip concatMap (directUniverse r.funDecl.body) \case
+            V.UBoolVar _ nm _ ci _ _ x | "WITH" `T.isInfixOf` nm.label -> [(ci, isJust x)]
+            V.App _ _ _ _ x -> [(True, isJust x)]
+            _ -> []
+      drawn `shouldBe` [(False, False), (False, False), (False, False), (True, True)]
+
     it "a WHERE helper called by name is keyed as its unfolding, as one called positionally is" $ do
       let src spelling = T.unlines
             [ "GIVEN x IS A NUMBER"

@@ -182,7 +182,14 @@ callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
 -- 'Nothing' for anything else: a named call the checker has not ordered, and one
 -- that supplies a section binder (a negative entry, 'implicitSupplyIndex'), whose
 -- callee reads a name that is not among its parameters, so substituting for the
--- parameters alone would not be the call.
+-- parameters alone would not be the call. 'Nothing' too for a call the checker
+-- rejected but recovered from, whose order can still look like a permutation: an
+-- argument name it could not resolve (a misspelling, a name given twice) is
+-- 'OutOfScope' and was given some parameter's index, and a named call to a rule
+-- that takes none has no arguments at all. The IDE draws modules with type errors
+-- in them, while the author is typing, and such a call must stay a closed leaf
+-- rather than open onto a meaning the checker refused (found by adversarial
+-- review).
 --
 -- The test cannot see the callee's arity. Today every named call names every
 -- parameter (the checker raises @IncompleteAppNamed@ otherwise), but if one may
@@ -195,9 +202,15 @@ positionalCall :: Expr Resolved -> Maybe (Resolved, [Expr Resolved])
 positionalCall = \ case
   App _ r args -> Just (r, args)
   AppNamed _ r nes (Just order)
-    | sort order == [0 .. length nes - 1] ->
+    | not (null nes)
+    , not (any (\ (MkNamedExpr _ n _) -> isOutOfScope n) nes)
+    , sort order == [0 .. length nes - 1] ->
         Just (r, [ x | i <- [0 .. length nes - 1], (MkNamedExpr _ _ x, j) <- zip nes order, j == i ])
   _ -> Nothing
+  where
+    isOutOfScope = \ case
+      OutOfScope {} -> True
+      _             -> False
 
 -- | Remove the definitions that can reach themselves through the others:
 -- self-recursive and mutually recursive ones, whose unfolding would not
