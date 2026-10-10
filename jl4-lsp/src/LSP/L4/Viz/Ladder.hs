@@ -48,6 +48,7 @@ import Control.Monad.Extra (unlessM)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified L4.TypeCheck as TC
+import L4.TypeCheck.Types (substituteType)
 import L4.Viz.Ladder (InputRef(..), collectTypicallyDefaults, seamLabel)
 import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful)
 import L4.Annotation
@@ -183,6 +184,10 @@ data VizState = MkVizState
   -- own WHERE definitions inlined into it; 'Nothing' for a definition whose
   -- body keeps a local binding after that (see 'expandCall'). Each entry is
   -- computed at most once per decision, and only for a rule that is called.
+  , typeVariables :: IntMap (Set Unique)
+  -- ^ Unique.unique -> the type variables (@GIVEN a IS A TYPE@) of each
+  -- definition of 'defsForInlining' that has any; absent for every other one.
+  -- A call's expansion puts in the types the call is at ('instantiateTypes').
   , leafExprs :: IntMap (Expr Resolved)
   -- ^ Leaf variable id -> the source expression the leaf stands for. Lets a
   -- consumer ask what a leaf MEANS: `l4 verify` reads a call leaf through to the
@@ -236,6 +241,7 @@ mkInitialVizState cfg =
     , appExprMakers = Map.empty
     , defsForInlining = Map.empty
     , expansionBodies = Map.empty
+    , typeVariables = Map.empty
     , leafExprs = Map.empty
     , callLeafTargets = Map.empty
     , atomDeps = Map.empty
@@ -466,6 +472,7 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     { functionName = (mkPrettyVizName funResolved).label
     , defsForInlining = defs
     , expansionBodies = Map.map expansionBodyOf defs
+    , typeVariables = Map.restrictKeys (typeVariablesOf cfg.module') (Map.keysSet defs)
     -- A leaf's variable is keyed by an Int. A bare reference to one of this
     -- module's names uses the name's unique; every other leaf gets a fresh id
     -- from 'getFresh'. Those were once two counters that both started near zero,
@@ -492,6 +499,17 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     seedFrom
       | cfg.expandCalls = toListOf (gplate @Unique) cfg.module'
       | otherwise = toListOf (gplate @Unique) body
+
+-- | The type variables (@GIVEN a IS A TYPE@) of each top-level definition that
+-- has any, by the Unique.unique a call refers to it by.
+typeVariablesOf :: Module Resolved -> IntMap (Set Unique)
+typeVariablesOf = Map.fromList . foldTopLevelDecides (foldDecides one)
+  where
+    one (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n _ _) _) =
+      [ ((getUnique n).unique, vars)
+      | let vars = Set.fromList [getUnique v | MkOptionallyTypedName _ v (Just (Type _)) _ <- otns]
+      , not (Set.null vars)
+      ]
 
 ------------------------------------------------------
 -- translateDecide, translateExpr
@@ -824,12 +842,13 @@ expandCall callee call = do
   known <- hasDefForInlining callee
   bodies <- use #expansionBodies
   spent <- use #expansionNodes
+  typeVars <- use #typeVariables
   let reduced = case (Transform.positionalCall call, join (Map.lookup callee.unique bodies)) of
         (Just (_, args), Just (ps, body))
-          | length args == length ps -> Just (Transform.substParams (zip ps args) body)
+          | length args == length ps -> Just (zip ps args, body)
         _ -> Nothing
   case reduced of
-    Just body
+    Just (actuals, body0)
       | cfg.expandCalls
       , known
       , callee.unique `notElem` env.expansionStack ->
@@ -841,6 +860,10 @@ expandCall callee call = do
                 assign #expansionOverBudget True
                 pure Nothing
             | otherwise -> do
+                instantiated <- case Map.lookup callee.unique typeVars of
+                  Just vars -> instantiateTypes vars call actuals body0
+                  Nothing -> pure body0
+                let body = Transform.substParams actuals instantiated
                 -- A definition's body is stored desugared (@AND@ as a function
                 -- application); resugar it as 'translateDecide' does the caller's.
                 let sweet = carameliseExpr body
@@ -853,6 +876,58 @@ expandCall callee call = do
                 when (total > expansionNodeBudget) $ assign #expansionOverBudget True
                 pure (Just ir)
     _ -> pure Nothing
+
+{- | A polymorphic definition's body, with the types its call is at put in for
+its type variables.
+
+The body is annotated as the checker saw it, in the definition's own scope, so a
+node whose type is one of its type variables says so: in
+@`whichever applies` cond x y MEANS IF cond THEN x ELSE y@ under
+@GIVEN a IS A TYPE@, the @IF@ is of type @a@. Putting a call's arguments in for
+@x@ and @y@ does not change that annotation, and the guarded-chain case of
+'translateGo' draws an @IF@ as structure only when it is BOOLEAN, so a call of
+that rule with BOOLEAN arguments drew its @IF@ as ONE opaque leaf, keyed apart
+from the inputs it reads (smucclaw/l4-ide#1033).
+
+What each type variable stands for is read off the call, by matching: each
+parameter's type, as annotated where the body refers to it, against its
+argument's type, and the body's type against the call's. The first match for a
+variable wins; the checker has already made them agree. Every type in the body
+is then rewritten, annotations included, so the body reads as it would have if
+the rule had been written at those types. A variable no match reaches is left as
+it is, which is what drawing did before.
+-}
+instantiateTypes :: Set Unique -> Expr Resolved -> [(Unique, Expr Resolved)] -> Expr Resolved -> Viz (Expr Resolved)
+instantiateTypes vars call actuals body = do
+  let paramUses =
+        [ (getAnno ref, getAnno actual)
+        | ref@(App _ r []) <- toListOf (cosmosOf (gplate @(Expr Resolved))) body
+        , Just actual <- [lookup (getUnique r) actuals]
+        ]
+  pairs <- traverse (\(p, a) -> (,) <$> annoType p <*> annoType a) ((getAnno body, getAnno call) : paramUses)
+  let theta = foldl' (\m (p, a) -> DataMap.union m (matchType p a)) DataMap.empty
+        [(p, a) | (Just p, Just a) <- pairs]
+  if DataMap.null theta
+    then pure body
+    else do
+      cfg <- getVizCfg
+      let expand = TC.applyFinalSubstitution cfg.substitution cfg.moduleUri
+      pure (over (gplate @(Type' Resolved)) (substituteType theta . expand) body)
+  where
+    annoType :: Anno -> Viz (Maybe (Type' Resolved))
+    annoType = \case
+      Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just <$> getExpandedType ty
+      _ -> pure Nothing
+
+    matchType :: Type' Resolved -> Type' Resolved -> DataMap.Map Unique (Type' Resolved)
+    matchType p a = case (p, a) of
+      (TyApp _ r [], _) | getUnique r `Set.member` vars -> DataMap.singleton (getUnique r) a
+      (TyApp _ r ps, TyApp _ r' qs)
+        | getUnique r == getUnique r', length ps == length qs -> DataMap.unions (zipWith matchType ps qs)
+      (Fun _ ps r, Fun _ qs r')
+        | length ps == length qs ->
+            DataMap.unions (matchType r r' : zipWith (\(MkOptionallyNamedType _ _ x) (MkOptionallyNamedType _ _ y) -> matchType x y) ps qs)
+      _ -> DataMap.empty
 
 -- | Does a @WHERE@ or @LET … IN@ survive anywhere in this expression?
 bindsLocally :: Expr Resolved -> Bool

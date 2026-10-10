@@ -618,6 +618,47 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       ids rNamed `shouldSatisfy` ((== 1) . length)
       ids rNamed `shouldBe` ids rPositional
 
+  describe "a polymorphic callee's IF is drawn as structure (smucclaw/l4-ide#1033, gap 2)" $ do
+    let src polymorphic = T.unlines $
+          (if polymorphic
+             then [ "GIVEN a    IS A TYPE"
+                  , "      cond IS A BOOLEAN"
+                  , "      x    IS AN a"
+                  , "      y    IS AN a"
+                  , "GIVETH AN a"
+                  ]
+             else [ "GIVEN cond IS A BOOLEAN"
+                  , "      x    IS A BOOLEAN"
+                  , "      y    IS A BOOLEAN"
+                  , "GIVETH A BOOLEAN"
+                  ]) <>
+          [ "`whichever applies` cond x y MEANS IF cond THEN x ELSE y"
+          , ""
+          , "GIVEN `is a resident`       IS A BOOLEAN"
+          , "      `holds a work pass`   IS A BOOLEAN"
+          , "      `has a local sponsor` IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `may apply` IF"
+          , "      `whichever applies` `is a resident` `holds a work pass` `has a local sponsor`"
+          , "  OR  (IF `is a resident` THEN `holds a work pass` ELSE `has a local sponsor`)"
+          ]
+        callLabel = "`whichever applies` OF `is a resident`, `holds a work pass`, `has a local sponsor`"
+        inputs = ["`is a resident`", "`holds a work pass`", "`has a local sponsor`"]
+
+    it "the issue's repro: the expansion's leaves are the caller's own inputs" $ do
+      r <- render "poly-if" (src True) "`may apply`"
+      x <- expansionOf callLabel r.funDecl
+      nub (map fst (allLeaves x)) `shouldMatchList` inputs
+      let direct = [l | l <- directLeaves r.funDecl.body, fst l `elem` inputs]
+      nub (allLeaves x) `shouldMatchList` nub direct
+
+    it "control: the monomorphic callee draws the same leaves" $ do
+      r <- render "poly-if-mono" (src False) "`may apply`"
+      rPoly <- render "poly-if" (src True) "`may apply`"
+      x <- expansionOf callLabel r.funDecl
+      xPoly <- expansionOf callLabel rPoly.funDecl
+      map fst (allLeaves xPoly) `shouldBe` map fst (allLeaves x)
+
   it "the wire omits `expansion` when a leaf has none" $ do
     r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
     let direct = [e | e@(V.UBoolVar _ nm _ _ _ _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
