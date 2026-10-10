@@ -118,12 +118,12 @@ These are the limits a drafter meets; they are stated here because each would ot
 - **A breach with nobody named.** A bare `LEST BREACH` is charged to whoever bore the obligation that failed. A breach that truly names nobody is reported as such, never silently dropped from a count (ruling N7).
 - **A party L4 has not worked out yet.** If a count by party meets an obligation whose party is still unknown when you ask, the evaluation stops with an error naming the obligation, rather than returning a smaller number (N7).
 - **Windows use the contract clock.** A failure counts from its missed deadline, not from when the machine noticed it (N3).
-- **History lasts one evaluation.** A deployed contract that resumes from a saved position must carry its ledgers, both inks, with it (N11, still open).
+- **History lasts one evaluation.** A deployed contract that resumes from a saved position must carry its ledgers, both inks, with it (N11, ruled 2026-10-11: the log is per evaluation, and `STATEFUL-CONTRACT-DEPLOYMENT.md` §3.1 records the requirement; nothing is built).
 
-> **Open — N10: rules side by side.**
+> **Ruled 2026-10-11, not built — N10: rules side by side.**
 > If `loan` and `borrowing` are two sides of one `RAND`, write the loan first.
 > L4 runs the first side through the whole trace before starting the second, so the second side sees the first side's history and the first side cannot see the second's (measured: `NORM-LOG-SPEC.md` §7 N10).
-> The recommendation on the bench is that a history read which runs before a sibling that later writes a matching entry is caught at run time as an error naming both rules; the library example, loan first, keeps working.
+> The ruling is that a history read which runs before a sibling that later writes a matching entry is caught at run time as an error naming both rules; the library example, loan first, keeps working. Running the two sides in lockstep is the stated goal, behind a corpus differential.
 > Plain `RECALL` of black ink has no such check, and a party's `COMMIT` in the first side is visible to the second side even if it happened later in the trace.
 
 > **Ruled elsewhere — SEESAW (2026-10-09).**
