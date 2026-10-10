@@ -323,13 +323,14 @@ provided at [scripts/validate.sh](scripts/validate.sh) for environments
 where `PATH` is problematic. Type errors are reported with line numbers —
 iterate until the check passes.
 
-**Read the diagnostics, not the exit code.** `l4 run` exits 0 on a failing
-`#ASSERT` (it prints `assertion failed` at `DiagnosticSeverity_Error` and
-carries on) and on a refusing `#EVAL`. It exits non-zero on a parse or check
-error and on an `#EVAL` that reaches an unsupplied section `GIVEN`. So
-`l4 run f.l4 && echo green` reports a file with failing assertions as green;
-check the output for `DiagnosticSeverity_Error` as well, which is what
-`doc/test-docs.sh` does.
+**Read the diagnostics as well as the exit code.** `l4 run` exits non-zero on
+a parse or check error, on an `#EVAL` that crashes (one that reaches an
+unsupplied section `GIVEN` is one), and on an `#ASSERT` that fails or cannot be
+evaluated. It exits 0 on a refusing `#EVAL` or `#ASSERT`. A binary built before
+legalese/l4-ide#518 exits 0 on a failing `#ASSERT`, so on one of those
+`l4 run f.l4 && echo green` reports a file with failing assertions as green.
+Only the diagnostics say which directive failed: check the output for
+`DiagnosticSeverity_Error`, which is what `doc/test-docs.sh` does.
 
 **Every result is printed twice, and `#CHECK` is the exception.** `l4 run`
 emits a diagnostics section first, then one `Evaluation[n]` block per directive

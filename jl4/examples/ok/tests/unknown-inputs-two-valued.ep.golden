@@ -14,7 +14,7 @@
 -- the catch-all's guess too. The row numbers below are §4.12's.
 --
 -- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN: a directive that cannot evaluate
--- is a crash (ruled by Meng 2026-08-01; see L4.Cli.Run.evalDirectiveCrashed).
+-- is a crash (ruled by Meng 2026-08-01; see L4.Cli.Run.evalDirectiveFailsRun).
 
 IMPORT prelude
 IMPORT daydate

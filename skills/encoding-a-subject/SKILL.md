@@ -101,7 +101,8 @@ Write a tests module whose expected values come **from the source**: worked exam
 
 ### 7. The self-check loop — read the diagnostics
 
-**`l4 run` exits 0 when an `#ASSERT` fails, and when it refuses.** A run that "passed" by exit code can be carrying either.
+**Read the diagnostics, not only the exit code.**
+`l4 run` exits 1 when an `#ASSERT` fails, but it exits 0 when one refuses, an `l4` built before legalese/l4-ide#518 exits 0 when one fails too, and no exit code says which assertion failed or how many ran.
 The outcome is printed in one of three shapes, and only the first is on the `Message:` line itself:
 
 - `Message:  assertion failed`, at `DiagnosticSeverity_Error`;

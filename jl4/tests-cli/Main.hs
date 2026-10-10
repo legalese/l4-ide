@@ -119,6 +119,10 @@ evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
 evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
 evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
 
+-- | Typechecks cleanly; one @#ASSERT@ holds and one evaluates to FALSE.
+assertFailsFixture :: FilePath
+assertFailsFixture = fixtureDir </> "assert-fails.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -714,6 +718,25 @@ spec bin = do
             arrayField waiting "needs" `shouldBe` Just [String "x", String "y"]
           other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Ruled by Meng 2026-09-29: an #ASSERT that evaluates cleanly to FALSE is a
+    -- failed test, and fails the run. Without this, no script or CI job could
+    -- catch a failing assertion by exit status.
+    it "fails the run when an #ASSERT evaluates to false" $ do
+      Output code sout _ <- runL4 bin ["run", assertFailsFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "returns ok=false in JSON when an #ASSERT evaluates to false" $ do
+      env <- jsonEnvelope bin ["run", assertFailsFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> map (`objField` "value") (toList v) `shouldBe` [Just (Bool True), Just (Bool False)]
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the failing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertFailsFixture] "Check succeeded."
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
