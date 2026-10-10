@@ -7,6 +7,7 @@ module L4.Transform where
 import L4.Annotation
 import L4.Syntax
 
+import Data.List (sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Optics
@@ -155,15 +156,40 @@ unfoldableDecide (MkDecide _ _ (MkAppForm _ n args _) rhs)
   where
     params = Set.fromList (map getUnique args)
     appliesParam = \ case
-      App _ r (_ : _) -> getUnique r `Set.member` params
-      _               -> False
+      App _ r (_ : _)  -> getUnique r `Set.member` params
+      AppNamed _ r _ _ -> getUnique r `Set.member` params
+      _                -> False
 
 -- | The uniques an expression refers to as the head of an application, at any
--- arity. A bare variable is an application of arity zero, so it is included.
+-- arity. A bare variable is an application of arity zero, so it is included, and
+-- so is the head of every named call, whether or not 'positionalCall' can read it.
 callees :: Expr Resolved -> Set.Set Unique
 callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
-  App _ r _ -> Set.singleton (getUnique r)
-  _         -> Set.empty
+  App _ r _        -> Set.singleton (getUnique r)
+  AppNamed _ r _ _ -> Set.singleton (getUnique r)
+  _                -> Set.empty
+
+-- | A call's head and its arguments in parameter order.
+--
+-- An 'App' is that already. A call with named arguments ('AppNamed') is read as
+-- the positional call it stands for when the checker's order says its arguments
+-- supply declared parameters @0 .. n-1@, each exactly once: @f WITH b IS y, a IS x@
+-- is @f x y@. Every pass that unfolds a call reads it through this, so a rule
+-- called by name is unfolded, counted and inlined exactly as one called
+-- positionally (smucclaw/l4-ide#1033), and "L4.Viz.AtomKey" keys the two alike
+-- through it too.
+--
+-- 'Nothing' for anything else: a named call the checker has not ordered, and one
+-- that supplies a section binder (a negative entry, 'implicitSupplyIndex'), whose
+-- callee reads a name that is not among its parameters, so substituting for the
+-- parameters alone would not be the call.
+positionalCall :: Expr Resolved -> Maybe (Resolved, [Expr Resolved])
+positionalCall = \ case
+  App _ r args -> Just (r, args)
+  AppNamed _ r nes (Just order)
+    | sort order == [0 .. length nes - 1] ->
+        Just (r, [ x | i <- [0 .. length nes - 1], (MkNamedExpr _ _ x, j) <- zip nes order, j == i ])
+  _ -> Nothing
 
 -- | Remove the definitions that can reach themselves through the others:
 -- self-recursive and mutually recursive ones, whose unfolding would not
@@ -193,7 +219,8 @@ closeUnder m0 = go (Map.size m0) m0
 
 -- | One round of beta reduction. Every call @App _ r args@ whose callee is in the
 -- map /and whose argument count equals the callee's parameter count/ is replaced
--- by the callee's body with each argument put in place of its parameter.
+-- by the callee's body with each argument put in place of its parameter. A call
+-- with named arguments is read as its positional call first ('positionalCall').
 --
 -- The arity check is the guard, and it is load-bearing: a reference at another
 -- arity (a helper passed as a value) is not a call and is left alone.
@@ -208,8 +235,8 @@ closeUnder m0 = go (Map.size m0) m0
 unfoldOnce :: Map.Map Unique Unfoldable -> Expr Resolved -> Expr Resolved
 unfoldOnce m
   | Map.null m = id
-  | otherwise  = transformOf (gplate @(Expr Resolved)) $ \ e -> case e of
-      App _ r args
+  | otherwise  = transformOf (gplate @(Expr Resolved)) $ \ e -> case positionalCall e of
+      Just (r, args)
         | Just (MkUnfoldable ps body) <- Map.lookup (getUnique r) m
         , length args == length ps
         -> substParams (zip ps args) body
@@ -219,8 +246,8 @@ unfoldOnce m
 unfoldableCallSites :: Map.Map Unique Unfoldable -> Expr Resolved -> Int
 unfoldableCallSites m = lengthOf (cosmosOf (gplate @(Expr Resolved)) % filtered isSite)
   where
-    isSite = \ case
-      App _ r args
+    isSite e = case positionalCall e of
+      Just (r, args)
         | Just (MkUnfoldable ps _) <- Map.lookup (getUnique r) m -> length args == length ps
       _ -> False
 
