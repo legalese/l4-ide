@@ -994,13 +994,23 @@ The same cut sent a gloss TRAILING a number or string default past its input, an
 _Changed (smucclaw/l4-ide#994):_ a gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, used to land on that name, silently, because the default was clamped to its own line but still claimed.
 A `TYPICALLY` default now takes no annotation at all: nothing reads a gloss on it, so it is not traversed, advertises no span and claims nothing, and the input behaves as if the default were not there.
 The test is metamorphic and does not depend on the shape of the default: adding or removing a `TYPICALLY` clause must not change where any annotation lands, or what is reported (`NlgAttachmentSpec`, "a TYPICALLY default takes no annotation").
+One shape is an exception, and is reported rather than read: a gloss at the `GIVEN` keyword's column written between an input's type and a `TYPICALLY` on the next line is inside the input, so it warns "Not attached" where, with no default, it would be the rule's.
+An input's "below" is measured from its name and type, not from its default, so the input does not take it silently.
 
-Field lists have no column test, and one field-list defect is unchanged here.
-An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`; that is a case of smucclaw/l4-ide#976.
+_Changed (assumed, not ruled):_ the last field of a field list takes a herald from a later line only when it is indented past where the declaration starts (its `GIVEN`, when a type-parameter signature comes first), the column test the last input of a `GIVEN` list has had since the 2026-10-02 ruling.
+A field at the margin, or on the `DECLARE`'s own line, therefore takes no herald from below: nothing marks one as the field's except indenting it past the column of the declaration.
+It is the same for the last field of the last constructor of an enum.
+Until now a record's last field took an `@nlg` between it and the next declaration, at any column, whenever no `GIVEN` or `GIVETH` sat between them — including a herald written above the rule's own `GIVEN`, which is the record case of smucclaw/l4-ide#976 and is now reported ("Not attached").
+A last field with a literal `TYPICALLY` default was spared only by accident, because its default cut its name off (one whose default was a name had its herald taken by that name), so making a default claim nothing exposed the shape; an adversarial review found it, and the column test closes it for fields with and without a default.
+The field's type is held to the field's own line, because it runs second and would otherwise take what the name declined; nothing renders an annotation on a type.
+Issue #976 stays open for what ends in something other than a record: a herald above a rule, or its `GIVEN`, that follows an `IMPORT`, an enum, a type synonym, an opaque type or a rule whose body ends in a name is still taken silently by the last name before it, and after a rule whose body ends in a literal it warns "Not attached".
 _Changed (smucclaw/l4-ide#997):_ a field with a `TYPICALLY` default used to pass its gloss to the next field, both an own-line gloss under it and one trailing a number default, and a default that was a name took it silently.
 The default was a sibling of the field's name, so its span cut the name off from the line below.
 It is no longer traversed (see the `TYPICALLY` row above), so an own-line gloss under such a field describes the field, and one trailing the line reaches the field's type, exactly as for a field with no default.
 The same holds for a field of a constructor (`Disc HAS …`).
+An `ASSUME` has the column test too (assumed, not ruled): an `@nlg` indented under it, or trailing it or its default, is its own, and one at the margin is the next declaration's, as it is below a `DECIDE`.
+Its default takes no annotation: `ASSUME x IS A BOOLEAN TYPICALLY FALSE @nlg …` used to lose its gloss to `FALSE`, silently.
+An `ASSUME` with no default used to take a herald at the margin below it; behind a literal default that herald went to the rule below, and behind a name it went to the name.
 
 The rule applies to every `GIVEN` list the attachment pass reaches — a rule's, an `ASSUME`'s, a `DECLARE`'s type parameters, a section's and a lambda's — and the list ends at the declaration's own keyword.
 A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own is a token of the declaration rather than a node with a span, so `signatureBeforeKeyword` bounds the signature there; without it the last input would reach past such a keyword to an annotation written under it.
@@ -1019,9 +1029,11 @@ None of the three layouts occurs in this repository, and the attachment differen
 Three own-line annotations in this repository sit under a `GIVEN` list's last input, all at the margin and so all unchanged: `doc/reference/syntax/directive-example.l4:7`, and an `@nlg:he` / `@nlg:en` pair in a fenced example of `skills/writing-l4-rules/references/gotchas.md` (lines 487–488 at `6ed297629`).
 The owner of every `@nlg` across 214 files is the same at `6ed297629` and at `e0366fd7f`, except in the fixture.
 The 214 are the 31 tracked `.l4` files that carry `@nlg`, the 146 tracked `.l4` files without one that contain a `[` (a possible inline gloss), 33 files from a canon checkout and 4 from pc-encode.
-`NlgAttachmentSpec` pins each placement, and each of these mutations fails at least one of its cases: measuring the column from 1, or from the input's own column; no column test; the default unclamped; no lower clamp at the keyword; no bound at each of the four keywords; and a column test on inputs before the last.
+`NlgAttachmentSpec` pins each placement, and each of these mutations fails at least one of its cases: measuring the column from 1, or from the input's own column; no column test; the default traversed; no lower clamp at the keyword; no bound at each of the four keywords; and a column test on inputs before the last.
 
 **What review changed.**
+A third adversarial review, of the `TYPICALLY` change (smucclaw/l4-ide#994, #997), found that making a default claim nothing exposed a defaulted last field to the capture in the paragraph above, and that `ASSUME` still had #994; the column test and the `ASSUME` column test are its repairs.
+Its second round found that a first repair for `ASSUME`, a bound at the end of its line, moved an indented herald to the next declaration and broke the metamorphic property for a default on a line of its own.
 Two adversarial reviews of this change found the keyword overreach, which `signatureBeforeKeyword` closes, the trailing-literal case, and the limits stated above.
 Do not drop the keyword bound as redundant: removing it from any one of the four declarations fails `NlgAttachmentSpec`'s "stops at a DECIDE, ASSUME, DECLARE or YIELD written on a line of its own".
 
