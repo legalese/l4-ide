@@ -435,6 +435,7 @@ Two choices made without a ruling, each in a commit of its own:
 
 `l4 verify` coalesces atoms by `atomId`, so it now sees `p's adult AND NOT adult p` as unsatisfiable (`verify-field-reads.l4`; base: two atoms, no finding).
 This makes the ladder's key and #556's `Term` agree on field reads; the general agreement test §10.6 calls owed is still owed.
+Measured over the corpus (2026-10-11, `l4 verify` on every `.l4` under `jl4/examples`, `jl4-core/libraries` and `doc`, base `def9a5e41` against this branch at `cff5b44f5`, which includes §10.7): of 844 files, 837 give identical output, one finishes on neither, two differ only in a worktree path inside an import error, and four with computed fields now report "N call(s) read through" where base read none, with no finding added or lost.
 
 What adversarial review changed (one reviewer with probe binaries; no false merge found in the fold):
 
