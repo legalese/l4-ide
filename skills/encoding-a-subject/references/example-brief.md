@@ -1,7 +1,9 @@
 # Example: a real brief
 
 This is the brief behind the 2026-09-21 comparison described in `SKILL.md` — four independent encodings of an Israeli licensing Law and its fee regulations, all from this text and the sources it names.
-Paths are generalised; nothing else is changed.
+Paths are generalised; nothing else in the brief is changed.
+Its rule "Cite the section or regulation on every rule (`@ref` or a comment)" is left as the encoders were given it, because this page is a record of what they were told.
+A brief written today follows [`source-locators.md`](source-locators.md) for citations.
 
 Things worth copying from it:
 

@@ -81,7 +81,9 @@ Now encode, a section or a unit at a time, moving each coverage row as you go.
 How to write each construct is [`writing-l4-rules`](../writing-l4-rules/SKILL.md)'s job; read its `references/drafting-patterns.md` and the `references/source-patterns/` pages before you start, not when you get stuck.
 The rules that decide whether a reviewer can trust the result:
 
-- **Isomorphic.** Someone holding the source beside your module can check it provision by provision. One source provision → one recognisable place in the L4, with the source's numbering and a citation (`@ref` or a comment) on every rule.
+- **Isomorphic.** Someone holding the source beside your module can check it provision by provision.
+  One source provision → one recognisable place in the L4, with the source's numbering and an `@ref` citation on every rule.
+  If you keep the source as a text file, quote it and put source locators on the `@ref`, so that a script can check the quotation and the citation against the file: [`references/source-locators.md`](references/source-locators.md).
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
 - **`REFUSE "…"` where the sources do not answer** — never `FALSE`, `0` or a plausible default. `MAYBE` / `NOTHING` where the source itself names an absent case. See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
   Do not invent your own three-valued logic (`Established` / `Rejected` / `Unresolved` enums threaded through every rule): the language already has these, and a home-made version is one more thing a reviewer must learn before they can read a single rule.

@@ -383,10 +383,17 @@ Read it before writing one:
 | `@export`  | Mark function for deployment via `jl4-service`                     |
 | `@nlg`     | Natural-language-generation hint (for rendering the rule as prose) |
 | `@ref`     | Cross-reference to a legal source                                  |
-| `@ref-src` | Source of the legal reference                                      |
+| `@ref-src` | Accepted and ignored (the CSV loading it did was removed)          |
 | `@ref-map` | Mapping table for references                                       |
 
-`@ref` / `@ref-src` / `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
+`@ref` and `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
+An `@ref` on its own line binds to the next syntax node, whatever it is, so it goes above the rule it cites.
+Measured with `l4 check` and `l4 ast`: one written under its rule attached to the next rule, with no message; one above a `§` heading attached to the heading.
+Two above one rule leave the nearer attached and report the other as unattached, and so does one at the end of a file; both are warnings, and `l4 check` still exits 0.
+`@ref-src` is accepted and ignored.
+The lexer still reads it and the parser stores nothing from it (`refAdditionalP` in `jl4-core/src/L4/Parser.hs`); the CSV loading it did was removed, as `specs/done/REF-ANNOTATION-SPEC.md` records.
+Measured: `@ref-src this-file-does-not-exist.csv` passes `l4 check` with `Check succeeded` and no diagnostic.
+To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [source-locators.md](../../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
 
 ### `@nlg` placement: a rule takes it on the line above, a name takes it trailing — and one leak
 
