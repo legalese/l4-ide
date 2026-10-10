@@ -477,7 +477,8 @@ The column is all it reads, and three consequences are silent:
   Write the rule's sentence at the `GIVEN` keyword's column, or between `GIVETH` and the head at any indentation; above the head but indented past `GIVEN`, with no `GIVETH`, it is still the last parameter's.
 
 A trailing gloss and an own-line one on the same parameter, in the same language, collide: L4 warns and drops both.
-A gloss trailing a `TYPICALLY` default reaches the parameter when the default is a number or a string; when the default is a name such as `FALSE`, `EMPTY` or `NOTHING`, that name takes it, silently (smucclaw/l4-ide#994), so put it on the line below.
+A `TYPICALLY` default takes no annotation, so a gloss trailing it describes the parameter whatever the default is.
+An `l4` older than smucclaw/l4-ide#994 let a default that is a name such as `FALSE`, `EMPTY` or `NOTHING` take the gloss, silently; against one of those, put the gloss on the line below.
 In a rule whose head has a pattern argument (`DECIDE fib 0 IS 0` — one clause is enough), no `@nlg` attaches anywhere, in the `GIVEN`, on the head or above it; each one warns "Not attached" (smucclaw/l4-ide#996).
 
 Before the ruling, an annotation under the last parameter was dropped with a warning when a `GIVETH` followed, and became the rule's sentence when none did (colliding, with a warning, if the rule had a sentence of its own).
@@ -496,9 +497,26 @@ DECLARE Payslip
 `l4 nlg` prints ``where `base` is 100 and the bonus is 5``: the first annotation describes `NUMBER`, so `base` renders bare, and the second describes `bonus`.
 Never end an `@nlg` line with a `--` comment: the annotation runs to the end of the line, and the comment becomes part of the prose.
 
-Field lists have no column test, which leaves two silent traps.
+Field lists have no column test, which leaves one silent trap.
 An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`, as in the `Teacher` example above, which is smucclaw/l4-ide#976.
-And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
+
+A field with a `TYPICALLY` default is a field like any other: the default takes no annotation, so a herald below it describes the field and one trailing the line reaches its type (smucclaw/l4-ide#997).
+Before that fix the herald went to the next field, or was dropped silently when the default was a name such as `TRUE` or an enum constructor; an `l4` older than it still does that, so a `BOOLEAN TYPICALLY TRUE` field glossed on the line below renders bare there.
+
+**A constructor that has fields takes its own herald BETWEEN its name and `HAS`.**
+The field list is a column (above), so a herald below the last field is that field's, not the constructor's, and a herald above the constructor name is the previous constructor's.
+Put `HAS` on a continuation line to make room:
+
+```l4
+DECLARE Penalty IS ONE OF
+    NoPenalty
+    Custodial
+        @nlg a custodial penalty
+        HAS years IS A NUMBER
+        @nlg the term in years
+```
+
+A herald written below `years` alone describes `years`, and both below it collide on `years` with a warning.
 
 > **A corpus written before 2026-09-19 will not reflect any of this.** Until `#433` merged, an
 > own-line herald under a `GIVEN` was captured by the signature and the rule rendered as a bare

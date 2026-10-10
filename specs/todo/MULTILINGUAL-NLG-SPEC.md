@@ -989,13 +989,18 @@ Rows two to six of the table are rows 15 to 19 of `ok/nlg-head-placement.l4`; th
 
 The `TYPICALLY` row is the same rule rather than a second one: the input's name was cut off at the start of its default, so the line below fell past the input.
 It fell to the next input when the default was a number or a string, and to the default itself when that was a name such as `FALSE`, `EMPTY` or `NOTHING`, silently either way.
-`L4.Parser.ResolveAnnotation.addNlgInput` lets the name reach past the default, as a record field's name reaches past its type, and clamps the default to its own line, so that a default that is a name cannot take an annotation the last input declined.
+`L4.Parser.ResolveAnnotation.addNlgInput` lets the name reach past the default, as a record field's name reaches past its type.
 The same cut sent a gloss TRAILING a number or string default past its input, and that is fixed with it: a literal claims nothing, so the name now takes the rest of its own line.
-A gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, still lands on that name, silently; that is unchanged, and filed as smucclaw/l4-ide#994.
+_Changed (smucclaw/l4-ide#994):_ a gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, used to land on that name, silently, because the default was clamped to its own line but still claimed.
+A `TYPICALLY` default now takes no annotation at all: nothing reads a gloss on it, so it is not traversed, advertises no span and claims nothing, and the input behaves as if the default were not there.
+The test is metamorphic and does not depend on the shape of the default: adding or removing a `TYPICALLY` clause must not change where any annotation lands, or what is reported (`NlgAttachmentSpec`, "a TYPICALLY default takes no annotation").
 
-Field lists have no column test, and two field-list defects are unchanged here.
+Field lists have no column test, and one field-list defect is unchanged here.
 An `@nlg` between a record and the next rule is taken by the record's last field, at any column, whenever no `GIVEN` or `GIVETH` sits between them — including a herald written above the rule's own `GIVEN`; that is a case of smucclaw/l4-ide#976.
-And a field with a `TYPICALLY` default passes its gloss to the next field, both an own-line gloss under it and one trailing a number default; behind a default that is a name, the name takes it (smucclaw/l4-ide#997).
+_Changed (smucclaw/l4-ide#997):_ a field with a `TYPICALLY` default used to pass its gloss to the next field, both an own-line gloss under it and one trailing a number default, and a default that was a name took it silently.
+The default was a sibling of the field's name, so its span cut the name off from the line below.
+It is no longer traversed (see the `TYPICALLY` row above), so an own-line gloss under such a field describes the field, and one trailing the line reaches the field's type, exactly as for a field with no default.
+The same holds for a field of a constructor (`Disc HAS …`).
 
 The rule applies to every `GIVEN` list the attachment pass reaches — a rule's, an `ASSUME`'s, a `DECLARE`'s type parameters, a section's and a lambda's — and the list ends at the declaration's own keyword.
 A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own is a token of the declaration rather than a node with a span, so `signatureBeforeKeyword` bounds the signature there; without it the last input would reach past such a keyword to an annotation written under it.

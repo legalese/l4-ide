@@ -23,6 +23,7 @@
 module NlgAttachmentSpec (spec) where
 
 import Base
+import qualified Base.Text as Text
 
 import L4.Annotation (getAnno)
 import L4.Nlg (simpleLinearizer)
@@ -465,3 +466,102 @@ spec = describe "which node an @nlg attaches to" $ do
         \DECIDE f other IS 3\n"
       attachments m `shouldBe` []
       [ () | NotAttached{} <- ws ] `shouldBe` []
+
+  -- A TYPICALLY default is a value the author supplies, not a thing the author
+  -- describes, and nothing reads an annotation on it. It used to be traversed
+  -- like any other child, so it advertised a span (cutting the field's name off
+  -- from the line below) and, when it was a name, claimed what trailed it. The
+  -- annotation then attached to a node nothing renders, or to the NEXT field,
+  -- and nothing was reported (smucclaw/l4-ide#994, #997).
+  --
+  -- The property is metamorphic and does not depend on the shape: adding or
+  -- removing the TYPICALLY clause must not change where any annotation lands,
+  -- or what is reported.
+  describe "a TYPICALLY default takes no annotation" $ do
+    let defaults =
+          [ ("a number",   "NUMBER",  "100")
+          , ("a string",   "STRING",  "\"x\"")
+          , ("TRUE",       "BOOLEAN", "TRUE")
+          , ("an enum constructor", "Colour", "Red")
+          ]
+        enums = "DECLARE Colour IS ONE OF Red, Green\n\n"
+        -- {T} is the type, {D} the default clause, present or absent.
+        fill ty clause template =
+          enums <> Text.replace "{T}" ty (Text.replace "{D}" clause template)
+        unreported ws = length [ () | NotAttached{} <- ws ] + length [ () | Ambiguous{} <- ws ]
+
+        sameWithAndWithout label template expected =
+          forM_ defaults $ \(kind, ty, dflt) ->
+            it (label <> ", behind " <> Text.unpack kind) $ do
+              (withDefault, wsWith) <- parsed (fill ty (" TYPICALLY " <> dflt) template)
+              (bare, wsWithout) <- parsed (fill ty "" template)
+              attachments withDefault `shouldBe` attachments bare
+              unreported wsWith `shouldBe` unreported wsWithout
+              -- The control is not vacuous: the shape lands where it says.
+              expected (attachments bare) ty
+
+    describe "on a record field" $ do
+      sameWithAndWithout "an own-line gloss under it, another field after it"
+        "DECLARE Rec HAS\n    base IS A {T}{D}\n    @nlg the base\n    other IS A {T}\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an own-line gloss under the last field"
+        "DECLARE Rec HAS\n    other IS A {T}\n    base IS A {T}{D}\n    @nlg the base\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "a gloss trailing it (the TYPE's, as for a field with no default)"
+        "DECLARE Rec HAS\n    base IS A {T}{D} @nlg the base\n    other IS A {T}\n"
+        (\ got ty -> got `shouldBe` [(ty, "the base")])
+      sameWithAndWithout "a gloss before the type"
+        "DECLARE Rec HAS\n    base [the base] IS A {T}{D}\n    other IS A {T}\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an own-line gloss under a constructor's field"
+        "DECLARE Shape IS ONE OF\n    Dot\n    Disc HAS\n        base IS A {T}{D}\n        @nlg the base\n        other IS A {T}\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+
+    describe "on a GIVEN input" $ do
+      sameWithAndWithout "a gloss trailing it, another input after it"
+        "GIVEN base IS A {T}{D} @nlg the base\n      other IS A {T}\nGIVETH A BOOLEAN\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an own-line gloss under it, another input after it"
+        "GIVEN base IS A {T}{D}\n      @nlg the base\n      other IS A {T}\nGIVETH A BOOLEAN\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "an indented own-line gloss under the last input"
+        "GIVEN other IS A {T}\n      base IS A {T}{D}\n      @nlg the base\nGIVETH A BOOLEAN\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("base", "the base")])
+      sameWithAndWithout "a rule's gloss at the GIVEN column, which is the rule's"
+        "GIVEN base IS A {T}{D}\n@nlg the rule\nDECIDE `r` IF TRUE\n"
+        (\ got _ -> got `shouldBe` [("r", "the rule")])
+
+  -- A constructor's field list is a column like a record's, so a herald below
+  -- the last field is that FIELD's. The constructor's own herald therefore goes
+  -- between its name and `HAS`, and the one written above a constructor is
+  -- the previous constructor's (`gotchas.md`, "A constructor that has fields").
+  describe "a constructor that has fields" $ do
+    it "takes the herald written between its name and HAS" $ do
+      (m, ws) <- parsed
+        "DECLARE Penalty IS ONE OF\n\
+        \    NoPenalty\n\
+        \    Custodial\n\
+        \        @nlg a custodial penalty\n\
+        \        HAS years IS A NUMBER\n\
+        \        @nlg the term in years\n"
+      attachments m
+        `shouldBe` [("Custodial", "a custodial penalty"), ("years", "the term in years")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "leaves a herald below its field list to the last field" $ do
+      (m, _) <- parsed
+        "DECLARE Penalty IS ONE OF\n\
+        \    NoPenalty\n\
+        \    Custodial\n\
+        \        HAS years IS A NUMBER\n\
+        \        @nlg the term in years\n"
+      attachments m `shouldBe` [("years", "the term in years")]
+
+    it "leaves a herald above it to the constructor before" $ do
+      (m, _) <- parsed
+        "DECLARE Penalty IS ONE OF\n\
+        \    NoPenalty\n\
+        \    @nlg a custodial penalty\n\
+        \    Custodial\n\
+        \        HAS years IS A NUMBER\n"
+      attachments m `shouldBe` [("NoPenalty", "a custodial penalty")]
