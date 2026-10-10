@@ -567,9 +567,10 @@ evalResultToJson fields edr = Aeson.object $
   case edr.range of
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
-  -- the run's notes (an early act, R-X6; an empty window), only when there
-  -- are any, so a directive with none is unchanged
-  ++ [ "notes" .= edr.notes | not (null edr.notes) ]
+  -- the run's notes (an early act, R-X6; an empty window) and the TYPICALLY
+  -- defaults it took (W11), only when there are any, so a directive with none is
+  -- unchanged; the same lines @l4 run --json@ carries under the same key
+  ++ [ "notes" .= notes | let notes = edr.notes <> EL.defaultNotes edr.trace edr.presumed, not (null notes) ]
   -- what an undetermined result waits on, only for one
   ++ [ "undetermined" .= u | Just u <- [EL.undeterminedJson edr.result] ]
   where

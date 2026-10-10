@@ -45,6 +45,7 @@ module TestData (
   enumNullJL4,
   recordWrapJL4,
   ownDecodeJL4,
+  echoRecordJL4,
   deonticDefaultJL4,
   spinJL4,
   spinOrRefuseJL4,
@@ -54,6 +55,9 @@ module TestData (
   heavyMainJL4,
   deepJL4,
   partialClausesJL4,
+  deonticSectionDefaultJL4,
+  directivesAboveDefaultJL4,
+  truncatedTraceJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -936,6 +940,22 @@ GIVETH A NUMBER
 budget MEANS cfg's timeout PLUS cfg's retries
 |]
 
+-- | A function that hands its record input back, so that a field the request
+-- left out is read only when the answer is written out (W8: the event of a
+-- default read that late hangs on the expression that built the result).
+echoRecordJL4 :: Text
+echoRecordJL4 =
+  [i|
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+
+@export default `same config`
+GIVEN cfg IS A Config
+GIVETH A Config
+`same config` MEANS cfg
+|]
+
 -- | A rule that decodes JSON of its own (review M3): the switch must not
 -- reach it, and under hard the answer says it rests on its default.
 ownDecodeJL4 :: Text
@@ -1126,4 +1146,74 @@ GIVEN p IS A BOOLEAN
       q IS A BOOLEAN
 GIVETH A BOOLEAN
 gate MEANS p AND q
+|]
+
+-- | A deontic rule that reads a section GIVEN's default: the wrapper's module
+-- is named for the function, so the range the evaluation reports names the
+-- function's file and not the author's (W8 review F2).
+deonticSectionDefaultJL4 :: Text
+deonticSectionDefaultJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+§ `Roads`
+    GIVEN `is motorway` IS A BOOLEAN TYPICALLY FALSE
+
+    @export default belt rule
+    GIVEN driver        IS A Driver
+    GIVETH A PROVISION OF Driver, `Driver Action`
+    `belt rule` MEANS
+        IF      `is motorway`
+        THEN    PARTY driver
+                MUST `wear seatbelt`
+                WITHIN 1
+        ELSE    PARTY driver
+                MAY `drive`
+|]
+
+-- | A section GIVEN's default declared below directives. The wrapper is
+-- evaluated from the source with its directives removed, which used to move
+-- every line below them up (W8 review F2).
+directivesAboveDefaultJL4 :: Text
+directivesAboveDefaultJL4 =
+  [i|
+GIVETH A NUMBER
+base MEANS 10
+
+\#EVAL base
+
+\#EVAL base
+
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export default may contract
+GIVEN `is adult`    IS A BOOLEAN
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `has capacity` AND `is adult`
+|]
+
+-- | A trace that fills the display limit (10000 nodes) before the step that
+-- reads the default: @fib 16@ first, @the rate@ last. The reasoning tree is cut
+-- off before it, and must show the default all the same (W8 review N2).
+truncatedTraceJL4 :: Text
+truncatedTraceJL4 =
+  [i|
+§ `Rates`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+fib n MEANS IF n < 2 THEN n ELSE fib (n MINUS 1) PLUS fib (n MINUS 2)
+
+@export default `big then rate`
+GIVEN k IS A NUMBER
+GIVETH A NUMBER
+`big then rate` MEANS fib k PLUS `the rate`
 |]

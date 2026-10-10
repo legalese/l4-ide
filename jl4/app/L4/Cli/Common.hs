@@ -79,6 +79,7 @@ import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
+  , defaultNotes
   , parseFixedNow
   , prettyAssertionOutcome
   , prettyReductionOutcome
@@ -396,7 +397,7 @@ traceTextModeReader = eitherReader \input ->
     other -> Left $ "Invalid trace MODE: " <> Text.unpack other <> " (expected none|full)"
 
 renderEvalOutput :: TraceTextMode -> Int -> EvalDirectiveResult -> Text
-renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace, ledger = led, notes = ns} =
+renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace, ledger = led, notes = ns0, presumed} =
   Text.intercalate "\n\n" $ catMaybes
     [ Just headerLine
     , Just ("Result:\n" <> indentBlockText (renderEvalValue result))
@@ -406,7 +407,9 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
     ]
   where
     -- what the run reported without failing (an early act, R-X6; an empty
-    -- window): dropped when there is nothing, like the ledger
+    -- window), and each TYPICALLY default it took (W11): dropped when there
+    -- is nothing, like the ledger
+    ns = ns0 <> defaultNotes mTrace presumed
     notesSection = case ns of
       [] -> Nothing
       _  -> Just ("Notes:\n" <> indentBlockText (Text.intercalate "\n" ns))

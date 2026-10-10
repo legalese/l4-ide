@@ -14,6 +14,9 @@
 # A script that greps the Message line alone undercounts the first and never sees the
 # second; a refusing assertion then looks green.
 #
+# A `NOTE:` line (an assertion that took a TYPICALLY default) also moves the message
+# below `Message:`; l4-cli-test runs this script on a module with both layouts.
+#
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
 # Env:    L4   the l4 binary      (default: `l4` on PATH)
 #

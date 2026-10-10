@@ -14,6 +14,7 @@ module L4.EvaluateLazy.Machine
 , runEval
 , tryEval
 , traceEval
+, traceDefaultForce
 , raiseException
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
@@ -60,6 +61,8 @@ module L4.EvaluateLazy.Machine
 , PresumedLog
 , emptyPresumedLog
 , presumedEvents
+, peekWHNF
+, peekNF
 , renderPresumedPath
 , Config (..)
 , forwardExpr
@@ -135,7 +138,7 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
-import L4.EvaluateLazy.Trace (EvalTraceAction (..))
+import L4.EvaluateLazy.Trace (EvalTraceAction (..), Presumed (..), PresumedKey, PresumedOrigin (..), presumedKey, renderPresumedPath)
 import L4.Presumption
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
@@ -413,61 +416,28 @@ data EvalState =
 -- | 'EvalState.presumed': the events in the order forced, and the ones seen,
 -- so that a repeat is dropped without rescanning the list.
 data PresumedLog = MkPresumedLog
-  { events :: !(DList Presumed)
-  , seen   :: !(Set ([Text], PresumedOrigin))
+  { events :: !(DList (Presumed, Reference))
+    -- ^ Each default with the reference whose force reported it, so that its
+    -- value can be read when the directive ends ('peekNF': a default is a thunk
+    -- when it is registered, and has its value only once it has been forced).
+  , seen   :: !(Set PresumedKey)
   }
 
 emptyPresumedLog :: PresumedLog
 emptyPresumedLog = MkPresumedLog mempty Set.empty
 
-presumedEvents :: PresumedLog -> [Presumed]
+presumedEvents :: PresumedLog -> [(Presumed, Reference)]
 presumedEvents l = DList.toList l.events
 
--- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
--- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
--- rests on it.
---
--- Recorded when the default is FORCED, not when it is filled in: an input the
--- rule never reads did not shape the answer, and T6 lists only the defaults
--- that did. That is why the event is raised by 'evalRef' rather than at the
--- fill site, wherever the fill happened.
-data Presumed =
-  MkPresumed
-    { path       :: ![Text]
-      -- ^ Where the default landed: the input's name, then the field names
-      -- below it, with a list element written as its index.
-    , declaredAt :: !(Maybe SrcRange)
-      -- ^ The @TYPICALLY@ that supplied the value.
-    , origin     :: !PresumedOrigin
-    }
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass NFData
-
--- | Which fill site supplied a default. A consumer keeps only the events that
--- belong to its request (T6b): an L4 program may decode JSON of its own.
-data PresumedOrigin
-  = FromSectionBinder
-    -- ^ A section @GIVEN@'s default, filled at the root by 'L4.Discharge'.
-  | FromRootFill
-    -- ^ A default the caller filled at the root ('presumableDefs').
-  | FromRequest
-    -- ^ A field of the request's own decode ('EvalState.requestRecord'),
-    -- filled from its @DECLARE@, or a MAYBE there filled with NOTHING.
-  | FromDecode !Text
-    -- ^ A field of a decode the RULES made, filled the same way; the text is
-    -- the type that decode started from.
-  deriving stock (Eq, Ord, Show, Generic)
-  deriving anyclass NFData
-
 -- | Report a default that took effect ('EvalState.presumed'), once.
-tellPresumed :: Presumed -> Eval ()
-tellPresumed p = do
+tellPresumed :: Presumed -> Reference -> Eval ()
+tellPresumed p rf = do
   psRef <- asks (.presumed)
   liftIO $ modifyIORef' psRef \ l ->
-    let key = (p.path, p.origin)
+    let key = presumedKey p
     in if key `Set.member` l.seen
          then l
-         else MkPresumedLog (l.events `DList.snoc` p) (Set.insert key l.seen)
+         else MkPresumedLog (l.events `DList.snoc` (p, rf)) (Set.insert key l.seen)
 
 -- | Mark a reference as a default, so that forcing it reports one.
 registerPresumable :: Reference -> Presumed -> Eval ()
@@ -487,6 +457,26 @@ lookupPresumable rf = do
 addressNumber :: Address -> Int
 addressNumber (MkAddress _ i) = i
 
+-- | W8: if this reference is a default nobody has forced yet, record that in
+-- the trace, as the event 'TookDefault'. Called by the machine immediately
+-- before it records the force itself ('SetRef'), which is what puts the event
+-- in the trace of whatever needed the value (Note [Defaults in the trace]).
+--
+-- It only looks: the log ('notePresumedForce') is updated by 'evalRef' as
+-- the force happens, and both see the same registry and the same log, so the
+-- trace has an event for exactly the defaults the log lists. With tracing off
+-- this costs one read of the trace switch.
+traceDefaultForce :: Reference -> Eval ()
+traceDefaultForce rf = do
+  tracing <- isJust <$> asks (.evalTrace)
+  when tracing $
+    lookupPresumable rf >>= traverse_ \ p -> do
+      -- once per default, as in the log: a pinned copy of a default
+      -- ('snapshotRef') is another reference to the same one
+      l <- readEvalRef (.presumed)
+      unless (presumedKey p `Set.member` l.seen) $
+        traceEval (TookDefault p rf)
+
 -- | Called on every force ('evalRef'): if the reference is a default nobody
 -- has forced yet, report it. The map is empty for almost every run, and the
 -- 'IntMap.null' test is all such a run pays.
@@ -498,7 +488,7 @@ notePresumedForce rf = do
     for_ (IntMap.lookup (addressNumber rf.address) m) \ (ptr, p) ->
       when (ptr == rf.pointer) do
         liftIO $ modifyIORef' pRef (IntMap.delete (addressNumber rf.address))
-        tellPresumed p
+        tellPresumed p rf
 
 -- | A note the run reports beside a directive's value ('EvalState.notes').
 -- Plain text: rendered where it is raised, from what the machine has in
@@ -4897,17 +4887,6 @@ atField at
   | null at.fieldPath = ""
   | otherwise         = " for field '" <> renderPresumedPath at.fieldPath <> "'"
 
--- | A decode path as one string: field names joined with dots, a list index
--- written straight after its list (@people[0].age@).
-renderPresumedPath :: [Text] -> Text
-renderPresumedPath = Text.concat . go True
-  where
-    go _ [] = []
-    go atStart (s : ss)
-      | "[" `Text.isPrefixOf` s = s : go False ss
-      | atStart                 = s : go False ss
-      | otherwise               = "." : s : go False ss
-
 -- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
 -- a number, a string, or a nullary constructor. 'Nothing' for anything else,
 -- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
@@ -5101,7 +5080,7 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                       fieldRefs <- forM fields $ \(fieldType, fieldAt, given, decision) -> do
                         let fieldTxt = renderPresumedPath fieldAt.fieldPath
                             presumedHere declaredAt =
-                              MkPresumed { path = fieldAt.fieldPath, declaredAt, origin }
+                              MkPresumed { path = fieldAt.fieldPath, declaredAt, origin, valueText = Nothing }
                         case (decision, given) of
                           -- A declared default, reported when it is forced,
                           -- not here: a field the rule never reads did not

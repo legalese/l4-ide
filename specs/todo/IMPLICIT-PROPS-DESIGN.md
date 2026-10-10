@@ -2448,11 +2448,14 @@ which owns the defect; this section owns the ruling and the limit.
   definitions rank with the selectors, below every opened field).
 - **R11, `@reads`, and the hover/index surfaces of §2.9 are not built.** They are
   §6 item 6 with the backends.
-- **A defaulted binder gets no dedicated trace event.** §2.5 asks for one naming
-  the binder, the declaration line and the value. Because the default becomes an
-  ordinary 0-ary definition, the trace records it as a definition force, which
-  is accurate but is not the "alpha took its default 10" line the directive
-  output was supposed to render from.
+- ~~**A defaulted binder gets no dedicated trace event.**~~ **Built 2026-10-03 in
+  `feat/typically-w8`, not landed** (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2): a
+  default that is read is an event in the text trace, the service's reasoning
+  tree and the graph, naming the binder, the declaration and the value. The
+  "alpha took its default" line of a plain `#EVAL` or `#ASSERT` is built beside
+  it as W11 (§4.3, same branch, not landed): a `NOTE:` line naming the binder,
+  its value and the declaration. Still open: a default read through an `IMPORT`
+  has no event at all (§4.2, F5).
 - ~~A rule that reads a binder cannot be passed as a first-class value.~~
   **Built after review.** The pass now eta-expands a bare reference to a reader
   with parameters of its own, minting `Unique`s with the sort char `'d'` (no

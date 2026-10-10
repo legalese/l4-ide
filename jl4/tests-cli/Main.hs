@@ -32,7 +32,9 @@ import System.Directory
   , removeFile
   , removePathForcibly
   )
+import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..), exitFailure)
+import qualified System.Info as Info
 import System.FilePath ((</>), isAbsolute, normalise)
 import Test.Hspec
 
@@ -254,14 +256,37 @@ arrayField v k = case objField v k of
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
-batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture, runDefaultFixture :: FilePath
 batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+traceDefaultFixture = fixtureDir </> "trace-default.l4"
+runDefaultFixture = fixtureDir </> "run-default.l4"
+
+-- | A trace cut off at its display limit before the step that read a default.
+traceDefaultTruncatedFixture :: FilePath
+traceDefaultTruncatedFixture = fixtureDir </> "trace-default-truncated.l4"
+
+-- | A directory with one module whose assertions read @TYPICALLY@ defaults, and
+-- the encoding skill's self-check that counts them from the text of @l4 run@.
+-- The tests run from the package directory, so the repository root is above it.
+checkShFixtureDir, checkShScript :: FilePath
+checkShFixtureDir = fixtureDir </> "check-sh"
+checkShScript     = ".." </> "skills" </> "encoding-a-subject" </> "assets" </> "check.sh"
 
 -- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
 descAttachmentFixture :: FilePath
 descAttachmentFixture    = fixtureDir </> "desc-attachment.l4"
+
+-- | Split a string where a needle first occurs: what is before it, and the rest
+-- from the needle on (the rest is empty when the needle does not occur).
+breakOn :: String -> String -> (String, String)
+breakOn needle = go []
+ where
+  go acc [] = (reverse acc, [])
+  go acc s@(c : rest)
+    | needle `isPrefixOf` s = (reverse acc, s)
+    | otherwise             = go (c : acc) rest
 
 -- | How many (possibly overlapping) times a needle occurs in a haystack.
 countInfix :: String -> String -> Int
@@ -411,7 +436,7 @@ coreFixtures =
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
-  , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+  , batchEscapeFixture, batchEscapeInput, evalTraceFixture, traceDefaultFixture, runDefaultFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
   , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
@@ -504,6 +529,47 @@ spec bin = do
       case objField env "results" of
         Just (Array v) -> length v `shouldBe` 2
         other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- W11 (R8: "every directive ... names each parameter that took its
+    -- default"): a plain #EVAL says which default it took, beside its value,
+    -- on both surfaces, and a directive that supplied the value says nothing.
+    it "says which TYPICALLY default a directive took, and not when the value was supplied" $ do
+      Output code sout _ <- runL4 bin ["run", runDefaultFixture]
+      code `shouldBe` ExitSuccess
+      -- with its value, which R8's example line has ("alpha took its default 10")
+      countInfix "the rate took its default 3 (declared at run-default.l4:" sout `shouldBe` 1
+      countInfix "Notes:" sout `shouldBe` 1
+      env <- jsonEnvelope bin ["run", runDefaultFixture, "--json"]
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [first, second] -> do
+            objField first "notes" `shouldSatisfy` (\ n -> case n of
+              Just (Array ns) -> length ns == 1
+              _               -> False)
+            objField second "notes" `shouldBe` Nothing
+          other -> expectationFailure ("Expected two results, got " ++ show other)
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Review N1 of W11: the encoding skill's check.sh reports "satisfied" and
+    -- "failed" counts, which are the deliverable of an encoding, by reading the
+    -- text of `l4 run`. A NOTE line makes `l4 run` print the message on the lines
+    -- below `Message:` and not on it, and a count that reads only that line
+    -- reports an assertion that took a default as neither satisfied nor failed,
+    -- at the same exit status. The fixture has both layouts.
+    it "is counted by the encoding skill's check.sh whichever line the message sits on" $ do
+      mbash  <- findExecutable "bash"
+      hasIt  <- doesFileExist checkShScript
+      case mbash of
+        Just bash | hasIt, Info.os /= "mingw32" -> do
+          script  <- makeAbsolute checkShScript
+          dir     <- makeAbsolute checkShFixtureDir
+          parent  <- getEnvironment
+          Output _ sout _ <- runL4In Nothing (Just (("L4", bin) : parent)) bash [script, dir]
+          let rows = [ words l | l <- lines sout, "rates.l4" `isPrefixOf` l ]
+          -- errors, satisfied, failed, refused, expected: the failed assertion is
+          -- the one error
+          rows `shouldBe` [["rates.l4", "1", "3", "1", "0", "0"]]
+        _ -> pendingWith "needs bash and the skills/ directory beside jl4/"
 
     -- The R-X6 note must reach the machine-readable surface too: a consumer
     -- reading only "value" would be handed the silent nullity the ruling
@@ -1152,6 +1218,31 @@ spec bin = do
       -- it just produces no output but still exits 0.
       Output code _ _ <- runL4 bin ["trace", evalFixture]
       code `shouldBe` ExitSuccess
+
+    -- W8: a default that took effect is a node of the graph, as it is a line
+    -- of the text trace, and an IF still labels its condition by position.
+    it "draws a default that took effect, and an IF keeps its labelled condition" $ do
+      Output code sout _ <- runL4 bin ["trace", traceDefaultFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("the rate took its default (declared at trace-default.l4:" `isInfixOf`)
+      sout `shouldSatisfy` ("has capacity took its default (declared at trace-default.l4:" `isInfixOf`)
+      -- one edge is the IF's, and it is the one into the condition, not into
+      -- the default that hangs below the condition
+      countInfix "label=IF" sout `shouldBe` 1
+
+    -- Review N2 of W8: a trace cut off at its display limit before the step that
+    -- read the default shows the default all the same, once, inside the trace (and
+    -- not as a line of the note outside it), and in the graph.
+    it "shows a default that a truncated trace did not reach" $ do
+      Output code sout serr <- runL4 bin ["trace", traceDefaultTruncatedFixture]
+      code `shouldBe` ExitSuccess
+      let said = "the rate took its default (declared at trace-default-truncated.l4:"
+          (beforeTrace, fromTrace) = breakOn "─────" serr
+      serr `shouldSatisfy` ("trace truncated" `isInfixOf`)
+      countInfix said serr `shouldBe` 1
+      said `shouldSatisfy` (`isInfixOf` fromTrace)
+      said `shouldSatisfy` (`notInfixOf` beforeTrace)
+      countInfix said sout `shouldBe` 1
 
   describe "l4 state-graph" $ do
     it "fails on a file without regulative rules" $ do
