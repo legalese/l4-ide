@@ -89,9 +89,9 @@ A validation mode runs the binder and does not evaluate; that is `--validate-onl
 | `UseDefault d`                                 | a root fill, origin `FromRootFill`                                                                                                                        | the same                                                                                                                                                                  |
 | `UseNothing` (D7.3)                            | a root fill of `NOTHING`                                                                                                                                  | the same                                                                                                                                                                  |
 | `NullIsNothing`                                | `NOTHING`                                                                                                                                                 | the same                                                                                                                                                                  |
-| `RefuseMissing why`                            | refused by name                                                                                                                                           | **a root assume** once C1 is marked accept; refused by name until then                                                                                                    |
+| `RefuseMissing why`                            | refused by name                                                                                                                                           | **a root assume** (C1, accepted 2026-10-10; CONTRACT §5.4)                                                                                                                |
 | `RefuseNull _ _` on a `BOOLEAN`                | refused by name on `/evaluation`; a lazy placeholder on the wrapper path (W1), which MCP and `/batch` reach for a top-level `null` (smucclaw/l4-ide#1021) | **a root assume**, at S3, with no ruling needed: W1's lazy binding is ruled (TU-wire-b) and built, and the binder applies it on every surface, which closes #1021's split |
-| `RefuseNull _ _` on any other non-`MAYBE` type | refused by name on both paths (T3)                                                                                                                        | **a root assume** once C1 is marked accept, with `Declined` provenance when UES §4.8 lands; refused by name until then                                                    |
+| `RefuseNull _ _` on any other non-`MAYBE` type | refused by name on both paths (T3)                                                                                                                        | **a root assume** (C1, accepted 2026-10-10), with `Declined` provenance when UES §4.8 lands                                                                               |
 
 **The new arm, a root assume.**
 An `ASSUME x IS A T` added to the module the way `addRootFills` adds a `DECIDE`, with a `Unique` minted under its own sort character (the list in `L4.Discharge.dischargeModule`), and referenced as `App ref []` wherever the input or field is read.
@@ -176,14 +176,14 @@ Each slice lands alone; S1 and S2 need no ruling.
 - **S2. `l4 batch` on the binder.** `processRow` builds a `Request` and calls the binder; `generateBatchWrapper`, `generateInputRecord`, `generateAssumeBinding`, `validateRow` and the per-row `runOneshot` go; the envelope keeps its keys; §7's batch tests are re-pinned to the unified wording; the tutorial page is re-quoted.
   Measured before merge: the §3.2.1 differential no longer applies to batch, and the batch examples in `doc/` give the answers they gave.
 - **S3. The root assume.** `RefuseMissing` and `RefuseNull` become root assumes at every position (§3.2); `requiresWrapperEvaluation`, `generateEvalWrapper` and the non-deontic half of `CodeGen.hs` go; the wrapper-path tests of §7 move to the direct path's wording; `jl4-service/README.md` describes one path.
-  **This slice is breaking where C1 is, and waits on C1's mark for those arms**: `RefuseMissing`, and `RefuseNull` on a type other than `BOOLEAN`.
+  **This slice is breaking where C1 is**; C1 was accepted on 2026-10-10 (read from the store on 2026-10-11, recorded in CONTRACT §5.4), so nothing gates it: `RefuseMissing`, and `RefuseNull` on a type other than `BOOLEAN`, become root assumes.
   The `BOOLEAN` arm needs no ruling (§3.2) and may land first, with the wrapper retired for a request whose only not-known values are `BOOLEAN`s; a `{}` or `null` elsewhere keeps the wrapper path until C1, because refusing it on the direct path would turn today's decode-time refusal by name into `fnLiteralToExprTyped`'s "unknown value for a non-MAYBE parameter", which is a change for no gain.
 - **S4. Assertions.** CONTRACT §9 as rewritten: `Request.assertions`, the generalised rewrite, `FromAssertion`, `asserted`, the §5.3 refusals, the schema key; waits on C4 and C6, as the bench's queue says.
 - **S5. The fallback.** Measure whether `createFunction`'s slow path is ever reached (§13); remove it if not.
 
 ## 9. What this does to the bench and the contract
 
-- **C1** stays a ruling: the cost of building step 6's two dependencies falls from three sites to one arm (§3.2), and the cost that remains is the breaking half, §7's sites and `--validate-only`'s status and exit code, which this document does not change.
+- **C1** was accepted on 2026-10-10 (CONTRACT §5.4): the cost of building step 6's two dependencies falls from three sites to one arm (§3.2), and the cost that remains is the breaking half, §7's sites and `--validate-only`'s status and exit code, which this document does not change.
 - **C4** stands as printed, and is smaller: the structured `Request` is canonical, and each flat surface is one adapter with one reserved key.
 - **C6** stands; §3.1's census is the binder's, run in validation mode.
 - **C2, C3, C5** are language and exporter questions this document does not reach.
@@ -203,8 +203,7 @@ Assumed, each revertible alone:
 
 Open for Meng, each a ruling and not a slice:
 
-- **C1**, which gates S3, as the bench has it.
-- **Nothing else new.** This document adds no card; its disagreements with the printed recommendations of C2 and C5 were given to Meng in chat on 2026-10-11 as input to his marks, and the cards stand as printed.
+- **Nothing new.** C1, which gated S3, was accepted on 2026-10-10. This document adds no card; its disagreements with the printed recommendations of C2 and C5 were given to Meng in chat on 2026-10-11 as input to his marks, and the cards stand as printed.
 
 ## 11. Non-goals
 

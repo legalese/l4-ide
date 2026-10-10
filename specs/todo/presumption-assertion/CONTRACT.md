@@ -194,7 +194,8 @@ Door number two depends on this: an asserted node's inputs are never reached, so
 **What this document asks for, and where it is already written.** An input of the request that is left out and that nothing fills is bound to an **unknown**, so that evaluation proceeds under U1 and an answer that rests on it is undetermined, naming it, instead of a decode-time refusal.
 Under soft, "nothing fills" means no default and not a `MAYBE`; under hard it also means a default withheld (T4) and a `MAYBE` not taken as `NOTHING` (T1b).
 UES §8 step 6 already lists exactly this as its two dependencies, "W1's placeholders extended to every input that is not a `MAYBE`, and lazy binding on the direct path, neither of which has a W number" (`:1136`), and row 55 already rules the batch outcome (U7b).
-Steps 4 to 7 are parked under MOTHBALL (`:977`), so **the open item is un-parking those two dependencies**, which is Meng's (§13); nothing here is new scope or a new choice.
+Steps 4 to 7 are parked under MOTHBALL (`:977`), so **the open item was un-parking those two dependencies**, which is Meng's (§13); nothing here is new scope or a new choice.
+**RULED 2026-10-10.** Meng marked `accept` on bench card C1 (Presumption and Assertion, `claude.ai/artifact/M9L8KvYihHAoUgwHrqWevm`, collection `l4-presumption-assertion-1010`) at 21:31:14Z, with no note; read from the store on 2026-10-11. The ruling, as the card printed it: un-park UES §8 step 6's two dependencies, built on the post-#556 `unstable`, as §5.4 states them; `--validate-only` keeps naming every gap, as a warning where it is a refusal now (a change of status and exit code that the PR lists with the tests); the listed tests and the tutorial page change in the same PR; for `l4 batch` the placeholder is new work in its own wrapper. The card's corrections, printed on it: W1 is jl4-service only, and §5.4's "already generate" was wrong for batch; it is one tutorial page cited twice, not two; `tests-cli/Main.hs:1792` pins a behaviour, not wording; `--validate-only`'s change is of status and exit code, not wording only; T3 (TU-wire-b) had already ruled eager refusal stays only on the direct path, so TY `:292` and UBC `:233` were wrong to call this new scope. How it would be built is `REQUEST-BINDER-SPEC.md` §3.2 (one root assume), slice S3, proposed and not built.
 
 _Superseded 2026-10-11 by `REQUEST-BINDER-SPEC.md` §3.2:_ the placeholder is one root assume, an `ASSUME` added to the module by the binder and named by the input or field itself, at every surface, so the three sites below collapse to one arm of `fillDecision`; the text is kept to show what each surface does today.
 
@@ -355,7 +356,7 @@ Non-goals of this version:
 
 Open for Meng, each a ruling and not a slice:
 
-- **§5.4, un-parking UES §8 step 6's two dependencies** (placeholders for every non-`MAYBE` input, lazy binding on the direct path), which MOTHBALL parked: already ruled in substance (U7b, row 55), breaking per §11, and stacked on #556, which has merged.
+- **§5.4, un-parking UES §8 step 6's two dependencies** (placeholders for every non-`MAYBE` input, lazy binding on the direct path), which MOTHBALL parked: **RULED 2026-10-10, accepted on bench card C1, recorded in §5.4**; already ruled in substance (U7b, row 55), breaking per §11, and stacked on #556, which has merged.
   _Note, 2026-10-11:_ `REQUEST-BINDER-SPEC.md` §3.2 makes the two dependencies one arm of the binder, built once; the ruling is unchanged and its breaking half is unchanged.
 - **§3's narrowing** of the ruling's "every named derived node" to nullary, main-module, uniquely named nodes for the first version.
 - **§7**: a presumption on a named step; no ruling reaches it.
