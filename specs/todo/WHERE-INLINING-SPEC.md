@@ -10,6 +10,8 @@ Server: `afffcb6e5` (expansions on the wire) and `56e978951` (opt-in per request
 Client: `ec7cae39e` (call panels) and `ab06af184` (real fixture, the IDE's click spreading, folded answers drive current).
 §10's line citations are to the tree at `e6e037d81`._
 
+_§10.7, named and polymorphic calls (smucclaw/l4-ide#1033), is built on branch `mengwong/ladder-dustpan`, not merged when this was written._
+
 **One-line summary.** `x WHERE x MEANS e` and `e` mean the same thing to the evaluator and
 different things to the analyser. This spec makes them mean the same thing to the analyser too:
 local bindings are substituted before analysis (§5), and a call to another rule is read through
@@ -176,20 +178,21 @@ inlineLocalBindings :: Expr Resolved -> Expr Resolved
 inlineLocalBindingsInDecide :: Decide Resolved -> Decide Resolved
 ```
 
-Both are in `jl4-core/src/L4/Transform.hs` (`:92` and `:259`).
+Both are in `jl4-core/src/L4/Transform.hs` (`:93` and `:307`).
 Algorithm, per `Where`/`LetIn` node, innermost first:
 
-1. Collect candidates: every `LocalDecide` that `unfoldableDecide` accepts (`Transform.hs:151-159`), with any number of parameters.
+1. Collect candidates: every `LocalDecide` that `unfoldableDecide` accepts (`Transform.hs:152-161`), with any number of parameters.
    It refuses a definition whose body applies one of its own parameters as a function (§9.2).
    Key by the bound name's unique, and keep the parameters' uniques in order.
 2. Drop from the candidate set any binding reachable from its own definiens (self- or mutual
    recursion), computed as a reachability closure over references among the candidates
-   (`pruneRecursive`, `Transform.hs:172`).
-3. Substitute surviving candidates into each other's definienda, iterating to a fixed point (`closeUnder`, `Transform.hs:185`), and then into the body.
+   (`pruneRecursive`, `Transform.hs:219`).
+3. Substitute surviving candidates into each other's definienda, iterating to a fixed point (`closeUnder`, `Transform.hs:232`), and then into the body.
    Termination follows from step 2: the reference graph among the candidates is now acyclic, so each pass strictly reduces the number of remaining references.
-4. A reference is a call `App _ r args` to a candidate **whose argument count equals the candidate's parameter count**, replaced by the definiens with each argument in place of its parameter (`unfoldOnce`, `Transform.hs:208-216`).
+4. A reference is a call `App _ r args` to a candidate **whose argument count equals the candidate's parameter count**, replaced by the definiens with each argument in place of its parameter (`unfoldOnce`, `Transform.hs:256-264`).
+   Since 2026-10-11 a call written with named arguments is such a call too, read as the positional call it stands for (`positionalCall`, `Transform.hs:201`; §10.7).
    A reference at another arity is left alone, per §3.
-5. A binding is dropped once nothing refers to it any more, which for a zero-arity binding is always; a parameterised one can still be referenced at another arity (`Transform.hs:114-137`).
+5. A binding is dropped once nothing refers to it any more, which for a zero-arity binding is always; a parameterised one can still be referenced at another arity (`Transform.hs:115-138`).
    If every binding was dropped, the node collapses to the substituted body; otherwise the node is retained carrying only the bindings that survived.
 
 **Annotations.** The definiens is spliced with its own `Anno`, so a finding at an inlined
@@ -258,9 +261,13 @@ Meng's ruling (BETAMAX): substitute through calls, arguments included.
 
 The second paragraph is the design, and it is the one that took a measurement to find (§9.4).
 
+_Changed 2026-10-11 (smucclaw/l4-ide#1033, §10.7):_ a call written with named arguments, `` `big` WITH k IS n ``, is such a leaf too, read as the positional call it stands for; until then it stayed an opaque atom.
+Assumed, not ruled: R2 says "each leaf that is a call", and a named call is one.
+
 ### 9.2 Beta reduction, and why nothing can be captured
 
 `L4.Transform.unfoldOnce` replaces a call `App _ r args` whose callee is known **and whose argument count equals the callee's parameter count** by the callee's body with each argument in place of its parameter.
+A call with named arguments is read as its positional call first (`positionalCall`, since 2026-10-11, §10.7).
 The arity check is the guard: a reference at another arity is the rule passed as a value, not a call, and is left alone.
 `inlineLocalBindings` uses the same step for local bindings, so a `WHERE` helper with parameters is now substituted too (§3's first row).
 
@@ -583,3 +590,43 @@ With the mixfix labels of §10.6 and the folded-call conduction fix of `ladder-d
   The sidebar's `setValueForUnique` still binds one Unique, so it still leaves such a twin unanswered.
 - **`ts-apps/charge-generator`** substitutes call arguments itself and keys by rule name, so two calls of one rule with different arguments collapse; it could consume `expansion` instead.
   Not in scope here.
+
+### 10.7 Named and polymorphic calls (2026-10-11, smucclaw/l4-ide#1033)
+
+_Built on branch `mengwong/ladder-dustpan`; not merged when this was written._
+
+smucclaw/l4-ide#1033 named three places where the ladder said less than R3's key does, measured after #598.
+This section closes the first two.
+The third, `p's adult` against `adult p`, was a ruling, not a defect; Meng ruled it on 2026-10-11 (fold them), and it is built on its own branch, `mengwong/ladder-record-accessor`, which records the ruling as R3b in §10.1 (not merged when this was written).
+
+**A call with named arguments opened no expansion.**
+`` `big` n `` opened into its panel and `` `big` WITH k IS n `` drew as one closed leaf, although R3 already keyed the two call boxes alike: the ladder matched only `App`, and so did every unfolding pass in `L4.Transform`.
+`Transform.positionalCall` now reads a named call as the positional call it stands for when the checker's order says its arguments supply parameters `0 .. n-1`, each once, and every pass goes through it: `unfoldOnce`, `unfoldableCallSites`, `unfoldableDecide`, and `L4.Viz.AtomKey.positional`, so the key and the expansion agree by construction.
+`callees` counts the head of every named call.
+Three things follow beyond the panel.
+
+- `l4 verify` reads a named call through, as §9.1 now says (`verify-unfold-named-calls.l4`).
+- A `WHERE` helper that only a named call refers to is unfolded; `inlineLocalBindings` used to drop it, leaving the call pointing at nothing.
+- A rule that calls itself, or another rule that calls it, through a named call is now seen as recursive and left opaque, like positional recursion. Base missed the edge and unfolded such a rule one level, which happened to be sound, so a few findings base made by accident are gone: with `` `r` n IF n > 5 AND (n < 3 OR (`r` WITH n IS n - 1)) ``, base found `` `r` n AND NOT n > 5 `` unsatisfiable, and the positional twin never was.
+
+A named call is drawn as that call, its label and argument boxes in the order written, by both ladders; for an all-BOOLEAN one that is a call box over its arguments, with or without expansions, so the IDE's default lens shows the change too.
+The panel title joins its arguments with commas (`callLabel`).
+`positionalCall` refuses a named call the checker rejected and recovered from, since the IDE draws modules with type errors: an argument name it could not resolve is `OutOfScope`, and a named call to a rule of no parameters has no arguments.
+A named call that supplies a section `GIVEN` (a negative order entry) stays opaque, since substituting for the parameters alone would not be the call.
+
+**A polymorphic callee's `IF` was one opaque leaf inside its expansion.**
+In `` `whichever applies` cond x y MEANS IF cond THEN x ELSE y `` under `GIVEN a IS A TYPE`, the `IF` carries type `a` in its annotation (rewriting that annotation is what makes it draw, as the gap-2 tests measure), substituting BOOLEAN arguments left it as it was, and the guarded-chain case draws an `IF` as structure only when it is BOOLEAN.
+`instantiateTypes` (`LSP.L4.Viz.Ladder`) reads what each type variable stands for off the call, matching the body's type against the call's and each parameter's type, as annotated where the body uses it, against its argument's, and puts that in for every type in the body: annotations through the checker's final substitution, types written in the syntax as written.
+The expand gesture (`l4/inlineExprs`) instantiates the same way.
+
+**Adversarial review** (four lanes, each with probe binaries built from base and from the branch) found five defects in the first build, all fixed with a test each: the expand gesture did not instantiate, so it drew the `IF` the panel had opened as one box; an untyped lambda's parameter type was resolved in the callee's copy only, which keyed it apart from the caller's identical lambda; jl4-core's copy of the ladder still drew a named all-BOOLEAN call as one leaf; panel titles kept the printer's line breaks; and ill-typed named calls opened onto meanings the checker had refused.
+
+**What it knowingly leaves**, by kind of failure:
+
+- **Silent, the safe direction: a polymorphic helper defined as a `WHERE` local INSIDE a callee is not instantiated**, so its `IF` stays one leaf, as before; `inlineLocalBindings` puts it in without types to match against. A polymorphic local of the decision itself is instantiated.
+- **Silent, the safe direction: `l4 verify` does not read a polymorphic rule through**, since it reads only rules whose body is BOOLEAN, so the IDE now opens a call that `verify` leaves opaque.
+- **Slow, and loud only as a timeout: `l4 verify` on a chain of named calls whose meaning doubles at each level** builds the meaning up to the unfold budget (200,000 nodes) before `--max-nodes` refuses it. That was already so for positional calls; named ones now reach it (measured by the review, under load: a 12-level chain took 1.3 s on base and 27.4 s here for the whole file, and with `--decision top` 0.15 s against 8.0 s; its positional twin took 6.9 s on base). A size test before drawing the meaning would avoid it; not done here.
+- **The node budget is all or nothing.** A polymorphic expansion now costs its full size, so a large one can push a decision over `expansionNodeBudget` and cost every call in it its expansion, as a large monomorphic one already could.
+- **An all-BOOLEAN named call's argument ladders count against `l4 verify --max-nodes`**, as a positional call's already did.
+- **Pre-existing, now reaching named calls:** a call box copied into a later row's negated prefix by `GuardedRows` gets a fresh id, and its evaluation maker is registered under the original's, so `l4/evalApp` on the copy finds none.
+- **Not reachable today: if a named call may one day omit a defaulted parameter** (TYPICALLY-ONE-BEHAVIOUR-SPEC row W4), `positionalCall` cannot see the callee's arity, and the term key would read such a call as a shorter positional one. The unfolding passes compare arities and stay right.
