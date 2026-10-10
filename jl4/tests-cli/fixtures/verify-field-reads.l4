@@ -1,0 +1,16 @@
+-- `p's adult` and `adult p` read one field of one record: the projection is sugar
+-- for the selector applied, and the evaluator reads both as one field read
+-- (smucclaw/l4-ide#1033, gap 3). Keyed as two atoms, `l4 verify` could not see
+-- that `either spelling contradicts` asks for the field and its negation at once.
+-- `two people` is the control: the same shape over two records is satisfiable.
+
+DECLARE Person HAS adult IS A BOOLEAN
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `either spelling contradicts` IF p's adult AND NOT adult p
+
+GIVEN p IS A Person
+      q IS A Person
+GIVETH A BOOLEAN
+DECIDE `two people` IF p's adult AND NOT adult q

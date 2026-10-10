@@ -20,6 +20,7 @@ import Control.Monad (forM, forM_)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List (nub, sort)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getTemporaryDirectory, listDirectory)
@@ -131,6 +132,46 @@ namedCalls = T.unlines
   , "  AND limb a b"
   , "  AND (big WITH k IS n)"
   , "  AND big n"
+  ]
+
+-- | Record fields read by projection and by their selectors (smucclaw/l4-ide#1033).
+fieldReads :: T.Text
+fieldReads = T.unlines
+  [ "DECLARE Person HAS adult IS A BOOLEAN"
+  , "                   age IS A NUMBER"
+  , ""
+  , "DECLARE Couple HAS first IS A Person"
+  , "                   second IS A Person"
+  , ""
+  , "GIVEN p IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `either spelling` IF p's adult AND adult p"
+  , ""
+  , "GIVEN c IS A Couple"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `every spelling` IF"
+  , "      c's first's adult"
+  , "  AND adult (first c)"
+  , "  AND (first c)'s adult"
+  , "  AND c's first's age > 18"
+  , "  AND age (first c) > 18"
+  , "  AND (first c)'s age > 18"
+  , ""
+  , "GIVEN p IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE grown p IF p's adult"
+  , ""
+  , "GIVEN c IS A Couple"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `not the same` IF"
+  , "      c's first's adult"
+  , "  AND c's second's adult"
+  , "  AND adult (second c)"
+  , "  AND grown (first c)"
+  , ""
+  , "GIVEN p IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `age either way` IF p's age > 18 OR age p > 18"
   ]
 
 -- | The module the mixfix head-keyword collision was found in
@@ -372,14 +413,14 @@ spec = describe "an atomId is the hash of its leaf's term (R3, smucclaw/l4-ide#1
     length (nub (map (.atomId) pinned)) `shouldBe` 1
 
   it "the query plan names every one of its atoms exactly as the diagram does" $ do
-    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves), ("named-calls", namedCalls)] \(stem, src) -> do
+    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves), ("named-calls", namedCalls), ("field-reads", fieldReads)] \(stem, src) -> do
       (verId, tc) <- checkSource ("plan-" <> stem) src
       forM_ [plain, expanded] \opts ->
         forM_ (drawAll opts verId tc) \(fd, st) ->
           planDisagreements fd st `shouldBe` []
 
   it "the browser's ladder (jl4-core) names every atom as the IDE's does" $ do
-    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves), ("named-calls", namedCalls)] \(stem, src) -> do
+    forM_ [("mixfix", mixfixSharedHead), ("section-shadow", sectionShadow), ("mixed", mixedLeaves), ("named-calls", namedCalls), ("field-reads", fieldReads)] \(stem, src) -> do
       (verId, tc) <- checkSource ("core-" <> stem) src
       let MkModule _ uri _ = tc.module'
           drawn = drawAll plain verId tc
@@ -395,6 +436,33 @@ spec = describe "an atomId is the hash of its leaf's term (R3, smucclaw/l4-ide#1
           Right (core, _) ->
             sort (map (\lf -> (lf.label, lf.atomId)) (directLeaves core.funDecl.body))
               `shouldBe` sort (map (\lf -> (lf.label, lf.atomId)) (directLeaves fd.body))
+
+  describe "a field read written as its selector applied is the field read (smucclaw/l4-ide#1033, gap 3)" $ do
+    let leavesOf target = do
+          (fd, st) <- draw plain "field-reads" fieldReads target
+          pure (directLeaves fd.body, st)
+
+    it "the issue's repro: `p's adult` and `adult p` are one atom" $ do
+      (ls, _) <- leavesOf "`either spelling`"
+      map (.label) ls `shouldBe` ["p's adult", "adult OF p"]
+      length (nub (map (.atomId) ls)) `shouldBe` 1
+
+    it "through a chain of fields, and inside a comparison" $ do
+      (ls, _) <- leavesOf "`every spelling`"
+      length ls `shouldBe` 6
+      -- three spellings of c's first's adult, then of c's first's age > 18
+      length (nub (map (.atomId) (take 3 ls))) `shouldBe` 1
+      length (nub (map (.atomId) (drop 3 ls))) `shouldBe` 1
+      (ls !! 0).atomId `shouldNotBe` (ls !! 3).atomId
+
+    it "different records, different fields, and a rule's call are still different atoms" $ do
+      (ls, _) <- leavesOf "`not the same`"
+      map (.label) ls `shouldBe` ["(c's first)'s adult", "(c's second)'s adult", "adult OF (second OF c)", "grown OF (first OF c)"]
+      -- the second and third are one field read; the rest are all different
+      length (nub (map (.atomId) ls)) `shouldBe` 3
+      (ls !! 1).atomId `shouldBe` (ls !! 2).atomId
+      -- a call to a rule is a call box (R3), not the field its body reads
+      (ls !! 3).atomId `shouldNotBe` (ls !! 0).atomId
 
   -- Every name a leaf mentions must reach 'AtomKey.mkKeyEnv'. One it misses
   -- falls back to its unique: still a distinct key, but one that moves on an

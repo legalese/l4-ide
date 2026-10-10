@@ -43,11 +43,12 @@ bindings, and the decision's @WHERE@ locals it reads ('withLocalsInScope'), are
 put in before keying, as a callee's are before its expansion is drawn. A local
 that cannot be put in (a recursive one) stays in the term with its definition.
 
-Two more things are normalised away before the term is shown, each because it
+Three more things are normalised away before the term is shown, each because it
 would split one proposition into two keys: an inference variable's counter (an
 untyped lambda parameter's type carries one, and it moves when anything checked
-earlier changes), and the named form of a call whose arguments are all given
-(keyed as the positional call). One thing that is NOT in the term is
+earlier changes), the named form of a call whose arguments are all given (keyed
+as the positional call), and a record field read written as its selector
+applied, @adult p@ (keyed as @p's adult@, 'fieldReads'). One thing that is NOT in the term is
 put back: the type a @JSONDECODE@ decodes into, which the evaluator reads off
 the node's annotation, so two decodes into different record types stay apart.
 
@@ -86,6 +87,7 @@ module L4.Viz.AtomKey
   , withTypeExpander
   , withLocalsInScope
   , isEffectful
+  , fieldReads
   , binderPaths
   , unmappedMarker
   ) where
@@ -323,7 +325,9 @@ termKey env expr =
       boundLevels
         . positional
         . over (gplate @(Type' Resolved)) eraseInfVars
-        $ over (gplate @Anno) (const emptyAnno) inlined
+        . over (gplate @Anno) (const emptyAnno)
+        -- before the annotations go: they are what says a name is a selector
+        $ fieldReads inlined
 
     -- JSONDECODE decodes into its node's inferred type, which is an annotation,
     -- so the stripped term no longer says what it decodes into: keep each
@@ -394,6 +398,35 @@ positional = transformOf (gplate @(Expr Resolved)) $ \case
     bySupplyName rn =
       let written = MkName emptyAnno (NormalName (unqualifiedRawNameToText (rawName (getActual rn))))
        in Ref written (MkUnique 's' 0 supplyUri) written
+
+-- | A record field read written as its selector applied, @adult p@, is the field
+-- read @p's adult@: the projection is sugar for the selector's application, and
+-- the evaluator desugars it so (@L4.EvaluateLazy.Machine@, the 'Proj' case), so
+-- the two spellings read one field of one record and are one proposition. Keyed
+-- alike, they are one atom (smucclaw/l4-ide#1033, gap 3, ruled by Meng
+-- 2026-10-11: "record accessor function desugaring").
+--
+-- Both are keyed as the projection, not the other way round, for two reasons.
+-- It is the evaluator's own term for both: a selector applied to an unknown
+-- record gives 'L4.Evaluate.ValueLazy.TField', the field read, whichever way it
+-- was written. And it leaves the key of every @p's adult@ where it was; only the
+-- rarer @adult p@ moves.
+--
+-- A name is a selector when the checker said so, on the reference or on the
+-- definition it refers to (the second because a reference with no source range
+-- carries no stamp; "L4.Dmn.Lower" reads computed selectors the same way). A
+-- computed field (@MEANS@ in a @DECLARE@) is read the same way, by projection or
+-- by its selector. Only an application to exactly one argument is a field read;
+-- a selector's type parameters are implicit, so it never takes more.
+fieldReads :: Expr Resolved -> Expr Resolved
+fieldReads = transformOf (gplate @(Expr Resolved)) $ \case
+  App ann f [record] | isSelector f -> Proj ann record f
+  e -> e
+  where
+    isSelector r = any selectorKind [getActual r, getOriginal r]
+    selectorKind (MkName a _) = case a.extra.resolvedInfo of
+      Just (TypeInfo _ (Just k)) -> k == Selector || k == ComputedSelector
+      _ -> False
 
 -- | Rename every binder defined inside the term by its scope: how many binding
 -- nodes enclose it, and its place among its own node's binders (de Bruijn
