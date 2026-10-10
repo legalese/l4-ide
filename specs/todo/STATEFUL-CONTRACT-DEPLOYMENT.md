@@ -68,6 +68,11 @@ The residual currently carries a captured environment of references. If those re
 
 If neither is feasible, the deployment falls back to event-sourced replay with periodic snapshots — workable but caps deployment scale.
 
+**Requirement recorded 2026-10-11 (`NORM-LOG-SPEC.md` N11, ruled; proposed there, not built here):** a resumable residual must carry the ledger it was evaluated against, so a `RECALL` after resumption reads what it would have read in a full replay.
+That is the `RECORD`/`COMMIT` entries today, and the norm entries as well once the norm log exists (the norm log is per evaluation, so a deployed contract has to persist it with the residual).
+The replay-equivalence property above must therefore be tested with a contract that `RECALL`s a cell written before the resume point; a contract with no ledger access cannot show the difference.
+This section does not yet say how the ledger is serialised, and the status header above is unchanged: all of this is OPEN.
+
 ### 3.2 Duration units (blocker under wall-clock mode)
 
 When a bundle declares `TIMEZONE IS …` the numeric timeline is reinterpreted as Unix seconds (see §5). Authors should be able to write durations in human units; the compiler resolves them to seconds:

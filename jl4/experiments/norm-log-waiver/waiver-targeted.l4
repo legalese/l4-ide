@@ -1,0 +1,75 @@
+-- The TARGETED userspace waiver for NORM-LOG-SPEC ruling N9: each waiver and cure names the book it answers,
+-- and the guard reads every default with RECALL ALL. Written by the N9 skeptic, 2026-10-09; tutorial in
+-- specs/todo/norm-log-waiver-userspace-draft.md. Not goldened; run with `l4 run`.
+-- E3 (one of two defaults waived) must block; E3b (both waived) must allow.
+IMPORT prelude
+
+DECLARE Person IS ONE OF patron, librarian
+DECLARE Action IS ONE OF
+  `return` HAS bk IS A NUMBER
+  payFine HAS bk IS A NUMBER
+              tm IS A NUMBER
+  borrow HAS bk IS A NUMBER
+             tm IS A NUMBER
+  waive HAS bk IS A NUMBER
+            tm IS A NUMBER
+
+DECLARE Mark HAS mbk IS A NUMBER
+                 mtm IS A NUMBER
+
+GIVEN b IS A NUMBER
+      d IS A NUMBER
+GIVETH DEONTIC Person Action
+loanOf MEANS
+  PARTY patron MUST `return` b WITHIN d
+  HENCE FULFILLED
+  LEST  RECORD `overdue` IS Mark b d
+        HENCE PARTY patron MUST payFine b t WITHIN 100
+              HENCE RECORD `cured` IS Mark b t
+              HENCE FULFILLED
+
+GIVETH DEONTIC Person Action
+waiverPower MEANS
+  PARTY librarian MAY waive b t WITHIN 200
+  HENCE COMMIT `waived` IS Mark b t
+  HENCE waiverPower
+
+GIVEN now IS A NUMBER
+      marks IS A LIST OF Mark
+      b IS A NUMBER
+GIVETH A BOOLEAN
+`marked by` MEANS any (GIVEN m IS A Mark YIELD m's mbk EQUALS b AND m's mtm AT MOST now) marks
+
+GIVEN now IS A NUMBER
+      m IS A Mark
+GIVETH A BOOLEAN
+`this default continuing at` MEANS
+      m's mtm AT MOST now
+  AND NOT `marked by` now (RECALL ALL patron's `cured`) (m's mbk)
+  AND NOT `marked by` now (RECALL ALL OFFICIAL's `waived`) (m's mbk)
+
+GIVEN now IS A NUMBER
+GIVETH A BOOLEAN
+`some default continuing at` MEANS
+  any (GIVEN m IS A Mark YIELD `this default continuing at` now m) (RECALL ALL patron's `overdue`)
+
+GIVETH DEONTIC Person Action
+borrowing MEANS
+  PARTY patron MAY borrow 2 t PROVIDED NOT `some default continuing at` t WITHIN 200
+
+GIVETH DEONTIC Person Action
+two MEANS loanOf 1 14 RAND loanOf 3 50 RAND waiverPower RAND borrowing
+
+-- E3: default A (book 1) waived at 25; default B (book 3) late at 60, never waived; borrow at 70. Should be blocked.
+#TRACE two AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY librarian DOES waive 1 25 AT 25
+  PARTY patron DOES `return` 3 AT 60
+  PARTY patron DOES borrow 2 70 AT 70
+-- E3b: both waived: allowed
+#TRACE two AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY librarian DOES waive 1 25 AT 25
+  PARTY patron DOES `return` 3 AT 60
+  PARTY librarian DOES waive 3 65 AT 65
+  PARTY patron DOES borrow 2 70 AT 70
