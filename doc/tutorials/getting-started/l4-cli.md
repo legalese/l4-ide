@@ -403,6 +403,14 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
 
+A fact whose type is a list of choices (`DECLARE Colour IS ONE OF Red, Green, Blue`) is given as the name of one choice, written as text: `"c": "Red"`, or a `Red` cell in a CSV file.
+A choice that carries facts of its own, such as `Circle HAS size IS A NUMBER`, cannot be given as input: there is no way yet to write one in a case.
+Anything else given for such a fact, a name that is not one of its choices, a number, or a record, is an error on that line, naming the fact and the choices it accepts:
+
+```
+Could not decode "Bogus" as Shape for field 's': it names no constructor of Shape; expected a string naming one of: Square. A constructor with fields (Circle) cannot be given as JSON input.
+```
+
 #### Facts a case leaves out
 
 A fact can carry a usual value, written with [`TYPICALLY`](../../reference/types/TYPICALLY.md): a rebuttable presumption that holds unless the case says otherwise. When a case leaves such a fact out, `l4 batch` uses the usual value, and the line says so under `presumed`:

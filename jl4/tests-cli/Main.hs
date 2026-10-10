@@ -158,6 +158,19 @@ batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 
+-- | A choice type with one constructor that has a field and one that has
+-- none. Only the second can be given as JSON input; every other value is
+-- refused by name rather than passed on as NOTHING or as itself
+-- (smucclaw/l4-ide#1012).
+batchChoiceFixture, batchChoiceJson :: FilePath
+batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
+batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
+
+-- | A choice type declared under a § section (smucclaw/l4-ide#947).
+batchSectionEnumFixture, batchSectionEnumJson :: FilePath
+batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
+batchSectionEnumJson    = fixtureDir </> "batch-section-enum.json"
+
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
 batchAssumeDirectFixture, batchAssumeHelperFixture, batchAssumeFullJson, batchAssumeMissingJson :: FilePath
@@ -1533,6 +1546,41 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
+      -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
+      -- and 42. Before #1012 the last four decoded to NOTHING or to
+      -- themselves, reached the fixture's OTHERWISE, and came back
+      -- "status":"success" with the answer "other".
+      Output code sout _ <-
+        runL4 bin ["batch", batchChoiceFixture, "--inputs", batchChoiceJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let rows = filter (not . all isSpace) (lines sout)
+      length rows `shouldBe` 5
+      case rows of
+        (sq : refused) -> do
+          sq `shouldSatisfy` ("\"result\":\"square\"" `isInfixOf`)
+          sq `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          flip mapM_ refused $ \r -> do
+            r `shouldSatisfy` ("Could not decode" `isInfixOf`)
+            r `shouldSatisfy` ("as Shape for field 's'" `isInfixOf`)
+            r `shouldSatisfy` ("one of: Square." `isInfixOf`)
+            r `shouldSatisfy` (not . ("\"other\"" `isInfixOf`))
+        [] -> expectationFailure "l4 batch printed no rows"
+      sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
+      sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "decodes a constructor of a choice type declared under a section by its bare name" $ do
+      -- "Red" is what JSONENCODE writes for Red, and what a request sends;
+      -- the constructor is stored as `Part A.Red`. Before #947's fix every
+      -- row answered FALSE, success; after #1012 alone, every row was refused.
+      Output code sout _ <- runL4 bin ["batch", batchSectionEnumFixture, "--inputs", batchSectionEnumJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [red, blue] -> do
+          red  `shouldSatisfy` ("\"result\":true" `isInfixOf`)
+          blue `shouldSatisfy` ("\"result\":false" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
       -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged

@@ -4800,6 +4800,52 @@ extractFieldNamesAndTypes ty = case ty of
         Just name -> Just (nameToText (TypeCheck.getName name), fieldType)
         Nothing -> Nothing
 
+-- | A JSON value the typed decoder cannot make into the type it was asked
+-- for. Each caller of this used to fall back to the untyped
+-- 'jsonValueToWHNF', which turns an object into @NOTHING@ and passes a string
+-- or a number through as itself: a value of the wrong type, carried on with no
+-- error, so that a rule reaching an @OTHERWISE@ answered with that branch and
+-- @l4 batch@ reported success (smucclaw/l4-ide#1012).
+cannotDecode :: DecodeAt -> Text -> Aeson.Value -> Text -> Machine a
+cannotDecode at typeName jsonValue why =
+  userException $ UserError $
+    "Could not decode " <> TE.decodeUtf8 (LBS.toStrict (Aeson.encode jsonValue))
+      <> " as " <> typeName <> atField at <> ": " <> why
+
+-- | What a value of a choice type is given as in JSON, for 'cannotDecode':
+-- the constructors without fields, by name, and those with fields, which
+-- cannot be given at all.
+choiceExpectation :: Text -> [Text] -> [Text] -> Text
+choiceExpectation typeName withoutFields withFields = case (withoutFields, withFields) of
+  ([], [])  -> typeName <> " has no constructor that JSON input can name."
+  ([], _)   -> "every constructor of " <> typeName <> " has fields (" <> commas withFields
+                 <> "), and a constructor with fields cannot be given as JSON input."
+  (_, [])   -> "expected a string naming one of: " <> commas withoutFields <> "."
+  (_, _)    -> "expected a string naming one of: " <> commas withoutFields
+                 <> ". A constructor with fields (" <> commas withFields
+                 <> ") cannot be given as JSON input."
+  where commas = Text.intercalate ", "
+
+-- | Why a JSON string is not a value of a choice type, for 'cannotDecode'.
+choiceNameMiss :: Text -> Text -> [Text] -> [Text] -> Text
+choiceNameMiss typeName name withoutFields withFields
+  | name `elem` withFields =
+      name <> " has fields, and a constructor with fields cannot be given as JSON input"
+        <> if null withoutFields
+             then "."
+             else "; expected a string naming one of: " <> Text.intercalate ", " withoutFields <> "."
+  | otherwise =
+      "it names no constructor of " <> typeName <> "; "
+        <> choiceExpectation typeName withoutFields withFields
+
+-- | Is this a constructor of the given type, with or without fields?
+constructorReturning :: Type' Resolved -> Resolved -> Bool
+constructorReturning conType targetTypeRef = case conType of
+  Forall _ _ innerTy -> constructorReturning innerTy targetTypeRef
+  Fun _ _ resultTy   -> constructorReturning resultTy targetTypeRef
+  TyApp _ tyRef _    -> getUnique tyRef == getUnique targetTypeRef
+  _                  -> False
+
 -- | Check if a constructor type is nullary (no arguments) and returns the given type
 -- Used for enum (ONE OF) type detection
 isNullaryConstructorReturning :: Type' Resolved -> Resolved -> Bool
@@ -5015,7 +5061,12 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
           -- First check if this is a type
           case Map.lookup (getUnique tyRef) entityInfo of
             Nothing ->
-              jsonValueToWHNF jsonValue
+              -- The type's declaration is not among those the evaluator can
+              -- see (a choice type under a § section is one way to get here,
+              -- smucclaw/l4-ide#947). See 'cannotDecode' for why this is an
+              -- error rather than an untyped decode.
+              cannotDecode at typeName jsonValue $
+                "the decoder cannot find the declaration of " <> typeName
             Just (typeNameRef, _checkEntity) -> do
               -- Now look for a constructor with the same name
               let constructors = Map.toList entityInfo
@@ -5029,13 +5080,31 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                 Nothing -> do
                   -- No record constructor found. Check if this is an enum type
                   -- by looking for nullary constructors that return this type.
+                  -- Only those can be given as JSON: a constructor with fields
+                  -- has no JSON spelling (smucclaw/l4-ide#1012).
+                  -- Named bare: a constructor declared under a § is stored
+                  -- with its section path (`Part A.Red`), which is not what
+                  -- JSONENCODE writes or what anyone should be told to send.
+                  let ofThisType =
+                        [ (unqualifiedRawNameToText (rawName (TypeCheck.getName name)), isNullaryConstructorReturning conType tyRef)
+                        | (_, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
+                        , constructorReturning conType tyRef
+                        ]
+                      withoutFields = [ n | (n, True)  <- ofThisType ]
+                      withFields    = [ n | (n, False) <- ofThisType ]
+                      expected = choiceExpectation typeName withoutFields withFields
                   case jsonValue of
                     Aeson.String enumName -> do
                       -- Look for a nullary constructor with this name that returns tyRef
                       let enumConstructor = listToMaybe
                             [ (unique, name)
                             | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
-                            , nameToText (TypeCheck.getName name) == enumName
+                            -- the bare name as well as the stored one: under a
+                            -- §, `Red` is stored as `Part A.Red`, and the bare
+                            -- name is what JSONENCODE writes (smucclaw/l4-ide#947)
+                            , let spelled = TypeCheck.getName name
+                            , enumName `elem` [ nameToText spelled
+                                              , unqualifiedRawNameToText (rawName spelled) ]
                             , isNullaryConstructorReturning conType tyRef
                             ]
                       case enumConstructor of
@@ -5044,11 +5113,10 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                           let enumRef = Def enumUnique enumConName
                           pure $ ValConstructor enumRef []
                         Nothing ->
-                          -- No matching enum constructor, fall back to generic decoding
-                          jsonValueToWHNF jsonValue
+                          cannotDecode at typeName jsonValue
+                            (choiceNameMiss typeName enumName withoutFields withFields)
                     _ ->
-                      -- Not a string, fall back to generic decoding
-                      jsonValueToWHNF jsonValue
+                      cannotDecode at typeName jsonValue expected
                 Just (conUnique, conName, conType) -> do
                   -- Construct a Resolved reference for the constructor
                   let conRef = Def conUnique conName
