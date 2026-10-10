@@ -250,7 +250,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
     MkDeclare ann tySig appFormAka tyDecl -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
-      tyDecl' <- addNlg tyDecl
+      tyDecl' <- addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl
       pure $ MkDeclare ann tySig' appFormAka' tyDecl'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
@@ -341,11 +341,40 @@ betweenClauses prev cl = do
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
+    -- An ASSUME is one declaration, so an annotation on a line of its own
+    -- BELOW it is the next declaration's, as it is below a DECIDE. The test is
+    -- the one the last input of a GIVEN list and the last field of a record
+    -- have: what is indented past the declaration's start describes the
+    -- ASSUME. That keeps a TYPICALLY default on a line of its own, with a gloss
+    -- trailing it, the assumption's, and a TYPICALLY default takes no
+    -- annotation (see 'addNlgInput'), so adding one moves nothing.
     MkAssume ann tySig appFormAka order mTypically -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
-      appFormAka' <- addNlg appFormAka
-      mTypically' <- traverse addNlg mTypically
-      pure $ MkAssume ann tySig' appFormAka' order mTypically'
+      appFormAka' <- addNlgAppFormWhere claims appFormAka
+      pure $ MkAssume ann tySig' appFormAka' order mTypically
+     where
+      headEnds = [ (fromSrcRange r).end | Just r <- [rangeOf appFormAka, order >>= rangeOf] ]
+      belowHead w = not (null headEnds) && all (\ e -> w.range.start.line > e.line) headEnds
+      claims w
+        | belowHead w = maybe True (\ s -> indentedPast s w) (fromSrcRange <$> rangeOf a)
+        | otherwise   = True
+
+-- | An application form whose names claim what @p@ accepts. The head of an
+-- ASSUME is the last thing in it that can reach down the file.
+addNlgAppFormWhere ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> AppForm n -> NlgA (AppForm n)
+addNlgAppFormWhere p a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- addNlgWhere p n
+    ns' <- traverse (addNlgWhere p) ns
+    maka' <- traverse addAka maka
+    pure $ MkAppForm ann n' ns' maka'
+ where
+  addAka k = extendNlgA k $ case k of
+    MkAka ann ns -> do
+      ns' <- traverse (addNlgWhere p) ns
+      pure $ MkAka ann ns'
 
 -- | Cut a declaration's signature off where the declaration's own keyword
 -- starts: the DECIDE of @GIVEN … DECIDE `r` IF …@, and likewise ASSUME,
@@ -402,18 +431,64 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Import n) where
       pure $ MkImport ann n' mr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
-  addNlg a = extendNlgA a $ case a of
+  addNlg = addNlgTypeDecl (const True)
+
+-- | A type declaration, given what the LAST field of its field list may take
+-- from a later line. 'Declare' passes the column test; see 'addNlgFields'.
+addNlgTypeDecl ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> TypeDecl n -> NlgA (TypeDecl n)
+addNlgTypeDecl claimsBelow a = extendNlgA a $ case a of
     RecordDecl ann mcon typedNames -> do
-      typedNames' <- traverse addNlg typedNames
+      typedNames' <- addNlgFields claimsBelow typedNames
       pure $ RecordDecl ann mcon typedNames'
-    EnumDecl ann conDecls -> do
-      conDecls' <- traverse addNlg conDecls
-      pure $ EnumDecl ann conDecls'
+    EnumDecl ann conDecls
+      | Just (cons, lastCon) <- List.unsnoc conDecls -> do
+          cons' <- traverse addNlg cons
+          lastCon' <- addNlgConDecl claimsBelow lastCon
+          pure $ EnumDecl ann (cons' <> [lastCon'])
+      | otherwise ->
+          pure $ EnumDecl ann conDecls
     SynonymDecl ann ty -> do
       ty' <- addNlg ty
       pure $ SynonymDecl ann ty'
     OpaqueDecl ann ->
       pure $ OpaqueDecl ann
+
+-- | A field list. Every field but the last is bounded by the field after it;
+-- the last is bounded only by whatever follows the declaration, so it takes
+-- from a later line only what @claimsBelow@ accepts.
+--
+-- __The last field takes only an annotation indented past the declaration's
+-- keyword__, the column test the last input of a GIVEN list has (ruled
+-- 2026-10-02). An annotation at the keyword's column or left of it is the
+-- NEXT declaration's herald, as it is anywhere else in a file:
+--
+-- @
+-- DECLARE Rec HAS
+--     base IS A NUMBER TYPICALLY 5
+--
+-- \@nlg the answer           -- the rule's, not @base@'s
+-- DECIDE `answer` IS 42
+-- @
+--
+-- Until this was written a field with no default took that herald silently
+-- (smucclaw/l4-ide#976), and a field with a default did not only by accident:
+-- the default's span used to cut its name off. Making a default claim nothing
+-- (#994, #997) removed the accident, so the test had to be written.
+--
+-- The test is the declaration's, so it applies to the last field of the last
+-- constructor of an enum too. A herald indented past the keyword is the last
+-- field's wherever it is, as before.
+addNlgFields ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> [TypedName n] -> NlgA [TypedName n]
+addNlgFields claimsBelow typedNames = case List.unsnoc typedNames of
+  Just (fields, lastField) -> do
+    fields' <- traverse addNlg fields
+    lastField' <- addNlgTypedName claimsBelow lastField
+    pure (fields' <> [lastField'])
+  Nothing -> pure []
 
 -- | Run a computation but advertise NO span for it, so a sibling's range is
 -- not cut short by it.
@@ -456,7 +531,14 @@ unclaimedSignatureType :: t -> NlgA t
 unclaimedSignatureType = pure
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
-  addNlg a = extendNlgA a $ case a of
+  addNlg = addNlgTypedName (const True)
+
+-- | One field of a record or constructor, given what its name may take from a
+-- later line ('addNlgFields').
+addNlgTypedName ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> TypedName n -> NlgA (TypedName n)
+addNlgTypedName claimsBelow a = extendNlgA a $ case a of
     -- A RECORD FIELD splits its two lines between the two claimants (ruled
     -- 2026-09-19, Meng). An annotation written UNDERNEATH a field describes
     -- that field:
@@ -483,8 +565,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
     -- independently generated Hebrew encodings measured in 2026-09 annotate
     -- fields this way — 100 heralds, every one below its field.
     MkTypedName ann n ty mTypically mExpr -> do
-      n' <- addNlgFieldName (fromSrcRange <$> rangeOf ty) n
-      ty' <- unspanned (addNlg ty)
+      n' <- addNlgFieldName claimsBelow (fromSrcRange <$> rangeOf ty) n
+      -- The type claims what is left on the field's own line, and no further:
+      -- it runs second, so with nothing after it, a type that reached down
+      -- would take the herald the last field's name has just declined
+      -- ('addNlgFields'), and nothing reads an annotation on a type.
+      ty' <- unspanned (maybe id (hoistNlgA . inLocRange . upToEndOfLineOf) (rangeOf ty) (addNlg ty))
       -- The field's TYPICALLY default takes no annotation (see 'addNlgInput'):
       -- traversing it made it a sibling whose span cut the name off from the
       -- line below, so an own-line herald under a field with a default went to
@@ -492,10 +578,15 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
       pure $ MkTypedName ann n' ty' mTypically mExpr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (ConDecl n) where
-  addNlg a = extendNlgA a $ case a of
+  addNlg = addNlgConDecl (const True)
+
+addNlgConDecl ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> ConDecl n -> NlgA (ConDecl n)
+addNlgConDecl claimsBelow a = extendNlgA a $ case a of
     MkConDecl ann n typedNames -> do
       n' <- addNlg n
-      typedNames' <- traverse addNlg typedNames
+      typedNames' <- addNlgFields claimsBelow typedNames
       pure $ MkConDecl ann n' typedNames'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
@@ -535,8 +626,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 -- allows. That is how a @GIVEN@ parameter came to claim an annotation written
 -- on its own line BELOW the whole signature, in a rule with no @GIVETH@ whose
 -- span would have stopped it. The last input of a GIVEN list now takes such an
--- annotation only when it is indented past the keyword ('addNlgInput'), and
--- this clamp is what keeps the input's TYPICALLY default from taking the rest.
+-- annotation only when it is indented past the keyword ('addNlgInput').
 confineToEndOfLine :: HasSrcRange e => e -> NlgA a -> NlgA a
 confineToEndOfLine e = hoistNlgA (inLocRange r)
  where
@@ -545,11 +635,17 @@ confineToEndOfLine e = hoistNlgA (inLocRange r)
     Just span' ->
       locRangeFrom (Just span'.start)
         <> locRangeTo (Just (endOfLine span'.end))
-  -- The last column of a line, expressed as the first column of the next.
-  -- Cheaper and more robust than asking how long the line actually is, and
-  -- the only annotations between the two are on the trailing line by
-  -- construction.
-  endOfLine pos = MkSrcPos {line = pos.line + 1, column = 1}
+
+-- | The lookup range that stops at the end of the line a node ends on.
+upToEndOfLineOf :: SrcRange -> LocRange
+upToEndOfLineOf r = locRangeTo (Just (endOfLine (fromSrcRange r).end))
+
+-- | The last column of a line, expressed as the first column of the next.
+-- Cheaper and more robust than asking how long the line actually is, and
+-- the only annotations between the two are on the trailing line by
+-- construction.
+endOfLine :: SrcPos -> SrcPos
+endOfLine pos = MkSrcPos {line = pos.line + 1, column = 1}
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivenSig n) where
   addNlg a = extendNlgA a $ case a of
@@ -623,9 +719,14 @@ addNlgInput claimsBelow o = extendNlgA o $ case o of
     tys' <- traverse unclaimedSignatureType mty
     pure $ MkOptionallyTypedName ann n' tys' mTypically
    where
+    -- Below the input's name and type, not below its default: an annotation
+    -- written between the type and a TYPICALLY on a later line is not below
+    -- the input, whether or not the default is there.
+    headEnds = [ (fromSrcRange r).end | Just r <- [rangeOf n, mty >>= rangeOf] ]
+    belowHead w = not (null headEnds) && all (\ e -> w.range.start.line > e.line) headEnds
     claims w
-      | startsBelow o w = claimsBelow w
-      | otherwise       = True
+      | belowHead w = claimsBelow w
+      | otherwise   = True
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of
@@ -686,11 +787,15 @@ instance HasNlg Name where
 -- just a range: everything BEFORE the type (the field's own trailing
 -- gloss, as always), plus everything on a LATER LINE than the field
 -- (ruled 2026-09-19 — an annotation written underneath a field describes
--- that field). What falls between — trailing the type on the field's own
--- line — is left for the type, which runs next.
-addNlgFieldName :: (HasSrcRange a, HasNlg a) => Maybe SrcSpan -> a -> NlgA a
-addNlgFieldName mTySpan a =
-  addNlgWhere (\ w -> startsBefore mTySpan w || startsBelow a w) a
+-- that field), as far as @claimsBelow@ accepts: everything, for a field with
+-- another after it, and for the last field only what 'addNlgFields' lets it
+-- have. What falls between — trailing the type on the field's own line — is
+-- left for the type, which runs next.
+addNlgFieldName ::
+  (HasSrcRange a, HasNlg a) =>
+  (NlgWithSpan -> Bool) -> Maybe SrcSpan -> a -> NlgA a
+addNlgFieldName claimsBelow mTySpan a =
+  addNlgWhere (\ w -> startsBefore mTySpan w || (startsBelow a w && claimsBelow w)) a
 
 -- | The shared body of both of 'Name'\'s claims.
 addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name
