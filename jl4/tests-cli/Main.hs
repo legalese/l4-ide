@@ -246,9 +246,12 @@ batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 -- | Two declarations of one name, each with a @TYPICALLY@ default, under
 -- different headings (rules, then records), and the two cases a heading cannot
 -- tell apart: top-level rules of two imported files, and @WHERE@ locals.
-batchTyCollideSections, batchTyCollideSpaced, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
+batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
 batchTyCollideSections = fixtureDir </> "batch-typically-collide-sections.l4"
 batchTyCollideSpaced   = fixtureDir </> "batch-typically-collide-spaced.l4"
+batchTyCollideDotted   = fixtureDir </> "batch-typically-collide-dotted.l4"
+batchTyCollideTopmix   = fixtureDir </> "batch-typically-collide-topmix.l4"
+batchTyCollideTopmixJson = fixtureDir </> "batch-typically-collide-topmix.json"
 batchTyCollideRecords  = fixtureDir </> "batch-typically-collide-records.l4"
 batchTyCollideImport   = fixtureDir </> "batch-typically-collide-import.l4"
 batchTyCollideImportA  = fixtureDir </> "batch-typically-collide-import-a.l4"
@@ -458,7 +461,8 @@ coreFixtures =
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
-  , batchTyCollideSections, batchTyCollideSpaced, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
+  , batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson
+  , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
   , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
@@ -2063,6 +2067,24 @@ spec bin = do
         , (Just (Number 50), presumedOf ["WITH `Part 2`.scaled: rate"])
         , (Just (Number 80), presumedOf ["WITH `Part 1. Fees`.scaled: rate", "WITH `Part 2`.scaled: rate"])
         ]
+
+    -- Found in review of the quoting commit: an owner with no section in front
+    -- of it was never quoted, so a top-level rule called `Pricing.scaled` and
+    -- the rule `scaled` under `§ Pricing` both printed `Pricing.scaled`. The
+    -- rows answer 30 (the top-level rule, default 3), 50 (the sectioned one,
+    -- default 5) and 80 (both).
+    it "does not print a top-level rule called `Pricing.scaled` as the rule `scaled` under a section" $ do
+      rows <- rowsOf batchTyCollideDotted batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH `Pricing.scaled`: rate"])
+        , (Just (Number 50), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH `Pricing.scaled`: rate", "WITH Pricing.scaled: rate"])
+        ]
+
+    it "writes a top-level name that needs backticks in backticks, as it does under a section" $ do
+      rows <- rowsOf batchTyCollideTopmix batchTyCollideTopmixJson
+      rows `shouldBe`
+        [ (Just (Number 50), presumedOf ["WITH `scaled by`: factor", "WITH `two words`: the rate"]) ]
 
     it "still gives one entry for two WHERE locals of one name" $ do
       rows <- rowsOf batchTyCollideWhere batchTyCollideRowsJson

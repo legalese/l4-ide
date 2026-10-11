@@ -766,11 +766,11 @@ spec = describe "integration" do
         soft <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (args ["years" Aeson..= (30 :: Int)])
         (reason, ps, shown) <- refusedWith soft
         reason `shouldBe` "cannot decide for a non-resident"
-        ps `shouldBe` ["WITH resident check: is resident"]
-        shown `shouldSatisfy` Text.isInfixOf "(resting on the defaults of WITH resident check: is resident)"
+        ps `shouldBe` ["WITH `resident check`: is resident"]
+        shown `shouldSatisfy` Text.isInfixOf "(resting on the defaults of WITH `resident check`: is resident)"
         hardRun <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (hard ["years" Aeson..= (30 :: Int)])
         (_, hps, _) <- refusedWith hardRun
-        hps `shouldBe` ["WITH resident check: is resident"]
+        hps `shouldBe` ["WITH `resident check`: is resident"]
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each

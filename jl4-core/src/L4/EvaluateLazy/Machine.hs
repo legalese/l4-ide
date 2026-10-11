@@ -464,17 +464,21 @@ data PresumedOrigin
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
 
--- | How the owner of a default reads in a @presumed@ entry. A name behind the
--- headings it is declared under is spelled the way L4 spells a qualified name
--- in an ambiguity error and when it prints source ('L4.Print'): each part that
--- needs backticks has them, so a heading with a space or a dot (@Part 1. Fees@)
--- stays one part, and a reader can tell the headings from the rule. Any other
--- name is as written. Assumed, not ruled: overnight card O6, 2026-10-11, where
--- Meng ruled that the headings are named and not how they are quoted.
+-- | How the owner of a default reads in a @presumed@ entry: the way L4 writes
+-- the name in source ('L4.Print.quoteIfNeeded'), so that an entry can be split
+-- back into its parts and two different names do not print alike. A name
+-- behind the headings it is declared under is spelled as L4 spells a qualified
+-- name in an ambiguity error and when it prints source: each part that L4
+-- would write in backticks has them, so a heading with a space or a dot
+-- (@Part 1. Fees@) stays one part. A name with no heading in front of it is
+-- quoted the same way, so a top-level rule called @Pricing.scaled@ prints as
+-- @`Pricing.scaled`@ and not as the rule @scaled@ under @§ Pricing@.
+-- Assumed, not ruled: overnight card O6, 2026-10-11, where Meng ruled that the
+-- headings are named and not how they are quoted.
 presumedOwner :: RawName -> Text
 presumedOwner = \ case
   q@QualifiedName{} -> prettyLayout q
-  other             -> rawNameToText other
+  other             -> quoteIfNeeded (rawNameToText other)
 
 -- | Report a default that took effect ('EvalState.presumed'), once.
 tellPresumed :: Presumed -> Eval ()

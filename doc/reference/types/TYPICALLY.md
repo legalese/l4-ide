@@ -209,8 +209,9 @@ govern what counts as leaving a fact out:
   `§ Pricing`, and `WITH scaled: rate` for a rule at the top of the file, which
   has no section to name. Two rules of one name in different sections are two
   entries. A name of more than one word, or with a dot in it, is written in
-  backticks after a section name, as L4 writes it in source and in its error
-  messages: ``WITH `Part 1. Fees`.scaled: rate``. The answer lists it only if
+  backticks, as L4 writes it in source and in its error messages, with or
+  without a section in front of it: ``WITH `Part 1. Fees`.scaled: rate``, or
+  ``WITH `two words`: rate`` for a rule at the top of the file. The answer lists it only if
   it actually used the default, under `soft` as well as under `hard`. Two cases
   still give one entry, because there is no section to tell them apart by:
   top-level rules of one name in two imported files, and rules of one name
