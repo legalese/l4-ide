@@ -103,7 +103,10 @@ scaled MEANS rate TIMES base
   input never forces its default, which is also what `presumed` (below) counts.
 
 This works for a rule in the same file, a rule declared in a `WHERE`, and a rule
-in a file you `IMPORT`. Two things it does not do:
+in a file you `IMPORT`. A default declared in a file you `IMPORT` stays with
+that file: if its `TYPICALLY` value is edited, a call here that leaves the input
+out takes the new value. Writing the input at the call, as
+`scaled WITH base IS 10, rate IS 3`, pins it. Two things it does not do:
 
 - **It does not choose between rules of the same name.** When two rules share a
   name and each could take the call's inputs, a call that leaves out an input
