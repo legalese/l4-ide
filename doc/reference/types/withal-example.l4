@@ -1,0 +1,43 @@
+-- WITHAL: a record built from every one of its usual values
+-- Reference: doc/reference/types/WITHAL.md
+
+DECLARE Colour IS ONE OF Red, Green
+
+-- Every field has a usual value, written with TYPICALLY.
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER TYPICALLY 2
+      rush   IS A BOOLEAN TYPICALLY FALSE
+
+-- WITHAL writes none of them and takes all of them.
+GIVETH A Paint
+`stock paint` MEANS Paint WITHAL
+
+#EVAL `stock paint`                           -- Paint OF Red, 2, FALSE
+#EVAL `stock paint`'s coats                   -- 2
+
+-- It is the same record as spelling every usual value out.
+#ASSERT `stock paint` EQUALS (Paint WITH colour IS Red, coats IS 2, rush IS FALSE)
+
+-- To change one field, name it with WITH. The others still take their usual value.
+GIVETH A Paint
+`green paint` MEANS Paint WITH colour IS Green
+
+#ASSERT (`green paint`'s coats) EQUALS 2
+
+-- A record read from JSON text that supplies nothing is the same record.
+GIVEN text IS A STRING
+GIVETH AN EITHER STRING Paint
+`read paint` MEANS JSONDECODE text
+
+#ASSERT `read paint` "{}" EQUALS RIGHT (Paint WITHAL)
+
+-- One field has no usual value, so WITHAL cannot build an Order: name the field instead.
+DECLARE Order
+  HAS item     IS A STRING
+      quantity IS A NUMBER TYPICALLY 1
+
+GIVETH AN Order
+`one pen` MEANS Order WITH item IS "pen"
+
+#ASSERT (`one pen`'s quantity) EQUALS 1

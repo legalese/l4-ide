@@ -1,6 +1,6 @@
 # `TYPICALLY`: one behaviour
 
-**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539, merged 2026-10-06), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); the rest not built.
+**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539, merged 2026-10-06), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); `T WITHAL`, the spelling T1 left open for a construction in which every field is defaulted, ruled 2026-10-09 and built in `feat/withal` on top of `feat/typically-w4w5` (local commits, not pushed, not reviewed: §4.3); the rest not built.
 This spec is an implementation plan, not a new design.
 The design was ruled on 2026-09-04 as **R8** (`IMPLICIT-PROPS-DESIGN.md` §11.5) and extended on 2026-09-06 by **D7.3** (`SURFACE-SUGAR-CLUSTER-2026-09.md`).
 R8 is the owning ruling, and anything this spec settles is recorded back there (repo `CLAUDE.md` §4).
@@ -95,7 +95,7 @@ Readers ration attention, so the silent failures come first (user `CLAUDE.md` ru
   **Fixed by W1** (#530, smucclaw/l4-ide#992): p31 now stops with "I needed to know the value of `has criminal record (not supplied)`", and p14's `{}` stops naming `has capacity (not supplied)`.
 - **S2. The `ASSUME` deprecation advice changes the answer, and says it does not.** The warning on p6 says "Nothing is broken: the file still checks, runs and exports as before" and recommends a section `GIVEN`, and `doc/reference/errors/README.md:571` calls that rewrite "safe to take". `doc/reference/types/TYPICALLY.md:150-155` says the opposite, correctly. On an `ASSUME` with a `TYPICALLY`, that move switches the default on: p6 evaluates to the bare name, and the same declaration as a section `GIVEN` (p7) evaluates to `TRUE`.
 - **S3. Canon keeps each default twice, and nothing checks the two agree.**
-  **Made avoidable by W5, not closed** (§4.2): a construction may now leave a defaulted field out, so a restated constant is no longer needed to override one field. S3's own defect, that nothing checks the two agree, is the check-time warning T4b rules for a construction that restates a field's default, and that is not built (§4.2, "Not built here"). Removing the restated constants is a canon change, not this repo's, and the two all-defaults constants stay until T1's spelling for "every field defaulted" is ruled. Because a field default does nothing, encoders restate it as a named constant that call sites pass. In `legalese/canon`, `subjects/sg/succession/encodings/legalese/sg-succession-domain.l4:188-200` declares `TYPICALLY TRUE` on two `Interpretation` fields and then builds `the orthodox reading` with both set by hand. `subjects/sg/child-support/encodings/legalese/sg-child-support-domain.l4:91-106` does the same with `the live reading`, and says why: _"It restates the TYPICALLY defaults so that call sites and #ASSERTs have a value to pass; the defaults above remain the normative statement of the readings."_ Edit one and the encoding silently runs on the other. `subjects/us/regcf/encodings/cleanroom-2026-08/regcf-denovo.l4:134-140` gave up on the field default altogether, because of the enum defect in §2.
+  **Made avoidable by W5, not closed** (§4.2): a construction may now leave a defaulted field out, so a restated constant is no longer needed to override one field. S3's own defect, that nothing checks the two agree, is the check-time warning T4b rules for a construction that restates a field's default, and that is not built (§4.2, "Not built here"). Removing the restated constants is a canon change, not this repo's, and the two all-defaults constants stay until canon takes T1's spelling for "every field defaulted", `T WITHAL` (ruled 2026-10-09, built in §4.3; no canon file is changed here). Because a field default does nothing, encoders restate it as a named constant that call sites pass. In `legalese/canon`, `subjects/sg/succession/encodings/legalese/sg-succession-domain.l4:188-200` declares `TYPICALLY TRUE` on two `Interpretation` fields and then builds `the orthodox reading` with both set by hand. `subjects/sg/child-support/encodings/legalese/sg-child-support-domain.l4:91-106` does the same with `the live reading`, and says why: _"It restates the TYPICALLY defaults so that call sites and #ASSERTs have a value to pass; the defaults above remain the normative statement of the readings."_ Edit one and the encoding silently runs on the other. `subjects/us/regcf/encodings/cleanroom-2026-08/regcf-denovo.l4:134-140` gave up on the field default altogether, because of the enum defect in §2.
 - **S4. The ladder shows an answer the evaluator cannot give** (§2, last bullet). It is drawn as tentative, which is honest about provenance, but no evaluator path reproduces it.
   **Closed by W4** (§4.2): `#EVAL` of the rule with the other inputs by name now takes the default the ladder presumed, so there is a path that reproduces it. The ladder itself is unchanged.
 - **S5. The service's wrapper path never delivered a section `GIVEN`'s value** (found while building W1, fixed by it in #530). It bound the name with a `LET` around the call, which does not reach the rules that read a section `GIVEN`: they saw its `TYPICALLY` default, or an assumed term. L6 hid this whenever the request had a boolean. Without it, `has capacity: false` (declared `TYPICALLY TRUE`) with a `{}` on an unread input answered `true`. W1 supplies section `GIVEN`s with `WITH`, the language's way of supplying them at a root.
@@ -256,7 +256,7 @@ On the wrapper path a missing `DATE`, `TIME` or `DATETIME` with no default still
 **Decided by Claude overnight 2026-10-02, pending Meng's review.** Three shapes W3 had made quiet that were loud before it; the lead's rule was to restore the loudness exactly there. Each is in its own commit, so that it can be reverted alone, and each names the alternative.
 
 - **An unknown key, where a default was filled (review M1).** Before W3, a misspelled key on a non-`MAYBE` input was loud, because the input it misspelled was then missing; once that input has a default, ignoring the key let the misspelling take the default, with status success and only `presumed` to show it. So in any object where a default was filled (the request's top level, a record inside it, a CSV row, which takes its keys from the header), a key that matches nothing is refused, naming it and the nearest declared name (`Unknown field 'has capasity' (did you mean 'has capacity'?)`; on the service's top level, `Unknown parameter …`). Postel's law still holds in an object where no default was filled, so nothing that worked before W3 starts failing. "Filled a default" means a `TYPICALLY`; D7.3's `NOTHING` for a left-out `MAYBE` does not count, because it predates W3, and counting it would break requests that worked. The decoder applies it to every decode, a rule's own `JSONDECODE` included, since there too the object would have failed before W3; the service checks its top level once for every path (`refuseUnknownArguments`), and `--validate-only` agrees, records and lists included (`validateRow`, `unknownIn`). Consequence to weigh: a CSV with a column that is not an input, such as an `id` kept for joining output to input, now fails on every row that takes a default. _Alternative:_ no refusal; an `unrecognised` list beside `presumed`, with `presumed` declared in the per-deployment OpenAPI so that a generated client keeps both.
-- **`{}` as a value means `null`, on every path, records included (review M2).** T3: "`{}` means `null` until it is retired". So `{}` on a record input or field never takes a default and is refused, naming it (`Field 'cfg' is {}, which means the value is not known: supply a value`), and on a `MAYBE` record it is `NOTHING`. The same holds for `{}` as a list element. The service now sends an uncertain value to its wrapper as `{}` rather than `null`, so that a refusal spells what the request sent; the decoder treats the two alike. A whole batch row `{}`, or a rule's own `JSONDECODE` of `"{}"`, is the object being decoded rather than a value inside one, and still supplies nothing, so every default applies. How to spell "a record with every field defaulted" stays open, as T1 left it; the batch page says so. _Alternative:_ `{}` on a record input means "a record with nothing supplied", on both paths (the service would then have to stop reading `{}` as uncertain for a record).
+- **`{}` as a value means `null`, on every path, records included (review M2).** T3: "`{}` means `null` until it is retired". So `{}` on a record input or field never takes a default and is refused, naming it (`Field 'cfg' is {}, which means the value is not known: supply a value`), and on a `MAYBE` record it is `NOTHING`. The same holds for `{}` as a list element. The service now sends an uncertain value to its wrapper as `{}` rather than `null`, so that a refusal spells what the request sent; the decoder treats the two alike. A whole batch row `{}`, or a rule's own `JSONDECODE` of `"{}"`, is the object being decoded rather than a value inside one, and still supplies nothing, so every default applies. A record with every field defaulted is spelled `T WITHAL` (T1, ANSWERED 2026-10-09, §4.3), and it is that same record: a rule's own `JSONDECODE` of `"{}"` gives the value `T WITHAL` builds (`batch-withal.l4`, `withalJL4`), so inside the rules `T WITHAL` is the spelling of "a record with nothing supplied". _Alternative:_ `{}` on a record input means "a record with nothing supplied", on both paths (the service would then have to stop reading `{}` as uncertain for a record).
 - **A CSV record whose cell count is not the header's is refused, naming its line (review M4).** A short record used to take the defaults of its missing cells, and a long one lost its extra cells, both with status success. Such a record is now an error row (`Line 3 has 1 cell, but the header has 2, …`), counted against `--continue-on-error` like any other, with the cells it had as its `input`. Line numbers count physical lines, so a quoted cell holding a line end moves the next record's number. An unquoted line holding only spaces or tabs is blank and skipped, in a one-column file too; a quoted `""` or `"   "` is a row whose cell is absent (T3c). _Alternative:_ an unquoted whitespace-only line in a one-column file is a row, whose cell is absent.
 
 W4 and W5 share a mechanism: a named supply site that can see the callee's defaults (§4.2).
@@ -307,7 +307,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   It holds for a rule in the same file, one declared in a `WHERE`, a recursive call, and one in an imported file; and together with a section `GIVEN` the rule reads, in any order of the written arguments (`ok/typically-named-site.l4`, last section: `130`, `31`, `51`).
 - **T1, T1b and D7.3 / W5.** `Paint WITH coats IS 2` takes every other field's declared default (p4: `c's timeout` is `30`), a number, a string, a boolean, an enum constructor (p10) and `NOTHING` for `MAYBE … TYPICALLY NOTHING` alike; the order of the written fields is free; a field with no default is still required, and a positional construction still gives every field.
   Only a record's fields: an enum constructor that carries data keeps requiring its fields, and a `TYPICALLY` on one of those fields is accepted and does nothing (a bench card is owed; see "Not built here").
-  How to write a construction in which EVERY field is defaulted is still open (T1); no spelling is invented, and the documentation page says so.
+  A construction in which EVERY field is defaulted is `Paint WITHAL` (T1, ANSWERED 2026-10-09, §4.3).
 - **T1's check error.** A `TYPICALLY` on a field with a `MEANS` clause is now a check error, `TypicallyOnComputedField`, at the field (`not-ok/tc/typically-computed-field.l4`).
   Read off the parsed module (`detectTypicallyOnComputedFields`), because `desugarComputedFields` moves the field out of its record, and its `TYPICALLY` with it.
   One file in this repository did it, `ok/typically-basic.l4` (`taxed`), under a comment calling the `TYPICALLY` "inert metadata"; the field and the comments are changed without moving a line, because `QueryPlanSpec` pins that file's ladder atom ids (unmoved: `jl4-service-test` below).
@@ -404,15 +404,15 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 **Not built here, and why.**
 
 - W6 (`ASSUME … TYPICALLY`): deferred, by Meng's word (§4).
-- A construction that leaves out every field: T1 leaves its spelling for a later card.
+- A construction that leaves out every field: not built in this section. T1's spelling for it, `T WITHAL`, is ANSWERED 2026-10-09 and built on top of this branch (§4.3).
 - An enum constructor's payload fields: a field of `Rect HAS width IS A NUMBER, height IS A NUMBER TYPICALLY 1` still has to be given at `Rect WITH width IS 2`, and its `TYPICALLY` does nothing.
   T1 as printed ("any field declared `TYPICALLY` may be omitted at construction") does not say records only, so this is a ruling for Meng and not an assumption.
   Recommended: open them, with the same table keyed by the constructor (`recordInputDefaults`); additive, since no `DECLARE … IS ONE OF` block in `jl4/examples`, `doc/`, `skills/`, `jl4-core/libraries` or `legalese/canon` (at `6b6476d`) has a `TYPICALLY` (scanned 2026-10-03, by block, not by grep for the keyword), and every such omission is an error today.
   If declined, make a `TYPICALLY` on such a field a check error, so that the annotation is never inert; that would also settle a `MEANS` there (above).
 - **T4b's check-time warning on a construction that restates a field's `TYPICALLY` literally.**
   Not built, so S3 is made avoidable and not closed (§3).
-  The warning would fire in two files of the vendored canon mirror, `canon/sg/succession/sg-succession-domain.l4` (`the orthodox reading`, `the per capita reading`) and `canon/sg/child-support/sg-child-support-domain.l4` (`the live reading`), and add diagnostics to their goldens, which this repository may not edit; and the two all-defaults constants cannot stop restating until T1's spelling for "every field defaulted" is ruled, so there would be nothing to change them to.
-  It can land once canon has dropped the restated constants it can drop, has re-blessed, and the pin is bumped, with a construction that restates every default of its record exempt, or the spelling ruled.
+  The warning would fire in two files of the vendored canon mirror, `canon/sg/succession/sg-succession-domain.l4` (`the orthodox reading`, `the per capita reading`) and `canon/sg/child-support/sg-child-support-domain.l4` (`the live reading`), and add diagnostics to their goldens, which this repository may not edit; and the two all-defaults constants could not stop restating until T1's spelling for "every field defaulted" was ruled, so there was nothing to change them to; it is ruled now (`T WITHAL`, §4.3), and the change to them is canon's.
+  It can land once canon has dropped the restated constants it can drop, has re-blessed, and the pin is bumped, with a construction that restates every default of its record exempt. It stays unbuilt.
 - The trace rendering of the event (W8's second half) and `#EVAL`'s listing of it.
 - `l4 batch` re-declares an exported rule's input types at the END of the module, so an export whose input is an enum or record type fails when a later section declares a type of the same name (silent X1: `agree-enum.l4`, where `#EVAL f WITH k IS 1` answers `101` and `l4 batch` reports "expected `Colour` (…:3) but is here of type `Colour` (…:17)").
   It does not depend on a default (re-measured: the same file without the `TYPICALLY`, and with the field sent, fails the same way), and the review measured the same failure on the W2+W3 binary (not re-run), so it is the wrapper's, not W4's or W5's; it is not fixed here.
@@ -456,6 +456,70 @@ The JSON boundary's treatment of an absent `MAYBE` field as `NOTHING` (D7.3).
 The query plan's use of a boolean default as a soft prior (`VizExpr.hs`, `typicallyTrueWeight`).
 That prior orders questions and never answers one, which is already the one behaviour applied to elicitation.
 
+### 4.3 `T WITHAL`, T1's open spelling, as built (2026-10-09)
+
+**Status:** built in `feat/withal`, local commits on top of `feat/typically-w4w5` at `cf6f68269` (#551's pushed head). Not pushed, not reviewed, no PR.
+
+**ANSWERED 2026-10-09** (T1, §5).
+Meng, 2026-10-09 05:29 +08: _"Yes let's go with WITHAL and I take your standalone recommendation re combining with overrides. One other advantage is a grep regex can be constructed to return both WITH and WITHAL should anyone want to search for constructors that way."_
+
+**The rule.**
+`T WITHAL` builds the record `T` taking every field's `TYPICALLY` default, and writes none.
+"Every default" is the whole of its meaning, so nobody should expect a required field to be filled in: it is a check error if any field of `T` has no default, and the message names each such field.
+It is standalone: `T WITHAL a IS TRUE` is a parse error, and an override is `T WITH a IS TRUE`, so one construction does not get two spellings (the drift T4b exists to stop).
+Bare `T` stays the constructor, unchanged.
+T4b's check-time warning stays unbuilt, and no canon file is touched.
+
+**`T WITHAL` and a decode of `{}` agree.**
+A record decoded from `{}` takes every field's default, and so does `T WITHAL`; they are the same value.
+A rule's own `JSONDECODE` of `"{}"` at `T` is that decode, and `l4 batch` and the service both run it.
+`jl4/tests-cli/fixtures/batch-withal.l4` and `withalJL4` in `jl4-service/test/TestData.hs` assert `st EQUALS (Settings WITHAL)` for it, and the doc example asserts it too (`doc/reference/types/withal-example.l4`).
+A whole batch row `{}` or an empty `arguments` object supplies nothing to the exported rule, so each of its inputs that declares a default takes it, as before.
+`{}` as the VALUE of a record input is a different thing and is unchanged: it means `null`, and is refused, naming the input (review M2, §4.1; its alternative stays open).
+Inside the rules, `T WITHAL` is the way to say "a record with nothing supplied".
+
+**Why this spelling** (the rationale Meng took).
+Nothing dangles after the keyword: a `WITH` with an empty list would leave a keyword with nothing after it.
+There is no grammar surgery: it is its own postfix, and no list has to be allowed to be empty.
+It is one token for exactprint.
+The intent is checkable: adding a required field to the record later breaks `T WITHAL` loudly, naming the field, which no bare name could do.
+Two measurements decided against the alternatives: `Paint WITH` followed by nothing is a parse error today (`l4 check`: "unexpected WITH"), and bare `Paint` is not a record but a function (`l4 check` of `bare MEANS Paint` against `GIVETH A Paint`: it "is here of type FUNCTION FROM Colour AND NUMBER AND BOOLEAN TO Paint").
+
+**How it is built.**
+The parser reads it as the node a `WITH` already parses to, `AppNamed`, with an empty list and the same three annotation slots (`namedApp`, `L4/Parser.hs`), so exactprint round-trips it with nothing new and `Extension` is untouched; the atomIds `QueryPlanSpec` pins are unmoved (`jl4-service-test -m 'atomIds committed'`).
+`inferWithal` (`L4/TypeCheck.hs`) fills it through `fillDefaults`, which `supplyAppNamed` now shares, so the checked tree is a `WITH` that omitted every field, each argument carrying its `DefaultFill`.
+Every consumer therefore sees what it already sees for a `WITH` that omitted fields, and `--presumption hard` lists each default as `WITH T: field` by the path it already had.
+`L4.Print` prints a named application with nothing written as `T WITHAL`; before this it printed bare `T`, a different expression (by reading; the old arm was `[] -> printWithLayout n`).
+A record is told from an enum alternative and from a rule by `recordInputDefaults`, which now has an entry for every record constructor, empty when no field has a default.
+The consumers were run, not only read: `l4 export` of `Paint WITHAL` and of `Paint WITH colour IS Red` gives the same dmn, dmn-md and catala output, and the same refusal, loud, from openfisca, blawx, docassemble and yscript; `jl4-mlir` compiles both to wasm and the four answers under node agree.
+
+**Reserved word.**
+`WITHAL` becomes a reserved word: a name spelled exactly `WITHAL` has to be written in backticks, and keywords are matched case-sensitively, so `withal` stays a name.
+Searched at the base (`cf6f68269`) by `git grep` over tracked files: `WITHAL`, `withal` and `Withal` occur in no file of `jl4/` (the vendored canon mirror included), `jl4-core/libraries/`, `doc/` or `skills/`, nor anywhere in the 6,313-file tree; and in no tracked file of `commons` (11,047 files at `27802e28`), `pc-encode` (240 at `d69c827`), `l4-pipeline` (215 at `c2371d4`), `solutions` (1,380 at `dad67cb`) or `cloud-rules` (7 at `7274c03`), each at its checked-out `main`.
+That is a count of tracked files at one commit each, not of untracked files or other branches.
+
+**Assumed, not ruled** (each is easy to loosen, none is easy to tighten later):
+
+- Records only.
+  `rule WITHAL` is refused ("is not a record"), because what is not ruled stays loud.
+  A rule whose every input has a default still has no spelling for being called with all of them.
+- An enum alternative that carries data is refused, as its payload fields stay required on this branch (§4.2, "Not built here").
+  One that carries nothing is refused too, with a message that says to write its name.
+- A record with no fields takes `WITHAL` and is that record.
+- It is not accepted in a pattern (`CONSIDER … WHEN T WITHAL`), which is a parse error.
+- The parse error for `T WITHAL a IS TRUE` is the parser's general "unexpected IS", positioned at the `IS`; no message says "WITHAL takes no fields".
+- At an overload (a rule that shares the record's name) the site is the ordinary "multiple definitions" error (`not-ok/tc/withal-overloaded.l4`).
+  An explicit `WithalOverloaded` refusal sits behind it; with it switched off the visible result is the same, because `fillDefaults` already withholds defaults at an overload.
+
+**Tests.**
+`ok/withal.l4` (14 `#ASSERT`s, 20 `Result:` blocks), `ok/withal-import-def.l4` and `ok/withal-import-use.l4` (a record across an `IMPORT`), and `not-ok/tc/withal-missing-default.l4`, `withal-not-a-record.l4`, `withal-overloaded.l4`, `withal-then-override.l4` (the parse error), each with its four goldens, read and free of absolute paths; `lsp/semantic-tokens/withal.l4`; `l4-cli-test` (batch under soft and hard, a record from an `IMPORT`, the name of a type); `jl4-service-test` (the same on the service).
+`prettyLayout round-trip`, `exactprint identity` and the parser memo check run over every `ok/` file, so over these.
+The evaluation differential of `CLAUDE.md` §3.2.1 was run by hand (`L4/Print.hs` is in the diff): see the commit message of the docs commit for its numbers.
+
+**What review changed.**
+Nothing yet: this section has not been reviewed.
+Two claims of the author's own were corrected before commit: a comment that said the overload refusal prevents a silent resolution by elimination (measured with the refusal off: the same single error), and a first draft of the page that said a whole batch row `{}` builds a record (a row builds no record; the claim is now the `JSONDECODE` one above).
+
 ---
 
 ## 5. Rulings this needs
@@ -469,7 +533,8 @@ Each is also a card on the bench "Unknowns and Defaults" (claude.ai artifact `XQ
 **AMENDED 2026-10-01**, by bench card T1b, which an independent skeptic reviewed before it was folded in. Meng ruled in chat at 10:20Z: _"These are my rulings prior to SEQUEL. Please fold in any additional recommendations due to SEQUEL."_ The amendment, as the card printed it: All three decoders (`Machine.hs:4387-4391`, `Backend/Jl4.hs:436-441`, the wrapper at `CodeGen.hs:431`) read each field's default from its `DECLARE`; a declared default wins. With presumption on, an absent `MAYBE` field with no `TYPICALLY` still becomes `NOTHING` (D7.3). With presumption off (CHUTZPAH), that fallback does not fire: the field is absent like any other. A field with a `TYPICALLY` leaves `required` in `FunctionSchema.hs:219-223` and `JsonSchema.hs:264`, `:333`, landing with or after the decoder change. Spec `:46` and `:144` are brought into line.
 D7.3 ruled the `MAYBE` case and was silent on `timeout IS A NUMBER TYPICALLY 30`.
 Its principle, "the default is written where the field is declared, never inferred from the type", holds just as well for a literal.
-It is additive (p4: every such omission is a check error today). It shortens canon's readings that override one field; the two all-defaults constants of S3 stay until a spelling for "every field defaulted" is ruled.
+It is additive (p4: every such omission is a check error today). It shortens canon's readings that override one field; the two all-defaults constants of S3 stay until canon takes the spelling for "every field defaulted" ruled below.
+**ANSWERED 2026-10-09, see §4.3.** The spelling this card left open is `T WITHAL`. Meng, 2026-10-09 05:29 +08: _"Yes let's go with WITHAL and I take your standalone recommendation re combining with overrides. One other advantage is a grep regex can be constructed to return both WITH and WITHAL should anyone want to search for constructors that way."_
 
 **T2. `ASSUME … TYPICALLY` is honoured.**
 **RULED 2026-10-01.** Meng marked `accept` on bench card T2 at 09:52:12Z, with no note. The ruling, as printed on the card: An `ASSUME … TYPICALLY d` takes `d` when unsupplied, filled at the root without turning the `ASSUME` into a definition the ladder or schema can see. Pass condition: `QueryPlanSpec`'s atomIds and `viz-adapter.real-module.test.ts` unchanged. In the same change: reword the deprecation warning and `errors/README.md:571`, and update `TYPICALLY.md:150-155` and `ASSUME.md:267`.

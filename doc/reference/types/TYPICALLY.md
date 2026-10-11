@@ -220,11 +220,12 @@ The same limits apply as for a rule's input: a field with no default must still
 be given, and `Paint OF 2` (by position) must give every field. The record may
 be declared after the rule that builds it, and in a file you `IMPORT`.
 
-Three things are not offered, and each is an error or unchanged rather than a
+A construction that leaves out _every_ field is written `Paint WITHAL`, which takes each field's default and writes none; see [`WITHAL`](WITHAL.md).
+It is an error when any field has no default, and the error names each one.
+
+Two things are not offered, and each is an error or unchanged rather than a
 quiet choice:
 
-- **A construction that leaves out _every_ field.** There is no way to write it
-  yet; how it should be spelled is an open question, so none is invented.
 - **A field of an enum constructor that carries data**, an alternative under
   `ONE OF` such as `Circle HAS radius IS A NUMBER`, still has to be given, even
   when it carries a `TYPICALLY`.
@@ -321,13 +322,13 @@ JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
 
-_Landed in stages (2026-10-02 and 2026-10-03). A **section** `GIVEN` may be left
+_Landed in stages (2026-10-02, 2026-10-03 and 2026-10-09). A **section** `GIVEN` may be left
 out, and a rule that reads it then uses the default; the published list of facts
 asks for a defaulted fact as optional, which the boundary then honours; a
 **rule's own** `GIVEN` and a **record field** may be left out at a call that
-names its inputs and at a construction. Still to come: a default may not yet
-name another `GIVEN` (it must be a fixed value written out), and nothing yet
-says how to write a construction that leaves out every field._
+names its inputs and at a construction; and `T WITHAL` leaves out every field of
+a record. Still to come: a default may not yet name another `GIVEN` (it must be
+a fixed value written out)._
 
 ## Examples
 
@@ -392,7 +393,8 @@ The companion file no longer carries this spelling.
 - The default must match the annotated type, or type checking fails.
 - The default must be a fixed value written out, like `18` or `"yes"`.
 - A call that gives its inputs by position, and a construction that gives its
-  fields by position, give all of them: only `WITH` may leave one out.
+  fields by position, give all of them: only `WITH` may leave one out, and
+  `WITHAL` leaves out every field of a record.
 - On a computed field (one with a MEANS clause) a TYPICALLY is an error.
 - For anything a fixed value cannot express, write an ordinary definition
   instead.
@@ -403,6 +405,7 @@ The companion file no longer carries this spelling.
 - [The section `GIVEN`](../syntax/section-given.md) — declaring a name once for a
   whole section
 - [WITH](../functions/WITH.md) — supplying, and overriding, an input by name
+- [WITHAL](WITHAL.md) — a record built from every field's default
 - [DECLARE](DECLARE.md) — declaring record types
 - [GIVEN](../functions/GIVEN.md) — the inputs of one rule
 - [Query Planning](../query-planning/README.md) — how a stored default becomes

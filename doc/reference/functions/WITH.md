@@ -133,6 +133,9 @@ bump n MEANS n TIMES `the rate`
   [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out
   a field that does; the default is taken. A call that gives its inputs by
   position still gives them all. An input with no default is still asked for.
+- **A construction that writes no field is `WITHAL`.** There is no `Paint WITH`
+  followed by nothing; a record built from every field's default is written
+  `Paint WITHAL`. See [`WITHAL`](../types/WITHAL.md).
 
 ## Example
 
@@ -148,3 +151,4 @@ Every call on this page, in one file you can run:
 - [`LET`](LET.md) and [`WHERE`](WHERE.md) — local definitions, which do not
   reach into the rules a definition calls
 - [`TYPICALLY`](../types/TYPICALLY.md) — a default for an input nobody supplies
+- [`WITHAL`](../types/WITHAL.md) — a record built from every field's default

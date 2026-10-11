@@ -86,7 +86,7 @@ Product types with named fields.
 
 - Named fields with types
 - Field access with `'s`
-- Construction with `WITH` keyword
+- Construction with `WITH` keyword, or with [`WITHAL`](WITHAL.md) from every field's default
 - **Examples:** Structured data, entities, configurations
 
 ### Enums

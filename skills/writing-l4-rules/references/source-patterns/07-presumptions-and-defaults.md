@@ -204,7 +204,7 @@ the form, and for a call that leaves the input out.
 **It is doing** three things. A **section `GIVEN`** that carries one is used by every rule that reads
 it and is given no value. A **rule's own `GIVEN`** that carries one may be left out of a `WITH` call
 that names the rule's inputs, and a **record field** that carries one may be left out of a `WITH`
-construction: the call or the construction takes the default. And at the boundary (`l4 batch`, the
+construction: the call or the construction takes the default. A record built from every one of its defaults is written `T WITHAL`. And at the boundary (`l4 batch`, the
 service) a case that leaves the fact out takes it and says so under `presumed`; an exported schema
 lists such an input as optional, with its default.
 
@@ -221,6 +221,10 @@ GIVETH A `Employment terms`
 ```
 
 Asked for the notice, ``#EVAL `the standard terms`'s `days of notice the contract requires` `` gives `28`.
+
+When the usual value of **every** field is what the source means, write the record as `T WITHAL` and nothing else: `` `Employment terms` WITHAL `` is an error naming `the employee`, which has no `TYPICALLY`, and a record whose fields all carry one has no such error.
+Do not restate the defaults as a named constant for call sites to pass; edit one of the two and the encoding silently runs on the other.
+To change one field, use `WITH` and name it: nothing may follow `WITHAL`, so `Paint WITHAL coats IS 3` is a parse error.
 
 **Not** a way to leave something out by position. `` `Employment terms` OF "Alex" `` is rejected: a
 construction or call by position gives every input. A field with **no** `TYPICALLY` is still
@@ -240,7 +244,7 @@ answer read, and also a default the rules take themselves, as here, in either pr
 `WITH the rule: the input`; an entry that starts with `WITH` is not an input of the case.
 
 **See** the corpus examples `jl4/examples/ok/typically-named-site.l4` (a rule's inputs) and
-`jl4/examples/ok/typically-record-construction.l4` (a record's fields), and `jl4/examples/ok/typically-basic.l4`
+`jl4/examples/ok/typically-record-construction.l4` (a record's fields), `jl4/examples/ok/withal.l4` (a record built from every default), and `jl4/examples/ok/typically-basic.l4`
 for the annotation on record fields, rule `GIVEN` inputs and `ASSUME` declarations.
 
 <a id="e7-5"></a>
