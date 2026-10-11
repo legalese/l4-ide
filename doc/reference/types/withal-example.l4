@@ -19,6 +19,11 @@ GIVETH A Paint
 -- It is the same record as spelling every usual value out.
 #ASSERT `stock paint` EQUALS (Paint WITH colour IS Red, coats IS 2, rush IS FALSE)
 
+-- A name after WITHAL is read as a function applied to the record, not as a field
+-- being set: this is the number of coats.
+#ASSERT (Paint WITHAL coats) EQUALS 2
+#ASSERT (Paint WITHAL coats) EQUALS (coats (Paint WITHAL))
+
 -- To change one field, name it with WITH. The others still take their usual value.
 GIVETH A Paint
 `green paint` MEANS Paint WITH colour IS Green

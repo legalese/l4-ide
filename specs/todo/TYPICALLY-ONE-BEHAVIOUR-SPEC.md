@@ -466,7 +466,10 @@ Meng, 2026-10-09 05:29 +08: _"Yes let's go with WITHAL and I take your standalon
 **The rule.**
 `T WITHAL` builds the record `T` taking every field's `TYPICALLY` default, and writes none.
 "Every default" is the whole of its meaning, so nobody should expect a required field to be filled in: it is a check error if any field of `T` has no default, and the message names each such field.
-It is standalone: `T WITHAL a IS TRUE` is a parse error, and an override is `T WITH a IS TRUE`, so one construction does not get two spellings (the drift T4b exists to stop).
+It is standalone: no field may follow it.
+`T WITHAL a IS TRUE` is a parse error, and an override is `T WITH a IS TRUE`, so one construction does not get two spellings (the drift T4b exists to stop).
+A name after `WITHAL` is read as a function applied to the record, so `Paint WITHAL coats` is `coats (Paint WITHAL)`, 2 (`l4 batch` of `Paint WITHAL coats PLUS k` with `k` 1 answers 3), and the error for `Paint WITHAL label IS "gloss"` is at the `IS` only because `Paint WITHAL label` has already parsed that way.
+No warning is given for it; that is not ruled.
 Bare `T` stays the constructor, unchanged.
 T4b's check-time warning stays unbuilt, and no canon file is touched.
 
@@ -517,7 +520,7 @@ That is a count of tracked files at one commit each, not of untracked files or o
   One that carries nothing is refused too, with a message that says to write its name.
 - A record with no fields takes `WITHAL` and is that record.
 - It is not accepted in a pattern (`CONSIDER … WHEN T WITHAL`), which is a parse error.
-- The parse error for `T WITHAL a IS TRUE` is the parser's general "unexpected IS", positioned at the `IS`; no message says "WITHAL takes no fields".
+- The parse error for `T WITHAL a IS TRUE` is the parser's general "unexpected IS", positioned at the `IS`, because `T WITHAL a` has already parsed as a function applied to the record; no message says "WITHAL takes no fields".
 - At an overload (a rule that shares the record's name) the site is the ordinary "multiple definitions" error (`not-ok/tc/withal-overloaded.l4`).
   The text of the explicit `WithalOverloaded` refusal behind it never reaches the author: the ambiguity error replaces it.
   The refusal is not dead code.
@@ -535,6 +538,8 @@ An independent review on 2026-10-11 found no silent wrong answer caused by this 
 
 - A record was reported as an alternative of a `ONE OF` when `T WITHAL` was written as a `TYPICALLY` default (above).
 - The sentence that the overload refusal "changes nothing visible" was true only for a record with at least one field (above).
+- The sentence "nothing may follow `WITHAL`" (in this section, the page and the skill) was untrue: a name after it is postfix application.
+- The page said a message "says which one L4 found" for a rule, a field and an alternative, and that a rule and a record sharing a name are ambiguous; a rule, a field and an input share one message, and a rule with no inputs of its own is not a rival (`Paint MEANS 3` beside `Paint`: the record is chosen).
 - The sentence that a decode of `{}` and `T WITHAL` "are the same value" was untrue for a record with a bare `MAYBE` field, and said nothing of `{}` as a record input's value (above).
 
 Before that review, two claims of the author's own were corrected before commit: a comment that said the overload refusal prevents a silent resolution by elimination (measured with the refusal off: the same single error), and a first draft of the page that said a whole batch row `{}` builds a record (a row builds no record; the claim is now the `JSONDECODE` one above).

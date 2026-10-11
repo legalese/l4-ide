@@ -224,7 +224,7 @@ Asked for the notice, ``#EVAL `the standard terms`'s `days of notice the contrac
 
 When the usual value of **every** field is what the source means, write the record as `T WITHAL` and nothing else: `` `Employment terms` WITHAL `` is an error naming `the employee`, which has no `TYPICALLY`, and a record whose fields all carry one has no such error.
 Do not restate the defaults as a named constant for call sites to pass; edit one of the two and the encoding silently runs on the other.
-To change one field, use `WITH` and name it: nothing may follow `WITHAL`, so `Paint WITHAL coats IS 3` is a parse error.
+To change one field, use `WITH` and name it: no field may follow `WITHAL`, so `Paint WITHAL coats IS 3` is a parse error (a name after `WITHAL` is read as a function applied to the record).
 
 **Not** a way to leave something out by position. `` `Employment terms` OF "Alex" `` is rejected: a
 construction or call by position gives every input. A field with **no** `TYPICALLY` is still

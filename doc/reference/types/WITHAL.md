@@ -37,11 +37,16 @@ It is not a record: it is the function that makes a `Paint` from its fields, sti
 
 ## One spelling for each thing
 
-`WITHAL` stands alone, and nothing may follow it:
+`WITHAL` stands alone: no field may follow it.
+Setting a field after it is a parse error:
 
 ```l4
 `glossy paint` MEANS Paint WITHAL coats IS 3     -- a parse error
 ```
+
+A name after `WITHAL` is not read as a field being set.
+It is read as a function applied to the record, so `Paint WITHAL coats` is the number of coats, 2, the same as `coats (Paint WITHAL)`.
+That is why the example above fails at the `IS` and not at `coats`.
 
 To change one field, name it with `WITH`.
 The other fields still take their usual values:
@@ -60,7 +65,7 @@ So there is exactly one way to write each construction: `WITH` names the fields 
   ```
   WITHAL takes the default of every field, but these fields of
 
-    Order (defined at withal-example.l4:36:9-14)
+    Order (defined at withal-example.l4:41:9-14)
 
   have none:
 
@@ -71,13 +76,15 @@ So there is exactly one way to write each construction: `WITH` names the fields 
 
 - **The name is not a record.**
   `WITHAL` builds records.
-  A rule, a field, and an alternative declared with `ONE OF` are each refused, with a message that says which one L4 found.
+  A rule, a field, and an input of a rule are each refused, with one message: the name is not a record.
+  An alternative declared with `ONE OF` gets a message of its own, one for an alternative that carries data and one for an alternative that carries nothing.
   An alternative that carries data, such as `Circle HAS radius IS A NUMBER`, still has to be given its fields, even a field that has a `TYPICALLY`.
   To call a rule and leave some of its inputs to their usual values, name the other inputs with `WITH`.
 
 - **More than one definition has the name.**
-  If a rule and a record share a name, `WITHAL` names no field that could tell them apart, so L4 reports the name as ambiguous.
+  If a rule that takes inputs shares its name with a record, `WITHAL` names no field that could tell them apart, so L4 reports the name as ambiguous.
   Rename one of them.
+  A rule with no inputs of its own, such as `Paint MEANS 3`, is not a rival: the record is chosen.
 
 ## What it does at the boundary
 
