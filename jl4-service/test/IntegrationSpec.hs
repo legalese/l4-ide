@@ -4219,6 +4219,10 @@ spec = describe "integration" do
       withServiceFromSources "ev-schema" [("events.l4", deonticEventRecordsJL4)] \baseUrl mgr -> do
         fnDoc <- getJson baseUrl mgr (functionPath "ev-schema")
         openapi <- getJson baseUrl mgr "/deployments/ev-schema/openapi.json"
+        -- openapi.json carries the typed event under `arguments` of /evaluation and in the
+        -- batch cases, where the service does not read it (its top-level `events` is
+        -- untyped), so only the function document describes an event as it is read; what
+        -- openapi.json says must not be a false promise either
         forM_ [("the function document" :: String, fnDoc), ("openapi.json", openapi)] \(label, doc) -> do
           let items = typedEventItems doc
           -- the search finds the typed events in this document

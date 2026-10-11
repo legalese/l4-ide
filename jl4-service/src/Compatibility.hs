@@ -20,8 +20,14 @@
 --     widening its enum (new values a consumer may not handle) is
 --     breaking; adding a new field is safe.
 --
--- New functions are safe; removed functions are breaking. This mirrors
--- the client-side check in the deploy sidebar so both surfaces agree.
+-- New functions are safe; removed functions are breaking. The deploy
+-- sidebar makes the same kind of check on the client, with one difference: it
+-- strips the DEONTIC envelope (@startTime@, @events@) from both sides first,
+-- because the schema its language server builds locally has no envelope. This
+-- check compares the envelope too, so a changed party or action type (under
+-- @events@) is flagged here and not there, and so is a change in how the
+-- service publishes that type: a deployment that was cached by an older run and
+-- has not been loaded since (@--lazy-load@) is compared against the old schema.
 module Compatibility
   ( FnIface (..)
   , ifaceFromFunction

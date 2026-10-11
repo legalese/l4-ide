@@ -134,6 +134,13 @@ A name that merely begins with a known annotation's is not an ignored line: `@ex
 
 The API shows a failed deployment's reason only when the service runs with `--debug`, and says `Compilation failed` otherwise (an existing choice, not changed here); the reason is always in the server log.
 
+**The gate compares the incoming bundle with the interface the deployment had when the service last loaded it.**
+By default every deployment is compiled when the service starts, so that is the interface the running service publishes.
+Under `--lazy-load` (off by default) a deployment that has not been loaded since the start is compared with the schema the previous run cached for it.
+So an upgrade of the service that changes how a function's schema is published appears, under `--lazy-load`, as a change in every such deployment, whatever its source: a `PUT` of an unchanged bundle is rejected as breaking, and a `POST` overwrite raises the breaking component of `deploymentVersion`.
+The upgrade that listed every field of an event's party and action under `required` ([An event's party and action](#an-events-party-and-action)) is one: it changes the published schema of every `DEONTIC` function whose party or action has a defaulted field, a nested record or a `MAYBE` field, and the gate compares the `events` and `startTime` of a `DEONTIC` function, as it does every parameter.
+Starting the upgraded service without `--lazy-load`, or loading the deployment before redeploying it (any request for it compiles it), compares with the schema as it is now.
+
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 
 **Validation rules:**
@@ -254,7 +261,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 # {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
 ```
 
-**Not in an event's record.** A deontic function's events are not decoded like its arguments, so the party and action records of an event take no default and are not published with one: see [An event's party and action](#an-events-party-and-action).
+**Not in an event's record.** An event's party and action records are part of the request, so they never take a default and are not published with one: see [An event's party and action](#an-events-party-and-action).
 
 **`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
 
@@ -372,11 +379,12 @@ Escapes in that source are the ones the Trace Output section describes.
 
 An event's `party` and `action` are values of the two types the function's `DEONTIC` result names, and the function's schema describes them.
 When one is a record, **every field of it is written, whether or not the field has a `TYPICALLY` default.**
-An argument record is decoded from JSON, so it may leave a defaulted field out; an event is not decoded, the service writes it into the generated wrapper as source text, and there is no default for it to take.
-The schema says so: each field of an event's `party` and `action` is under `required`, and none carries a `default`.
+An argument record may leave a defaulted field out and take the default.
+An event's record is part of the request, so it never takes one.
+The schema says so: each field of an event's `party` and `action` is under `required`, and none carries a `default`, at any depth.
 A request that leaves a field out is refused with `422`, in both `"presumption"` modes.
 
-**A record inside an event's record is written under its constructor's name**, and so is each record in a list.
+**A record inside an event's record is written under its constructor's name**, and so is each record in a list, including a party or action that is itself a list.
 The party or action record itself is written plainly.
 For a `Driver` whose `zhome` is an `Address`:
 
@@ -394,15 +402,43 @@ For a `Driver` whose `zhome` is an `Address`:
 The plain form an argument takes, `"zhome": { "zip": 5, "floor": 2 }`, is refused.
 The schema describes the form the service reads.
 
+**Where `openapi.json` describes an event.**
+The typed schema of an event is in the function document (`GET .../functions/{fn}`), which is the one place that describes it as the service reads it.
+In `openapi.json` the same typed schema sits under `arguments` of the `/evaluation` request body, listed beside the function's own inputs, and under each batch case.
+The service ignores events in both places: an event put only under `arguments` leaves the obligation open, and so does a batch case with a matching event.
+The top-level `events` of the `/evaluation` request body, which is the one it reads, has items of just `{"type": "object"}`.
+So a client that builds its request from `openapi.json` alone has no description of an event.
+
 **What the service cannot yet read in an event's record.**
-Measured on 2026-10-11 at `72044c7b9`, and refused with `422` and a type-check message each time; the schema describes these fields as ordinary ones, so a client that follows it can meet them:
+The service writes an event's record into the generated wrapper as source text, and does not decode it as it decodes an argument, so it reads only what it can write as source.
+These were measured on 2026-10-11 at `72044c7b9` and again on this branch, and each is refused with `422`, usually with a type-check message.
+The schema describes these fields as ordinary ones, so a client that follows it can meet them:
 
-- A field of text type works directly in the party or action, but not inside a record nested in it; a field of an enumeration type is the other way round.
-- A `MAYBE` field is written as `null` (it is `NOTHING`); a value for it is refused.
-- The service writes a record's fields in the sorted order of their JSON keys, whatever order the request wrote them in, and a record nested in another takes every field written after it. So a nested record has to be the last of its parent's fields in that order: a record with a field whose name sorts after the nested record's is refused.
+- A field of text type is written as text directly in the party or action, and is refused inside a record nested in it.
+  A field of an enumeration type is the other way round: inside a nested record it is its plain name (`"kind": "Home"`); directly in the party or action the plain name is refused, and it is written `{"tag": "Active"}` or `{"Active": []}`.
+- A `MAYBE` field is written as `null`, which is `NOTHING`; the schema's description of the field says so.
+  A `MAYBE NUMBER` can also be written `{"JUST": [3]}`; a value for a `MAYBE` of text or of a record is refused.
+- The service writes a record's fields in the sorted order of their JSON keys, whatever order the request wrote them in, and a record nested in another takes every field written after it.
+  So a nested record has to be the last of its parent's fields in that order: a record with a field whose name sorts after the nested record's is refused, and a record with two record-typed fields can never be written.
+- A list of records is read for one element only: two records are refused with a parser message (`unexpected WITH`), not a type-check one.
+- A fractional number below 0.1, or of 10,000,000 or more, is written in exponent form (`1.0e-2`) and refused (`could not find a definition for the identifier e`).
 
-Fields of number or boolean type, lists of text or numbers, a record nested in a record, and a list of records were tried, and are read.
+The spellings `{"tag": ...}`, `{"Active": []}` and `{"JUST": [3]}` are what the writer happens to read today.
+The schema does not publish them, and they are not promised.
+
+**A number that has no exact binary form does not equal itself.**
+A fractional number that a binary floating-point number cannot hold exactly, such as `0.1`, `0.3` or `1.1`, is read, but it does not equal the same number given in `arguments`.
+An event that carries it does not match the party, so the obligation stays open, and a later event leaves a breach, with nothing in the answer to say why.
+`0.25` and `0.5` are held exactly and match, and so do whole numbers.
+This predates the schema change and is not part of it.
+
+Fields of boolean type, whole numbers, and lists of text or numbers were tried and are read.
 Other types were not tried.
+
+**Three choices of the schema are assumed, not ruled** (the ruling covers the constructor-keyed nested record and nothing else).
+Every `MAYBE` field is under `required` with its inner type and a description that says to write `null`, since the format has no way to say "or `null`".
+A record inside a `MAYBE` field is published plain, with no constructor-name hint, because the constructor-keyed form is refused there.
+A record that contains itself is cut short in the schema, so it is published plain too, with its `x-l4-type` and no hint, because there is nothing to wrap.
 
 ### Batch Evaluation
 

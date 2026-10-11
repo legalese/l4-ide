@@ -130,13 +130,12 @@ is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
 The one record that does not follow this is an event's party or action, in a
 request to a rule that describes obligations.
-The service writes that record into the rule as text, and does not read it in
-from JSON as it reads an argument, so it takes no default.
+That record is part of the request, so it never takes a default.
 The schema lists each of its fields under `required` and gives none a `default`,
 and a request that leaves a field out is refused.
 A record inside it is written under its constructor's name.
 The [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action)
-says how.
+says how, and what the service cannot yet read there.
 
 _Partly landed (2026-10-02). Of the four things proposed on 2026-09-04, two have
 landed: a **section** `GIVEN` may be left out, and a rule that reads it then uses

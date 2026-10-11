@@ -452,12 +452,12 @@ exportToFunction declares implicitParams export =
 -- @action@ (card O4 of the 2026-10-11 overnight bench: "keep A until B
 -- lists").
 --
--- An argument record is decoded from JSON, which is why it may leave out a
--- field that has a @TYPICALLY@ and take the default, and why its schema says
--- so. An event's record is not decoded: 'Backend.CodeGen.prepareEvents' writes
--- it into the generated wrapper as source text (@Driver WITH name IS "Alice"@),
--- so the request has to give every field. A schema built exactly like an
--- argument's would promise a default the service never takes. So here:
+-- An argument record may leave out a field that has a @TYPICALLY@ and take the
+-- default, and its schema says so. An event's record is part of the request, so
+-- it never takes a default: the request has to give every field.
+-- 'Backend.CodeGen.prepareEvents' writes each such record into the generated
+-- wrapper as source text (@Driver WITH name IS "Alice"@). A schema built exactly
+-- like an argument's would promise a default the service never takes. So here:
 --
 -- * every field is @required@ and none carries a @default@, at every depth;
 --
@@ -470,11 +470,20 @@ exportToFunction declares implicitParams export =
 -- This describes what the wrapper reads today; it does not change what the
 -- wrapper reads. What it cannot write as source it still cannot, and the schema
 -- does not hide that by describing a different shape. Measured on 2026-10-11 at
--- 72044c7b9: a text field inside a nested record, a field of an enumeration
--- type, and a @MAYBE@ field given a value (only @null@ is read) all fail to
--- type-check, and so does a field whose name sorts after a nested record's (the
--- wrapper writes the fields in key order and the nested record's @WITH@ takes
--- the rest). That is the decoder's to fix, not this schema's.
+-- 72044c7b9, and listed in the service README ("What the service cannot yet
+-- read"): a text field inside a nested record; a field of an enumeration type,
+-- which directly in the party is read as @{"tag": "Active"}@ and not as its
+-- plain name; a @MAYBE@ given anything but @null@ (a @MAYBE NUMBER@ also reads
+-- @{"JUST": [3]}@); a list of two records; a fractional number below 0.1 or of
+-- 1e7 and over, which is written in exponent form; and a nested record that is
+-- not the last of its parent's fields in key order (the wrapper writes the
+-- fields in key order and the nested record's @WITH@ takes the rest). Those
+-- spellings are not published here, so the decoder is free to replace them.
+--
+-- In openapi.json this schema sits under @arguments@ of the @/evaluation@ request
+-- body and in the batch cases, where the service does not read it; the top-level
+-- @events@ it does read is untyped there. The function document is where an
+-- event is described as the service reads it.
 eventRecordParameter :: Parameter -> Parameter
 eventRecordParameter p = case p.parameterProperties of
   -- A party or action that is not a record has no fields to require: an
