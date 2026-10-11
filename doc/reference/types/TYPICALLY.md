@@ -108,15 +108,82 @@ that file: if its `TYPICALLY` value is edited, a call here that leaves the input
 out takes the new value. Writing the input at the call, as
 `scaled WITH base IS 10, rate IS 3`, pins it. Two things it does not do:
 
-- **It does not choose between rules of the same name.** When two rules share a
-  name and each could take the call's inputs, a call that leaves out an input
-  with a default is still ambiguous, as it was before, and has to name every
-  input of the one it means. A default is not allowed to decide which rule the
-  author meant. A rule that shares its name with a record field is not in this
-  case: a field takes no named inputs, so the call can only mean the rule.
+- **It does not choose between rules of the same name.** A default is not
+  allowed to decide which rule the author meant. When the call's own inputs do
+  not settle which of two rules it means, a call that leaves out an input with a
+  default is ambiguous, as it was before, and has to name every input of the
+  one it means ([below](#two-rules-with-the-same-name)). A rule that shares its
+  name with a record field is not in this case: a field takes no named inputs,
+  so the call can only mean the rule.
 - **It does not reach an `ASSUME`.** An `ASSUME` that takes inputs (`ASSUME` is
   deprecated) keeps its inputs' `TYPICALLY` as a note only, in the file that
   declares it and in a file that imports it alike.
+
+### Two rules with the same name
+
+Two rules may share a name when their inputs tell them apart.
+A call that names its inputs and leaves one out takes the default only if the call cannot mean any other rule of that name.
+A rule **could take** the call when every input the call names is an input of that rule, and every value the call gives fits the type of that input.
+A rule does not have to be complete to count: one that is missing an input, and has no default for it, could still take the call.
+
+1. **If a rule can take the call as written, with every input given, that is the rule meant.**
+   No other rule's default is used against it, and the call means what it meant before `TYPICALLY` existed.
+2. **Otherwise, if only one rule could take the call, it takes its defaults** for what the call left out.
+3. **Otherwise, two or more rules could take the call and none is complete as written. No default is taken**, and the call is ambiguous.
+
+The values the call gives are what tell the rules apart.
+Here the second `scaled` takes a `STRING` for `base`, and the call gives a number, so only the first `scaled` could take it:
+
+```l4
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A STRING
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS factor
+
+#EVAL scaled WITH base IS 10      -- 30: only the first `scaled` could take it
+```
+
+Here one rule takes the call as written, and the other would take it only by a default, so the first rule is not chosen on the strength of its default:
+
+```l4
+GIVEN a IS A NUMBER
+      b IS A NUMBER TYPICALLY 1
+GIVETH A NUMBER
+f MEANS a PLUS b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+f MEANS a TIMES 100
+
+#EVAL f WITH a IS 5               -- 500: the second `f` takes `a` as written
+```
+
+Here both rules take a number for `base`, and the second needs a `factor` that the call does not give.
+A default of the first rule is not allowed to decide that the author meant the first:
+
+```l4
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A NUMBER
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS base PLUS factor
+
+#EVAL scaled WITH base IS 10      -- error: both `scaled` could take this call
+```
+
+There are two ways to settle a call that is still ambiguous.
+Write the input that has the default (`scaled WITH base IS 10, rate IS 3`), which leaves only the first rule able to take the call.
+Or, when the two rules sit under different section headings, name the one you mean: `` `Pricing`.scaled WITH base IS 10 ``.
+When the rules sit in the same section, only the first way is open.
 
 ## On a record field: leaving a field out of a construction
 
