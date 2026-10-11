@@ -197,10 +197,10 @@ govern what counts as leaving a fact out:
   `"presumption": "hard"` in a service request, uses no defaults: a fact left
   out is missing, and the case is refused, naming it. The default is `soft`.
   The switch reaches only the facts a case can supply. A record the rules
-  decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
-  in either mode the answer lists them under `presumed` as
-  `JSONDECODE <type>: <field>`, because nothing the case says could replace
-  them. The same is true of a default a `WITH` call or a construction _inside_
+  decode with `JSONDECODE` still takes its defaults, whether the JSON is
+  written in the rules or is text the case sent, and in either mode the answer
+  lists them under `presumed` as `JSONDECODE <type>: <field>`: the switch does
+  not withdraw them. The same is true of a default a `WITH` call or a construction _inside_
   the rules takes (see above): neither mode withdraws it, because no case could
   have supplied it. The answer lists it under `presumed` as
   `WITH <rule>: <input>`, naming the rule or record as its declaration writes
@@ -221,8 +221,11 @@ govern what counts as leaving a fact out:
   bare, so it also shares an entry with a top-level rule of that name. So
   `presumed` has more than one shape: a fact's name
   or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and
-  `JSONDECODE <type>: <field>`. An entry that starts `WITH ` or
-  `JSONDECODE ` is a usual value the rules took, not a fact the case left out.
+  `JSONDECODE <type>: <field>`. An entry that starts `WITH ` is a usual value
+  the rules took where a call or a construction inside them left it out, which
+  no case could have supplied. One that starts `JSONDECODE ` is a usual value
+  in a decode the rules made, which may be of text the case sent, so it can be
+  a fact that text left out.
 - **An event's record in the decision service is not a place a default can
   be left out.** When a request for a rule that describes obligations replays
   events, each event's party or action record has to give every field, whether

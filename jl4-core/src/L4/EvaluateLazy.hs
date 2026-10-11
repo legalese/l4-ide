@@ -990,15 +990,16 @@ recordFieldDefaults decls = Map.fromList
 --
 -- Only events that belong to the request count (T6b): a section binder's or a
 -- root fill's for an input the function takes, and one from the request's own
--- decode. A decode the RULES made is not the request's, and is listed in both
--- presumption modes (Meng, 2026-10-11, card O1 condition 3): it is a default
--- no request can supply, so the switch does not withdraw it, and the answer
--- rests on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
--- naming the type the rules decoded.
+-- decode. A decode the RULES made, of JSON written in the rules or of text the
+-- request sent, is not the request's, and its defaults are listed in both
+-- presumption modes (Meng, 2026-10-11, card O1 condition 3): the switch reaches
+-- the request's own decode only, and the answer rests on them (T4b: "rests on
+-- presumed x"). It is written @JSONDECODE T: path@, naming the type the rules
+-- decoded.
 --
 -- A default a named application of the rules took (W4, W5) is a default no
--- request could supply, as a rule's own @JSONDECODE@ is, and the answer rests
--- on it just the same. It is listed in BOTH modes, as @WITH rule: input@ (Meng,
+-- request could supply, and the answer rests on it just the same. It is listed
+-- in BOTH modes, as @WITH rule: input@ (Meng,
 -- 2026-10-11, card O1): R8 asks that every output name each parameter that took
 -- its default, and T4b that the mark cover every default that took effect,
 -- wherever filled. T6b's "keeps only those whose binder or JSON path is part of
