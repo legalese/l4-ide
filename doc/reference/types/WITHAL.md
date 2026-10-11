@@ -85,8 +85,10 @@ A usual value is a _presumption_, and the presumption can be switched off for a 
 `WITHAL` is inside your rules, where no case could have supplied the value, so it takes the usual values in both modes.
 Under `hard` the answer lists each one under **`presumed`** as `WITH Paint: coats`, exactly as it lists a `WITH` that left the field out.
 
-A record that your rules read from JSON text which supplies nothing takes the same usual values, so it is the record `WITHAL` builds.
-Both `l4 batch` and the decision service run it:
+A rule can also read a record from JSON text.
+When the text is an empty object, `{}`, it supplies nothing, and a field that has a usual value takes it.
+So for a record in which **every** field has a usual value, reading `{}` gives the record `WITHAL` builds.
+Both `l4 batch` and the decision service run this:
 
 ```l4
 GIVEN text IS A STRING
@@ -96,9 +98,15 @@ GIVETH AN EITHER STRING Paint
 #ASSERT `read paint` "{}" EQUALS RIGHT (Paint WITHAL)
 ```
 
-`{}` written as the _value_ of a record input in a case is a different thing.
-It means "not known", and a case that sends it is refused, naming the input.
-Inside your rules, `WITHAL` is how you say "a record with nothing supplied".
+That holds only when every field has a usual value.
+A field declared `MAYBE` with no usual value is filled with `NOTHING` when the text is read, while `WITHAL` refuses to build the record and names the field.
+`WITHAL` takes the usual values a record declares, and never works one out from a field's kind of thing.
+
+An empty object written as the _value_ of a record input in a case is a different thing.
+It means "not known".
+An input that must have a value, sent `{}`, is refused, naming the input.
+An input declared `MAYBE`, sent `{}`, is `NOTHING`, and the case succeeds.
+Inside your rules, `WITHAL` is how you say "a record with every usual value".
 
 ## Limits
 
