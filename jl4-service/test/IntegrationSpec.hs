@@ -4262,11 +4262,23 @@ spec = describe "integration" do
               , "startTime" Aeson..= (0 :: Int)
               , "events" Aeson..= [event]
               ]
-            written = exampleOf [] item
-        -- the example is the schema's own: every required field, the nested record under its name
+            -- The example is the schema's own: every required field, the nested record
+            -- under its name. Its values are the arguments' (the defaults the arguments
+            -- took, "full", 1 and "email", written out), so that the event is the
+            -- obligated party doing the obligated action.
+            written = exampleOf
+              [ (["party", "name"], Aeson.String "Alice")
+              , (["party", "licence"], Aeson.String "full")
+              , (["party", "zhome", "Address", "zip"], Aeson.Number 5)
+              , (["party", "zhome", "Address", "floor"], Aeson.Number 1)
+              , (["action", "body"], Aeson.String "hi")
+              , (["action", "channel"], Aeson.String "email")
+              ] item
         jsonAt ["party", "zhome", "Address"] written `shouldSatisfy` Maybe.isJust
+        -- FULFILLED, not merely a 200: an event that was dropped, or read as some other
+        -- party, would leave the obligation open
         answered <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request written)
-        assertSuccess answered \_ -> pure ()
+        assertSuccess answered \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitString "FULFILLED")
         -- the same event with one field left out is refused, whether or not the field has a default
         forM_ [["party", "licence"], ["action", "channel"], ["party", "zhome", "Address", "floor"], ["party", "name"]] \path -> do
           refused <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request (deleteAt path written))
