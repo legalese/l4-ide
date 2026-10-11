@@ -433,7 +433,7 @@ batchResponseSchema fn =
                     , "@presumed" .= Aeson.object
                         [ "type" .= ("array" :: Text)
                         , "items" .= Aeson.object ["type" .= ("string" :: Text)]
-                        , "description" .= ("The defaults its answer or refusal rests on. Most entries are inputs the case left out whose defaults were used, by name (a record field by its path); an entry that starts with WITH, such as WITH scaled: rate, is a default the rules themselves took, which no case could supply; one that starts with JSONDECODE is a default in a decode the rules made, of JSON written in the rules or of text the case sent" :: Text)
+                        , "description" .= ("The defaults its answer or refusal rests on. Most entries are inputs the case left out whose defaults were used, by name (a record field by its path); an entry that starts with WITH, such as WITH scaled: rate, is a default the rules themselves took, which no case could supply; one that starts with JSONDECODE, such as JSONDECODE Settings: limit, is a default in a decode the rules made, of JSON written in the rules or of text the case sent. The record is named as it is declared, behind its section heading; a record from an imported file is named without the heading" :: Text)
                         ]
                     , "value" .= Aeson.object
                         [ "description" .= ("The answer, of type " <> fn.fsReturnType <> ". Only on an answered case" :: Text) ]
