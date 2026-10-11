@@ -2728,6 +2728,14 @@ namedApp = do
     AppNamed emptyAnno
     <$> annoHole name
     <*> (   annoLexeme (spacedKeyword_ TKWith) *> annoHole (lsepBy1 namedExpr (spacedSymbol_ TComma))
+        -- @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ARCHAISM): the same
+        -- node as @T WITH …@ with nothing written after the keyword. The
+        -- checker fills it exactly as it fills a @WITH@ that omits fields, so
+        -- no consumer needs to know the spelling; the printer reads it back
+        -- off the empty written list ('L4.Print'). Standalone on purpose: a
+        -- field after it is not parsed here, so it is a parse error at the
+        -- enclosing level, and an override is spelled @WITH@.
+        <|> annoLexeme (spacedKeyword_ TKWithal) *> annoHole (pure [])
         )
     <*> pure Nothing
 
