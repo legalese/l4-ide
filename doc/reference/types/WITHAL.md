@@ -38,11 +38,23 @@ It is not a record: it is the function that makes a `Paint` from its fields, sti
 ## One spelling for each thing
 
 `WITHAL` stands alone: no field may follow it.
-Setting a field after it is a parse error:
+Where it is the whole construction, setting a field after it is a parse error:
 
 ```l4
 `glossy paint` MEANS Paint WITHAL coats IS 3     -- a parse error
 ```
+
+Inside another `WITH`, a comma after `Paint WITHAL` is not an error: what follows the comma belongs to the outer call, not to the `Paint`.
+Suppose `days to deliver` takes a `paint` and has a `rush` input of its own, usually `FALSE`.
+These two calls differ only in which one `rush IS TRUE` is given to:
+
+```l4
+`days to deliver` WITH paint IS Paint WITH coats IS 2, rush IS TRUE    -- rush is the Paint's: 3
+`days to deliver` WITH paint IS Paint WITHAL, rush IS TRUE             -- rush is the rule's: 1
+```
+
+L4 gives no warning for the second.
+If you mean a `Paint` that is rushed, write `Paint WITH rush IS TRUE`.
 
 A name after `WITHAL` is not read as a field being set.
 It is read as a function applied to the record, so `Paint WITHAL coats` is the number of coats, 2, the same as `coats (Paint WITHAL)`.

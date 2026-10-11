@@ -330,7 +330,7 @@ Six of the decisions below were put to Meng as cards O1 to O6 on a bench ("Overn
   **RULED 2026-10-11, bench card O1.**
   Meng marked `accept`, option B, at 12:54:16Z, with no note.
   Conditions as printed on the card: (1) the tests and documents that say "hard only" change in the same commit, rewritten rather than deleted, and so do the published descriptions of `presumed`, the OpenAPI schema text first; (2) the service README says that `presumed` entries come in more than one shape; (3) Meng says whether a rule's own `JSONDECODE` follows.
-  He answered (3) in chat on 2026-10-11 (~21:25 +0800) by firing the word DECODERRING: it follows, listed in both modes (§4.1).
+  He answered (3) in chat on 2026-10-11 (21:29 +0800, 13:29:00Z) by firing the word DECODERRING: it follows, listed in both modes (§4.1).
   T6b names these sites ("W4's named sites and constructions emit W8's event themselves. The trace shows every event; `presumed` keeps only those whose binder or JSON path is part of the request"), and the binder of `rate` in `scaled WITH base IS 10` is part of no request; T4b's "elsewhere the result says 'rests on presumed x'" is about the off switch.
   Read together, the first build (2026-10-03) listed it under hard and filtered it under soft, which is how a rule's own `JSONDECODE` was treated then (`JSONDECODE T: field`, under hard only; both modes now, §4.1).
   On that reading every entry in `presumed` under soft was a name a client could have sent, as it was in #539.
@@ -378,7 +378,7 @@ Six of the decisions below were put to Meng as cards O1 to O6 on a bench ("Overn
   The mark used to persist for the rest of the module, so one site that had to choose among overloads took the default away from every later site of the chosen rule, a section-qualified one included, and whether a default was taken depended on the order of the declarations (`#EVAL scaled WITH base IS 10, rate IS 2` above ``#EVAL `Pricing`.scaled WITH base IS 10`` failed; the other order checked).
   And every other survivor counted as a rival whatever it was, so a rule that shares its name with a record field (`amount`, `discount`, `rate`: an ordinary pattern) lost W4 at every named site and reported a false ambiguity between the rule and a field that takes no named inputs, while `l4 batch` took the default for the same rule.
   A rival now counts only if it could take the inputs the site names (`couldTakeNamedSite`): a function with a named parameter, a bare definition only when every name the site gives is a section binder, a type still being inferred (to stay loud), and a record field selector never.
-  Still ambiguous, as ruled: two rules, or a rule and a function of the same name, that could each take what the site writes, by names and by types (`ok/typically-site-names.l4` pins what is no longer an overload; `not-ok/tc/typically-overloaded-site.l4` and `not-ok/tc/typically-overloaded-fit.l4` what still is).
+  Still ambiguous, as ruled: two rules, or a rule and a function of the same name, that could each take what the site writes, going by the types of the values it writes (a name the site gives that a rule lacks rules nothing out; `ok/typically-site-names.l4` pins what is no longer an overload; `not-ok/tc/typically-overloaded-site.l4` and `not-ok/tc/typically-overloaded-fit.l4` what still is).
 
 - **An event's party or action record in the service takes no default: a field it leaves out is refused, in both modes.** In its own commit.
   **RULED 2026-10-11, bench card O4.**
@@ -410,15 +410,20 @@ Six of the decisions below were put to Meng as cards O1 to O6 on a bench ("Overn
   The card's own condition on B applies: it asked for the quoting to be ruled first, and imports and `WHERE` locals stay merged (below).
   The quoting was built meanwhile and is marked assumed below, still owed its ruling.
   `WITH rescaled: rate` (an `AKA` alias) leaked from the callee's resolved name; the entry now carries the owner with the default (`InputDefault.owner`), so it does not depend on how a site spelled the callee, or on an `IMPORT`.
-  The owner is named behind the section it is declared in, `WITH Pricing.scaled: rate` (`TypeCheck.qualifiedOwner`), which tells two same-named rules or records in different sections apart: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) list `WITH A.scaled: rate`, `WITH B.scaled: rate` and both.
+  The owner is named behind the section it is declared in, `WITH Pricing.scaled: rate` (`TypeCheck.qualifiedOwner`), which tells two same-named rules or records in different sections apart: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) list ``WITH `A`.scaled: rate``, `WITH B.scaled: rate` and both (`A` is a reserved word, so it is written in backticks, and `B` is not; the tests use `Alpha` and `Beta`).
   A rule at the top of a file has no section to name, and a rule declared in a `WHERE` or `LET` is kept bare.
   A part that L4 would write in backticks in source (`quoteIfNeeded`: any character that is not a letter, digit or underscore, a first character that is not a letter, a reserved word) is written in backticks, as the printer writes a qualified name (`` `Part 1. Fees`.scaled ``), and a name with no section in front of it is quoted the same way (`` `two words` ``): `L4.EvaluateLazy.Machine.presumedOwner`.
   A backticked part can hold a dot or a colon, so an entry is split by reading each one whole.
   Without that, a top-level rule called `Pricing.scaled` and the rule `scaled` under `§ Pricing` printed the same entry (found in review).
+  The quoting reaches a heading named with a reserved word: `A`, `AN`, `THE`, `IS` and `OF` are written in backticks (``WITH `A`.fee: rate``), while `B` and `Pricing` are not (checked on a one-rule file under each heading).
+  That is part of the quoting question O6 still owes.
   The section qualification is ruled (O6); the quoting of a part, just above, is assumed, not ruled, and in commits of its own.
-  _Two limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4)._
+  _Three limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4, and the Opus review of the combined branch)._
   Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file or the place: the same name in two imported files (at the top level, or under the same `§`), and a `WHERE` or `LET` local, which is named bare and so also shares an entry with a top-level rule of that name.
   A row that rests on two such defaults lists one, and nothing says which default either was.
+  Two rules of one name in ONE section, each taking its own default, give one entry too: `fee(amount NUMBER, rate TYPICALLY 0.02)` and `fee(amount STRING, rate TYPICALLY 0.5)` in `§ Pricing`, and `(fee WITH amount IS 100) PLUS (fee WITH amount IS "x")` answers 2.5 with `presumed` `["WITH Pricing.fee: rate"]`, whichever default each call took (review probe `i8/both.l4`; the same under soft and under hard).
+  The parent reports "multiple definitions" for that module, so this case is new with O3.
+  It is not among the exceptions O6 ruled (imports and `WHERE` locals), and it has not been put to Meng.
   And `presumed` now has three string shapes, `rate`, `JSONDECODE T: path` and `WITH scaled: rate`, which a client tells apart by prefix; T4b asks for the mark "with its declaration line", and a structured entry (origin, owner, path, declaration line) would carry it, but is a change of the wire.
   Neither is changed.
 
@@ -475,7 +480,7 @@ Each code fix has its own commit and a test that failed before it (the previous 
 - **A record nested in an event's record is refused too** (rulings R2-2; above, under the event decision).
   `jl4-service-test`, "refuses an event whose nested record leaves out a defaulted field, in both modes".
 - **Text that claimed more than the behaviour** (silent N4, N5, rulings R2-4): "a misspelt `rate` is never read as a default taken" (above, under R8 rule 1, now with the one case it cannot catch); two sentences that said `presumed` lists a default taken inside the rules, which under soft it did not then (`jl4-service/README.md`, the skill's entry 7.4; both modes list it now); the line under T6 in §5, which said T4b's mark "is the trace's" and now names the conflict between T4b and T6b and what soft gives up; and, found by searching for the same claim in the other pages, `doc/courses/advanced/module-a4-production.md`, which said a default on a field or a rule's input "is metadata only" inside a file.
-- **Recorded, not changed:** the two limits on `presumed` entries (R2-3, above); an event's record under soft is built differently from T1, and the faithful reading is owed (R2-5, above), so it is not a question for Meng; T4b's check-time warning stays unbuilt (R2-6, "Not built here"); and the tutorial's "The file and the boundary agree" is now "A call inside the file may leave out the same things", because `l4 batch` cannot run an export whose input is an enum or record type when a later section declares a type of the same name (silent X1, "Not built here").
+- **Recorded, not changed:** the three limits on `presumed` entries (R2-3 and the one added after the Opus review, above); an event's record under soft is built differently from T1, and the faithful reading is owed (R2-5, above), so it is not a question for Meng; T4b's check-time warning stays unbuilt (R2-6, "Not built here"); and the tutorial's "The file and the boundary agree" is now "A call inside the file may leave out the same things", because `l4 batch` cannot run an export whose input is an enum or record type when a later section declares a type of the same name (silent X1, "Not built here").
 
 **What does not change.**
 Positional calls (R8 rule 1).
@@ -486,7 +491,7 @@ That prior orders questions and never answers one, which is already the one beha
 
 ### 4.3 `T WITHAL`, T1's open spelling, as built (2026-10-09)
 
-**Status:** built in `feat/withal`, local commits on top of `feat/typically-w4w5` at `cf6f68269` (#551's pushed head). Not pushed, not reviewed, no PR.
+**Status:** built in `feat/withal`, integrated with O1, O3, O5 and O6 on the local branch `integ/lane-c-rulings`, and reviewed by Opus alone and in the combination (2026-10-11/12). Not pushed, no PR.
 
 **ANSWERED 2026-10-09** (T1, §5).
 Meng, 2026-10-09 05:29 +08: _"Yes let's go with WITHAL and I take your standalone recommendation re combining with overrides. One other advantage is a grep regex can be constructed to return both WITH and WITHAL should anyone want to search for constructors that way."_
@@ -495,6 +500,9 @@ Meng, 2026-10-09 05:29 +08: _"Yes let's go with WITHAL and I take your standalon
 `T WITHAL` builds the record `T` taking every field's `TYPICALLY` default, and writes none.
 "Every default" is the whole of its meaning, so nobody should expect a required field to be filled in: it is a check error if any field of `T` has no default, and the message names each such field.
 It is standalone: no field may follow it.
+That holds where `T WITHAL` is the whole construction.
+Inside an outer `WITH`, a comma after it is accepted and what follows belongs to the OUTER call: `` `days to deliver` WITH paint IS Paint WITHAL, rush IS TRUE `` gives `rush` to the rule and answers 1, where `… WITH paint IS Paint WITH coats IS 2, rush IS TRUE` gives it to the `Paint` and answers 3 (exit 0 both; review probe `i2b/nested-comma.l4`; the pair is `doc/reference/types/withal-example.l4`), while `Paint WITHAL, rush IS TRUE` alone is "unexpected ," (`i2b/top-comma.l4`).
+No diagnostic is added for the nested case; that is Meng's call, not made.
 `T WITHAL a IS TRUE` is a parse error, and an override is `T WITH a IS TRUE`, so one construction does not get two spellings (the drift T4b exists to stop).
 A name after `WITHAL` is read as a function applied to the record, so `Paint WITHAL coats` is `coats (Paint WITHAL)`, 2 (`l4 batch` of `Paint WITHAL coats PLUS k` with `k` 1 answers 3), and the error for `Paint WITHAL label IS "gloss"` is at the `IS` only because `Paint WITHAL label` has already parsed that way.
 No warning is given for it; that is not ruled.

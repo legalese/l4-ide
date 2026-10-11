@@ -193,7 +193,7 @@ A value that is a positional call (`double 5`) is compared, and so is a name: gi
 Without this limit the time to check calls inside calls grew several-fold with every level.
 
 There are two ways to settle a call that is still ambiguous.
-Write the input that has the default (`scaled WITH base IS 10, rate IS 3`), which leaves only the first rule able to take the call.
+Write the input that has the default (`scaled WITH base IS 10, rate IS 3`): the call is then complete as written for the first rule and not for the second, so the first is the rule meant (rule 1 above).
 Or, when the two rules sit under different section headings, name the one you mean: `` `Pricing`.scaled WITH base IS 10 ``.
 When the rules sit in the same section, only the first way is open.
 
@@ -250,7 +250,7 @@ What the mark does and does not tell you:
 
 - **It covers a default added at a call that names its inputs, or at a construction.** Those are the two places where a call or a construction that the author wrote gets a value the author did not write.
 - **It does not cover a default taken at the root of a section `GIVEN`.** With `surcharge TYPICALLY 2` on a section `GIVEN`, `` `tax on` WITH amount IS 10 `` prints as `` `tax on` where `amount` is 10 is equal to 12 ``, and the 2 is not in the text. Written at the call, `surcharge IS 7` is printed.
-- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, and, in either mode, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
+- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, a field default in a record the rules decode with `JSONDECODE`, and, in either mode, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
 - **The words are English in `l4 render`, whatever `--lang` says.** `l4 nlg --lang he` prints `כברירת מחדל` from a draft entry in its table of Hebrew phrases, which no Hebrew-speaking lawyer has reviewed, and `l4 render` does not use that table yet ([the syntax reference](../syntax/README.md) says so).
 
 ## What the default must be
@@ -294,13 +294,15 @@ govern what counts as leaving a fact out:
   refused, naming the nearest one, since it may misspell the fact left out.
   Where no default is taken, it is ignored.
 - **The presumption can be switched off.** `l4 batch --presumption hard`, or
-  `"presumption": "hard"` in a service request, uses no defaults: a fact left
-  out is missing, and the case is refused, naming it. The default is `soft`.
+  `"presumption": "hard"` in a service request, uses no default for a fact the
+  case leaves out: that fact is missing, and the case is refused, naming it. The default is `soft`.
   The switch reaches only the facts a case can supply. A record the rules
   decode with `JSONDECODE` still takes its defaults, whether the JSON is
   written in the rules or is text the case sent, and in either mode the answer
   lists them under `presumed` as `JSONDECODE <type>: <field>`: the switch does
-  not withdraw them. The same is true of a default a `WITH` call or a construction _inside_
+  not withdraw them. A `MAYBE` field with no `TYPICALLY` that the decoded JSON
+  leaves out is filled with `NOTHING` and listed the same way
+  (`JSONDECODE Partial: note`), in both modes. The same is true of a default a `WITH` call or a construction _inside_
   the rules takes (see above): neither mode withdraws it, because no case could
   have supplied it. The answer lists it under `presumed` as
   `WITH <rule>: <input>`, naming the rule or record as its declaration writes

@@ -5210,7 +5210,7 @@ inferAppNamed _noDefault r t nes = do
 -- exactly that: the arguments are the same 'DefaultFill'ed ones a @WITH@ that
 -- omits the fields gets ('fillDefaults'), so the evaluator, the exporters, the
 -- ladder and the NLG already do with it what they do with those, and
--- @--presumption hard@ lists each as @WITH T: field@ with no second path.
+-- both presumption modes list each as @WITH T: field@ with no second path.
 --
 -- A field with no default is an error that names it ('IncompleteWithal'): the
 -- spelling asks for every default, so a field that has none is the author

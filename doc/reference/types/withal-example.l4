@@ -30,6 +30,18 @@ GIVETH A Paint
 
 #ASSERT (`green paint`'s coats) EQUALS 2
 
+-- Inside another WITH, a field written after `Paint WITHAL,` is not Paint's:
+-- the comma ends the inner construction, and `rush IS TRUE` belongs to the OUTER
+-- call. The first call below puts `rush IS TRUE` inside the Paint (the delivery
+-- rule's own `rush` stays FALSE); the second puts it on the rule.
+GIVEN paint IS A Paint
+      rush  IS A BOOLEAN TYPICALLY FALSE
+GIVETH A NUMBER
+`days to deliver` MEANS IF rush THEN 1 ELSE IF paint's rush THEN 3 ELSE 10
+
+#ASSERT (`days to deliver` WITH paint IS Paint WITH coats IS 2, rush IS TRUE) EQUALS 3
+#ASSERT (`days to deliver` WITH paint IS Paint WITHAL, rush IS TRUE) EQUALS 1
+
 -- A record read from JSON text that supplies nothing is the same record.
 GIVEN text IS A STRING
 GIVETH AN EITHER STRING Paint

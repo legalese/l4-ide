@@ -341,7 +341,7 @@ presumptionSchema :: Aeson.Value
 presumptionSchema = Aeson.object
   [ "type" .= ("string" :: Text)
   , "enum" .= (["soft", "hard"] :: [Text])
-  , "description" .= ("soft (the default): an argument left out takes its default; hard: no defaults are used, so an argument left out is missing" :: Text)
+  , "description" .= ("soft (the default): an argument left out takes its default; hard: no default is used for an argument left out, so it is missing; a default a rule takes itself is still used" :: Text)
   ]
 
 -- | Build the request body schema for evaluation endpoints.
