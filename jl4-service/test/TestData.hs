@@ -37,6 +37,7 @@ module TestData (
   namedSiteDefaultJL4,
   constructorNamedDefaultJL4,
   collideSectionsJL4,
+  collideSpacedJL4,
   recordDefaultJL4,
   maybeHardJL4,
   sectionSecondJL4,
@@ -944,6 +945,34 @@ GIVETH A NUMBER
 scaled MEANS rate TIMES base
 
 § `Beta`
+
+GIVEN rate IS A NUMBER TYPICALLY 5
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+|]
+
+-- | The same under headings that are not one plain word: @Part 1. Fees@ holds a
+-- space and a dot, so the entry writes it in backticks (assumed, not ruled).
+collideSpacedJL4 :: Text
+collideSpacedJL4 =
+  [i|
+@export default combine
+GIVEN `use alpha` IS A BOOLEAN
+      `use beta` IS A BOOLEAN
+GIVETH A NUMBER
+combine MEANS
+  (IF `use alpha` THEN `Part 1. Fees`.scaled WITH base IS 10 ELSE 0)
+    PLUS (IF `use beta` THEN `Part 2`.scaled WITH base IS 10 ELSE 0)
+
+§ `Part 1. Fees`
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+§ `Part 2`
 
 GIVEN rate IS A NUMBER TYPICALLY 5
       base IS A NUMBER

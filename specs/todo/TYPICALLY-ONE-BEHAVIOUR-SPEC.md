@@ -368,6 +368,8 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   `WITH rescaled: rate` (an `AKA` alias) leaked from the callee's resolved name; the entry now carries the owner with the default (`InputDefault.owner`), so it does not depend on how a site spelled the callee, or on an `IMPORT`.
   The owner is named behind the section it is declared in, `WITH Pricing.scaled: rate` (`TypeCheck.qualifiedOwner`), which tells two same-named rules or records in different sections apart: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) list `WITH A.scaled: rate`, `WITH B.scaled: rate` and both.
   A rule at the top of a file has no section to name, and a rule declared in a `WHERE` or `LET` is kept bare.
+  A part of the qualified name that is more than one plain word, or holds a dot, is written in backticks, as the printer writes a qualified name (`` `Part 1. Fees`.scaled ``): `L4.EvaluateLazy.Machine.presumedOwner`.
+  Assumed, not ruled, and in a commit of its own.
   _Two limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4)._
   Top-level rules of one name in two imported files give one entry (a call cannot say which file's `scaled` it means, so there is nothing to put in front), and so do two `WHERE` locals of one name: a row that rests on two defaults lists one, and nothing says which default either was.
   And `presumed` now has three string shapes, `rate`, `JSONDECODE T: path` and `WITH scaled: rate`, which a client tells apart by prefix; T4b asks for the mark "with its declaration line", and a structured entry (origin, owner, path, declaration line) would carry it, but is a change of the wire.
