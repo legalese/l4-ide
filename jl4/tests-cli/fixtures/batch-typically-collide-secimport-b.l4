@@ -1,0 +1,13 @@
+-- Imported by batch-typically-collide-secimport.l4, with the module beside it.
+-- Both declare `scaled` under `§ Pricing`, with a TYPICALLY default on `rate`.
+
+§ `Pricing`
+
+GIVEN rate IS A NUMBER TYPICALLY 5
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+useTwo MEANS scaled WITH base IS n

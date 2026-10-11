@@ -368,11 +368,13 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   `WITH rescaled: rate` (an `AKA` alias) leaked from the callee's resolved name; the entry now carries the owner with the default (`InputDefault.owner`), so it does not depend on how a site spelled the callee, or on an `IMPORT`.
   The owner is named behind the section it is declared in, `WITH Pricing.scaled: rate` (`TypeCheck.qualifiedOwner`), which tells two same-named rules or records in different sections apart: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) list `WITH A.scaled: rate`, `WITH B.scaled: rate` and both.
   A rule at the top of a file has no section to name, and a rule declared in a `WHERE` or `LET` is kept bare.
-  A part of the name that is more than one plain word, or holds a dot, is written in backticks, as the printer writes a qualified name (`` `Part 1. Fees`.scaled ``), and a name with no section in front of it is quoted the same way (`` `two words` ``): `L4.EvaluateLazy.Machine.presumedOwner`.
+  A part that L4 would write in backticks in source (`quoteIfNeeded`: any character that is not a letter, digit or underscore, a first character that is not a letter, a reserved word) is written in backticks, as the printer writes a qualified name (`` `Part 1. Fees`.scaled ``), and a name with no section in front of it is quoted the same way (`` `two words` ``): `L4.EvaluateLazy.Machine.presumedOwner`.
+  A backticked part can hold a dot or a colon, so an entry is split by reading each one whole.
   Without that, a top-level rule called `Pricing.scaled` and the rule `scaled` under `§ Pricing` printed the same entry (found in review).
   Assumed, not ruled, and in a commit of its own.
   _Two limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4)._
-  Top-level rules of one name in two imported files give one entry (a call cannot say which file's `scaled` it means, so there is nothing to put in front), and so do two `WHERE` locals of one name: a row that rests on two defaults lists one, and nothing says which default either was.
+  Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file or the place: the same name in two imported files (at the top level, or under the same `§`), and a `WHERE` or `LET` local, which is named bare and so also shares an entry with a top-level rule of that name.
+  A row that rests on two such defaults lists one, and nothing says which default either was.
   And `presumed` now has three string shapes, `rate`, `JSONDECODE T: path` and `WITH scaled: rate`, which a client tells apart by prefix; T4b asks for the mark "with its declaration line", and a structured entry (origin, owner, path, declaration line) would carry it, but is a change of the wire.
   Neither is changed.
 

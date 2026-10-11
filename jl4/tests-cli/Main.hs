@@ -246,10 +246,14 @@ batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 -- | Two declarations of one name, each with a @TYPICALLY@ default, under
 -- different headings (rules, then records), and the two cases a heading cannot
 -- tell apart: top-level rules of two imported files, and @WHERE@ locals.
-batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
+batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop, batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
 batchTyCollideSections = fixtureDir </> "batch-typically-collide-sections.l4"
 batchTyCollideSpaced   = fixtureDir </> "batch-typically-collide-spaced.l4"
 batchTyCollideDotted   = fixtureDir </> "batch-typically-collide-dotted.l4"
+batchTyCollideSecImport  = fixtureDir </> "batch-typically-collide-secimport.l4"
+batchTyCollideSecImportA = fixtureDir </> "batch-typically-collide-secimport-a.l4"
+batchTyCollideSecImportB = fixtureDir </> "batch-typically-collide-secimport-b.l4"
+batchTyCollideWhereTop   = fixtureDir </> "batch-typically-collide-wheretop.l4"
 batchTyCollideTopmix   = fixtureDir </> "batch-typically-collide-topmix.l4"
 batchTyCollideTopmixJson = fixtureDir </> "batch-typically-collide-topmix.json"
 batchTyCollideRecords  = fixtureDir </> "batch-typically-collide-records.l4"
@@ -462,6 +466,7 @@ coreFixtures =
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
   , batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson
+  , batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop
   , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
   , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
@@ -2085,6 +2090,26 @@ spec bin = do
       rows <- rowsOf batchTyCollideTopmix batchTyCollideTopmixJson
       rows `shouldBe`
         [ (Just (Number 50), presumedOf ["WITH `scaled by`: factor", "WITH `two words`: the rate"]) ]
+
+    -- Found in review. The entry names the sections, not the file, so the same
+    -- name under the same sections in two imported files is one entry.
+    it "still gives one entry for the same name under the same section in two imported files" $ do
+      rows <- rowsOf batchTyCollideSecImport batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH Pricing.scaled: rate"])
+        ]
+
+    -- Found in review. A WHERE local is named bare, so it shares an entry with a
+    -- top-level rule of that name.
+    it "still gives one entry for a WHERE local and a top-level rule of one name" $ do
+      rows <- rowsOf batchTyCollideWhereTop batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH scaled: rate"])
+        ]
 
     it "still gives one entry for two WHERE locals of one name" $ do
       rows <- rowsOf batchTyCollideWhere batchTyCollideRowsJson

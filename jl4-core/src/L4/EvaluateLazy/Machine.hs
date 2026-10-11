@@ -473,6 +473,10 @@ data PresumedOrigin
 -- (@Part 1. Fees@) stays one part. A name with no heading in front of it is
 -- quoted the same way, so a top-level rule called @Pricing.scaled@ prints as
 -- @`Pricing.scaled`@ and not as the rule @scaled@ under @§ Pricing@.
+-- Two declarations with the same name under the same sections print the same
+-- entry: the entry names the sections, not the file, so the same name in two
+-- imported files shares one, and a @WHERE@ or @LET@ local, which is named
+-- bare, shares one with a top-level rule of that name.
 -- Assumed, not ruled: overnight card O6, 2026-10-11, where Meng ruled that the
 -- headings are named and not how they are quoted.
 presumedOwner :: RawName -> Text
