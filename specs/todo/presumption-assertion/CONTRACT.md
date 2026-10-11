@@ -215,7 +215,7 @@ Steps 4 to 7 are parked under MOTHBALL (`:977`), so **the open item is un-parkin
 
 Presumption mode is a property of a request, and a construction inside the rules has no request (T4b).
 Today a `WITH` that omits a defaulted field is refused in every mode on `unstable`, and filled in every mode on #551 (`../PRESUMPTION-SCENARIOS.md` §2.5).
-This document does not change that; it notes that #551 lists such a fill under `presumed` as `WITH Record: field` **under hard only**, which is the right disclosure.
+This document does not change that; it notes that #551 lists such a fill under `presumed` as `WITH Record: field` **in both modes** (Meng, 2026-10-11, card O1 of the overnight bench), which is the right disclosure.
 
 ### 5.6 The ladder's evaluators and the query planner
 

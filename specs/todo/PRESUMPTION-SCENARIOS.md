@@ -101,7 +101,7 @@ With `is adult` omitted the check's FALSE rests on the presumption and says so (
 `l4 run` has no `--presumption` flag (`l4 run --help`), and `EvalConfig.requestRecord` is `Nothing` for `#EVAL` and `l4 run`.
 T4b says the switch reaches only what a request can supply.
 So Meng's "under hard evaluation the instantiation would error that `is_adult` is a required field" has no instrument on either binary: today's refuses the construction in every mode, because no field default is applied at a `WITH` at all, and #551's fills it in every mode.
-Neither has a mode; #551's documentation says a `WITH` fill is listed under `presumed` when the mode is hard, so there it is reported, not withheld.
+Neither has a mode; #551's documentation says a `WITH` fill is listed under `presumed` in either mode, so there it is reported, not withheld.
 
 ### 2.6 The footgun, measured: `tmtowtdi.l4`
 

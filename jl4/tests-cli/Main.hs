@@ -1827,7 +1827,9 @@ spec bin = do
     -- Review M3 / code #1, T4b: the switch reaches the request's decode only.
     -- A decode the rule makes of its own fills its default in both modes;
     -- under hard the answer says it rests on it, because no row could
-    -- supply it. Soft keeps T6b's filter, so it is not listed there.
+    -- supply it. Soft does not list it (assumed, not ruled: overnight bench
+    -- card O1 asked whether a rule's own JSONDECODE follows a named site into
+    -- soft, and Meng did not answer).
     it "lets a rule's own JSONDECODE fill its defaults in both modes" $ do
       soft <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson]
       resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf [])
@@ -1911,19 +1913,18 @@ spec bin = do
   -- W4 and W5: a rule's own defaulted input, and a record's defaulted field,
   -- may be left out at a NAMED site. The default is taken inside the rules, so
   -- no request could have supplied it: presumption does not withdraw it, soft or
-  -- hard. Under soft `presumed` keeps only what a request could have supplied
-  -- (T6b), as it does for a rule's own JSONDECODE; under hard the answer rests
-  -- on it and lists it under the application that took it (T4b).
+  -- hard. The answer rests on it in both modes and lists it under the
+  -- application that took it (T4b, R8; Meng, 2026-10-11, overnight card O1).
   describe "l4 batch: TYPICALLY at a named site (W4, W5)" $ do
     -- Before: the module did not check ("you have not supplied these inputs:
     -- rate", and `timeout`), so there was no row to run. The request's own
     -- `rate` is 7 and is NOT what `scaled` takes: it takes its default 3.
-    it "takes the default under soft, and lists nothing: no request could have supplied it" $ do
+    it "takes the default under soft, and lists it under the application: the answer rests on it" $ do
       Output code sout _ <- runL4 bin ["batch", batchTyNamed, "--inputs", batchTyNamedJson, "--format", "json"]
       code `shouldBe` ExitSuccess
       rows <- decodeArray sout
       map resultAndPresumed rows `shouldBe`
-        [ (Just (Number 60), presumedOf [])
+        [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
         , (Just (Number 0), presumedOf [])
         ]
 
@@ -1946,9 +1947,8 @@ spec bin = do
   -- default that is NOT read, or a pair of which only one is, with a later use
   -- of the same constructor to trip it. The numeric defaults above never could.
   describe "l4 batch: a constructor default at a named site is listed only if the answer read it" $ do
-    -- Under hard, which is where `presumed` lists a default taken inside the
-    -- rules (the same default under soft is listed nowhere, so a wrong listing
-    -- could not show).
+    -- Under hard; soft lists the same entries for these sites (the first test
+    -- of the describe above), so a wrong listing shows in either mode.
     let rowsFor entry = do
           Output code sout _ <-
             runL4 bin [ "batch", batchTyCtors, "--inputs", batchTyCtorsJson

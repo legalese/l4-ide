@@ -433,7 +433,7 @@ batchResponseSchema fn =
                     , "@presumed" .= Aeson.object
                         [ "type" .= ("array" :: Text)
                         , "items" .= Aeson.object ["type" .= ("string" :: Text)]
-                        , "description" .= ("Inputs the case left out whose defaults its answer or refusal used, by name (a record field by its path)" :: Text)
+                        , "description" .= ("The defaults its answer or refusal rests on. Most entries are inputs the case left out whose defaults were used, by name (a record field by its path); an entry that starts with WITH, such as WITH scaled: rate, is a default the rules themselves took, which no case could supply" :: Text)
                         ]
                     , "value" .= Aeson.object
                         [ "description" .= ("The answer, of type " <> fn.fsReturnType <> ". Only on an answered case" :: Text) ]

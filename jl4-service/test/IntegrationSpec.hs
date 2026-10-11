@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, refuseNamedDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -678,25 +678,24 @@ spec = describe "integration" do
         expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
 
     -- W4, W5: a default the RULES take at a named site is not the request's to
-    -- supply, so it is taken in both presumption modes. Under soft `presumed`
-    -- keeps what a request could have supplied (T6b), as for a rule's own
-    -- JSONDECODE, so it lists nothing; under hard the answer rests on it and
-    -- lists it under the application that took it (T4b), on both paths. The
-    -- request's own `rate` is 7; `scaled` still takes its 3.
-    it "takes a default a named site inside the rules took in both modes, and lists it under hard, on both paths" do
+    -- supply, so it is taken in both presumption modes, and the answer rests on
+    -- it in both: `presumed` lists it under the application that took it (T4b,
+    -- R8; Meng, 2026-10-11, overnight card O1), on both paths. The request's
+    -- own `rate` is 7; `scaled` still takes its 3.
+    it "takes a default a named site inside the rules took in both modes, and lists it in both, on both paths" do
       withServiceFromSources "ty-named" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
         let used = ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= True]
             presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
         soft <- evalFunction baseUrl mgr "ty-named" "combine"
           (args ("unused flag" Aeson..= False : used))
-        expectAnswer soft (FnLitInt 60) []
+        expectAnswer soft (FnLitInt 60) presumedHere
         hardRun <- evalFunction baseUrl mgr "ty-named" "combine"
           (hard ("unused flag" Aeson..= False : used))
         expectAnswer hardRun (FnLitInt 60) presumedHere
         -- a {} on the unread flag sends the request down the wrapper path
         wrapped <- evalFunction baseUrl mgr "ty-named" "combine"
           (args ("unused flag" Aeson..= uncertain : used))
-        expectAnswer wrapped (FnLitInt 60) []
+        expectAnswer wrapped (FnLitInt 60) presumedHere
         wrappedHard <- evalFunction baseUrl mgr "ty-named" "combine"
           (hard ("unused flag" Aeson..= uncertain : used))
         expectAnswer wrappedHard (FnLitInt 60) presumedHere
@@ -704,6 +703,51 @@ spec = describe "integration" do
         skipped <- evalFunction baseUrl mgr "ty-named" "combine"
           (hard ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
         expectAnswer skipped (FnLitInt 0) []
+        skippedSoft <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer skippedSoft (FnLitInt 0) []
+
+    -- MCP tools always evaluate soft (McpServer.runMcpEvaluationIO), so this
+    -- is the only way a tool-calling client is told that an answer rests on a
+    -- default the rules took (overnight card O1, Meng 2026-10-11).
+    it "lists a default a named site took in an MCP tool call, which always evaluates soft" do
+      withServiceFromSources "ty-named-mcp" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
+        let call n use = do
+              req <- buildJsonPost (baseUrl <> "/deployments/ty-named-mcp/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("combine" :: Text)
+                    , "arguments" Aeson..= Aeson.object
+                        [ "n" Aeson..= (n :: Int), "rate" Aeson..= (7 :: Int)
+                        , "use" Aeson..= (use :: Bool), "unused flag" Aeson..= False ] ] ]
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 200
+              pure (mcpToolText (responseBody resp))
+        used <- call 10 True
+        fmap fst used `shouldBe` Just False
+        (presumedOfText . snd =<< used) `shouldBe` Just ["WITH scaled: rate", "WITH Config: timeout"]
+        -- the positive control: `use` FALSE reaches neither site
+        skipped <- call 10 False
+        fmap fst skipped `shouldBe` Just False
+        (presumedOfText . snd =<< skipped) `shouldBe` Just []
+
+    -- A refusal is an answer, and rests on a default the rules took just as an
+    -- answer does: it says so in soft, in its own `presumed` and in the text of
+    -- the error (Backend.Api.prettyEvaluatorError).
+    it "carries a default a named site took on a refusal, under soft and hard" do
+      withServiceFromSources "ty-refuse-named" [("eligible.l4", refuseNamedDefaultJL4)] \baseUrl mgr -> do
+        let refusedWith resp = case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+              Just (SimpleError e@(EvaluatorRefused reason ps)) -> pure (reason, ps, prettyEvaluatorError e)
+              other -> expectationFailure ("Expected a refusal, got: " <> show other) >> pure ("", [], "")
+        soft <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (args ["years" Aeson..= (30 :: Int)])
+        (reason, ps, shown) <- refusedWith soft
+        reason `shouldBe` "cannot decide for a non-resident"
+        ps `shouldBe` ["WITH resident check: is resident"]
+        shown `shouldSatisfy` Text.isInfixOf "(resting on the defaults of WITH resident check: is resident)"
+        hardRun <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (hard ["years" Aeson..= (30 :: Int)])
+        (_, hps, _) <- refusedWith hardRun
+        hps `shouldBe` ["WITH resident check: is resident"]
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each
@@ -711,8 +755,8 @@ spec = describe "integration" do
     -- later use of the same constructor to trip it, on both paths.
     it "lists a constructor default a named site took only if the answer read it, on both paths" do
       withServiceFromSources "ty-ctor" [("ctor.l4", constructorNamedDefaultJL4)] \baseUrl mgr -> do
-        -- under hard, which is where `presumed` lists a default taken inside the
-        -- rules: under soft it lists none, so a wrong listing could not show
+        -- under hard; soft lists the same entries for a named site (the test
+        -- above), so a wrong listing shows in either mode
         let flag = "unused flag" Aeson..= False
             run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (hard (extra <> [flag]))
             runWrapped fn extra = evalFunction baseUrl mgr "ty-ctor" fn
@@ -3700,6 +3744,15 @@ reportOfText :: Text -> Maybe Text
 reportOfText t = case Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t)) of
   Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
   _ -> Nothing
+
+-- | The @presumed@ list an MCP tool result's text states, the text being an
+-- encoded evaluation response.
+presumedOfText :: Text -> Maybe [Text]
+presumedOfText t = do
+  Aeson.Object o <- Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t))
+  Aeson.Object c <- Aeson.KeyMap.lookup "contents" o
+  Aeson.Array ps <- Aeson.KeyMap.lookup "presumed" c
+  pure [ p | Aeson.String p <- toList ps ]
 
 -- | Whether an MCP @tools/call@ result is an error, and its first text.
 mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)

@@ -314,9 +314,11 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   That is settled with the payload-field card below, which has to say what a `MEANS` there means first.
   None in `doc/`, `jl4-core/libraries` or `skills/`; none in `legalese/canon` (searched 2026-10-03 at `6b6476d`, its own checkout; `l4 check` of its three files that carry a `TYPICALLY` gives no diagnostic on this branch, as on the W2+W3 binary).
 - **p10's message (L4).** A default naming something that is not in scope is reported once, as that: `checkTypically` no longer raises "must be a literal" for an `OutOfScope` reference, on a field or on a rule's input (`not-ok/tc/typically-unresolved.l4`).
-- **T4 and T4b.** A default taken at a named site or a construction is inside the rules, where no request can supply the value, so presumption does not withdraw it: `--presumption hard` and `"presumption": "hard"` take it as soft does, and under hard the answer says it rests on it (below).
+- **T4 and T4b.** A default taken at a named site or a construction is inside the rules, where no request can supply the value, so presumption does not withdraw it: `--presumption hard` and `"presumption": "hard"` take it as soft does, and in either mode the answer says it rests on it (below).
 - **T6 and T6b.** Each default taken at a named site or a construction raises W8's event itself.
-  Under hard it is listed in `presumed` as `WITH rule: input` (`WITH scaled: rate`) or, for a record, `WITH Config: timeout`, with the rule or record named as its declaration writes it (not an `AKA` alias, not section-qualified, a mixfix rule by its declared name), only if it was forced, on `l4 batch` and on the service's direct and wrapper path; under soft it is not listed, as T6b's filter says (below).
+  It is listed in `presumed` in both modes as `WITH rule: input` (`WITH scaled: rate`) or, for a record, `WITH Config: timeout`, with the rule or record named as its declaration writes it (not an `AKA` alias, not section-qualified, a mixfix rule by its declared name), only if it was forced, on `l4 batch`, on the service's direct and wrapper path, and over MCP, which always evaluates soft.
+  The `WITH rule:` prefix is what keeps the entry from being read as an input of the request, which is how T6b's "whose binder or JSON path is part of the request" is read for these sites (below).
+  A rule's own `JSONDECODE` is still listed under hard only (assumed, not ruled: asked on the overnight bench, O1, and not answered).
   The request's own input of the same spelling is never listed for it (the batch and service fixtures name the exported rule's input `rate` on purpose).
   `#EVAL` lists nothing, as it never did for a default taken at the root: the trace rendering is W8's and is not built.
 
@@ -513,9 +515,9 @@ The evidence is §2: OpenFisca replaces a default with the first enum member, an
 R8 already asks for it in every directive and trace output (`PROPS-REDTEAM-2026-09-03.md:367`); the service response's `reasoning` is sent only when a trace is requested (`Backend/Api.hs:210-214`), so the list is a field of its own.
 _Reading used for W4 and W5 (decided by Claude overnight 2026-10-03, pending Meng's review, §4.2):_ T4b and T6b conflict for a default the rules take themselves, at a named site or a construction.
 T4 says the "presuming _x_" mark is ALIBI's `presumed` list, and T4b says the mark "covers every default that took effect, wherever filled", which reads as listing it everywhere; T6b says `presumed` "keeps only those whose binder or JSON path is part of the request", and names W4's sites among the fill sites, which reads as leaving it out.
-The branch follows T4b under hard, where `presumed` is the only place the result can say it "rests on presumed _x_", and T6b under soft, where every entry in `presumed` is something a request could have supplied.
-What soft gives up, measured on the review's probes: a soft answer that took `rate TYPICALLY 3` inside the rules lists nothing for it (`presumed: []`), and a soft batch row answering `60` lists `cfg.timeout` although `30` of the 60 is a construction's default; the trace is the only place that shows it, and its rendering is not built (W8).
-Which reading governs under soft is Meng's: listing it is one line in `requestPresumed` (the guard on the `FromNamedApp` case, `L4.EvaluateLazy`).
+The branch follows T4b and R8 in both modes: `presumed` is the only place the result can say it "rests on presumed _x_", and the `WITH rule:` prefix keeps such an entry from being read as an input a request could have supplied.
+What the overnight build gave up under soft, measured on the review's probes: a soft answer that took `rate TYPICALLY 3` inside the rules listed nothing for it (`presumed: []`), and a soft batch row answering `60` listed `cfg.timeout` although `30` of the 60 is a construction's default.
+The listing is one clause in `requestPresumed` (the `FromNamedApp` case, `L4.EvaluateLazy`); a rule's own `JSONDECODE` keeps its guard, so it is listed under hard only.
 
 ---
 

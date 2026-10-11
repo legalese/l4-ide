@@ -13,10 +13,13 @@
 --
 -- Each result row is an envelope
 -- @{ input, output, status, presumed, diagnostics }@ (validate-only mode emits
--- @{ input, status, errors }@ instead). @presumed@ lists the inputs whose
--- @TYPICALLY@ default the row's answer rests on: those the row left out, that
+-- @{ input, status, errors }@ instead). @presumed@ lists the defaults the row's
+-- answer rests on: the inputs whose @TYPICALLY@ default the row left out, that
 -- took their default (or, for a MAYBE input with none, NOTHING), and that the
--- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@).
+-- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@),
+-- and also a default the rules themselves took, written @WITH rule: input@
+-- (and, under hard only, @JSONDECODE T: path@), so a reader that takes entries to
+-- be input names filters on the prefix.
 --
 -- An input the row leaves out takes its default while presumption is on
 -- (@--presumption soft@, the default); with @--presumption hard@ it is a

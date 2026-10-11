@@ -996,16 +996,19 @@ recordFieldDefaults decls = Map.fromList
 -- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
 -- naming the type the rules decoded.
 --
--- A default a named application of the rules took (W4, W5) is the same kind of
--- default, so it is treated the same way: listed only when presumption is hard,
--- as @WITH rule: input@, and kept out under soft. T6b names these sites ("W4's
--- named sites and constructions emit W8's event themselves ... @presumed@ keeps
--- only those whose binder or JSON path is part of the request"), and the binder
--- of an input a rule leaves out at its own call is part of no request. Under
--- hard T4b's "rests on presumed x" applies, as it does to a rule's own
--- @JSONDECODE@. (Decided by Claude overnight 2026-10-03, pending Meng's
--- review: listing it in both modes is a one-line change, dropping the guard on
--- the 'FromNamedApp' case below.) The trace still carries every event.
+-- A default a named application of the rules took (W4, W5) is a default no
+-- request could supply, as a rule's own @JSONDECODE@ is, and the answer rests
+-- on it just the same. It is listed in BOTH modes, as @WITH rule: input@ (Meng,
+-- 2026-10-11, card O1): R8 asks that every output name each parameter that took
+-- its default, and T4b that the mark cover every default that took effect,
+-- wherever filled. T6b's "keeps only those whose binder or JSON path is part of
+-- the request" is read, for these sites, as keeping the request's own inputs
+-- apart from the callee's, which the @WITH rule:@ prefix does: the binder of an
+-- input a rule leaves out at its own call is part of no request, and an entry
+-- for it is not an input's name. The trace still carries every event.
+--
+-- A rule's own @JSONDECODE@ stays listed only under hard (assumed, not ruled:
+-- Meng was asked whether it follows and did not answer).
 --
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
@@ -1018,15 +1021,14 @@ requestPresumed presume fieldName inputs events =
       | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
       | otherwise   -> Nothing
     -- A default a named application of the RULES took (W4, W5): no request
-    -- could supply it, so the switch does not withdraw it, and under hard the
-    -- answer rests on it. Its binder is the callee's, not an input of the
-    -- request, so it must not fall through to the case below in either mode,
-    -- where a binder that shares an input's spelling would be listed as that
-    -- input. Written @WITH scaled: rate@ (the application, then the input), as
-    -- a rules' own decode is written @JSONDECODE T: path@.
-    (FromNamedApp callee, path)
-      | not presume -> Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
-      | otherwise   -> Nothing
+    -- could supply it, so the switch does not withdraw it and the answer
+    -- rests on it, in either mode. Its binder is the callee's, not an input of
+    -- the request, so it must not fall through to the case below, where a
+    -- binder that shares an input's spelling would be listed as that input.
+    -- Written @WITH scaled: rate@ (the application, then the input), as a
+    -- rules' own decode is written @JSONDECODE T: path@.
+    (FromNamedApp callee, path) ->
+      Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
     _ -> Nothing

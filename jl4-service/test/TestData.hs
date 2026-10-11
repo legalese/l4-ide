@@ -41,6 +41,7 @@ module TestData (
   sectionSecondJL4,
   twoDefaultsJL4,
   refuseDefaultJL4,
+  refuseNamedDefaultJL4,
   exactDecimalJL4,
   enumSchemaJL4,
   wrapperNullJL4,
@@ -918,6 +919,25 @@ GIVETH A BOOLEAN
 DECIDE eligible IF
   IF `is resident` THEN age >= 18
   ELSE REFUSE "cannot decide for a non-resident"
+|]
+
+-- | A refusal that rests on a default the RULES took at a named site (overnight
+-- card O1): the exported rule leaves @is resident@ out of its own call, so it
+-- takes FALSE, and FALSE refuses.
+refuseNamedDefaultJL4 :: Text
+refuseNamedDefaultJL4 =
+  [i|
+GIVEN `is resident` IS A BOOLEAN TYPICALLY FALSE
+      age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `resident check` IF
+  IF `is resident` THEN age >= 18
+  ELSE REFUSE "cannot decide for a non-resident"
+
+@export default eligible
+GIVEN years IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE eligible IF `resident check` WITH age IS years
 |]
 
 -- | A decimal default that a Double cannot hold (review m1).

@@ -195,15 +195,18 @@ govern what counts as leaving a fact out:
   out is missing, and the case is refused, naming it. The default is `soft`.
   The switch reaches only the facts a case can supply. A record the rules
   decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
-  under `hard` the answer lists them under `presumed` as
-  `JSONDECODE <type>: <field>`, because nothing the case says could replace
+  under `hard` (and only under `hard`) the answer lists them under `presumed`
+  as `JSONDECODE <type>: <field>`, because nothing the case says could replace
   them. The same is true of a default a `WITH` call or a construction _inside_
   the rules takes (see above): neither mode withdraws it, because no case could
-  have supplied it. Under `hard` the answer lists it under `presumed` as
+  have supplied it. The answer lists it under `presumed` as
   `WITH <rule>: <input>` (for example `WITH scaled: rate`, or
   `WITH Config: timeout` for a field), naming the rule or record as its
-  declaration writes it, and only if the answer actually used it. Under `soft`
-  `presumed` lists the facts a case could have left out, and none of these.
+  declaration writes it, and only if the answer actually used it, under `soft`
+  as well as under `hard`. So `presumed` has more than one shape: a fact's name
+  or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and under
+  `hard` `JSONDECODE <type>: <field>`. An entry that starts `WITH ` or
+  `JSONDECODE ` is a usual value the rules took, not a fact the case left out.
 - **An event's record in the decision service is not a place a default can
   be left out.** When a request for a rule that describes obligations replays
   events, each event's party or action record has to give every field, whether

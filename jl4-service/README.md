@@ -183,9 +183,12 @@ The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an a
 
 **Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
-Every response says which of the request's own defaults the answer rests on, in `presumed`, beside `result`: the names of inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
+Every response says which defaults the answer rests on, in `presumed`, beside `result`.
+Most entries are the names of the request's own inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
 A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same way.
-A default the rules themselves take, where a `WITH` call or a record construction inside them leaves out an input or a field that has one, is taken in both modes, because no request could supply it. Under `"presumption": "hard"` it is listed too, as `WITH` and the rule or record named as its declaration writes it (not an alias, and not the section it is declared in), a colon, and the input or field (`WITH scaled: rate`, `WITH Config: timeout`), once, and only if the evaluation read it. Under soft, `presumed` lists what a request could have left out, and none of these.
+**The entries come in more than one shape**, so a client that treats an entry as the name of an input filters on the prefix: a bare name or path (`rate`, `cfg.timeout`) is an input of the request; `WITH scaled: rate` is a default the rules took (below); and `JSONDECODE Settings: limit` is a default the rules took in decoding JSON of their own, listed under `hard` only.
+A default the rules themselves take, where a `WITH` call or a record construction inside them leaves out an input or a field that has one, is taken in both modes, because no request could supply it, and is listed in both modes too, since the answer rests on it just the same. It is written `WITH` and the rule or record named as its declaration writes it (not an alias, and not the section it is declared in), a colon, and the input or field (`WITH scaled: rate`, `WITH Config: timeout`), once, and only if the evaluation read it. It is not an input of the request, and the request cannot supply it.
+A record the rules decode from JSON of their own (`JSONDECODE`) also takes its defaults in both modes, but is listed only under `"presumption": "hard"`, written `JSONDECODE`, the type, a colon and the path (`JSONDECODE Settings: limit`); under soft it is not listed.
 An event's party or action record, in a request to a function that describes obligations, is part of the request but is built into the generated wrapper as source, not decoded, so it has no default to take: a field it leaves out is refused, in both modes, as `Missing required field 'events[0].party.licence' (Driver)`; so is a field left out of a record nested in it, named by the path the request wrote (`events[0].party.zhome.Address.floor`).
 A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
 Any other error response has no `presumed`, since it carries no answer.
@@ -211,7 +214,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 # {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
 ```
 
-**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
+**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included, so a tool call's `presumed` names the defaults the rules took (`WITH scaled: rate`) as well as the inputs the call left out.
 
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
@@ -318,7 +321,7 @@ The response has one entry per case, in the order the cases were sent, each unde
 
 An answered case carries the function's result under `value`.
 `outcomes` is required, but the service does not use it yet: every answered case carries the whole result.
-Every case carries its own `@presumed`, the inputs it left out whose defaults its answer or refusal used (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+Every case carries its own `@presumed`, the defaults its answer or refusal rests on: the inputs it left out whose defaults were used, and the defaults the rules took (see [Missing and uncertain inputs](#missing-and-uncertain-inputs), which gives the forms an entry takes).
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
 Neither has a `value`.
 The three `processor…` fields of `summary` are not measured, and are always `0`.
