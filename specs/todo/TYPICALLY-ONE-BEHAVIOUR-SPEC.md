@@ -319,7 +319,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - **T6 and T6b.** Each default taken at a named site or a construction raises W8's event itself.
   It is listed in `presumed` in both modes as `WITH rule: input` (`WITH scaled: rate`) or, for a record, `WITH Config: timeout`, with the rule or record named as its declaration writes it (not an `AKA` alias; behind the section it is declared in, `WITH Pricing.scaled: rate`, and bare for a rule at the top of a file or in a `WHERE`; a mixfix rule by its declared name), only if it was forced, on `l4 batch`, on the service's direct and wrapper path, and over MCP, which always evaluates soft.
   The `WITH rule:` prefix is what keeps the entry from being read as an input of the request, which is how T6b's "whose binder or JSON path is part of the request" is read for these sites (below).
-  A rule's own `JSONDECODE` is listed the same way, as `JSONDECODE T: field`, in both modes (O1 condition 3, DECODERRING).
+  A rule's own `JSONDECODE` is listed the same way, as `JSONDECODE T: field`, in both modes (O1 condition 3, DECODERRING), where `T` is the record's declared name behind the headings it is declared under, whatever the decode site wrote, except for a record declared under a heading in an imported file (the O6 bullet below: assumed, not ruled, and the fourth limit).
   The request's own input of the same spelling is never listed for it (the batch and service fixtures name the exported rule's input `rate` on purpose).
   `#EVAL` lists nothing, as it never did for a default taken at the root: the trace rendering is W8's and is not built.
 
@@ -415,17 +415,24 @@ Six of the decisions below were put to Meng as cards O1 to O6 on a bench ("Overn
   A part that L4 would write in backticks in source (`quoteIfNeeded`: any character that is not a letter, digit or underscore, a first character that is not a letter, a reserved word) is written in backticks, as the printer writes a qualified name (`` `Part 1. Fees`.scaled ``), and a name with no section in front of it is quoted the same way (`` `two words` ``): `L4.EvaluateLazy.Machine.presumedOwner`.
   A backticked part can hold a dot or a colon, so an entry is split by reading each one whole.
   Without that, a top-level rule called `Pricing.scaled` and the rule `scaled` under `§ Pricing` printed the same entry (found in review).
+  The `JSONDECODE T: path` entry names its record the same way (assumed, not ruled, in a commit of its own; found by the Opus review of the combined branch): `T` is the type's declared name behind the headings it is declared under, spelled and quoted by the same two functions (`TypeCheck.qualifiedOwner`, `presumedOwner`), whichever way the decode site wrote the type (`EvalState.recordOwners`, built by `declaredOwners` from the sections of the evaluated module).
+  Before, `T` was the type as the site spelled it, so one record decoded under two spellings was two entries, two different records of one name were one entry, and the decode entry lacked the heading the `WITH` entry beside it carried (probes `i4/spelling.l4`, `i4/two-q.l4`, `i1/sec.l4`).
+  A type declared at the top of the module is named as before (the existing own-decode rows), and so, by reading `decodeRoot` and not run, is a type applied to arguments.
   The quoting reaches a heading named with a reserved word: `A`, `AN`, `THE`, `IS` and `OF` are written in backticks (``WITH `A`.fee: rate``), while `B` and `Pricing` are not (checked on a one-rule file under each heading).
   That is part of the quoting question O6 still owes.
   The section qualification is ruled (O6); the quoting of a part, just above, is assumed, not ruled, and in commits of its own.
-  _Three limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4, and the Opus review of the combined branch)._
+  _Four limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4, and the Opus review of the combined branch)._
   Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file or the place: the same name in two imported files (at the top level, or under the same `§`), and a `WHERE` or `LET` local, which is named bare and so also shares an entry with a top-level rule of that name.
   A row that rests on two such defaults lists one, and nothing says which default either was.
   Two rules of one name in ONE section, each taking its own default, give one entry too: `fee(amount NUMBER, rate TYPICALLY 0.02)` and `fee(amount STRING, rate TYPICALLY 0.5)` in `§ Pricing`, and `(fee WITH amount IS 100) PLUS (fee WITH amount IS "x")` answers 2.5 with `presumed` `["WITH Pricing.fee: rate"]`, whichever default each call took (review probe `i8/both.l4`; the same under soft and under hard).
   The parent reports "multiple definitions" for that module, so this case is new with O3.
   It is not among the exceptions O6 ruled (imports and `WHERE` locals), and it has not been put to Meng.
+  A decode into an IMPORTED record declared under a heading still names the type bare (``JSONDECODE `Paint Order`: coats``, review probe `i4imp`), where the `WITH` entry of the same record names the heading (``WITH `Stock items`.`Paint Order`: coats``).
+  The imports' `DECLARE`s reach the evaluator as a flat list that has lost its headings, in the LSP (`concatMap moduleDeclares importedModules`) and in the service (`compiledAllDeclares`, which the CBOR bundle stores), so fixing it needs the headings carried to the evaluator through `SharedModuleContext`, `CompiledModule` and `SerializedBundle`, which is a change to the format of `bundle.cbor`.
+  Chosen on 2026-10-12 by the lead, not by Meng: fix the evaluated module only and state this residual.
+  `batch-typically-decode-import.l4` pins the bare name, so that the limit cannot change silently.
   And `presumed` now has three string shapes, `rate`, `JSONDECODE T: path` and `WITH scaled: rate`, which a client tells apart by prefix; T4b asks for the mark "with its declaration line", and a structured entry (origin, owner, path, declaration line) would carry it, but is a change of the wire.
-  Neither is changed.
+  None of the four is changed.
 
 **Assumed, not ruled** (no one outside the code would notice, or the text is new):
 
@@ -480,7 +487,7 @@ Each code fix has its own commit and a test that failed before it (the previous 
 - **A record nested in an event's record is refused too** (rulings R2-2; above, under the event decision).
   `jl4-service-test`, "refuses an event whose nested record leaves out a defaulted field, in both modes".
 - **Text that claimed more than the behaviour** (silent N4, N5, rulings R2-4): "a misspelt `rate` is never read as a default taken" (above, under R8 rule 1, now with the one case it cannot catch); two sentences that said `presumed` lists a default taken inside the rules, which under soft it did not then (`jl4-service/README.md`, the skill's entry 7.4; both modes list it now); the line under T6 in §5, which said T4b's mark "is the trace's" and now names the conflict between T4b and T6b and what soft gives up; and, found by searching for the same claim in the other pages, `doc/courses/advanced/module-a4-production.md`, which said a default on a field or a rule's input "is metadata only" inside a file.
-- **Recorded, not changed:** the three limits on `presumed` entries (R2-3 and the one added after the Opus review, above); an event's record under soft is built differently from T1, and the faithful reading is owed (R2-5, above), so it is not a question for Meng; T4b's check-time warning stays unbuilt (R2-6, "Not built here"); and the tutorial's "The file and the boundary agree" is now "A call inside the file may leave out the same things", because `l4 batch` cannot run an export whose input is an enum or record type when a later section declares a type of the same name (silent X1, "Not built here").
+- **Recorded, not changed:** the four limits on `presumed` entries (R2-3 and the two added after the Opus review, above); an event's record under soft is built differently from T1, and the faithful reading is owed (R2-5, above), so it is not a question for Meng; T4b's check-time warning stays unbuilt (R2-6, "Not built here"); and the tutorial's "The file and the boundary agree" is now "A call inside the file may leave out the same things", because `l4 batch` cannot run an export whose input is an enum or record type when a later section declares a type of the same name (silent X1, "Not built here").
 
 **What does not change.**
 Positional calls (R8 rule 1).

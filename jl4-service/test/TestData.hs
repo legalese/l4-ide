@@ -50,6 +50,7 @@ module TestData (
   enumNullJL4,
   recordWrapJL4,
   ownDecodeJL4,
+  headingDecodeJL4,
   withalJL4,
   deonticDefaultJL4,
   spinJL4,
@@ -1111,6 +1112,32 @@ parseSettings s MEANS JSONDECODE s
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE `within limit` amount IF
+  CONSIDER parseSettings "{}"
+    WHEN RIGHT st THEN amount <= st's limit
+    WHEN LEFT e THEN FALSE
+|]
+
+-- | A rule's own JSONDECODE into a record declared under a section heading: the
+-- entry in @presumed@ names the record behind the heading (assumed, not ruled:
+-- the review of the combined branch, 2026-10-12, following overnight card O6).
+-- The extra BOOLEAN lets a request send @{}@ for it, which takes the wrapper path.
+headingDecodeJL4 :: Text
+headingDecodeJL4 =
+  [i|
+§ `Pricing`
+
+DECLARE Settings HAS
+  limit IS A NUMBER TYPICALLY 10
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseSettings s MEANS JSONDECODE s
+
+@export default within limit
+GIVEN amount IS A NUMBER
+      `unused flag` IS A BOOLEAN
+GIVETH A BOOLEAN
+`within limit` MEANS
   CONSIDER parseSettings "{}"
     WHEN RIGHT st THEN amount <= st's limit
     WHEN LEFT e THEN FALSE

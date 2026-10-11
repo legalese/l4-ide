@@ -300,7 +300,11 @@ govern what counts as leaving a fact out:
   decode with `JSONDECODE` still takes its defaults, whether the JSON is
   written in the rules or is text the case sent, and in either mode the answer
   lists them under `presumed` as `JSONDECODE <type>: <field>`: the switch does
-  not withdraw them. A `MAYBE` field with no `TYPICALLY` that the decoded JSON
+  not withdraw them. The type is named as it is declared, behind the section
+  heading it is declared under (`JSONDECODE Pricing.Settings: limit`), whichever
+  way the rule wrote the type at the decode. A record declared under a heading
+  in an _imported_ file is the exception: it is named without the heading
+  (``JSONDECODE `Paint Order`: coats``), though its `WITH` entry has it. A `MAYBE` field with no `TYPICALLY` that the decoded JSON
   leaves out is filled with `NOTHING` and listed the same way
   (`JSONDECODE Partial: note`), in both modes. The same is true of a default a `WITH` call or a construction _inside_
   the rules takes (see above): neither mode withdraws it, because no case could

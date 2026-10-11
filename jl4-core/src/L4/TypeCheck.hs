@@ -15,6 +15,7 @@ module L4.TypeCheck
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
+  , qualifiedOwner
   -- 'severity' is re-exported via @module X@ (it lives in
   -- L4.TypeCheck.Types now, next to candidate viability)
   )

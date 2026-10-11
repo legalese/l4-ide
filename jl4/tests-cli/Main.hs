@@ -94,6 +94,16 @@ renderDefaultMarkFixture, renderDefaultMarkRootFixture :: FilePath
 renderDefaultMarkFixture     = fixtureDir </> "render-default-mark.l4"
 renderDefaultMarkRootFixture = fixtureDir </> "render-default-mark-root.l4"
 
+-- | A record declared under a section heading and decoded by the rules
+-- (@JSONDECODE@): how the entry in @presumed@ names it. The first three are in
+-- one file; the last two are an IMPORTED record, which the entry names bare.
+batchTyDecodeSpelling, batchTyDecodeTwoSections, batchTyDecodeHeading, batchTyDecodeImport, batchTyDecodeJson :: FilePath
+batchTyDecodeSpelling    = fixtureDir </> "batch-typically-decode-spelling.l4"
+batchTyDecodeTwoSections = fixtureDir </> "batch-typically-decode-two-sections.l4"
+batchTyDecodeHeading     = fixtureDir </> "batch-typically-decode-heading.l4"
+batchTyDecodeImport      = fixtureDir </> "batch-typically-decode-import.l4"
+batchTyDecodeJson        = fixtureDir </> "batch-typically-decode.json"
+
 -- | @T WITHAL@ on a record with no fields, as a rule's whole body, as an
 -- argument and as the value of a field: how @l4 render@ and @l4 nlg@ read it.
 renderEmptyRecordFixture :: FilePath
@@ -514,6 +524,7 @@ coreFixtures =
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , renderDefaultMarkFixture, renderDefaultMarkRootFixture, renderEmptyRecordFixture
+  , batchTyDecodeSpelling, batchTyDecodeTwoSections, batchTyDecodeHeading, batchTyDecodeImport, batchTyDecodeJson
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB, batchClausesCatchAll
@@ -2340,6 +2351,60 @@ spec bin = do
         , (Just (Number 50), presumedOf ["WITH scaled: rate"])
         , (Just (Number 80), presumedOf ["WITH scaled: rate"])
         ]
+
+  -- Assumed, not ruled (the review of the combined branch, 2026-10-12, following
+  -- overnight card O6): a decode the rules make names the record as it is
+  -- DECLARED, behind the heading it is declared under and quoted as the WITH
+  -- entry of the same record is, whichever way the decode site spelled the type.
+  -- Before, it named the type as the site spelled it: the same record decoded
+  -- twice was two entries, two different records of one name were one, and the
+  -- decode entry lacked the heading the WITH entry beside it carried. Both modes
+  -- list the same entries (the switch does not reach a decode the rules make).
+  describe "l4 batch: a JSONDECODE entry names the record as it is declared" $ do
+    let entriesFor file ep extra = do
+          Output code sout _ <-
+            runL4 bin ([ "batch", file, "--inputs", batchTyDecodeJson
+                       , "--entrypoint", ep, "--format", "json" ] <> extra)
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+        inBothModes file ep expected = do
+          soft <- entriesFor file ep []
+          hard <- entriesFor file ep ["--presumption", "hard"]
+          soft `shouldBe` expected
+          hard `shouldBe` expected
+
+    it "names one record once, however the decode site spelled its type" $
+      inBothModes batchTyDecodeSpelling "go"
+        [ ( Just (Number 40)
+          , presumedOf ["JSONDECODE Pricing.Settings: limit", "WITH Pricing.Settings: limit"] ) ]
+
+    it "tells two records of one name apart, as the WITH entries do" $
+      inBothModes batchTyDecodeTwoSections "both"
+        [ ( Just (Number 218)
+          , presumedOf [ "JSONDECODE Alpha.Settings: limit", "JSONDECODE Beta.Settings: limit"
+                       , "WITH Alpha.Settings: limit", "WITH Beta.Settings: limit" ] ) ]
+
+    it "writes a heading that needs backticks in backticks, as the WITH entry does" $
+      inBothModes batchTyDecodeHeading "same defaults"
+        [ ( Just (Bool True)
+          , presumedOf [ "JSONDECODE `Part 1. Fees`.Settings: limit", "WITH `Part 1. Fees`.Settings: limit"
+                       , "JSONDECODE `Part 1. Fees`.Settings: strict", "WITH `Part 1. Fees`.Settings: strict" ] ) ]
+
+    -- a bare MAYBE field the decoder fills with NOTHING is listed too, in both modes
+    it "lists a MAYBE field a decode filled with NOTHING, behind the heading, in both modes" $
+      inBothModes batchTyDecodeHeading "partial decode"
+        [ ( Just (Bool True)
+          , presumedOf ["JSONDECODE `Part 1. Fees`.Partial: cap", "JSONDECODE `Part 1. Fees`.Partial: note"] ) ]
+
+    -- KNOWN LIMIT. The headings of an imported module do not reach the
+    -- evaluator, so a record declared under a heading in an IMPORTED module is
+    -- named bare by a decode, where the WITH entry beside it carries the
+    -- heading. If the headings are ever carried across, this test and the pages
+    -- that state the limit change together.
+    it "still names an imported record bare, where the WITH entry carries its heading" $
+      inBothModes batchTyDecodeImport "coats"
+        [ ( Just (Number 9)
+          , presumedOf ["WITH `Stock items`.`Paint Order`: coats", "JSONDECODE `Paint Order`: coats"] ) ]
 
   -- Decision O3. A named site whose callee has an overload takes a default only
   -- when no other rule of that name could take the inputs the site writes. Here

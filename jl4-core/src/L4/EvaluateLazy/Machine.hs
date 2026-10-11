@@ -58,6 +58,7 @@ module L4.EvaluateLazy.Machine
 , Presumed (..)
 , PresumedOrigin (..)
 , PresumedLog
+, presumedOwner
 , emptyPresumedLog
 , presumedEvents
 , renderPresumedPath
@@ -404,6 +405,16 @@ data EvalState =
       -- whatever modules the caller passed beside it. The JSON decoder fills an
       -- absent field from here (T1b). Static for the run, and deliberately
       -- lazy: only a run that decodes JSON pays for walking the modules.
+    , recordOwners :: Map Unique Text
+      -- ^ How a decode the rules make names a record type that is declared
+      -- under a section heading in the evaluated module: the type's declared
+      -- name behind its headings, spelled and quoted as the owner of a @WITH@
+      -- default is ('presumedOwner'), keyed by the type's 'Unique'. It is what
+      -- @JSONDECODE T: path@ in @presumed@ names, whatever spelling the decode
+      -- site used for the type. A type declared at the top of the module, or
+      -- in an imported module, is not here and is named as the site spelled it
+      -- (decision O6, assumed: the headings of an imported module do not
+      -- reach the evaluator). Static for the run, and lazy like 'recordDefaults'.
     , presumed :: !(IORef PresumedLog)
       -- ^ The defaults that took effect during this directive, in the order
       -- they were forced: W8's \"took its default\" event. Per directive,
@@ -4943,10 +4954,16 @@ data DecodeAt = MkDecodeAt
 decodeRoot :: Type' Resolved -> Machine DecodeAt
 decodeRoot ty = do
   rr <- asks (.requestRecord)
+  owners <- asks (.recordOwners)
   let isRequest = case (rr, ty) of
         (Just r, TyApp _ tyRef []) -> nameToText (TypeCheck.getName tyRef) == r
         _                          -> False
-  pure (MkDecodeAt (prettyLayout ty) [] isRequest)
+      -- a record declared under a heading is named behind it, as a WITH default
+      -- is, whichever way the decode site spelled the type
+      root = case ty of
+        TyApp _ tyRef [] | Just owner <- Map.lookup (getUnique tyRef) owners -> owner
+        _                                                                    -> prettyLayout ty
+  pure (MkDecodeAt root [] isRequest)
 
 -- | @ for field 'a.b'@, or nothing at the root of the decode.
 atField :: DecodeAt -> Text

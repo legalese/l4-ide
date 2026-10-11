@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (withalJL4, qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, refuseNamedDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (headingDecodeJL4, withalJL4, qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, refuseNamedDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1018,6 +1018,24 @@ spec = describe "integration" do
         hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
           (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
         expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]
+
+    -- Assumed, not ruled (the review of the combined branch, 2026-10-12): a
+    -- decode the rules make into a record declared under a heading names it
+    -- behind the heading, on the direct path and on the wrapper path alike (a
+    -- `{}` sent for an input takes the wrapper path), in both modes.
+    it "names a decoded record behind its section heading, on both paths and in both modes" do
+      withServiceFromSources "ty-heading" [("heading.l4", headingDecodeJL4)] \baseUrl mgr -> do
+        let hardOf as = Aeson.object ["arguments" Aeson..= Aeson.object as, "presumption" Aeson..= ("hard" :: Text)]
+            direct = ["amount" Aeson..= (5 :: Int), "unused flag" Aeson..= True]
+            wrapped = ["amount" Aeson..= (5 :: Int), "unused flag" Aeson..= Aeson.object []]
+        d1 <- evalFunction baseUrl mgr "ty-heading" "within limit" (args direct)
+        expectAnswer d1 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
+        d2 <- evalFunction baseUrl mgr "ty-heading" "within limit" (hardOf direct)
+        expectAnswer d2 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
+        w1 <- evalFunction baseUrl mgr "ty-heading" "within limit" (args wrapped)
+        expectAnswer w1 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
+        w2 <- evalFunction baseUrl mgr "ty-heading" "within limit" (hardOf wrapped)
+        expectAnswer w2 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
 
     -- T1, ruled by Meng 2026-10-09: `T WITHAL` is the record a decode of {}
     -- gives. A default it takes is one inside the rules, so it is listed as

@@ -79,6 +79,7 @@ import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
 import L4.Syntax
+import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
@@ -933,7 +934,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
-    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, recordOwners = Map.empty, presumed
     }
 
 -- | Tell a run where defaults come from: the section binders of the evaluated
@@ -944,6 +945,7 @@ withDefaultsKnown :: EvalConfig -> RootFills -> Module Resolved -> [Declare Reso
 withDefaultsKnown evalConfig rootFills m imported st =
   st { presumableDefs = binderDefaults <> rootFills
      , recordDefaults = recordFieldDefaults (moduleDeclares m <> imported)
+     , recordOwners = declaredOwners m
      }
  where
   binderDefaults
@@ -969,6 +971,28 @@ moduleDeclares (MkModule _ _ sect) = goSection sect
   goDecl = \ case
     Declare _ d -> [d]
     Section _ s -> goSection s
+    _ -> []
+
+-- | The record types a module declares under a section heading, each with the
+-- name a decode the rules make reports for it ('EvalState.recordOwners'): the
+-- declared name behind the headings it sits under, written and quoted as the
+-- owner of a @WITH@ default is, by the same two functions
+-- ('TypeCheck.qualifiedOwner', 'presumedOwner'). Keyed by the type's 'Unique'.
+-- A type at the top of the module is left out, and is named as it always was.
+-- Only the module itself is walked: the @DECLARE@s of its imports arrive as a
+-- flat list that has lost its headings.
+declaredOwners :: Module Resolved -> Map Unique Text
+declaredOwners (MkModule _ _ sect) = Map.fromList (goSection [] sect)
+ where
+  goSection heads (MkSection _ mname _ _ decls) =
+    let heads' = heads <> [ rawNameToText (rawName (getActual n)) | Just n <- [mname] ]
+    in decls >>= goDecl heads'
+  goDecl heads = \ case
+    Declare _ (MkDeclare _ _ (MkAppForm _ tyName _ _) _)
+      | not (null heads) ->
+          [ ( getUnique tyName
+            , presumedOwner (rawName (TypeCheck.qualifiedOwner heads (getOriginal tyName))) ) ]
+    Section _ s -> goSection heads s
     _ -> []
 
 -- | The field defaults of every record among some @DECLARE@s, keyed by the
@@ -998,8 +1022,11 @@ recordFieldDefaults decls = Map.fromList
 -- request sent, is not the request's, and its defaults are listed in both
 -- presumption modes (Meng, 2026-10-11, card O1 condition 3): the switch reaches
 -- the request's own decode only, and the answer rests on them (T4b: "rests on
--- presumed x"). It is written @JSONDECODE T: path@, naming the type the rules
--- decoded.
+-- presumed x"). It is written @JSONDECODE T: path@, naming the record the rules
+-- decoded as it is declared: behind the section headings it sits under, as a
+-- @WITH@ default's owner is ('EvalState.recordOwners'), whichever way the
+-- decode site wrote the type. A record declared under a heading in an imported
+-- module is named bare.
 --
 -- A default a named application of the rules took (W4, W5) is a default no
 -- request could supply, and the answer rests on it just the same. It is listed
