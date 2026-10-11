@@ -323,22 +323,38 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   The request's own input of the same spelling is never listed for it (the batch and service fixtures name the exported rule's input `rate` on purpose).
   `#EVAL` lists nothing, as it never did for a default taken at the root: the trace rendering is W8's and is not built.
 
-**Decided by Claude overnight 2026-10-03, pending Meng's review.**
+**Decided by Claude overnight 2026-10-03.**
+Six of the decisions below were put to Meng as cards O1 to O6 on a bench ("Overnight Decisions", claude.ai artifact `SBzUtX1ZvZiofka1L8GeAr`, db collection `l4-overnight-1011`) and ruled on 2026-10-11; each has a **RULED** line under its title, and a bullet with none is still Claude's, pending his review.
 
-- **A default taken at a named site or construction is listed in `presumed` under hard, and not under soft.** In its own commit, so that it can be reverted alone.
+- **A default taken at a named site or construction is listed in `presumed` in both modes (O1, B).** In its own commit, so that it can be reverted alone.
+  **RULED 2026-10-11, bench card O1.**
+  Meng marked `accept`, option B, at 12:54:16Z, with no note.
+  Conditions as printed on the card: (1) the tests and documents that say "hard only" change in the same commit, rewritten rather than deleted, and so do the published descriptions of `presumed`, the OpenAPI schema text first; (2) the service README says that `presumed` entries come in more than one shape; (3) Meng says whether a rule's own `JSONDECODE` follows.
+  He answered (3) in chat on 2026-10-11 (~21:25 +0800) by firing the word DECODERRING: it follows, listed in both modes (§4.1).
   T6b names these sites ("W4's named sites and constructions emit W8's event themselves. The trace shows every event; `presumed` keeps only those whose binder or JSON path is part of the request"), and the binder of `rate` in `scaled WITH base IS 10` is part of no request; T4b's "elsewhere the result says 'rests on presumed x'" is about the off switch.
-  Read together: listed under hard, filtered under soft, which is how a rule's own `JSONDECODE` was treated then (`JSONDECODE T: field`, under hard only; both modes now, §4.1).
+  Read together, the first build (2026-10-03) listed it under hard and filtered it under soft, which is how a rule's own `JSONDECODE` was treated then (`JSONDECODE T: field`, under hard only; both modes now, §4.1).
   On that reading every entry in `presumed` under soft was a name a client could have sent, as it was in #539.
   That no longer holds: both modes list these entries now, and the `WITH` prefix is what tells them from a name a client could have sent (T6 above, T6 in §5).
-  _Alternatives:_ (b) list it in both modes, which reads T4b's first sentence ("every default that took effect, wherever filled") alone, and is a one-line change (drop the guard on the `FromNamedApp` case of `requestPresumed`, `L4.EvaluateLazy`); (c) never list it, trace only, which reads T6b's filter alone and loses "rests on presumed x" under hard.
+  _Alternatives, not taken:_ (A) under hard only, as the first build had it, which reads T6b's filter alone and leaves the default mode, and so every MCP tool call, silent about a default the rules took; (C) never list it, trace only, which reads T6b's filter alone and loses "rests on presumed x" under hard.
+  B reads T4b's first sentence ("every default that took effect, wherever filled") and is a one-line change (drop the guard on the `FromNamedApp` case of `requestPresumed`, `L4.EvaluateLazy`).
   The reconciliation of T4b and T6b is also noted under T6 in §5.
 
 - **A default crosses an `IMPORT`.** In its own commit, so that it can be reverted alone.
+  **RULED 2026-10-11, bench card O2.**
+  Meng marked `accept`, option A, at 12:55:40Z, with no note.
+  Conditions as printed: (1) the TYPICALLY reference page says that an imported default follows the imported file when it is edited, and that writing the input pins it; (2) A holds only together with O1 = B, which was ruled; (3) #557 and #558 stand on it, and the dropped type is W7's debt.
   R8 says nothing about imports, and a default that stopped at the file boundary would be a third behaviour: the same line of source, a loud error in one file and a default in the next.
   The tables travel as `implicitReaders` does (`CheckResult.inputDefaults`, `unionImportedCheckEnv`, `tcdInputDefaults`, the LSP's `TypeCheckResult`).
   _Alternative:_ stop at the boundary, where an imported rule's omitted default stays the "you have not supplied these inputs" error.
 
-- **A named site whose callee is an overload takes a default only if no other rule of the name could take what the site writes.** In its own commit; first built as "takes no default at all" and narrowed on 2026-10-11 (decision O3, below).
+- **A named site whose callee is an overload takes a default only if no other rule of the name could take what the site writes.** In its own commit; first built as "takes no default at all" and narrowed on 2026-10-11 (card O3, ruled below).
+  **RULED 2026-10-11, bench card O3.**
+  Meng marked `accept`, option A, at 13:06:57Z, with the note "Would prefer the more principled alternative."
+  He then answered in chat on 2026-10-11 (13:25Z): "Narrower rule."
+  So what is built is the card's narrower rule and not the guard as option A had it; the card's condition (1), that an overload which types alone would settle still needs the defaulted input written out, therefore does not apply (`ok/typically-overload-fit.l4` answers 30).
+  The card's conditions (2), that the sentences calling the arity case "still ambiguous" are reworded, and (3), that any relaxation is the narrower rule and never the guard switched off, stand.
+  One choice inside the narrower rule, whether a rival that lacks a name the site writes is ruled out, was put to him as an assumed choice, and he answered in chat on 2026-10-11: "Re your flag of the third: my lean is in whichever direction is less footgun."
+  Built that way, after review showed the other direction to be a silent wrong answer (below): the rival is not ruled out, so the site stays ambiguous.
   R8 does not rule on overloads. With `scaled(rate TYPICALLY 3, base)` and `scaled(base, factor)` in scope, `scaled WITH base IS 10` was ambiguous before W4, and became the first `scaled` run on a presumed rate, with exit 0; it stays ambiguous (`not-ok/tc/typically-overloaded-site.l4`).
   The checker records, on each branch of its search, the callee it chose when more than one candidate survives, with the types of the others (`CheckState.overloadedCallees`); the named site reads it straight after its name resolves, from a mark cleared just before, so it describes that site and no other.
   A `WHERE`-local rule that shadows a global one is not an overload (shadowing leaves one candidate) and still takes its default.
@@ -365,6 +381,10 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   Still ambiguous, as ruled: two rules, or a rule and a function of the same name, that could each take what the site writes, by names and by types (`ok/typically-site-names.l4` pins what is no longer an overload; `not-ok/tc/typically-overloaded-site.l4` and `not-ok/tc/typically-overloaded-fit.l4` what still is).
 
 - **An event's party or action record in the service takes no default: a field it leaves out is refused, in both modes.** In its own commit.
+  **RULED 2026-10-11, bench card O4.**
+  Meng marked `accept`, option B, at 12:58:25Z, with the note "Accept B as the target, and keep A until B lists."
+  Conditions as printed: (1) B ships only with three service tests, for an action record and a nested record too: a default that is read shows soft answering with the field listed in `presumed`, an event skipped by an expiry or an earlier mismatch lists nothing, and hard refuses; if the listing cannot be made to hold, A stays; (2) B still accepts the constructor-keyed nested record that clients send today; (3) until B lands, #551 merges with A as built, and the published schema stops promising the default for event records, as its own change to `unstable`; (4) under B a verdict can rest on a defaulted event field that the client left out although the request states the party in arguments, which the list shows and does not make correct.
+  So the refusal below stays until B lists, and B is not built.
   This is built differently from T1, and is a stop-gap, not a question for Meng: T1's "absent in JSON, taking its default" answers it (soft takes, hard refuses), and the faithful reading is owed (below).
   The deontic wrapper builds each event record as source, which since W5 would fill an omitted field from its `TYPICALLY`, under hard as well, and list it as a default no request could supply; the filled default changed which party the event matched.
   Soft cannot simply take it yet, because the deontic machinery reads a party without forcing it (§4.1), so a default taken there would be used and never listed in `presumed`: silent, where T6 asks for listed.
@@ -375,19 +395,27 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   _Follow-up owed, T1's reading:_ decode the event records as the arguments are, so that soft takes the default and lists it as `events[0].party.licence` and hard refuses it; it needs the wrapper to carry the events through the request decoder, and a party read that counts as a force.
 
 - **`l4 render` and `l4 nlg` mark a value the checker added: "`rate` is 3 by default".** In its own commit.
+  **RULED 2026-10-11, bench card O5.**
+  Meng marked `accept`, option A, at 12:59:17Z, with no note.
+  Conditions as printed: `l4 render` marks the same value where it prints a field list, a construction or a table row, in the same change; and the phrase is documented at `doc/reference/syntax/README.md` (frame words) and `doc/reference/types/TYPICALLY.md` (how a default surfaces), including that the mark covers a named call or a construction and not a section `GIVEN` default.
   A rendered document is read by someone who never sees the source, and "`rate` is 3" is what a module that writes `rate IS 3` renders to, so the text now says the value is a default.
   A value the author wrote is unchanged.
   The Hebrew phrasebook has a draft entry for the phrase.
   _Alternative:_ show the added argument as a plain one, or hide it.
 
-- **The owner in a `presumed` entry is the rule's or record's own name as its declaration writes it, not section-qualified.**
+- **The owner in a `presumed` entry is the rule's or record's own name as its declaration writes it, behind the section it is declared in (O6, B).**
+  **RULED 2026-10-11, bench card O6.**
+  Meng marked `accept` at 13:01:32Z, with no option and the note "B seems more principled and correct. Discuss if you disagree"; the card had recommended A as an interim.
+  So the owner is behind its section, B.
+  The card's own condition on B applies: it asked for the quoting to be ruled first, and imports and `WHERE` locals stay merged (below).
+  The quoting was built meanwhile and is marked assumed below, still owed its ruling.
   `WITH rescaled: rate` (an `AKA` alias) leaked from the callee's resolved name; the entry now carries the owner with the default (`InputDefault.owner`), so it does not depend on how a site spelled the callee, or on an `IMPORT`.
   The owner is named behind the section it is declared in, `WITH Pricing.scaled: rate` (`TypeCheck.qualifiedOwner`), which tells two same-named rules or records in different sections apart: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) list `WITH A.scaled: rate`, `WITH B.scaled: rate` and both.
   A rule at the top of a file has no section to name, and a rule declared in a `WHERE` or `LET` is kept bare.
   A part that L4 would write in backticks in source (`quoteIfNeeded`: any character that is not a letter, digit or underscore, a first character that is not a letter, a reserved word) is written in backticks, as the printer writes a qualified name (`` `Part 1. Fees`.scaled ``), and a name with no section in front of it is quoted the same way (`` `two words` ``): `L4.EvaluateLazy.Machine.presumedOwner`.
   A backticked part can hold a dot or a colon, so an entry is split by reading each one whole.
   Without that, a top-level rule called `Pricing.scaled` and the rule `scaled` under `§ Pricing` printed the same entry (found in review).
-  Assumed, not ruled, and in a commit of its own.
+  The section qualification is ruled (O6); the quoting of a part, just above, is assumed, not ruled, and in commits of its own.
   _Two limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4)._
   Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file or the place: the same name in two imported files (at the top level, or under the same `§`), and a `WHERE` or `LET` local, which is named bare and so also shares an entry with a top-level rule of that name.
   A row that rests on two such defaults lists one, and nothing says which default either was.
@@ -427,7 +455,7 @@ Each code fix has its own commit and a test that failed before it.
 
 - A default that is a bare constructor is reported only if read (`allocateArgument`; four batch cases and a service case, which run under hard; soft lists the same entries now, so a wrong listing shows in either mode).
 - An enum default exports to DMN quoted, as the field written out does (`defaultValueAt`; Camunda 8.7.6 on JDK 21: 2/2 values as expected, where it was `colour=null`, 1/2 FAILED).
-- The owner in a `presumed` entry is the declaration's own name (above).
+- The owner in a `presumed` entry is the declaration's own name behind its section (above, O6).
 - A written `ASSUME`'s input default is not honoured at a named site, in either file (above).
 - `doc/reference/types/TYPICALLY.md`'s stale sentences are removed (the section `GIVEN` as "the one place a default changes what a rule works out", and the `ASSUME` default "as everywhere outside a section `GIVEN`"), and the three pages that say what `presumed` lists said hard only then; they say both modes now.
 - The W5 row of §4 cites `supplyAppNamed` by name and not by a line number that had moved.
@@ -627,7 +655,7 @@ The evidence is §2: OpenFisca replaces a default with the first enum member, an
 **AMENDED 2026-10-01**, by bench card T6b, which an independent skeptic reviewed before it was folded in. Meng ruled in chat at 10:20Z: _"These are my rulings prior to SEQUEL. Please fold in any additional recommendations due to SEQUEL."_ The amendment, as the card printed it: Section binders (and T2's `ASSUME … TYPICALLY`) are left absent and filled by discharge. Every other fill site, the service direct path (`Jl4.hs:448`, including via `:501`), batch's JSON decoder, W4's named sites and constructions, emits W8's event itself. The trace shows every event; `presumed` keeps only those whose binder or JSON path is part of the request. Tests omit a section binder, a rule `GIVEN` and a record field on both batch and service, and check each appears in `presumed`. #526 §5's wording is reconciled to "actually forced".
 **Extended (proposed, not built), 2026-10-09.** A request may also assert a named derived node, and the answer lists the nodes whose asserted value was forced under `asserted`, beside `presumed`, by the same forcing rule; see `presumption-assertion/CONTRACT.md` §4.2 and `PRESUMPTION-SCENARIOS.md` §7 for the ruling behind it.
 R8 already asks for it in every directive and trace output (`PROPS-REDTEAM-2026-09-03.md:367`); the service response's `reasoning` is sent only when a trace is requested (`Backend/Api.hs:210-214`), so the list is a field of its own.
-_Reading used for W4 and W5 (decided by Claude overnight 2026-10-03, pending Meng's review, §4.2):_ T4b and T6b conflict for a default the rules take themselves, at a named site or a construction.
+_Reading used for W4 and W5 (decided by Claude overnight 2026-10-03, ruled by Meng 2026-10-11 as card O1, §4.2):_ T4b and T6b conflict for a default the rules take themselves, at a named site or a construction.
 T4 says the "presuming _x_" mark is ALIBI's `presumed` list, and T4b says the mark "covers every default that took effect, wherever filled", which reads as listing it everywhere; T6b says `presumed` "keeps only those whose binder or JSON path is part of the request", and names W4's sites among the fill sites, which reads as leaving it out.
 The branch follows T4b and R8 in both modes: `presumed` is the only place the result can say it "rests on presumed _x_", and the `WITH rule:` prefix keeps such an entry from being read as an input a request could have supplied.
 What the overnight build gave up under soft, measured on the review's probes: a soft answer that took `rate TYPICALLY 3` inside the rules listed nothing for it (`presumed: []`), and a soft batch row answering `60` listed `cfg.timeout` although `30` of the 60 is a construction's default.
