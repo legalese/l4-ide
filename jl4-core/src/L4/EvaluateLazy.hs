@@ -988,9 +988,13 @@ recordFieldDefaults decls = Map.fromList
 -- evaluation forced: each as the input's name, or the path to a field below
 -- it. Shared by @l4 batch@ and the service.
 --
--- Only events that belong to the request count (T6b): a section binder's or a
--- root fill's for an input the function takes, and one from the request's own
--- decode. A decode the RULES made, of JSON written in the rules or of text the
+-- Two kinds of event are listed. The request's own (T6b): a section binder's
+-- or a root fill's for an input the function takes, and one from the request's
+-- own decode. And the rules' own, which no request owns and the answer rests
+-- on: a decode the RULES made, and a default a named application took (below).
+-- Any other event is not listed.
+--
+-- A decode the RULES made, of JSON written in the rules or of text the
 -- request sent, is not the request's, and its defaults are listed in both
 -- presumption modes (Meng, 2026-10-11, card O1 condition 3): the switch reaches
 -- the request's own decode only, and the answer rests on them (T4b: "rests on

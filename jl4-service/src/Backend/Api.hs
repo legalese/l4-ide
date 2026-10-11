@@ -299,8 +299,10 @@ data EvaluatorError
     -- server fault, and a refusal is a designed answer of the model.
     --
     -- The list is the refusal's @presumed@ (T6: "every service response"):
-    -- a refusal that rests on a default is one that supplying the input might
-    -- turn into an answer, so the caller must be able to see it.
+    -- a refusal that rests on a default says which, so the caller can see it.
+    -- For an entry that names an input of the request, supplying that input
+    -- might turn the refusal into an answer. A @WITH rule: input@ entry is a
+    -- default the rules took at their own call, which no request can supply.
   | EvaluatorLimited !LimitHit !Text
     -- ^ The evaluation was stopped by one of the service's limits before it
     -- finished, with the message the batch endpoint reports. Not an
