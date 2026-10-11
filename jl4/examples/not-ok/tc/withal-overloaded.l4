@@ -12,3 +12,14 @@ GIVETH A NUMBER
 Paint MEANS n
 
 #EVAL Paint WITHAL
+
+-- A record with NO field beside a rule of the same name. There are no defaults to
+-- withhold here, so only the refusal of WITHAL at an overload keeps the site from
+-- resolving to the record by elimination, the rule failing for its own reason.
+DECLARE Marker HAS
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+Marker MEANS n
+
+#EVAL Marker WITHAL

@@ -490,7 +490,9 @@ The parser reads it as the node a `WITH` already parses to, `AppNamed`, with an 
 `inferWithal` (`L4/TypeCheck.hs`) fills it through `fillDefaults`, which `supplyAppNamed` now shares, so the checked tree is a `WITH` that omitted every field, each argument carrying its `DefaultFill`.
 Every consumer therefore sees what it already sees for a `WITH` that omitted fields, and `--presumption hard` lists each default as `WITH T: field` by the path it already had.
 `L4.Print` prints a named application with nothing written as `T WITHAL`; before this it printed bare `T`, a different expression (by reading; the old arm was `[] -> printWithLayout n`).
-A record is told from an enum alternative and from a rule by `recordInputDefaults`, which now has an entry for every record constructor, empty when no field has a default.
+A record is told from an enum alternative and from a rule by its declaration: this module's own records are read from `declareDeclarations` (a `RecordDecl` whose constructor it is), and a record from an `IMPORT` from the table `recordInputDefaults` builds from the same declaration, which now has an entry for every record constructor, empty when no field has a default.
+Presence in that table alone was not enough, and was the first version: the module's own entries are installed after the field defaults and the rule `GIVEN` defaults are checked, so `Inner WITHAL` written as a `TYPICALLY` was reported as an alternative of a `ONE OF`.
+That early state, a record of this module whose defaults are not installed yet, now says nothing and gives the record's type, because `checkTypically` rejects any named application there as no literal and the author is told that, once (`not-ok/tc/withal-in-a-default.l4`).
 The consumers were run, not only read: `l4 export` of `Paint WITHAL` and of `Paint WITH colour IS Red` gives the same dmn, dmn-md and catala output, and the same refusal, loud, from openfisca, blawx, docassemble and yscript; `jl4-mlir` compiles both to wasm and the four answers under node agree.
 
 **Reserved word.**
@@ -509,16 +511,24 @@ That is a count of tracked files at one commit each, not of untracked files or o
 - It is not accepted in a pattern (`CONSIDER … WHEN T WITHAL`), which is a parse error.
 - The parse error for `T WITHAL a IS TRUE` is the parser's general "unexpected IS", positioned at the `IS`; no message says "WITHAL takes no fields".
 - At an overload (a rule that shares the record's name) the site is the ordinary "multiple definitions" error (`not-ok/tc/withal-overloaded.l4`).
-  An explicit `WithalOverloaded` refusal sits behind it; with it switched off the visible result is the same, because `fillDefaults` already withholds defaults at an overload.
+  The text of the explicit `WithalOverloaded` refusal behind it never reaches the author: the ambiguity error replaces it.
+  The refusal is not dead code.
+  For a record with at least one field, switching it off changes nothing visible (measured), because `fillDefaults` already withholds defaults at an overload.
+  For a record with NO field there is nothing to withhold, and it is what keeps the site from resolving to the record by elimination (measured 2026-10-11 on `DECLARE Marker HAS` beside a rule `Marker` with one input: with the refusal off the site checks clean, with it on it is "multiple definitions").
+  The first half rests on `fillDefaults` withholding defaults at an overload, which `feat/o-overload` (the O3 rule) changes: re-check overloads when it is spliced.
 
 **Tests.**
-`ok/withal.l4` (14 `#ASSERT`s, 20 `Result:` blocks), `ok/withal-import-def.l4` and `ok/withal-import-use.l4` (a record across an `IMPORT`), and `not-ok/tc/withal-missing-default.l4`, `withal-not-a-record.l4`, `withal-overloaded.l4`, `withal-then-override.l4` (the parse error), each with its four goldens, read and free of absolute paths; `lsp/semantic-tokens/withal.l4`; `l4-cli-test` (batch under soft and hard, a record from an `IMPORT`, the name of a type); `jl4-service-test` (the same on the service).
+`ok/withal.l4` (14 `#ASSERT`s, 20 `Result:` blocks), `ok/withal-import-def.l4` and `ok/withal-import-use.l4` (a record across an `IMPORT`), and `not-ok/tc/withal-missing-default.l4`, `withal-not-a-record.l4`, `withal-overloaded.l4`, `withal-in-a-default.l4`, `withal-then-override.l4` (the parse error), each with its four goldens, read and free of absolute paths; `lsp/semantic-tokens/withal.l4`; `l4-cli-test` (batch under soft and hard, a record from an `IMPORT`, the name of a type); `jl4-service-test` (the same on the service).
 `prettyLayout round-trip`, `exactprint identity` and the parser memo check run over every `ok/` file, so over these.
 The evaluation differential of `CLAUDE.md` §3.2.1 was run by hand (`L4/Print.hs` is in the diff): see the commit message of the docs commit for its numbers.
 
 **What review changed.**
-Nothing yet: this section has not been reviewed.
-Two claims of the author's own were corrected before commit: a comment that said the overload refusal prevents a silent resolution by elimination (measured with the refusal off: the same single error), and a first draft of the page that said a whole batch row `{}` builds a record (a row builds no record; the claim is now the `JSONDECODE` one above).
+An independent review on 2026-10-11 found no silent wrong answer caused by this branch, and these things to correct:
+
+- A record was reported as an alternative of a `ONE OF` when `T WITHAL` was written as a `TYPICALLY` default (above).
+- The sentence that the overload refusal "changes nothing visible" was true only for a record with at least one field (above).
+
+Before that review, two claims of the author's own were corrected before commit: a comment that said the overload refusal prevents a silent resolution by elimination (measured with the refusal off: the same single error), and a first draft of the page that said a whole batch row `{}` builds a record (a row builds no record; the claim is now the `JSONDECODE` one above).
 
 ---
 

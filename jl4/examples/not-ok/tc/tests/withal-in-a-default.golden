@@ -1,0 +1,22 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-in-a-default.l4
+  Hidden: no
+  Range: 15:9-15:14
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY value for `inner` must be a literal:
+    a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.
+
+File: withal-in-a-default.l4
+  Hidden: no
+  Range: 24:1-24:2
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The TYPICALLY value for `p` must be a literal:
+    a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.
