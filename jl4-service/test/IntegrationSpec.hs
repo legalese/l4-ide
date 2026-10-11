@@ -985,11 +985,13 @@ spec = describe "integration" do
           (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= Aeson.Null], "unused flag" Aeson..= uncertain])
         expectError nulled "Field 'cfg.timeout' is null"
 
-    -- Review M3 / code #1: a rule's own decode is not the request's.
-    it "lets a rule's own JSONDECODE fill its default under hard, and says so" do
+    -- Review M3 / code #1: a rule's own decode is not the request's. It fills
+    -- its default in both modes and the answer says it rests on it in both
+    -- (Meng, 2026-10-11, overnight card O1 condition 3: DECODERRING).
+    it "lets a rule's own JSONDECODE fill its default, and says so in both modes" do
       withServiceFromSources "ty-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
         soft <- evalFunction baseUrl mgr "ty-own" "within limit" (args ["amount" Aeson..= (5 :: Int)])
-        expectAnswer soft (FnLitBool True) []
+        expectAnswer soft (FnLitBool True) ["JSONDECODE Settings: limit"]
         hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
           (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
         expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]

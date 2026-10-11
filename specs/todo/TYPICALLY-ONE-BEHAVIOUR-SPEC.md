@@ -198,7 +198,8 @@ Its `MAYBE` paragraph measured both ways: an empty cell for `GIVEN premium IS A 
 - In the core: `EvalConfig.presumeDefaults`, read by discharge (`dischargeModuleWith`) and by the decoder.
 - T4b: the switch reaches only the request's decode, following the ruling (review code #1, silent M3).
   The decoder treats a decode at `EvalConfig.requestRecord` (`L4.Presumption.requestRecordName`, set by batch and the service wrapper) as the request's, through `DecodeAt.isRequest`, and its nested fields inherit that.
-  A decode the rules make of their own fills its defaults in both modes; under hard they are listed in `presumed` as `JSONDECODE <type>: <field>`, which is T4b's "rests on presumed x", and under soft T6b's filter keeps them out (`L4.EvaluateLazy.requestPresumed`).
+  A decode the rules make of their own fills its defaults in both modes and lists them in `presumed` in both, as `JSONDECODE <type>: <field>`, which is T4b's "rests on presumed x" (`L4.EvaluateLazy.requestPresumed`).
+  It was listed under hard only until the O1 ruling of 2026-10-11 (condition 3, DECODERRING).
   Before this, hard mode withdrew a rule's own decode's defaults too, and the failure escaped the `EITHER`, so the rule's own `WHEN LEFT` never ran.
   `#EVAL`, which no request reaches, takes `presumeDefaults` as on.
 
@@ -318,7 +319,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - **T6 and T6b.** Each default taken at a named site or a construction raises W8's event itself.
   It is listed in `presumed` in both modes as `WITH rule: input` (`WITH scaled: rate`) or, for a record, `WITH Config: timeout`, with the rule or record named as its declaration writes it (not an `AKA` alias, not section-qualified, a mixfix rule by its declared name), only if it was forced, on `l4 batch`, on the service's direct and wrapper path, and over MCP, which always evaluates soft.
   The `WITH rule:` prefix is what keeps the entry from being read as an input of the request, which is how T6b's "whose binder or JSON path is part of the request" is read for these sites (below).
-  A rule's own `JSONDECODE` is still listed under hard only (assumed, not ruled: asked on the overnight bench, O1, and not answered).
+  A rule's own `JSONDECODE` is listed the same way, as `JSONDECODE T: field`, in both modes (O1 condition 3, DECODERRING).
   The request's own input of the same spelling is never listed for it (the batch and service fixtures name the exported rule's input `rate` on purpose).
   `#EVAL` lists nothing, as it never did for a default taken at the root: the trace rendering is W8's and is not built.
 
@@ -326,7 +327,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 
 - **A default taken at a named site or construction is listed in `presumed` under hard, and not under soft.** In its own commit, so that it can be reverted alone.
   T6b names these sites ("W4's named sites and constructions emit W8's event themselves. The trace shows every event; `presumed` keeps only those whose binder or JSON path is part of the request"), and the binder of `rate` in `scaled WITH base IS 10` is part of no request; T4b's "elsewhere the result says 'rests on presumed x'" is about the off switch.
-  Read together: listed under hard, filtered under soft, which is how a rule's own `JSONDECODE` is treated (`JSONDECODE T: field`, under hard only).
+  Read together: listed under hard, filtered under soft, which is how a rule's own `JSONDECODE` was treated then (`JSONDECODE T: field`, under hard only; both modes now, §4.1).
   Under soft every entry in `presumed` is then a name a client could have sent, as it was in #539.
   _Alternatives:_ (b) list it in both modes, which reads T4b's first sentence ("every default that took effect, wherever filled") alone, and is a one-line change (drop the guard on the `FromNamedApp` case of `requestPresumed`, `L4.EvaluateLazy`); (c) never list it, trace only, which reads T6b's filter alone and loses "rests on presumed x" under hard.
   The reconciliation of T4b and T6b is also noted under T6 in §5.
@@ -517,7 +518,7 @@ _Reading used for W4 and W5 (decided by Claude overnight 2026-10-03, pending Men
 T4 says the "presuming _x_" mark is ALIBI's `presumed` list, and T4b says the mark "covers every default that took effect, wherever filled", which reads as listing it everywhere; T6b says `presumed` "keeps only those whose binder or JSON path is part of the request", and names W4's sites among the fill sites, which reads as leaving it out.
 The branch follows T4b and R8 in both modes: `presumed` is the only place the result can say it "rests on presumed _x_", and the `WITH rule:` prefix keeps such an entry from being read as an input a request could have supplied.
 What the overnight build gave up under soft, measured on the review's probes: a soft answer that took `rate TYPICALLY 3` inside the rules listed nothing for it (`presumed: []`), and a soft batch row answering `60` listed `cfg.timeout` although `30` of the 60 is a construction's default.
-The listing is one clause in `requestPresumed` (the `FromNamedApp` case, `L4.EvaluateLazy`); a rule's own `JSONDECODE` keeps its guard, so it is listed under hard only.
+The listing is one clause in `requestPresumed` (the `FromNamedApp` case, `L4.EvaluateLazy`); a rule's own `JSONDECODE` is listed the same way, in both modes (O1 condition 3, DECODERRING).
 
 ---
 

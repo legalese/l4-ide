@@ -232,10 +232,10 @@ data ResponseWithReason = ResponseWithReason
   -- the request left out whose TYPICALLY default the evaluation read: an
   -- argument's name, or the path to a record field inside one
   -- (@config.timeout@). A default the rules themselves took is listed too,
-  -- written @WITH rule: input@ in either presumption mode, and one from a
-  -- decode of their own as @JSONDECODE T: path@ under hard only, so an entry
-  -- with such a prefix is not an input of the request. Always present, and
-  -- empty when the answer rests on no default.
+  -- written @WITH rule: input@, and one from a decode of their own as
+  -- @JSONDECODE T: path@, in either presumption mode, so an entry with such a
+  -- prefix is not an input of the request. Always present, and empty when the
+  -- answer rests on no default.
   }
   deriving (Show, Read, Ord, Eq, Generic)
   deriving anyclass (NFData)

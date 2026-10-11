@@ -921,9 +921,9 @@ wrapperPlan presumption m decide params (givens, binders, assumes) =
 
 -- | The request's @presumed@ list on the wrapper path ('Eval.requestPresumed'),
 -- mapping the wrapper's field names back to the inputs'.
-wrapperPresumed :: Presumption -> WrapperPlan -> [Eval.Presumed] -> [Text]
-wrapperPresumed presumption plan =
-  Eval.requestPresumed (presumption == PresumeSoft) unInputField plan.wpInputs
+wrapperPresumed :: WrapperPlan -> [Eval.Presumed] -> [Text]
+wrapperPresumed plan =
+  Eval.requestPresumed unInputField plan.wpInputs
 
 -- | The wrapper names a field @x (input)@ ('Backend.CodeGen.inputFieldName');
 -- messages and @presumed@ name the input.
@@ -982,7 +982,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
       handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
-        (wrapperPresumed presumption plan r.presumed)
+        (wrapperPresumed plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -1170,7 +1170,7 @@ evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presum
     Nothing -> throwError $ InterpreterError "L4: Expression evaluation failed."
     Just r@Eval.MkEvalDirectiveResult{result, trace} ->
       handleEvalResultDirect compiled.compiledEntityInfo result trace traceLevel includeGraphViz compiled.compiledModule
-        (Eval.requestPresumed soft id (functionInputs compiled) r.presumed)
+        (Eval.requestPresumed id (functionInputs compiled) r.presumed)
 
 -- | Add each root fill to the module as a 0-ary definition of its default.
 -- At the top of the module, so nothing it is appended to can capture it.
@@ -1276,7 +1276,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
       handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
-        (wrapperPresumed presumption plan r.presumed)
+        (wrapperPresumed plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -1557,7 +1557,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat errs)
                   Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
                     handleEvalResult tcRes.entityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz tcRes.module'
-                      (wrapperPresumed presumption plan r.presumed)
+                      (wrapperPresumed plan r.presumed)
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
             }

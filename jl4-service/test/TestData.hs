@@ -1036,7 +1036,7 @@ budget MEANS cfg's timeout PLUS cfg's retries
 |]
 
 -- | A rule that decodes JSON of its own (review M3): the switch must not
--- reach it, and under hard the answer says it rests on its default.
+-- reach it, and in both modes the answer says it rests on its default.
 ownDecodeJL4 :: Text
 ownDecodeJL4 =
   [i|

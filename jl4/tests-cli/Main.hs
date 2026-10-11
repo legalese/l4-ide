@@ -1825,14 +1825,12 @@ spec bin = do
       sstr `shouldSatisfy` ("\"note\":\"line one\\nline two\"" `isInfixOf`)
 
     -- Review M3 / code #1, T4b: the switch reaches the request's decode only.
-    -- A decode the rule makes of its own fills its default in both modes;
-    -- under hard the answer says it rests on it, because no row could
-    -- supply it. Soft does not list it (assumed, not ruled: overnight bench
-    -- card O1 asked whether a rule's own JSONDECODE follows a named site into
-    -- soft, and Meng did not answer).
-    it "lets a rule's own JSONDECODE fill its defaults in both modes" $ do
+    -- A decode the rule makes of its own fills its default in both modes, and
+    -- in both the answer says it rests on it, because no row could supply it
+    -- (Meng, 2026-10-11, overnight card O1 condition 3: DECODERRING).
+    it "lets a rule's own JSONDECODE fill its defaults in both modes, and lists it in both" $ do
       soft <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson]
-      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf [])
+      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
       hard <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson, "--presumption", "hard"]
       resultAndPresumed hard `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
 

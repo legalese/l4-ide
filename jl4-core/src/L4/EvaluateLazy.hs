@@ -990,10 +990,10 @@ recordFieldDefaults decls = Map.fromList
 --
 -- Only events that belong to the request count (T6b): a section binder's or a
 -- root fill's for an input the function takes, and one from the request's own
--- decode. A decode the RULES made is not the request's, and is listed only
--- when presumption is hard (@presume@ False): there it is a default the switch
--- could not withdraw, because no request can supply it, and the answer rests
--- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
+-- decode. A decode the RULES made is not the request's, and is listed in both
+-- presumption modes (Meng, 2026-10-11, card O1 condition 3): it is a default
+-- no request can supply, so the switch does not withdraw it, and the answer
+-- rests on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
 -- naming the type the rules decoded.
 --
 -- A default a named application of the rules took (W4, W5) is a default no
@@ -1007,19 +1007,15 @@ recordFieldDefaults decls = Map.fromList
 -- input a rule leaves out at its own call is part of no request, and an entry
 -- for it is not an input's name. The trace still carries every event.
 --
--- A rule's own @JSONDECODE@ stays listed only under hard (assumed, not ruled:
--- Meng was asked whether it follows and did not answer).
---
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
-requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
-requestPresumed presume fieldName inputs events =
+requestPresumed :: (Text -> Text) -> Set Text -> [Presumed] -> [Text]
+requestPresumed fieldName inputs events =
   nubOrd (mapMaybe entry events)
  where
   entry p = case (p.origin, p.path) of
-    (FromDecode root, path)
-      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
-      | otherwise   -> Nothing
+    (FromDecode root, path) ->
+      Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
     -- A default a named application of the RULES took (W4, W5): no request
     -- could supply it, so the switch does not withdraw it and the answer
     -- rests on it, in either mode. Its binder is the callee's, not an input of

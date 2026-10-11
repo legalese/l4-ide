@@ -18,8 +18,8 @@
 -- took their default (or, for a MAYBE input with none, NOTHING), and that the
 -- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@),
 -- and also a default the rules themselves took, written @WITH rule: input@
--- (and, under hard only, @JSONDECODE T: path@), so a reader that takes entries to
--- be input names filters on the prefix.
+-- (and @JSONDECODE T: path@, for a decode the rules made), so a reader that
+-- takes entries to be input names filters on the prefix.
 --
 -- An input the row leaves out takes its default while presumption is on
 -- (@--presumption soft@, the default); with @--presumption hard@ it is a
@@ -455,7 +455,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
         Shake.use Rules.EvaluateLazy uri
       let presumed = case mEval of
             Nothing          -> []
-            Just evalResults -> rowPresumed opts.batchPresumption schema evalResults
+            Just evalResults -> rowPresumed schema evalResults
           (status, outputJson, diags) = case mEval of
             Nothing ->
               -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
@@ -501,9 +501,9 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
 -- decodes the row as the request record ('requestRecordName'), so the
 -- request's own events are the ones that decode raised. The filter is the
 -- service's too ('requestPresumed').
-rowPresumed :: Presumption -> [ExportedParam] -> [EvalDirectiveResult] -> [Text]
-rowPresumed presumption schema results =
-  requestPresumed (presumption == PresumeSoft) id inputs (concatMap (.presumed) results)
+rowPresumed :: [ExportedParam] -> [EvalDirectiveResult] -> [Text]
+rowPresumed schema results =
+  requestPresumed id inputs (concatMap (.presumed) results)
   where
     inputs = Set.fromList [ x.paramName | x <- schema ]
 
