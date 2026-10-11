@@ -183,6 +183,7 @@ A request that asserts `offence made out` would then be refused by name, before 
 The rule's own final answer can never be asserted in L4's own evaluators, with or without the annotation.
 
 **Not built yet.** Nothing today refuses an assertion, because nothing today accepts one.
+The `@nonassertable` annotation itself parses and is checked today, and nothing reads it.
 Open by default, with this annotation as the opt-out, is what Meng ruled in chat on 2026-10-09 (`../PRESUMPTION-SCENARIOS.md` §7); it is recorded in the specification that owns it (`UNKNOWN-EVALUATION-SPEC.md` §5), so by this repository's rules it is decided.
 
 Why open by default?
@@ -218,8 +219,9 @@ GIVETH A BOOLEAN
 ```
 
 `is adult` here belongs to this rule, and is not the one at the top of the page.
+There it decides the answer; here it is read only when the birthdate leaves the question open.
 This rule works adulthood out from the birthdate when it can, and falls back on `is adult` only when it cannot.
-The input is named for the fact, not for its default, so a value sent for it is evidence and the answer does not call it a presumption.
+The input is named for the fact, not for its default, so a value sent for it counts as supplied, and only the default, when it is used, is listed under `presumed`.
 
 With a known birthdate the presumption is never read and never listed.
 With the birthdate sent as no date, the answer is `true` and `presumed` names `is adult`.
@@ -227,8 +229,9 @@ With the birthdate left out altogether, `presumed` names both `alex.birthdate`, 
 A value sent for `is adult` is read only where the rule falls back on it, which is when the birthdate leaves the question open.
 Sent beside a known birthdate it is ignored: Alex born in 1990 with `is adult` false still comes out `true`, with nothing listed and no warning.
 So this input lets someone answer for a missing birthdate, and does not let anyone overrule one.
-Overruling a birthdate is what an assertion on the `adult` step is for, as in the section on assertions above, once that is built.
-`../PRESUMPTION-SCENARIOS.md` §2.2 shows the same rows on a longer version of this rule, and the row with a value sent beside a known birthdate.
+Overruling a birthdate is what an assertion is for, once that is built, as in "Door number two" above.
+It needs a named step on the birthdate side to land on, which this rule does not have, because the rule's own final answer, `adult`, can never be asserted.
+`../PRESUMPTION-SCENARIOS.md` §2.2 shows the same rows on a longer version of this rule, and the rows with a value sent beside a known birthdate.
 
 One trap is worth knowing.
 If you write `WHEN NOTHING THEN TRUE` instead, you have made the same presumption, but the answer will not say so: `TRUE` written in a rule is a value, and nothing marks it as a presumption (§2.7 there measures it).
@@ -272,6 +275,6 @@ Spreadsheet users take note: in a comma-separated values (CSV) file an empty cel
 | pick door two in a picture                                                                     | click the named step's box                     | built                                                                                                 |
 | pick door two in a request                                                                     | `assertions` beside `arguments`                | ruled 2026-10-09; the key's spelling and the limits on which steps qualify are assumed; not built     |
 | see what was asserted                                                                          | `asserted` in the answer                       | ruled 2026-10-09; not built                                                                           |
-| keep a conclusion from being asserted                                                          | `@nonassertable` on the step                   | ruled 2026-10-09; not built                                                                           |
+| keep a conclusion from being asserted                                                          | `@nonassertable` on the step                   | ruled 2026-10-09; the annotation parses and is checked, nothing reads it yet                          |
 | presume a named step                                                                           | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                   |
 | say "the value is not known"                                                                   | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                      |

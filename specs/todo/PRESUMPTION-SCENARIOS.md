@@ -1,6 +1,6 @@
 # Presumptions at the end of a chain: what today's L4 can and cannot say
 
-**Status:** a design note with measurements, written 2026-10-09 and revised the same day after an Opus adversarial review (§9 says what it changed); nothing here is built.
+**Status:** a design note with measurements, written 2026-10-09 and revised the same day after an Opus adversarial review, and again on 2026-10-11 for an input rename (§9 says what each changed); nothing here is built.
 §7 records a ruling Meng made in chat; it is written in its owning document, `UNKNOWN-EVALUATION-SPEC.md` §5, and so decided (repo `CLAUDE.md` §4).
 It answers Meng's question of 2026-10-09: write the Alice scenarios in plain L4 using only what the tree has, run them soft and hard, and report what the language cannot say, or says with a wrong or missing explanation.
 It also measures the footgun Meng named the same day: a `MAYBE` and a `TYPICALLY` are two mechanisms for one idea, and `TYPICALLY NOTHING` sits where they meet.
@@ -12,6 +12,7 @@ Its batch behaviour is W2/W3's (#539): the TYPICALLY spec's §2 census, measured
 The one census row re-run here is p4, a `DECLARE` field default refused at construction, which still holds.
 The construction probes also ran on a binary built from the `#551` branch (`feat/typically-w4w5`: W4 and W5, a default applied at a named call and at a record construction), copied 2026-10-09 05:19 and deleted after the probes.
 `JL4_LIBRARY_PATH` was unset throughout, so each binary used its embedded prelude.
+The eight outputs of the `presumed`, `presumed-extra`, `presumed-section` and `presumed-known` families were captured on 2026-10-11 on a snapshot of an `l4` built from `c32814ccb`, the tip of the #606 branch (§9).
 Every probe file is in Appendix A and every raw output in Appendix B, modulo trailing whitespace.
 
 **Owning documents.** `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (T1, T3, T4, T6; D7.3 as restated in its §1.1), `IMPLICIT-PROPS-DESIGN.md` §11.5 (R8), `SURFACE-SUGAR-CLUSTER-2026-09.md` (D7.3), `UNKNOWN-EVALUATION-SPEC.md`, and `UNKNOWNS-BACKEND-CONTRACT.md` (the newer per-backend survey of `TYPICALLY`).
@@ -25,13 +26,13 @@ A ruling that comes out of this note is recorded in one of those, not here (repo
 `age at` compares year, month and day; `majority for` is SG: voting 21, beer 18; US: voting 18, beer 21, so the two jurisdictions cross.
 The chain birthdate → as_at → age → jurisdiction → purpose → adult is then written four ways:
 
-| route                          | spelling                                                                              | the presumption lives in                    |
-| ------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------- |
-| 1 `adult derived`              | `GIVETH A MAYBE BOOLEAN`; `WHEN NOTHING THEN NOTHING`                                 | nowhere; unknown stays unknown              |
-| 2 `adult presumed`             | a rule `GIVEN `is adult` IS A BOOLEAN TYPICALLY TRUE`, read only in the `NOTHING` arm | a rule input at the end of the chain        |
-| 2b `adult presumed by section` | the same default as a section `GIVEN`                                                 | a section input                             |
-| 3 `adult stored`               | `citizen's `is adult``                                                                | a stored field (Meng's model of 2026-10-09) |
-| 3c `stored agrees with chain`  | route 3 compared against the derivation                                               | an author-written consistency check         |
+| route                          | spelling                                                                                | the presumption lives in                    |
+| ------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------- |
+| 1 `adult derived`              | `GIVETH A MAYBE BOOLEAN`; `WHEN NOTHING THEN NOTHING`                                   | nowhere; unknown stays unknown              |
+| 2 `adult presumed`             | a rule ``GIVEN `is adult` IS A BOOLEAN TYPICALLY TRUE``, read only in the `NOTHING` arm | a rule input at the end of the chain        |
+| 2b `adult presumed by section` | the same default as a section `GIVEN`                                                   | a section input                             |
+| 3 `adult stored`               | `citizen's `is adult``                                                                  | a stored field (Meng's model of 2026-10-09) |
+| 3c `stored agrees with chain`  | route 3 compared against the derivation                                                 | an author-written consistency check         |
 
 `as_at` is an input, not `TODAY`, so no run depends on the clock.
 
@@ -66,8 +67,10 @@ Carol becomes an adult for Singapore voting on her 21st birthday and not the day
 
 Supplying `"is adult": false` rebuts route 2 in both modes: FALSE, presumed none.
 Supplying `"is adult": null` is refused in both modes: "null … never takes the TYPICALLY default".
-Supplying `"is adult"` beside a known birthdate changes nothing, in either mode: Bob, born 2006-01-01, answers from his birthdate and `presumed` is empty (`presumed-known.json`).
-`"is adult": false` leaves US voting `true`, and `"is adult": true` leaves SG voting `false`.
+A known birthdate is a separate case from Alice's: Bob, born 2006-01-01, answers from his birthdate whatever `"is adult"` says, and `presumed` is empty (`presumed-known.json`).
+`"is adult": false` leaves US voting `true`, and `"is adult": true` leaves SG voting `false`, in either mode.
+The value changes nothing, but its presence is still required under hard (§2.3).
+Alice with no birthdate and `"is adult": false` answers `false`, so the same file shows the input is read where the birthdate is missing; route 1 answers `null` on that row.
 
 ### 2.3 Hard mode refuses the whole function, not the presumption
 
@@ -82,15 +85,15 @@ Route 1 under hard accepts `null` and refuses absent, so in hard mode the only w
 
 Route 3 on Dave, born 2010-01-01, as at 2026-10-09 (age 16), and one Alice row:
 
-| row                                         | soft                              | hard                |
-| ------------------------------------------- | --------------------------------- | ------------------- |
-| `is adult: true` supplied                   | TRUE; presumed none               | TRUE; presumed none |
-| `is adult` omitted                          | TRUE; presumed `citizen.is adult` | refused             |
-| `is adult: null` (Alice, `birthdate: null`) | refused (never takes the default) | refused             |
+| row                                                 | soft                              | hard                |
+| --------------------------------------------------- | --------------------------------- | ------------------- |
+| `citizen.is adult: true` supplied                   | TRUE; presumed none               | TRUE; presumed none |
+| `citizen.is adult` omitted                          | TRUE; presumed `citizen.is adult` | refused             |
+| `citizen.is adult: null` (Alice, `birthdate: null`) | refused (never takes the default) | refused             |
 
 Nothing notices that TRUE contradicts the birthdate.
 Route 3c, the author-written check, returns FALSE for both Dave rows under soft, and under hard refuses the omitted row; that FALSE is a value, not a diagnostic, and the author had to think of writing it.
-With `is adult` omitted the check's FALSE rests on the presumption and says so (`presumed: citizen.is adult`), which is the one place the two mechanisms touched.
+With `citizen.is adult` omitted the check's FALSE rests on the presumption and says so (`presumed: citizen.is adult`), which is the one place the two mechanisms touched.
 
 ### 2.5 Construction inside the rules
 
@@ -160,13 +163,17 @@ And on the client side, absent and `null` are two spellings of "no value" that d
   Corrected 2026-10-09 after the bench skeptic for this question: the first version called it "a presumption that is not one".
 - **G5 (silent).** There is no presumption mode inside the rules: today's binary refuses a `WITH` that omits a defaulted field, in every mode, and #551's fills it, in every mode (§2.5); #551 lists such a fill under `presumed`, and nothing withholds it.
   Only the flag's absence from `l4 run --help` is loud.
+- **G6 (silent).** A value supplied for a fallback input is read only where the fallback is read, so it cannot overrule a derivation (§2.2).
+  Route 2's `is adult`, sent beside a known birthdate, has its value ignored in either direction and in either mode: no diagnostic, and `presumed` stays empty.
+  Its presence is not ignored: under hard it is still required (§2.3), so a hard-mode client must send a value that is then thrown away, which is G4 and G6 together.
+  What is silent is that a correctly named input is never read; a misspelt key is refused loudly.
+  Naming the input for the fact, as it is now, does not change that.
+  Overruling a derivation is what an assertion is for (`presumption-assertion/CONTRACT.md` §5.1, asserted over derived over presumed), on a named step that §3 there admits.
+  Route 2 as written has no such step, since its helper rules take inputs of their own and its final answer is the root.
+  A presumption written on the step (§7 there, proposed, not ruled) would not help, because it applies only where the derivation is unknown.
 - **G4 (loud, wrong scope).** Hard mode on `l4 batch` and on the service's direct path refuses at decode, so a presumption at the end of a chain blocks every request that omits it, including those whose evaluation never reaches it (§2.3).
   The service's wrapper path is already lazy there (`UNKNOWNS-BACKEND-CONTRACT.md:128–130`, measured), and TU-wire-b names lazy binding on the direct path as its own work item (TYPICALLY spec `:290`); so the scope is known and the item exists, and this note adds the measurement that a presumption input shows it plainly.
   It cannot say "refused because the answer would have rested on a presumption"; it says "a presumption is declared here".
-- **G6 (silent).** A value supplied for a fallback input is read only where the fallback is read, so it cannot overrule a derivation (§2.2).
-  Route 2's `is adult`, sent beside a known birthdate, is ignored in either direction and in either mode: no diagnostic, and `presumed` stays empty.
-  Naming the input for the fact, as it is now, does not change that.
-  Overruling a derivation is what an assertion is for (`presumption-assertion/CONTRACT.md` §3), or a presumption written on the step itself (§7 there, proposed, not ruled).
 
 ## 5. What falls out of a tweak, and what needs syntax
 
@@ -192,7 +199,7 @@ Given the measurements, the smallest changes that remove a spelling or make a si
 
 ## 6. Open for Meng
 
-- Does an explicit supply of `is adult` win over a contradicting birthdate, or is the clash an error? (G2; asked 2026-10-09, not yet ruled. §7 settles precedence within one node, asserted over derived; this is two nodes, a stored field and a derivation, that ought to agree, and §7 does not reach it.)
+- Does an explicit supply of route 3's `citizen.is adult` win over a contradicting birthdate, or is the clash an error? (G2; asked 2026-10-09, not yet ruled. §7 settles precedence within one node, asserted over derived; this is two nodes, a stored field and a derivation, that ought to agree, and §7 does not reach it. Route 2's fallback input is the other case, and G6 measures what it does today.)
 - Should `TYPICALLY` be refused on a `MAYBE`, amending D7.3? (G3.)
 - Should hard mode refuse at force rather than at decode? (G4; a behaviour change to `l4 batch` and the service, so a service client would notice.)
 
@@ -241,7 +248,7 @@ Four families: natively defeasible (Catala, Blawx, PROLEG) take the design as id
 Obligations: every exporter with a fidelity report (DMN, dmn-md, BPMN, docassemble, Blawx) gains "assertable nodes" and "presumed conclusions" rows, emitted-as or dropped; OpenFisca and yscript have none, so their limits pages carry it; the OpenFisca enum default is a standing silent wrong answer independent of this design.
 Guard 2 appears in no target column: it is ours alone.
 
-## 9. What review changed (2026-10-09)
+## 9. What review changed (2026-10-09, and the input rename of 2026-10-11)
 
 An Opus adversarial review of the first version found 28 problems, 7 of them overturning a sentence; each was re-verified against the tree at `c6d081622` or re-run on the installed binary before it was applied, and all held.
 The overturned sentences: the installed binary "matches the census on every row" (it honours what the pre-W2/W3 census refused); "all four routes agree … soft and hard" (hard refuses routes 2 and 2b, and route 3 has no chain); `TYPICALLY NOTHING` "changes no answer" (it changes `#EVAL` on a section input, is refused by docassemble, and is published as `"default": null`); G5's "always fill" (true of #551, not of today's binary); §7 "decided when filed" (not decided until recorded in its owning document); Blawx "dropped, disclosed" (that is the ruling, not the code); and docassemble "answered/pre-filled already distinguished" (the exporter's own note says user-confirmed).
@@ -252,6 +259,8 @@ The six affected outputs in Appendix B were re-run, not edited, with the appendi
 A run of the unrenamed probe on that binary first reproduced all six recorded outputs byte for byte.
 The renamed run then matched them row for row apart from the name and, in the `presumed-extra` outputs, the position of the key in the echoed input, which the printer sorts.
 `presumed-known.json`, its two outputs and G6 are new.
+A second Opus review of the rename found three sentences wrong: an assertion said to land on the root, a step presumption said to overrule, and "changes nothing" said where hard still requires the key, and a handful of smaller faults.
+All were corrected, and the third row of `presumed-known.json` now pins which export ran.
 
 ---
 
@@ -493,7 +502,8 @@ GIVETH A STRING
 ```text
 [
  {"person":{"name":"Bob","birthdate":"2006-01-01"}, "asat":"2026-10-09","j":"US","p":"Voting", "is adult": false},
- {"person":{"name":"Bob","birthdate":"2006-01-01"}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": true}
+ {"person":{"name":"Bob","birthdate":"2006-01-01"}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": true},
+ {"person":{"name":"Alice","birthdate":null}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": false}
 ]
 ```
 
@@ -661,7 +671,8 @@ GIVETH A BOOLEAN
 ## Appendix B. Raw outputs
 
 `<name>-<mode>.json` is `l4 batch ... --presumption <mode> -f json -c`; `*-check.txt` is `l4 check`; `*-run.txt` is `l4 run` on the installed binary; `construct-*-installed.txt` and `construct-*-551.txt` are `l4 run` on the two binaries; `tmtowtdi-docassemble.txt` is `l4 export docassemble`.
-The six `presumed*` outputs were re-captured on 2026-10-11 under the new input names (§9), and `presumed-known-*` is new that day.
+The outputs named `presumed`, `presumed-extra` and `presumed-section`, six files, were re-captured on 2026-10-11 under the new input names (§9), and the two `presumed-known` outputs are new that day.
+Each of those eight ran with `-e "adult presumed"`, except the two `presumed-section` ones, which ran with `-e "adult presumed by section"`.
 
 **`out/construct-a-551.txt`**
 
@@ -898,7 +909,8 @@ File:     construct-c.l4
 ```text
 [
   {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
-  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":true,"j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":true,"j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
 ]
 ```
 
@@ -907,7 +919,8 @@ File:     construct-c.l4
 ```text
 [
   {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
-  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":true,"j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":true,"j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
 ]
 ```
 
