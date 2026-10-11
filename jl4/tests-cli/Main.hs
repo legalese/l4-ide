@@ -1022,7 +1022,7 @@ spec bin = do
     it "is not marked, while the same value written at the call is printed" $ do
       Output code sout _ <- runL4 bin ["nlg", renderDefaultMarkRootFixture]
       code `shouldBe` ExitSuccess
-      lines sout `shouldBe`
+      map (filter (/= '\r')) (lines sout) `shouldBe`
         [ "`tax on` where `amount` is 10 is equal to 12"
         , "`tax on` where `amount` is 10 and `surcharge` is 7 is equal to 17"
         ]
