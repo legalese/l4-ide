@@ -328,7 +328,8 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - **A default taken at a named site or construction is listed in `presumed` under hard, and not under soft.** In its own commit, so that it can be reverted alone.
   T6b names these sites ("W4's named sites and constructions emit W8's event themselves. The trace shows every event; `presumed` keeps only those whose binder or JSON path is part of the request"), and the binder of `rate` in `scaled WITH base IS 10` is part of no request; T4b's "elsewhere the result says 'rests on presumed x'" is about the off switch.
   Read together: listed under hard, filtered under soft, which is how a rule's own `JSONDECODE` was treated then (`JSONDECODE T: field`, under hard only; both modes now, §4.1).
-  Under soft every entry in `presumed` is then a name a client could have sent, as it was in #539.
+  On that reading every entry in `presumed` under soft was a name a client could have sent, as it was in #539.
+  That no longer holds: both modes list these entries now, and the `WITH` prefix is what tells them from a name a client could have sent (T6 above, T6 in §5).
   _Alternatives:_ (b) list it in both modes, which reads T4b's first sentence ("every default that took effect, wherever filled") alone, and is a one-line change (drop the guard on the `FromNamedApp` case of `requestPresumed`, `L4.EvaluateLazy`); (c) never list it, trace only, which reads T6b's filter alone and loses "rests on presumed x" under hard.
   The reconciliation of T4b and T6b is also noted under T6 in §5.
 
@@ -409,11 +410,11 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 After the two adversarial reviews (one for silent failures, one for fidelity to the rulings), beyond what is recorded above.
 Each code fix has its own commit and a test that failed before it.
 
-- A default that is a bare constructor is reported only if read (`allocateArgument`; four batch cases and a service case, which run under hard because that is where `presumed` lists such a default).
+- A default that is a bare constructor is reported only if read (`allocateArgument`; four batch cases and a service case, which run under hard; soft lists the same entries now, so a wrong listing shows in either mode).
 - An enum default exports to DMN quoted, as the field written out does (`defaultValueAt`; Camunda 8.7.6 on JDK 21: 2/2 values as expected, where it was `colour=null`, 1/2 FAILED).
 - The owner in a `presumed` entry is the declaration's own name (above).
 - A written `ASSUME`'s input default is not honoured at a named site, in either file (above).
-- `doc/reference/types/TYPICALLY.md`'s stale sentences are removed (the section `GIVEN` as "the one place a default changes what a rule works out", and the `ASSUME` default "as everywhere outside a section `GIVEN`"), and the three pages that say what `presumed` lists now say hard only.
+- `doc/reference/types/TYPICALLY.md`'s stale sentences are removed (the section `GIVEN` as "the one place a default changes what a rule works out", and the `ASSUME` default "as everywhere outside a section `GIVEN`"), and the three pages that say what `presumed` lists said hard only then; they say both modes now.
 - The W5 row of §4 cites `supplyAppNamed` by name and not by a line number that had moved.
 
 **Review fixes, second round (2026-10-03).**
@@ -430,7 +431,7 @@ Each code fix has its own commit and a test that failed before it (the previous 
   `ok/typically-site-names.l4`.
 - **A record nested in an event's record is refused too** (rulings R2-2; above, under the event decision).
   `jl4-service-test`, "refuses an event whose nested record leaves out a defaulted field, in both modes".
-- **Text that claimed more than the behaviour** (silent N4, N5, rulings R2-4): "a misspelt `rate` is never read as a default taken" (above, under R8 rule 1, now with the one case it cannot catch); two sentences that said `presumed` lists a default taken inside the rules, which under soft it does not (`jl4-service/README.md`, the skill's entry 7.4); the line under T6 in §5, which said T4b's mark "is the trace's" and now names the conflict between T4b and T6b and what soft gives up; and, found by searching for the same claim in the other pages, `doc/courses/advanced/module-a4-production.md`, which said a default on a field or a rule's input "is metadata only" inside a file.
+- **Text that claimed more than the behaviour** (silent N4, N5, rulings R2-4): "a misspelt `rate` is never read as a default taken" (above, under R8 rule 1, now with the one case it cannot catch); two sentences that said `presumed` lists a default taken inside the rules, which under soft it did not then (`jl4-service/README.md`, the skill's entry 7.4; both modes list it now); the line under T6 in §5, which said T4b's mark "is the trace's" and now names the conflict between T4b and T6b and what soft gives up; and, found by searching for the same claim in the other pages, `doc/courses/advanced/module-a4-production.md`, which said a default on a field or a rule's input "is metadata only" inside a file.
 - **Recorded, not changed:** the two limits on `presumed` entries (R2-3, above); an event's record under soft is built differently from T1, and the faithful reading is owed (R2-5, above), so it is not a question for Meng; T4b's check-time warning stays unbuilt (R2-6, "Not built here"); and the tutorial's "The file and the boundary agree" is now "A call inside the file may leave out the same things", because `l4 batch` cannot run an export whose input is an enum or record type when a later section declares a type of the same name (silent X1, "Not built here").
 
 **What does not change.**
