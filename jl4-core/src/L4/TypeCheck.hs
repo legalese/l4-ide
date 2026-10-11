@@ -5249,13 +5249,23 @@ inferAppNamed _noDefault r t nes = do
 -- of 'WithalOverloaded' itself never reaches the author. The guard is NOT dead
 -- code. For a record with at least one field, 'fillDefaults' already withholds
 -- the defaults at an overload, so the record's own branch fails too and the
--- guard changes nothing visible (measured with it switched off). For a record
--- with NO field there is nothing to withhold: the record's branch succeeds with
--- @([], t)@, the rule's branch fails with 'WithalOnRule', and the site would
--- resolve to the record by elimination, which is what the guard prevents
--- (@DECLARE Marker HAS@ beside a rule @Marker@ with one input). That the first
--- half holds rests on 'fillDefaults' withholding defaults at an overload, which
--- feat/o-overload (the O3 rule) changes: re-check overloads when it is spliced.
+-- guard changes nothing visible (measured with it switched off, before the O3
+-- rule below was spliced in). For a record with NO field there is nothing to
+-- withhold: the record's branch succeeds with @([], t)@, the rule's branch
+-- fails with 'WithalOnRule', and the site would resolve to the record by
+-- elimination, which is what the guard prevents (@DECLARE Marker HAS@ beside a
+-- rule @Marker@ with one input).
+--
+-- The flag @overloaded@ is the name-level test, not O3's: the call site in
+-- 'inferExpr'' hands this function @not (null nameRivals)@ and does not ask
+-- 'siteTakesNoDefault'. O3 withholds a default only when a rival FITS the
+-- values a site writes, and @WITHAL@ writes none, so there is nothing for the
+-- narrower rule to narrow with; and 'siteTakesNoDefault' is silent for a record
+-- that has no defaulted field, which is the case the guard exists for. So an
+-- overload is refused here exactly as it was before O3. That was checked on
+-- the combined tree by the goldens of not-ok/tc/withal-overloaded.l4 and a
+-- record with no field beside a rule of one input, not by switching the guard
+-- off again.
 inferWithal :: Bool -> Resolved -> Type' Resolved -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
 inferWithal overloaded r t = do
   mFields <- asks (Map.lookup (getUnique r) . (.visibleInputDefaults))

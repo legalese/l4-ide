@@ -250,7 +250,7 @@ What the mark does and does not tell you:
 
 - **It covers a default added at a call that names its inputs, or at a construction.** Those are the two places where a call or a construction that the author wrote gets a value the author did not write.
 - **It does not cover a default taken at the root of a section `GIVEN`.** With `surcharge TYPICALLY 2` on a section `GIVEN`, `` `tax on` WITH amount IS 10 `` prints as `` `tax on` where `amount` is 10 is equal to 12 ``, and the 2 is not in the text. Written at the call, `surcharge IS 7` is printed.
-- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, and, under `hard`, one added at a call. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
+- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, and, in either mode, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
 - **The words are English in `l4 render`, whatever `--lang` says.** `l4 nlg --lang he` prints `כברירת מחדל` from a draft entry in its table of Hebrew phrases, which no Hebrew-speaking lawyer has reviewed, and `l4 render` does not use that table yet ([the syntax reference](../syntax/README.md) says so).
 
 ## What the default must be
@@ -320,9 +320,8 @@ govern what counts as leaving a fact out:
   imported files, and a rule declared in a `WHERE`, which is named
   bare, so it also shares an entry with a top-level rule of that name.
   The entry names the rule and not which of two rules of that name took the
-  default: two rules called `fee` in one section, each with its own default for
-  `rate`, both list the same `WITH` entry for `fee: rate`, whatever value each
-  took. So
+  default: two rules called `fee` in `§ Pricing`, each with its own default for
+  `rate`, both list `WITH Pricing.fee: rate`, whatever value each took. So
   `presumed` has more than one shape: a fact's name
   or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and
   `JSONDECODE <type>: <field>`. An entry that starts `WITH ` is a usual value

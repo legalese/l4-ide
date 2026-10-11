@@ -232,7 +232,7 @@ A percentage reads `50%`.
 **A value the checker supplied is marked.**
 A call that names its inputs may leave out an input that has a [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out a field that has one.
 The checker fills the value in, and the text says so after it, because someone reading the text never sees the source and would otherwise take the value for one that was stipulated.
-``#ASSERT (scaled WITH base IS 10) EQUALS 30`` reads `` `scaled` where `base` is 10 and `rate` is 3 by default is equal to 30 ``, where `scaled WITH base IS 10, rate IS 3` reads the same without "by default".
+`#ASSERT (scaled WITH base IS 10) EQUALS 30` reads `` `scaled` where `base` is 10 and `rate` is 3 by default is equal to 30 ``, where `scaled WITH base IS 10, rate IS 3` reads the same without "by default".
 
 `l4 render` marks the value wherever it prints it.
 In a sentence it reads as above.

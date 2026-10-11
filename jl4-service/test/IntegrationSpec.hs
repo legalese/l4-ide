@@ -1021,20 +1021,21 @@ spec = describe "integration" do
 
     -- T1, ruled by Meng 2026-10-09: `T WITHAL` is the record a decode of {}
     -- gives. A default it takes is one inside the rules, so it is listed as
-    -- `WITH T: field` under hard, beside the decode's own, on both paths, and
-    -- under soft nothing is listed.
-    it "builds with WITHAL the record a decode of {} gives, and lists the defaults it took under hard" do
+    -- `WITH T: field` in both modes, beside the decode's own, on both paths
+    -- (Meng, 2026-10-11, overnight card O1 and DECODERRING).
+    it "builds with WITHAL the record a decode of {} gives, and lists the defaults it took in both modes" do
       withServiceFromSources "ty-withal" [("withal.l4", withalJL4)] \baseUrl mgr -> do
+        let sameDefaults =
+              [ "JSONDECODE Settings: limit", "WITH Settings: limit"
+              , "JSONDECODE Settings: strict", "WITH Settings: strict" ]
         soft <- evalFunction baseUrl mgr "ty-withal" "same defaults" (args ["amount" Aeson..= (5 :: Int)])
-        expectAnswer soft (FnLitBool True) []
+        expectAnswer soft (FnLitBool True) sameDefaults
         hardResp <- evalFunction baseUrl mgr "ty-withal" "same defaults"
           (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
-        expectAnswer hardResp (FnLitBool True)
-          [ "JSONDECODE Settings: limit", "WITH Settings: limit"
-          , "JSONDECODE Settings: strict", "WITH Settings: strict" ]
+        expectAnswer hardResp (FnLitBool True) sameDefaults
         -- the answer depends on the default: 50 is over the limit WITHAL takes
         over <- evalFunction baseUrl mgr "ty-withal" "within limit" (args ["amount" Aeson..= (50 :: Int)])
-        expectAnswer over (FnLitBool False) []
+        expectAnswer over (FnLitBool False) ["WITH Settings: limit"]
         overHard <- evalFunction baseUrl mgr "ty-withal" "within limit"
           (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
         expectAnswer overHard (FnLitBool True) ["WITH Settings: limit"]

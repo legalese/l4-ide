@@ -90,7 +90,8 @@ So there is exactly one way to write each construction: `WITH` names the fields 
 
 A usual value is a _presumption_, and the presumption can be switched off for a case: `l4 batch --presumption hard`, or `"presumption": "hard"` in a request to the decision service.
 `WITHAL` is inside your rules, where no case could have supplied the value, so it takes the usual values in both modes.
-Under `hard` the answer lists each one under **`presumed`** as `WITH Paint: coats`, exactly as it lists a `WITH` that left the field out.
+In either mode the answer lists each one under **`presumed`** as `WITH Paint: coats`, exactly as it lists a `WITH` that left the field out.
+A record declared under a section heading is named behind it: `WITH Pricing.Paint: coats`.
 
 A rule can also read a record from JSON text.
 When the text is an empty object, `{}`, it supplies nothing, and a field that has a usual value takes it.

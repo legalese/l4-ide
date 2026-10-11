@@ -2088,11 +2088,17 @@ spec bin = do
   -- T1, ruled by Meng 2026-10-09: `T WITHAL` is the record with EVERY field's
   -- default and nothing written. It is the record that a rule's own JSONDECODE
   -- of "{}" gives, and it is a default taken inside the rules, so it is listed
-  -- as `WITH T: field` under hard exactly as a WITH that leaves the field out
-  -- is (above). `{}` as the VALUE of a record input is still `null` and is
-  -- refused (M2); WITHAL is the spelling for it inside the rules.
+  -- as `WITH T: field` in both modes exactly as a WITH that leaves the field
+  -- out is (above), beside the decode's own `JSONDECODE T: field` (Meng,
+  -- 2026-10-11, overnight card O1 and DECODERRING). `{}` as the VALUE of a
+  -- record input is still `null` and is refused (M2); WITHAL is the spelling
+  -- for it inside the rules.
   describe "l4 batch: T WITHAL (T1)" $ do
-    it "builds the record a decode of {} gives, and takes the defaults in both modes" $ do
+    -- What `same defaults` lists: the decode's defaults, then WITHAL's.
+    let withalSameDefaults =
+          [ "JSONDECODE Settings: limit", "WITH Settings: limit"
+          , "JSONDECODE Settings: strict", "WITH Settings: strict" ]
+    it "builds the record a decode of {} gives, and takes and lists the defaults in both modes" $ do
       -- the second row is the positive control: the answer depends on the default
       Output code sout _ <-
         runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
@@ -2100,15 +2106,19 @@ spec bin = do
       code `shouldBe` ExitSuccess
       rows <- decodeArray sout
       map resultAndPresumed rows `shouldBe`
-        [ (Just (Bool True), presumedOf []), (Just (Bool False), presumedOf []) ]
+        [ (Just (Bool True), presumedOf ["WITH Settings: limit"])
+        , (Just (Bool False), presumedOf ["WITH Settings: limit"])
+        ]
       Output scode ssout _ <-
         runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson, "--format", "json" ]
       scode `shouldBe` ExitSuccess
       srows <- decodeArray ssout
       map resultAndPresumed srows `shouldBe`
-        [ (Just (Bool True), presumedOf []), (Just (Bool True), presumedOf []) ]
+        [ (Just (Bool True), presumedOf withalSameDefaults)
+        , (Just (Bool True), presumedOf withalSameDefaults)
+        ]
 
-    it "lists each default it took under hard, as WITH T: field, beside the decode's own" $ do
+    it "lists the same entries with --presumption hard, as WITH T: field beside the decode's own" $ do
       Output code sout _ <-
         runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
                   , "--entrypoint", "within limit", "--presumption", "hard", "--format", "json" ]
@@ -2125,8 +2135,7 @@ spec bin = do
       srows <- decodeArray ssout
       map resultAndPresumed (take 1 srows) `shouldBe`
         [ ( Just (Bool True)
-          , presumedOf [ "JSONDECODE Settings: limit", "WITH Settings: limit"
-                       , "JSONDECODE Settings: strict", "WITH Settings: strict" ] ) ]
+          , presumedOf withalSameDefaults ) ]
 
   describe "l4 check: T WITHAL (T1)" $ do
     it "names the field with no default, on a record from an IMPORT" $ do
