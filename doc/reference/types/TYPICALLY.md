@@ -185,6 +185,12 @@ scaled MEANS base PLUS factor
 A name that only one rule has does not settle the choice either.
 If the second `scaled` took `width` and `height` and had no `base`, the call `scaled WITH base IS 10` would still be ambiguous: it does not say which rule it means.
 
+One more limit, chosen to keep the check fast and not ruled on.
+A value that itself contains a call that names its inputs is not compared with the other rule's types, and a record built with `WITH` is such a call.
+So `scaled WITH base IS (double WITH x IS 5)` stays ambiguous, although the number it gives would settle the choice.
+A value that is a positional call (`double 5`) is compared, and so is a name: give the value a name with `WHERE` first, and write that name in the call.
+Without this limit the time to check calls inside calls grew several-fold with every level.
+
 There are two ways to settle a call that is still ambiguous.
 Write the input that has the default (`scaled WITH base IS 10, rate IS 3`), which leaves only the first rule able to take the call.
 Or, when the two rules sit under different section headings, name the one you mean: `` `Pricing`.scaled WITH base IS 10 ``.

@@ -117,6 +117,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
 import Optics ((%~), (^.), (?~), gplate)
+import qualified Optics
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -5257,8 +5258,18 @@ siteTakesNoDefault callee t nes rivals = do
 -- missing inputs: the rival need not be complete.
 --
 -- Anything this cannot tell answers 'True': a rival whose type is not a function
--- (a type still being inferred, or a bare definition at a binder-only site).
+-- (a type still being inferred, or a bare definition at a binder-only site), and
+-- a written value that itself contains a named call ('containsNamedCall'), which
+-- is not checked. That last bound is what keeps the work linear: each such value
+-- would otherwise be checked again, here, at every rival and on every branch of
+-- the search, and a value with a named call in it checks its own again, so a
+-- call nested d deep cost about 3^d checks (measured 2026-10-11, ok/typically-
+-- overload-nested.l4: depth 14 took 53s, against 0.35s with the value left
+-- alone; depth 16 was killed at 130s). Left alone, such a value is checked once
+-- per branch, as it was before this rule.
 rivalFitsSite :: Resolved -> [NamedExpr Name] -> Type' Resolved -> Check Bool
+rivalFitsSite _ nes _
+  | all (\ (MkNamedExpr _ _ e) -> containsNamedCall e) nes = pure True
 rivalFitsSite callee nes rival = speculate do
   rt <- instantiate rival >>= applySubst
   case rt of
@@ -5268,10 +5279,25 @@ rivalFitsSite callee nes rival = speculate do
     go _    []                             = pure True
     go onts (MkNamedExpr _ n e : rest) =
       case lookupOptionallyNamedType n onts of
-        Just (_, n', t, onts') -> do
-          _ <- checkExpr (ExpectNamedArgContext callee n') e t
-          go onts' rest
+        Just (_, n', t, onts')
+          | containsNamedCall e -> go onts' rest
+          | otherwise -> do
+              _ <- checkExpr (ExpectNamedArgContext callee n') e t
+              go onts' rest
         Nothing -> go onts rest
+
+-- | Is a call that names its inputs anywhere in this expression, itself
+-- included? A record construction (@Order WITH total IS 50@) is one, since the
+-- parser does not tell it from a rule's call, so a value that builds a record
+-- is left unchecked too (on the loud side).
+containsNamedCall :: Expr Name -> Bool
+containsNamedCall = \ case
+  AppNamed {} -> True
+  e           -> Optics.anyOf (Optics.cosmosOf (gplate @(Expr Name))) isAppNamed e
+ where
+  isAppNamed = \ case
+    AppNamed {} -> True
+    _           -> False
 
 -- | Is this name one the module's section-level @GIVEN@s bind?
 --
