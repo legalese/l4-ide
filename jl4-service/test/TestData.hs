@@ -98,6 +98,7 @@ module TestData (
   ownDecodeJL4,
   deonticDefaultJL4,
   deonticEventRecordsJL4,
+  deonticListPartyJL4,
   spinJL4,
   spinOrRefuseJL4,
   spinWrapperJL4,
@@ -1371,6 +1372,29 @@ GIVEN driver IS A Driver
 GIVETH A PROVISION OF Driver, Msg
 `seatbelt requirement` MEANS
     PARTY driver
+    MUST note
+    WITHIN 5
+|]
+
+-- | A deontic rule whose party is a LIST of records, a group acting as one party
+-- (O4, review finding 2): the record with a @TYPICALLY@ is the list's element, so
+-- the party's own schema is an array, not an object.
+deonticListPartyJL4 :: Text
+deonticListPartyJL4 =
+  [i|
+DECLARE Crew HAS
+    id IS A NUMBER
+    shift IS A NUMBER TYPICALLY 1
+
+DECLARE Msg HAS
+    body IS A STRING
+
+@export default seatbelt requirement
+GIVEN crew IS A LIST OF Crew
+      note IS A Msg
+GIVETH A DEONTIC (LIST OF Crew) Msg
+`seatbelt requirement` MEANS
+    PARTY crew
     MUST note
     WITHIN 5
 |]

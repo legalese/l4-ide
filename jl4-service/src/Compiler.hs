@@ -476,7 +476,11 @@ exportToFunction declares implicitParams export =
 -- the rest). That is the decoder's to fix, not this schema's.
 eventRecordParameter :: Parameter -> Parameter
 eventRecordParameter p = case p.parameterProperties of
-  Nothing -> p -- an enumeration, a number, an opaque type: no fields to require
+  -- A party or action that is not a record has no fields to require: an
+  -- enumeration, a number, an opaque type. A list is written element by element
+  -- ('Backend.CodeGen.fnLiteralToL4Expr'), each record in it like a record in
+  -- any other list.
+  Nothing -> p { parameterItems = eventFieldParameter <$> p.parameterItems }
   Just fields -> p
     { parameterProperties = Just (Map.map eventFieldParameter fields)
     , parameterRequired = Just (Maybe.fromMaybe (Map.keys fields) p.parameterPropertyOrder)

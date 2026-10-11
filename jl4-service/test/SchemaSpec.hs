@@ -156,6 +156,16 @@ spec = do
         element.parameterRequired `shouldBe` Just ["Address"]
         (fieldOf "Address" element >>= (.parameterRequired)) `shouldBe` Just ["zip", "floor"]
 
+      it "writes the records of a party that is itself a list like a record in a list" do
+        let party = eventRecordParameter ((param "array") { parameterItems = Just address })
+            element = Maybe.fromJust party.parameterItems
+        element.parameterRequired `shouldBe` Just ["Address"]
+        (fieldOf "Address" element >>= (.parameterRequired)) `shouldBe` Just ["zip", "floor"]
+        (fieldOf "Address" element >>= fieldOf "floor" >>= (.parameterDefault)) `shouldBe` Nothing
+        -- a list of text has no fields to require
+        eventRecordParameter ((param "array") { parameterItems = Just (param "string") })
+          `shouldBe` (param "array") { parameterItems = Just (param "string") }
+
       it "leaves alone what is not a record" do
         let enum = (param "string") { parameterEnum = ["wear seatbelt", "drive"], parameterL4Type = Just "Driver Action" }
             stub = (param "object") { parameterL4Type = Just "Driver" }

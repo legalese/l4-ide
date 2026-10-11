@@ -64,7 +64,7 @@ import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4)
 import TestStoreDir (withStoreDir)
-import TestData (deonticEventRecordsJL4)
+import TestData (deonticEventRecordsJL4, deonticListPartyJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -4262,7 +4262,7 @@ spec = describe "integration" do
               , "startTime" Aeson..= (0 :: Int)
               , "events" Aeson..= [event]
               ]
-            written = exampleOf item
+            written = exampleOf [] item
         -- the example is the schema's own: every required field, the nested record under its name
         jsonAt ["party", "zhome", "Address"] written `shouldSatisfy` Maybe.isJust
         answered <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request written)
@@ -4271,6 +4271,33 @@ spec = describe "integration" do
         forM_ [["party", "licence"], ["action", "channel"], ["party", "zhome", "Address", "floor"], ["party", "name"]] \path -> do
           refused <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request (deleteAt path written))
           (path, statusCode' refused) `shouldBe` (path, 422)
+
+    -- Review finding 2: a party that is a LIST of records is an array, and the
+    -- records in it are written like a record in any other list.
+    it "describes a party that is a list of records like a record in a list" do
+      withServiceFromSources "ev-schema-list" [("crew.l4", deonticListPartyJL4)] \baseUrl mgr -> do
+        fnDoc <- getJson baseUrl mgr (functionPath "ev-schema-list")
+        item <- case typedEventItems fnDoc of
+          [i] -> pure i
+          other -> expectationFailure ("expected one typed events schema, got " <> show (length other)) >> pure Aeson.Null
+        let at path = jsonAt path item
+            crew = ["properties", "party", "items", "properties", "Crew"]
+        jsonAt ["properties", "party", "type"] item `shouldBe` Just (Aeson.String "array")
+        jsonTexts (at ["properties", "party", "items", "required"]) `shouldBe` Just ["Crew"]
+        jsonTexts (at (crew <> ["required"])) `shouldBe` Just ["id", "shift"]
+        hasKeyAnywhere "default" item `shouldBe` False
+        -- what the schema says is read, and is the crew the arguments gave
+        let event = exampleOf [(["party", "[]", "Crew", "id"], Aeson.Number 7), (["action", "body"], Aeson.String "hi")] item
+            request = Aeson.object
+              [ "arguments" Aeson..= Aeson.object
+                  [ "crew" Aeson..= [Aeson.object ["id" Aeson..= (7 :: Int)]]
+                  , "note" Aeson..= Aeson.object ["body" Aeson..= ("hi" :: Text)]
+                  ]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event]
+              ]
+        answered <- evalFunction baseUrl mgr "ev-schema-list" "seatbelt requirement" request
+        assertSuccess answered \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitString "FULFILLED")
 
   describe "state graphs" do
     it "returns empty list for a boolean-only module" do
@@ -6170,26 +6197,32 @@ typedEventItems = \case
   Aeson.Array xs -> concatMap typedEventItems (toList xs)
   _ -> []
 
--- | A value that satisfies a published schema: its required properties, filled in.
-exampleOf :: Aeson.Value -> Aeson.Value
-exampleOf schema = case jsonAt ["type"] schema of
-  Just (Aeson.String "object") ->
-    let props = case jsonAt ["properties"] schema of
-          Just (Aeson.Object o) -> o
-          _ -> mempty
-        required = Maybe.fromMaybe [] (jsonTexts (jsonAt ["required"] schema))
-    in Aeson.object
-         [ (Aeson.Key.fromText k, exampleOf v)
-         | k <- required
-         , Just v <- [Aeson.KeyMap.lookup (Aeson.Key.fromText k) props]
-         ]
-  Just (Aeson.String "string") -> case jsonAt ["enum"] schema of
-    Just (Aeson.Array es) | e : _ <- toList es -> e
-    _ -> Aeson.String "x"
-  Just (Aeson.String "number") -> Aeson.Number 1
-  Just (Aeson.String "boolean") -> Aeson.Bool True
-  Just (Aeson.String "array") -> Aeson.toJSON (maybe [] (\items -> [exampleOf items]) (jsonAt ["items"] schema))
-  _ -> Aeson.Null
+-- | A value that satisfies a published schema: its required properties, filled
+-- in. A value at a path (the property names down to it, @"[]"@ for an array's
+-- element) is taken from the overrides instead.
+exampleOf :: [([Text], Aeson.Value)] -> Aeson.Value -> Aeson.Value
+exampleOf overrides = go []
+ where
+  go path schema = case lookup path overrides of
+    Just v -> v
+    Nothing -> case jsonAt ["type"] schema of
+      Just (Aeson.String "object") ->
+        let props = case jsonAt ["properties"] schema of
+              Just (Aeson.Object o) -> o
+              _ -> mempty
+            required = Maybe.fromMaybe [] (jsonTexts (jsonAt ["required"] schema))
+        in Aeson.object
+             [ (Aeson.Key.fromText k, go (path <> [k]) v)
+             | k <- required
+             , Just v <- [Aeson.KeyMap.lookup (Aeson.Key.fromText k) props]
+             ]
+      Just (Aeson.String "string") -> case jsonAt ["enum"] schema of
+        Just (Aeson.Array es) | e : _ <- toList es -> e
+        _ -> Aeson.String "x"
+      Just (Aeson.String "number") -> Aeson.Number 1
+      Just (Aeson.String "boolean") -> Aeson.Bool True
+      Just (Aeson.String "array") -> Aeson.toJSON (maybe [] (\items -> [go (path <> ["[]"]) items]) (jsonAt ["items"] schema))
+      _ -> Aeson.Null
 
 -- | A JSON value without the key at the end of a path.
 deleteAt :: [Text] -> Aeson.Value -> Aeson.Value
