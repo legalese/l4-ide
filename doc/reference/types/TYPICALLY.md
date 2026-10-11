@@ -233,6 +233,26 @@ quiet choice:
   at all: its value always comes from the `MEANS`, so a default could never be
   used. That is a check error.
 
+## In rendered text: `l4 nlg` and `l4 render`
+
+Someone reading rendered text never sees the source.
+`` `scaled` where `base` is 10 and `rate` is 3 `` would tell that reader that the author stipulated the 3, when the author wrote only `scaled WITH base IS 10` and the 3 is the default declared on `rate`.
+So a value the checker added is marked as one:
+
+- **In a sentence**, `l4 nlg` and `l4 render` print `` `rate` is 3 by default ``.
+- **In a list of fields**, `l4 render` prints `- rate — 3 (by default)`. A rule whose whole body is the call, and a record construction, print this way.
+- **In a table**, `l4 render` prints `red (by default)` in each cell the checker filled in, and nothing in the cells the author wrote. A column that holds both is marked cell by cell.
+- **In the document JSON** (`l4 render --format json`), the mark is part of the text of the value, `"3 (by default)"`. No key was added, so the shape of the document is the same.
+
+A value you wrote is never marked, whatever it equals: `scaled WITH base IS 10, rate IS 3` prints `` `rate` is 3 ``.
+
+What the mark does and does not tell you:
+
+- **It covers a default added at a call that names its inputs, or at a construction.** Those are the two places where a call or a construction that the author wrote gets a value the author did not write.
+- **It does not cover a default taken at the root of a section `GIVEN`.** With `surcharge TYPICALLY 2` on a section `GIVEN`, `` `tax on` WITH amount IS 10 `` prints as `` `tax on` where `amount` is 10 is equal to 12 ``, and the 2 is not in the text. Written at the call, `surcharge IS 7` is printed.
+- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, and, under `hard`, one added at a call. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
+- **The words are English in `l4 render`, whatever `--lang` says.** `l4 nlg --lang he` prints `כברירת מחדל` from a draft entry in its table of Hebrew phrases, which no Hebrew-speaking lawyer has reviewed, and `l4 render` does not use that table yet ([the syntax reference](../syntax/README.md) says so).
+
 ## What the default must be
 
 A default is checked when it is written, and has to be a fixed value:

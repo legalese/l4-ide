@@ -229,11 +229,40 @@ That covers only daydate's own `YMD` and `Date`, only when all three arguments a
 Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
 A percentage reads `50%`.
 
+**A value the checker supplied is marked.**
+A call that names its inputs may leave out an input that has a [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out a field that has one.
+The checker fills the value in, and the text says so after it, because someone reading the text never sees the source and would otherwise take the value for one that was stipulated.
+``#ASSERT (scaled WITH base IS 10) EQUALS 30`` reads `` `scaled` where `base` is 10 and `rate` is 3 by default is equal to 30 ``, where `scaled WITH base IS 10, rate IS 3` reads the same without "by default".
+
+`l4 render` marks the value wherever it prints it.
+In a sentence it reads as above.
+A rule whose whole body is the call, and a record construction, print as a list of fields, and there the words follow the value in parentheses:
+
+```text
+- base — n
+- rate — 3 (by default)
+```
+
+A table marks each cell on its own, because one column can hold a default in one row and a value you wrote in the next:
+
+```text
+| coats | colour           |
+|-------|------------------|
+| 1     | red (by default) |
+| 2     | blue             |
+```
+
+The mark follows a value the checker added at a call or a construction, and nowhere else.
+It does not follow a default taken at the root of a [section `GIVEN`](section-given.md): for a rule that reads a section's `surcharge`, whose default is 2, ``#ASSERT (`tax on` WITH amount IS 10) EQUALS 12`` reads `` `tax on` where `amount` is 10 is equal to 12 ``, with nothing about the 2, while ``(`tax on` WITH amount IS 10, surcharge IS 7)`` prints the 7.
+So a value with no mark was not added at this call; it may still have used a default.
+The defaults an answer used are listed under `presumed` by `l4 batch` and the decision service, which [the `TYPICALLY` page](../types/TYPICALLY.md#in-rendered-text-l4-nlg-and-l4-render) explains.
+The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
+
 The words L4 itself puts around your sentences — "is equal to", "not", "with", a month's name — follow `--lang` in `l4 nlg`.
 For ``#EVAL `is large` 150 EQUALS TRUE`` over the rule above, `l4 nlg --lang he` prints ``150 עולה על הסף שווה ל־`TRUE` `` where `l4 nlg` prints ``the amount 150 is large is equal to `TRUE` ``.
 They come from a table of phrases, not a grammar, so the English word order stays: a Hebrew line is Hebrew words in the order English would put them.
 A word the table has no entry for stays English, and `l4 nlg` names it on stderr, so you can see what was not translated.
-The Hebrew table has not yet been reviewed by a Hebrew-speaking lawyer, and `l4 render` does not use it yet.
+The Hebrew table has not yet been reviewed by a Hebrew-speaking lawyer, and `l4 render` does not use it yet, so `l4 render --lang he` prints "by default" and "(by default)" in English where `l4 nlg --lang he` prints `כברירת מחדל`.
 Without `--lang`, nothing changes.
 
 In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
