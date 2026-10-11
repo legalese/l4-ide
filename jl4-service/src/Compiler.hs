@@ -21,6 +21,7 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Aeson as Aeson
 import Data.Aeson (toJSON)
 import Data.List (sortBy)
 import Data.Map.Strict (Map)
@@ -480,31 +481,55 @@ eventRecordParameter p = case p.parameterProperties of
   -- enumeration, a number, an opaque type. A list is written element by element
   -- ('Backend.CodeGen.fnLiteralToL4Expr'), each record in it like a record in
   -- any other list.
-  Nothing -> p { parameterItems = eventFieldParameter <$> p.parameterItems }
+  Nothing -> p { parameterItems = eventFieldParameter False <$> p.parameterItems }
   Just fields -> p
-    { parameterProperties = Just (Map.map eventFieldParameter fields)
+    { parameterProperties = Just (Map.mapWithKey (\name field -> eventFieldParameter (isMaybeField name field) field) fields)
     , parameterRequired = Just (Maybe.fromMaybe (Map.keys fields) p.parameterPropertyOrder)
     }
+ where
+  -- 'typeToParameter' publishes a @MAYBE x@ field as @x@, so the type is gone;
+  -- what is left is that the record's own @required@ omits it and it has no
+  -- default, or that its default is @NOTHING@ (a @null@). Any other @TYPICALLY@
+  -- is a literal ('L4.TypeCheck.isTypicallyLiteral') and is published, so a
+  -- field with neither is a @MAYBE@ without a default.
+  isMaybeField name field = case field.parameterDefault of
+    Just Aeson.Null -> True
+    Just _ -> False
+    Nothing -> name `notElem` Maybe.fromMaybe [] p.parameterRequired
 
 -- | A field of an event's record: no default, and a record written under its
--- constructor's name ('eventRecordParameter').
-eventFieldParameter :: Parameter -> Parameter
-eventFieldParameter field0 = case (field.parameterProperties, field.parameterL4Type) of
-  (Just _, Just constructor) ->
-    field
-      { parameterDescription =
-          let hint = "Written under its constructor's name: {\"" <> constructor <> "\": {...}}."
-              described = Text.strip field.parameterDescription
-           in if Text.null described then hint
-              else described <> (if "." `Text.isSuffixOf` described then " " else ". ") <> hint
-      , parameterProperties = Just (Map.singleton constructor (eventRecordParameter field) { parameterDescription = "" })
-      , parameterPropertyOrder = Just [constructor]
-      , parameterRequired = Just [constructor]
-      , parameterL4Type = Nothing
-      }
-  _ -> field { parameterItems = eventFieldParameter <$> field.parameterItems }
+-- constructor's name ('eventRecordParameter'). A @MAYBE@ field is told apart,
+-- because the one value the wrapper reads for every @MAYBE@ is @null@, which
+-- its published type (the inner one) does not admit; the description says so.
+-- A record in a @MAYBE@ is published plain, as the party itself is: the
+-- constructor-keyed form is not read there either (a type error, @MAYBE@
+-- against the record).
+eventFieldParameter :: Bool -> Parameter -> Parameter
+eventFieldParameter maybeField field0
+  | maybeField = describedWith "Optional in the rule (a MAYBE): write null, which is read as NOTHING." $
+      case field.parameterProperties of
+        Just _ -> eventRecordParameter field
+        Nothing -> inElements
+  | Just _ <- field.parameterProperties, Just constructor <- field.parameterL4Type =
+      describedWith ("Written under its constructor's name: {\"" <> constructor <> "\": {...}}.") field
+        { parameterProperties = Just (Map.singleton constructor (eventRecordParameter field) { parameterDescription = "" })
+        , parameterPropertyOrder = Just [constructor]
+        , parameterRequired = Just [constructor]
+        , parameterL4Type = Nothing
+        }
+  | otherwise = inElements
  where
   field = field0 { parameterDefault = Nothing }
+  inElements = field { parameterItems = eventFieldParameter False <$> field.parameterItems }
+
+-- | A parameter with a sentence added to its description.
+describedWith :: Text -> Parameter -> Parameter
+describedWith hint p =
+  let described = Text.strip p.parameterDescription
+   in p { parameterDescription =
+            if Text.null described then hint
+            else described <> (if "." `Text.isSuffixOf` described then " " else ". ") <> hint
+        }
 
 -- | Build Parameters from ExportedParam list.
 --

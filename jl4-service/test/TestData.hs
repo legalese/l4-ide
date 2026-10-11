@@ -99,6 +99,7 @@ module TestData (
   deonticDefaultJL4,
   deonticEventRecordsJL4,
   deonticListPartyJL4,
+  deonticMaybeFieldsJL4,
   spinJL4,
   spinOrRefuseJL4,
   spinWrapperJL4,
@@ -1395,6 +1396,33 @@ GIVEN crew IS A LIST OF Crew
 GIVETH A DEONTIC (LIST OF Crew) Msg
 `seatbelt requirement` MEANS
     PARTY crew
+    MUST note
+    WITHIN 5
+|]
+
+-- | A deontic rule whose party has @MAYBE@ fields, one of them a record (O4,
+-- review finding 8). An event writes each as @null@, which reads as @NOTHING@;
+-- the argument leaves them out, which does too, so the two parties are equal.
+deonticMaybeFieldsJL4 :: Text
+deonticMaybeFieldsJL4 =
+  [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+
+DECLARE Driver HAS
+    name IS A STRING
+    nickname IS A MAYBE STRING
+    zhome IS A MAYBE Address
+
+DECLARE Msg HAS
+    body IS A STRING
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+      note IS A Msg
+GIVETH A PROVISION OF Driver, Msg
+`seatbelt requirement` MEANS
+    PARTY driver
     MUST note
     WITHIN 5
 |]

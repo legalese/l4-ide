@@ -166,6 +166,29 @@ spec = do
         eventRecordParameter ((param "array") { parameterItems = Just (param "string") })
           `shouldBe` (param "array") { parameterItems = Just (param "string") }
 
+      it "tells a MAYBE field to be written as null, and leaves a record in it plain" do
+        -- 'typeToParameter' publishes MAYBE x as x: such a field is out of the
+        -- record's required list and has no default, or its default is null
+        let person = (record "Person"
+              [ ("name", param "string")
+              , ("nick", param "string")
+              , ("age", withDefault Aeson.Null (param "number"))
+              , ("licence", withDefault (Aeson.String "full") (param "string"))
+              , ("zhome", address)
+              ]) { parameterRequired = Just ["name"] }
+            event' = eventRecordParameter person
+            described name = fmap (.parameterDescription) (fieldOf name event')
+        event'.parameterRequired `shouldBe` Just ["name", "nick", "age", "licence", "zhome"]
+        described "nick" `shouldSatisfy` maybe False (Text.isInfixOf "write null")
+        described "age" `shouldSatisfy` maybe False (Text.isInfixOf "write null")
+        described "zhome" `shouldSatisfy` maybe False (Text.isInfixOf "write null")
+        described "name" `shouldBe` Just ""
+        described "licence" `shouldBe` Just ""
+        -- the record in the MAYBE is plain: no constructor wrapper, its fields all written
+        (fieldOf "zhome" event' >>= fieldOf "Address") `shouldBe` Nothing
+        (fieldOf "zhome" event' >>= (.parameterRequired)) `shouldBe` Just ["zip", "floor"]
+        (fieldOf "zhome" event' >>= fieldOf "floor" >>= (.parameterDefault)) `shouldBe` Nothing
+
       it "leaves alone what is not a record" do
         let enum = (param "string") { parameterEnum = ["wear seatbelt", "drive"], parameterL4Type = Just "Driver Action" }
             stub = (param "object") { parameterL4Type = Just "Driver" }
