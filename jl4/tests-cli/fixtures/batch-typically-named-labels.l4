@@ -1,9 +1,10 @@
 -- The name `presumed` gives a default taken at a named site is the rule's (or
--- record's) own name as its declaration writes it, whatever the site called it
--- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T6b, review m1, 2026-10-03). Three things used
--- to leak into it: an AKA alias, the section a rule is declared in, and a mixfix
--- rule's canonical pattern. `scaled` is called by its own name, by its alias and
--- by its section-qualified name; the answer lists it once, as `scaled`.
+-- record's) own name as its declaration writes it, behind the section it is
+-- declared in, whatever the site called it (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T6b,
+-- review m1, 2026-10-03; the section, overnight card O6, 2026-10-11). Two
+-- things used to leak into it: an AKA alias and a mixfix rule's canonical
+-- pattern. `scaled` is called by its own name, by its alias and by its
+-- section-qualified name; the answer lists it once, as `Pricing.scaled`.
 
 § `Pricing`
 

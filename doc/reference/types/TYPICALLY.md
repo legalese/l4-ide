@@ -200,10 +200,16 @@ govern what counts as leaving a fact out:
   them. The same is true of a default a `WITH` call or a construction _inside_
   the rules takes (see above): neither mode withdraws it, because no case could
   have supplied it. The answer lists it under `presumed` as
-  `WITH <rule>: <input>` (for example `WITH scaled: rate`, or
-  `WITH Config: timeout` for a field), naming the rule or record as its
-  declaration writes it, and only if the answer actually used it, under `soft`
-  as well as under `hard`. So `presumed` has more than one shape: a fact's name
+  `WITH <rule>: <input>`, naming the rule or record as its declaration writes
+  it, behind the section it is declared in: `WITH Pricing.scaled: rate`, or
+  `WITH Pricing.Config: timeout` for a field, for a rule and a record in
+  `§ Pricing`, and `WITH scaled: rate` for a rule at the top of the file, which
+  has no section to name. Two rules of one name in different sections are two
+  entries. The answer lists it only if it actually used the default, under
+  `soft` as well as under `hard`. Two cases still give one entry, because
+  there is no section to tell them apart by: top-level rules of one name in two
+  imported files, and rules of one name declared in two `WHERE`s. So
+  `presumed` has more than one shape: a fact's name
   or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and
   `JSONDECODE <type>: <field>`. An entry that starts `WITH ` or
   `JSONDECODE ` is a usual value the rules took, not a fact the case left out.

@@ -1,0 +1,15 @@
+-- The limit of naming a default's owner behind its heading (overnight card O6,
+-- 2026-10-11): a rule declared at the top of a file has no heading to name, and
+-- a call cannot say which file's `scaled` it means, so two imported files that
+-- each declare one give a single entry. The rows answer 30, 50 and 80, and
+-- every one lists `WITH scaled: rate`.
+
+IMPORT `batch-typically-collide-import-a`
+IMPORT `batch-typically-collide-import-b`
+
+@export default Combine
+GIVEN n IS A NUMBER
+      one IS A BOOLEAN
+      two IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS (IF one THEN useOne n ELSE 0) PLUS (IF two THEN useTwo n ELSE 0)

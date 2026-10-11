@@ -243,6 +243,19 @@ batchTyLabels, batchTyLabelsJson :: FilePath
 batchTyLabels     = fixtureDir </> "batch-typically-named-labels.l4"
 batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 
+-- | Two declarations of one name, each with a @TYPICALLY@ default, under
+-- different headings (rules, then records), and the two cases a heading cannot
+-- tell apart: top-level rules of two imported files, and @WHERE@ locals.
+batchTyCollideSections, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
+batchTyCollideSections = fixtureDir </> "batch-typically-collide-sections.l4"
+batchTyCollideRecords  = fixtureDir </> "batch-typically-collide-records.l4"
+batchTyCollideImport   = fixtureDir </> "batch-typically-collide-import.l4"
+batchTyCollideImportA  = fixtureDir </> "batch-typically-collide-import-a.l4"
+batchTyCollideImportB  = fixtureDir </> "batch-typically-collide-import-b.l4"
+batchTyCollideWhere    = fixtureDir </> "batch-typically-collide-where.l4"
+batchTyCollideJson     = fixtureDir </> "batch-typically-collide.json"
+batchTyCollideRowsJson = fixtureDir </> "batch-typically-collide-rows.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -444,6 +457,8 @@ coreFixtures =
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
+  , batchTyCollideSections, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
+  , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -1984,10 +1999,11 @@ spec bin = do
 
   -- Review m1, 2026-10-03: the entry named the rule by whatever the callee's
   -- resolved name carried, so an AKA alias, the section a rule is declared in
-  -- and a mixfix rule's canonical pattern all leaked into it, and none of the
-  -- documentation's examples (`WITH scaled: rate`) matched a client's parse.
-  describe "l4 batch: a default taken at a named site is listed under the rule's own name" $ do
-    it "names the rule and the record as declared: not an alias, not a section path, not a mixfix pattern" $ do
+  -- and a mixfix rule's canonical pattern all leaked into it. Overnight card O6
+  -- (Meng, 2026-10-11): the name is the declaration's own, behind the headings
+  -- it is declared under, whatever the site called it.
+  describe "l4 batch: a default taken at a named site is listed under the declaration's own name" $ do
+    it "names the rule and the record behind their section: not an alias, not a mixfix pattern" $ do
       Output code sout _ <-
         runL4 bin [ "batch", batchTyLabels, "--inputs", batchTyLabelsJson
                   , "--presumption", "hard", "--format", "json" ]
@@ -1995,7 +2011,52 @@ spec bin = do
       rows <- decodeArray sout
       map resultAndPresumed rows `shouldBe`
         [ ( Just (Number 140)
-          , presumedOf ["WITH scaled: rate", "WITH scaled by: factor", "WITH Config: timeout"] )
+          , presumedOf ["WITH Pricing.scaled: rate", "WITH Pricing.scaled by: factor", "WITH Pricing.Config: timeout"] )
+        ]
+
+  -- Overnight card O6, 2026-10-11. Before, the entry named a rule by its bare
+  -- name, so two rules of one name in different sections gave one entry for
+  -- three answers (30, 50, 80): the row that rests on two defaults listed one.
+  -- Naming the section tells them apart. It cannot for a rule at the top of a
+  -- file, which has no heading, or for a local of a WHERE: the last two tests
+  -- pin that these still give one entry, so the pages that state the limit
+  -- stay true.
+  describe "l4 batch: two declarations of one name in different sections give two entries" $ do
+    let rowsOf file json = do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", json, "--format", "json"]
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+
+    it "tells apart two rules of one name in sibling sections" $ do
+      rows <- rowsOf batchTyCollideSections batchTyCollideJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH Alpha.scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH Beta.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH Alpha.scaled: rate", "WITH Beta.scaled: rate"])
+        ]
+
+    it "tells apart two records of one name in sibling sections" $ do
+      rows <- rowsOf batchTyCollideRecords batchTyCollideJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH Alpha.Config: timeout"])
+        , (Just (Number 60), presumedOf ["WITH Beta.Config: timeout"])
+        , (Just (Number 90), presumedOf ["WITH Alpha.Config: timeout", "WITH Beta.Config: timeout"])
+        ]
+
+    it "still gives one entry for top-level rules of one name in two imported files" $ do
+      rows <- rowsOf batchTyCollideImport batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH scaled: rate"])
+        ]
+
+    it "still gives one entry for two WHERE locals of one name" $ do
+      rows <- rowsOf batchTyCollideWhere batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH scaled: rate"])
         ]
 
   describe "l4 trace (output path safety)" $ do

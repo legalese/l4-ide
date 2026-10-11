@@ -1042,10 +1042,13 @@ lookupByCanonicalName cn reg = fromMaybe [] $ Map.lookup cn reg.byCanonicalName
 data InputDefault = MkInputDefault
   { owner      :: !Name
     -- ^ The rule or record constructor that declares the input or field, named
-    -- as its declaration writes it: not an @AKA@ alias, not section-qualified,
-    -- and a mixfix rule by the name it is declared with. This is the name the
-    -- evaluator's report gives for the default ('L4.Syntax.DefaultFill'), so it
-    -- must not depend on how a site spelled the callee.
+    -- as its declaration writes it, behind the headings it is declared under
+    -- (@Pricing.scaled@; 'L4.TypeCheck.qualifiedOwner'): not an @AKA@ alias, and
+    -- a mixfix rule by the name it is declared with. A rule declared at the top
+    -- of a file, or in a @WHERE@ or @LET@, has no heading to name and stays
+    -- bare. This is the name the evaluator's report gives for the default
+    -- ('L4.Syntax.DefaultFill'), so it must not depend on how a site spelled
+    -- the callee.
   , binder     :: !Name
     -- ^ The input or field, as declared.
   , declaredAt :: !(Maybe SrcRange)

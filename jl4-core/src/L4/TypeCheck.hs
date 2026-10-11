@@ -420,7 +420,8 @@ checkProgram written = do
   withDeclares rdeclares do
     module' <- separateOverloads written
     rdecides <- scanFunSigModule module'
-    withDecides rdecides do
+    paths <- use #sectionPaths
+    withDecides paths rdecides do
       (rprog, topEnv) <- withCheckedFieldDefaults module' (inferProgram module')
       -- Build the mixfix registry from THIS module's function signatures
       -- so it can be propagated to importing modules
@@ -507,15 +508,40 @@ separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
     -- head, with any @\@nlg@ above it, and its @AKA@ come with the clause.
     clauseAnno cl b = maybe id setDesc (pickDesc cl.clauseDescs) (rangedAnno (clauseSpan cl b))
 
-withDecides :: [FunTypeSig] -> Check a -> Check a
-withDecides rdecides =
+-- | @paths@ is the 'SectionPaths' the rules' defaults are named with
+-- ('functionInputDefaults'): the module's own for its top-level rules, and
+-- none for the rules of a @WHERE@ or @LET@.
+withDecides :: SectionPaths -> [FunTypeSig] -> Check a -> Check a
+withDecides paths rdecides =
   extendKnownGlobalMany topDecides . local \s -> s
     { functionTypeSigs = Map.fromList $ mapMaybe (\d -> (,d) <$> rangeOf d.anno) rdecides
     , mixfixRegistry = unionMixfixRegistry (buildMixfixRegistry rdecides) s.mixfixRegistry
-    , visibleInputDefaults = Map.union (functionInputDefaults rdecides) s.visibleInputDefaults
+    , visibleInputDefaults = Map.union (functionInputDefaults paths rdecides) s.visibleInputDefaults
     }
   where
     topDecides = fmap (.name) rdecides
+
+-- | A rule's or record's own name behind the headings it is declared under, as
+-- the owner of a default is named in the evaluator's @presumed@ report:
+-- @Pricing.scaled@ for a @scaled@ in @§ Pricing@, and @A.B.scaled@ two sections
+-- down. It is the spelling an ambiguity error gives the same declaration
+-- ('sectionQualifiedWith'), so two declarations of one name under different
+-- headings are told apart. Declared outside any heading, or already
+-- qualified, the name is left as it is (card O6 of the overnight bench).
+qualifiedOwner :: [Text] -> Name -> Name
+qualifiedOwner heads n = case (rawName n, nonEmpty heads) of
+  (NormalName t, Just qual) -> MkName (getAnno n) (QualifiedName qual t)
+  _                         -> n
+
+-- | The headings a declaration was registered under, innermost last, by its
+-- 'Unique'. The same text 'sectionQualifiedWith' reads.
+headingsOf :: SectionPaths -> Resolved -> [Text]
+headingsOf paths r = NE.head <$> Map.findWithDefault [] (getUnique r) paths
+
+-- | The heading a section is pushed onto the 'sectionStack' under
+-- ('withSectionStack'): its own name, not its @AKA@ aliases.
+headingText :: Name -> Text
+headingText = rawNameToText . rawName
 
 -- | The @TYPICALLY@ defaults of the rule inputs these signatures declare, for
 -- the named applications that leave one out (W4). The default is the checked
@@ -525,14 +551,17 @@ withDecides rdecides =
 --
 -- Keyed by every name the rule is known by, because they share one 'Unique'
 -- ('withQualified', the mixfix canonical alias).
-functionInputDefaults :: [FunTypeSig] -> InputDefaults
-functionInputDefaults sigs = Map.fromList
+--
+-- Each default carries its rule's name behind the headings the rule is
+-- declared under, read from @paths@ ('qualifiedOwner').
+functionInputDefaults :: SectionPaths -> [FunTypeSig] -> InputDefaults
+functionInputDefaults paths sigs = Map.fromList
   [ (getUnique r, defaults)
   | sig <- sigs
   , let MkTypeSig _ (MkGivenSig _ otns) _ = sig.rtysig
         MkAppForm _ ownerRef _ _ = sig.rappForm
         defaults = Map.fromList
-          [ (getUnique n, MkInputDefault { owner = getOriginal ownerRef, binder = getOriginal n, declaredAt = rangeOf d, value = d })
+          [ (getUnique n, MkInputDefault { owner = qualifiedOwner (headingsOf paths ownerRef) (getOriginal ownerRef), binder = getOriginal n, declaredAt = rangeOf d, value = d })
           | MkOptionallyTypedName _ n _ (Just d) <- otns
           ]
   , not (Map.null defaults)
@@ -830,28 +859,32 @@ inferDeclare (MkDeclare ann _tysig appForm _t) =
 -- 'inferDeclare' did; 'inferDeclare' now only reads the result.
 withCheckedFieldDefaults :: Module Name -> Check a -> Check a
 withCheckedFieldDefaults m act = do
-  checked <- for (declaresOf m) \ (MkDeclare ann _ appForm t) -> do
+  checked <- for (declaresOf m) \ (heads, MkDeclare ann _ appForm t) -> do
     dc <- lookupDeclareCheckedByAnno ann
     payload <-
       prune $ errorContext (WhileCheckingDeclare (getName appForm)) $
         checkFieldDefaults t dc.payload
-    pure (ann, MkDeclChecked payload dc.publicNames)
+    pure (heads, ann, MkDeclChecked payload dc.publicNames)
   local
     (\ s -> s
       { declareDeclarations =
           Map.union
-            (Map.fromList [ (r, dc) | (ann, dc) <- checked, Just r <- [rangeOf ann] ])
+            (Map.fromList [ (r, dc) | (_, ann, dc) <- checked, Just r <- [rangeOf ann] ])
             s.declareDeclarations
       , visibleInputDefaults =
-          Map.union (foldMap (recordInputDefaults . (.payload) . snd) checked) s.visibleInputDefaults
+          Map.union (foldMap (\ (heads, _, dc) -> recordInputDefaults heads dc.payload) checked) s.visibleInputDefaults
       })
     act
  where
-  declaresOf (MkModule _ _ sect) = fromSection sect
-  fromSection (MkSection _ _ _ _ decls) = concatMap fromDecl decls
-  fromDecl = \ case
-    Declare _ d -> [d]
-    Section _ s -> fromSection s
+  -- Each record with the headings it is declared under. A record constructor
+  -- is deliberately not recorded in 'sectionPaths' ('addQualifiedAliases'), so
+  -- the headings are carried down the sections here.
+  declaresOf (MkModule _ _ sect) = fromSection [] sect
+  fromSection heads (MkSection _ mname _ _ decls) =
+    concatMap (fromDecl (heads <> foldMap (pure . headingText) mname)) decls
+  fromDecl heads = \ case
+    Declare _ d -> [(heads, d)]
+    Section _ s -> fromSection heads s
     _           -> []
 
 -- | The @TYPICALLY@ defaults a checked module declares, for the modules that
@@ -864,19 +897,21 @@ withCheckedFieldDefaults m act = do
 -- takes only zonked input). Nothing reads a default's type: it is the declared
 -- type of the input, and the application that takes it is checked against that.
 moduleInputDefaults :: Module Resolved -> InputDefaults
-moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection sect)
+moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection [] sect)
  where
-  fromSection (MkSection _ _ _ _ decls) = Map.unions (map fromDecl decls)
-  fromDecl = \ case
+  -- The headings are carried down the sections, as in 'withCheckedFieldDefaults'.
+  fromSection heads (MkSection _ mname _ _ decls) =
+    Map.unions (map (fromDecl (heads <> foldMap (pure . headingText . getOriginal) mname)) decls)
+  fromDecl heads = \ case
     Decide _ (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n _ _) _)
       | not (Map.null ds) -> Map.singleton (getUnique n) ds
       where
         ds = Map.fromList
-          [ (getUnique bn, MkInputDefault { owner = getOriginal n, binder = getOriginal bn, declaredAt = rangeOf d, value = d })
+          [ (getUnique bn, MkInputDefault { owner = qualifiedOwner heads (getOriginal n), binder = getOriginal bn, declaredAt = rangeOf d, value = d })
           | MkOptionallyTypedName _ bn _ (Just d) <- otns
           ]
-    Declare _ d -> recordInputDefaults d
-    Section _ s -> fromSection s
+    Declare _ d -> recordInputDefaults heads d
+    Section _ s -> fromSection heads s
     _           -> Map.empty
   untyped d =
     MkInputDefault
@@ -894,13 +929,13 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
 -- construction); the payload of an enum constructor is the same mechanism and
 -- could be opened with it, but nobody has asked, and what is not ruled stays
 -- loud. Assumed, not ruled.
-recordInputDefaults :: Declare Resolved -> InputDefaults
-recordInputDefaults = \ case
+recordInputDefaults :: [Text] -> Declare Resolved -> InputDefaults
+recordInputDefaults heads = \ case
   MkDeclare _ _ _ (RecordDecl _ (Just con) tns)
     | not (Map.null ds) -> Map.singleton (getUnique con) ds
     where
       ds = Map.fromList
-        [ (getUnique fn, MkInputDefault { owner = getOriginal con, binder = getOriginal fn, declaredAt = rangeOf d, value = d })
+        [ (getUnique fn, MkInputDefault { owner = qualifiedOwner heads (getOriginal con), binder = getOriginal fn, declaredAt = rangeOf d, value = d })
         | MkTypedName _ fn _ (Just d) _ <- tns
         ]
   _ -> Map.empty
@@ -2685,7 +2720,7 @@ checkExpr ec (Where ann e ds) t = softprune $ do
 
   (rds, extends, mixfixAdds, defaultsAdds) <- withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \rdecides -> do
     (rds, extends) <- unzip <$> traverse (firstM nlgLocalDecl <=< inferLocalDecl) ds
-    pure (rds, extends, buildMixfixRegistry rdecides, functionInputDefaults rdecides)
+    pure (rds, extends, buildMixfixRegistry rdecides, functionInputDefaults Map.empty rdecides)
   re <- withExtraInputDefaults defaultsAdds $ withExtraMixfix mixfixAdds do
     let knownExtends = dedupCheckInfos (concat extends)
     re <- extendKnownMany knownExtends do
@@ -2705,7 +2740,7 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
 
   (rds, extends, mixfixAdds, defaultsAdds) <- withScanTypeAndSigEnvironment preScanDecl scanDecl scanFuns ds \rdecides -> do
     (rds, extends) <- unzip <$> traverse (firstM nlgLocalDecl <=< inferLocalDecl) ds
-    pure (rds, extends, buildMixfixRegistry rdecides, functionInputDefaults rdecides)
+    pure (rds, extends, buildMixfixRegistry rdecides, functionInputDefaults Map.empty rdecides)
   re <- withExtraInputDefaults defaultsAdds $ withExtraMixfix mixfixAdds $
     extendKnownMany (dedupCheckInfos (concat extends)) do
       re <- checkExpr ec e t
@@ -6186,7 +6221,9 @@ withScanTypeAndSigEnvironment preScanDecls scanDecl scanTySig a act = do
   rdeclares <- scanDeclares preScanDecls scanDecl a
   withDeclares rdeclares do
     rdecides <- scanTySig a
-    withDecides rdecides $ do
+    -- A rule declared in a WHERE or a LET is local, and named bare in
+    -- @presumed@: it has no section of its own to name it by.
+    withDecides Map.empty rdecides $ do
       act rdecides
 
 -- | @'withQualified' rs ce@ takes a list of 'Resolved' names and creates

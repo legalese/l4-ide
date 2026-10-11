@@ -1,0 +1,28 @@
+-- Two rules of one name, each with a TYPICALLY default, in sibling sections.
+-- The entry `presumed` gives for a default names the rule behind the heading it
+-- is declared under, so the three rows (Alpha's rate 3, Beta's rate 5, both)
+-- list `Alpha.scaled`, `Beta.scaled` and both, instead of one `scaled` for all
+-- three (overnight card O6, 2026-10-11). The exported rule is at the top level
+-- so that it has no heading of its own.
+
+@export default Combine
+GIVEN useAlpha IS A BOOLEAN
+      useBeta  IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS
+  (IF useAlpha THEN `Alpha`.scaled WITH base IS 10 ELSE 0)
+    PLUS (IF useBeta THEN `Beta`.scaled WITH base IS 10 ELSE 0)
+
+§ `Alpha`
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+§ `Beta`
+
+GIVEN rate IS A NUMBER TYPICALLY 5
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base

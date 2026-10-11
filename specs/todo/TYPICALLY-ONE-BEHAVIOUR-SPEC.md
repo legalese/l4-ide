@@ -317,7 +317,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
 - **p10's message (L4).** A default naming something that is not in scope is reported once, as that: `checkTypically` no longer raises "must be a literal" for an `OutOfScope` reference, on a field or on a rule's input (`not-ok/tc/typically-unresolved.l4`).
 - **T4 and T4b.** A default taken at a named site or a construction is inside the rules, where no request can supply the value, so presumption does not withdraw it: `--presumption hard` and `"presumption": "hard"` take it as soft does, and in either mode the answer says it rests on it (below).
 - **T6 and T6b.** Each default taken at a named site or a construction raises W8's event itself.
-  It is listed in `presumed` in both modes as `WITH rule: input` (`WITH scaled: rate`) or, for a record, `WITH Config: timeout`, with the rule or record named as its declaration writes it (not an `AKA` alias, not section-qualified, a mixfix rule by its declared name), only if it was forced, on `l4 batch`, on the service's direct and wrapper path, and over MCP, which always evaluates soft.
+  It is listed in `presumed` in both modes as `WITH rule: input` (`WITH scaled: rate`) or, for a record, `WITH Config: timeout`, with the rule or record named as its declaration writes it (not an `AKA` alias; behind the section it is declared in, `WITH Pricing.scaled: rate`, and bare for a rule at the top of a file or in a `WHERE`; a mixfix rule by its declared name), only if it was forced, on `l4 batch`, on the service's direct and wrapper path, and over MCP, which always evaluates soft.
   The `WITH rule:` prefix is what keeps the entry from being read as an input of the request, which is how T6b's "whose binder or JSON path is part of the request" is read for these sites (below).
   A rule's own `JSONDECODE` is listed the same way, as `JSONDECODE T: field`, in both modes (O1 condition 3, DECODERRING).
   The request's own input of the same spelling is never listed for it (the batch and service fixtures name the exported rule's input `rate` on purpose).
@@ -365,12 +365,13 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   _Alternative:_ show the added argument as a plain one, or hide it.
 
 - **The owner in a `presumed` entry is the rule's or record's own name as its declaration writes it, not section-qualified.**
-  `WITH Pricing.scaled: rate` and `WITH rescaled: rate` (an `AKA` alias) both leaked from the callee's resolved name; the entry now carries the owner with the default (`InputDefault.owner`), so it does not depend on how a site spelled the callee, or on an `IMPORT`.
-  _Alternative:_ section-qualified, `WITH Pricing.scaled: rate`, which tells two same-named rules in different sections apart.
-  _Two limits, for the card on the `presumed` surface (review rulings R2-3, advisor D4)._
-  Two rules or records of one name in different sections give one entry: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) all list `WITH scaled: rate` under hard, so a row that rests on two defaults lists one and nothing says which default either was.
+  `WITH rescaled: rate` (an `AKA` alias) leaked from the callee's resolved name; the entry now carries the owner with the default (`InputDefault.owner`), so it does not depend on how a site spelled the callee, or on an `IMPORT`.
+  The owner is named behind the section it is declared in, `WITH Pricing.scaled: rate` (`TypeCheck.qualifiedOwner`), which tells two same-named rules or records in different sections apart: rows taking `` `A`.scaled ``'s `rate` (3), `` `B`.scaled ``'s (5) and both (8) list `WITH A.scaled: rate`, `WITH B.scaled: rate` and both.
+  A rule at the top of a file has no section to name, and a rule declared in a `WHERE` or `LET` is kept bare.
+  _Two limits remain, for the card on the `presumed` surface (review rulings R2-3, advisor D4)._
+  Top-level rules of one name in two imported files give one entry (a call cannot say which file's `scaled` it means, so there is nothing to put in front), and so do two `WHERE` locals of one name: a row that rests on two defaults lists one, and nothing says which default either was.
   And `presumed` now has three string shapes, `rate`, `JSONDECODE T: path` and `WITH scaled: rate`, which a client tells apart by prefix; T4b asks for the mark "with its declaration line", and a structured entry (origin, owner, path, declaration line) would carry it, but is a change of the wire.
-  Neither is changed overnight.
+  Neither is changed.
 
 **Assumed, not ruled** (no one outside the code would notice, or the text is new):
 

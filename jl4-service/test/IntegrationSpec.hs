@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, refuseNamedDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, refuseNamedDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -706,6 +706,20 @@ spec = describe "integration" do
         skippedSoft <- evalFunction baseUrl mgr "ty-named" "combine"
           (args ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
         expectAnswer skippedSoft (FnLitInt 0) []
+
+    -- Overnight card O6 (Meng, 2026-10-11): two rules of one name in different
+    -- sections are told apart in the entry, so the answer that rests on both
+    -- lists both. Before, all three answers listed one `WITH scaled: rate`.
+    it "names two rules of one name behind their sections" do
+      withServiceFromSources "ty-collide" [("combine.l4", collideSectionsJL4)] \baseUrl mgr -> do
+        let run a b = evalFunction baseUrl mgr "ty-collide" "combine"
+              (hard ["use alpha" Aeson..= (a :: Bool), "use beta" Aeson..= (b :: Bool)])
+        alpha <- run True False
+        expectAnswer alpha (FnLitInt 30) ["WITH Alpha.scaled: rate"]
+        beta <- run False True
+        expectAnswer beta (FnLitInt 50) ["WITH Beta.scaled: rate"]
+        both <- run True True
+        expectAnswer both (FnLitInt 80) ["WITH Alpha.scaled: rate", "WITH Beta.scaled: rate"]
 
     -- MCP tools always evaluate soft (McpServer.runMcpEvaluationIO), so this
     -- is the only way a tool-calling client is told that an answer rests on a

@@ -36,6 +36,7 @@ module TestData (
   ruleDefaultJL4,
   namedSiteDefaultJL4,
   constructorNamedDefaultJL4,
+  collideSectionsJL4,
   recordDefaultJL4,
   maybeHardJL4,
   sectionSecondJL4,
@@ -919,6 +920,35 @@ GIVETH A BOOLEAN
 DECIDE eligible IF
   IF `is resident` THEN age >= 18
   ELSE REFUSE "cannot decide for a non-resident"
+|]
+
+-- | Two rules of one name in sibling sections, each with a @TYPICALLY@ default:
+-- the entry @presumed@ gives names each behind its section (overnight card O6),
+-- so the answer that rests on both lists both.
+collideSectionsJL4 :: Text
+collideSectionsJL4 =
+  [i|
+@export default combine
+GIVEN `use alpha` IS A BOOLEAN
+      `use beta` IS A BOOLEAN
+GIVETH A NUMBER
+combine MEANS
+  (IF `use alpha` THEN `Alpha`.scaled WITH base IS 10 ELSE 0)
+    PLUS (IF `use beta` THEN `Beta`.scaled WITH base IS 10 ELSE 0)
+
+§ `Alpha`
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+§ `Beta`
+
+GIVEN rate IS A NUMBER TYPICALLY 5
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
 |]
 
 -- | A refusal that rests on a default the RULES took at a named site (overnight
