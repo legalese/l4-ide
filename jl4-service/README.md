@@ -254,6 +254,8 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 # {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
 ```
 
+**Not in an event's record.** A deontic function's events are not decoded like its arguments, so the party and action records of an event take no default and are not published with one: see [An event's party and action](#an-events-party-and-action).
+
 **`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
 
 **Absent with no default, or `null`.**
@@ -365,6 +367,42 @@ So a client can ask whether the party who acted is the party who was obliged by 
 The name is the identifier the rule uses, not the party it stands for: a party written as a `GIVEN` input or as a `MEANS` definition answers with that identifier until an event has been compared with it, so the comparison is still false there.
 Rule source stays L4, backticks included: an action that carries a value, such as `say "pay\nnow"`, an action given by a `GIVEN` input, the reasoning tree of a trace, the graphviz source, the state graph, and a `RAND` or `ROR` operand the evaluation has not reached yet.
 Escapes in that source are the ones the Trace Output section describes.
+
+#### An event's party and action
+
+An event's `party` and `action` are values of the two types the function's `DEONTIC` result names, and the function's schema describes them.
+When one is a record, **every field of it is written, whether or not the field has a `TYPICALLY` default.**
+An argument record is decoded from JSON, so it may leave a defaulted field out; an event is not decoded, the service writes it into the generated wrapper as source text, and there is no default for it to take.
+The schema says so: each field of an event's `party` and `action` is under `required`, and none carries a `default`.
+A request that leaves a field out is refused with `422`, in both `"presumption"` modes.
+
+**A record inside an event's record is written under its constructor's name**, and so is each record in a list.
+The party or action record itself is written plainly.
+For a `Driver` whose `zhome` is an `Address`:
+
+```json
+{
+  "party": {
+    "name": "Alice",
+    "zhome": { "Address": { "zip": 5, "floor": 2 } }
+  },
+  "action": "wear seatbelt",
+  "at": 1
+}
+```
+
+The plain form an argument takes, `"zhome": { "zip": 5, "floor": 2 }`, is refused.
+The schema describes the form the service reads.
+
+**What the service cannot yet read in an event's record.**
+Measured on 2026-10-11 at `72044c7b9`, and refused with `422` and a type-check message each time; the schema describes these fields as ordinary ones, so a client that follows it can meet them:
+
+- A field of text type works directly in the party or action, but not inside a record nested in it; a field of an enumeration type is the other way round.
+- A `MAYBE` field is written as `null` (it is `NOTHING`); a value for it is refused.
+- The service writes a record's fields in the sorted order of their JSON keys, whatever order the request wrote them in, and a record nested in another takes every field written after it. So a nested record has to be the last of its parent's fields in that order: a record with a field whose name sorts after the nested record's is refused.
+
+Fields of number or boolean type, lists of text or numbers, a record nested in a record, and a list of records were tried, and are read.
+Other types were not tried.
 
 ### Batch Evaluation
 
