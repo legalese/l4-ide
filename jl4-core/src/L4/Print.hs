@@ -714,6 +714,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
         [ "@desc" <+> pretty (Text.strip (getDesc d))
         | Just d <- [Optics.view annDesc ann]
         ]
+        -- The same for @nonassertable: a printed module must keep the mark,
+        -- or a re-print (l4 batch, the REPL) would let a request assert a
+        -- node its author closed.
+        <> [ "@nonassertable"
+           | Just _ <- [Optics.view annNonassertable ann]
+           ]
         <> case writtenClauses ann appForm expr of
           -- A multi-clause group prints as the clauses the drafter wrote. Its
           -- tree is what they compile to, and that names things the desugarer

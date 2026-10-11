@@ -13,6 +13,12 @@ module L4.Parser.ResolveAnnotation (
   FixityS(..),
   FixityWarning(..),
   FixityWithSpan,
+  HasNonassertable(..),
+  addNonassertableCommentsToAst,
+  renderNonassertableWarning,
+  NonassertableS(..),
+  NonassertableWarning(..),
+  NonassertableWithSpan,
   HasRef(..),
   addRefCommentsToAst,
   -- * Annotate Syntax Nodes with definite 'SrcSpan's.
@@ -83,6 +89,18 @@ data Warning
     -- directly above a binary operator definition; it is ignored.
   | FixityAnnotationNoLocation Fixity
     -- ^ A fixity annotation had no source location. That's a bug.
+  | NonassertableAnnotationMisplaced NonassertableWithSpan
+    -- ^ An @\@nonassertable@ sits inside a definition's body (after its name
+    -- line, a WHERE local included), or after the last construct, so no
+    -- definition claims it.
+  | NonassertableAnnotationSameLine NonassertableWithSpan
+    -- ^ An @\@nonassertable@ is on the same line as the construct before it
+    -- (at the end of a definition's line), so nothing carries it.
+  | NonassertableAnnotationSuperseded NonassertableWithSpan
+    -- ^ Two or more marks sit above one construct; this is one of the
+    -- earlier ones, and the closest attaches.
+  | NonassertableAnnotationNoLocation Nonassertable
+    -- ^ An @\@nonassertable@ had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -2553,3 +2571,176 @@ Violation of this assumption would lead to bugs, and care must be taken to
 traverse the AST correctly. For example, when dealing with class declarations,
 we have to use 'flattenBindsAndSigs' to traverse it in the correct order.
 -}
+
+-- ----------------------------------------------------------------------------
+-- @nonassertable attachment
+-- ----------------------------------------------------------------------------
+
+-- A mark is attached to the nearest following top-level or section-level
+-- construct, whatever it is: a definition honours it, and the typechecker
+-- reports it on anything else ('L4.TypeCheck', NonassertableOnNonDefinition),
+-- so a misplaced one is loud rather than a warning CI never sees.
+--
+-- Where "above a definition" ends: at the definition's NAME line. A definition
+-- with a GIVEN or GIVETH starts there, and a mark written between the GIVETH
+-- and the MEANS is still above the name, so it counts (the fixity pass, which
+-- this one was modelled on, treats that span as interior; for this mark that
+-- would drop it with a warning). A mark after the name line is inside the body
+-- and is a parser warning, as is one on the same line as the construct before
+-- it (lineAnno takes the rest of the line, so such a mark would otherwise land
+-- on the NEXT definition in silence), and one after the last construct.
+--
+-- A section claims the marks above its heading and up to the end of its own
+-- GIVEN, on its own Anno, which the typechecker rejects: a section is not a
+-- named step, and letting such a mark pass to the first definition below
+-- would close a node its author did not name (review of 55249fc4c).
+--
+-- WHERE locals are not reached by this pass (PRESUMPTION-ASSERTION contract
+-- §6 allows the mark on them; that half lands with the assertion slice), so a
+-- mark inside a WHERE is reported as misplaced, and the warning says so.
+
+type NonassertableWithSpan = WithSpan Nonassertable
+
+data NonassertableWarning
+  = NonassertableMissingLocation Nonassertable
+  | NonassertableMisplaced NonassertableWithSpan
+  | NonassertableSameLine NonassertableWithSpan
+  | NonassertableSuperseded NonassertableWithSpan
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+data NonassertableS = NonassertableS
+  { nonassertables :: ![NonassertableWithSpan]
+  , nonassertableWarnings :: ![NonassertableWarning]
+  , nonassertableLastEnd :: !(Maybe SrcPos)
+    -- ^ Where the previous construct ended, for the same-line check.
+  }
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+addNonassertableCommentsToAst :: HasNonassertable a => [Nonassertable] -> a -> (a, NonassertableS)
+addNonassertableCommentsToAst nas ast =
+  let
+    (withSpan, missing) = foldl' go ([], []) nas
+    go (located, miss) na = case rangeOf na of
+      Nothing -> (located, na : miss)
+      Just r  -> (WithSpan (fromSrcRange r) na : located, miss)
+    initialS =
+      NonassertableS
+        { nonassertables = List.sortOn (.range.start) withSpan
+        , nonassertableWarnings = fmap NonassertableMissingLocation missing
+        , nonassertableLastEnd = Nothing
+        }
+    (ast', s) = runState (addNonassertable ast) initialS
+  in
+    ( ast'
+    , s { nonassertables = []
+        , nonassertableWarnings = fmap NonassertableMisplaced s.nonassertables <> s.nonassertableWarnings
+        }
+    )
+
+renderNonassertableWarning :: NonassertableWarning -> Warning
+renderNonassertableWarning = \ case
+  NonassertableMissingLocation na -> NonassertableAnnotationNoLocation na
+  NonassertableMisplaced na       -> NonassertableAnnotationMisplaced na
+  NonassertableSameLine na        -> NonassertableAnnotationSameLine na
+  NonassertableSuperseded na      -> NonassertableAnnotationSuperseded na
+
+class HasNonassertable a where
+  addNonassertable :: a -> State NonassertableS a
+
+instance HasSrcRange n => HasNonassertable (Module n) where
+  addNonassertable (MkModule uri ann sect) =
+    MkModule uri ann <$> addNonassertable sect
+
+instance HasSrcRange n => HasNonassertable (Section n) where
+  addNonassertable (MkSection ann lbl maka mgiven decls) = do
+    -- The module's root section has no heading and no GIVEN of its own; a
+    -- headed section claims everything up to the end of its heading, or of
+    -- its GIVEN when it has one.
+    let headerEnd = maximumMay (mapMaybe (fmap (.end) . nodeSpan) [SomeSpan lbl, SomeSpan maka, SomeSpan mgiven])
+    ann' <- case headerEnd of
+      Nothing -> pure ann
+      Just he -> claimNonassertableUpTo he ann
+    decls' <- traverse addNonassertable decls
+    pure $ MkSection ann' lbl maka mgiven decls'
+   where
+    maximumMay [] = Nothing
+    maximumMay xs = Just (List.maximumBy (\ a b -> if posLt a b then LT else if a == b then EQ else GT) xs)
+
+-- | A span-bearing thing of any type, for folding the header's parts together.
+data SomeSpan = forall a. HasSrcRange a => SomeSpan a
+instance HasSrcRange SomeSpan where
+  rangeOf (SomeSpan a) = rangeOf a
+
+instance HasSrcRange n => HasNonassertable (TopDecl n) where
+  -- Every construct claims the marks before it, so that none leaks past to a
+  -- later definition; which constructs may carry one is the typechecker's
+  -- question. A definition carries the mark on its OWN Anno, where
+  -- 'L4.Export.isNonassertableDecide' and the printer read it; the others
+  -- carry it on the wrapper's, which the typechecker inspects, and they take
+  -- every mark on them, above or among their lines, since each is an error.
+  addNonassertable = \ case
+    Declare ann decl  -> (\ a -> Declare a decl) <$> claimAll (nodeSpan decl) ann
+    Decide ann (MkDecide dann tySig@(MkTypeSig _ givenSig _) appForm expr) ->
+      (\ dann' -> Decide ann (MkDecide dann' tySig appForm expr))
+        <$> claimNonassertable (nodeSpan (MkDecide dann tySig appForm expr)) (fmap (.start) (nodeSpan appForm)) (nodeSpan givenSig) dann
+    Assume ann asm    -> (\ a -> Assume a asm) <$> claimAll (nodeSpan asm) ann
+    Directive ann dir -> (\ a -> Directive a dir) <$> claimAll (nodeSpan dir) ann
+    Import ann imp    -> (\ a -> Import a imp) <$> claimAll (nodeSpan imp) ann
+    Section ann sect  -> Section ann <$> addNonassertable sect
+    Timezone ann e    -> (\ a -> Timezone a e) <$> claimAll (nodeSpan e) ann
+   where
+    claimAll mspan ann = claimNonassertable mspan (fmap (.end) mspan) Nothing ann
+
+-- | Claim every mark positioned before the construct ends. Those ending at or
+-- before its head (the name line for a definition, the end otherwise) are
+-- leading: the closest attaches, earlier stacked ones are superseded. A mark
+-- at the end of the previous construct's last line is not on a line of its
+-- own and is reported as such; those among a definition's GIVEN lines are
+-- kept apart ('annNonassertableOnInputs'), each for the typechecker to refuse
+-- on every surface; marks inside the body are misplaced.
+claimNonassertable :: Maybe SrcSpan -> Maybe SrcPos -> Maybe SrcSpan -> Anno -> State NonassertableS Anno
+claimNonassertable mspan mhead mgiven ann =
+  case mspan of
+    Nothing -> pure ann
+    Just r -> do
+      s <- get
+      let headPos = maybe r.start id mhead
+          (claimed, rest) = List.partition (\ na -> posLt na.range.start r.end) s.nonassertables
+          (leading, interior) = List.partition (\ na -> posLe na.range.end headPos) claimed
+          notOwnLine :: NonassertableWithSpan -> Bool
+          notOwnLine na = maybe False (\ e -> na.range.start.line == e.line) s.nonassertableLastEnd
+          -- On one of the GIVEN's lines: from its first token to the end of
+          -- its last line. A mark on its own line after the GIVEN, or between
+          -- GIVETH and the name line, is above the definition.
+          inSignature :: NonassertableWithSpan -> Bool
+          inSignature na = case mgiven of
+            Just g -> posLe g.start na.range.start && na.range.start.line <= g.end.line
+            Nothing -> False
+          (sameLine, leading0) = List.partition notOwnLine leading
+          (onInput, leading') = List.partition inSignature leading0
+      put s { nonassertables = rest, nonassertableLastEnd = Just r.end }
+      warnNa (fmap NonassertableMisplaced interior <> fmap NonassertableSameLine sameLine)
+      let ann' = addNonassertableOnInputs (fmap (.payload) onInput) ann
+      case reverse leading' of
+        closest : superseded -> do
+          warnNa (fmap NonassertableSuperseded superseded)
+          pure (setNonassertable closest.payload ann')
+        [] -> pure ann'
+
+-- | A section's claim: every mark before the end of its header.
+claimNonassertableUpTo :: SrcPos -> Anno -> State NonassertableS Anno
+claimNonassertableUpTo he ann = do
+  s <- get
+  -- A mark at the end of the header's last line is on the header too.
+  let (claimed, rest) = List.partition (\ na -> posLt na.range.start he || na.range.start.line == he.line) s.nonassertables
+  put s { nonassertables = rest, nonassertableLastEnd = Just he }
+  case reverse claimed of
+    closest : superseded -> do
+      warnNa (fmap NonassertableSuperseded superseded)
+      pure (setNonassertable closest.payload ann)
+    [] -> pure ann
+
+warnNa :: [NonassertableWarning] -> State NonassertableS ()
+warnNa ws = modify' (\ st -> st { nonassertableWarnings = ws <> st.nonassertableWarnings })

@@ -32,6 +32,7 @@ module L4.Export (
   collectExportedDecides,
   isExportedDecide,
   isNonexhaustiveDecide,
+  isNonassertableDecide,
 ) where
 
 import Base
@@ -744,6 +745,12 @@ isNonexhaustiveDecide decide =
   case getAnno decide ^. annDesc of
     Just desc -> (parseDescText (getDesc desc)).flags.isNonexhaustive
     Nothing   -> False
+
+-- | Whether the definition carries @\@nonassertable@ (its own annotation,
+-- never read from a @\@desc@): a request may not assert this node
+-- (specs/todo/presumption-assertion/CONTRACT.md §6).
+isNonassertableDecide :: Decide n -> Bool
+isNonassertableDecide decide = isJust (getAnno decide ^. annNonassertable)
 
 -- | Like 'assumesFromModule' but WITHOUT the function-type filter —
 -- so the validator sees every ASSUME and can flag function-typed ones.
