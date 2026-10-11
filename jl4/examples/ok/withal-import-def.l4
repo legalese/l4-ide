@@ -1,0 +1,16 @@
+-- The defining half of ok/withal-import-use.l4: records whose TYPICALLY
+-- defaults a module that IMPORTS this one takes with `T WITHAL`
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng 2026-10-09; the defaults
+-- cross an IMPORT as they do for WITH, W5).
+
+DECLARE Colour IS ONE OF Red, Green
+
+-- Every field has a default: `Paint WITHAL` is a Paint.
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER TYPICALLY 2
+
+-- One field has none: `Order WITHAL` is an error that names it.
+DECLARE Order
+  HAS item     IS A STRING
+      quantity IS A NUMBER TYPICALLY 1

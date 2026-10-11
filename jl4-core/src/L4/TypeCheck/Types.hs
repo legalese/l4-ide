@@ -126,6 +126,21 @@ data CheckErrorWithContext =
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
+-- | Why @T WITHAL@ cannot be read as a record built from its defaults.
+data WithalMisuse
+  = WithalOnRule
+    -- ^ @T@ is a rule or a field selector, not a record.
+  | WithalOnAlternative
+    -- ^ @T@ is an alternative of an enumeration or a choice (@ONE OF@) that
+    -- carries data: its payload fields stay required whatever they declare.
+  | WithalOnPlainAlternative
+    -- ^ @T@ is an alternative of an enumeration that carries nothing.
+  | WithalOverloaded
+    -- ^ @T@ is one of several definitions of its name; @WITHAL@ names no field
+    -- to choose between them.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 data CheckError =
     OutOfScopeError Name (Type' Resolved)
   | KindError Kind [Type' Name]
@@ -151,6 +166,11 @@ data CheckError =
   | IllegalApp Resolved (Type' Resolved) Int
   | IllegalAppNamed Resolved (Type' Resolved)
   | IncompleteAppNamed Resolved [OptionallyNamedType Resolved]
+  | IncompleteWithal Resolved [OptionallyNamedType Resolved]
+    -- ^ @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1) on a record, some of
+    -- whose fields declare no @TYPICALLY@: it names each of them.
+  | IllegalWithal Resolved WithalMisuse
+    -- ^ @T WITHAL@ where @T@ is not a record whose defaults it can take.
   | CheckInfo (Type' Resolved) (Maybe SrcRange)
   | CheckWarning CheckWarning
   | IllegalTypeInKindSignature (Type' Resolved)

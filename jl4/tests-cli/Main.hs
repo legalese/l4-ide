@@ -230,6 +230,15 @@ batchTyNamed, batchTyNamedJson :: FilePath
 batchTyNamed     = fixtureDir </> "batch-typically-named.l4"
 batchTyNamedJson = fixtureDir </> "batch-typically-named.json"
 
+-- | @T WITHAL@ (T1 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@, ruled by
+-- Meng 2026-10-09): over @l4 batch@, and across an @IMPORT@.
+batchWithal, batchWithalJson, withalImportMissing, withalImportMissingDef, withalTypeName :: FilePath
+batchWithal            = fixtureDir </> "batch-withal.l4"
+batchWithalJson        = fixtureDir </> "batch-withal.json"
+withalImportMissing    = fixtureDir </> "withal-import-missing.l4"
+withalImportMissingDef = fixtureDir </> "withal-import-missing-def.l4"
+withalTypeName         = fixtureDir </> "withal-type-name.l4"
+
 -- | The same, for defaults whose value is a bare constructor (TRUE, FALSE, an
 -- enum value), which share a cell with every other use of it unless the checker's
 -- added argument is given a cell of its own.
@@ -476,6 +485,7 @@ coreFixtures =
   , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
   , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
   , batchTyOverload, batchTyOverloadJson
+  , batchWithal, batchWithalJson, withalImportMissing, withalImportMissingDef, withalTypeName
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -1970,6 +1980,63 @@ spec bin = do
         [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
         , (Just (Number 0), presumedOf [])
         ]
+
+  -- T1, ruled by Meng 2026-10-09: `T WITHAL` is the record with EVERY field's
+  -- default and nothing written. It is the record that a rule's own JSONDECODE
+  -- of "{}" gives, and it is a default taken inside the rules, so it is listed
+  -- as `WITH T: field` under hard exactly as a WITH that leaves the field out
+  -- is (above). `{}` as the VALUE of a record input is still `null` and is
+  -- refused (M2); WITHAL is the spelling for it inside the rules.
+  describe "l4 batch: T WITHAL (T1)" $ do
+    it "builds the record a decode of {} gives, and takes the defaults in both modes" $ do
+      -- the second row is the positive control: the answer depends on the default
+      Output code sout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
+                  , "--entrypoint", "within limit", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf []), (Just (Bool False), presumedOf []) ]
+      Output scode ssout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson, "--format", "json" ]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray ssout
+      map resultAndPresumed srows `shouldBe`
+        [ (Just (Bool True), presumedOf []), (Just (Bool True), presumedOf []) ]
+
+    it "lists each default it took under hard, as WITH T: field, beside the decode's own" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
+                  , "--entrypoint", "within limit", "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["WITH Settings: limit"])
+        , (Just (Bool False), presumedOf ["WITH Settings: limit"])
+        ]
+      Output scode ssout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
+                  , "--presumption", "hard", "--format", "json" ]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray ssout
+      map resultAndPresumed (take 1 srows) `shouldBe`
+        [ ( Just (Bool True)
+          , presumedOf [ "JSONDECODE Settings: limit", "WITH Settings: limit"
+                       , "JSONDECODE Settings: strict", "WITH Settings: strict" ] ) ]
+
+  describe "l4 check: T WITHAL (T1)" $ do
+    it "names the field with no default, on a record from an IMPORT" $ do
+      Output code _ serr <- runL4 bin ["check", withalImportMissing]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("WITHAL takes the default of every field" `isInfixOf`)
+      serr `shouldSatisfy` ("item of type STRING" `isInfixOf`)
+      serr `shouldSatisfy` (not . ("quantity" `isInfixOf`))
+
+    it "is only the ordinary 'could not find a definition' on the name of a type" $ do
+      Output code _ serr <- runL4 bin ["check", withalTypeName]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("I could not find a definition for the identifier" `isInfixOf`)
+      serr `shouldSatisfy` (not . ("WITHAL builds a record" `isInfixOf`))
 
   -- Review F1, 2026-10-03: a default whose value is a bare constructor was
   -- listed whenever the same constructor was evaluated anywhere later in the

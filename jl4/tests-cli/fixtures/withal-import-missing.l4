@@ -1,0 +1,8 @@
+-- `T WITHAL` on a record imported from another module, one of whose fields
+-- has no default: the error names that field (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- T1, ruled by Meng 2026-10-09). The defaults cross the IMPORT, so
+-- `quantity` is not named and `item` is.
+IMPORT `withal-import-missing-def`
+
+GIVETH AN Order
+bad MEANS Order WITHAL

@@ -50,6 +50,7 @@ module TestData (
   enumNullJL4,
   recordWrapJL4,
   ownDecodeJL4,
+  withalJL4,
   deonticDefaultJL4,
   spinJL4,
   spinOrRefuseJL4,
@@ -1113,6 +1114,34 @@ DECIDE `within limit` amount IF
   CONSIDER parseSettings "{}"
     WHEN RIGHT st THEN amount <= st's limit
     WHEN LEFT e THEN FALSE
+|]
+
+-- | @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1): the record a rule's own
+-- JSONDECODE of "{}" gives is the record WITHAL builds, and a default WITHAL
+-- takes is one taken inside the rules.
+withalJL4 :: Text
+withalJL4 =
+  [i|
+DECLARE Settings HAS
+  limit  IS A NUMBER TYPICALLY 10
+  strict IS A BOOLEAN TYPICALLY FALSE
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseSettings s MEANS JSONDECODE s
+
+@export default same defaults
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `same defaults` amount IF
+  CONSIDER parseSettings "{}"
+    WHEN RIGHT st THEN st EQUALS (Settings WITHAL)
+    WHEN LEFT e THEN FALSE
+
+@export within limit
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `within limit` amount IF amount <= (Settings WITHAL)'s limit
 |]
 
 -- | A deontic rule with a defaulted BOOLEAN input, which takes the deontic

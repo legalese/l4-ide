@@ -1,0 +1,21 @@
+-- `T WITHAL` on a record declared in an IMPORTED module (TYPICALLY-ONE-BEHAVIOUR-SPEC.md
+-- T1, ruled by Meng 2026-10-09). The declaring half is ok/withal-import-def.l4.
+-- The error for a record with a field that has no default, across an IMPORT, is
+-- pinned by l4-cli-test (withal-import-missing.l4 in tests-cli/fixtures).
+
+IMPORT `withal-import-def`
+
+GIVETH A Paint
+`stock paint` MEANS Paint WITHAL
+
+#ASSERT (`stock paint`'s colour) EQUALS Red
+#ASSERT (`stock paint`'s coats) EQUALS 2
+#ASSERT `stock paint` EQUALS (Paint WITH coats IS 2)
+#EVAL `stock paint`
+
+-- A record with a field that has no default is still built with WITH, which
+-- names it.
+GIVETH AN Order
+`one pen` MEANS Order WITH item IS "pen"
+
+#ASSERT (`one pen`'s quantity) EQUALS 1

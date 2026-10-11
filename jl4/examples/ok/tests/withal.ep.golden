@@ -1,0 +1,88 @@
+-- T WITHAL builds a record with EVERY field's TYPICALLY default and writes
+-- none (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1; ruled by Meng 2026-10-09).
+--
+-- It is a construction like `T WITH ...`, and it takes exactly the defaults a
+-- `WITH` that left those fields out would take. It is standalone: a field
+-- after it is a parse error, an override is spelled `WITH`
+-- (not-ok/tc/withal-then-override.l4). A field with no default makes it a
+-- check error that names the field (not-ok/tc/withal-missing-default.l4).
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      note   IS A MAYBE STRING TYPICALLY NOTHING
+      label  IS A STRING TYPICALLY "plain"
+      rush   IS A BOOLEAN TYPICALLY FALSE
+      coats  IS A NUMBER TYPICALLY 2
+
+GIVETH A Paint
+`stock paint` MEANS Paint WITHAL
+
+-- Every default is taken, whatever its type, an enum constructor and NOTHING
+-- included.
+#EVAL `stock paint`
+#EVAL `stock paint`'s colour
+#EVAL `stock paint`'s note
+#EVAL `stock paint`'s label
+#EVAL `stock paint`'s rush
+#EVAL `stock paint`'s coats
+
+-- It is the same value as spelling every default out, and as a WITH that
+-- leaves the fields out and writes one.
+#ASSERT `stock paint` EQUALS (Paint WITH colour IS Red, note IS NOTHING, label IS "plain", rush IS FALSE, coats IS 2)
+#ASSERT `stock paint` EQUALS (Paint WITH coats IS 2)
+#ASSERT `stock paint` EQUALS (Paint OF Red, NOTHING, "plain", FALSE, 2)
+
+-- A WITH that writes a field overrides that one default, as before.
+#ASSERT (Paint WITH colour IS Green)'s colour EQUALS Green
+#ASSERT (Paint WITH colour IS Green)'s coats EQUALS 2
+
+-- It is an expression like any other construction: an argument, a list item,
+-- a branch of an IF, the subject of a projection.
+GIVEN p IS A Paint
+GIVETH A NUMBER
+`coats of` p MEANS p's coats
+
+#ASSERT `coats of` (Paint WITHAL) EQUALS 2
+
+GIVETH LIST OF Paint
+`two paints` MEANS LIST Paint WITHAL, Paint WITH coats IS 3
+
+#ASSERT (`two paints`) EQUALS (LIST (Paint WITH coats IS 2), (Paint WITH coats IS 3))
+
+GIVEN rush IS A BOOLEAN
+GIVETH A Paint
+`order paint` rush MEANS
+  IF rush THEN Paint WITH rush IS TRUE ELSE Paint WITHAL
+
+#ASSERT (`order paint` FALSE)'s rush EQUALS FALSE
+#ASSERT (`order paint` TRUE)'s rush EQUALS TRUE
+#ASSERT (Paint WITHAL)'s label EQUALS "plain"
+
+-- The record is declared AFTER the rule that builds it, as with WITH: the
+-- defaults are checked before any body is.
+GIVETH A Brick
+`a brick` MEANS Brick WITHAL
+
+DECLARE Brick
+  HAS weight IS A NUMBER TYPICALLY 3
+      baked  IS A BOOLEAN TYPICALLY TRUE
+
+#ASSERT (`a brick`'s weight) EQUALS 3
+#ASSERT (`a brick`'s baked) EQUALS TRUE
+
+-- A record with no fields has nothing to default, and WITHAL on it is that
+-- record.
+DECLARE Marker HAS
+
+GIVETH A Marker
+`the marker` MEANS Marker WITHAL
+
+#ASSERT `the marker` EQUALS Marker
+
+-- WITHAL is reserved, but only in capitals: the lower-case spelling is a name.
+GIVETH A NUMBER
+withal MEANS 7
+
+#ASSERT withal EQUALS 7

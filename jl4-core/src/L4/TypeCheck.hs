@@ -930,10 +930,16 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
 -- construction); the payload of an enum constructor is the same mechanism and
 -- could be opened with it, but nobody has asked, and what is not ruled stays
 -- loud. Assumed, not ruled.
+--
+-- Every record constructor has an entry, EMPTY when no field declares a
+-- default. That is how @T WITHAL@ ('inferWithal') tells a record from an enum
+-- constructor that carries data, which has none, and from a rule with no
+-- defaulted input; 'supplyAppNamed' reads a missing entry and an empty one the
+-- same way.
 recordInputDefaults :: [Text] -> Declare Resolved -> InputDefaults
 recordInputDefaults heads = \ case
-  MkDeclare _ _ _ (RecordDecl _ (Just con) tns)
-    | not (Map.null ds) -> Map.singleton (getUnique con) ds
+  MkDeclare _ _ _ (RecordDecl _ (Just con) tns) ->
+    Map.singleton (getUnique con) ds
     where
       ds = Map.fromList
         [ (getUnique fn, MkInputDefault { owner = qualifiedOwner heads (getOriginal con), binder = getOriginal fn, declaredAt = rangeOf d, value = d })
@@ -4956,8 +4962,18 @@ inferExpr' g =
       let binderOnly = not (null nes) && and binderSupplies
           nameRivals = filter (couldTakeNamedSite binderOnly) rivals
       t <- instantiate pt
-      noDefault <- siteTakesNoDefault rn t nes nameRivals
-      (ornes, rt) <- inferAppNamed noDefault rn t nes
+      -- A named application with nothing written after the keyword is @T
+      -- WITHAL@: the parser reads @WITH@ with one or more arguments, so this
+      -- is the only way a parsed one comes out empty ('inferWithal'). It takes
+      -- the name-level overload test, not 'siteTakesNoDefault': it writes no
+      -- value for a rival to fit or not fit, so any rival that could take a
+      -- named site by its name is reason enough to refuse.
+      (ornes, rt) <-
+        if null nes
+          then inferWithal (not (null nameRivals)) rn t
+          else do
+            noDefault <- siteTakesNoDefault rn t nes nameRivals
+            inferAppNamed noDefault rn t nes
       let (order, rnes) = unzip ornes
       pure (AppNamed ann rn rnes (Just order), rt)
     IfThenElse ann e1 e2 e3 -> do
@@ -5187,6 +5203,72 @@ inferAppNamed _noDefault r t nes = do
       v <- fresh (NormalName "v")
       pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
 
+-- | @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ARCHAISM): the record @T@
+-- built with EVERY field's @TYPICALLY@ default, and nothing written.
+--
+-- It is checked as @T WITH@ followed by every field's default and comes out as
+-- exactly that: the arguments are the same 'DefaultFill'ed ones a @WITH@ that
+-- omits the fields gets ('fillDefaults'), so the evaluator, the exporters, the
+-- ladder and the NLG already do with it what they do with those, and
+-- @--presumption hard@ lists each as @WITH T: field@ with no second path.
+--
+-- A field with no default is an error that names it ('IncompleteWithal'): the
+-- spelling asks for every default, so a field that has none is the author
+-- being told the record is not defaulted all the way down.
+--
+-- Records only, and a refusal for anything else, because what is not ruled
+-- stays loud: @WITHAL@ on a rule is not offered ('WithalOnRule'), and neither
+-- is it on an enum constructor that carries data, whose payload fields still
+-- have to be given even when they carry a @TYPICALLY@
+-- ('WithalOnAlternative'). A record is told from those by its entry in
+-- 'recordInputDefaults', which has one for every record constructor, empty or
+-- not.
+--
+-- At an overload it refuses too ('WithalOverloaded'): @WITH@ names fields,
+-- which is what lets a site choose between two definitions of one name, and
+-- @WITHAL@ names none, so a default must not be what decides. Every candidate
+-- then fails and what the author reads is the ambiguity error that follows
+-- ("there are multiple definitions", not-ok/tc/withal-overloaded.l4). That is
+-- what the site already did before this guard existed, measured with the guard
+-- switched off: 'fillDefaults' withholds the defaults at an overload, so the
+-- record's own branch fails too, only with a message that would be wrong
+-- ("these fields have none") if it were ever the one surfaced. The guard makes
+-- the reason in each failed branch the true one.
+inferWithal :: Bool -> Resolved -> Type' Resolved -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
+inferWithal overloaded r t = do
+  mFields <- asks (Map.lookup (getUnique r) . (.visibleInputDefaults))
+  case (resolvedTermKind r, mFields) of
+    -- A name that is not in scope has been reported as that, and what it would
+    -- have been is not known: a second error here would only be noise (the name
+    -- of a type that is not a record lands here, since only terms resolve).
+    _ | OutOfScope {} <- r                -> pure ([], t)
+    _ | overloaded                        -> refuse WithalOverloaded
+    (Just Constructor, Just _) -> case t of
+      Fun _ onts res -> do
+        (missing, fills) <- fillDefaults overloaded r (zip [0 ..] onts)
+        unless (null missing) $
+          addError (IncompleteWithal r missing)
+        pure (fills, res)
+      -- A record with no fields has nothing to default.
+      _ -> pure ([], t)
+    (Just Constructor, Nothing) -> case t of
+      Fun {} -> refuse WithalOnAlternative
+      _      -> refuse WithalOnPlainAlternative
+    _                                     -> refuse WithalOnRule
+ where
+  refuse why = do
+    addError (IllegalWithal r why)
+    v <- fresh (NormalName "v")
+    pure ([], v)
+
+-- | What the checker stamped on a resolved name when it looked it up: whether
+-- it is a constructor, a rule, a field selector, and so on.
+resolvedTermKind :: Resolved -> Maybe TermKind
+resolvedTermKind r = case getActual r of
+  MkName cAnn _ -> case cAnn.extra.resolvedInfo of
+    Just (TypeInfo _ mk) -> mk
+    _                    -> Nothing
+
 -- | Could a candidate of this type be what a named application means, going by
 -- the names alone? It is the first test a callee's rivals have to pass for the
 -- callee to count as an overload ('overloadedCallees'); 'rivalFitsSite' then
@@ -5405,9 +5487,18 @@ sectionBinderFor n = do
             pure (Just (Ref n' u o, rt))
           _ -> pure Nothing
 
-supplyAppNamed :: Bool -> Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
-supplyAppNamed _noDefault _r []   [] = pure []
-supplyAppNamed  noDefault  r onts [] = do
+-- | What a named site left out, split into the inputs or fields that take
+-- their @TYPICALLY@ default (with the argument that supplies it) and those that
+-- do not, which are missing. Shared by a @WITH@ that runs out of written
+-- arguments ('supplyAppNamed') and by @T WITHAL@ ('inferWithal'), which writes
+-- none: the two differ only in how they report a missing one, so the default a
+-- field takes cannot differ between them.
+fillDefaults
+  :: Bool
+  -> Resolved
+  -> [(Int, OptionallyNamedType Resolved)]
+  -> Check ([OptionallyNamedType Resolved], [(Int, NamedExpr Resolved)])
+fillDefaults noDefault r onts = do
   -- What the site left out. An input or field that declares a TYPICALLY is not
   -- missing: it takes its default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 for a
   -- rule's inputs, W5 for a record's fields). Only a NAMED site gets here, so
@@ -5428,7 +5519,12 @@ supplyAppNamed  noDefault  r onts [] = do
     fillFor (i, MkOptionallyNamedType _ (Just n') _)
       | Just d <- Map.lookup (getUnique n') defaults = Right (i, defaultNamedExpr n' d)
     fillFor (_, ont) = Left ont
-    (missing, fills) = partitionEithers (map fillFor onts)
+  pure (partitionEithers (map fillFor onts))
+
+supplyAppNamed :: Bool -> Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
+supplyAppNamed _noDefault _r []   [] = pure []
+supplyAppNamed  noDefault  r onts [] = do
+  (missing, fills) <- fillDefaults noDefault r onts
   unless (null missing) $
     addError (IncompleteAppNamed r missing)
   pure fills
@@ -8091,6 +8187,43 @@ prettyCheckError (IncompleteAppNamed r onts)               =
   , "you have not supplied these inputs:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
+prettyCheckError (IncompleteWithal r onts)                 =
+  [ "WITHAL takes the default of every field, but these fields of"
+  , ""
+  , "  " <> prettyResolvedWithRange r
+  , ""
+  , "have none:"
+  , ""
+  ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
+  ++
+  [ ""
+  , "Give each of them a TYPICALLY default where the record is declared,"
+  , "or build the record with WITH and name them."
+  ]
+prettyCheckError (IllegalWithal r why)                     =
+  [ "WITHAL builds a record with the default of every field, but"
+  , ""
+  , "  " <> prettyResolvedWithRange r
+  , ""
+  ] ++ case why of
+    WithalOnRule ->
+      [ "is not a record: it is a rule, or a field of one. To use a rule and leave"
+      , "some of its inputs to their defaults, name the other inputs with WITH."
+      ]
+    WithalOnAlternative ->
+      [ "is one of the alternatives of a type declared with ONE OF, not a record."
+      , "Every field of such an alternative has to be given, even one that has a"
+      , "TYPICALLY, so write it with WITH or OF."
+      ]
+    WithalOnPlainAlternative ->
+      [ "is one of the alternatives of a type declared with ONE OF, not a record."
+      , "It has no fields to take defaults for, so write just its name."
+      ]
+    WithalOverloaded ->
+      [ "has more than one definition here, and WITHAL names no field that could"
+      , "tell them apart. Rename one of them, or build the record with WITH and"
+      , "name its fields."
+      ]
 -- A '#CHECK' over a polymorphic term carries residual inference variables,
 -- and the raw layout prints them as the checker's gensyms (@a24@) — not a name
 -- in any scope, and different after every edit. Render for display instead:
