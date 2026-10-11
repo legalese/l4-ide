@@ -132,6 +132,7 @@ A name the call gives that the rule does not have does not rule it out either, b
    No other rule's default is used against it, and the call means what it meant before `TYPICALLY` existed.
 2. **Otherwise, if only one rule could take the call, it takes its defaults** for what the call left out.
 3. **Otherwise, two or more rules could take the call and none is complete as written. No default is taken**, and the call is ambiguous.
+4. **If no rule could take the call**, because a value it gives does not fit the input of that name in any of them, the call is an error and none is chosen. The message is the same "multiple definitions" one, since nothing settled the choice.
 
 The values the call gives are what tell the rules apart.
 Here the second `scaled` takes a `STRING` for `base`, and the call gives a number, so only the first `scaled` could take it:
@@ -296,7 +297,11 @@ govern what counts as leaving a fact out:
   Two declarations with the same name under the same sections give one entry,
   because the entry names the sections and not the file: the same name in two
   imported files, and a rule declared in a `WHERE`, which is named
-  bare, so it also shares an entry with a top-level rule of that name. So
+  bare, so it also shares an entry with a top-level rule of that name.
+  The entry names the rule and not which of two rules of that name took the
+  default: two rules called `fee` in one section, each with its own default for
+  `rate`, both list the same `WITH` entry for `fee: rate`, whatever value each
+  took. So
   `presumed` has more than one shape: a fact's name
   or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and
   `JSONDECODE <type>: <field>`. An entry that starts `WITH ` is a usual value
