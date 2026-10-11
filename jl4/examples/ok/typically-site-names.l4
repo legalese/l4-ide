@@ -6,7 +6,9 @@
 --   2. a bare definition that shares the rule's name (it takes only a section
 --      GIVEN, and the site names an input of the rule);
 --   3. an earlier site that did have to choose between two overloads (the choice
---      must not follow the rule to the sites below it).
+--      must not follow the rule to the sites below it). The other `scaled` takes
+--      NUMBERs too, so it could take the qualified site below; were the choice to
+--      follow the rule, that site would lose its default.
 
 § `A field of the same name`
 
@@ -42,9 +44,9 @@ scaled MEANS rate TIMES base
 
 § `Other`
 
-GIVEN base   IS A STRING
-      factor IS A STRING
-GIVETH A STRING
+GIVEN base   IS A NUMBER
+      factor IS A NUMBER
+GIVETH A NUMBER
 scaled MEANS base
 
 § `Use`
