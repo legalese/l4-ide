@@ -5213,17 +5213,19 @@ couldTakeNamedSite binderOnly = \ case
 -- @scaled(base, factor)@ in scope, @scaled WITH base IS 10@ was ambiguous
 -- before W4, and must not quietly become the first @scaled@, run on a presumed
 -- rate, when the author meant the second and forgot @factor@. But it IS
--- decided when the written inputs settle the choice. So, for the callee this
+-- decided when the written values settle the choice. So, for the callee this
 -- branch of the search is on, the default is withheld exactly when some rival
 -- (the other rules in the running, 'overloadedCallees', already filtered by
 -- 'couldTakeNamedSite' to those that could take the site by name) FITS the
--- site: every name the site writes is one of its inputs, or a section binder,
--- and every value fits that input's type ('rivalFitsSite'). A rival that fits
--- need not be complete, and needs no default of its own: that is what keeps the
--- first example ambiguous, and what keeps @f WITH a IS 5@ answering with the
--- @f@ that takes @a@ alone, when another @f@ would take it by a default for @b@.
--- Where no rival fits, this branch is the only reading and takes its defaults
--- like a rule that has no namesake.
+-- site: no value the site writes for one of the rival's inputs fails to check
+-- against that input's type ('rivalFitsSite'). A name the rival does not have
+-- does NOT rule it out: a misspelt input would otherwise make the rule that has
+-- the right spelling look like the only reading, and run it on a presumed value.
+-- A rival that fits need not be complete, and needs no default of its own: that
+-- is what keeps the first example ambiguous, and what keeps @f WITH a IS 5@
+-- answering with the @f@ that takes @a@ alone, when another @f@ would take it by
+-- a default for @b@. Where no rival fits, this branch is the only reading and
+-- takes its defaults like a rule that has no namesake.
 --
 -- Nothing is decided, and nothing is checked, unless the site leaves out an
 -- input that has a default; any other site is unchanged. Every doubt answers
@@ -5247,16 +5249,15 @@ siteTakesNoDefault callee t nes rivals = do
       fits <- rivalFitsSite callee nes r
       if fits then pure True else anyFits rs
 
--- | Could this rival take what the site writes? Each named value is checked
--- against the type of the rival's input of that name, speculatively
--- ('speculate'): the rival is not chosen, and nothing the check does survives.
--- A name that is not an input of the rival is acceptable only if it is a
--- section binder, as at 'supplyAppNamed'. The rival need not be complete.
+-- | Could this rival take what the site writes? Each written value whose name is
+-- an input of the rival is checked against the type of that input,
+-- speculatively ('speculate'): the rival is not chosen, and nothing the check
+-- does survives. Only a value that fails its check rules the rival out. A name
+-- the rival does not have rules nothing out, and nor does a rival that is
+-- missing inputs: the rival need not be complete.
 --
 -- Anything this cannot tell answers 'True': a rival whose type is not a function
--- (a type still being inferred, or a bare definition at a binder-only site) and
--- a value supplied for a section binder, whose type is the binder's and not the
--- rival's ('implicitSupply').
+-- (a type still being inferred, or a bare definition at a binder-only site).
 rivalFitsSite :: Resolved -> [NamedExpr Name] -> Type' Resolved -> Check Bool
 rivalFitsSite callee nes rival = speculate do
   rt <- instantiate rival >>= applySubst
@@ -5270,9 +5271,7 @@ rivalFitsSite callee nes rival = speculate do
         Just (_, n', t, onts') -> do
           _ <- checkExpr (ExpectNamedArgContext callee n') e t
           go onts' rest
-        Nothing -> do
-          isBinder <- isSectionBinderSupply n
-          if isBinder then go onts rest else pure False
+        Nothing -> go onts rest
 
 -- | Is this name one the module's section-level @GIVEN@s bind?
 --

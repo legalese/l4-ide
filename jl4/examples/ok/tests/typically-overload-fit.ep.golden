@@ -1,10 +1,12 @@
 -- A named site that leaves out an input with a TYPICALLY default takes the
--- default, unless another rule of the same name could also take the inputs the
--- site writes. "Could take" means that every name the site writes is an input
--- of the other rule and that every value fits that input's type; the other rule
--- need not be complete. When two rules could take the site and neither is
--- complete as written, no default is taken (not-ok/tc/typically-overloaded-site.l4
--- and not-ok/tc/typically-overloaded-fit.l4). When one of them is complete as
+-- default, unless another rule of the same name could also take what the site
+-- writes. A rule could not take the site if a value the site writes does not
+-- fit the type of that rule's input of that name; nothing else rules it out.
+-- It need not be complete, and a name it lacks does not rule it out
+-- (not-ok/tc/typically-overloaded-name.l4). When two rules could take the site
+-- and neither is complete as written, no default is taken
+-- (not-ok/tc/typically-overloaded-site.l4 and
+-- not-ok/tc/typically-overloaded-fit.l4). When one of them is complete as
 -- written, it is the one the site means, as it was before TYPICALLY.
 
 -- 1. The types tell the rules apart. The site writes a NUMBER for `base`, which

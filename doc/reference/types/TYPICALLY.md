@@ -123,8 +123,10 @@ out takes the new value. Writing the input at the call, as
 
 Two rules may share a name when their inputs tell them apart.
 A call that names its inputs and leaves one out takes the default only if the call cannot mean any other rule of that name.
-A rule **could take** the call when every input the call names is an input of that rule, and every value the call gives fits the type of that input.
-A rule does not have to be complete to count: one that is missing an input, and has no default for it, could still take the call.
+A rule **could not take** the call when a value the call gives does not fit the type of that rule's input of that name.
+Nothing else rules a rule out.
+It does not have to be complete: one that is missing an input, and has no default for it, could still take the call.
+A name the call gives that the rule does not have does not rule it out either, because a misspelt input would otherwise make the rule with the right spelling look like the only choice.
 
 1. **If a rule can take the call as written, with every input given, that is the rule meant.**
    No other rule's default is used against it, and the call means what it meant before `TYPICALLY` existed.
@@ -179,6 +181,9 @@ scaled MEANS base PLUS factor
 
 #EVAL scaled WITH base IS 10      -- error: both `scaled` could take this call
 ```
+
+A name that only one rule has does not settle the choice either.
+If the second `scaled` took `width` and `height` and had no `base`, the call `scaled WITH base IS 10` would still be ambiguous: it does not say which rule it means.
 
 There are two ways to settle a call that is still ambiguous.
 Write the input that has the default (`scaled WITH base IS 10, rate IS 3`), which leaves only the first rule able to take the call.
