@@ -264,6 +264,12 @@ batchTyCollideWhere    = fixtureDir </> "batch-typically-collide-where.l4"
 batchTyCollideJson     = fixtureDir </> "batch-typically-collide.json"
 batchTyCollideRowsJson = fixtureDir </> "batch-typically-collide-rows.json"
 
+-- | A named site whose callee is an overload that the written inputs settle by
+-- their types: the one rule that fits takes its default (decision O3).
+batchTyOverload, batchTyOverloadJson :: FilePath
+batchTyOverload     = fixtureDir </> "batch-typically-overload.l4"
+batchTyOverloadJson = fixtureDir </> "batch-typically-overload.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -469,6 +475,7 @@ coreFixtures =
   , batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop
   , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
   , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
+  , batchTyOverload, batchTyOverloadJson
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -2118,6 +2125,29 @@ spec bin = do
         , (Just (Number 50), presumedOf ["WITH scaled: rate"])
         , (Just (Number 80), presumedOf ["WITH scaled: rate"])
         ]
+
+  -- Decision O3. A named site whose callee has an overload takes a default only
+  -- when no other rule of that name could take the inputs the site writes. Here
+  -- the other `scaled` wants a STRING for `base` and the request gives a number,
+  -- so the site means the first `scaled` and it takes its default for `rate`.
+  -- Only the answer is pinned under soft: what soft lists in `presumed` for a
+  -- default taken inside the rules is a separate question (decision O1).
+  describe "l4 batch: a named site that the written inputs settle between overloads takes the default" $ do
+    it "answers under soft" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyOverload, "--inputs", batchTyOverloadJson, "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map (fst . resultAndPresumed) rows `shouldBe` [Just (Number 30)]
+
+    it "answers under hard, and lists the default under the rule's own name" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyOverload, "--inputs", batchTyOverloadJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"]) ]
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

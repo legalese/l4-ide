@@ -4953,9 +4953,10 @@ inferExpr' g =
       (rn, pt) <- resolveTerm n
       rivals <- Map.findWithDefault [] (getUnique rn) <$> use #overloadedCallees
       let binderOnly = not (null nes) && and binderSupplies
-          overloaded = any (couldTakeNamedSite binderOnly) rivals
+          nameRivals = filter (couldTakeNamedSite binderOnly) rivals
       t <- instantiate pt
-      (ornes, rt) <- inferAppNamed overloaded rn t nes
+      noDefault <- siteTakesNoDefault rn t nes nameRivals
+      (ornes, rt) <- inferAppNamed noDefault rn t nes
       let (order, rnes) = unzip ornes
       pure (AppNamed ann rn rnes (Just order), rt)
     IfThenElse ann e1 e2 e3 -> do
@@ -5161,14 +5162,14 @@ inferEvent (MkEvent ann party action timestamp atFirst) = do
 -- supplied. This ordering is returned as well (and then stored in the
 -- AST after type-checking, to be used by the evaluator).
 --
--- The 'Bool' says the callee was chosen over another that could also take the
--- site's named inputs ('couldTakeNamedSite'), in which case it takes no
--- @TYPICALLY@ default ('supplyAppNamed').
+-- The 'Bool' says the site takes no @TYPICALLY@ default ('siteTakesNoDefault'),
+-- because the callee was chosen over another rule of its name that could also
+-- take what the site writes.
 inferAppNamed :: Bool -> Resolved -> Type' Resolved -> [NamedExpr Name] -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
-inferAppNamed overloaded r (Fun _ onts t) nes = do
-  ornes <- supplyAppNamed overloaded r (zip [0 ..] onts) nes
+inferAppNamed noDefault r (Fun _ onts t) nes = do
+  ornes <- supplyAppNamed noDefault r (zip [0 ..] onts) nes
   pure (ornes, t)
-inferAppNamed _overloaded r t nes = do
+inferAppNamed _noDefault r t nes = do
   -- A definition with no parameters of its own can still be applied to named
   -- arguments, provided every one of them supplies a SECTION BINDER (R1). It
   -- has no function type yet because the parameters discharge gives it are a
@@ -5185,23 +5186,93 @@ inferAppNamed _overloaded r t nes = do
       v <- fresh (NormalName "v")
       pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
 
--- | Could a candidate of this type be what a named application means? It is the
--- test a callee's rivals have to pass for the callee to count as an overload
--- ('overloadedCallees'), and it only has to be wide enough never to let a
--- default decide between two readings of a site; it never says a candidate
--- WILL take it. A function takes named inputs if any of its parameters is
--- named, so a record field selector, @FUNCTION FROM Order TO NUMBER@ with
--- nothing to name, is no rival to a rule that shares its name (review silent
--- N2, rulings R2-1). A candidate that is not a function takes a named site only
--- when every name the site gives is a section binder ('inferAppNamed'), so a
--- bare definition beside a rule is a rival only to such a site. A type still
--- being inferred is a rival, to stay on the loud side.
+-- | Could a candidate of this type be what a named application means, going by
+-- the names alone? It is the first test a callee's rivals have to pass for the
+-- callee to count as an overload ('overloadedCallees'); 'rivalFitsSite' then
+-- asks whether the values the site writes fit the types. It only has to be wide
+-- enough never to let a default decide between two readings of a site; it never
+-- says a candidate WILL take it. A function takes named inputs if any of its
+-- parameters is named, so a record field selector, @FUNCTION FROM Order TO
+-- NUMBER@ with nothing to name, is no rival to a rule that shares its name
+-- (review silent N2, rulings R2-1). A candidate that is not a function takes a
+-- named site only when every name the site gives is a section binder
+-- ('inferAppNamed'), so a bare definition beside a rule is a rival only to such
+-- a site. A type still being inferred is a rival, to stay on the loud side.
 couldTakeNamedSite :: Bool -> Type' Resolved -> Bool
 couldTakeNamedSite binderOnly = \ case
   Forall _ _ t -> couldTakeNamedSite binderOnly t
   Fun _ onts _ -> any (\ (MkOptionallyNamedType _ mn _) -> isJust mn) onts
   InfVar {}    -> True
   _            -> binderOnly
+
+-- | Does this named site take no @TYPICALLY@ default, because another rule of
+-- the callee's name could take what the site writes? (Decision O3.)
+--
+-- R8 does not rule on overloads, and a default must never decide which of two
+-- rules an under-specified site means: with @scaled(rate TYPICALLY 3, base)@ and
+-- @scaled(base, factor)@ in scope, @scaled WITH base IS 10@ was ambiguous
+-- before W4, and must not quietly become the first @scaled@, run on a presumed
+-- rate, when the author meant the second and forgot @factor@. But it IS
+-- decided when the written inputs settle the choice. So, for the callee this
+-- branch of the search is on, the default is withheld exactly when some rival
+-- (the other rules in the running, 'overloadedCallees', already filtered by
+-- 'couldTakeNamedSite' to those that could take the site by name) FITS the
+-- site: every name the site writes is one of its inputs, or a section binder,
+-- and every value fits that input's type ('rivalFitsSite'). A rival that fits
+-- need not be complete, and needs no default of its own: that is what keeps the
+-- first example ambiguous, and what keeps @f WITH a IS 5@ answering with the
+-- @f@ that takes @a@ alone, when another @f@ would take it by a default for @b@.
+-- Where no rival fits, this branch is the only reading and takes its defaults
+-- like a rule that has no namesake.
+--
+-- Nothing is decided, and nothing is checked, unless the site leaves out an
+-- input that has a default; any other site is unchanged. Every doubt answers
+-- 'True' ('rivalFitsSite'), which is the answer that withholds the default.
+siteTakesNoDefault :: Resolved -> Type' Resolved -> [NamedExpr Name] -> [Type' Resolved] -> Check Bool
+siteTakesNoDefault _      _ _   [] = pure False
+siteTakesNoDefault callee t nes rivals = do
+  defaults <- asks (Map.findWithDefault Map.empty (getUnique callee) . (.visibleInputDefaults))
+  let written = [ n | MkNamedExpr _ n _ <- nes ]
+      leavesOutDefault = case t of
+        Fun _ onts _ ->
+          or [ Map.member (getUnique n') defaults
+             | MkOptionallyNamedType _ (Just n') _ <- onts
+             , not (any (\ w -> rawName w == rawName (getOriginal n')) written)
+             ]
+        _ -> False
+  if leavesOutDefault then anyFits rivals else pure False
+  where
+    anyFits []       = pure False
+    anyFits (r : rs) = do
+      fits <- rivalFitsSite callee nes r
+      if fits then pure True else anyFits rs
+
+-- | Could this rival take what the site writes? Each named value is checked
+-- against the type of the rival's input of that name, speculatively
+-- ('speculate'): the rival is not chosen, and nothing the check does survives.
+-- A name that is not an input of the rival is acceptable only if it is a
+-- section binder, as at 'supplyAppNamed'. The rival need not be complete.
+--
+-- Anything this cannot tell answers 'True': a rival whose type is not a function
+-- (a type still being inferred, or a bare definition at a binder-only site) and
+-- a value supplied for a section binder, whose type is the binder's and not the
+-- rival's ('implicitSupply').
+rivalFitsSite :: Resolved -> [NamedExpr Name] -> Type' Resolved -> Check Bool
+rivalFitsSite callee nes rival = speculate do
+  rt <- instantiate rival >>= applySubst
+  case rt of
+    Fun _ onts _ -> go (zip [0 :: Int ..] onts) nes
+    _            -> pure True
+  where
+    go _    []                             = pure True
+    go onts (MkNamedExpr _ n e : rest) =
+      case lookupOptionallyNamedType n onts of
+        Just (_, n', t, onts') -> do
+          _ <- checkExpr (ExpectNamedArgContext callee n') e t
+          go onts' rest
+        Nothing -> do
+          isBinder <- isSectionBinderSupply n
+          if isBinder then go onts rest else pure False
 
 -- | Is this name one the module's section-level @GIVEN@s bind?
 --
@@ -5310,21 +5381,22 @@ sectionBinderFor n = do
           _ -> pure Nothing
 
 supplyAppNamed :: Bool -> Resolved -> [(Int, OptionallyNamedType Resolved)] -> [NamedExpr Name] -> Check [(Int, NamedExpr Resolved)]
-supplyAppNamed _overloaded _r []   [] = pure []
-supplyAppNamed  overloaded  r onts [] = do
+supplyAppNamed _noDefault _r []   [] = pure []
+supplyAppNamed  noDefault  r onts [] = do
   -- What the site left out. An input or field that declares a TYPICALLY is not
   -- missing: it takes its default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 for a
   -- rule's inputs, W5 for a record's fields). Only a NAMED site gets here, so
   -- R8 rule 1 holds without being checked: a positional site never reaches
   -- this function and keeps its arity error.
   --
-  -- Except at an overload. R8 does not rule on them, and taking a default there
-  -- would turn a site that was ambiguous (neither candidate has every input it
-  -- needs) into one that quietly chooses the candidate whose default fills the
-  -- gap and runs it on a presumed value, with nothing said. Such a site stays
-  -- as it was before W4: it needs every input written out.
+  -- Except at an overload that the inputs the site writes do not settle. R8
+  -- does not rule on them, and taking a default there would turn a site that
+  -- was ambiguous (another rule of the name could also take what is written)
+  -- into one that quietly chooses the candidate whose default fills the gap and
+  -- runs it on a presumed value, with nothing said. Such a site stays as it was
+  -- before W4: it needs every input written out ('siteTakesNoDefault').
   defaults <-
-    if overloaded
+    if noDefault
       then pure Map.empty
       else asks (Map.findWithDefault Map.empty (getUnique r) . (.visibleInputDefaults))
   let
@@ -5335,12 +5407,12 @@ supplyAppNamed  overloaded  r onts [] = do
   unless (null missing) $
     addError (IncompleteAppNamed r missing)
   pure fills
-supplyAppNamed  overloaded r onts (ne@(MkNamedExpr ann n e) : nes) =
+supplyAppNamed  noDefault r onts (ne@(MkNamedExpr ann n e) : nes) =
   case lookupOptionallyNamedType n onts of
     Just (i, n', t, onts') -> do
       rn <- ref n n'
       re <- checkExpr (ExpectNamedArgContext r rn) e t
-      rnes <- supplyAppNamed overloaded r onts' nes
+      rnes <- supplyAppNamed noDefault r onts' nes
       pure ((i, MkNamedExpr ann rn re) : rnes)
     Nothing -> do
       -- Not one of the callee's own parameters. Under R1 it may still be a
@@ -5352,12 +5424,12 @@ supplyAppNamed  overloaded r onts (ne@(MkNamedExpr ann n e) : nes) =
       if isBinder
         then do
           orne <- implicitSupply r ne
-          rnes <- supplyAppNamed overloaded r onts nes
+          rnes <- supplyAppNamed noDefault r onts nes
           pure (orne : rnes)
         else do
           (i, rn, t, onts') <- findOptionallyNamedType n onts
           re <- checkExpr (ExpectNamedArgContext r rn) e t
-          rnes <- supplyAppNamed overloaded r onts' nes
+          rnes <- supplyAppNamed noDefault r onts' nes
           pure ((i, MkNamedExpr ann rn re) : rnes)
 
 -- | The declared parameter this name supplies, if it is one of them, together

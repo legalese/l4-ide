@@ -100,19 +100,21 @@ data CheckState =
     -- among several candidates that were all still in the running
     -- ('resolveTermFilteredIn'), the types of the OTHER candidates, so that a
     -- named application of it can tell whether its name is an overload for the
-    -- inputs it names. A named site whose callee is an overload takes no
-    -- @TYPICALLY@ default ('L4.TypeCheck.supplyAppNamed'): R8 does not rule on
+    -- inputs it names. A named site whose callee has such a rival takes a
+    -- @TYPICALLY@ default only if no rival could take the inputs the site
+    -- writes ('L4.TypeCheck.siteTakesNoDefault'): R8 does not rule on
     -- overloads, and letting a default decide which overload an under-specified
     -- site means would change a site that was ambiguous into one that quietly
     -- picks a rule and runs it on a presumed value (review silent F3,
-    -- 2026-10-03).
+    -- 2026-10-03; narrowed by decision O3, 2026-10-11).
     --
     -- It is cleared before each named application resolves its callee and read
     -- straight after ('L4.TypeCheck.inferExpr', @AppNamed@), so it describes
     -- that site and no other (review silent N3). Why the types and not a flag:
     -- whether another candidate is a rival depends on the site, since a record
     -- field selector takes no named inputs and a bare definition takes only
-    -- section binders (review silent N2).
+    -- section binders (review silent N2), and whether a rival COULD TAKE the
+    -- site depends on the types of the inputs it names.
     }
   deriving stock (Generic)
 
@@ -2394,6 +2396,20 @@ orElseKeepAll m1 m2 = do
       if any isSuccess candidates
         then candidates
         else runCheck m2 e s
+
+-- | Would the computation come out 'True' on some branch that reports no error?
+--
+-- It is run from the current state and then forgotten: whatever the branches
+-- unified, minted or reported never reaches the caller's search, and exactly
+-- one outcome comes back, in the state the caller had. This is for asking
+-- whether something WOULD fit. 'orElse' is for keeping the first computation
+-- that does.
+speculate :: Check Bool -> Check Bool
+speculate m = MkCheck $ \ e s ->
+  [ ( Plain (or [ b | (w, _) <- runCheck m e s, viableCandidate w, let (_, b) = runWith w ])
+    , s
+    )
+  ]
 
 -- | Allow the subcomputation to have at most one result.
 --

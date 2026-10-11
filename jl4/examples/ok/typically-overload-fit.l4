@@ -1,0 +1,69 @@
+-- A named site that leaves out an input with a TYPICALLY default takes the
+-- default, unless another rule of the same name could also take the inputs the
+-- site writes. "Could take" means that every name the site writes is an input
+-- of the other rule and that every value fits that input's type; the other rule
+-- need not be complete. When two rules could take the site and neither is
+-- complete as written, no default is taken (not-ok/tc/typically-overloaded-site.l4
+-- and not-ok/tc/typically-overloaded-fit.l4). When one of them is complete as
+-- written, it is the one the site means, as it was before TYPICALLY.
+
+-- 1. The types tell the rules apart. The site writes a NUMBER for `base`, which
+-- the second `scaled` cannot take, so only the first can, and it takes its
+-- default for `rate`.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A STRING
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS factor
+
+#EVAL scaled WITH base IS 10                      -- 30: `rate` takes its default
+#EVAL scaled WITH base IS 10, rate IS 2           -- 20: a value the call gives wins
+#EVAL scaled WITH base IS "ten", factor IS 4      -- 4: the second `scaled`, every input written
+
+-- 2. The same site inside a rule, where the value is a rule's own input and not
+-- a literal.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+thrice MEANS scaled WITH base IS n
+
+#EVAL thrice 10                                   -- 30
+
+-- 3. A rule that is complete as written is the one the site means, so the other
+-- rule's default is not taken. This answered 500 before TYPICALLY and still does.
+GIVEN a IS A NUMBER
+      b IS A NUMBER TYPICALLY 1
+GIVETH A NUMBER
+f MEANS a PLUS b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+f MEANS a TIMES 100
+
+#EVAL f WITH a IS 5                               -- 500: the second `f`, as written
+#EVAL f WITH a IS 5, b IS 2                       -- 7: only the first `f` has a `b`
+
+-- 4. Three rules whose first inputs differ in type. All three have an input
+-- named `x`, but only the first takes a NUMBER, so it is the only one the site
+-- fits, and it is incomplete by one input that has a default.
+GIVEN x IS A NUMBER
+      y IS A NUMBER TYPICALLY 4
+GIVETH A NUMBER
+g MEANS x PLUS y
+
+GIVEN x IS A STRING
+      z IS A STRING
+GIVETH A STRING
+g MEANS z
+
+GIVEN x IS A BOOLEAN
+      w IS A BOOLEAN
+GIVETH A BOOLEAN
+g MEANS w
+
+#EVAL g WITH x IS 3                               -- 7: `y` takes its default
+#EVAL g WITH x IS "a", z IS "b"                   -- "b"
+#EVAL g WITH x IS TRUE, w IS FALSE                -- FALSE

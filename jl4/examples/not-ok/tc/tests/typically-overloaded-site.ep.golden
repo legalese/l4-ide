@@ -1,9 +1,9 @@
--- R8 does not rule on overloads, so a named site whose callee has more than one
--- definition in scope takes no default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md section
--- 4.2; review silent F3, 2026-10-03). Before W4 the first #EVAL below was
--- ambiguous: neither `scaled` had every input it needs. It must stay so, and
--- not quietly become the first `scaled`, run on a presumed rate, when what the
--- author meant was the second and forgot `factor`.
+-- R8 does not rule on overloads, so a named site that two rules of the same name
+-- could each take gets no default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md section 4.2;
+-- review silent F3, 2026-10-03; narrowed by decision O3, 2026-10-11). Before W4
+-- the first #EVAL below was ambiguous: neither `scaled` had every input it needs.
+-- It must stay so, and not quietly become the first `scaled`, run on a presumed
+-- rate, when what the author meant was the second and forgot `factor`.
 
 GIVEN rate IS A NUMBER TYPICALLY 3
       base IS A NUMBER
