@@ -86,6 +86,14 @@ earlyActFixture = fixtureDir </> "early-act.l4"
 multiClauseRenderFixture :: FilePath
 multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
+-- | Calls and constructions that leave out a @TYPICALLY@ default, each beside
+-- a twin that writes the value, for how @l4 render@ marks a value the checker
+-- added in a field list and a table cell. The second is a default taken at the
+-- root of a section @GIVEN@, which @l4 nlg@ does not mark.
+renderDefaultMarkFixture, renderDefaultMarkRootFixture :: FilePath
+renderDefaultMarkFixture     = fixtureDir </> "render-default-mark.l4"
+renderDefaultMarkRootFixture = fixtureDir </> "render-default-mark-root.l4"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -500,6 +508,7 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
+  , renderDefaultMarkFixture, renderDefaultMarkRootFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB, batchClausesCatchAll
@@ -906,6 +915,101 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
       sout `shouldNotSatisfy` mentionsOldName
+
+  -- A value the type checker added from a TYPICALLY default is not one the
+  -- author wrote, and a rendered document is read by someone who never sees
+  -- the source. Inline text says so ("`rate` is 3 by default"); a field list or
+  -- a table cell says it with "(by default)" after the value. Before this, the
+  -- two rendered a rule whose whole body is the call, and a record
+  -- construction, exactly as they rendered a source that wrote the value.
+  describe "l4 render: a value the checker added from a TYPICALLY default" $ do
+    let fieldsNamed name out = filter (name `isInfixOf`) (lines out)
+
+    it "marks it in a field list, and not the value the author wrote" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      -- `the bill` leaves rate out; `the written bill` writes it. Same document,
+      -- same value, two readings.
+      fieldsNamed "- rate" sout `shouldBe`
+        [ "    - rate \8212 3 (by default)"
+        , "    - rate \8212 3"
+        ]
+      -- the input the author did write is not marked
+      let bases = fieldsNamed "- base" sout
+      bases `shouldNotBe` []
+      all (== "    - base \8212 n") bases `shouldBe` True
+
+    it "marks it in a record construction, and not the field the author wrote" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      fieldsNamed "\8212 red" sout `shouldBe`
+        [ "    - colour \8212 red (by default)"
+        , "    - colour \8212 red"
+        ]
+
+    it "marks a constructor, a boolean and a number of ten thousand or more" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("    - colour \8212 Green (by default)" `isInfixOf`)
+      sout `shouldSatisfy` ("    - urgent \8212 FALSE (by default)" `isInfixOf`)
+      sout `shouldSatisfy` ("    - fee \8212 12,500 (by default)" `isInfixOf`)
+
+    it "still marks a call inside a larger expression, a large number too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy`
+        ("- otherwise: scaled where base is n and rate is 3 by default" `isInfixOf`)
+      -- grouped to 12,500 by the exporter before the mark is looked for
+      sout `shouldSatisfy`
+        ("- otherwise: big fee where base is n and fee is 12,500 by default" `isInfixOf`)
+
+    it "marks each defaulted cell of a table, and not a cell the author wrote" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      let rows = [ l | l <- lines sout, "| 1 " `isPrefixOf` dropWhile isSpace l
+                                      || "| 2 " `isPrefixOf` dropWhile isSpace l ]
+      case rows of
+        [row1, row2] -> do
+          row1 `shouldSatisfy` ("| red (by default) |" `isInfixOf`)
+          row2 `shouldSatisfy` ("| blue " `isInfixOf`)
+          row2 `shouldNotSatisfy` ("(by default)" `isInfixOf`)
+        _ -> expectationFailure ("expected the two rows of the table, got " ++ show rows)
+
+    it "says it in the HTML document, field list and table alike" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy`
+        ("<span class=\"field\">rate</span> \8212 <span class=\"prose\">3 (by default)</span>" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("<span class=\"field\">rate</span> \8212 <span class=\"prose\">3</span>" `isInfixOf`)
+      sout `shouldSatisfy` ("<td><span class=\"prose\">red (by default)</span></td>" `isInfixOf`)
+
+    it "carries it in the document JSON as the text of the value, with the shape unchanged" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "json", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"value\":\"3 (by default)\"" `isInfixOf`)
+      sout `shouldSatisfy` ("\"value\":\"3\"" `isInfixOf`)
+      -- no key was added to a field: still exactly `label` and `value`
+      sout `shouldSatisfy` ("{\"label\":\"rate\",\"value\":\"3 (by default)\"}" `isInfixOf`)
+
+    it "says it in the Akoma Ntoso document" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("3 (by default)" `isInfixOf`)
+
+  -- The limit the mark has, stated on the reference pages: it follows an
+  -- argument the checker added at a call or a construction. A default taken at
+  -- the root of a section GIVEN is not added to the call, so `l4 nlg` prints
+  -- nothing about it, and the `presumed` list is the account. If a later change
+  -- marks it, this test and those pages change together.
+  describe "l4 nlg: a default taken at the root of a section GIVEN" $
+    it "is not marked, while the same value written at the call is printed" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderDefaultMarkRootFixture]
+      code `shouldBe` ExitSuccess
+      lines sout `shouldBe`
+        [ "`tax on` where `amount` is 10 is equal to 12"
+        , "`tax on` where `amount` is 10 and `surcharge` is 7 is equal to 17"
+        ]
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $

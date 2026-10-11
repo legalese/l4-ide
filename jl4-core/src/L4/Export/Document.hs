@@ -747,8 +747,29 @@ decideRendering tysig body
       ("equals", CLeaf (normalizeWs f))
   | otherwise =
       (connectorFor tysig body, toClause body)
- where
-  fieldPair (MkNamedExpr _ f v) = (resolvedText f, leafText v)
+
+-- | One row of a field list: the field's name and its value as the list shows
+-- it ('namedValueText').
+fieldPair :: NamedExpr Resolved -> (Text, Text)
+fieldPair ne@(MkNamedExpr _ f _) = (resolvedText f, namedValueText ne)
+
+-- | The value of a named argument or field as a field list, or a table cell,
+-- shows it.
+--
+-- A value the type checker added from a @TYPICALLY@ default ('isDefaultFill',
+-- the test 'L4.Print' uses to leave it out of printed source) was not written
+-- at this site, and a reader of the document, who never sees the source, would
+-- take it for one that was. Inline text says so as @`rate` is 3 by default@
+-- ('L4.Nlg'); a list or a cell has no sentence for those words to fall in, so
+-- they follow the value in parentheses: @3 (by default)@.
+--
+-- The mark covers a default added at a named call or a construction. A default
+-- taken at the root of a section @GIVEN@ is not added to the call as an
+-- argument, so there is no value here to carry it.
+namedValueText :: NamedExpr Resolved -> Text
+namedValueText ne@(MkNamedExpr _ _ v)
+  | isDefaultFill ne = leafText v <> " (" <> Nlg.byDefaultPhrase <> ")"
+  | otherwise        = leafText v
 
 -- | Lay out a rule written as a list of clauses the way its clauses read.
 --
@@ -911,8 +932,10 @@ listElemTypeName e = case carameliseNode e of
   _ -> Nothing
 
 -- | A @LIST@ of record literals that all share the same field columns: the
--- column headings and the per-row field-value expressions. Renders as a table.
-bodyAsTable :: Expr Resolved -> Maybe ([Text], [[Expr Resolved]])
+-- column headings and the per-row field arguments, kept as written so that
+-- 'cellClause' can tell a value the author wrote from one the checker added.
+-- Renders as a table.
+bodyAsTable :: Expr Resolved -> Maybe ([Text], [[NamedExpr Resolved]])
 bodyAsTable e = case carameliseNode e of
   List _ items
     | Just recs@(firstRec : _) <- traverse asRecord items
@@ -923,10 +946,10 @@ bodyAsTable e = case carameliseNode e of
   _ -> Nothing
  where
   asRecord ex = case carameliseNode ex of
-    AppNamed _ _ nes _ -> Just [ (resolvedText f, v) | MkNamedExpr _ f v <- nes ]
+    AppNamed _ _ nes _ -> Just [ (resolvedText f, ne) | ne@(MkNamedExpr _ f _) <- nes ]
     _                  -> Nothing
 
-tableClause :: [Text] -> [[Expr Resolved]] -> Clause
+tableClause :: [Text] -> [[NamedExpr Resolved]] -> Clause
 tableClause cols rows = CTable cols [ map cellClause row | row <- rows ]
 
 -- | A literal list of more than three (non-record) values — e.g. strings,
@@ -942,12 +965,16 @@ bodyAsValueList e = case carameliseNode e of
 -- table, a nested record a small field list, anything else a value — and a
 -- reference to another defined list links to that list's table via the normal
 -- cross-reference mechanism.
-cellClause :: Expr Resolved -> Clause
-cellClause v
+--
+-- A value the checker added from a @TYPICALLY@ default carries its own mark
+-- ('namedValueText'), cell by cell: one column can hold both a default and a
+-- value the author wrote, so a note on the column would be wrong for one of
+-- them.
+cellClause :: NamedExpr Resolved -> Clause
+cellClause ne@(MkNamedExpr _ _ v)
   | Just (cols, rows) <- bodyAsTable v = tableClause cols rows
-  | Just (_, fields) <- bodyAsRecordLiteral v =
-      CFields [ (resolvedText f, leafText fv) | MkNamedExpr _ f fv <- fields ]
-  | otherwise = CLeaf (leafText v)
+  | Just (_, fields) <- bodyAsRecordLiteral v = CFields (map fieldPair fields)
+  | otherwise = CLeaf (namedValueText ne)
 
 declareClause :: TypeDecl Resolved -> Clause
 declareClause = \case

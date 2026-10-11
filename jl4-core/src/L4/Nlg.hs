@@ -23,6 +23,8 @@ module L4.Nlg (
   renderNlgWithIn,
   normalizeWs,
   oxford,
+  -- * The mark of a default the checker added
+  byDefaultPhrase,
 ) where
 
 import Base
@@ -748,7 +750,15 @@ instance Linearize (NamedExpr Resolved) where
       -- never sees the source, would otherwise take it for one that was. It is
       -- a rebuttable presumption declared elsewhere, so the text says so (W4,
       -- W5; review m2, 2026-10-03).
-      <> [ frame "by default" | isJust (exprDefaultFill e) ]
+      <> [ frame byDefaultPhrase | isJust (exprDefaultFill e) ]
+
+-- | The words that say a named argument's value was added by the checker
+-- from a @TYPICALLY@ default. One string, so that the sentence above and the
+-- field lists and table cells of "L4.Export.Document" say the same words. It is
+-- also the key of the Hebrew entry in 'L4.Nlg.Phrasebook', which
+-- 'L4.Export.Document' does not use.
+byDefaultPhrase :: Text
+byDefaultPhrase = "by default"
 
 -- | daydate's date constructors, applied to three whole-number literals, read
 -- as the date they name: @YMD 2025 7 16@ and @Date 16 7 2025@ both become

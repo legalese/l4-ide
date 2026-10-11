@@ -1068,10 +1068,16 @@ data DefaultFill = MkDefaultFill
 -- shapes a default can take are looked at ('L4.TypeCheck.isTypicallyLiteral':
 -- a literal, or a nullary constructor), which keeps the test to one constructor
 -- check for every other expression.
+--
+-- A third shape is looked at because the document exporter produces it: it
+-- rewrites a whole number of 10,000 or more into the text @12,500@, an 'Inert'
+-- node that keeps the annotation of the literal it replaced
+-- ('L4.Export.Document.rewriteExpr'), so the mark is still on it.
 exprDefaultFill :: Expr n -> Maybe DefaultFill
 exprDefaultFill = \ case
   Lit ann _     -> (.extra.defaultFill) ann
   App ann _ []  -> (.extra.defaultFill) ann
+  Inert ann _ _ -> (.extra.defaultFill) ann
   _             -> Nothing
 
 -- | A named argument the type checker added, as opposed to one the author wrote.

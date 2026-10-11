@@ -1,0 +1,62 @@
+-- How `l4 render` shows a value the type checker added from a TYPICALLY
+-- default. The same value is written out in a twin of each rule, so a test can
+-- put the two renderings side by side: a rendered document is read by someone
+-- who never sees the source, and the two must not read alike.
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN fee  IS A NUMBER TYPICALLY 12500
+      base IS A NUMBER
+GIVETH A NUMBER
+`big fee` MEANS fee PLUS base
+
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN colour IS A Colour TYPICALLY Green
+      urgent IS A BOOLEAN TYPICALLY FALSE
+      base   IS A NUMBER
+GIVETH A NUMBER
+graded MEANS IF urgent THEN base ELSE base
+
+-- A call that is a rule's whole body renders as a field list.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the bill` MEANS scaled WITH base IS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the written bill` MEANS scaled WITH base IS n, rate IS 3
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the big bill` MEANS `big fee` WITH base IS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the graded bill` MEANS graded WITH base IS n
+
+-- A call inside a larger expression renders as a sentence.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the nested bill` MEANS IF n EQUALS 0 THEN 0 ELSE scaled WITH base IS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the nested big bill` MEANS IF n EQUALS 0 THEN 0 ELSE `big fee` WITH base IS n
+
+-- A record construction renders as a field list.
+DECLARE Paint HAS
+  coats  IS A NUMBER
+  colour IS A STRING TYPICALLY "red"
+
+`some paint` MEANS Paint WITH coats IS 2
+
+`some written paint` MEANS Paint WITH coats IS 2, colour IS "red"
+
+-- A list of record constructions renders as a table. One column holds a
+-- default in the first row and a value the author wrote in the second.
+GIVETH A LIST OF Paint
+`all paints` MEANS LIST (Paint WITH coats IS 1), (Paint WITH coats IS 2, colour IS "blue")
