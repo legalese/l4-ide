@@ -95,6 +95,10 @@ data TAnnotations
   | TExport       !Text -- ^ "@export"
   | TFixity       !FixityDirection !Text -- ^ "@infixl" / "@infixr" / "@infix"
   | TNonexhaustive      !Text -- ^ "@nonexhaustive"
+  | TNonassertable
+    -- ^ @\@nonassertable@: the definition below may not be asserted by a
+    -- request (PRESUMPTION-ASSERTION contract §6). Its own token, so that a
+    -- @\@desc@ whose text happens to start with the word cannot stand in for it.
   | TLang         !LangTag !Text
     -- ^ @\@lang he@ — the module's default language, the one an untagged
     -- @\@nlg@ in that module is written in. The 'Text' is the RAW remainder
@@ -534,6 +538,14 @@ fixityAnnotation =
 nonexhaustiveAnnotation :: Lexer Text
 nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
 
+-- | @\@nonassertable@ takes nothing: it is the herald alone, and whatever
+-- follows it on the line is read as source. So a definition written after it
+-- on the same line is still parsed (and the mark is then reported as not on a
+-- line of its own), and prose after it is a parse error; a line annotation
+-- would swallow both silently.
+nonassertableAnnotation :: Lexer ()
+nonassertableAnnotation = () <$ (string "@nonassertable" <* notFollowedBy (satisfy (\ c -> isAlphaNum c || c == '_')))
+
 -- | A run of literal text inside an NLG annotation.
 --
 -- This is the RENDER-side lexer: it runs over the text an annotation already
@@ -832,6 +844,7 @@ annotationsPayload = asum
   , TExport       <$> exportAnnotation
   , uncurry TFixity <$> fixityAnnotation
   , TNonexhaustive      <$> nonexhaustiveAnnotation
+  , TNonassertable      <$  nonassertableAnnotation
   , (\ (mtag, t, ty) -> TNlg mtag t ty) <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
@@ -1506,6 +1519,7 @@ displayTokenType = \case
     TExport t         -> "@export" <> t
     TFixity dir t     -> fixityHerald dir <> t
     TNonexhaustive t        -> "@nonexhaustive" <> t
+    TNonassertable          -> "@nonassertable"
     TLang _ raw       -> "@lang" <> raw
   TIdentifiers i -> case i of
     TGenitive         -> "'s"

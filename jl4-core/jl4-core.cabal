@@ -243,6 +243,7 @@ test-suite jl4-core-test
     UUID5Spec
     ExportReadSetSpec
     ExportValidationSpec
+    NonassertableSpec
     CatalaLowerSpec
     NumberLiteralSpec
     NlgLangTagSpec

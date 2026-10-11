@@ -109,6 +109,30 @@ Human-readable descriptions.
 
 **Example:** [annotation-example.l4](annotation-example.l4)
 
+### @nonassertable
+
+Marks a named step as closed to assertion: once node assertion ships, a request to a published rule will not be allowed to supply a value for this definition, so its truth will have to come from what it is defined as.
+Today the mark is recorded and kept, and nothing reads it: a request that names the definition is treated as it is for an unmarked one.
+Write it on a line of its own above a `MEANS` or `DECIDE` definition, at the top level of a file or inside a section: above the definition's `GIVEN`, or directly above the line that names it.
+
+```l4
+§ `The offence`
+    GIVEN `did the act`    IS A BOOLEAN
+          `had the intent` IS A BOOLEAN
+          `has a defence`  IS A BOOLEAN
+
+@nonassertable
+`offence made out` MEANS `did the act` AND `had the intent` AND NOT `has a defence`
+```
+
+The mark changes nothing a rule works out, and it survives a re-print: `l4 batch` and the REPL, which re-print a module before running it, keep it.
+On anything that is not a definition, above it or among its lines, it is an error that names what it sits on: a `DECLARE`, an `ASSUME`, a section heading or the `GIVEN` under it, a directive, an `IMPORT`.
+On one of a definition's own `GIVEN` lines it is an error too, one per mark, naming the input on that line (or the next one, for a mark on a line of its own among them): an input is supplied, never asserted, so there is nothing there to close; a mark above the same definition still counts.
+The mark takes no words: what follows it on the line is read as source and never swallowed, so prose after it is an error, often reported on the next line or inside the definition before; a definition written on the mark's line usually fails to parse, since it no longer starts at the margin, and where it does parse the mark is its.
+A mark at the end of the line that names a definition, or inside its body, is a warning and carries nothing; one at the end of the `GIVETH` line is above the name line and counts; two marks above one definition are one mark and a warning.
+A `@desc` whose text begins with the word `nonassertable` is a description, not the mark.
+Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the request-side assertion the mark closes; both are designed in `specs/todo/presumption-assertion/CONTRACT.md` and not built.
+
 ### @nlg
 
 Natural language generation hints.
