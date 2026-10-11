@@ -64,6 +64,7 @@ import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4)
 import TestStoreDir (withStoreDir)
+import TestData (deonticEventRecordsJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -4195,6 +4196,82 @@ spec = describe "integration" do
               _ -> expectationFailure "Missing properties in parameters"
           _ -> expectationFailure "Missing parameters in response"
 
+  -- O4 of the 2026-10-11 overnight bench. An argument record is decoded from
+  -- JSON, so it may leave out a field that has a TYPICALLY and take the default,
+  -- and its schema says so. An event's record is written into the generated
+  -- wrapper as source text, so it may not: a request that leaves a field out is
+  -- refused. The schema built both records the same way and promised the
+  -- default for the event too, and described a record nested in an event in the
+  -- plain form an argument uses, which the wrapper does not read. (Card O4:
+  -- "Accept B as the target, and keep A until B lists.") Nothing here changes
+  -- how an event is evaluated.
+  describe "an event's record in the published schema (O4)" do
+    let getJson baseUrl mgr path = do
+          req <- parseRequest (baseUrl <> path)
+          resp <- httpLbs req mgr
+          statusCode' resp `shouldBe` 200
+          case Aeson.decode (responseBody resp) of
+            Just v -> pure (v :: Aeson.Value)
+            Nothing -> expectationFailure ("not JSON: " <> path) >> pure Aeson.Null
+        functionPath dep = "/deployments/" <> dep <> "/functions/seatbelt%20requirement"
+
+    it "requires every field of an event's party and action, with no default, at any depth" do
+      withServiceFromSources "ev-schema" [("events.l4", deonticEventRecordsJL4)] \baseUrl mgr -> do
+        fnDoc <- getJson baseUrl mgr (functionPath "ev-schema")
+        openapi <- getJson baseUrl mgr "/deployments/ev-schema/openapi.json"
+        forM_ [("the function document" :: String, fnDoc), ("openapi.json", openapi)] \(label, doc) -> do
+          let items = typedEventItems doc
+          -- the search finds the typed events in this document
+          (label, null items) `shouldBe` (label, False)
+          forM_ items \item -> do
+            let at path = jsonTexts (jsonAt path item)
+                party = ["properties", "party"]
+                action = ["properties", "action"]
+                address = party <> ["properties", "zhome", "properties", "Address"]
+            (label, at (party <> ["required"])) `shouldBe` (label, Just ["name", "licence", "zhome"])
+            (label, at (action <> ["required"])) `shouldBe` (label, Just ["body", "channel"])
+            -- a record in the party is written under its constructor's name
+            (label, at (party <> ["properties", "zhome", "required"])) `shouldBe` (label, Just ["Address"])
+            (label, at (address <> ["required"])) `shouldBe` (label, Just ["zip", "floor"])
+            (label, hasKeyAnywhere "default" item) `shouldBe` (label, False)
+
+    it "still publishes an argument record's defaults, optional and in the plain form" do
+      withServiceFromSources "ev-schema-args" [("events.l4", deonticEventRecordsJL4)] \baseUrl mgr -> do
+        fnDoc <- getJson baseUrl mgr (functionPath "ev-schema-args")
+        let at path = jsonAt (["parameters", "properties"] <> path) fnDoc
+        jsonTexts (at ["driver", "required"]) `shouldBe` Just ["name", "zhome"]
+        at ["driver", "properties", "licence", "default"] `shouldBe` Just (Aeson.String "full")
+        -- a nested argument record is plain, with its own optional field
+        jsonTexts (at ["driver", "properties", "zhome", "required"]) `shouldBe` Just ["zip"]
+        at ["driver", "properties", "zhome", "properties", "floor", "default"] `shouldBe` Just (Aeson.Number 1)
+        at ["driver", "properties", "zhome", "properties", "Address"] `shouldBe` Nothing
+        jsonTexts (at ["note", "required"]) `shouldBe` Just ["body"]
+        at ["note", "properties", "channel", "default"] `shouldBe` Just (Aeson.String "email")
+
+    it "answers an event written the way the schema says, and refuses one that leaves a field out" do
+      withServiceFromSources "ev-schema-wire" [("events.l4", deonticEventRecordsJL4)] \baseUrl mgr -> do
+        fnDoc <- getJson baseUrl mgr (functionPath "ev-schema-wire")
+        item <- case typedEventItems fnDoc of
+          [i] -> pure i
+          other -> expectationFailure ("expected one typed events schema, got " <> show (length other)) >> pure Aeson.Null
+        let request event = Aeson.object
+              [ "arguments" Aeson..= Aeson.object
+                  [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text), "zhome" Aeson..= Aeson.object ["zip" Aeson..= (5 :: Int)]]
+                  , "note" Aeson..= Aeson.object ["body" Aeson..= ("hi" :: Text)]
+                  ]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event]
+              ]
+            written = exampleOf item
+        -- the example is the schema's own: every required field, the nested record under its name
+        jsonAt ["party", "zhome", "Address"] written `shouldSatisfy` Maybe.isJust
+        answered <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request written)
+        assertSuccess answered \_ -> pure ()
+        -- the same event with one field left out is refused, whether or not the field has a default
+        forM_ [["party", "licence"], ["action", "channel"], ["party", "zhome", "Address", "floor"], ["party", "name"]] \path -> do
+          refused <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request (deleteAt path written))
+          (path, statusCode' refused) `shouldBe` (path, 422)
+
   describe "state graphs" do
     it "returns empty list for a boolean-only module" do
       withServiceFromSources "sg-empty" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -6059,6 +6136,66 @@ ladderLeafAtoms fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
      in here <> concatMap go (Aeson.KeyMap.elems o)
   go (Aeson.Array xs) = concatMap go (toList xs)
   go _ = []
+
+-- | The value at a path of object keys, if every step is there.
+jsonAt :: [Text] -> Aeson.Value -> Maybe Aeson.Value
+jsonAt [] v = Just v
+jsonAt (k : ks) (Aeson.Object o) = Aeson.KeyMap.lookup (Aeson.Key.fromText k) o >>= jsonAt ks
+jsonAt _ _ = Nothing
+
+-- | The texts of a JSON array of strings.
+jsonTexts :: Maybe Aeson.Value -> Maybe [Text]
+jsonTexts (Just (Aeson.Array xs)) = traverse (\case Aeson.String t -> Just t; _ -> Nothing) (toList xs)
+jsonTexts _ = Nothing
+
+-- | Whether a key is anywhere in a JSON value, at any depth.
+hasKeyAnywhere :: Text -> Aeson.Value -> Bool
+hasKeyAnywhere k = \case
+  Aeson.Object o -> Aeson.KeyMap.member (Aeson.Key.fromText k) o || any (hasKeyAnywhere k) (Aeson.KeyMap.elems o)
+  Aeson.Array xs -> any (hasKeyAnywhere k) (toList xs)
+  _ -> False
+
+-- | The @items@ schema of every @events@ property, at any depth, that describes
+-- a party: the typed events a deontic function takes. The untyped
+-- @{"type": "object"}@ that openapi.json also gives the top-level @events@ has
+-- no party, so it is not one.
+typedEventItems :: Aeson.Value -> [Aeson.Value]
+typedEventItems = \case
+  Aeson.Object o ->
+    [ items
+    | Just events <- [Aeson.KeyMap.lookup "events" o]
+    , Just items <- [jsonAt ["items"] events]
+    , Maybe.isJust (jsonAt ["properties", "party"] items)
+    ] <> concatMap typedEventItems (Aeson.KeyMap.elems o)
+  Aeson.Array xs -> concatMap typedEventItems (toList xs)
+  _ -> []
+
+-- | A value that satisfies a published schema: its required properties, filled in.
+exampleOf :: Aeson.Value -> Aeson.Value
+exampleOf schema = case jsonAt ["type"] schema of
+  Just (Aeson.String "object") ->
+    let props = case jsonAt ["properties"] schema of
+          Just (Aeson.Object o) -> o
+          _ -> mempty
+        required = Maybe.fromMaybe [] (jsonTexts (jsonAt ["required"] schema))
+    in Aeson.object
+         [ (Aeson.Key.fromText k, exampleOf v)
+         | k <- required
+         , Just v <- [Aeson.KeyMap.lookup (Aeson.Key.fromText k) props]
+         ]
+  Just (Aeson.String "string") -> case jsonAt ["enum"] schema of
+    Just (Aeson.Array es) | e : _ <- toList es -> e
+    _ -> Aeson.String "x"
+  Just (Aeson.String "number") -> Aeson.Number 1
+  Just (Aeson.String "boolean") -> Aeson.Bool True
+  Just (Aeson.String "array") -> Aeson.toJSON (maybe [] (\items -> [exampleOf items]) (jsonAt ["items"] schema))
+  _ -> Aeson.Null
+
+-- | A JSON value without the key at the end of a path.
+deleteAt :: [Text] -> Aeson.Value -> Aeson.Value
+deleteAt [k] (Aeson.Object o) = Aeson.Object (Aeson.KeyMap.delete (Aeson.Key.fromText k) o)
+deleteAt (k : ks) (Aeson.Object o) = Aeson.Object (Aeson.KeyMap.mapWithKey (\key v -> if key == Aeson.Key.fromText k then deleteAt ks v else v) o)
+deleteAt _ v = v
 
 -- | Decode a JSON response body as an Aeson Object.
 decodeObject :: LBS.ByteString -> Maybe Aeson.Object

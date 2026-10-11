@@ -12,10 +12,12 @@ import Backend.Api
 import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryRefusal (..), QueryPlanResponse (..))
 import qualified L4.Decision.QueryPlan as QP
 import L4.FunctionSchema (Parameters (..), Parameter (..))
+import Compiler (eventRecordParameter)
 import ControlPlane (DeploymentStatusResponse (..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.Map as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import Schema (serverOpenApi)
 import Servant.API (FromHttpApiData (..))
@@ -104,6 +106,63 @@ spec = do
           [ "@id" Aeson..= (2 :: Int), "@presumed" Aeson..= ([] :: [Text.Text]), "value" Aeson..= (8 :: Int) ]
       it "reads both back as they were written" do
         Aeson.fromJSON (Aeson.toJSON [errored, answered]) `shouldBe` Aeson.Success [errored, answered]
+
+    -- O4 of the 2026-10-11 overnight bench: an event's record is written into
+    -- the generated wrapper as source, not decoded, so its schema is not an
+    -- argument's.
+    describe "eventRecordParameter" do
+      let param t = Parameter t Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing
+          withDefault v p = p { parameterDefault = Just v }
+          record l4Type fields = (param "object")
+            { parameterProperties = Just (Map.fromList fields)
+            , parameterPropertyOrder = Just (map fst fields)
+            , parameterRequired = Just [n | (n, p) <- fields, Maybe.isNothing p.parameterDefault]
+            , parameterL4Type = Just l4Type
+            }
+          address = record "Address"
+            [ ("zip", param "number")
+            , ("floor", withDefault (Aeson.Number 1) (param "number"))
+            ]
+          driver = record "Driver"
+            [ ("name", param "string")
+            , ("licence", withDefault (Aeson.String "full") (param "string"))
+            , ("homes", (param "array") { parameterItems = Just address })
+            , ("zhome", address { parameterDescription = "where they live" })
+            ]
+          event = eventRecordParameter driver
+          field name = Map.lookup name (Maybe.fromMaybe mempty event.parameterProperties)
+          fieldOf name p = Map.lookup name (Maybe.fromMaybe mempty p.parameterProperties)
+
+      it "requires every field, in declaration order, and takes the defaults off" do
+        event.parameterRequired `shouldBe` Just ["name", "licence", "homes", "zhome"]
+        field "licence" `shouldSatisfy` Maybe.isJust
+        (field "licence" >>= (.parameterDefault)) `shouldBe` Nothing
+
+      it "writes a nested record under its constructor's name, with every field required" do
+        let wrapper = Maybe.fromJust (field "zhome")
+        wrapper.parameterRequired `shouldBe` Just ["Address"]
+        wrapper.parameterPropertyOrder `shouldBe` Just ["Address"]
+        wrapper.parameterL4Type `shouldBe` Nothing
+        wrapper.parameterDescription `shouldBe` "where they live. Written under its constructor's name: {\"Address\": {...}}."
+        let inner = Maybe.fromJust (fieldOf "Address" wrapper)
+        inner.parameterRequired `shouldBe` Just ["zip", "floor"]
+        inner.parameterL4Type `shouldBe` Just "Address"
+        inner.parameterDescription `shouldBe` ""
+        (fieldOf "floor" inner >>= (.parameterDefault)) `shouldBe` Nothing
+
+      it "writes a record in a list the same way" do
+        let homes = Maybe.fromJust (field "homes")
+            element = Maybe.fromJust homes.parameterItems
+        element.parameterRequired `shouldBe` Just ["Address"]
+        (fieldOf "Address" element >>= (.parameterRequired)) `shouldBe` Just ["zip", "floor"]
+
+      it "leaves alone what is not a record" do
+        let enum = (param "string") { parameterEnum = ["wear seatbelt", "drive"], parameterL4Type = Just "Driver Action" }
+            stub = (param "object") { parameterL4Type = Just "Driver" }
+        eventRecordParameter enum `shouldBe` enum
+        eventRecordParameter (param "number") `shouldBe` param "number"
+        -- a record cut short by the schema's own recursion guard has no fields to require
+        eventRecordParameter stub `shouldBe` stub
 
 -- ----------------------------------------------------------------------------
 -- Arbitrary instances

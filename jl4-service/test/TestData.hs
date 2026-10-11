@@ -97,6 +97,7 @@ module TestData (
   recordWrapJL4,
   ownDecodeJL4,
   deonticDefaultJL4,
+  deonticEventRecordsJL4,
   spinJL4,
   spinOrRefuseJL4,
   spinWrapperJL4,
@@ -1340,6 +1341,38 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A deontic rule whose party and action are records with a @TYPICALLY@ field
+-- each, and a record nested in the party (O4 of the 2026-10-11 overnight bench).
+-- An argument may leave those fields out; an event's record may not. The nested
+-- @zhome@ sorts after every other field of @Driver@ on purpose: the service
+-- writes an event's record in key order, and a field after a nested record
+-- would be taken by the nested record's @WITH@.
+deonticEventRecordsJL4 :: Text
+deonticEventRecordsJL4 =
+  [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    floor IS A NUMBER TYPICALLY 1
+
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+    zhome IS AN Address
+
+DECLARE Msg HAS
+    body IS A STRING
+    channel IS A STRING TYPICALLY "email"
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+      note IS A Msg
+GIVETH A PROVISION OF Driver, Msg
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST note
+    WITHIN 5
 |]
 
 -- | A rule whose cost is set by its input: it counts @n@ down to zero, so one

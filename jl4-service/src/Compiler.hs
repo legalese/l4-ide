@@ -2,6 +2,7 @@ module Compiler (
   compileBundle,
   computeVersion,
   toDecl,
+  eventRecordParameter,
 ) where
 
 import qualified Backend.Jl4 as Jl4
@@ -24,6 +25,7 @@ import Data.Aeson (toJSON)
 import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Ord (comparing)
 import qualified Data.Set as Set
 import Data.Text (Text)
@@ -377,11 +379,13 @@ exportToFunction declares implicitParams export =
           Just (p, a) -> (Just p, Just a)
           Nothing -> (Nothing, Nothing)
         Nothing -> (Nothing, Nothing)
-      -- Build typed event schema using actual party/action types
+      -- Build typed event schema using actual party/action types. An event's
+      -- record is not decoded the way an argument is, so it is not described
+      -- the way an argument is ('eventRecordParameter').
       (partyParam, actionParam) = case export.exportReturnType of
         Just (TyApp _ _ [partyTy, actionTy]) ->
-          ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
-          , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
+          ( eventRecordParameter ((typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" })
+          , eventRecordParameter ((typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" })
           )
         _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing Nothing
              , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing Nothing
@@ -442,6 +446,61 @@ exportToFunction declares implicitParams export =
     , returnSchema = mReturnSchema
     , isDeontic = isDeontic
     }
+
+-- | How the published schema describes the record of an event's @party@ or
+-- @action@ (card O4 of the 2026-10-11 overnight bench: "keep A until B
+-- lists").
+--
+-- An argument record is decoded from JSON, which is why it may leave out a
+-- field that has a @TYPICALLY@ and take the default, and why its schema says
+-- so. An event's record is not decoded: 'Backend.CodeGen.prepareEvents' writes
+-- it into the generated wrapper as source text (@Driver WITH name IS "Alice"@),
+-- so the request has to give every field. A schema built exactly like an
+-- argument's would promise a default the service never takes. So here:
+--
+-- * every field is @required@ and none carries a @default@, at every depth;
+--
+-- * a record inside the record is written under its constructor's name,
+--   @{"Address": {"zip": 5, "floor": 2}}@, which is the only form the wrapper
+--   reads ('Backend.CodeGen.fnLiteralToL4Expr'); the plain @{"zip": 5}@ an
+--   argument uses fails to type-check. The same holds for a record in a list.
+--   The party or action record itself is written plainly, as before.
+--
+-- This describes what the wrapper reads today; it does not change what the
+-- wrapper reads. What it cannot write as source it still cannot, and the schema
+-- does not hide that by describing a different shape. Measured on 2026-10-11 at
+-- 72044c7b9: a text field inside a nested record, a field of an enumeration
+-- type, and a @MAYBE@ field given a value (only @null@ is read) all fail to
+-- type-check, and so does a field whose name sorts after a nested record's (the
+-- wrapper writes the fields in key order and the nested record's @WITH@ takes
+-- the rest). That is the decoder's to fix, not this schema's.
+eventRecordParameter :: Parameter -> Parameter
+eventRecordParameter p = case p.parameterProperties of
+  Nothing -> p -- an enumeration, a number, an opaque type: no fields to require
+  Just fields -> p
+    { parameterProperties = Just (Map.map eventFieldParameter fields)
+    , parameterRequired = Just (Maybe.fromMaybe (Map.keys fields) p.parameterPropertyOrder)
+    }
+
+-- | A field of an event's record: no default, and a record written under its
+-- constructor's name ('eventRecordParameter').
+eventFieldParameter :: Parameter -> Parameter
+eventFieldParameter field0 = case (field.parameterProperties, field.parameterL4Type) of
+  (Just _, Just constructor) ->
+    field
+      { parameterDescription =
+          let hint = "Written under its constructor's name: {\"" <> constructor <> "\": {...}}."
+              described = Text.strip field.parameterDescription
+           in if Text.null described then hint
+              else described <> (if "." `Text.isSuffixOf` described then " " else ". ") <> hint
+      , parameterProperties = Just (Map.singleton constructor (eventRecordParameter field) { parameterDescription = "" })
+      , parameterPropertyOrder = Just [constructor]
+      , parameterRequired = Just [constructor]
+      , parameterL4Type = Nothing
+      }
+  _ -> field { parameterItems = eventFieldParameter <$> field.parameterItems }
+ where
+  field = field0 { parameterDefault = Nothing }
 
 -- | Build Parameters from ExportedParam list.
 --
