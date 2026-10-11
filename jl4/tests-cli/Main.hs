@@ -94,6 +94,11 @@ renderDefaultMarkFixture, renderDefaultMarkRootFixture :: FilePath
 renderDefaultMarkFixture     = fixtureDir </> "render-default-mark.l4"
 renderDefaultMarkRootFixture = fixtureDir </> "render-default-mark-root.l4"
 
+-- | @T WITHAL@ on a record with no fields, as a rule's whole body, as an
+-- argument and as the value of a field: how @l4 render@ and @l4 nlg@ read it.
+renderEmptyRecordFixture :: FilePath
+renderEmptyRecordFixture = fixtureDir </> "render-empty-record.l4"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -508,7 +513,7 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
-  , renderDefaultMarkFixture, renderDefaultMarkRootFixture
+  , renderDefaultMarkFixture, renderDefaultMarkRootFixture, renderEmptyRecordFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB, batchClausesCatchAll
@@ -1010,6 +1015,36 @@ spec bin = do
         [ "`tax on` where `amount` is 10 is equal to 12"
         , "`tax on` where `amount` is 10 and `surcharge` is 7 is equal to 17"
         ]
+
+  -- `Marker WITHAL` on a record with no fields checks to a named application
+  -- with nothing written. It used to render as a field list with no fields
+  -- ("The marker is a Marker with:" and nothing after it) and as "Marker where"
+  -- (found by the Opus review of the combined branch, 2026-10-12).
+  describe "l4 render and l4 nlg: T WITHAL on a record with no fields" $ do
+    it "reads as the record's name where it stands, with no text left hanging" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderEmptyRecordFixture]
+      code `shouldBe` ExitSuccess
+      let ls = map (filter (/= '\r')) (lines sout)
+      -- a rule whose whole body is the record, an argument, and a field's value
+      ls `shouldSatisfy` ("\8226 The marker means Marker." `elem`)
+      ls `shouldSatisfy` ("\8226 Check holds if is marker with Marker." `elem`)
+      ls `shouldSatisfy` ("    - mark \8212 Marker" `elem`)
+      -- the field that has a value still shows it
+      ls `shouldSatisfy` ("    - n \8212 1" `elem`)
+      sout `shouldNotSatisfy` ("where" `isInfixOf`)
+      sout `shouldNotSatisfy` ("is a Marker with" `isInfixOf`)
+
+    it "says the record's name in the HTML document too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", renderEmptyRecordFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("The marker</span> means" `isInfixOf`)
+      sout `shouldNotSatisfy` ("Marker where" `isInfixOf`)
+      sout `shouldNotSatisfy` ("is a Marker with" `isInfixOf`)
+
+    it "prints the name, and no \"where\", in the natural-language line" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderEmptyRecordFixture]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe` [ "`is marker` with `Marker`" ]
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $

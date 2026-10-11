@@ -606,6 +606,9 @@ instance Linearize (Expr Resolved) where
             [ frame "with"
             , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin es)
             ]
+    -- @T WITHAL@ checks to a named application with nothing written: it is
+    -- the record @T@, and there is no "where" for it to say.
+    AppNamed _ n [] _order -> linearize n
     AppNamed _ n es _order -> hcat
       [ linearize n
       , frame "where"

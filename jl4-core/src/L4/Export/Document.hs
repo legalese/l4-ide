@@ -916,10 +916,13 @@ typeNameText = \case
   TyApp _ n _ -> nameToText (getActual n)
   _           -> ""
 
+-- | A record construction that writes at least one field. @T WITHAL@ checks to
+-- a named application with none, which has no field list to show and reads as
+-- the bare constructor.
 bodyAsRecordLiteral :: Expr Resolved -> Maybe (Text, [NamedExpr Resolved])
 bodyAsRecordLiteral = \case
-  AppNamed _ ctor nes _ -> Just (resolvedText ctor, nes)
-  _                     -> Nothing
+  AppNamed _ ctor nes@(_ : _) _ -> Just (resolvedText ctor, nes)
+  _                             -> Nothing
 
 -- | The element type name of a @LIST@ of record literals — the constructor of
 -- its first element (the rows share columns, so the type is uniform). Used to
