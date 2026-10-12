@@ -82,6 +82,8 @@ module L4.Viz.AtomKey
   , mkKeyEnv
   , emptyKeyEnv
   , termKey
+  , digestThreshold
+  , inlinedSize
   , atomIdOfKey
   , withTypeExpander
   , withLocalsInScope
@@ -102,6 +104,7 @@ import L4.Syntax
 import L4.TypeCheck.Environment (jsonDecodeUnique)
 import qualified L4.Transform as Transform (inlineLocalBindings, positionalCall)
 import qualified L4.Crypto.UUID5 as UUID5
+import qualified L4.Transform as Transform (Unfoldable (..), callees, pruneRecursive, unfoldableDecide)
 
 -- | What 'termKey' needs to know about the module a term comes from.
 data KeyEnv = MkKeyEnv
@@ -308,6 +311,129 @@ withLocalsInScope locals e
       let seen' = seen <> foldMap namesIn (Map.restrictKeys defined seen)
        in if seen' == seen then seen else grow seen'
     namesIn x = Set.fromList [getUnique r | r <- toList x, Map.member (getUnique r) defined]
+
+-- | The size, in expression nodes, past which a leaf is no longer keyed by the
+-- 'show' of its term. ASSUMED, NOT RULED (WHERE-INLINING-SPEC §10.1, R3c). Compared
+-- with the leaf's 'inlinedSize': the number of nodes of the leaf with its locals put
+-- in, which is the size of the term the key is a key OF.
+--
+-- The unit is expression nodes, not time. The largest leaf over every .l4 under
+-- jl4/examples that is not a deliberate error (537 files, 8,085 leaves),
+-- jl4-core/libraries and doc (130 files, 687 leaves), with its locals put in, is
+-- 313 nodes (measured 2026-10-12), and the largest with a local in it is 267; the
+-- threshold is the next power of two above four times the largest. A leaf at the
+-- threshold has a key of about 600,000 characters (305 a node, measured on a body
+-- of AND, NOT and variables).
+digestThreshold :: Int
+digestThreshold = 2048
+
+-- | How many expression nodes 'Transform.inlineLocalBindings' would leave of this
+-- term, worked out WITHOUT putting the locals in: a pass over the term, plus one
+-- evaluation of each local for each distinct set of argument sizes it is called
+-- with. The sizes saturate just above 'digestThreshold', so nothing here is ever
+-- exponential, and a result over the threshold means only "over".
+--
+-- An estimate, not the pass. It equals the real count for the body of every rule
+-- the ladder can draw under jl4/examples/ok and legal (jl4-lsp's AtomKeySizeSpec,
+-- which also requires more than ten of them to have a WHERE or a LET; canon
+-- agreed too, run once), and on the shapes in jl4-core's AtomKeySpec. Where it can
+-- differ is a declaration that STAYS (one that cannot be put in, or is still named
+-- after the calls are): which of the others it keeps is decided by a rule that can
+-- keep one more than the real pass does ('scope'). The exponential of a chain of
+-- locals is the one thing it never counts.
+inlinedSize :: Expr Resolved -> Int
+inlinedSize expr = evalState (size Set.empty Map.empty expr) Map.empty
+  where
+    cap = digestThreshold + 1
+    clamp = min cap
+
+    -- Every local the term declares that can be put in, wherever it sits: names
+    -- are resolved to Uniques, so one flat map is as good as scoping.
+    usable :: Map Unique Transform.Unfoldable
+    usable =
+      Transform.pruneRecursive . Map.fromList $
+        [ p
+        | LocalDecide _ d <- concatMap localsOf (toListOf (cosmosOf (gplate @(Expr Resolved))) expr)
+        , Just p <- [Transform.unfoldableDecide d]
+        ]
+
+    localsOf = \case
+      Where _ _ ds -> ds
+      LetIn _ ds _ -> ds
+      _ -> []
+
+    -- @blocked@ are the locals whose calls are NOT put in here: inside a
+    -- declaration that stays, the pass that puts in its own scope's locals has
+    -- already run past it.
+    size :: Set Unique -> Map Unique Int -> Expr Resolved -> State (Map (Unique, [Int]) Int) Int
+    size blocked params e = case e of
+      Where _ body ds -> scope blocked params body ds
+      LetIn _ ds body -> scope blocked params body ds
+      -- a parameter is replaced by its argument, whole
+      App _ r [] | Just n <- Map.lookup (getUnique r) params -> pure n
+      _ | Just (r, args) <- Transform.positionalCall e
+        , not (Set.member (getUnique r) blocked)
+        , Just (Transform.MkUnfoldable ps body) <- Map.lookup (getUnique r) usable
+        , length args == length ps -> do
+            sizes <- traverse (size blocked params) args
+            call (getUnique r) ps body sizes
+      _ -> do
+        ks <- traverse (size blocked params) (toListOf (gplate @(Expr Resolved)) e)
+        pure (clamp (1 + sum ks))
+
+    -- A scope disappears when every local in it is put in and none is named again;
+    -- otherwise it stays round the body, with the declarations that are left. Those
+    -- are the ones that cannot be put in, and the ones that can but are still named
+    -- after the calls are replaced: a call at another arity (a local passed as a
+    -- value), or a mention in a declaration that stays. This takes every mention in
+    -- the body and the local bodies, whether or not the call it sits in is
+    -- replaced, so it can keep a declaration that 'Transform.inlineLocalBindings'
+    -- drops.
+    scope blocked params body ds = do
+      b <- size blocked params body
+      let here = Map.fromList [(u, length ps) | d <- ds, Just (u, Transform.MkUnfoldable ps _) <- [unfoldable d], Map.member u usable]
+          stays = [d | d <- ds, not (putIn d)]
+          bodiesPutIn = [e | d <- ds, Just (u, Transform.MkUnfoldable _ e) <- [unfoldable d], Map.member u usable]
+          named =
+            foldMap (offArity here) (body : bodiesPutIn)
+              <> foldMap Transform.callees [e | d <- stays, e <- toListOf (gplate @(Expr Resolved)) d]
+          stillNamed = [d | d <- ds, putIn d, Just (u, _) <- [unfoldable d], Set.member u named]
+          left = stays <> stillNamed
+      ks <- traverse (declSize (blocked <> Map.keysSet here) params) left
+      pure (clamp (if null left then b else 1 + b + sum ks))
+
+    unfoldable = \case
+      LocalDecide _ d -> Transform.unfoldableDecide d
+      _ -> Nothing
+
+    putIn d = case unfoldable d of
+      Just (u, _) -> Map.member u usable
+      Nothing -> False
+
+    -- The locals of @here@ that the expression names other than by a call with
+    -- exactly their parameters.
+    offArity here = foldMapOf (cosmosOf (gplate @(Expr Resolved))) \e ->
+      case e of
+        App _ r _ -> check r e
+        AppNamed _ r _ _ -> check r e
+        _ -> Set.empty
+      where
+        check r e = case Map.lookup (getUnique r) here of
+          Just arity | maybe True ((/= arity) . length . snd) (Transform.positionalCall e) -> Set.singleton (getUnique r)
+          _ -> Set.empty
+
+    declSize blocked params d = sum <$> traverse (size blocked params) (toListOf (gplate @(Expr Resolved)) d)
+
+    -- The memo is keyed by the callee and the sizes of its arguments: the size of
+    -- a call depends on nothing else about them.
+    call u ps body sizes = do
+      memo <- get
+      case Map.lookup (u, sizes) memo of
+        Just n -> pure n
+        Nothing -> do
+          n <- size Set.empty (Map.fromList (zip ps sizes)) body
+          modify' (Map.insert (u, sizes) n)
+          pure n
 
 -- | The C1 key of a term (see the module header).
 termKey :: KeyEnv -> Expr Resolved -> Text

@@ -9,12 +9,15 @@
 module AtomKeySpec (spec) where
 
 import Data.Text (Text)
+import qualified Data.Text as Text
+import Optics (cosmosOf, gplate, lengthOf)
 import Test.Hspec
 
 import Base (NormalizedUri, Uri (..), toNormalizedUri)
 import L4.Annotation (emptyAnno)
 import L4.Syntax
-import L4.Viz.AtomKey (mkKeyEnv, termKey)
+import qualified L4.Transform as Transform
+import L4.Viz.AtomKey (inlinedSize, mkKeyEnv, termKey)
 
 uri :: Text -> NormalizedUri
 uri = toNormalizedUri . Uri
@@ -134,3 +137,85 @@ spec = describe "L4.Viz.AtomKey.termKey" $ do
               m = moduleOf [rule (u (off + 1)) "other" [] (var (ref (u (off + 2)) "p")), rule (u (off + 3)) "r" [p] body]
            in termKey (mkKeyEnv m) body
     build 100 `shouldBe` build 0
+
+  describe "the size of a leaf with its locals put in" $ do
+    -- Hand-built, so each term is the shape it names.
+    let y = ref (u 2) "y"
+        env = mkKeyEnv (moduleOf [rule (u 1) "r" [Def (u 2) (nm "y")] (var y)])
+        key = termKey env
+
+        local k t params body =
+          LocalDecide emptyAnno $
+            MkDecide emptyAnno
+              (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+              (MkAppForm emptyAnno (Def k (nm t)) [Def pk (nm p) | (pk, p) <- params] Nothing)
+              body
+
+        -- LET a0 BE y IN LET a1 BE a0 AND y OR a0 IN ... a(n-1): each local names the
+        -- one before it twice, so what it means doubles with each, and the source
+        -- does not.
+        aRef i = ref (u (100 + i)) ("a" <> Text.pack (show i))
+        chainLet :: Int -> Expr Resolved
+        chainLet n = go 0
+          where
+            go i
+              | i == n = var (aRef (n - 1))
+              | otherwise = LetIn emptyAnno [local (u (100 + i)) ("a" <> Text.pack (show i)) [] (rhs i)] (go (i + 1))
+            rhs 0 = var y
+            rhs i = Or emptyAnno (And emptyAnno (var (aRef (i - 1))) (var y)) (var (aRef (i - 1)))
+        -- the same proposition as chainLet n, with every local written out
+        writtenOut :: Int -> Expr Resolved
+        writtenOut 0 = var y
+        writtenOut i = Or emptyAnno (And emptyAnno (writtenOut (i - 1)) (var y)) (writtenOut (i - 1))
+
+        -- the number of nodes Transform.inlineLocalBindings leaves
+        inlinedNodes :: Expr Resolved -> Int
+        inlinedNodes = lengthOf (cosmosOf (gplate @(Expr Resolved))) . Transform.inlineLocalBindings
+
+    it "is estimated at the size inlineLocalBindings leaves, for each shape of local" $ do
+      let f = ref (u 10) "f"
+          g = ref (u 11) "g"
+          z = ref (u 12) "z"
+          n = ref (u 13) "n"
+          anyOf' = ref (u 14) "any"
+          x = var (ref (u 3) "x")
+          call h args = App emptyAnno h args
+          fDecl body = local (u 10) "f" [(u 13, "n")] body
+          shapes =
+            [ ("a chain of 1", chainLet 1)
+            , ("a chain of 6", chainLet 6)
+            , ( "a local called twice"
+              , LetIn emptyAnno [fDecl (And emptyAnno (var n) (Not emptyAnno (var n)))] (And emptyAnno (call f [x]) (call f [var y]))
+              )
+            , ( "a local calling a local, each twice"
+              , LetIn
+                  emptyAnno
+                  [ fDecl (And emptyAnno (var n) (var y))
+                  , local (u 11) "g" [(u 13, "n")] (And emptyAnno (call f [var n]) (call f [var n]))
+                  ]
+                  (call g [x])
+              )
+            , ( "a local passed as a value stays"
+              , LetIn emptyAnno [fDecl (And emptyAnno (var n) (var y))] (call anyOf' [var f])
+              )
+            , ( "a local named only by a local that stays is dropped with it"
+              , LetIn
+                  emptyAnno
+                  [local (u 12) "z" [] (var y), fDecl (And emptyAnno (var n) (var z))]
+                  (call anyOf' [var f])
+              )
+            , ( "a local named by a local that stays, stays"
+              , LetIn
+                  emptyAnno
+                  [local (u 12) "z" [] (var y), fDecl (And emptyAnno (call f [var n]) (var z))]
+                  (call f [x])
+              )
+            , ( "a recursive local stays"
+              , LetIn emptyAnno [fDecl (And emptyAnno (call f [var n]) (var y))] (call f [x])
+              )
+            ]
+      mapM_ (\(label, term) -> (label :: String, inlinedSize term) `shouldBe` (label, inlinedNodes term)) shapes
+
+    it "keys a small local and the same text written out alike, doubling chains included" $ do
+      -- the control for everything below: at this size nothing has changed
+      mapM_ (\k -> key (chainLet k) `shouldBe` key (writtenOut (k - 1))) [1 .. 8]
