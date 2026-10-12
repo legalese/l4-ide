@@ -741,10 +741,11 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
         -- NOTHING), and with presumption hard it is missing. CSV has no
         -- spelling of null; T3c adds one only when a user needs it.
         --
-        -- A case that will be evaluated keeps each cell as the text written:
-        -- only the export's declared input types can say whether @123456@ is
-        -- a number or a code ('declareInputs'). A refused record is not
-        -- evaluated, and is shown with the cells typed by what they look like.
+        -- A case that will be evaluated keeps each non-blank cell as the text
+        -- written: only the export's declared input types can say whether
+        -- @123456@ is a number or a code ('declareInputs'). A refused record
+        -- is not evaluated, and is shown with the cells typed by what they
+        -- look like.
         rowToJson :: (Text -> Aeson.Value) -> Csv.NamedRecord -> Aeson.Value
         rowToJson cell record = Aeson.Object $ KeyMap.fromList
           [ (Key.fromText (decodeUtf8 k), cell (decodeUtf8 v))
@@ -761,10 +762,11 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
 -- not read as one is left alone, so that the decode error names the value it
 -- could not read.
 --
--- A STRING input keeps its text exactly as written. JSON and YAML already say
--- what a string is, so a number sent for one stays the error it was; a CSV
--- cell is never a number just because it looks like one (@123456@, @1.50@,
--- @018956@ are all codes to a STRING input).
+-- A STRING input keeps its text exactly as written (a blank CSV cell is not
+-- text: 'parseBatchInput' leaves it out). JSON and YAML already say what a
+-- string is, so a number sent for one stays the error it was; a CSV cell is
+-- never a number just because it looks like one (@123456@, @1.50@, @018956@
+-- are all codes to a STRING input).
 --
 -- An input whose type is not one of those three, or which the export does not
 -- declare, is not typed here: JSON and YAML values are left alone, and a CSV
@@ -1054,11 +1056,20 @@ generateJsonPayload json =
 
 -- | Render a JSON value as an L4 string literal.
 --
--- Delegates to the lexer's own 'showStringLit', which emits Haskell-style
--- escapes — the exact inverse of the @Lexer.charLiteral@ the parser uses to
--- read string literals back in. A hand-rolled @"@-only replacement corrupts
--- any payload containing a backslash (e.g. a Windows path @C:\\Users@) or a
--- control character, producing a wrapper that fails to lex.
+-- Delegates to the lexer's own 'showStringLit', which emits the Haskell
+-- escapes that @Lexer.charLiteral@ reads back when the parser reads a string
+-- literal. 'showStringLit' says of itself that it "isn't truly precise", so
+-- the round trip is pinned by a test and not assumed: see "hands every payload
+-- to the rule and back unchanged" in @jl4/tests-cli/Main.hs@.
+--
+-- A hand-rolled @"@-only replacement does not survive a payload that holds a
+-- backslash, a tab or a line break. The lexer reads the backslash of each JSON
+-- escape as the start of an escape of its own, so the rule decodes JSON that
+-- is not the JSON that was sent, and the row still says success: @\\u0041@ (a
+-- backslash and the text u0041) comes back as @A@, and a Windows path, a tab
+-- or a line break comes back as null. Only a payload that holds @"@, or a
+-- control character that JSON writes as @\\u0001@, which is no Haskell
+-- escape, is loud: the wrapper fails to lex.
 escapeAsL4String :: Aeson.Value -> Text
 escapeAsL4String val =
   let jsonText = Text.Lazy.toStrict $ Text.Lazy.Encoding.decodeUtf8 $ Aeson.encode val
