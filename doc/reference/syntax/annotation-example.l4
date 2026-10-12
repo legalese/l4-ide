@@ -4,7 +4,8 @@
 § `Example: Annotations in L4`
     GIVEN age IS A NUMBER @desc "Person's age in years"
           applicantAge IS A NUMBER @nlg "the applicant's age"
-          eligible IS A BOOLEAN @ref "Section 4(1)(a) of the Act"
+          @ref "Section 4(1)(a) of the Act"
+          eligible IS A BOOLEAN
 
 -- A section input is supplied where a rule that reads it is evaluated.
 GIVETH A NUMBER
