@@ -444,11 +444,8 @@ newly-added DECIDE would not surface its inline affordance until a manual re-vis
 See smucclaw/l4-ide#557. -}
 updateVizConfig :: VersionedTextDocumentIdentifier -> TypeCheckResult -> RecentlyVisualised -> Ladder.VizConfig
 updateVizConfig verTxtDocId tcRes recentlyVisualised =
-  Ladder.getVizConfig recentlyVisualised.vizState
-    & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
-    & set #moduleUri (toNormalizedUri verTxtDocId._uri)
-    & set #substitution tcRes.substitution
-    & set #module' (ladderModule tcRes)
+  Ladder.retargetVizConfig verTxtDocId (ladderModule tcRes) tcRes.substitution
+    (Ladder.getVizConfig recentlyVisualised.vizState)
 
 {- | The module a ladder is drawn from: the checked module with every mixfix
 call stamped with its pattern ('Ladder.stampMixfixCalls'), so two operators

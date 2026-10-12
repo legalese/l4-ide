@@ -112,6 +112,7 @@ import Data.Monoid
 import Control.Monad.Extra (mapMaybeM)
 import qualified Control.Monad.Extra as Extra
 import Data.Either (partitionEithers)
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
@@ -405,6 +406,7 @@ checkProgram written = do
   -- known, a run of clauses that the parser grouped on bare names alone is
   -- told apart from a run of overloads ('separateOverloads').
   rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
+    >>= quarantineResolvedSynonymCycles
   withDeclares rdeclares do
     module' <- separateOverloads written
     rdecides <- scanFunSigModule module'
@@ -3626,7 +3628,8 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 -- ones are silenced, by the mark on the node: a CONSIDER the drafter wrote
 -- inside any clause's body is checked like any other. (A one-clause group's
 -- warnings are only withdrawn once the matrix has answered; see
--- 'settleOneClause'.)
+-- 'settleOneClause'.) Their redundant branches are never reported either:
+-- the only branch of theirs that can be redundant is the OTHERWISE they were given.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
@@ -3686,7 +3689,11 @@ checkConsider ec ann e branches t = do
   -- is silenced; redundancy is a bug regardless of intended partiality.
   unless (inNonexhaustive || leftToClauseMatrix || null missing) do
     addWarning $ PatternMatchesMissing missing
-  unless (null redundant) do
+  -- A CONSIDER the clauses compiled to is @WHEN p@ and an OTHERWISE for the
+  -- clauses after it, which nobody wrote, and which nothing reaches when @p@
+  -- is a new name. That finding is about the clauses, and
+  -- 'warnUnreachableClauses' makes it in their terms.
+  unless (null redundant || isJust generated) do
     addWarning $ PatternMatchRedundant redundant
 
   -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
@@ -5574,10 +5581,15 @@ maxMissingSuggestions = 64
 --     ('Nabla's) describing every value not matched by the branches seen so
 --     far; it starts as the unconstrained set (everything).
 --   * A branch whose guard conjunction is inconsistent with EVERY current
---     'Nabla' covers nothing new: redundant. (Guard-less arms — OTHERWISE
---     and bare binders — are deliberately exempt, preserving the
---     long-standing behaviour that a defensive trailing catch-all is not
---     flagged; they still consume the remaining value space.)
+--     'Nabla' covers nothing new: redundant. That holds of a branch with no
+--     guards (an OTHERWISE, a bare binder, an @EXACTLY@ of the scrutinee
+--     itself) too: it is consistent with every 'Nabla', so it is redundant
+--     when there is none, which is when an earlier branch with no guards has
+--     taken the whole value space (its residue is empty). After branches
+--     that merely name every constructor the 'Nabla's stay, each with every
+--     constructor excluded, so a defensive trailing catch-all there is not
+--     flagged. That is deliberate: the refinement-tree analysis this
+--     replaced did not flag it either.
 --   * Splitting a 'Nabla' against a branch with guards @g1..gk@ yields the
 --     standard residue: @nabla ∧ ¬g1@, @nabla ∧ g1 ∧ ¬g2@, …; inconsistent
 --     conjunctions die immediately.
@@ -5608,7 +5620,7 @@ analyzeGuardRows branches = do
       let coversSomething =
             any (\nab -> isJust (foldM (flip addConstraint) nab (map guardEq guards))) uncovered
           redundant'
-            | not coversSomething, not (null guards) = b : redundant
+            | not coversSomething = b : redundant
             | otherwise = redundant
           uncovered' =
             nubNablas (concatMap (splitByGuards guards) uncovered)
@@ -5879,6 +5891,70 @@ matchPatFunTy  r t args =
 -- ----------------------------------------------------------------------------
 -- Forward References high level helpers
 -- ----------------------------------------------------------------------------
+
+-- | The second line of defence against a type synonym that refers to itself.
+--
+-- 'detectTypeSynonymCycles' reads spellings, before anything is resolved,
+-- and a spelling can hide a reference: a section-qualified name
+-- (@`One`.Loop@), or an alias that a same-arity sibling in another section
+-- also answers to, which the checker settles by section and this pass does
+-- not see. A cycle it misses keeps its bodies, and the fuel in
+-- "L4.TypeCheck.Unify" bounds the
+-- depth of their expansion, not its work: two such synonyms that each name
+-- themselves twice, unified with each other, ran past 4 GiB.
+--
+-- So once every body is resolved, this reads the references themselves. A
+-- body names the 'Unique' of the synonym each type application in it
+-- resolved to, whatever it was spelled, and a name that did not resolve (an
+-- ambiguity, an unknown name) names none. A cycle among those is a cycle of
+-- expansions, and its members are given no body and reported as
+-- 'CyclicTypeSynonyms', as the spelling-based check does. A cycle that check
+-- already caught has no body left to follow, so this finds only what it
+-- missed. It cannot reject a program the other accepts correctly: a
+-- reference cycle among synonyms has no finite expansion.
+quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
+quarantineResolvedSynonymCycles decls = do
+  for_ cycles \ cyc -> case cyc of
+    []                       -> pure ()
+    (_, firstName, _) : _ ->
+      errorContext (WhileCheckingDeclare firstName) $
+        addError (CyclicTypeSynonyms [ n | (_, n, _) <- cyc ])
+  pure (map quarantine decls)
+  where
+    -- Every synonym that still has a body, in declaration order: the unique
+    -- all its spellings share, its declared name, and the uniques its body
+    -- applies.
+    synonyms :: [(Unique, Name, [Unique])]
+    synonyms =
+      [ (getUnique r, getOriginal r, map getUnique (typeHeads body))
+      | MkDeclChecked _ cis <- decls
+      , MkCheckInfo (r : _) (KnownType _ _ (Just body)) <- cis
+      ]
+
+    -- Each cycle's members in declaration order, the cycles in the order of
+    -- their first members.
+    cycles :: [[(Unique, Name, [Unique])]]
+    cycles =
+      map (map snd)
+        . List.sortOn (map fst)
+        $ [ List.sortOn fst members
+          | CyclicSCC members <- stronglyConnComp [ (ix, u, deps) | ix@(_, (u, _, deps)) <- indexed ]
+          ]
+
+    indexed :: [(Int, (Unique, Name, [Unique]))]
+    indexed = zip [0 ..] synonyms
+
+    quarantine :: DeclChecked DeclareOrAssume -> DeclChecked DeclareOrAssume
+    quarantine d = d { publicNames = map unbody d.publicNames }
+
+    unbody :: CheckInfo -> CheckInfo
+    unbody ci = case ci of
+      MkCheckInfo (r : _) (KnownType k ps (Just _))
+        | getUnique r `Set.member` cyclic -> ci { checkEntity = KnownType k ps Nothing }
+      _ -> ci
+
+    cyclic :: Set Unique
+    cyclic = Set.fromList [ u | cyc <- cycles, (u, _, _) <- cyc ]
 
 scanDeclares ::
   (a -> Check [DeclTypeSig]) ->
@@ -7751,6 +7827,16 @@ prettyCheckError (CyclicTypeSynonyms cycleSyns) =
   [ ""
   , "A type synonym must not refer to itself, directly or via other"
   , "synonyms, because it could then never be fully expanded."
+  ]
+prettyCheckError (SynonymExpansionLimit limit syn) =
+  [ "I stopped following type synonyms at " <> quotedName (getName syn) <> "."
+  , ""
+  , "To compare two types I replace a type synonym by the type it stands for,"
+  , "and I give up after " <> Text.pack (show limit) <> " replacements in a row. Here a chain of synonyms,"
+  , "each defined as the next, is longer than that."
+  , ""
+  , "The types were not found to differ. Declare the first synonym in the chain"
+  , "as the type it finally stands for, to shorten the chain."
   ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
