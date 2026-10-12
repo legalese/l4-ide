@@ -5896,12 +5896,14 @@ matchPatFunTy  r t args =
 --
 -- 'detectTypeSynonymCycles' reads spellings, before anything is resolved,
 -- and a spelling can hide a reference: a section-qualified name
--- (@`One`.Loop@), or an alias that a same-arity sibling in another section
+-- (@`One`.Loop@), an alias that a same-arity sibling in another section
 -- also answers to, which the checker settles by section and this pass does
--- not see. A cycle it misses keeps its bodies, and the fuel in
--- "L4.TypeCheck.Unify" bounds the
--- depth of their expansion, not its work: two such synonyms that each name
--- themselves twice, unified with each other, ran past 4 GiB.
+-- not see, or a use at the wrong number of arguments (a kind error, which
+-- the checker still resolves to the synonym; the pass over spellings leaves
+-- such uses alone, since a record or enum of that arity may be meant). A
+-- cycle it misses keeps its bodies, and the fuel in "L4.TypeCheck.Unify"
+-- bounds the depth of their expansion, not its work: two such synonyms
+-- that each name themselves twice, unified with each other, ran past 4 GiB.
 --
 -- So once every body is resolved, this reads the references themselves. A
 -- body names the 'Unique' of the synonym each type application in it
