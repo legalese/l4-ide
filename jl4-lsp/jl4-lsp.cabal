@@ -159,7 +159,9 @@ test-suite jl4-lsp-test
   main-is: Spec.hs
   other-modules:
     AtomKeySizeSpec
+    AtomKeySweepSpec
     CheckSource
+    CorpusSweep
     HoverDisplaySpec
     ImportDiagnosticSpec
     ImportUriSpec

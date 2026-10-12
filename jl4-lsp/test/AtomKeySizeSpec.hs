@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedRecordDot, OverloadedStrings, PatternSynonyms, TupleSections #-}
+{-# LANGUAGE OverloadedRecordDot, OverloadedStrings #-}
 -- | The size of a leaf with its locals put in ('AtomKey.inlinedSize'), against the
 -- size 'Transform.inlineLocalBindings' actually leaves, over the corpus.
 --
@@ -8,27 +8,18 @@
 -- with a WHERE or a LET among them.
 module AtomKeySizeSpec (spec) where
 
-import Control.Monad (filterM, forM)
-import Data.List (sort)
+import Control.Monad (filterM)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Optics (anyOf, cosmosOf, gplate, lengthOf)
-import System.Directory (doesDirectoryExist, listDirectory)
-import System.FilePath (takeExtension, (</>))
 
-import Language.LSP.Protocol.Types (VersionedTextDocumentIdentifier (..), fromNormalizedUri, normalizedFilePathToUri, toNormalizedFilePath)
-
-import L4.EvaluateLazy (resolveEvalConfig)
-import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Syntax (Decide (..), Expr (..), Resolved, foldTopLevelDecides)
-import L4.TracePolicy (lspDefaultPolicy)
 import qualified L4.Transform as Transform
 import L4.Viz.AtomKey (digestThreshold, inlinedSize)
-import qualified LSP.Core.Shake as Shake
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
-import LSP.L4.Rules (TypeCheckResult (..), pattern TypeCheck)
+import LSP.L4.Rules (TypeCheckResult (..))
 import qualified LSP.L4.Viz.Ladder as Ladder
 
+import CorpusSweep (checkAll, corpus)
 import Test.Hspec
 
 spec :: Spec
@@ -44,24 +35,13 @@ spec = describe "the size of a leaf, locals put in" $ do
     everything <- corpus ["../jl4/examples/ok", "../jl4/examples/legal"]
     files <- filterM (fmap (\t -> "WHERE" `T.isInfixOf` t || "LET " `T.isInfixOf` t) . T.readFile) everything
     length files `shouldSatisfy` (> 30)
-    firstFile <- case files of
-      f : _ -> pure f
-      [] -> fail "no corpus found"
-    evalConfig <- resolveEvalConfig Nothing (lspDefaultPolicy defaultGraphVizOptions)
-    (_, results) <- oneshotL4ActionAndErrors evalConfig firstFile \_ ->
-      forM files \f -> do
-        let nfp = toNormalizedFilePath f
-            uri = normalizedFilePathToUri nfp
-        _ <- Shake.addVirtualFileFromFS nfp
-        mTc <- Shake.use TypeCheck uri
-        pure (f, fmap (VersionedTextDocumentIdentifier (fromNormalizedUri uri) 0,) mTc)
+    checked <- checkAll files
     -- The rules the ladder can draw, which are the boolean ones: only their leaves
     -- are keyed. (A rule with a literal clause, `DECIDE f 0 IS "zero"`, has a body
     -- that does not survive being walked whole, and nothing keys it.)
     let bodies =
           [ (f, body)
-          | (f, Just (verId, tc)) <- results
-          , tc.success
+          | (f, verId, tc) <- checked
           , let cfg = Ladder.mkVizConfig verId tc.module' tc.substitution False
           , d@(MkDecide _ _ _ body) <- foldTopLevelDecides (\d' -> [d']) tc.module'
           , Right _ <- [Ladder.doVisualize d cfg]
@@ -79,18 +59,3 @@ spec = describe "the size of a leaf, locals put in" $ do
     -- the sweep is only worth something if locals are in it
     length [() | (_, body) <- bodies, anyOf (cosmosOf (gplate @(Expr Resolved))) hasScope body] `shouldSatisfy` (> 10)
     take 10 problems `shouldBe` []
-
--- | Every @.l4@ file under the given directories, recursively.
-corpus :: [FilePath] -> IO [FilePath]
-corpus roots = concat <$> mapM walk roots
-  where
-    walk dir = do
-      exists <- doesDirectoryExist dir
-      if not exists
-        then pure []
-        else do
-          entries <- sort <$> listDirectory dir
-          concat <$> forM entries \e -> do
-            let p = dir </> e
-            isDir <- doesDirectoryExist p
-            if isDir then walk p else pure [p | takeExtension p == ".l4"]
