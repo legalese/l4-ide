@@ -34,7 +34,7 @@ The result is built field by field from the accumulator (`accEnv`) and one depen
 
 Precondition, documented and not checked: the imported `EntityInfo` is already zonked.
 `Resolution.hs` zonks it with `applyFinalSubstitution` just before the call (`:390`); `Rules.hs` relies on `TypeCheckResult.entityInfo` being stored zonked (comment at `:877-879`).
-The old LSP site copied the importer's `errorContext`; the function sets `None`, which is what `initialCheckEnv` holds anyway (`jl4-core/src/L4/TypeCheck.hs:143, 178-179 @ 73a953821`; `:129, 156-157` on main).
+The old LSP site copied the importer's `errorContext`; the function sets `None`, which is what `initialCheckEnv` holds anyway (`jl4-core/src/L4/TypeCheck.hs:143, 178-179 @ 73a953821`; `:134, 161-162` on main).
 
 ## Where the design comment points
 
