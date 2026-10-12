@@ -293,7 +293,16 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
-Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, each cell is typed by its content: an empty cell becomes `null`, `true` or `false` (any case) a boolean, and a plain number such as `100` or `3.5` a number (a cell containing `e` or `E` stays text); anything else arrives as a string. So a digits-only cell without a leading zero (`123456`) arrives as a number, and a row that sends it to a `STRING` parameter fails, while `018956` stays text. `--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
+Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
+A value is read as the type its parameter declares, whichever kind of file the case comes from.
+A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
+Text that does not spell one is left as it is, and the line is an error that names the text.
+A parameter declared as `STRING` keeps a CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
+A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
+An empty CSV cell is `null`.
+A CSV cell for any other kind of parameter is typed by its content: `true` or `false` (any case) is a boolean, a plain number such as `3.5` is a number (a cell containing `e` or `E` stays text), and anything else is a string.
+
+`--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 

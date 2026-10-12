@@ -204,6 +204,16 @@ batchLineBreakFixture, batchLineBreakJson :: FilePath
 batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
 batchLineBreakJson    = fixtureDir </> "batch-string-line-break.json"
 
+-- | Cases that send text for a NUMBER or BOOLEAN input (@"25"@, @"false"@) or a
+-- CSV cell for a STRING input, run against 'batchEligFixture' and
+-- 'batchCodeFixture'.
+batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv, batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson :: FilePath
+batchDeclaredStringsJson           = fixtureDir </> "batch-declared-strings.json"
+batchDeclaredStringsYaml           = fixtureDir </> "batch-declared-strings.yaml"
+batchDeclaredStringCellsCsv        = fixtureDir </> "batch-declared-string-cells.csv"
+batchDeclaredBadNumberJson         = fixtureDir </> "batch-declared-bad-number.json"
+batchDeclaredNumberForStringJson   = fixtureDir </> "batch-declared-number-for-string.json"
+
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
 decodeArray sout =
@@ -448,6 +458,68 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
       sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- A value is read by the type its input declares. Main's `coerceInputTypes`
+    -- (f6ebc282e) did that; #47's `inferCsvCell` types a CSV cell by how it
+    -- looks and knows nothing of JSON or YAML, so each of these answered with
+    -- status "error" without the declared-type step.
+    describe "reads a value by the type its input declares" $ do
+      let rowsOf args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , sout
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          resultOf row = case objField row "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+          statusAndResult row = (objField row "status", resultOf row)
+          succeeded r = (Just (String "success"), Just r)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in JSON" $ do
+        (code, sout, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsJson]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+        -- the line shows the case as the inputs declare it
+        sout `shouldSatisfy` ("\"age\":25" `isInfixOf`)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in YAML" $ do
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsYaml]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+
+      it "validates a case that sends text for a NUMBER or BOOLEAN input" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchDeclaredStringsJson, "--validate-only"]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+      it "keeps a CSV cell for a STRING input as the text written" $ do
+        -- 123456 and 1.50 used to arrive as numbers and be refused; 018956 and
+        -- 1e3 already stayed text
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredStringCellsCsv]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows
+          `shouldBe` map (succeeded . String) ["123456", "018956", "1.50", "1e3"]
+
+      -- JSON and YAML carry their own types, so a number sent for a STRING
+      -- input is an error.
+      it "still refuses a JSON number for a STRING input" $ do
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredNumberForStringJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` [Just (String "error")]
+
+      it "leaves text that is not a number alone, so the error names the value" $ do
+        -- `age` is readable and `income` is not. The error is about `lots`.
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredBadNumberJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [row] -> do
+            objField row "status" `shouldBe` Just (String "error")
+            let diagnostics = show (objField row "diagnostics")
+            diagnostics `shouldSatisfy` ("lots" `isInfixOf`)
+            diagnostics `shouldNotSatisfy` ("25" `isInfixOf`)
+          other -> expectationFailure ("expected 1 row, got " ++ show (length other))
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do
