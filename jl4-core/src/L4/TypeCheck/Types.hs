@@ -418,6 +418,13 @@ data CheckWarning
     -- (counting from 1), the annotation as written (@\@export@, say), and
     -- whether the group has a GIVEN, which is where its @\@desc@ and
     -- @\@export@ go.
+  | ClauseArityChanged SrcRange Name Int [Name]
+    -- ^ A definition with no GIVEN of its own, right after a multi-clause
+    -- group of the same name, that has another number of inputs than the
+    -- group has patterns ('L4.TypeCheck.warnClauseArityChange'). It is not a
+    -- clause of the group: it is a rule of its own, and the names after its
+    -- head are its inputs. Carries the head's range, the name, the number of
+    -- patterns each clause above has, and the definition's input names.
   | FixityIgnoredNonBinary RawName (Maybe SrcRange)
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
@@ -841,6 +848,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
   rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
+  rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
