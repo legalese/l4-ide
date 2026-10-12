@@ -430,6 +430,20 @@ analyseDecide opts callees cfg decide0 =
         , drResult = Left (LadderViz.prettyPrintVizError err)
         , drUnfolding = noUnfolding
         }
+    -- A rule written as clauses whose whole ladder is one box holding the
+    -- CONSIDER the clauses compile to: the ladder could not break it down (a
+    -- column matches JUST x, a list or the like), so there is nothing here to
+    -- check, and "no findings" would read as a clean bill.
+    Right (ladderInfo, vizState)
+      | Transform.writtenAsClauses decide
+      , VizExpr.UBoolVar _ leaf _ _ _ _ _ <- ladderInfo.funDecl.body
+      , Just (Consider leafAnn _ _) <- LadderViz.getLeafExpr vizState leaf.unique
+      , Just PmConsider{} <- view annPmSynthetic leafAnn ->
+          DecisionReport
+            { drName = ladderInfo.funDecl.fnName.label
+            , drResult = Left notBrokenDown
+            , drUnfolding = noUnfolding
+            }
     Right (ladderInfo, vizState) ->
       let fnName = ladderInfo.funDecl.fnName.label
           nodes = ladderNodeCount opts.verifyMaxNodes ladderInfo.funDecl.body
@@ -471,6 +485,8 @@ analyseDecide opts callees cfg decide0 =
                     }
   where
     decide = Transform.inlineLocalBindingsInDecide decide0
+    notBrokenDown =
+      "these clauses were not broken down into questions: a column matches a pattern other than an enum value or a literal (JUST x, a list, and the like), so the whole rule is one box and there is nothing in it to check"
 
 -- | The config every decision of the file is drawn from, with simplification on
 -- (a call's meaning is drawn without it: 'LadderViz.withSimplification', which

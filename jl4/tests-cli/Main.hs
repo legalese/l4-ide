@@ -328,7 +328,7 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
 verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
-verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture :: FilePath
+verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -339,6 +339,8 @@ verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
 verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
 verifyClauseGroupWhereFixture = fixtureDir </> "verify-clause-group-where.l4"
+verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
+verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -459,7 +461,7 @@ coreFixtures =
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
-  , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture
+  , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
@@ -2750,7 +2752,9 @@ spec bin = do
     -- and a call in a clause is read through as it is in the CONSIDER.
     it "counts a clause group's atoms, and reads its calls, as it does the CONSIDER written by hand" $ do
       for_ [ (verifyClauseGroupFixture, "covered", "`covered by hand`", 0)
-           , (verifyClauseGroupCallFixture, "paid", "`paid by hand`", 1) ] \ (fixture, clauses, hand, calls) -> do
+           , (verifyClauseGroupCallFixture, "paid", "`paid by hand`", 1)
+           , (verifyClauseTableFixture, "`colour rule`", "`colour rule by hand`", 0)
+           , (verifyClauseTableFixture, "`either rule`", "`either rule by hand`", 0) ] \ (fixture, clauses, hand, calls) -> do
         env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
         let stats nm =
               [ (k, v)
@@ -2764,6 +2768,28 @@ spec bin = do
         lookup "analysed" (stats clauses) `shouldBe` Just (Bool True)
         lookup "callsReadThrough" (stats clauses) `shouldBe` Just (Number calls)
         stats clauses `shouldBe` stats hand
+
+    -- A clause group whose ladder is one box (a column matches JUST x, a list
+    -- and the like, which the ladder does not break down) is not reported as
+    -- clean: there was nothing to check.
+    it "says it did not analyse a clause group the ladder could not break down" $ do
+      env <- jsonEnvelope bin ["verify", verifyClauseGroupMaybeFixture, "--format", "json"]
+      let reasons =
+            [ (nm, analysed, reason)
+            | Just (Array ds) <- [objField env "decisions"]
+            , d <- toList ds
+            , Just (String nm) <- [objField d "name"]
+            , Just (Bool analysed) <- [objField d "analysed"]
+            , let reason = case objField d "reason" of
+                    Just (String r) -> r
+                    _ -> ""
+            ]
+      case reasons of
+        [(nm, analysed, reason)] -> do
+          nm `shouldBe` "`flag is set`"
+          analysed `shouldBe` False
+          reason `shouldSatisfy` T.isInfixOf "not broken down"
+        other -> expectationFailure ("expected one decision, got " ++ show other)
 
     it "records a non-boolean DECIDE as skipped, never as clean" $ do
       env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]
