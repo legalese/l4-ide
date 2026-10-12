@@ -8,10 +8,14 @@ import System.CPUTime (getCPUTime)
 import System.Timeout (timeout)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Map.Strict as Map
+import Base (NormalizedUri, Uri (..), toNormalizedUri)
 import L4.API.VirtualFS
-import L4.Syntax (rawName, rawNameToText)
-import L4.TypeCheck (prettyCheckErrorWithContext)
-import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..))
+import L4.Annotation (emptyAnno)
+import L4.Syntax (Name (MkName), RawName (NormalName), Resolved (Def), Type' (..), Unique (MkUnique), getOriginal, getUnique, rawName, rawNameToText)
+import L4.TypeCheck (initialCheckEnv, initialCheckState, prettyCheckErrorWithContext, runWith)
+import L4.TypeCheck.Types (CheckEntity (..), CheckEnv (..), CheckError (..), CheckErrorWithContext (..), runCheck)
+import L4.TypeCheck.Unify (unify)
 
 -- | Run the type checker on a snippet under a watchdog: unification bugs
 -- in this area historically caused nontermination, so a hang is reported
@@ -518,6 +522,21 @@ spec = describe "Unification" $ do
     it "checks a use of a generic function at a nested type in time linear in the nesting" $
       checksInLinearTime 100 400 deepLimit \ depth -> deepIdentity depth 10
 
+  describe "cost of unifying types nested on the left" $ do
+    -- The first difference between @P OF (P OF (... a ...), a), a@ and the
+    -- same type at NUMBER is at the bottom. Unification used to compare the
+    -- two for structural equality at every level on the way down, and each
+    -- comparison walked to that bottom, so the cost was the square of the
+    -- depth. This unifies the two directly, with no parsing or name
+    -- resolution to add their own cost, so that nothing but the descent is
+    -- timed (the same shape through `l4 check` is mostly the cost of
+    -- everything else, and the square only shows far down). Four times the
+    -- depth takes about four times as long when the descent is linear, up
+    -- to about six when the larger heap makes collection dearer, and about
+    -- fifteen times as long when it is quadratic.
+    it "unifies a type nested on the left with its instance in time linear in the nesting" $
+      unifiesInLinearTime 4000 16000 10
+
   describe "occurs check within one walk" $ do
     it "rejects PAIR OF a, a against PAIR OF b, LIST OF b" $ do
       -- Pre-fix, the overwrite in bind masked this indirect infinite
@@ -690,3 +709,68 @@ checksInLinearTime smallSize largeSize limit program = do
         if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
   r <- settle 3
   r `shouldSatisfy` (< limit)
+
+-- | @unifiesInLinearTime small large limit@: unifying a type nested on the
+-- left @large@ deep with its instance at NUMBER takes less than @limit@
+-- times the CPU time of doing so @small@ deep. Measured like
+-- 'checksInLinearTime'.
+unifiesInLinearTime :: Int -> Int -> Double -> Expectation
+unifiesInLinearTime smallSize largeSize limit = do
+  let timeUnify k = do
+        let (t1, t2) = leftNestedPair k
+        _ <- evaluate (typeSize t1 + typeSize t2)
+        t0 <- getCPUTime
+        let (errs, ok) = case runCheck (unify t1 t2) unifyEnv initialCheckState of
+              [(w, _)] -> runWith w
+              _        -> error "expected exactly one result"
+        _ <- evaluate (length errs)
+        _ <- evaluate ok
+        t1' <- getCPUTime
+        (null errs, ok) `shouldBe` (True, True)
+        pure (fromIntegral (t1' - t0) :: Double)
+      fastest k tries = minimum <$> traverse (const (timeUnify k)) [1 .. tries :: Int]
+  small <- fastest smallSize 3
+  let ratio large = large / max small 1.0e9
+      settle tries = do
+        r <- ratio <$> timeUnify largeSize
+        if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
+  r <- settle 3
+  r `shouldSatisfy` (< limit)
+
+-- | The module the hand-built types below live in.
+unifySpecUri :: NormalizedUri
+unifySpecUri = toNormalizedUri (Uri "file:///unify-spec")
+
+nominal :: Int -> Text -> Resolved
+nominal k t = Def (MkUnique 't' k unifySpecUri) (MkName emptyAnno (NormalName t))
+
+-- | A checker environment that knows the two type constructors 'leftNestedPair'
+-- uses, @P@ (two parameters) and @NUMBER@.
+unifyEnv :: CheckEnv
+unifyEnv =
+  (initialCheckEnv unifySpecUri)
+    { entityInfo = Map.fromList
+        [ (getUnique pName, (getOriginal pName, KnownType 2 [] Nothing))
+        , (getUnique numName, (getOriginal numName, KnownType 0 [] Nothing))
+        ]
+    }
+
+pName, numName :: Resolved
+pName = nominal 1 "P"
+numName = nominal 2 "NUMBER"
+
+-- | @P OF (P OF (... (v), (v)) ..., (v)), (v)@, @d@ levels of @P@ deep, with
+-- @v@ an inference variable on one side and NUMBER on the other.
+leftNestedPair :: Int -> (Type' Resolved, Type' Resolved)
+leftNestedPair d = (nest (InfVar emptyAnno (NormalName "a") 0), nest (TyApp emptyAnno numName []))
+  where
+    nest leaf = go d
+      where
+        go 0 = leaf
+        go k = TyApp emptyAnno pName [go (k - 1 :: Int), leaf]
+
+-- | The number of nodes in a type; forcing it builds the whole type.
+typeSize :: Type' Resolved -> Int
+typeSize = \ case
+  TyApp _ _ ts -> 1 + sum (typeSize <$> ts)
+  _            -> 1
