@@ -119,7 +119,7 @@ DECIDE `describe count` 1 IS "one"
 -- warns: DECIDE `describe count` n IS
 ```
 
-The enumeration inputs of the same rule are still analysed, and the two spellings of one determination warn alike.
+The enumeration inputs of the same rule are still analysed, and the two spellings of one determination warn alike over enumerations declared in the same file, numbers, text and `EXACTLY`; they can differ for a repeated value, and where a branch or clause names a constructor of a `MAYBE`, an `EITHER`, a list or a type declared in another file (see [CONSIDER](../../reference/control-flow/CONSIDER.md)).
 
 The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the check can only ask for an `OTHERWISE`; it cannot tell you which categories you left out. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
 

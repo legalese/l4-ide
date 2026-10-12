@@ -20,7 +20,8 @@ spec = describe "CONSIDER over many numbers" $ do
   -- written: the warning that asks this CONSIDER for an OTHERWISE carries
   -- the whole CONSIDER. Resolving the types in a diagnostic used to rebuild
   -- all of that inside the checker's monad, whether anything read it or not
-  -- ('L4.TypeCheck.Types.substituteInfVars'); before GANDER, a CONSIDER of
+  -- ('L4.TypeCheck.Types.substituteInfVars'); before M-D of the as-built spec
+  -- (specs/as-built/multi-clause-decide.md, "Literal patterns"), a CONSIDER of
   -- 4,000 numbers with one type error in it peaked at 610 MB for it.
   --
   -- Counted in the bytes this thread allocates, which nothing else running
@@ -50,7 +51,7 @@ spec = describe "CONSIDER over many numbers" $ do
   -- that forcing the warning at the innermost level, as the language
   -- server's rules force every diagnostic, made a copy of the syntax per
   -- level, quadratic in the depth: 600 levels peaked at 520 MB, where the
-  -- build before GANDER, which raised no warning there, peaked at 13 MB. A
+  -- build before M-D, which raised no warning there, peaked at 13 MB. A
   -- context with nothing in it to resolve is now kept as it is, and shared
   -- ('L4.TypeCheck.Types.contextChanges').
   --

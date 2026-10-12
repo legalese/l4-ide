@@ -1121,9 +1121,9 @@ clauseSpec = describe "Multi-clause DECIDE: missing-case warning" $ do
   -- A rule written as clauses reads the annotations above its first clause as
   -- a plain definition's, and one written between two clauses was used by
   -- nothing, mostly without a word (refutation of legalese/l4-ide#545's
-  -- review, round 3). The goldens on main record no warnings, so the fixtures
-  -- ok/pattern-matching-later-clause-annotations.l4 and
-  -- ok/pattern-matching-first-clause-annotations.l4 are pinned here.
+  -- review, round 3). Main's golden harness prints warnings, so the golden of
+  -- ok/pattern-matching-later-clause-annotations.l4 records them, and the
+  -- cases below pin them by text and position as well.
   it "warns at each @desc, @export and @nlg above a later clause, and not at the rule's own" $ do
     ws <- filter (mentions "where it is not used") <$> warnings (Text.unlines
       [ "@desc how many there are"
@@ -1300,8 +1300,8 @@ clauseSpec = describe "Multi-clause DECIDE: missing-case warning" $ do
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- | A CONSIDER written by hand reads numbers, pieces of text and EXACTLY as
--- the clauses of a group do (GANDER, 2026-10-09), so a rule warns alike
--- written either way.
+-- the clauses of a group do (specs/as-built/multi-clause-decide.md, "Literal
+-- patterns", M-D), so either spelling reports a missing case over them.
 considerSpec :: Spec
 considerSpec = describe "CONSIDER over numbers, text and EXACTLY" $ do
   let colour body = Text.unlines $
@@ -1505,12 +1505,12 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       ]
     missingArms ws `shouldBe` ["WHEN Pair Basic Gold THEN", "WHEN Pair Gold `_` THEN"]
 
-  it "reads a CONSIDER over a type that holds a MAYBE when no arm names a MAYBE's constructor (NAMEDROP)" $ do
-    -- HIGHLANDER kept main's own analysis for every CONSIDER over this
-    -- record, because its type can hold a MAYBE, and main's own analysis
-    -- asked for `WHEN Row `_` Basic` after `WHEN Row v1 v2`, an arm that
-    -- matches everything. No arm here names `NOTHING` or `JUST`, so the
-    -- clauses' engine reads them all, and a variable stands for the MAYBE.
+  it "reads a CONSIDER over a type that holds a MAYBE when no arm names a MAYBE's constructor" $ do
+    -- M-D (as-built spec, "Literal patterns"), as first built, kept main's own
+    -- analysis for every CONSIDER over this record, because its type can hold
+    -- a MAYBE, and it asked for `WHEN Row `_` Basic` after `WHEN Row v1 v2`,
+    -- an arm that matches everything. No arm here names `NOTHING` or `JUST`,
+    -- so the clauses' engine reads them all; a variable stands for the MAYBE.
     let row arms = Text.unlines $
           [ "DECLARE Tier IS ONE OF Basic, Gold"
           , "DECLARE Row HAS f1 IS A MAYBE NUMBER"
@@ -1548,7 +1548,7 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
   it "still warns when its missing branches are more than the clauses' engine lists" $ do
     -- 208 missing values: past 64 rows the clauses' engine gives up, and
     -- this CONSIDER fell silent (7236198ad). Main's own analysis reads it
-    -- instead, and warns as it did before HIGHLANDER.
+    -- instead, and warns as it did before M-D sent it to the clauses' engine.
     ws <- considerWarnings $ Text.unlines
       [ "DECLARE E IS ONE OF e0, e1, e2, e3, e4, e5"
       , "DECLARE Rec HAS f0 IS AN E, f1 IS AN E, f2 IS AN E"

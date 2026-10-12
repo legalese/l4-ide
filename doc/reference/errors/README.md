@@ -519,7 +519,7 @@ When a clause counts for nothing that way, the warning lists only what the claus
 A suggested number prints as the clauses spelled it, and a suggested piece of text as L4 writes it, with `"` and `\` escaped.
 A rule whose clauses match enumeration values only gets no warning when it would need more than 64 clauses listed, or more than 10000 steps to find them; when its clauses match numbers or texts, the warning lists instead only the clauses that the clauses without a number or a piece of text leave open, which, when every clause names a number or a text, is the clause with every input's name alone.
 [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits) gives an example of each.
-A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER reads numbers, texts and `EXACTLY` the same way, so the same rule warns alike written either way.
+A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER reads numbers, texts and `EXACTLY` the same way, so a missing case over them is reported in either spelling; the two can differ for a repeated value, and where a branch or clause names a constructor of a `MAYBE`, an `EITHER`, a list or a type from another file (see [CONSIDER](../control-flow/CONSIDER.md)).
 See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
 
 ---

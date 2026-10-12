@@ -207,7 +207,8 @@ Any other `EXACTLY` (`EXACTLY someConstant`, `EXACTLY (m PLUS 1)` with `m` anoth
 The same holds inside a pattern: `DECIDE f (Box (EXACTLY zero)) IS 1` with `DECIDE f (Box 1) IS 2`, where `Box` has a number field, counts the first clause for nothing.
 A clause counted for nothing may still match some of the inputs the other clauses miss, so a group with one is told only what the clauses without a number or a piece of text leave open, with each input's name in its number and text positions: with `two MEANS 2`, the clauses `DECIDE f 2 "b" IS 1`, `DECIDE f (EXACTLY two) s IS 2` and `DECIDE f 1 s IS 3` list ``DECIDE `f` n s IS`` alone, not `f 2 s`, which the second clause covers.
 An `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, stops the check for the group on any input, since such a clause may match any number of the input's values.
-A `CONSIDER` written by hand reads numbers, texts and `EXACTLY` the same way, so a rule warns alike written as clauses or as a `CONSIDER`: a missing case over a number or a piece of text is suggested there as `OTHERWISE`.
+A `CONSIDER` written by hand reads numbers, texts and `EXACTLY` the same way, so a missing case over them is reported in either spelling, and the `CONSIDER` suggests it as `OTHERWISE`.
+The two spellings do not warn alike everywhere: only the `CONSIDER` reports a repeated value as redundant, and where a branch or clause names a constructor of a `MAYBE`, an `EITHER`, a list or a type declared in another file, one of them can warn where the other is silent ([CONSIDER](../control-flow/CONSIDER.md) gives an example).
 
 **Lists, `MAYBE` values and enumerations declared in another file are not read.**
 The check cannot tell such values apart, so where a missing case could be found only by telling them apart, the group gets no warning, not even for a number nested inside such a value: `DECIDE show NOTHING IS "none"` and `DECIDE show (JUST 0) IS "zero"` draw none, and neither do `DECIDE f (JUST 0) IS "zero"` and `DECIDE f (JUST n) IS "other"`.
@@ -220,6 +221,11 @@ A clause whose patterns all match anything ends the search, so a table of nine i
 When the clauses match numbers or texts, the check does not fall silent at those limits: it lists instead only the clauses that the clauses without a number or a piece of text leave open, which, when every clause names a number or a text, is the clause with every input's `GIVEN` name alone, and a gap inside the table is then not listed.
 Sixty-four clauses `DECIDE f 1 Basic IS 1` to `DECIDE f 64 Basic IS 64`, over `GIVEN n IS A NUMBER` and `t IS A Tier` of `Basic` and `Premium`, would need 65 clauses listed (`1 Premium` to `64 Premium`, then `n t`), so the warning lists ``DECIDE `f` n t IS`` alone; with 63 such clauses it lists all 64.
 There is no `@nonexhaustive` in this version, so a group over numbers or texts that is partial on purpose is silenced only by a clause that matches anything.
+
+**A deep nest of `CONSIDER`s with no `OTHERWISE` is slow to check.**
+Each level without an `OTHERWISE` draws its own missing-case warning, and the time to check grows much faster than the depth.
+Measured on one laptop, a nest of 100 levels over numbers (`WHEN 0`, then a `CONSIDER` inside it with `WHEN 1`, and so on) took 0.5 s, 300 levels took 7 s and 500 levels took 37 s; the same nest over an enumeration (`WHEN Red` at every level) took 0.5 s, 11 s and 56 s.
+An `OTHERWISE` at every level takes the cost away: 500 such levels checked in about half a second.
 
 When no clause matches at run time, evaluation stops with an error.
 For this `describe.l4`:

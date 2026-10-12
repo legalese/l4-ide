@@ -2088,19 +2088,19 @@ builtinConstructorLookup =
 --
 -- A CONSIDER with a number, a piece of text or an EXACTLY in any arm is
 -- analysed by the clauses' engine instead, as a group of one column with the
--- scrutinee as its input, so that a rule warns alike written either way
--- (GANDER, 2026-10-09; 'considerWithLiterals'). Main's own analysis below
--- reads such an arm as matching anything, which called a reachable arm
--- redundant after @WHEN EXACTLY Red@ and passed a CONSIDER whose only arm
--- was @WHEN EXACTLY Red@.
+-- scrutinee as its input, so that either spelling reports a missing case
+-- over those (as-built spec, "Literal patterns", M-D; 'considerWithLiterals').
+-- Main's own analysis below reads such an arm as matching anything, which
+-- called a reachable arm redundant after @WHEN EXACTLY Red@ and passed a
+-- CONSIDER whose only arm was @WHEN EXACTLY Red@.
 --
 -- A CONSIDER written by hand goes to the clauses' engine too, with or
 -- without a number in it, unless one of its arms names a constructor that
 -- engine does not list ('armsNameUnlisted': a MAYBE's, a LIST's, an
 -- EITHER's, or one of a type declared in another module). There the engine
 -- would stand down, where main's own analysis still lists part of what is
--- missing (HIGHLANDER, 2026-10-10, which named MAYBE and LIST). The test is
--- on the arms and not on the scrutinee's type (NAMEDROP, 2026-10-12): that
+-- missing (M-D too, built 2026-10-10 for MAYBE and LIST). The test is
+-- on the arms and not on the scrutinee's type (M-D, refined 2026-10-12): that
 -- type can hold a MAYBE and the arms still name none, as in @WHEN Row v1 v2@
 -- over a record with a MAYBE or a LIST field, where main's own analysis
 -- asked for cases after an arm that matches everything. EITHER and another
