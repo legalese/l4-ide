@@ -448,14 +448,14 @@ exprFieldRefs fieldNames expr =
 -- all: every member of a cycle is given no body ('cyclicSynonyms'). Imports
 -- need no such care of their own. Modules are acyclic, and an imported
 -- module's cyclic synonyms were quarantined when that module was checked.
--- A cycle that hides behind a spelling this pass does not follow, such as
--- an alias that a same-arity sibling in another section also answers to, is
--- found by 'L4.TypeCheck.quarantineResolvedSynonymCycles' once the bodies
--- are resolved.
+-- A cycle that hides behind a spelling this pass does not follow, such as a
+-- use at the wrong number of arguments, is found by
+-- 'L4.TypeCheck.quarantineResolvedSynonymCycles' once the bodies are
+-- resolved.
 --
 -- Like 'detectComputedFieldCycles' this matches names textually, which
--- over-approximates references (it does not know which section a name is
--- resolved in); a synonym's own type parameters are excluded from its
+-- over-approximates references (it does not know what a name finally
+-- resolves to); a synonym's own type parameters are excluded from its
 -- dependencies so that a parameter shadowing a sibling synonym's name
 -- cannot manufacture a spurious cycle. A synonym is referenceable through
 -- its AKA aliases as well as its primary name, so aliases participate on
@@ -489,8 +489,8 @@ detectTypeSynonymCycles (MkModule _ _ section) =
         ]
     -- The synonyms a use of a name with this many arguments can refer to.
     -- Several of the same arity are an ambiguity the checker reports;
-    -- all of them are kept, since which one it would pick can depend on
-    -- sections this pass does not see.
+    -- all of them are kept, since this pass cannot tell which one the
+    -- checker would pick.
     referents :: (RawName, Int) -> [RawName]
     referents (spelling, argc) =
       [ p | (p, arity) <- Map.findWithDefault [] spelling bySpelling, arity == argc ]

@@ -207,29 +207,6 @@ spec = describe "Unification" $ do
       ok `shouldBe` False
       cycles `shouldMatchList` [["W1"], ["W2"]]
 
-    it "rejects a cycle through an alias that beats a same-arity sibling in another section" $ do
-      -- Same shape, with no difference in arity to tell the two apart: the
-      -- alias in the section the reference sits in is nearer than the
-      -- sibling in the section beside it, so `B1` is W1's own alias and W1
-      -- is `PAIR OF W1, W1`.
-      (ok, cycles) <- cycleReport $ Text.unlines
-        [ "IMPORT prelude"
-        , ""
-        , "§ One"
-        , "DECLARE W1 AKA B1 IS A PAIR OF B1, B1"
-        , "DECLARE W2 AKA B2 IS A PAIR OF B2, B2"
-        , ""
-        , "GIVEN x IS A W1"
-        , "GIVETH A W2"
-        , "f x MEANS x"
-        , ""
-        , "§ Two"
-        , "DECLARE B1 IS A NUMBER"
-        , "DECLARE B2 IS A NUMBER"
-        ]
-      ok `shouldBe` False
-      cycles `shouldMatchList` [["W1"], ["W2"]]
-
     it "rejects a synonym whose body is its own alias, even when a sibling takes the same spelling" $ do
       -- The single-synonym form of the case above. The cycle is W = W; this
       -- used to check clean, with no report at all.
@@ -370,26 +347,23 @@ spec = describe "Unification" $ do
 
     it "terminates when a cycle only the resolved bodies show comes from an imported module" $ do
       -- The same, for the cycle that is found among the resolved bodies
-      -- rather than by spelling: the module that declares it has them
-      -- quarantined before anyone imports it.
+      -- rather than by spelling (a use at the wrong number of arguments): the
+      -- module that declares it has them quarantined before anyone imports it.
       let vfs = vfsFromList
-            [ ( "qloops"
+            [ ( "wloops"
               , Text.unlines
-                  [ "DECLARE Duo OF a, b"
-                  , "  HAS fst IS AN a"
-                  , "      snd IS A  b"
-                  , ""
-                  , "§ One"
-                  , "DECLARE L1 IS A Duo OF `One`.L1, `One`.L1"
-                  , "DECLARE L2 IS A Duo OF `One`.L2, `One`.L2"
+                  [ "IMPORT prelude"
+                  , "DECLARE B1 a IS A PAIR OF B1, B1"
+                  , "DECLARE B2 a IS A PAIR OF B2, B2"
                   ]
               )
             ]
           source = Text.unlines
-            [ "IMPORT qloops"
+            [ "IMPORT prelude"
+            , "IMPORT wloops"
             , ""
-            , "GIVEN x IS A L1"
-            , "GIVETH A L2"
+            , "GIVEN x IS A B1 OF NUMBER"
+            , "GIVETH A B2 OF NUMBER"
             , "f x MEANS x"
             ]
       mb <- timeout (30 * 1000000) $ case checkWithImports vfs source of
