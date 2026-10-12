@@ -217,6 +217,13 @@ letInliningNodeBudget = 20000
 -- gave a 0.16 MB plan in 0.5 s, 271 nodes 2.1 MB in 1.1 s, 811 nodes 29 MB in
 -- 3.9 s and 3441 nodes 325 MB in 20 s. 300 is the largest of those that
 -- stays in a few megabytes and about a second.
+--
+-- Those times were measured on 539cad5fd, before an atomId was the hash of its
+-- leaf's term (R3). On 708c40f72 naming the atoms costs far more: @l4 verify@
+-- on a rule of 200 @n EQUALS i@ disjuncts takes 13 s, against 0.24 s with
+-- @--no-coalesce-atoms@ and 1.1 s on 704ce98d8 (a rule with no clauses, so the
+-- cost is not the clauses'), and a 598-row group (300 nodes) no longer answers
+-- /query-plan inside 30 s. The limit was not changed for that.
 clauseGroupLadderBudget :: Int
 clauseGroupLadderBudget = 300
 
