@@ -1,0 +1,9 @@
+`scaled` where `base` is 10 and `rate` is 3 by default
+`scaled` where `base` is 10 and `rate` is 2
+`scaled` where `base` is ten and `factor` is 4
+`thrice` with 10
+`f` where `a` is 5
+`f` where `a` is 5 and `b` is 2
+`g` where `x` is 3 and `y` is 4 by default
+`g` where `x` is a and `z` is b
+`g` where `x` is `TRUE` and `w` is `FALSE`

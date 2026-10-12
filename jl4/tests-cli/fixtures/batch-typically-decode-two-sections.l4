@@ -1,0 +1,47 @@
+-- l4 batch over two DIFFERENT records of one name, `Settings`, one under
+-- `§ Alpha` (limit 10) and one under `§ Beta` (limit 99), each decoded by the
+-- rules. The entry for each decode carries its own heading, as the WITH entry of
+-- the same record does, so the row that rests on both lists two decode entries,
+-- not one for two different defaults (assumed, not ruled: the review of the
+-- combined branch, 2026-10-12, following overnight card O6). The row answers 218.
+
+§ `Alpha`
+
+DECLARE Settings HAS
+  limit IS A NUMBER TYPICALLY 10
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseA s MEANS JSONDECODE s
+
+GIVETH A NUMBER
+limitA MEANS CONSIDER parseA "{}"
+    WHEN RIGHT st THEN st's limit
+    WHEN LEFT e THEN 0
+
+GIVETH A NUMBER
+withalA MEANS (`Alpha`.Settings WITHAL)'s limit
+
+§ `Beta`
+
+DECLARE Settings HAS
+  limit IS A NUMBER TYPICALLY 99
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseB s MEANS JSONDECODE s
+
+GIVETH A NUMBER
+limitB MEANS CONSIDER parseB "{}"
+    WHEN RIGHT st THEN st's limit
+    WHEN LEFT e THEN 0
+
+GIVETH A NUMBER
+withalB MEANS (`Beta`.Settings WITHAL)'s limit
+
+§ `Use`
+
+@export default both
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+DECIDE both amount IS limitA PLUS limitB PLUS withalA PLUS withalB

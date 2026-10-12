@@ -1,0 +1,6 @@
+`imported scaled` where `base` is 10, `rate` is 3 by default and `colour` is `Green` by default is equal to 30
+`imported scaled` where `base` is 10, `rate` is 2 and `colour` is `Green` by default is equal to 20
+`imported scaled` where `base` is 10, `colour` is `Red` and `rate` is 3 by default is equal to 0
+`some paint` 's `colour` is equal to `Red`
+`some paint` 's `coats` is equal to 2
+`some paint`

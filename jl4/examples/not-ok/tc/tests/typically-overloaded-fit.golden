@@ -1,0 +1,80 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-overloaded-fit.l4
+  Hidden: no
+  Range: 19:7-19:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      scaled
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      scaled (defined at typically-overloaded-fit.l4:17:1-7) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+      scaled (defined at typically-overloaded-fit.l4:12:1-7) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+
+File: typically-overloaded-fit.l4
+  Hidden: no
+  Range: 19:7-19:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    You are giving named inputs to
+
+      scaled (defined at typically-overloaded-fit.l4:19:7-13) of type scaled21
+
+    but it is not a function, so it takes none.
+
+File: typically-overloaded-fit.l4
+  Hidden: no
+  Range: 40:7-40:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      scaled2
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      scaled2 (defined at typically-overloaded-fit.l4:38:1-8) of type FUNCTION FROM STRING AND NUMBER TO NUMBER
+      scaled2 (defined at typically-overloaded-fit.l4:33:1-8) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+      scaled2 (defined at typically-overloaded-fit.l4:28:1-8) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+
+File: typically-overloaded-fit.l4
+  Hidden: no
+  Range: 40:7-40:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    You are giving named inputs to
+
+      scaled2 (defined at typically-overloaded-fit.l4:40:7-14) of type scaled224
+
+    but it is not a function, so it takes none.
+
+File: typically-overloaded-fit.l4
+  Hidden: no
+  Range: 54:7-54:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      scaled3
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      scaled3 (defined at typically-overloaded-fit.l4:52:1-8) of type FUNCTION FROM STRING AND NUMBER TO NUMBER
+      scaled3 (defined at typically-overloaded-fit.l4:47:1-8) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER

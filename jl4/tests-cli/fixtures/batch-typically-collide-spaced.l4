@@ -1,0 +1,34 @@
+-- Headings that are more than one plain word (overnight card O6, 2026-10-11).
+-- `Part 1. Fees` holds a space and a dot, so `presumed` names its rule the way
+-- L4 spells a qualified name in an ambiguity error, with backticks round the
+-- parts that need them, and a reader can still tell the heading from the rule.
+
+@export default Combine
+GIVEN useAlpha IS A BOOLEAN
+      useBeta  IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS
+  (IF useAlpha THEN `Part 1. Fees`.scaled WITH base IS 10 ELSE 0)
+    PLUS (IF useBeta THEN `Part 2`.scaled WITH base IS 10 ELSE 0)
+
+§ `Part 1. Fees`
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 30
+      retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+§ `Part 2`
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 60
+      retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY 5
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base

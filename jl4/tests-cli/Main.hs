@@ -86,6 +86,29 @@ earlyActFixture = fixtureDir </> "early-act.l4"
 multiClauseRenderFixture :: FilePath
 multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
+-- | Calls and constructions that leave out a @TYPICALLY@ default, each beside
+-- a twin that writes the value, for how @l4 render@ marks a value the checker
+-- added in a field list and a table cell. The second is a default taken at the
+-- root of a section @GIVEN@, which @l4 nlg@ does not mark.
+renderDefaultMarkFixture, renderDefaultMarkRootFixture :: FilePath
+renderDefaultMarkFixture     = fixtureDir </> "render-default-mark.l4"
+renderDefaultMarkRootFixture = fixtureDir </> "render-default-mark-root.l4"
+
+-- | A record declared under a section heading and decoded by the rules
+-- (@JSONDECODE@): how the entry in @presumed@ names it. The first three are in
+-- one file; the last two are an IMPORTED record, which the entry names bare.
+batchTyDecodeSpelling, batchTyDecodeTwoSections, batchTyDecodeHeading, batchTyDecodeImport, batchTyDecodeJson :: FilePath
+batchTyDecodeSpelling    = fixtureDir </> "batch-typically-decode-spelling.l4"
+batchTyDecodeTwoSections = fixtureDir </> "batch-typically-decode-two-sections.l4"
+batchTyDecodeHeading     = fixtureDir </> "batch-typically-decode-heading.l4"
+batchTyDecodeImport      = fixtureDir </> "batch-typically-decode-import.l4"
+batchTyDecodeJson        = fixtureDir </> "batch-typically-decode.json"
+
+-- | @T WITHAL@ on a record with no fields, as a rule's whole body, as an
+-- argument and as the value of a field: how @l4 render@ and @l4 nlg@ read it.
+renderEmptyRecordFixture :: FilePath
+renderEmptyRecordFixture = fixtureDir </> "render-empty-record.l4"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -236,6 +259,61 @@ batchTyTypoCsv       = fixtureDir </> "batch-typically-typo.csv"
 batchTyTypoJson      = fixtureDir </> "batch-typically-typo.json"
 batchTyRecordTypoJson  = fixtureDir </> "batch-typically-record-typo.json"
 batchTyRecordEmptyJson = fixtureDir </> "batch-typically-record-empty.json"
+
+-- | @TYPICALLY@ taken at a NAMED site inside the rules (W4, W5): the exported
+-- rule's own input has the spelling of the one the inner rule leaves out.
+batchTyNamed, batchTyNamedJson :: FilePath
+batchTyNamed     = fixtureDir </> "batch-typically-named.l4"
+batchTyNamedJson = fixtureDir </> "batch-typically-named.json"
+
+-- | @T WITHAL@ (T1 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@, ruled by
+-- Meng 2026-10-09): over @l4 batch@, and across an @IMPORT@.
+batchWithal, batchWithalJson, withalImportMissing, withalImportMissingDef, withalTypeName :: FilePath
+batchWithal            = fixtureDir </> "batch-withal.l4"
+batchWithalJson        = fixtureDir </> "batch-withal.json"
+withalImportMissing    = fixtureDir </> "withal-import-missing.l4"
+withalImportMissingDef = fixtureDir </> "withal-import-missing-def.l4"
+withalTypeName         = fixtureDir </> "withal-type-name.l4"
+
+-- | The same, for defaults whose value is a bare constructor (TRUE, FALSE, an
+-- enum value), which share a cell with every other use of it unless the checker's
+-- added argument is given a cell of its own.
+batchTyCtors, batchTyCtorsJson :: FilePath
+batchTyCtors     = fixtureDir </> "batch-typically-named-constructors.l4"
+batchTyCtorsJson = fixtureDir </> "batch-typically-named-constructors.json"
+
+-- | The name @presumed@ gives a default taken at a named site: the rule's own,
+-- as declared, whatever the site called it.
+batchTyLabels, batchTyLabelsJson :: FilePath
+batchTyLabels     = fixtureDir </> "batch-typically-named-labels.l4"
+batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
+
+-- | Two declarations of one name, each with a @TYPICALLY@ default, under
+-- different headings (rules, then records), and the two cases a heading cannot
+-- tell apart: top-level rules of two imported files, and @WHERE@ locals.
+batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop, batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
+batchTyCollideSections = fixtureDir </> "batch-typically-collide-sections.l4"
+batchTyCollideSpaced   = fixtureDir </> "batch-typically-collide-spaced.l4"
+batchTyCollideDotted   = fixtureDir </> "batch-typically-collide-dotted.l4"
+batchTyCollideSecImport  = fixtureDir </> "batch-typically-collide-secimport.l4"
+batchTyCollideSecImportA = fixtureDir </> "batch-typically-collide-secimport-a.l4"
+batchTyCollideSecImportB = fixtureDir </> "batch-typically-collide-secimport-b.l4"
+batchTyCollideWhereTop   = fixtureDir </> "batch-typically-collide-wheretop.l4"
+batchTyCollideTopmix   = fixtureDir </> "batch-typically-collide-topmix.l4"
+batchTyCollideTopmixJson = fixtureDir </> "batch-typically-collide-topmix.json"
+batchTyCollideRecords  = fixtureDir </> "batch-typically-collide-records.l4"
+batchTyCollideImport   = fixtureDir </> "batch-typically-collide-import.l4"
+batchTyCollideImportA  = fixtureDir </> "batch-typically-collide-import-a.l4"
+batchTyCollideImportB  = fixtureDir </> "batch-typically-collide-import-b.l4"
+batchTyCollideWhere    = fixtureDir </> "batch-typically-collide-where.l4"
+batchTyCollideJson     = fixtureDir </> "batch-typically-collide.json"
+batchTyCollideRowsJson = fixtureDir </> "batch-typically-collide-rows.json"
+
+-- | A named site whose callee is an overload that the written inputs settle by
+-- their types: the one rule that fits takes its default (decision O3).
+batchTyOverload, batchTyOverloadJson :: FilePath
+batchTyOverload     = fixtureDir </> "batch-typically-overload.l4"
+batchTyOverloadJson = fixtureDir </> "batch-typically-overload.json"
 
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
@@ -438,6 +516,13 @@ coreFixtures =
   , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
+  , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
+  , batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson
+  , batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop
+  , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
+  , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
+  , batchTyOverload, batchTyOverloadJson
+  , batchWithal, batchWithalJson, withalImportMissing, withalImportMissingDef, withalTypeName
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
@@ -452,6 +537,8 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
+  , renderDefaultMarkFixture, renderDefaultMarkRootFixture, renderEmptyRecordFixture
+  , batchTyDecodeSpelling, batchTyDecodeTwoSections, batchTyDecodeHeading, batchTyDecodeImport, batchTyDecodeJson
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
   , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
   , batchClausesString, batchClausesB, batchClausesCatchAll
@@ -858,6 +945,131 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
       sout `shouldNotSatisfy` mentionsOldName
+
+  -- A value the type checker added from a TYPICALLY default is not one the
+  -- author wrote, and a rendered document is read by someone who never sees
+  -- the source. Inline text says so ("`rate` is 3 by default"); a field list or
+  -- a table cell says it with "(by default)" after the value. Before this, the
+  -- two rendered a rule whose whole body is the call, and a record
+  -- construction, exactly as they rendered a source that wrote the value.
+  describe "l4 render: a value the checker added from a TYPICALLY default" $ do
+    let fieldsNamed name out = filter (name `isInfixOf`) (lines out)
+
+    it "marks it in a field list, and not the value the author wrote" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      -- `the bill` leaves rate out; `the written bill` writes it. Same document,
+      -- same value, two readings.
+      fieldsNamed "- rate" sout `shouldBe`
+        [ "    - rate \8212 3 (by default)"
+        , "    - rate \8212 3"
+        ]
+      -- the input the author did write is not marked
+      let bases = fieldsNamed "- base" sout
+      bases `shouldNotBe` []
+      all (== "    - base \8212 n") bases `shouldBe` True
+
+    it "marks it in a record construction, and not the field the author wrote" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      fieldsNamed "\8212 red" sout `shouldBe`
+        [ "    - colour \8212 red (by default)"
+        , "    - colour \8212 red"
+        ]
+
+    it "marks a constructor, a boolean and a number of ten thousand or more" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("    - colour \8212 Green (by default)" `isInfixOf`)
+      sout `shouldSatisfy` ("    - urgent \8212 FALSE (by default)" `isInfixOf`)
+      sout `shouldSatisfy` ("    - fee \8212 12,500 (by default)" `isInfixOf`)
+
+    it "still marks a call inside a larger expression, a large number too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy`
+        ("- otherwise: scaled where base is n and rate is 3 by default" `isInfixOf`)
+      -- grouped to 12,500 by the exporter before the mark is looked for
+      sout `shouldSatisfy`
+        ("- otherwise: big fee where base is n and fee is 12,500 by default" `isInfixOf`)
+
+    it "marks each defaulted cell of a table, and not a cell the author wrote" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      let rows = [ l | l <- lines sout, "| 1 " `isPrefixOf` dropWhile isSpace l
+                                      || "| 2 " `isPrefixOf` dropWhile isSpace l ]
+      case rows of
+        [row1, row2] -> do
+          row1 `shouldSatisfy` ("| red (by default) |" `isInfixOf`)
+          row2 `shouldSatisfy` ("| blue " `isInfixOf`)
+          row2 `shouldNotSatisfy` ("(by default)" `isInfixOf`)
+        _ -> expectationFailure ("expected the two rows of the table, got " ++ show rows)
+
+    it "says it in the HTML document, field list and table alike" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy`
+        ("<span class=\"field\">rate</span> \8212 <span class=\"prose\">3 (by default)</span>" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("<span class=\"field\">rate</span> \8212 <span class=\"prose\">3</span>" `isInfixOf`)
+      sout `shouldSatisfy` ("<td><span class=\"prose\">red (by default)</span></td>" `isInfixOf`)
+
+    it "carries it in the document JSON as the text of the value, with the shape unchanged" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "json", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"value\":\"3 (by default)\"" `isInfixOf`)
+      sout `shouldSatisfy` ("\"value\":\"3\"" `isInfixOf`)
+      -- no key was added to a field: still exactly `label` and `value`
+      sout `shouldSatisfy` ("{\"label\":\"rate\",\"value\":\"3 (by default)\"}" `isInfixOf`)
+
+    it "says it in the Akoma Ntoso document" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", renderDefaultMarkFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("3 (by default)" `isInfixOf`)
+
+  -- The limit the mark has, stated on the reference pages: it follows an
+  -- argument the checker added at a call or a construction. A default taken at
+  -- the root of a section GIVEN is not added to the call, so `l4 nlg` prints
+  -- nothing about it, and the `presumed` list is the account. If a later change
+  -- marks it, this test and those pages change together.
+  describe "l4 nlg: a default taken at the root of a section GIVEN" $
+    it "is not marked, while the same value written at the call is printed" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderDefaultMarkRootFixture]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "`tax on` where `amount` is 10 is equal to 12"
+        , "`tax on` where `amount` is 10 and `surcharge` is 7 is equal to 17"
+        ]
+
+  -- `Marker WITHAL` on a record with no fields checks to a named application
+  -- with nothing written. It used to render as a field list with no fields
+  -- ("The marker is a Marker with:" and nothing after it) and as "Marker where"
+  -- (found by the Opus review of the combined branch, 2026-10-12).
+  describe "l4 render and l4 nlg: T WITHAL on a record with no fields" $ do
+    it "reads as the record's name where it stands, with no text left hanging" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderEmptyRecordFixture]
+      code `shouldBe` ExitSuccess
+      let ls = map (filter (/= '\r')) (lines sout)
+      -- a rule whose whole body is the record, an argument, and a field's value
+      ls `shouldSatisfy` ("\8226 The marker means Marker." `elem`)
+      ls `shouldSatisfy` ("\8226 Check holds if is marker with Marker." `elem`)
+      ls `shouldSatisfy` ("    - mark \8212 Marker" `elem`)
+      -- the field that has a value still shows it
+      ls `shouldSatisfy` ("    - n \8212 1" `elem`)
+      sout `shouldNotSatisfy` ("where" `isInfixOf`)
+      sout `shouldNotSatisfy` ("is a Marker with" `isInfixOf`)
+
+    it "says the record's name in the HTML document too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", renderEmptyRecordFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("The marker</span> means" `isInfixOf`)
+      sout `shouldNotSatisfy` ("Marker where" `isInfixOf`)
+      sout `shouldNotSatisfy` ("is a Marker with" `isInfixOf`)
+
+    it "prints the name, and no \"where\", in the natural-language line" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderEmptyRecordFixture]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe` [ "`is marker` with `Marker`" ]
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $
@@ -1854,12 +2066,12 @@ spec bin = do
       sstr `shouldSatisfy` ("\"note\":\"line one\\nline two\"" `isInfixOf`)
 
     -- Review M3 / code #1, T4b: the switch reaches the request's decode only.
-    -- A decode the rule makes of its own fills its default in both modes;
-    -- under hard the answer says it rests on it, because no row could
-    -- supply it. Soft keeps T6b's filter, so it is not listed there.
-    it "lets a rule's own JSONDECODE fill its defaults in both modes" $ do
+    -- A decode the rule makes of its own fills its default in both modes, and
+    -- in both the answer says it rests on it, because no row could supply it
+    -- (Meng, 2026-10-11, overnight card O1 condition 3: DECODERRING).
+    it "lets a rule's own JSONDECODE fill its defaults in both modes, and lists it in both" $ do
       soft <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson]
-      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf [])
+      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
       hard <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson, "--presumption", "hard"]
       resultAndPresumed hard `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
 
@@ -1936,6 +2148,335 @@ spec bin = do
       hrows <- decodeArray hout
       map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
       hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
+
+  -- W4 and W5: a rule's own defaulted input, and a record's defaulted field,
+  -- may be left out at a NAMED site. The default is taken inside the rules, so
+  -- no request could have supplied it: presumption does not withdraw it, soft or
+  -- hard. The answer rests on it in both modes and lists it under the
+  -- application that took it (T4b, R8; Meng, 2026-10-11, overnight card O1).
+  describe "l4 batch: TYPICALLY at a named site (W4, W5)" $ do
+    -- Before: the module did not check ("you have not supplied these inputs:
+    -- rate", and `timeout`), so there was no row to run. The request's own
+    -- `rate` is 7 and is NOT what `scaled` takes: it takes its default 3.
+    it "takes the default under soft, and lists it under the application: the answer rests on it" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyNamed, "--inputs", batchTyNamedJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0), presumedOf [])
+        ]
+
+    -- The positive control is the second row: `use` FALSE never reaches either
+    -- site, so nothing is listed. The report counts what the answer rests on.
+    it "takes the same defaults with --presumption hard, and lists them under the application" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyNamed, "--inputs", batchTyNamedJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 60), presumedOf ["WITH scaled: rate", "WITH Config: timeout"])
+        , (Just (Number 0), presumedOf [])
+        ]
+
+  -- T1, ruled by Meng 2026-10-09: `T WITHAL` is the record with EVERY field's
+  -- default and nothing written. It is the record that a rule's own JSONDECODE
+  -- of "{}" gives, and it is a default taken inside the rules, so it is listed
+  -- as `WITH T: field` in both modes exactly as a WITH that leaves the field
+  -- out is (above), beside the decode's own `JSONDECODE T: field` (Meng,
+  -- 2026-10-11, overnight card O1 and DECODERRING). `{}` as the VALUE of a
+  -- record input is still `null` and is refused (M2); WITHAL is the spelling
+  -- for it inside the rules.
+  describe "l4 batch: T WITHAL (T1)" $ do
+    -- What `same defaults` lists: the decode's defaults, then WITHAL's.
+    let withalSameDefaults =
+          [ "JSONDECODE Settings: limit", "WITH Settings: limit"
+          , "JSONDECODE Settings: strict", "WITH Settings: strict" ]
+    it "builds the record a decode of {} gives, and takes and lists the defaults in both modes" $ do
+      -- the second row is the positive control: the answer depends on the default
+      Output code sout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
+                  , "--entrypoint", "within limit", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["WITH Settings: limit"])
+        , (Just (Bool False), presumedOf ["WITH Settings: limit"])
+        ]
+      Output scode ssout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson, "--format", "json" ]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray ssout
+      map resultAndPresumed srows `shouldBe`
+        [ (Just (Bool True), presumedOf withalSameDefaults)
+        , (Just (Bool True), presumedOf withalSameDefaults)
+        ]
+
+    it "lists the same entries with --presumption hard, as WITH T: field beside the decode's own" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
+                  , "--entrypoint", "within limit", "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["WITH Settings: limit"])
+        , (Just (Bool False), presumedOf ["WITH Settings: limit"])
+        ]
+      Output scode ssout _ <-
+        runL4 bin [ "batch", batchWithal, "--inputs", batchWithalJson
+                  , "--presumption", "hard", "--format", "json" ]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray ssout
+      map resultAndPresumed (take 1 srows) `shouldBe`
+        [ ( Just (Bool True)
+          , presumedOf withalSameDefaults ) ]
+
+  describe "l4 check: T WITHAL (T1)" $ do
+    it "names the field with no default, on a record from an IMPORT" $ do
+      Output code _ serr <- runL4 bin ["check", withalImportMissing]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("WITHAL takes the default of every field" `isInfixOf`)
+      serr `shouldSatisfy` ("item of type STRING" `isInfixOf`)
+      serr `shouldSatisfy` (not . ("quantity" `isInfixOf`))
+
+    it "is only the ordinary 'could not find a definition' on the name of a type" $ do
+      Output code _ serr <- runL4 bin ["check", withalTypeName]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("I could not find a definition for the identifier" `isInfixOf`)
+      serr `shouldSatisfy` (not . ("WITHAL builds a record" `isInfixOf`))
+
+  -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+  -- listed whenever the same constructor was evaluated anywhere later in the
+  -- run, and two such defaults shared one registry slot. Each case below is a
+  -- default that is NOT read, or a pair of which only one is, with a later use
+  -- of the same constructor to trip it. The numeric defaults above never could.
+  describe "l4 batch: a constructor default at a named site is listed only if the answer read it" $ do
+    -- Under hard; soft lists the same entries for these sites (the first test
+    -- of the describe above), so a wrong listing shows in either mode.
+    let rowsFor entry = do
+          Output code sout _ <-
+            runL4 bin [ "batch", batchTyCtors, "--inputs", batchTyCtorsJson
+                      , "--entrypoint", entry, "--presumption", "hard", "--format", "json" ]
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+
+    it "lists nothing while an AND stops before the default, and the default once it is read" $ do
+      rows <- rowsFor "short circuits"
+      rows `shouldBe`
+        [ (Just (Number 0), presumedOf [])
+        , (Just (Number 0), presumedOf ["WITH both: b"])
+        ]
+
+    it "lists nothing for an enum default the rule never mentions, though the rule evaluates that constructor" $ do
+      rows <- rowsFor "never mentioned"
+      rows `shouldBe`
+        [ (Just (String "Red"), presumedOf [])
+        , (Just (String "Red"), presumedOf [])
+        ]
+
+    it "lists the one of two defaults of the same constructor that was read, and not the other" $ do
+      rows <- rowsFor "two of one constructor"
+      rows `shouldBe`
+        [ (Just (Bool False), presumedOf ["WITH readsB: b"])
+        , (Just (Bool False), presumedOf ["WITH readsB: b"])
+        ]
+
+    it "lists nothing for a record's boolean field that the construction left out and nothing read" $ do
+      rows <- rowsFor "unread field"
+      rows `shouldBe`
+        [ (Just (Bool True), presumedOf [])
+        , (Just (Bool True), presumedOf [])
+        ]
+
+  -- Review m1, 2026-10-03: the entry named the rule by whatever the callee's
+  -- resolved name carried, so an AKA alias, the section a rule is declared in
+  -- and a mixfix rule's canonical pattern all leaked into it. Overnight card O6
+  -- (Meng, 2026-10-11): the name is the declaration's own, behind the headings
+  -- it is declared under, whatever the site called it.
+  describe "l4 batch: a default taken at a named site is listed under the declaration's own name" $ do
+    it "names the rule and the record behind their section: not an alias, not a mixfix pattern" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyLabels, "--inputs", batchTyLabelsJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ ( Just (Number 140)
+          , presumedOf ["WITH Pricing.scaled: rate", "WITH Pricing.`scaled by`: factor", "WITH Pricing.Config: timeout"] )
+        ]
+
+  -- Overnight card O6, 2026-10-11. Before, the entry named a rule by its bare
+  -- name, so two rules of one name in different sections gave one entry for
+  -- three answers (30, 50, 80): the row that rests on two defaults listed one.
+  -- Naming the section tells them apart. It cannot for a rule at the top of a
+  -- file, which has no heading, or for a local of a WHERE: the last two tests
+  -- pin that these still give one entry, so the pages that state the limit
+  -- stay true.
+  describe "l4 batch: two declarations of one name in different sections give two entries" $ do
+    let rowsOf file json = do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", json, "--format", "json"]
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+
+    it "tells apart two rules of one name in sibling sections" $ do
+      rows <- rowsOf batchTyCollideSections batchTyCollideJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH Alpha.scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH Beta.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH Alpha.scaled: rate", "WITH Beta.scaled: rate"])
+        ]
+
+    it "tells apart two records of one name in sibling sections" $ do
+      rows <- rowsOf batchTyCollideRecords batchTyCollideJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH Alpha.Config: timeout"])
+        , (Just (Number 60), presumedOf ["WITH Beta.Config: timeout"])
+        , (Just (Number 90), presumedOf ["WITH Alpha.Config: timeout", "WITH Beta.Config: timeout"])
+        ]
+
+    it "still gives one entry for top-level rules of one name in two imported files" $ do
+      rows <- rowsOf batchTyCollideImport batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH scaled: rate"])
+        ]
+
+    -- Assumed, not ruled: a part of a qualified name that is more than one
+    -- plain word, or holds a dot, is written in backticks as L4 writes a
+    -- qualified name in source and in its errors. Without it `Part 1. Fees.scaled`
+    -- cannot be split back into a heading and a rule.
+    it "writes a heading with a space or a dot in backticks, as L4 does" $ do
+      rows <- rowsOf batchTyCollideSpaced batchTyCollideJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH `Part 1. Fees`.scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH `Part 2`.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH `Part 1. Fees`.scaled: rate", "WITH `Part 2`.scaled: rate"])
+        ]
+
+    -- Found in review of the quoting commit: an owner with no section in front
+    -- of it was never quoted, so a top-level rule called `Pricing.scaled` and
+    -- the rule `scaled` under `§ Pricing` both printed `Pricing.scaled`. The
+    -- rows answer 30 (the top-level rule, default 3), 50 (the sectioned one,
+    -- default 5) and 80 (both).
+    it "does not print a top-level rule called `Pricing.scaled` as the rule `scaled` under a section" $ do
+      rows <- rowsOf batchTyCollideDotted batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH `Pricing.scaled`: rate"])
+        , (Just (Number 50), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH `Pricing.scaled`: rate", "WITH Pricing.scaled: rate"])
+        ]
+
+    it "writes a top-level name that needs backticks in backticks, as it does under a section" $ do
+      rows <- rowsOf batchTyCollideTopmix batchTyCollideTopmixJson
+      rows `shouldBe`
+        [ (Just (Number 50), presumedOf ["WITH `scaled by`: factor", "WITH `two words`: the rate"]) ]
+
+    -- Found in review. The entry names the sections, not the file, so the same
+    -- name under the same sections in two imported files is one entry.
+    it "still gives one entry for the same name under the same section in two imported files" $ do
+      rows <- rowsOf batchTyCollideSecImport batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH Pricing.scaled: rate"])
+        ]
+
+    -- Found in review. A WHERE local is named bare, so it shares an entry with a
+    -- top-level rule of that name.
+    it "still gives one entry for a WHERE local and a top-level rule of one name" $ do
+      rows <- rowsOf batchTyCollideWhereTop batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH scaled: rate"])
+        ]
+
+    it "still gives one entry for two WHERE locals of one name" $ do
+      rows <- rowsOf batchTyCollideWhere batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH scaled: rate"])
+        ]
+
+  -- Assumed, not ruled (the review of the combined branch, 2026-10-12, following
+  -- overnight card O6): a decode the rules make names the record as it is
+  -- DECLARED, behind the heading it is declared under and quoted as the WITH
+  -- entry of the same record is, whichever way the decode site spelled the type.
+  -- Before, it named the type as the site spelled it: the same record decoded
+  -- twice was two entries, two different records of one name were one, and the
+  -- decode entry lacked the heading the WITH entry beside it carried. Both modes
+  -- list the same entries (the switch does not reach a decode the rules make).
+  describe "l4 batch: a JSONDECODE entry names the record as it is declared" $ do
+    let entriesFor file ep extra = do
+          Output code sout _ <-
+            runL4 bin ([ "batch", file, "--inputs", batchTyDecodeJson
+                       , "--entrypoint", ep, "--format", "json" ] <> extra)
+          code `shouldBe` ExitSuccess
+          map resultAndPresumed <$> decodeArray sout
+        inBothModes file ep expected = do
+          soft <- entriesFor file ep []
+          hard <- entriesFor file ep ["--presumption", "hard"]
+          soft `shouldBe` expected
+          hard `shouldBe` expected
+
+    it "names one record once, however the decode site spelled its type" $
+      inBothModes batchTyDecodeSpelling "go"
+        [ ( Just (Number 40)
+          , presumedOf ["JSONDECODE Pricing.Settings: limit", "WITH Pricing.Settings: limit"] ) ]
+
+    it "tells two records of one name apart, as the WITH entries do" $
+      inBothModes batchTyDecodeTwoSections "both"
+        [ ( Just (Number 218)
+          , presumedOf [ "JSONDECODE Alpha.Settings: limit", "JSONDECODE Beta.Settings: limit"
+                       , "WITH Alpha.Settings: limit", "WITH Beta.Settings: limit" ] ) ]
+
+    it "writes a heading that needs backticks in backticks, as the WITH entry does" $
+      inBothModes batchTyDecodeHeading "same defaults"
+        [ ( Just (Bool True)
+          , presumedOf [ "JSONDECODE `Part 1. Fees`.Settings: limit", "WITH `Part 1. Fees`.Settings: limit"
+                       , "JSONDECODE `Part 1. Fees`.Settings: strict", "WITH `Part 1. Fees`.Settings: strict" ] ) ]
+
+    -- a bare MAYBE field the decoder fills with NOTHING is listed too, in both modes
+    it "lists a MAYBE field a decode filled with NOTHING, behind the heading, in both modes" $
+      inBothModes batchTyDecodeHeading "partial decode"
+        [ ( Just (Bool True)
+          , presumedOf ["JSONDECODE `Part 1. Fees`.Partial: cap", "JSONDECODE `Part 1. Fees`.Partial: note"] ) ]
+
+    -- KNOWN LIMIT. The headings of an imported module do not reach the
+    -- evaluator, so a record declared under a heading in an IMPORTED module is
+    -- named bare by a decode, where the WITH entry beside it carries the
+    -- heading. If the headings are ever carried across, this test and the pages
+    -- that state the limit change together.
+    it "still names an imported record bare, where the WITH entry carries its heading" $
+      inBothModes batchTyDecodeImport "coats"
+        [ ( Just (Number 9)
+          , presumedOf ["WITH `Stock items`.`Paint Order`: coats", "JSONDECODE `Paint Order`: coats"] ) ]
+
+  -- Decision O3. A named site whose callee has an overload takes a default only
+  -- when no other rule of that name could take the inputs the site writes. Here
+  -- the other `scaled` wants a STRING for `base` and the request gives a number,
+  -- so the site means the first `scaled` and it takes its default for `rate`.
+  -- Only the answer is pinned under soft: what soft lists in `presumed` for a
+  -- default taken inside the rules is a separate question (decision O1).
+  describe "l4 batch: a named site that the written inputs settle between overloads takes the default" $ do
+    it "answers under soft" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyOverload, "--inputs", batchTyOverloadJson, "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map (fst . resultAndPresumed) rows `shouldBe` [Just (Number 30)]
+
+    it "answers under hard, and lists the default under the rule's own name" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTyOverload, "--inputs", batchTyOverloadJson
+                  , "--presumption", "hard", "--format", "json" ]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH scaled: rate"]) ]
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

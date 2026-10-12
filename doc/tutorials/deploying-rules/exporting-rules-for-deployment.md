@@ -181,7 +181,7 @@ and `qualifies-for-discount` returns:
 }
 ```
 
-`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; here there are none.
+`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; here there are none. It also lists a default that the rules themselves took, for example `WITH scaled: rate` when a rule calls `scaled` and leaves out its `rate`, so an entry that starts with `WITH` is not an input of the call. A service can also be set to refuse an input that is left out instead of defaulting it (`"presumption": "hard"`); that mode withdraws the first kind of default and not the second, which no call could have supplied. The `jl4-service` README gives the exact forms.
 
 What `value` holds depends on what the rule gives back:
 

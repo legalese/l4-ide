@@ -1,0 +1,40 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-missing-default.l4
+  Hidden: no
+  Range: 12:7-12:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL takes the default of every field, but these fields of
+
+      Paint (defined at withal-missing-default.l4:6:9-14)
+
+    have none:
+
+      colour of type STRING
+      coats of type NUMBER
+
+    Give each of them a TYPICALLY default where the record is declared,
+    or build the record with WITH and name them.
+
+File: withal-missing-default.l4
+  Hidden: no
+  Range: 19:7-19:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL takes the default of every field, but these fields of
+
+      Point (defined at withal-missing-default.l4:15:9-14)
+
+    have none:
+
+      x of type NUMBER
+      y of type NUMBER
+
+    Give each of them a TYPICALLY default where the record is declared,
+    or build the record with WITH and name them.

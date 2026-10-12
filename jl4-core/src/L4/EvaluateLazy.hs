@@ -79,6 +79,7 @@ import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
 import L4.Syntax
+import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
@@ -933,7 +934,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
-    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, recordOwners = Map.empty, presumed
     }
 
 -- | Tell a run where defaults come from: the section binders of the evaluated
@@ -944,6 +945,7 @@ withDefaultsKnown :: EvalConfig -> RootFills -> Module Resolved -> [Declare Reso
 withDefaultsKnown evalConfig rootFills m imported st =
   st { presumableDefs = binderDefaults <> rootFills
      , recordDefaults = recordFieldDefaults (moduleDeclares m <> imported)
+     , recordOwners = declaredOwners m
      }
  where
   binderDefaults
@@ -971,6 +973,28 @@ moduleDeclares (MkModule _ _ sect) = goSection sect
     Section _ s -> goSection s
     _ -> []
 
+-- | The record types a module declares under a section heading, each with the
+-- name a decode the rules make reports for it ('EvalState.recordOwners'): the
+-- declared name behind the headings it sits under, written and quoted as the
+-- owner of a @WITH@ default is, by the same two functions
+-- ('TypeCheck.qualifiedOwner', 'presumedOwner'). Keyed by the type's 'Unique'.
+-- A type at the top of the module is left out, and is named as it always was.
+-- Only the module itself is walked: the @DECLARE@s of its imports arrive as a
+-- flat list that has lost its headings.
+declaredOwners :: Module Resolved -> Map Unique Text
+declaredOwners (MkModule _ _ sect) = Map.fromList (goSection [] sect)
+ where
+  goSection heads (MkSection _ mname _ _ decls) =
+    let heads' = heads <> [ rawNameToText (rawName (getActual n)) | Just n <- [mname] ]
+    in decls >>= goDecl heads'
+  goDecl heads = \ case
+    Declare _ (MkDeclare _ _ (MkAppForm _ tyName _ _) _)
+      | not (null heads) ->
+          [ ( getUnique tyName
+            , presumedOwner (rawName (TypeCheck.qualifiedOwner heads (getOriginal tyName))) ) ]
+    Section _ s -> goSection heads s
+    _ -> []
+
 -- | The field defaults of every record among some @DECLARE@s, keyed by the
 -- record type's 'Unique', then by field name. Only fields with a @TYPICALLY@
 -- appear.
@@ -988,24 +1012,51 @@ recordFieldDefaults decls = Map.fromList
 -- evaluation forced: each as the input's name, or the path to a field below
 -- it. Shared by @l4 batch@ and the service.
 --
--- Only events that belong to the request count (T6b): a section binder's or a
--- root fill's for an input the function takes, and one from the request's own
--- decode. A decode the RULES made is not the request's, and is listed only
--- when presumption is hard (@presume@ False): there it is a default the switch
--- could not withdraw, because no request can supply it, and the answer rests
--- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
--- naming the type the rules decoded.
+-- Two kinds of event are listed. The request's own (T6b): a section binder's
+-- or a root fill's for an input the function takes, and one from the request's
+-- own decode. And the rules' own, which no request owns and the answer rests
+-- on: a decode the RULES made, and a default a named application took (below).
+-- Any other event is not listed.
+--
+-- A decode the RULES made, of JSON written in the rules or of text the
+-- request sent, is not the request's, and its defaults are listed in both
+-- presumption modes (Meng, 2026-10-11, card O1 condition 3): the switch reaches
+-- the request's own decode only, and the answer rests on them (T4b: "rests on
+-- presumed x"). It is written @JSONDECODE T: path@, naming the record the rules
+-- decoded as it is declared: behind the section headings it sits under, as a
+-- @WITH@ default's owner is ('EvalState.recordOwners'), whichever way the
+-- decode site wrote the type. A record declared under a heading in an imported
+-- module is named bare.
+--
+-- A default a named application of the rules took (W4, W5) is a default no
+-- request could supply, and the answer rests on it just the same. It is listed
+-- in BOTH modes, as @WITH rule: input@ (Meng,
+-- 2026-10-11, card O1): R8 asks that every output name each parameter that took
+-- its default, and T4b that the mark cover every default that took effect,
+-- wherever filled. T6b's "keeps only those whose binder or JSON path is part of
+-- the request" is read, for these sites, as keeping the request's own inputs
+-- apart from the callee's, which the @WITH rule:@ prefix does: the binder of an
+-- input a rule leaves out at its own call is part of no request, and an entry
+-- for it is not an input's name. The trace still carries every event.
 --
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
-requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
-requestPresumed presume fieldName inputs events =
+requestPresumed :: (Text -> Text) -> Set Text -> [Presumed] -> [Text]
+requestPresumed fieldName inputs events =
   nubOrd (mapMaybe entry events)
  where
   entry p = case (p.origin, p.path) of
-    (FromDecode root, path)
-      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
-      | otherwise   -> Nothing
+    (FromDecode root, path) ->
+      Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+    -- A default a named application of the RULES took (W4, W5): no request
+    -- could supply it, so the switch does not withdraw it and the answer
+    -- rests on it, in either mode. Its binder is the callee's, not an input of
+    -- the request, so it must not fall through to the case below, where a
+    -- binder that shares an input's spelling would be listed as that input.
+    -- Written @WITH scaled: rate@ (the application, then the input), as a
+    -- rules' own decode is written @JSONDECODE T: path@.
+    (FromNamedApp callee, path) ->
+      Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
     _ -> Nothing

@@ -1,0 +1,8 @@
+-- WITHAL after the name of a type that is not a record: only a term can be
+-- built, so this is the ordinary "could not find a definition" error and
+-- nothing about WITHAL (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng
+-- 2026-10-09). The message carries the checker's inference counter, so the
+-- test looks for its words and not its digits.
+DECLARE Colour IS ONE OF Red, Green
+
+#EVAL Colour WITHAL

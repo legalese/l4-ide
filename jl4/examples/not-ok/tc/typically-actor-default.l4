@@ -1,0 +1,39 @@
+-- The mirror image of ok/typically-actor-default.l4: each action is performed
+-- by the party in its `sender` field, read in the order the record DECLARES its
+-- fields, and each obligation here names the other party, so each is an error.
+--
+-- Before the fix, `omitted` and `viaRule` below were ACCEPTED: the sender is
+-- left out, so the checker adds it after the written fields, and the performer
+-- was taken to be the first party in that list, Bob, the recipient. A file that
+-- failed to check before a default could be left out (`you have not supplied
+-- these inputs: sender`) passed with the wrong actor.
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Msg HAS
+    sender    IS A Person TYPICALLY Alice
+    recipient IS A Person
+    body      IS A STRING
+
+GIVETH A Msg
+omitted MEANS Msg WITH recipient IS Bob, body IS "hi"
+
+GIVETH A Msg
+reordered MEANS Msg WITH recipient IS Alice, sender IS Bob, body IS "yo"
+
+GIVEN sender    IS A Person TYPICALLY Alice
+      recipient IS A Person
+GIVETH A Msg
+send MEANS Msg OF sender, recipient, "hi"
+
+GIVETH A Msg
+viaRule MEANS send WITH recipient IS Bob
+
+GIVETH A PROVISION OF Person, Msg
+fromOmitted MEANS PARTY Bob MUST omitted WITHIN 1            -- performed by Alice, not by Bob
+
+GIVETH A PROVISION OF Person, Msg
+fromReordered MEANS PARTY Alice MUST reordered WITHIN 1      -- performed by Bob, not by Alice
+
+GIVETH A PROVISION OF Person, Msg
+fromRule MEANS PARTY Bob MUST viaRule WITHIN 1               -- performed by Alice, not by Bob

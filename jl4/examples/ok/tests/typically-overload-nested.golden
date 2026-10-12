@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-overload-nested.l4:24:1-204:
+  16384
+typically-overload-nested.l4:41:1-37:
+  30
+typically-overload-nested.l4:50:1-17:
+  30

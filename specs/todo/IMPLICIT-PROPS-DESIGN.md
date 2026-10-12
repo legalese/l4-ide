@@ -1098,19 +1098,28 @@ binder or a definition (`beta TYPICALLY phi`), is evaluated lazily at the root, 
 `b ∈ R*(default(b))` is a check error, the default's read-set joining the requirement of every root
 that may use it. Surfaces: the trace records a defaulted binder as its own event with the
 declaration line and value; the JSON schema lists a `TYPICALLY` parameter as optional, never in
-`required`, with its default (as source text when it is an expression) and description.
+`required`, with its default (as source text when it is an expression; since HAIRCUT, 2026-10-12, it is always a literal) and description.
+
+**RULE 3 REVERSED 2026-10-12 (HAIRCUT, in chat).** `TYPICALLY` takes only a literal: a number, a string, or a nullary constructor (an enum value such as `Green`, and `TRUE`, `FALSE`, `NOTHING`), which is `isTypicallyLiteral` (`TypeCheck.hs`) as it stands.
+A default is therefore not a module-scope expression, may not name another binder or a definition, and there is no cycle to check; rules 1 and 2 and the surfaces stand, the schema's `default` is always a literal, and W7 (expression defaults, legalese/l4-ide#557) does not land.
+The fallback a default used to compute is written as an input `MAYBE … TYPICALLY NOTHING` plus an ordinary `CONSIDER … WHEN JUST d THEN d OTHERWISE <expr>`.
+Meng's words, verbatim, 2026-10-12 in chat: _"if we radically simplified TYPICALLY to prohibit complex expressions and only allowed simple values we increase simplicity without making the desired ideas impossible to express; the programmer just has to find other existing ways of saying the same thing, no?"_ and _"It just feels like we're asking the TYPICALLY keyword to do the job of an OTHERWISE branch."_
+Recorded in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4, which carries the same line.
+The text above is kept as the record of what was ruled on 2026-09-04.
 
 **What decided it.** Three images today (schema required-and-defaulted, Catala `context`,
 evaluator discards) and a reference page saying defaults do not change evaluation. Meng's own
 note: this expands `TYPICALLY` from a literal annotation into a defaulted expression, a language
-change in its own right; `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
+change in its own right (HAIRCUT, 2026-10-12, reversed it: `TYPICALLY` stays a literal annotation); `doc/reference/types/TYPICALLY.md` says so when R8 lands. Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.5.
 
 **EXTENDED 2026-09-06 to `DECLARE` record fields (D7.3, upstream #645).** R8 as written governs
 `GIVEN` binders and `TYPICALLY.md:69-72` carves record fields out. D7.3 rules that a `MAYBE`-typed
 field may be declared `field IS A MAYBE T TYPICALLY NOTHING`, and only then may a construction
 site omit it — same principle, one declaration, the default living where the name is declared.
-Ruled 2026-09-06, **not built**, and **blocked on R8's own named-site half**. The governing text for
+Ruled 2026-09-06, and **built 2026-10-03** with R8's named-site half (W4 and W5 of
+`TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2; `feat/typically-w4w5`, not yet merged), for a
+record's fields. The governing text for
 that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
 `SURFACE-SUGAR-CLUSTER-2026-09.md` §D7.3, which also rules the source/boundary asymmetry R8 does not
 reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
@@ -2180,7 +2189,8 @@ it on, so the only site that can reach that definition is a root that supplied
 nothing — and a 0-ary definition is a shared thunk, so `d` is forced at most
 once per evaluation and every reader sees the same value. `WITH` still wins,
 being an argument. The default's own read-set joins the call graph, so R8 rule 3
-("Closure") holds by construction. `doc/reference/types/TYPICALLY.md` now says
+("Closure") holds by construction. Since HAIRCUT (2026-10-12, §11.5) `d` is a
+literal, so that read-set is empty and the closure is trivial. `doc/reference/types/TYPICALLY.md` now says
 this is a change of meaning and says where it stops, which is Meng's own note in
 §11.5.
 
@@ -2435,13 +2445,13 @@ which owns the defect; this section owns the ruling and the limit.
   `L4.Discharge.implicitSupplySites` names so a backend can refuse rather than
   answer wrongly; wiring that refusal into each backend is part of the same
   follow-up.
-- **A rule's own defaulted `GIVEN` still cannot be omitted at a named site.**
-  R8's other half. The default lives on the declaration's `GivenSig`, and
-  `supplyAppNamed` sees only the callee's `Fun` type, which carries names and
-  types but not defaults; supplying it needs the callee's `FunTypeSig` threaded
-  to the call site. `TYPICALLY` therefore has two behaviours today, not the one
-  R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
-  is which.
+- ~~A rule's own defaulted `GIVEN` still cannot be omitted at a named site.~~
+  **Built 2026-10-03 (W4 of `TYPICALLY-ONE-BEHAVIOUR-SPEC.md`, §4.2),** on
+  `feat/typically-w4w5`, not yet merged. `supplyAppNamed` now reads the callee's
+  defaults from a table the checker keeps (`CheckEnv.visibleInputDefaults`, built
+  from each `FunTypeSig`'s own checked signature and carried across `IMPORT`) and
+  adds the default as one more named argument; a positional site still gives
+  every input (R8 rule 1).
 - ~~R5, field-opening, is not built.~~ **Built 2026-09-16**, see §11.7.1 for
   what is in the tree and what is not (typed binders only; no synonyms, no
   lambdas, nothing inside a regulative or an `EVENT`; constructors and top-level

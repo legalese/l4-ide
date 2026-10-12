@@ -1,0 +1,25 @@
+-- A rule that shares its name with a record. WITH names fields, which is what
+-- lets a site tell the two apart; WITHAL names none, so it cannot choose, and
+-- what the author reads is the ordinary "multiple definitions" error. A
+-- default must not be what decides which definition was meant (R8, as for a
+-- WITH: TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng 2026-10-09).
+
+DECLARE Paint
+  HAS label IS A STRING TYPICALLY "plain"
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+Paint MEANS n
+
+#EVAL Paint WITHAL
+
+-- A record with NO field beside a rule of the same name. There are no defaults to
+-- withhold here, so only the refusal of WITHAL at an overload keeps the site from
+-- resolving to the record by elimination, the rule failing for its own reason.
+DECLARE Marker HAS
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+Marker MEANS n
+
+#EVAL Marker WITHAL

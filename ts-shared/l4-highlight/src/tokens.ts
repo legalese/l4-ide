@@ -113,6 +113,7 @@ export const L4_KEYWORDS: ReadonlySet<string> = new Set([
   'WHEN',
   'WHERE',
   'WITH',
+  'WITHAL',
   'WITHIN',
   'YIELD',
 ])

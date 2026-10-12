@@ -1,0 +1,32 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-overloaded-site.l4
+  Hidden: no
+  Range: 20:7-20:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      scaled
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      scaled (defined at typically-overloaded-site.l4:16:1-7) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+      scaled (defined at typically-overloaded-site.l4:11:1-7) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+
+File: typically-overloaded-site.l4
+  Hidden: no
+  Range: 20:7-20:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    You are giving named inputs to
+
+      scaled (defined at typically-overloaded-site.l4:20:7-13) of type scaled6
+
+    but it is not a function, so it takes none.

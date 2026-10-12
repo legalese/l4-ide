@@ -1,0 +1,71 @@
+-- A record field's TYPICALLY default is taken at a construction that leaves the
+-- field out (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W5, ruling T1; D7.3 for a MAYBE).
+--
+-- Any field declared TYPICALLY may be left out. A field without one is still
+-- required (see not-ok/tc/typically-named-site.l4), and a TYPICALLY on a
+-- computed field, one with a MEANS clause, is an error (not-ok/tc/typically-computed-field.l4).
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER
+      note   IS A MAYBE STRING TYPICALLY NOTHING
+      label  IS A STRING TYPICALLY "plain"
+      rush   IS A BOOLEAN TYPICALLY FALSE
+
+GIVETH A Paint
+fresh MEANS Paint WITH coats IS 2
+
+GIVETH A Paint
+fancy MEANS Paint WITH coats IS 3, colour IS Green, label IS "gloss", rush IS TRUE, note IS JUST "mind the drips"
+
+-- Each default is taken, whatever its type, including an enum constructor
+-- (probe p10 of the spec: the default used to be checked where `Red` was not
+-- yet in scope).
+#EVAL fresh's colour
+#EVAL fresh's label
+#EVAL fresh's rush
+#EVAL fresh's note
+#EVAL fresh
+
+-- A field the construction supplies wins over its default.
+#EVAL fancy's colour
+#EVAL fancy's label
+#EVAL fancy's rush
+#EVAL fancy's note
+#EVAL fancy
+
+-- The order of the fields in the construction does not matter, and the checker
+-- still knows what the omitted field was, by its name.
+GIVETH A Paint
+`in another order` MEANS Paint WITH label IS "matte", coats IS 1
+
+#ASSERT (`in another order`'s colour) EQUALS Red
+#ASSERT (`in another order`'s label) EQUALS "matte"
+
+-- The record is declared AFTER the rule that builds it. The defaults are
+-- checked before any body is, so the order of the file does not matter.
+GIVETH A Brick
+`a brick` MEANS Brick WITH weight IS 3
+
+DECLARE Brick
+  HAS weight IS A NUMBER
+      baked  IS A BOOLEAN TYPICALLY TRUE
+
+#ASSERT (`a brick`'s baked) EQUALS TRUE
+
+-- A record built by a rule that is given the inputs, the default untouched
+-- when the field is read nowhere.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`coats needed` MEANS IF n EQUALS 0 THEN 0 ELSE (Paint WITH coats IS n)'s coats
+
+#ASSERT (`coats needed` 4) EQUALS 4
+
+-- The default of a field that is a record's own TYPICALLY is taken at every
+-- construction of it, in a list too.
+GIVETH LIST OF Paint
+`two paints` MEANS LIST (Paint WITH coats IS 1), (Paint WITH coats IS 2, colour IS Green)
+
+#EVAL `two paints`

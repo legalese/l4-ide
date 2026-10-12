@@ -1,0 +1,29 @@
+-- l4 batch over `T WITHAL` (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng
+-- 2026-10-09). `Settings WITHAL` is the record a rule's own JSONDECODE of "{}"
+-- gives: both take every field's TYPICALLY default, because every field of
+-- `Settings` has one. (A field that is a bare MAYBE is where they differ; see
+-- ok/withal-decode.l4. No batch row builds a record this way: `{}` as the value
+-- of a record input is `null`.)
+
+DECLARE Settings HAS
+  limit  IS A NUMBER TYPICALLY 10
+  strict IS A BOOLEAN TYPICALLY FALSE
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseSettings s MEANS JSONDECODE s
+
+-- TRUE when the decoded record is the one WITHAL builds
+@export default `same defaults`
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `same defaults` amount IF
+  CONSIDER parseSettings "{}"
+    WHEN RIGHT st THEN st EQUALS (Settings WITHAL)
+    WHEN LEFT e THEN FALSE
+
+-- reads one defaulted field of the record WITHAL builds
+@export `within limit`
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `within limit` amount IF amount <= (Settings WITHAL)'s limit

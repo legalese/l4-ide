@@ -1,0 +1,26 @@
+-- WITHAL written as a TYPICALLY default is no literal, and that is the one thing
+-- the author is told (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng
+-- 2026-10-09). A default must be a fixed value written out.
+--
+-- This used to add a second, false error. This module's own records are put
+-- where a construction finds their defaults only AFTER the defaults of record
+-- fields and of rule inputs have been checked, so `Inner` was not yet known as a
+-- record there and was reported as "one of the alternatives of a type declared
+-- with ONE OF". A record is now told from an alternative by its declaration.
+
+DECLARE Inner HAS
+  a IS A NUMBER TYPICALLY 1
+
+-- a field's default
+DECLARE Outer HAS
+  inner IS AN Inner TYPICALLY (Inner WITHAL)
+  n     IS A NUMBER TYPICALLY 2
+
+#EVAL Outer WITHAL
+
+-- a rule input's default
+GIVEN p IS AN Inner TYPICALLY (Inner WITHAL)
+GIVETH A NUMBER
+f p MEANS p's a
+
+#EVAL f WITH p IS Inner WITH a IS 5
