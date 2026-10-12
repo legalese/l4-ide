@@ -182,6 +182,16 @@ batchDeclaredStringCellsCsv        = fixtureDir </> "batch-declared-string-cells
 batchDeclaredBadNumberJson         = fixtureDir </> "batch-declared-bad-number.json"
 batchDeclaredNumberForStringJson   = fixtureDir </> "batch-declared-number-for-string.json"
 
+-- | CSV cells for inputs that are neither a NUMBER nor a BOOLEAN: a choice
+-- (@DECLARE Answer IS ONE OF True, False, Unknown@), a @MAYBE@ choice, a DATE,
+-- and synonyms of a NUMBER and a BOOLEAN, which are still read as those.
+batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional, batchDeclaredTextDates, batchDeclaredTextSynonyms :: FilePath
+batchDeclaredText         = fixtureDir </> "batch-declared-text.l4"
+batchDeclaredTextAnswers  = fixtureDir </> "batch-declared-text-answers.csv"
+batchDeclaredTextOptional = fixtureDir </> "batch-declared-text-optional.csv"
+batchDeclaredTextDates    = fixtureDir </> "batch-declared-text-dates.csv"
+batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
+
 -- | A choice type with one constructor that has a field and one that has
 -- none. Only the second can be given as JSON input; every other value is
 -- refused by name rather than passed on as NOTHING or as itself
@@ -453,6 +463,8 @@ coreFixtures =
   , batchUndeclaredColumnCsv, batchEscapeRoundtripJson
   , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
   , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
+  , batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional
+  , batchDeclaredTextDates, batchDeclaredTextSynonyms
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
@@ -1707,6 +1719,39 @@ spec bin = do
             diagnostics `shouldSatisfy` ("lots" `isInfixOf`)
             diagnostics `shouldNotSatisfy` ("25" `isInfixOf`)
           other -> expectationFailure ("expected 1 row, got " ++ show (length other))
+
+      -- Only a NUMBER or a BOOLEAN reads a CSV cell as anything but its text.
+      -- A choice named `True`, or a DATE written without dashes, was typed by
+      -- how it looks and then refused: `True` became JSON true ("Could not
+      -- decode true as Answer"), and 20261013 a number.
+      let csvRows entry csv = rowsOf [batchDeclaredText, "-e", entry, "--inputs", csv]
+      it "reads a CSV cell for a choice input as the name written" $ do
+        (code, _, rows) <- csvRows "echo answer" batchDeclaredTextAnswers
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` map (succeeded . String) ["yes", "no", "dunno"]
+
+      it "reads a CSV cell for a MAYBE choice input as the name written, and a blank one as left out" $ do
+        -- the second row is a quoted "", a cell that is blank (T3c)
+        (code, _, rows) <- csvRows "echo optional answer" batchDeclaredTextOptional
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` map (succeeded . String) ["yes", "none", "dunno"]
+
+      it "reads a CSV cell for a DATE input as text, so a bad date is reported as one" $ do
+        (code, _, rows) <- csvRows "echo date" batchDeclaredTextDates
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [good, bad] -> do
+            statusAndResult good `shouldBe` succeeded (String "2026-10-13")
+            objField bad "status" `shouldBe` Just (String "error")
+            show (objField bad "diagnostics") `shouldSatisfy` ("Could not parse date string '20261013'" `isInfixOf`)
+          other -> expectationFailure ("expected 2 rows, got " ++ show (length other))
+
+      -- Not a regression test: it passes on a build that types every cell by
+      -- its look. It pins the way a synonym is still read as what it stands for.
+      it "still reads a CSV cell for a synonym of NUMBER or BOOLEAN as one" $ do
+        (code, _, rows) <- csvRows "echo year" batchDeclaredTextSynonyms
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Number 2026)]
 
       -- A MAYBE input is read by the type it wraps, so "25" is 25 for a MAYBE
       -- NUMBER. Nothing tested that, and a build that stopped looking through
