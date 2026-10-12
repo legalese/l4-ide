@@ -2,7 +2,7 @@
 
 As built on `main` by the type-checker soundness change.
 Source spec: none.
-The fixes came from `unstable`: #55 (`e6975cd9b9`), #56 (`f16e0ad667`), their follow-ups in #628 (`36f2bec91`), and the `TIMEZONE IS` hunks of #130 (`bce739e9f`); this page describes only what `main` has.
+The fixes came from `unstable`: #55 (`e6975cd9b9`), #56 (`f16e0ad667`), their follow-ups in #628 (`36f2bec91`) and #634 (`8be0243b2`, `1e052b92d`), and the `TIMEZONE IS` hunks of #130 (`bce739e9f`); this page describes only what `main` has.
 Line numbers are in this PR's tree, on `main` at `00298eb60`.
 
 Scope: unification (`TypeCheck/Unify.hs`), the detection of type synonym cycles (`Desugar.hs`, `TypeCheck.hs`), and the directives `#ASSERT` and `TIMEZONE IS`.
@@ -14,10 +14,11 @@ Scope: unification (`TypeCheck/Unify.hs`), the detection of type synonym cycles 
   An inference variable that occurs twice in one type (`Pair OF a, a` against `Pair OF STRING, NUMBER`) could be silently rebound mid-unification; swapped arguments could build a cyclic substitution and hang.
 - A cycle of type synonyms, which has no finite expansion, is reported, and its members are set aside so that no unification expands them.
   That includes a cycle hidden by a name: in `DECLARE W1 AKA B1 IS A Duo OF B1, B1` next to `DECLARE B1 a IS A LIST OF a`, the `B1` with no arguments is `W1`'s own alias.
+  A synonym that merely shares its spelling with a record of a different number of parameters is not a cycle: `DECLARE Box IS A Box OF NUMBER` next to `DECLARE Box a HAS item IS AN a` is accepted.
 - Running out of the expansion limit (1000 synonyms in a row) is reported as a limit, not as a mismatch of types.
-- Unification is linear, not quadratic, in the depth of a type.
+- Unification no longer substitutes the whole type at every step of the descent, nor compares whole subtrees at every level, so a check does not grow with the square of the depth of a type nested on either side (measured below).
 - An ambiguous but well-typed expression under `#ASSERT` or `TIMEZONE IS` is reported as an ambiguity diagnostic instead of crashing the checker with `internal error: expected unique result, got several`.
-- Exact-print keeps `TIMEZONE IS`: it used to give back only the expression, so `l4 format` dropped the declaration.
+- Exact-print keeps `TIMEZONE IS`: it used to give back only the expression, so `l4 format` dropped the declaration, and the editor's parse and check phases gave the two tokens no semantic token (`lsp/semantic-tokens/timezone.l4`).
 
 Measured 2026-10-13 with `l4 check`, once with an `l4` built from `main` without this change and once with this PR's build, each under a 4 GiB memory cap and a 60 s timeout:
 
@@ -32,19 +33,31 @@ Measured 2026-10-13 with `l4 check`, once with an `l4` built from `main` without
 | `not-ok/tc/timezone-mixed-ambiguity.l4`       | the same internal error                               | the same ambiguity message                              |
 | a chain of 1200 synonyms, each the one before | `Check succeeded.`                                    | ``I stopped following type synonyms at `S200`.``        |
 
+For the cost of unifying, `l4 check` user plus system CPU of a type nested on the left (`P OF (P OF (… a …), a), a`) that a definition is used at fifty times, minus the same file with no uses, single runs on 2026-10-13:
+
+| depth | `main` without this change | with this change |
+| ----- | -------------------------- | ---------------- |
+| 400   | 0.11 s                     | 0.19 s           |
+| 800   | 0.46 s                     | 0.51 s           |
+| 1600  | 1.56 s                     | 1.20 s           |
+| 3200  | 3.50 s                     | 2.37 s           |
+
+Each use still unifies the whole type, so the cost grows with the depth times the number of uses; what the change removes is the extra factor of the depth.
+`UnifySpec` times a generic function at nesting depth 100 against 400, and a left-nested unification (no parsing or resolution) at 4000 against 16000.
+
 ## Where it lives
 
-- `jl4-core/src/L4/TypeCheck/Unify.hs`: `synonymExpansionFuel = 1000` (`:51-52`), `unify`/`unifyFuel` (`:112-119`), `walkHead` (`:126-133`), `unify'` (`:139-146`), `bindChecked` (`:153-156`), `plainTypeEqUnder` (`:171-186`), `expandAndUnify` (`:197-214`), `unifyBase` (`:222-235`), `bind` and its precondition comment (`:245-254`).
-- `jl4-core/src/L4/Desugar.hs`: `detectTypeSynonymCycles` (`:473`, its comment `:441-472`), `typeUses` (`:507`) and `synonymsInSection` (`:517`).
+- `jl4-core/src/L4/TypeCheck/Unify.hs`: `synonymExpansionFuel = 1000` (`:51-52`), `unify`/`unifyFuel` (`:124-131`), `walkHead` (`:138-145`), `unify'` (`:151-158`), `sameUnderSubstitution` (`:168-182`), `isExpandableSynonym` (`:188-191`), `bindChecked` (`:198-201`), `plainTypeEqUnder` (`:216-231`), `expandAndUnify` (`:242-259`), `unifyBase` (`:267-280`), `bind` and its precondition comment (`:290-299`).
+- `jl4-core/src/L4/Desugar.hs`: `detectTypeSynonymCycles` (`:477`, its comment `:441-476`), `typeUses` (`:507`) and `synonymsInSection` (`:517`).
 - `jl4-core/src/L4/TypeCheck.hs`:
   - cycle wiring in `doCheckProgramWithDependencies`: `synonymCycles` (`:171`), the `CyclicTypeSynonyms` errors (`:168-170`), `cyclicSynonyms` in the `CheckEnv` (`:137, 174`);
-  - the second cycle pass, `quarantineResolvedSynonymCycles` (`:2126-2198`), called from `checkProgram` between scanning the types and scanning the definitions (`:205-218`);
+  - the second cycle pass, `quarantineResolvedSynonymCycles` (`:2126-2199`), called from `checkProgram` between scanning the types and scanning the definitions (`:205-218`);
   - quarantine in `inferTypeNameAndSynonym` (`:886-900`);
   - fuelled synonym chase in `matchFunTy` (`:2011-2071`, the fuel is set at `:2022`);
   - `runCheckUnique` and its INVARIANT comment (`:351-372`);
   - `prune` on `inferDirective (Assert …)` (`:484-489`) and on `inferTopDecl (Timezone …)`, which also gains an `errorContext` (`:540-546`);
   - the strict `error` for the projection case (`:1407-1416`);
-  - `prettyCheckError` for `CyclicTypeSynonyms` (`:3386-3393`) and `SynonymExpansionLimit` (`:3394-3403`).
+  - `prettyCheckError` for `CyclicTypeSynonyms` (`:3387-3394`) and `SynonymExpansionLimit` (`:3395-3404`).
 - `jl4-core/src/L4/TypeCheck/Types.hs`: `CyclicTypeSynonyms [Name]` (`:95`) and `SynonymExpansionLimit Int Resolved` (`:97-101`); `CheckEnv.cyclicSynonyms` (`:385`), carried by `extendEnv` (`:981`) and reset to empty at an import boundary in `unionImportedCheckEnv` (`:437`).
 - The positional `MkCheckEnv` pattern in `withExtraMixfix` gains a field (`TypeCheck.hs:235-236`; 12 fields).
 - `jl4-core/src/L4/Parser.hs`: `timezone'` returns the `Timezone` declaration with its `TIMEZONE` and `IS` tokens kept in the annotation (`:606-612`), and `topdecl` tries it first (`:456`).
@@ -55,18 +68,22 @@ Measured 2026-10-13 with `l4 check`, once with an `l4` built from `main` without
 - **Look through the substitution at every descent.** `unifyFuel` resolves the head of both types (`walkHead`) before it compares them, and `unifyBase` recurses through `unifyFuel`, so later siblings see bindings made by earlier ones.
   Every inference variable reaching `bind` is therefore unbound, and `bind`'s `Map.insert` never overwrites a live binding.
 - **Substitute the whole type only to bind.** `bindChecked` substitutes the type in full when a variable is about to be bound to it, because the occurs check needs every variable the type reaches.
-  Elsewhere only the head is read, which keeps unification linear in the depth of a type (a generic function used fifty times at a type nested 400 deep checks in 0.46 s of user CPU on this build; `UnifySpec` times 100 against 400 deep).
-- **Short-circuit.** `plainTypeEqUnder` compares types structurally, ignoring annotations and argument names, reading bound variables through the substitution, and returns success before any synonym is expanded.
+  Elsewhere only the head is read (a generic function used fifty times at a type nested 400 deep checks in 0.46 s of user CPU on this build).
+- **Short-circuit, only where it pays.** `sameUnderSubstitution` answers "the same type" without descending in three cases: the same inference variable (which must not be bound to itself), a type constructor with no arguments against itself, and the same type synonym applied to the same arguments, which `plainTypeEqUnder` compares structurally, ignoring annotations and argument names and reading bound variables through the substitution.
+  The synonym case is what keeps a tower of synonyms from being expanded at exponential cost.
+  Other type constructors are left to the descent, because a structural comparison walks to the first difference, and in a type nested on the left that is at the bottom, so trying it at every level cost the square of the depth (`Unify.hs:100-122`).
 - **Fuel.** Each synonym expansion costs one unit from a budget of 1000 that is passed down, never reset, through constructor children.
   When it runs out with a synonym still to expand, `SynonymExpansionLimit` is reported and the two types are taken as unified, so the module fails once with that error and not twice.
   `matchFunTy` keeps a separate count of the same size for its synonym chain (`TypeCheck.hs:2022-2065`); substitution-chase steps there cost nothing.
   The fuel bounds the depth of an expansion, not its work: a synonym that names itself twice branches twice per expansion, so the cycle checks below, and not the fuel, are what keep a cycle from being expanded (`Unify.hs:26-50`).
 - **Cycle detection, by spelling.** `detectTypeSynonymCycles` builds a graph over the module's synonym declarations, including those in nested sections, and reports each cyclic strongly connected component.
   A use is told from a like-named sibling by the number of arguments it is written with: `B` with none is `W`'s alias in `DECLARE W AKA B IS A B`, and `B OF NUMBER` is the sibling that takes one.
-  A use whose argument count matches no synonym of that spelling refers to all of them.
+  A use whose argument count matches no synonym of that spelling refers to none of them: it is a record or an enum that takes that many arguments (`DECLARE Box IS A Box OF NUMBER` next to `DECLARE Box a HAS item IS AN a`), or a kind error.
   A synonym's own parameters are not references.
-- **Cycle detection, by reference.** `quarantineResolvedSynonymCycles` runs once the bodies are resolved and follows the `Unique` each type application in a body resolved to, so it sees what a spelling hides, such as an alias that a same-arity sibling in another section also answers to.
+- **Cycle detection, by reference.** `quarantineResolvedSynonymCycles` runs once the bodies are resolved and follows the `Unique` each type application in a body resolved to.
+  It finds what the pass over spellings leaves alone: a synonym that names itself at the wrong number of arguments (`DECLARE B a IS A PAIR OF B, B`), a kind error that the checker still resolves to the synonym.
   It cannot reject a program the first pass accepts correctly, because a reference cycle has no finite expansion.
+  On `main` two `UnifySpec` cases fail without it: the wrong-arity self-reference, and the same cycle imported from another module.
 - **Quarantine.** Members of a cycle are installed as bodyless `KnownType`s, so expansion never touches them; their bodies are still checked for other errors.
   An imported module's cyclic synonyms were quarantined when that module was checked, and modules are acyclic, so imports need no care of their own (`Desugar.hs:441-472`).
 - **Directive ambiguity.** `#ASSERT` and `TIMEZONE IS` now `prune` their candidates like the other directives, so an ambiguity becomes `AmbiguousTermError`.
@@ -75,25 +92,28 @@ Measured 2026-10-13 with `l4 check`, once with an `l4` built from `main` without
 
 ## Diagnostics
 
-- `Circular dependency detected between type synonyms:`, then each member quoted on its own line, then `A type synonym must not refer to itself, directly or via other` / `synonyms, because it could then never be fully expanded.` (`TypeCheck.hs:3386-3393`), reported at the first member's declaration.
-- ``I stopped following type synonyms at `S200`.``, then the explanation and what to do (`TypeCheck.hs:3394-3403`).
+- `Circular dependency detected between type synonyms:`, then each member quoted on its own line, then `A type synonym must not refer to itself, directly or via other` / `synonyms, because it could then never be fully expanded.` (`TypeCheck.hs:3387-3394`), reported at the first member's declaration.
+- ``I stopped following type synonyms at `S200`.``, then the explanation and what to do (`TypeCheck.hs:3395-3404`).
 - Directive ambiguity uses the existing message: `There are multiple definitions for the identifier` … `and I do not have sufficient information to make a choice between them.`
 
 ## Tests and fixtures that pin it
 
-- `jl4-core/test/UnifySpec.hs` (27 `it` blocks, among them the cycle, alias, import, expansion-limit and nesting-depth cases) and `jl4-core/test/DirectiveAmbiguitySpec.hs` (4).
-- `jl4/examples/not-ok/tc/unify-sibling-rebind.l4`, `not-ok/tc/type-synonym-cycle.l4`, `not-ok/tc/type-synonym-alias-cycle.l4`, `ok/unify-swapped-pair-args.l4`.
+- `jl4-core/test/UnifySpec.hs` (32 `it` blocks, among them the cycle, alias, wrong-arity, shared-spelling, import, expansion-limit and nesting-depth cases, and a timing guard for a type nested on the left) and `jl4-core/test/DirectiveAmbiguitySpec.hs` (4).
+- `jl4/examples/not-ok/tc/unify-sibling-rebind.l4`, `not-ok/tc/type-synonym-cycle.l4`, `not-ok/tc/type-synonym-alias-cycle.l4`, `ok/unify-swapped-pair-args.l4`, `ok/synonym-shares-record-name.l4`.
 - `jl4/examples/not-ok/tc/assert-directive-ambiguity.l4`, `timezone-directive-ambiguity.l4`, `timezone-mixed-ambiguity.l4`.
-- Each fixture has four goldens under its `tests/` directory.
+- Each fixture has four goldens under its `tests/` directory; `lsp/semantic-tokens/timezone.l4` has one, listing the tokens of a `TIMEZONE IS` line in the lexer, parse and check phases.
 - The `.ep.golden` of every file with a `TIMEZONE IS` line (`ok/tests/{datetime-tests,excel-date-tests,legal-persons-tests,timezone-tests}`, `ok/excel-date/tests/serials` and the two timezone fixtures) shows that line whole.
 
 ## Limits and known defects (verified)
 
-- The fuel is a count, not a cost bound: two different spellings of the same exponentially large expansion, as two acyclic towers of the same shape under different names, can still be slow (`Unify.hs:100-110`); not measured here.
+- The fuel is a count, not a cost bound: two different spellings of the same exponentially large expansion, as two acyclic towers of the same shape under different names, can still be slow (`Unify.hs:108-112`); not measured here.
+- A synonym applied to a type nested deeply on the left is still compared as a whole at every synonym on the way down (`Unify.hs:120-122`); not measured here.
 - A chain of more than 1000 synonyms, each defined as the one before, is rejected with the limit message.
   `main` without this change accepts a chain of 1200 (measured above).
-- A synonym that reuses the name of an imported type can draw a `CyclicTypeSynonyms` error stacked on the ambiguity errors, because the first pass reads spellings (`Desugar.hs:473-503`).
-  Both programs are invalid anyway.
+- A synonym that reuses the name of another type with the same number of parameters, an imported record say (`IMPORT lib` with `DECLARE Money HAS amount IS A NUMBER`, then `DECLARE Cash AKA Money IS A Money`), is an ambiguity, which the checker reports.
+  The pass over spellings keeps every candidate of that number of parameters (`Desugar.hs:490-496`), so it adds a `CyclicTypeSynonyms` error for the synonym on top of the ambiguity errors, though the program is not circular once the ambiguity is resolved.
+  That stacked error is the remaining limit.
+  A different number of parameters is not a collision: `DECLARE Box IS A Box OF NUMBER` next to `DECLARE Box a HAS item IS AN a` is accepted.
 - `TIMEZONE IS` infers its expression with no expected type (`TypeCheck.hs:545`), so `TIMEZONE IS 42` checks clean.
   This is as it was before the change; `timezone-mixed-ambiguity.l4` pins the other side of the same fact.
 - `ok/tests/legal-persons-tests.ep.golden` still differs from its source file in the escaping of a non-ASCII string (`\206le` for `Île`); that comes from string-literal exact-print, which this change does not touch.
