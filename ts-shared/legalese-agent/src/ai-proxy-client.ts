@@ -369,6 +369,71 @@ export class AiProxyClient {
   }
 
   /**
+   * POST /v1/audio/transcriptions — speech-to-text for chat dictation
+   * (the `legalese-listen-4` pipeline). Takes a PCM WAV clip and returns
+   * the transcript, which may be empty when nothing intelligible was
+   * said. `apiBaseUrl` routes a deployment-bound chat's dictation to
+   * that deployment's endpoint, as {@link stream} does for its turns.
+   * Throws {@link AiProxyError} on auth, quota, or upstream failure,
+   * with code `network_error` when the service couldn't be reached.
+   */
+  async transcribe(wav: Uint8Array, apiBaseUrl?: string): Promise<string> {
+    const defaultEndpoint = this.getEndpoint()
+    // A recording of the user's voice only ever goes to the configured
+    // AI endpoint. `apiBaseUrl` comes from the UI, so it is honoured
+    // only when it points at that same origin (a deployment path under
+    // it); anything else falls back to the bare endpoint.
+    const scoped =
+      apiBaseUrl && sameOrigin(apiBaseUrl, defaultEndpoint.url)
+        ? apiBaseUrl.replace(/\/$/, '')
+        : undefined
+    const endpoint = scoped ?? defaultEndpoint.url
+    const headers = await this.getAuthHeaders()
+    if (!headers.Authorization) {
+      throw new AiProxyError(
+        'No Legalese Cloud session found. Sign in from the sidebar to use dictation.',
+        'unauthenticated',
+        401
+      )
+    }
+    let res: Response
+    try {
+      res = await fetch(`${endpoint}/v1/audio/transcriptions`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'legalese-listen-4',
+          input_audio: {
+            data: Buffer.from(wav).toString('base64'),
+            format: 'wav',
+          },
+        }),
+        signal: AbortSignal.timeout(90_000),
+      })
+    } catch (err) {
+      // fetch only rejects when no HTTP response came back at all:
+      // nothing listening, DNS, offline, or the timeout above.
+      throw new AiProxyError(
+        `${endpoint}: ${err instanceof Error ? err.message : String(err)}`,
+        'network_error'
+      )
+    }
+    if (!res.ok) {
+      let body = ''
+      try {
+        body = await res.text()
+      } catch {
+        // ignore
+      }
+      const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      throw new AiProxyError(message, code, res.status)
+    }
+    const json = (await res.json()) as { text?: unknown }
+    return typeof json.text === 'string' ? json.text : ''
+  }
+
+  /**
    * Fire-and-forget title generation using the summize pipeline. Keeps
    * the call stateless (no conversationId) so it doesn't create junk
    * conversation files on the server.
@@ -498,6 +563,14 @@ export class AiProxyError extends Error {
   ) {
     super(message)
     this.name = 'AiProxyError'
+  }
+}
+
+function sameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin
+  } catch {
+    return false
   }
 }
 

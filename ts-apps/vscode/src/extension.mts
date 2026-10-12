@@ -718,6 +718,7 @@ export async function activate(context: ExtensionContext) {
       mcp: aiMcpClient,
       vsMcp: vsMcpTools,
       serviceClient,
+      extensionPath: context.extensionPath,
     })
   )
 
