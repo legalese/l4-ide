@@ -363,9 +363,10 @@ applyFinalSubstitution subst moduleUri t =
 -- If you add a directive or top-level declaration case that runs
 -- 'checkExpr'/'inferExpr', wrap it in 'prune', or the 'error' below becomes
 -- reachable from ordinary user input (this happened for #ASSERT and
--- TIMEZONE IS; see T4). We deliberately keep these arms as 'error' rather
--- than auto-recovering: post-T4, reaching them requires a compiler bug (a
--- missing 'prune'), and failing loudly in CI/golden runs beats silently
+-- TIMEZONE IS; see specs/as-built/tc-soundness.md). We deliberately keep these arms as 'error'
+-- rather than auto-recovering: now that those are pruned, reaching them
+-- requires a compiler bug (a missing 'prune'), and failing loudly in
+-- CI/golden runs beats silently
 -- committing to an arbitrary typing. The CLI/LSP drivers have catch-alls
 -- that keep interactive sessions alive.
 runCheckUnique :: Check a -> CheckEnv -> CheckState  -> (With CheckErrorWithContext a, CheckState)
@@ -484,7 +485,7 @@ inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
   -- The 'prune' is load-bearing: like the sibling directive cases above, we must
   -- collapse candidate results here, so that an ambiguous-but-well-typed expression
   -- surfaces as an 'AmbiguousTermError' diagnostic instead of leaking multiple
-  -- results into 'runCheckUnique' (which calls 'error'). See T4.
+  -- results into 'runCheckUnique' (which calls 'error'). See specs/as-built/tc-soundness.md.
   e' <- prune $ checkExpr ExpectAssertContext e boolean
   pure (Assert ann e')
 
@@ -540,7 +541,7 @@ inferTopDecl (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExp
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
-  -- source range for that diagnostic. See T4.
+  -- source range for that diagnostic. See specs/as-built/tc-soundness.md.
   (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
 
@@ -1407,7 +1408,8 @@ inferExpr' g =
               -- every 'matchFunTy' branch returns exactly one resolved expr per
               -- argument (zip3 traversals; error branches 'traverse inferExpr args';
               -- Check nondeterminism forks whole computations, never concatenates
-              -- result lists), so the singleton match always succeeds (T4).
+              -- result lists), so the singleton match always succeeds (see
+              -- specs/as-built/tc-soundness.md).
               -- Fail strictly at the site rather than 'pure $ error ...', which
               -- would plant a lazy bottom inside the returned 'Proj' node that
               -- detonates arbitrarily far away (eval/nlg/serialization).
@@ -1824,9 +1826,8 @@ desugarBranches scrut nebs = do
     -- This wildcard fires only for a PatApp/PatCons whose anno lacks
     -- 'resolvedInfo'. That requires a RANGELESS anno: 'setAnnResolvedType'
     -- routes through 'withRange', which is a silent no-op when the anno has no
-    -- 'SrcRange'. The parser always stamps ranges on pattern annos, so this is
-    -- unreachable from surface syntax (verified empirically across all
-    -- user-writable pattern forms, T4). However, any future stage that
+    -- 'SrcRange'. The parser stamps ranges on pattern annos, so surface syntax
+    -- is not expected to reach this (no test pins that). Any future stage that
     -- synthesizes CONSIDER branches with 'emptyAnno' would land here — the
     -- root cause would be the missing range, not missing type information.
     _ -> error "fatal internal error: expected type information but didn't get any"
@@ -2127,10 +2128,10 @@ matchPatFunTy  r t args =
 -- 'detectTypeSynonymCycles' reads spellings, before anything is resolved,
 -- and a spelling can hide a reference: an alias that a same-arity sibling
 -- in another section also answers to, which the checker settles by section
--- and this pass does not see. A cycle it misses keeps its bodies, and the fuel in
--- "L4.TypeCheck.Unify" bounds the
--- depth of their expansion, not its work: two such synonyms that each name
--- themselves twice, unified with each other, ran past 4 GiB.
+-- and this pass does not see. A cycle it misses keeps its bodies, and the
+-- fuel in "L4.TypeCheck.Unify" bounds the depth of their expansion, not its
+-- work: two such synonyms that each name themselves twice, unified with each
+-- other, ran past 4 GiB.
 --
 -- So once every body is resolved, this reads the references themselves. A
 -- body names the 'Unique' of the synonym each type application in it
