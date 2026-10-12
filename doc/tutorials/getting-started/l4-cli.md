@@ -145,7 +145,7 @@ Trace:
   (no trace captured; add #EVALTRACE to the directive)
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks, every directive evaluates without crashing, and no `#ASSERT` fails; type errors, runtime evaluation errors (such as a `CONSIDER` with no matching branch) and a failing `#ASSERT` exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -402,6 +402,14 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
+
+A fact whose type is a list of choices (`DECLARE Colour IS ONE OF Red, Green, Blue`) is given as the name of one choice, written as text: `"c": "Red"`, or a `Red` cell in a CSV file.
+A choice that carries facts of its own, such as `Circle HAS size IS A NUMBER`, cannot be given as input: there is no way yet to write one in a case.
+Anything else given for such a fact, a name that is not one of its choices, a number, or a record, is an error on that line, naming the fact and the choices it accepts:
+
+```
+Could not decode "Bogus" as Shape for field 's': it names no constructor of Shape; expected a string naming one of: Square. A constructor with fields (Circle) cannot be given as JSON input.
+```
 
 #### Facts a case leaves out
 

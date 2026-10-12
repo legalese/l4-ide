@@ -1,0 +1,19 @@
+-- A choice type declared under a § section. Its constructors are stored with
+-- the section's path (`Part A.Red`), and the decoder used to compare the JSON
+-- string with that, so "Red" matched nothing (smucclaw/l4-ide#947). Until
+-- #1012 it then fell through to the untyped decoder and reached the
+-- OTHERWISE below: every row answered FALSE with "status":"success".
+
+§ `Part A`
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default Is it red
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE `is red` c IS
+  CONSIDER c
+    WHEN Red THEN TRUE
+    OTHERWISE FALSE
+
+#EVAL `is red` Red

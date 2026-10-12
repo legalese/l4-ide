@@ -399,7 +399,7 @@ Two ways out today, and choosing between them is a drafting decision, not a tech
 - **Hoist.** If the two Divisions were always talking about one applicant, delete both declarations and put one `GIVEN` under `§ Part 8`. Every rule beneath it then reads that one.
 - **Rename.** If they are two different applicants, say so: `the individual applicant` and `the corporate applicant`. The error was the file telling you that one word is doing two jobs.
 
-_**A third way out is not available today.** It is planned: saying at the point of use which section's `the applicant` is meant, written `` `name for the Part` WITH `the applicant` IS `the applicant` ``. Writing that now does not work. After a bare name, as here, L4 reads `WITH` as an attempt to build a record and answers `You are giving named inputs to … but it is not a function`; after a rule that has already been given its own inputs, L4 cannot read the line at all and answers `unexpected WITH`. Proposed, not landed (2026-09-04); it arrives in a later version of L4. Until then: hoist or rename._
+_**A third way out is not available here.** Saying at the point of use which section's `the applicant` is meant, written `` `name for the Part` WITH `the applicant` IS `the applicant` ``, does not work: the two candidates meet inside `name for the Part` itself, which a `WITH` at a use does not reach, so L4 gives the same error. Proposed, not landed (2026-09-04). From inside one Division it does work: a rule in `Division 15` can hand its own `the applicant` to the other Division's rule for one use, as ``(`name for Division 14` WITH `the applicant` IS `the applicant`)``._
 
 ---
 
@@ -541,7 +541,7 @@ There is no message for this one. The file checks, the editor is clean, the rule
 
 Stated plainly, so nothing here is a surprise later. Each was measured on the version of L4 this page documents.
 
-**A rule that reads a section `GIVEN` cannot be run to an answer until the fact is filled in.** Nothing is broken, and the file is not wrong. Checking the file passes — `l4 check` prints `Check succeeded.` and the editor shows no error — and `#CHECK` still reports what kind of thing the rule gives. It is only asking for the answer, with `#EVAL`, that stops, and it stops by saying exactly what it is waiting for:
+**A rule whose answer depends on a section `GIVEN` cannot be run to an answer until the fact is filled in.** Nothing is broken, and the file is not wrong. Checking the file passes — `l4 check` prints `Check succeeded.` and the editor shows no error — and `#CHECK` still reports what kind of thing the rule gives. It is only asking for the answer, with `#EVAL`, that stops, and it stops by saying exactly what it is waiting for:
 
 ```
 I could not continue evaluating, because I needed to know the value of

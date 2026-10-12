@@ -1,8 +1,8 @@
 # Specification: Negation as Failure via `MAYBE BOOLEAN`
 
-**Status:** ✅ IMPLEMENTED (dedicated library, 2026-06-10 · moved out of the prelude per review) · Kleene lift remains an experiment
+**Status:** ✅ IMPLEMENTED (dedicated library, 2026-06-10 · moved out of the prelude per review) · truth-functional strong Kleene (`kand`/`kor`/`knot`, #526 §4.1(a)) stays a worked example, declined as a library (open question 2)
 **Scope:** A new `negation-as-failure` library + documentation. No compiler/lexer/parser changes required.
-**Implementation:** `holds` / `naf` / `presumed` (each with an `@nlg` annotation) live in `jl4-core/libraries/negation-as-failure.l4`, which imports `prelude`; worked, runnable demo (including the Kleene lift) at `jl4/experiments/negation-as-failure-examples.l4`.
+**Implementation:** `holds` / `naf` / `presumed` (each with an `@nlg` annotation) live in `jl4-core/libraries/negation-as-failure.l4`, which imports `prelude`; worked, runnable demo (including truth-functional strong Kleene, #526 §4.1(a)) at `jl4/examples/ok/negation-as-failure-examples.l4`.
 **Related:** `TYPICALLY-DEFAULTS-SPEC.md` (rebuttable presumptions), `BOUNDED-DEONTICS-SPEC.md` (deontic modalities), `doc/reference/libraries/negation-as-failure.md`
 
 ## Executive Summary
@@ -20,7 +20,7 @@ The entire treatment of NAF reduces to one idea:
 
 No new keyword, no new type machinery. The proposal is to **name** the combinators (so
 they read like the legal concept) and to **document** the design, including the optional
-three-valued (Kleene) lift for users who want NAF to propagate through connectives.
+truth-functional strong Kleene connectives (#526 §4.1(a)) for users who want NAF to propagate through connectives.
 
 ```l4
 DECLARE DefBool IS A MAYBE BOOLEAN     -- JUST TRUE | JUST FALSE | NOTHING
@@ -152,8 +152,8 @@ The three-line core applies NAF **at the leaves**, with ordinary two-valued `AND
 above. That is sufficient for most isomorphic encodings and keeps the truth tables trivial.
 
 If instead you want `NOTHING` ("unknown") to **flow through** the connectives — the road to
-the well-founded and stable-model semantics that give Prolog NAF its maturity — lift the
-operators to **Kleene strong three-valued logic** over `DefBool`, treating `NOTHING` as the
+the well-founded and stable-model semantics that give Prolog NAF its maturity — define the
+operators over `DefBool` by **truth-functional strong Kleene** (#526 §4.1(a)), treating `NOTHING` as the
 undefined element ⊥, and ground to two-valued _once_, at the top, with the same `holds`:
 
 ```l4
@@ -213,7 +213,7 @@ naf p MEANS NOT (holds p)
 #ASSERT NOT (naf (JUST TRUE))
 ```
 
-### `naf2.l4` — the dual, strong knowledge, and the Kleene lift
+### `naf2.l4` — the dual, strong knowledge, and truth-functional strong Kleene
 
 ```l4
 IMPORT prelude
@@ -269,23 +269,23 @@ the combinators to live in a dedicated module and to carry `@nlg` annotations:
 4. Each of the three carries an `@nlg` annotation (e.g. `naf p @nlg %p% has not
 been proven true`), so both the library's own generated docs and any calling
    rule without its own `@nlg` override render as plain English. ✅
-5. _(experiment, not core)_ Kleene three-valued `kand` / `kor` / `knot` over
+5. _(example, not core)_ truth-functional strong Kleene (#526 §4.1(a)) `kand` / `kor` / `knot` over
    `MAYBE BOOLEAN` for users who want NAF to propagate through connectives — demonstrated
-   in `jl4/experiments/negation-as-failure-examples.l4`. Deliberately kept out of the
+   in `jl4/examples/ok/negation-as-failure-examples.l4`. Deliberately kept out of the
    library itself (it introduces a second algebra; see Open question 2).
 
 `DefBool` itself was **not** added as a named type in the library — `MAYBE BOOLEAN`
-is already legible — but the experiment file declares it locally as a teaching alias.
+is already legible — but the example file declares it locally as a teaching alias.
 
 ## Open questions / design decisions
 
 1. **Name of the grounding function.** `holds` vs `provablyTrue` vs `cwa`. `holds` reads
    well in rules (`IF holds (...)`); `provablyTrue` is more honest. Recommend `holds` with a
    doc note.
-2. **Ship the Kleene lift in the prelude or keep it as a documented pattern?** It introduces
+2. **Ship truth-functional strong Kleene (`kand`/`kor`/`knot`) in the prelude or keep it as a documented pattern?** It introduces
    a second algebra; some users will want two-valued connectives only. Leaning: separate
    optional library module, not the core prelude.
-   **ANSWERED 2026-10-01, conditionally** (`UNKNOWN-EVALUATION-SPEC.md` §9 U12, accepted on bench card U12): `kand`/`kor`/`knot` do not ship as a library, provided the evaluator lift (U1) and its per-evaluation switch (U7) are accepted, as both were the same day. This reverses the leaning above. A `NOTHING` that is data, a `MAYBE BOOLEAN` field or a lookup result, still needs `CONSIDER`; the library can be revisited if that demand appears.
+   **ANSWERED 2026-10-01, conditionally** (`UNKNOWN-EVALUATION-SPEC.md` §9 U12, accepted on bench card U12): `kand`/`kor`/`knot` do not ship as a library, provided the evaluator lift (U1) and its per-evaluation switch (U7) are accepted, as both were the same day, so the condition is met. This reverses the leaning above. A `NOTHING` that is data, a `MAYBE BOOLEAN` field or a lookup result, still needs `CONSIDER`; the library can be revisited if that demand appears.
 3. **Relationship to `TYPICALLY`.** `TYPICALLY` attaches a default to a _declaration_ site;
    `holds`/`presumed` apply a default at the _use_ site. They are complementary, not
    competing. Worth a cross-reference paragraph in both specs.

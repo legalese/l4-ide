@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -394,6 +394,51 @@ spec = describe "integration" do
     it "stops a deontic rule instead of taking its ELSE branch" do
       withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "w1-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertNotSupplied resp "is motorway"
+
+    it "stops and names a missing BOOLEAN read by CONSIDER, not taking its OTHERWISE" do
+      withServiceFromSources "w1-consider" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-consider" "fee"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "amount" Aeson..= (10 :: Int)
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertNotSupplied resp "is member"
+
+    it "answers when a missing BOOLEAN the rule reads cannot change the answer" do
+      withServiceFromSources "w1-anyway" [("eligible.l4", decidedAnywayJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-anyway" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "unused flag" Aeson..= uncertain ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "uses a BOOLEAN read by CONSIDER when it is supplied" do
+      withServiceFromSources "w1-consider-given" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-consider-given" "fee"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "amount" Aeson..= (10 :: Int)
+                , "is member" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 10)
+
+    it "stops a deontic rule instead of taking its OTHERWISE" do
+      withServiceFromSources "w1-deontic-consider" [("seatbelt.l4", deonticConsiderJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-deontic-consider" "seatbelt requirement"
           (Aeson.object
             [ "arguments" Aeson..= Aeson.object
                 [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
@@ -1034,6 +1079,8 @@ spec = describe "integration" do
             batch.summary.casesRead `shouldBe` 10
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
+        -- every response states its report (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        reportOf resp `shouldBe` Just "default"
 
     -- TRAFFICJAM (2026-10-02). A case's time limit is wall-clock, and the batch
     -- used to start every case at once. On one core each case's timer then
@@ -1325,6 +1372,75 @@ spec = describe "integration" do
           again <- callTool 3 0
           LBS.toStrict again `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           LBS.toStrict again `shouldSatisfy` BS.isInfixOf "true"
+
+  -- U7b: the report a response carries is never left to be guessed. Until
+  -- build step 6 adds the others it is always the default one.
+  describe "the stated report" do
+    it "is \"default\" on a successful evaluation and on one that stopped" do
+      withServiceFromSources "report" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        decided <- evalFunction baseUrl mgr "report" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= False
+                , "unused flag" Aeson..= Aeson.object []
+                ]
+            ])
+        statusCode' decided `shouldBe` 200
+        reportOf decided `shouldBe` Just "default"
+        waiting <- evalFunction baseUrl mgr "report" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "unused flag" Aeson..= Aeson.object []
+                ]
+            ])
+        statusCode' waiting `shouldBe` 422
+        reportOf waiting `shouldBe` Just "default"
+
+    -- Decided by Claude 2026-10-07, pending Meng's review. @p AND TRUE@ is @p@:
+    -- a bare unknown inside the wrapper's JUST must be undetermined and name
+    -- the input, as on the direct path, and not "#EVAL produced ASSUME".
+    it "names the input when a wrapper-path answer is the bare missing input" do
+      withServiceFromSources "bare-input" [("gate.l4", bareInputJL4)] \baseUrl mgr -> do
+        let ask q = evalFunction baseUrl mgr "bare-input" "gate"
+              (Aeson.object
+                [ "arguments" Aeson..= Aeson.object [ "p" Aeson..= Aeson.object [], "q" Aeson..= q ] ])
+            textOf = Text.Encoding.decodeUtf8 . LBS.toStrict . responseBody
+        -- positive control: the same request, decided by q, answers
+        decided <- ask False
+        statusCode' decided `shouldBe` 200
+        -- the answer is p itself
+        waiting <- ask True
+        statusCode' waiting `shouldBe` 422
+        textOf waiting `shouldSatisfy` Text.isInfixOf "I could not continue evaluating"
+        textOf waiting `shouldSatisfy` Text.isInfixOf "`p (not supplied)`"
+        textOf waiting `shouldSatisfy` (not . Text.isInfixOf "produced ASSUME")
+        reportOf waiting `shouldBe` Just "default"
+
+    it "is \"default\" in an MCP tool's answer, and in its undetermined error" do
+      withServiceFromSources "report-mcp" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        let call args = do
+              req <- buildJsonPost (baseUrl <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("eligible" :: Text)
+                    , "arguments" Aeson..= args
+                    ]
+                ]
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 200
+              pure (mcpToolText (responseBody resp))
+        decided <- call $ Aeson.object
+          [ "is resident" Aeson..= False, "unused flag" Aeson..= Aeson.object [] ]
+        fmap fst decided `shouldBe` Just False
+        (reportOfText . snd =<< decided) `shouldBe` Just "default"
+        waiting <- call $ Aeson.object
+          [ "is resident" Aeson..= True, "unused flag" Aeson..= Aeson.object [] ]
+        fmap fst waiting `shouldBe` Just True
+        (reportOfText . snd =<< waiting) `shouldBe` Just "default"
+        (snd <$> waiting) `shouldSatisfy` maybe False ("I needed to know the value" `Text.isInfixOf`)
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -1698,15 +1814,16 @@ spec = describe "integration" do
       -- Was a characterisation test pinning the disagreement, with a note to
       -- invert it when the two surfaces were reconciled. This is that inversion.
       --
-      -- The gap: L4.Viz.Ladder.generateAtomId hashes each input ref as its
-      -- numeric rootUnique over the atom's DIRECT ref set, while
-      -- L4.Decision.QueryPlan.atomIdByUnique hashes it as the ref's LABEL over
+      -- The gap, then: the ladder hashed each input ref as its numeric
+      -- rootUnique over the atom's DIRECT ref set, while
+      -- L4.Decision.QueryPlan.atomIdByUnique hashed it as the ref's LABEL over
       -- the TRANSITIVE closure. The ids therefore disagreed for every atom with
       -- a non-empty ref set — which is every ordinary leaf — so a client could
       -- not join `ladder` leaves to `impactByAtomId`, and a binding keyed by a
       -- ladder atomId was accepted with a 200 and quietly did nothing.
-      -- jl4-lsp had always reconciled the two with annotateLadderWithAtomIds;
-      -- jl4-service now does the same, in buildDecisionQueryCacheFromCompiled.
+      -- Both now hash the leaf's C1 term key, which the ladder records once and
+      -- the plan reads (R3, smucclaw/l4-ide#1013), so they agree by construction;
+      -- this test is what says so.
       withServiceFromSources "ladder-atomids" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         qpResp <- queryPlan' baseUrl mgr "ladder-atomids" "compute_qualifies"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
@@ -1756,10 +1873,17 @@ spec = describe "integration" do
       withServiceFromSources "ladder-atomid-binds" [("twins.l4", twinLeavesJL4)] \baseUrl mgr -> do
         ladResp <- getLadder baseUrl mgr "ladder-atomid-binds" "twins"
         statusCode' ladResp `shouldBe` 200
-        let ids = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
-              Just (Aeson.Object fd) -> ladderAtomIds fd
+        -- A twin is one atomId held by two different uniques; a bare input
+        -- drawn twice keeps its one unique and is not one (and under
+        -- simplification the inputs are drawn twice too).
+        let atoms = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
+              Just (Aeson.Object fd) -> ladderLeafAtoms fd
               _ -> []
-            twins = [a | (a : _ : _) <- List.group (List.sort ids)]
+            twins =
+              [ a
+              | (a, us) <- Map.toList (Map.fromListWith (<>) [(a, [u]) | (a, u) <- atoms])
+              , length (List.nub us) >= 2
+              ]
         -- Guard: without a genuine twin the binding assertion would pass for the
         -- wrong reason.
         twinId <- case twins of
@@ -2888,6 +3012,21 @@ spec = describe "integration" do
             "Expected rejection, but published the inputs "
               <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
 
+    -- Overloads written one after another are gathered by the parser and
+    -- separated by the checker; the @export above the second one must stay
+    -- with it (refutation of legalese/l4-ide#545's review, round 3).
+    it "publishes the overload whose @export is written above it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "twice.l4" $ Text.unlines
+        [ "DECIDE twice n IS n * 2"
+        , "@export the boolean version"
+        , "DECIDE twice b IS b AND b"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta, _bundles) ->
+          [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions] `shouldBe` [("twice", ["b"])]
+
     it "publishes the same clause group with a GIVEN, under the names it gives" do
       logger <- newLogger False
       result <- compileBundle logger "test" $ Map.singleton "size.l4" $ exportedSizeGroup
@@ -3322,8 +3461,9 @@ hasDecisionQueryCache registry deployId fnName = do
 -- Every other helper in this file registers freshly-compiled
 -- 'ValidatedFunction's straight into the TVar, which makes the whole suite
 -- blind to anything that differs only after a restart. The CBOR round-trip is
--- exactly such a thing: 'L4.Instances.Serialise' encodes every annotation as
--- @()@, so a rehydrated AST carries no type information. That is what made
+-- exactly such a thing: a bundle keeps no part of an annotation but the
+-- multi-clause mark (@Serialise Anno@ in "L4.Syntax"), so a rehydrated AST
+-- carries no type information. That is what made
 -- @\/query-plan@ and @\/ladder@ answer 400 ("Can only visualize, as a ladder
 -- diagram, a DECIDE that returns a boolean") on any process restarted since the
 -- deploy, while @\/evaluation@ — which needs no annotations — kept working.
@@ -3422,6 +3562,32 @@ evalFunction :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response
 evalFunction baseUrl mgr deployId fnName body = do
   req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/evaluation") body
   httpLbs req mgr
+
+-- | The report a response states it carries, if it states one.
+reportOf :: Response LBS.ByteString -> Maybe Text
+reportOf resp = case Aeson.decode (responseBody resp) of
+  Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
+  _ -> Nothing
+
+-- | The report an MCP tool result's text states, the text being an encoded
+-- evaluation response.
+reportOfText :: Text -> Maybe Text
+reportOfText t = case Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t)) of
+  Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
+  _ -> Nothing
+
+-- | Whether an MCP @tools/call@ result is an error, and its first text.
+mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
+mcpToolText body = do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  Aeson.Object c : _ <- pure (toList cs)
+  Aeson.String t <- Aeson.KeyMap.lookup "text" c
+  let isErr = case Aeson.KeyMap.lookup "isError" r of
+        Just (Aeson.Bool b) -> b
+        _                   -> False
+  pure (isErr, t)
 
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
@@ -3554,6 +3720,20 @@ ladderAtomLabels = List.sort . ladderLeafField "name"
 -- | The @atomId@s embedded in the ladder's leaves.
 ladderAtomIds :: Aeson.Object -> [Text]
 ladderAtomIds = ladderLeafField "atomId"
+
+-- | Each leaf's @atomId@ with its @unique@ (@name.unique@).
+ladderLeafAtoms :: Aeson.Object -> [(Text, Int)]
+ladderLeafAtoms fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [(Text, Int)]
+  go (Aeson.Object o) =
+    let here = case (Aeson.KeyMap.lookup "atomId" o, Aeson.KeyMap.lookup "name" o) of
+          (Just (Aeson.String a), Just (Aeson.Object nm))
+            | Just (Aeson.Number n) <- Aeson.KeyMap.lookup "unique" nm -> [(a, round n)]
+          _ -> []
+     in here <> concatMap go (Aeson.KeyMap.elems o)
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []
 
 -- | Decode a JSON response body as an Aeson Object.
 decodeObject :: LBS.ByteString -> Maybe Aeson.Object

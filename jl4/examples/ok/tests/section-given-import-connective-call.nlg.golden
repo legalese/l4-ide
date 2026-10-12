@@ -1,0 +1,14 @@
+`rate is high` and `TRUE`
+`TRUE` and `rate is high`
+not `rate is low` or `FALSE`
+not `FALSE` or `rate is low`
+`rate is low` implies `FALSE`
+`TRUE` implies `rate is high`
+not `rate is low`
+`combine` with `__AND__`, `rate is high` and `TRUE`
+`combine` with `__AND__`, `TRUE` and `rate is high`
+not `combine` with `__OR__`, `rate is low` and `FALSE`
+not `combine` with `__OR__`, `FALSE` and `rate is low`
+`combine` with `__IMPLIES__`, `rate is low` and `FALSE`
+`combine` with `__IMPLIES__`, `TRUE` and `rate is high`
+`apply` with `__NOT__` and `rate is low`

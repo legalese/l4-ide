@@ -280,8 +280,9 @@ processTypecheckedFile logger deployId filepath content moduleContext
 --
 -- == Why the AST is NOT taken from CBOR
 --
--- 'L4.Instances.Serialise' encodes every 'L4.Annotation.Anno_' as @()@ and
--- decodes it as 'L4.Annotation.emptyAnno', to keep bundles small. That throws
+-- 'L4.Syntax''s @Serialise Anno@ keeps only the mark on the nodes a
+-- multi-clause group compiles to (@pmSynthetic@) and decodes the rest of every
+-- annotation as 'L4.Annotation.emptyAnno', to keep bundles small. That throws
 -- away the source tokens (which nothing here wants) /and/ the typechecker's
 -- @resolvedInfo@ (which several things do): 'L4.Viz.Ladder.hasBooleanType'
 -- reads the result type of a DECIDE's body off exactly that field, so a

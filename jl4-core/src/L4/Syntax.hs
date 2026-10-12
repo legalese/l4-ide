@@ -884,8 +884,13 @@ moduleTopDecls = lens
 -- ----------------------------------------------------------------------------
 
 -- | One clause of a multi-clause pattern-matching group, as parsed: the
--- clause head name's source range (the warning anchor) and the argument
--- patterns, one per column.
+-- clause head name's source range (the warning anchor), the argument
+-- patterns, one per column, and what belongs to this clause alone: its head
+-- name as written, its @AKA@, and the @\@desc@ (or @\@export@) written
+-- above it. A run that the checker turns back into separate definitions
+-- ('L4.TypeCheck.separateOverloads') gives each definition its own clause's
+-- head, @AKA@ and annotations; a group keeps those of its first clause, and
+-- warns about any above a later one ('L4.TypeCheck.checkClauseMatrix').
 --
 -- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
 -- generic traversals): the stored patterns transitively contain @Expr Name@
@@ -898,14 +903,32 @@ moduleTopDecls = lens
 data PmMatrixClause = MkPmMatrixClause
   { headRange :: Maybe SrcRange
   , patterns  :: [Pattern Name]
+  , clauseHead :: Name
+    -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
+    -- clause is attached to it ('L4.Parser.ResolveAnnotation')
+  , clauseAka :: Maybe (Aka Name)
+  , clauseDescs :: [Desc]
+    -- ^ every @\@desc@ and @\@export@ written between the clause above and a
+    -- later clause, in source order ('L4.Parser.ResolveAnnotation'); a
+    -- separated overload keeps one of them, as a definition does
+    -- ('L4.Parser.ResolveAnnotation.pickDesc'). The first clause's are the
+    -- group's own, as a plain definition's are.
+  , clauseNlgs :: [Nlg]
+    -- ^ every @\@nlg@ written between the clause above and a later clause, in
+    -- source order; the one a separated overload uses is on @clauseHead@
+  , bodyRange :: Maybe SrcRange
+    -- ^ the range of the clause's body, with a @WHERE@'s definitions and
+    -- anything written inside them; an annotation after it and before the next
+    -- clause's head is written between the two clauses
+    -- ('L4.Parser.ResolveAnnotation')
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrixClause where
-  rnf (MkPmMatrixClause r ps) = rnf r `seq` rnf ps
+  rnf (MkPmMatrixClause r ps h a d n b) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n `seq` rnf b
 
 instance ToExpr PmMatrixClause where
-  toExpr (MkPmMatrixClause r ps) = toExpr (r, ps)
+  toExpr (MkPmMatrixClause r ps h a d n b) = toExpr (r, ps, h, a, (d, n, b))
 
 -- | The source clause matrix of a multi-clause pattern-matching group,
 -- attached by the parser to the fused Decide's annotation BEFORE
@@ -966,12 +989,14 @@ data PmSynthetic
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
--- NOTE on serialisation: adding 'pmMatrix' below changes the CBOR shape of
--- 'Extension' — jl4-service's AST-cache blobs from before the change will
--- fail to deserialise and the cache re-fills; that is the cache's normal
--- versioning behaviour. If a @SERIALISE_ENABLED@ build breaks on a missing
--- instance here, the fix is to add the instance (see the CPP block at the
--- bottom of this module), not to remove the field.
+-- NOTE on serialisation: jl4-service's AST cache (@bundle.cbor@) writes an
+-- annotation through 'Serialise Anno' at the bottom of this module, which
+-- keeps 'pmSynthetic' and none of the other fields below. So a change to
+-- 'PmSynthetic' or 'PmGroup' changes the shape of every cached bundle: one
+-- written before the change fails to decode and is recompiled from source,
+-- which is the cache's normal versioning behaviour. If a @SERIALISE_ENABLED@
+-- build breaks on a missing instance here, the fix is to add the instance (see
+-- the CPP block at the bottom of this module), not to remove the field.
 data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
@@ -981,6 +1006,11 @@ data Extension = Extension
   , desc         :: Maybe Desc
   , ref          :: Maybe Ref
   , fixityAnn    :: Maybe Fixity
+  , nonassertable :: Maybe Nonassertable
+    -- ^ The @\@nonassertable@ annotation above a definition. See 'annNonassertable'.
+  , nonassertableOnInputs :: [Nonassertable]
+    -- ^ Marks found on a definition's GIVEN lines, each an error the
+    -- typechecker raises naming the input; none of them closes the definition.
   , pmMatrix     :: Maybe PmMatrix
   , mixfixCanonical :: Maybe RawName
     -- ^ The CANONICAL mixfix pattern of the name this node applies, e.g.
@@ -992,11 +1022,11 @@ data Extension = Extension
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 mx2 syn2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -1006,7 +1036,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1061,6 +1091,19 @@ annRef = #extra % #ref
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn
 
+-- | The @\@nonassertable@ annotation written above a definition: a request
+-- may not assert this node, its truth must come from its derivation
+-- (specs/todo/presumption-assertion/CONTRACT.md §6). Attached by position
+-- ('L4.Parser.ResolveAnnotation.addNonassertableCommentsToAst') to the nearest
+-- following top-level or section-level construct; the typechecker rejects it on
+-- anything that is not a definition.
+annNonassertable :: Lens' Anno (Maybe Nonassertable)
+annNonassertable = #extra % #nonassertable
+
+-- | The marks found on a definition's GIVEN lines (see 'Extension').
+annNonassertableOnInputs :: Lens' Anno [Nonassertable]
+annNonassertableOnInputs = #extra % #nonassertableOnInputs
+
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
 
@@ -1095,6 +1138,12 @@ setRef r a = a & annRef ?~ r
 
 setFixity :: Fixity -> Anno -> Anno
 setFixity f a = a & annFixity ?~ f
+
+setNonassertable :: Nonassertable -> Anno -> Anno
+setNonassertable n a = a & annNonassertable ?~ n
+
+addNonassertableOnInputs :: [Nonassertable] -> Anno -> Anno
+addNonassertableOnInputs ns a = a & annNonassertableOnInputs %~ (<> ns)
 
 setPmMatrix :: PmMatrix -> Anno -> Anno
 setPmMatrix m a = a & annPmMatrix ?~ m
@@ -1458,6 +1507,14 @@ getFixityDirection (MkFixity _ dir _) = dir
 getFixityPayload :: Fixity -> Text
 getFixityPayload (MkFixity _ _ t) = t
 
+-- | The @\@nonassertable@ mark. It carries nothing but its position: the
+-- herald takes no words ('L4.Lexer.nonassertableAnnotation'). Where it
+-- landed is which 'Extension' field holds it: 'nonassertable' above a
+-- definition, 'nonassertableOnInputs' on one of its GIVEN lines.
+data Nonassertable = MkNonassertable Anno
+  deriving stock (Show, Eq, Ord, GHC.Generic)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
 deriving via L4Syntax Nlg
   instance HasAnno Nlg
 deriving via L4Syntax (NlgFragment n)
@@ -1470,6 +1527,8 @@ deriving via L4Syntax Desc
   instance HasAnno Desc
 deriving via L4Syntax Fixity
   instance HasAnno Fixity
+deriving via L4Syntax Nonassertable
+  instance HasAnno Nonassertable
 
 instance ToConcreteNodes PosToken Comment where
   toNodes (MkComment ann _) = flattenConcreteNodes ann []
@@ -1599,6 +1658,7 @@ deriving anyclass instance HasSrcRange Name
 deriving anyclass instance HasSrcRange Nlg
 deriving anyclass instance HasSrcRange Desc
 deriving anyclass instance HasSrcRange Fixity
+deriving anyclass instance HasSrcRange Nonassertable
 deriving anyclass instance HasSrcRange (NlgFragment n)
 deriving anyclass instance HasSrcRange Comment
 deriving anyclass instance HasSrcRange Ref
@@ -1684,13 +1744,26 @@ deriving anyclass instance Serialise SrcRange
 -- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
 -- definitions), so their instances are written by hand, via tuples.
 instance Serialise PmMatrixClause where
-  encode (MkPmMatrixClause r ps) = encode (r, ps)
-  decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
+  encode (MkPmMatrixClause r ps h a d n b) = encode (r, ps, h, a, (d, n, b))
+  decode = (\ (r, ps, h, a, (d, n, b)) -> MkPmMatrixClause r ps h a d n b) <$> decode
 instance Serialise PmMatrix where
   encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
   decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode
 deriving anyclass instance Serialise PmGroup
 deriving anyclass instance Serialise PmSynthetic
+-- | An annotation holds the concrete tokens, the source range and what the
+-- checker found, which the IDE needs and an evaluator does not, so a bundle
+-- keeps only 'pmSynthetic', the mark on the nodes a multi-clause group is
+-- compiled to. The evaluator reads that mark to say which rule has no clause
+-- for an input ("No clause of `price` matches these inputs";
+-- 'L4.EvaluateLazy.Machine.consideredClauses'). A module read back from
+-- jl4-service's @bundle.cbor@ without the mark reports a CONSIDER that the
+-- drafter never wrote. An unmarked node still costs one byte, as the @()@ that
+-- used to stand for every annotation did. A bundle written before the mark
+-- was kept does not decode, and the service then recompiles from source.
+instance Serialise Anno where
+  encode = encode . view annPmSynthetic
+  decode = (\ m -> emptyAnno & annPmSynthetic .~ m) <$> decode
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
@@ -1701,6 +1774,7 @@ deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
 deriving anyclass instance Serialise Desc
 deriving anyclass instance Serialise Fixity
+deriving anyclass instance Serialise Nonassertable
 deriving anyclass instance Serialise FixityDirection
 #endif
 

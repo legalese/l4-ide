@@ -245,7 +245,8 @@ been migrated.
 
 - An assumed name says what kind of thing it is, but carries no value. L4
   accepts a rule that reads one, and that rule can be quoted, published and
-  reasoned about, but it cannot be run to an answer until the value is supplied.
+  reasoned about, but it cannot be run to an answer that depends on the name
+  until the value is supplied.
 - `#EVAL` on such a rule stops at the name and says so:
 
   ```

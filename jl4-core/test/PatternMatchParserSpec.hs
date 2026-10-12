@@ -8,8 +8,10 @@
 module PatternMatchParserSpec (spec) where
 
 import Base
+import Control.Exception (evaluate)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
+import System.CPUTime (getCPUTime)
 import L4.Parser (execProgramParser)
 import L4.Syntax
 import Test.Hspec
@@ -75,9 +77,61 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
     decides <- parseDecides src
     map decideHeadText decides `shouldBe` ["inc", "dec"]
 
+  -- A run of clauses that starts no group is read once, not once for each of
+  -- its clauses: a file of n lines @f x MEANS i@ was read about n * n / 2
+  -- times, and 4,000 lines took minutes to check (review of
+  -- legalese/l4-ide#545, round 2). Timed by the ratio of two sizes, not by a
+  -- bound in seconds, so that a slow machine does not fail it; and in the
+  -- process's CPU time, not wall-clock time, so that time spent waiting for a
+  -- busy machine is not counted. Eight times the lines take about eight times
+  -- as long when parsing is linear, and sixty-four times as long when it is
+  -- quadratic; the test fails above three times linear. A ratio short of
+  -- clearly quadratic is measured again, so that one pause does not fail it.
+  it "parses a run of same-headed definitions in time linear in its length" $
+    parsesInLinearTime 250 2000 24 \ i -> "f x MEANS " <> T.pack (show i)
+
+  -- Every definition is tried as a clause group first, and every one that is
+  -- not a group fails that attempt, so what a failed attempt costs must not
+  -- grow with the definitions above it. Recording one once walked every
+  -- position recorded so far, and a file of n lines @f1 x MEANS 1@,
+  -- @f2 x MEANS 2@, ... took time quadratic in n (refutation of
+  -- legalese/l4-ide#545's review, round 3). That cost was small beside the
+  -- parse's own below a few thousand lines: measured with it, 2,000 lines took
+  -- 8.4 times as long as 250, and 12,000 lines 40 to 68 times as long as
+  -- 1,000, where without it they take about 14 times as long. So this times
+  -- 1,000 and 12,000 lines, and fails above twice linear.
+  it "parses definitions with different names in time linear in their number" $
+    parsesInLinearTime 1000 12000 24 \ i -> "f" <> T.pack (show i) <> " x MEANS " <> T.pack (show i)
+
 -- ----------------------------------------------------------------------------
 -- Helpers
+
 -- ----------------------------------------------------------------------------
+
+-- | @parsesInLinearTime small large limit line@: parsing @large@ lines made
+-- by @line@ (one definition each) takes less than @limit@ times the CPU time
+-- of parsing @small@ lines. A ratio short of twice the limit is measured
+-- again, up to twice, so that one pause does not fail it. See the comments
+-- at its uses.
+parsesInLinearTime :: Int -> Int -> Double -> (Int -> T.Text) -> Expectation
+parsesInLinearTime smallSize largeSize limit line = do
+  let file k = T.unlines (map line [1 .. k])
+      timeParse k = do
+        src <- evaluate (file k)
+        _ <- evaluate (T.length src)
+        t0 <- getCPUTime
+        n <- length <$> parseDecides src
+        t1 <- getCPUTime
+        n `shouldBe` k
+        pure (fromIntegral (t1 - t0) :: Double)
+      fastest k tries = minimum <$> traverse (const (timeParse k)) [1 .. tries :: Int]
+  small <- fastest smallSize 3
+  let ratio large = large / max small 1.0e9
+      settle tries = do
+        r <- ratio <$> timeParse largeSize
+        if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
+  r <- settle 3
+  r `shouldSatisfy` (< limit)
 
 parseDecides :: T.Text -> IO [Decide Name]
 parseDecides src =

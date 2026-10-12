@@ -3521,9 +3521,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         let live = drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n")
         map (.bkmName) (drgBkms live) `shouldSatisfy` elem "helper"
 
-    -- §7.7: the 9th-constructor tripwire. 'UserEvalException' has exactly 8
+    -- §7.7: the 10th-constructor tripwire. 'UserEvalException' has exactly 9
     -- constructors, and every one is either foreclosed by a DMN-SAFE clause
-    -- or deliberately NOT foreclosed. A ninth constructor makes the case
+    -- or deliberately NOT foreclosed. A tenth constructor makes the case
     -- below incomplete — under -Wall -Werror the WARNING is the alarm — and
     -- the count assertion is the belt to those braces. When it fires: add the
     -- constructor to the coverage map AND to L4.Dmn.Analysis, or record why
@@ -3540,11 +3540,15 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               BlackholeForced _           -> "L12"
               StackOverflow               -> "TERMINATES (a resource bound, not a clause)"
               Stuck _                     -> "deliberately NOT foreclosed: the ASSUME input channel"
-            constructorCount = 8 :: Int
+              -- raised only once a term has reached a site, which needs an
+              -- unknown input, and never reported: the directive boundary
+              -- rewrites it into 'Stuck' (UNKNOWN-EVALUATION-SPEC §4.5)
+              RanOutOfSteps               -> "TERMINATES (a resource bound on an unknown; reported as Stuck)"
+            constructorCount = 9 :: Int
         -- the case above is TOTAL; -Werror's incomplete-pattern warning fires
-        -- on a ninth constructor before this assertion ever runs
+        -- on a tenth constructor before this assertion ever runs
         coveredBy StackOverflow `shouldSatisfy` (not . Text.null)
-        constructorCount `shouldBe` 8
+        constructorCount `shouldBe` 9
 
   -- smucclaw/l4-ide#936. Two gaps, one issue, and the tests are written in that
   -- order deliberately: the FEEL lowering alone would have removed a loud

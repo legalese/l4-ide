@@ -285,12 +285,15 @@ sampleProfessionalism MEANS LLMJudgment WITH
 #CHECK `is compliant`
 ```
 
-_Proposed, not landed (2026-09-04): supplying values in the file itself, with a
-`WITH` clause on the instruction naming each judgment. This lands with the
-discharge pull request; until then supply values from outside the file (web
-form, `l4 batch`, API). `#CHECK ... WITH ...` does not supply them today: L4
-rejects it, reporting that a rule, which is not something you can apply to named
-inputs, is being applied to named inputs._
+To try the sample case inside the file, name each judgment with `WITH`. This
+answers `TRUE`:
+
+```l4
+#EVAL `is compliant` WITH timingJudgment IS sampleTiming, qualityJudgment IS sampleQuality, professionalismJudgment IS sampleProfessionalism
+```
+
+A real case supplies them from outside the file: a web form,
+`l4 batch`, or the API.
 
 ---
 

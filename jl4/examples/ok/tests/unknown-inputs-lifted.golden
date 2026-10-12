@@ -1,0 +1,257 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+unknown-inputs-lifted.l4:19:8-9:
+  I found a problem while checking the assumption of `g`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `g`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN g IS A FUNCTION FROM NUMBER TO BOOLEAN
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+unknown-inputs-lifted.l4:54:1-18:
+  FALSE
+unknown-inputs-lifted.l4:55:1-16:
+  TRUE
+unknown-inputs-lifted.l4:56:1-20:
+  FALSE
+unknown-inputs-lifted.l4:57:1-32:
+  FALSE
+unknown-inputs-lifted.l4:62:1-21:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-lifted.l4:63:1-17:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+  
+  ─────
+  ┌ NOT x
+  │┌ x
+  │└ x
+  └ NOT x
+unknown-inputs-lifted.l4:64:1-32:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-lifted.l4:65:1-44:
+  I could not continue evaluating, because I needed to know the values of
+    x
+    y
+  but they are assumed terms.
+unknown-inputs-lifted.l4:68:1-14:
+  I could not continue evaluating, because I needed to know the values of
+    x
+    y
+  but they are assumed terms.
+unknown-inputs-lifted.l4:69:1-16:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the values of
+    x
+    y
+  but they are assumed terms.
+unknown-inputs-lifted.l4:70:1-22:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the values of
+    x
+    y
+  but they are assumed terms.
+unknown-inputs-lifted.l4:74:1-17:
+  TRUE
+unknown-inputs-lifted.l4:75:1-31:
+  TRUE
+unknown-inputs-lifted.l4:76:1-29:
+  TRUE
+unknown-inputs-lifted.l4:77:1-20:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-lifted.l4:81:1-22:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+  
+  ─────
+  ┌ n EQUALS 3
+  └ n EQUALS 3
+unknown-inputs-lifted.l4:82:1-22:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+  
+  ─────
+  ┌ 3 EQUALS n
+  └ 3 EQUALS n
+unknown-inputs-lifted.l4:83:1-37:
+  I could not continue evaluating, because I needed to know the value of
+    age
+  but it is an assumed term.
+  
+  ─────
+  ┌ (older OF 18, age) AND (NOT (older OF 65, age))
+  │┌ older OF 18, age
+  ││┌ older
+  ││└ <function>
+  │├ age GREATER THAN k
+  │└ age GREATER THAN 18
+  │┌ NOT (older OF 65, age)
+  ││┌ older OF 65, age
+  │││┌ older
+  │││└ <function>
+  ││├ age GREATER THAN k
+  ││└ age GREATER THAN 65
+  │└ NOT (age GREATER THAN 65)
+  └ (age GREATER THAN 18) AND (NOT (age GREATER THAN 65))
+unknown-inputs-lifted.l4:84:1-42:
+  I could not continue evaluating, because I needed to know the value of
+    age
+  but it is an assumed term.
+unknown-inputs-lifted.l4:85:1-15:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-lifted.l4:86:1-30:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+  
+  ─────
+  ┌ elem OF n, (LIST 1, 2)
+  │┌ LIST 1, 2
+  │├ 1 FOLLOWED BY (LIST 2)
+  ││┌ LIST 2
+  ││├ 2 FOLLOWED BY (LIST )
+  │││┌ LIST 
+  │││└ EMPTY
+  ││└ LIST 2
+  │└ LIST 1, 2
+  │┌ elem
+  │└ <function>
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN FALSE
+  │   WHEN y FOLLOWED BY ys THEN x EQUALS y OR (elem OF x, ys)
+  ├ x EQUALS y OR (elem OF x, ys)
+  │┌ x EQUALS y
+  │└ n EQUALS 1
+  │┌ elem OF x, ys
+  ││┌ elem
+  ││└ <function>
+  │├ CONSIDER list
+  ││   WHEN EMPTY THEN FALSE
+  ││   WHEN y FOLLOWED BY ys THEN x EQUALS y OR (elem OF x, ys)
+  │├ x EQUALS y OR (elem OF x, ys)
+  ││┌ x EQUALS y
+  ││└ n EQUALS 2
+  ││┌ elem OF x, ys
+  │││┌ elem
+  │││└ <function>
+  ││├ CONSIDER list
+  │││   WHEN EMPTY THEN FALSE
+  │││   WHEN y FOLLOWED BY ys THEN x EQUALS y OR (elem OF x, ys)
+  ││├ FALSE
+  ││└ FALSE
+  │└ n EQUALS 2
+  └ (n EQUALS 1) OR (n EQUALS 2)
+unknown-inputs-lifted.l4:89:1-14:
+  I could not continue evaluating, because I needed to know the value of
+    d's age
+  but it is an assumed term.
+unknown-inputs-lifted.l4:90:1-26:
+  I could not continue evaluating, because I needed to know the value of
+    d's age
+  but it is an assumed term.
+unknown-inputs-lifted.l4:93:1-22:
+  I could not continue evaluating, because I needed to know the value of
+    g
+  but it is an assumed term.
+unknown-inputs-lifted.l4:94:1-20:
+  FALSE
+unknown-inputs-lifted.l4:95:1-22:
+  Trying to check equality on types that do not support it
+  These were the values you tried to compare:
+    g
+    g
+unknown-inputs-lifted.l4:98:1-25:
+  TRUE
+unknown-inputs-lifted.l4:99:1-25:
+  TRUE
+unknown-inputs-lifted.l4:100:1-18:
+  TRUE
+unknown-inputs-lifted.l4:101:1-18:
+  TRUE
+unknown-inputs-lifted.l4:102:1-36:
+  FALSE
+unknown-inputs-lifted.l4:105:1-48:
+  FALSE
+unknown-inputs-lifted.l4:106:1-48:
+  Division by zero in the operation:
+  DIVIDED BY
+unknown-inputs-lifted.l4:111:1-16:
+  The model refuses to answer:
+    TBD: this rule has not been written yet
+unknown-inputs-lifted.l4:112:1-20:
+  FALSE
+unknown-inputs-lifted.l4:113:1-16:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-lifted.l4:115:1-44:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-lifted.l4:118:1-44:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+unknown-inputs-lifted.l4:123:1-55:
+  I could not continue evaluating, because I needed to know the values of
+    x
+    y
+  but they are assumed terms.
+unknown-inputs-lifted.l4:124:1-57:
+  I could not continue evaluating, because I needed to know the value of
+    m
+  but it is an assumed term.
+unknown-inputs-lifted.l4:125:1-49:
+  I could not continue evaluating, because I needed to know the value of
+    m
+  but it is an assumed term.
+unknown-inputs-lifted.l4:126:1-40:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-lifted.l4:127:1-18:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-lifted.l4:128:1-19:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-lifted.l4:134:1-20:
+  LIST n, 6
+unknown-inputs-lifted.l4:135:1-32:
+  LIST n, 20000
+unknown-inputs-lifted.l4:136:1-26:
+  LIST x, TRUE
+unknown-inputs-lifted.l4:137:1-25:
+  I could not continue evaluating, because I needed to know the value of
+    n
+  but it is an assumed term.
+unknown-inputs-lifted.l4:138:1-21:
+  I could not continue evaluating, because I needed to know the values of
+    x
+    y
+  but they are assumed terms.

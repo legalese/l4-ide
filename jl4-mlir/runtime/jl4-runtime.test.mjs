@@ -13,6 +13,8 @@ import {
   MemoryLimitError,
   DEFAULT_MAX_HEAP_BYTES,
   DeonticInputError,
+  MissingInputError,
+  evaluationErrorResponse,
   runDeontic,
 } from "./jl4-runtime.mjs";
 
@@ -756,6 +758,140 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     "deontic: MUSTNOT respected (no prohibited act by deadline) → FULFILLED",
     () => runDeontic(prohibition, 0, [], {}, null) === "FULFILLED",
   );
+}
+
+// ---- A required input that is missing or null is refused, as jl4-service
+//      refuses it, not marshalled as 0 (UNKNOWN-EVALUATION-SPEC §8 step 3) ----
+{
+  const rtm = createRuntime();
+  rtm.attachMemory(new WebAssembly.Memory({ initial: 4 }));
+  const calls = [];
+  // A stand-in for a compiled `x AND y`, with and without its trace export,
+  // and for a function of `x` and a MAYBE `m`.
+  const body = (x, y) => {
+    calls.push([x, y]);
+    return x && y ? 1 : 0;
+  };
+  const instance = {
+    exports: {
+      both: body,
+      both$trace: body,
+      maybeOne: (x) => {
+        calls.push([x]);
+        return x ? 1 : 0;
+      },
+    },
+  };
+  const both = {
+    wasmSymbol: "both",
+    parameters: {
+      properties: { x: { type: "boolean" }, y: { type: "boolean" } },
+      required: ["x", "y"],
+      type: "object",
+    },
+    paramOrder: ["x", "y"],
+    returnType: "BOOLEAN",
+    returnSchema: { type: "boolean" },
+  };
+  eq(
+    "inputs: all supplied answers",
+    rtm.invokeFunction(instance, both, { x: true, y: true }),
+    true,
+  );
+  for (const [label, args, missing] of [
+    ["y left out", { x: true }, "y"],
+    ["y null", { x: true, y: null }, "y"],
+    ["both left out, the first named", {}, "x"],
+  ]) {
+    throws(
+      "inputs: refuses " + label,
+      () => rtm.invokeFunction(instance, both, args),
+      (e) => e instanceof MissingInputError && e.parameter === missing,
+    );
+    throws(
+      "inputs: refuses " + label + ", with reasoning",
+      () => rtm.invokeFunctionWithReasoning(instance, both, args),
+      (e) => e instanceof MissingInputError && e.parameter === missing,
+    );
+  }
+  eq("inputs: refused before the wasm body runs", calls.length, 1);
+  const maybeOne = {
+    wasmSymbol: "maybeOne",
+    parameters: {
+      properties: { x: { type: "boolean" }, m: { type: "number" } },
+      required: ["x"],
+      type: "object",
+    },
+    paramOrder: ["x", "m"],
+    returnType: "BOOLEAN",
+    returnSchema: { type: "boolean" },
+  };
+  eq(
+    "inputs: a MAYBE input may be left out",
+    rtm.invokeFunction(instance, maybeOne, { x: true }),
+    true,
+  );
+  // A record input with a required field left out or null, and a list input
+  // with a null element, are refused too, naming the input.
+  const person = {
+    type: "object",
+    properties: {
+      age: { type: "number" },
+      adult: { type: "boolean" },
+      nickname: { type: "string" },
+    },
+    propertyOrder: ["age", "adult", "nickname"],
+    required: ["age", "adult"],
+  };
+  const ofAge = {
+    wasmSymbol: "maybeOne",
+    parameters: {
+      properties: {
+        p: person,
+        xs: { type: "array", items: { type: "number" } },
+      },
+      required: ["p", "xs"],
+      type: "object",
+    },
+    paramOrder: ["p", "xs"],
+    returnType: "BOOLEAN",
+    returnSchema: { type: "boolean" },
+  };
+  eq(
+    "inputs: a record with its required fields answers, a MAYBE field left out",
+    rtm.invokeFunction(instance, ofAge, {
+      p: { age: 20, adult: true },
+      xs: [1],
+    }),
+    true,
+  );
+  for (const [label, args] of [
+    ["a record's field left out", { p: { age: 20 }, xs: [1] }],
+    ["a record's field null", { p: { age: 20, adult: null }, xs: [1] }],
+  ]) {
+    throws(
+      "inputs: refuses " + label,
+      () => rtm.invokeFunction(instance, ofAge, args),
+      (e) => e instanceof MissingInputError && e.parameter === "p",
+    );
+  }
+  throws(
+    "inputs: refuses a list with a null element",
+    () =>
+      rtm.invokeFunction(instance, ofAge, {
+        p: { age: 20, adult: true },
+        xs: [1, null],
+      }),
+    (e) => e instanceof MissingInputError && e.parameter === "xs",
+  );
+  const refused = evaluationErrorResponse(new MissingInputError("y"));
+  eq("inputs: refused with a 422", refused.status, 422);
+  eq(
+    "inputs: with jl4-service's own body",
+    refused.body,
+    '{"contents":{"contents":"Parameter \'y\': missing required parameter","tag":"InterpreterError"},"report":"default","tag":"Error"}',
+  );
+  eq("inputs: which does not respawn the worker", refused.fatal, false);
 }
 
 console.log(

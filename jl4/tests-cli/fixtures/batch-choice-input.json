@@ -1,0 +1,7 @@
+[
+  {"s": "Square"},
+  {"s": {"Circle": {"size": 3}}},
+  {"s": "Bogus"},
+  {"s": "Circle"},
+  {"s": 42}
+]

@@ -11,4 +11,7 @@
    multi-line
    block comment -}
 
-#EVAL age
+GIVETH A NUMBER
+`age next year` MEANS age PLUS 1  -- a comment can follow code on any line
+
+#EVAL `age next year` WITH age IS 41

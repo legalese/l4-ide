@@ -1,14 +1,9 @@
 # Specification: Runtime Input State Model
 
-**Status:** ⚠️ BLOCKED (December 2025) - depends on TYPICALLY
-**Related:** `TYPICALLY-DEFAULTS-SPEC.md` (compile-time defaults), `BOOLEAN-MINIMIZATION-SPEC.md` (partial evaluation), `doc/default-values.md` (conceptual background)
-
-> **⚠️ IMPLEMENTATION STATUS: BLOCKED**
->
-> This spec depends on the TYPICALLY keyword implementation, which was reverted due to
-> a critical heisenbug. See `TYPICALLY-DEFAULTS-SPEC.md` for details.
->
-> The specification below remains valid as a design document for future implementation.
+**Status:** superseded 2026-10-09 by `UNKNOWN-EVALUATION-SPEC.md` §5 and `presumption-assertion/CONTRACT.md`, which state what a left-out, `null` or presumed input means at every surface, and by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` T3 and T4, which ruled the wire's absences and the presumption switch on 2026-10-01.
+Retained because its four-cell model (`WithDefault a = Either (Maybe a) (Maybe a)`, below) is the reference for the interview layer: `ladder-diagrams-2026/DESIGN.md` §22 and `ts-shared/ladder-core/src/types.ts` cite it, and the distinction it draws between "never asked" and "said I don't know" is the one T3 keeps as absent versus `null`.
+Nothing below is an implementation plan any more; the API and test sections describe a design that was never built in this form.
+**Related:** `TYPICALLY-DEFAULTS-SPEC.md`, `BOOLEAN-MINIMIZATION-SPEC.md`, `doc/default-values.md`
 
 ## Executive Summary
 

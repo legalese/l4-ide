@@ -24,6 +24,10 @@ module TestData (
   missingBooleanJL4,
   sectionBooleanJL4,
   deonticBooleanJL4,
+  considerBooleanJL4,
+  decidedAnywayJL4,
+  bareInputJL4,
+  deonticConsiderJL4,
   maybeInputsJL4,
   timeInputsJL4,
   wireProbeJL4,
@@ -49,6 +53,7 @@ module TestData (
   heavyLibJL4,
   heavyMainJL4,
   deepJL4,
+  partialClausesJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -212,9 +217,8 @@ DECIDE compute_qualifies IF walks AND eats AND drinks
 --
 -- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes
 -- through 'L4.Viz.Ladder.leafFromExpr', which mints a fresh @unique@ per
--- occurrence. The two occurrences share a label and an input-ref closure, so
--- 'L4.Viz.Ladder.generateAtomId' gives them one atomId between them: one
--- question, two BDD variables.
+-- occurrence. The two occurrences are one term, so they share one C1 key and
+-- one atomId between them ("L4.Viz.AtomKey"): one question, two BDD variables.
 --
 -- Answering that question FALSE refutes both disjuncts and settles the whole
 -- decision — but only if the binding reaches both variables. That makes "did
@@ -513,6 +517,63 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A BOOLEAN input read by a CONSIDER with an OTHERWISE. Until
+-- UNKNOWN-EVALUATION-SPEC §8 step 1, a missing one on the wrapper path failed
+-- the WHEN TRUE pattern and the OTHERWISE took it, so the answer was the
+-- OTHERWISE's value, with a 200.
+considerBooleanJL4 :: Text
+considerBooleanJL4 =
+  [i|
+@export default fee
+GIVEN `is member`   IS A BOOLEAN
+      amount        IS A NUMBER
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+fee MEANS
+    CONSIDER `is member`
+    WHEN TRUE THEN 0
+    OTHERWISE amount
+|]
+
+-- | A rule that reads a BOOLEAN input whose value cannot change its answer:
+-- from UNKNOWN-EVALUATION-SPEC §8 step 3, a missing one is no reason to stop.
+decidedAnywayJL4 :: Text
+decidedAnywayJL4 =
+  [i|
+@export default eligible
+GIVEN `has criminal record` IS A BOOLEAN
+      `unused flag`         IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible MEANS `has criminal record` OR TRUE
+|]
+
+-- | 'deonticBooleanJL4' with the branch written as a CONSIDER and an
+-- OTHERWISE, which a missing input used to take.
+deonticConsiderJL4 :: Text
+deonticConsiderJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver        IS A Driver
+      `is motorway` IS A BOOLEAN
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    CONSIDER `is motorway`
+    WHEN TRUE THEN
+        PARTY driver
+        MUST `wear seatbelt`
+        WITHIN 1
+    OTHERWISE
+        PARTY driver
+        MAY `drive`
 |]
 
 -- | A MAYBE DATE and a MAYBE NUMBER input, each followed by another input. On
@@ -1036,4 +1097,33 @@ GIVETH A NUMBER
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 DECIDE deep IS `sum to` n
+|]
+
+-- | A rule written as clauses, with no clause for Blue. The error for Blue is
+-- worded from the clauses ("No clause of `price` matches these inputs"), and
+-- the evaluator reads that from a mark on the CONSIDERs the clauses compile
+-- to, which the bundle has to keep (review of legalese/l4-ide#545).
+partialClausesJL4 :: Text
+partialClausesJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default The price of a colour
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+|]
+
+-- | A rule whose answer, when its second input is TRUE, is its first input
+-- itself: @p AND TRUE@ is @p@. On the wrapper path (a @{}@ in the request) that
+-- answer sits inside the wrapper's JUST.
+bareInputJL4 :: Text
+bareInputJL4 =
+  [i|
+@export default gate
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+gate MEANS p AND q
 |]

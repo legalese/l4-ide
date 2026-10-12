@@ -496,6 +496,54 @@ export class DeonticInputError extends Error {
   }
 }
 
+/**
+ * A required input the request leaves out, or sends as null, or a record
+ * input with a required field left out or null, or a list input with a
+ * null element. jl4-service refuses each with a 422 naming the first such
+ * input in parameter order, "Parameter 'y': missing required parameter",
+ * and so does the runtime ('refuseMissingInputs'); a MAYBE input or field,
+ * which the schema does not list as required, may be left out and is
+ * NOTHING. Before, each was marshalled as 0, so `{"x": true}` to `x AND y`
+ * answered FALSE. For a field or element sent as null the service's
+ * message is its JSON decoder's instead ("Expected JSON boolean but got:
+ * Null"); the status is the same.
+ */
+export class MissingInputError extends Error {
+  constructor(parameter) {
+    super("Parameter '" + parameter + "': missing required parameter");
+    this.name = "MissingInputError";
+    this.parameter = parameter;
+  }
+}
+
+/**
+ * The HTTP status and body for an evaluation that threw, and whether the
+ * worker's wasm state may be inconsistent after it. A missing input gets
+ * jl4-service's own 422 body, byte for byte: an 'InterpreterError' under
+ * the 'Error' tag, with the report every response states (U7b). A
+ * malformed deontic request is a 400 and a memory cap a 413, each with a
+ * plain error body; anything else is a 500. Only the last two are fatal.
+ */
+export function evaluationErrorResponse(err) {
+  if (err instanceof MissingInputError) {
+    return {
+      status: 422,
+      body: aesonStringify({
+        contents: { contents: err.message, tag: "InterpreterError" },
+        report: "default",
+        tag: "Error",
+      }),
+      fatal: false,
+    };
+  }
+  const body = JSON.stringify({ error: String(err.message || err) });
+  if (err instanceof DeonticInputError)
+    return { status: 400, body, fatal: false };
+  if (err instanceof MemoryLimitError)
+    return { status: 413, body, fatal: true };
+  return { status: 500, body, fatal: true };
+}
+
 // ===========================================================================
 // M6 — deontic interpreter. Walks 'schema.deonticContract' against the
 // request's startTime + events stream, returning a wire-shaped value
@@ -3289,6 +3337,45 @@ export function createRuntime(opts) {
     };
   }
 
+  // A required input that does not supply what its schema requires is
+  // refused, naming the first in parameter order, as jl4-service refuses it
+  // ('MissingInputError').
+  function refuseMissingInputs(meta, args) {
+    const props = meta.parameters.properties || {};
+    const order = meta.paramOrder || Object.keys(props);
+    const required = new Set(meta.parameters.required || order);
+    for (const pn of order) {
+      const v = args == null ? undefined : args[pn];
+      if (required.has(pn) && !suppliesRequired(v, props[pn]))
+        throw new MissingInputError(pn);
+    }
+  }
+
+  // Whether a value is there, and so is everything inside it its schema
+  // requires: a record's required fields, a list's elements. A MAYBE field
+  // may be left out. A value of another shape than its schema's is left to
+  // the marshaller, as before.
+  function suppliesRequired(value, schema) {
+    if (value === undefined || value === null) return false;
+    if (!schema) return true;
+    if (
+      schema.type === "object" &&
+      schema.properties &&
+      typeof value === "object"
+    ) {
+      const order = schema.propertyOrder || Object.keys(schema.properties);
+      const required = new Set(schema.required || order);
+      return order.every(
+        (name) =>
+          !required.has(name) ||
+          suppliesRequired(value[name], schema.properties[name]),
+      );
+    }
+    if (schema.type === "array" && Array.isArray(value))
+      return value.every((v) => suppliesRequired(v, schema.items || {}));
+    return true;
+  }
+
   // ---- High-level helper: marshal args, call an exported function,
   //      decode the return per the schema's return type. ----
   function invokeFunction(instance, meta, args) {
@@ -3300,6 +3387,7 @@ export function createRuntime(opts) {
     if (meta.isDeontic) {
       return invokeDeontic(meta, args);
     }
+    refuseMissingInputs(meta, args);
     const props = meta.parameters.properties || {};
     const order = meta.paramOrder || Object.keys(props);
     const required = new Set(meta.parameters.required || order);
@@ -3468,6 +3556,7 @@ export function createRuntime(opts) {
   // route to `<fn>$trace` without duplicating the marshalling pipeline.
   function invokeFunctionRaw(instance, meta, args, wasmSymbol) {
     resetHeap();
+    refuseMissingInputs(meta, args);
     const props = meta.parameters.properties || {};
     const order = meta.paramOrder || Object.keys(props);
     const required = new Set(meta.parameters.required || order);
@@ -3512,13 +3601,11 @@ export function createRuntime(opts) {
     // compile-time metadata has `special` set (M5 slice 4A), we patch
     // the children list to match what `traceToReasoning` produces:
     //
-    //   * short-circuit filter — drop the rhs sibling when the prelude
-    //     would have skipped it (AND with FALSE lhs, OR with TRUE lhs);
-    //     our wasm codegen is eager so both frames exist in the pool.
-    //   * synthetic IF sub-tree — `__AND__ a b` desugars to
-    //     @IF a THEN b ELSE FALSE@; jl4-service's trace shows this IF as
-    //     an additional child of the AND node, with `a`/`b` Var leaves.
-    //     Mirror the same shape here.
+    //   * short-circuit filter — drop the rhs sibling when jl4-core would
+    //     have skipped it (AND or IMPLIES with a FALSE lhs, OR with a TRUE
+    //     lhs). jl4-core evaluates the connectives in frames of their own,
+    //     so its trace shows the connective with a child per operand it
+    //     evaluated, and no IF sub-tree (UNKNOWN-EVALUATION-SPEC §4.4).
     // M5 — second arg is the label inherited from an enclosing
     // WHERE/LET binding wrapper. jl4-core's `traceToReasoning`
     // propagates the wrapper's label down through the LAST
@@ -3596,13 +3683,12 @@ export function createRuntime(opts) {
         };
       }
       let kidFrames = frame.children;
-      let extras = [];
-      if (node.special === "AND" || node.special === "OR") {
-        const filtered = filterShortCircuitChildren(frame, node, lookupNode);
-        kidFrames = filtered.kids;
-        extras = synthesizeBoolDesugar(node, filtered, resultText, lookupNode);
-      } else if (node.special === "NOT") {
-        extras = synthesizeNotDesugar(frame, node, resultText, lookupNode);
+      if (
+        node.special === "AND" ||
+        node.special === "OR" ||
+        node.special === "IMPLIES"
+      ) {
+        kidFrames = filterShortCircuitChildren(frame, node, lookupNode).kids;
       }
       // Effective label for THIS frame: the schema's bindingLabel if
       // the frame is a wrapper, else whatever the parent passed down.
@@ -3620,7 +3706,7 @@ export function createRuntime(opts) {
       return {
         exampleCode: ec,
         explanation: ["Result: " + resultText],
-        children: [...renderedKids, ...extras],
+        children: renderedKids,
       };
     };
     // Synthesised top: `<fn name> OF <args>` Result: …. Children list
@@ -3691,139 +3777,23 @@ export function createRuntime(opts) {
     return null;
   }
 
-  // M5 slice 4A — drop the rhs frame when the prelude would have
-  // short-circuited. Our wasm codegen evaluates AND/OR eagerly so both
-  // arg frames exist in the pool; this filter brings the trace shape
-  // back in line with jl4-service's lazy evaluation order.
+  // M5 slice 4A — drop the rhs frame when jl4-core would have
+  // short-circuited. Our wasm codegen may evaluate the operands eagerly
+  // so both arg frames can exist in the pool; this filter brings the
+  // trace shape back in line with jl4-service's lazy evaluation order.
   function filterShortCircuitChildren(frame, node, lookupNode) {
     const kids = frame.children;
-    if (kids.length < 1) return { kids, dropped: false, lhsTruth: null };
-    // M5 slice 4D — always read lhs from the FIRST child if present.
-    // With slice-4D's short-circuit AND/OR codegen, the rhs frame is
-    // absent (only 1 child); we still need lhsTruth to drive the IF
-    // sub-tree's taken-branch leaf (FALSE / TRUE / b).
+    if (kids.length < 2) return { kids, dropped: false };
+    // M5 slice 4D — the lhs is the FIRST child. With slice-4D's
+    // short-circuit codegen the rhs frame is already absent.
     const lhsTruth = frameTruth(kids[0], lookupNode);
-    if (kids.length < 2) return { kids, dropped: false, lhsTruth };
-    let kept = kids;
-    let dropped = false;
-    if (node.special === "AND" && lhsTruth === false) {
-      kept = kids.slice(0, 1);
-      dropped = true;
-    } else if (node.special === "OR" && lhsTruth === true) {
-      kept = kids.slice(0, 1);
-      dropped = true;
-    }
-    return { kids: kept, dropped, lhsTruth };
-  }
-
-  // M5 slice 4A — append the synthetic IF sub-tree the prelude desugar
-  // for @__AND__@ / @__OR__@ produces in jl4-service's trace.
-  //
-  //   __AND__ a b ⟶ IF a THEN b ELSE FALSE
-  //   __OR__  a b ⟶ IF a THEN TRUE ELSE b
-  //
-  // The IF sub-tree's "a" and "b" leaves use the *evaluated* truths
-  // from the AND/OR's sibling sub-traces — the lambda body sees @a@
-  // and @b@ already reduced to WHNF. When short-circuit dropped the
-  // rhs, we drop the corresponding child from the IF sub-tree too.
-  function synthesizeBoolDesugar(node, filtered, parentResultText, lookupNode) {
-    const kids = filtered.kids;
-    if (kids.length < 1) return [];
-    const lhsTruth = filtered.lhsTruth;
-    const rhsTruth = kids.length >= 2 ? frameTruth(kids[1], lookupNode) : null;
-    const aText =
-      lhsTruth === true ? "TRUE" : lhsTruth === false ? "FALSE" : "";
-    const bText =
-      rhsTruth === true ? "TRUE" : rhsTruth === false ? "FALSE" : "";
-    // IF sub-tree's exampleCode literal differs by operator. AND emits
-    // `IF a THEN b ELSE FALSE`; OR emits `IF a THEN TRUE ELSE b`.
-    const ifText =
-      node.special === "AND"
-        ? "IF a THEN b ELSE FALSE"
-        : "IF a THEN TRUE ELSE b";
-    const ifChildren = [
-      { exampleCode: ["a"], explanation: ["Result: " + aText], children: [] },
-    ];
-    // The second IF child is the *taken* branch:
-    //   AND, lhs TRUE  → `b` (the rhs eval)            ⇒ Result = b's truth
-    //   AND, lhs FALSE → `FALSE` (the ELSE literal)    ⇒ Result = FALSE
-    //   OR,  lhs TRUE  → `TRUE`  (the THEN literal)    ⇒ Result = TRUE
-    //   OR,  lhs FALSE → `b` (the rhs eval)            ⇒ Result = b's truth
-    // jl4-service traces the taken branch as a leaf node with the
-    // branch expression as exampleCode and its NF result as the line.
-    if (node.special === "AND") {
-      if (lhsTruth === true && kids.length >= 2) {
-        ifChildren.push({
-          exampleCode: ["b"],
-          explanation: ["Result: " + bText],
-          children: [],
-        });
-      } else if (lhsTruth === false) {
-        ifChildren.push({
-          exampleCode: ["FALSE"],
-          explanation: ["Result: FALSE"],
-          children: [],
-        });
-      }
-    } else {
-      // OR
-      if (lhsTruth === true) {
-        ifChildren.push({
-          exampleCode: ["TRUE"],
-          explanation: ["Result: TRUE"],
-          children: [],
-        });
-      } else if (lhsTruth === false && kids.length >= 2) {
-        ifChildren.push({
-          exampleCode: ["b"],
-          explanation: ["Result: " + bText],
-          children: [],
-        });
-      }
-    }
-    return [
-      {
-        exampleCode: [ifText],
-        explanation: ["Result: " + parentResultText],
-        children: ifChildren,
-      },
-    ];
-  }
-
-  // M5 slice 4A — synthetic IF sub-tree for `__NOT__ a` ⟶
-  // `IF a THEN FALSE ELSE TRUE`. Single arg, no short-circuit.
-  function synthesizeNotDesugar(frame, _node, parentResultText, lookupNode) {
-    if (frame.children.length < 1) return [];
-    const argTruth = frameTruth(frame.children[0], lookupNode);
-    const aText =
-      argTruth === true ? "TRUE" : argTruth === false ? "FALSE" : "";
-    // Mirror 'synthesizeBoolDesugar' for AND/OR — the IF sub-tree
-    // includes a 'taken-branch' leaf after the @a@ input leaf:
-    //   argTruth === true  → @FALSE@ (the THEN literal)
-    //   argTruth === false → @TRUE@  (the ELSE literal)
-    const ifChildren = [
-      { exampleCode: ["a"], explanation: ["Result: " + aText], children: [] },
-    ];
-    if (argTruth === true) {
-      ifChildren.push({
-        exampleCode: ["FALSE"],
-        explanation: ["Result: FALSE"],
-        children: [],
-      });
-    } else if (argTruth === false) {
-      ifChildren.push({
-        exampleCode: ["TRUE"],
-        explanation: ["Result: TRUE"],
-        children: [],
-      });
-    }
-    return [
-      {
-        exampleCode: ["IF a THEN FALSE ELSE TRUE"],
-        explanation: ["Result: " + parentResultText],
-        children: ifChildren,
-      },
-    ];
+    const decided =
+      ((node.special === "AND" || node.special === "IMPLIES") &&
+        lhsTruth === false) ||
+      (node.special === "OR" && lhsTruth === true);
+    return decided
+      ? { kids: kids.slice(0, 1), dropped: true }
+      : { kids, dropped: false };
   }
 
   // M5 — walk a wasm-allocated compound value at `raw` using the
@@ -4231,9 +4201,9 @@ export function createRuntime(opts) {
 // until later slices replace this with a real instrumented trace.
 //
 // `wrapEvaluationEnvelope({value, reasoning})` builds the
-// `{contents: {result: {value}, reasoning?}, tag}` envelope `jl4-service`
-// returns, with `tag = TraceResponse` whenever `reasoning` is non-empty
-// (matching `responseTag` in jl4-service's Api.hs).
+// `{contents: {result: {value}, reasoning?}, report, tag}` envelope
+// `jl4-service` returns, with `tag = TraceResponse` whenever `reasoning` is
+// non-empty (matching `responseTag` in jl4-service's Api.hs).
 // ---------------------------------------------------------------------------
 
 export function isEmptyReasoning(r) {
@@ -4715,9 +4685,12 @@ export function synthesizeArgEvalTree(value, schema, _opts) {
 }
 
 // Build the wire envelope matching jl4-service's `SimpleResponse` ToJSON
-// instance: `{tag, contents}` where `contents` is `ResponseWithReason` (so
-// `{result, reasoning?}`). The tag flips to "TraceResponse" whenever
-// `reasoning` is non-empty (= `responseTag` in Backend/Api.hs).
+// instance: `{tag, contents, report}` where `contents` is
+// `ResponseWithReason` (so `{result, reasoning?}`). The tag flips to
+// "TraceResponse" whenever `reasoning` is non-empty (= `responseTag` in
+// Backend/Api.hs). Every response states its report, as the service's do
+// (UNKNOWN-EVALUATION-SPEC U7b); WASM evaluates only fully supplied inputs,
+// so it is always the default one.
 export function wrapEvaluationEnvelope({ value, reasoning }) {
   const result = { value };
   const contents =
@@ -4728,5 +4701,5 @@ export function wrapEvaluationEnvelope({ value, reasoning }) {
     reasoning && !isEmptyReasoning(reasoning)
       ? "TraceResponse"
       : "SimpleResponse";
-  return { contents, tag };
+  return { contents, report: "default", tag };
 }

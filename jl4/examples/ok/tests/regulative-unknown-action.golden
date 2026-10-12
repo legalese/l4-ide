@@ -36,7 +36,9 @@ regulative-unknown-action.l4:155:1-156:33:
     ks
   but it is an assumed term.
 regulative-unknown-action.l4:162:1-163:41:
-  PARTY Seller OF "Alice" MUST Deliver Retail WITHIN 13 HENCE FULFILLED LEST BREACH
+  I could not continue evaluating, because I needed to know the value of
+    k
+  but it is an assumed term.
 regulative-unknown-action.l4:180:1-181:46:
   I could not continue evaluating, because I needed to know the value of
     k

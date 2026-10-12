@@ -97,11 +97,13 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValNullaryBuiltinFun{}) = toJSON ("<builtin>" :: Text)
   toJSON (ValUnaryBuiltinFun{})   = toJSON ("<builtin>" :: Text)
   toJSON (ValBinaryBuiltinFun{})  = toJSON ("<builtin>" :: Text)
+  toJSON (ValConnective{})        = toJSON ("<function>" :: Text)
   toJSON (ValTernaryBuiltinFun{}) = toJSON ("<builtin>" :: Text)
   toJSON (ValPartialTernary{})    = toJSON ("<partial>" :: Text)
   toJSON (ValPartialTernary2{})   = toJSON ("<partial>" :: Text)
   toJSON (ValUnappliedConstructor r) = toJSON (resolvedNameText r)
-  toJSON (ValAssumed r)           = toJSON ("<assumed:" <> resolvedNameText r <> ">" :: Text)
+  toJSON (ValAssumed r _)         = toJSON ("<assumed:" <> resolvedNameText r <> ">" :: Text)
+  toJSON (ValTerm t)              = toJSON ("<unknown:" <> prettyLayout t <> ">" :: Text)
   toJSON (ValEnvironment{})       = toJSON ("<environment>" :: Text)
   toJSON (ValBreached reason)     = object ["breached" .= toJSON reason]
 

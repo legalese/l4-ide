@@ -9,4 +9,7 @@
 
 -- Quoted identifiers with spaces
 
-#EVAL age
+GIVETH A NUMBER
+`tax on age` MEANS age TIMES taxRate
+
+#EVAL `tax on age` WITH age IS 40, taxRate IS 0.5

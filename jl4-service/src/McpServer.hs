@@ -42,7 +42,7 @@ import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID
 import Control.Exception (SomeException, catch)
 
-import Backend.Api (EvalBackend (..), FnLiteral (..), Presumption (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
+import Backend.Api (EvalBackend (..), FnLiteral (..), Presumption (..), RunFunction (..), TraceLevel (..))
 import Options (Options (..))
 
 -- ----------------------------------------------------------------------------
@@ -571,8 +571,12 @@ runMcpEvaluationIO cfg vf args = do
         runExceptT (runFn.runFunction args Nothing TraceNone False PresumeSoft)
       case limited of
         Left _ -> pure $ Left "Evaluation resource limit exceeded"
+        -- An evaluation's answer and its error are both the body the HTTP
+        -- route returns, so each states its report (UNKNOWN-EVALUATION-SPEC
+        -- U7b), an undetermined result's 422 among the errors.
         Right (Left err, _) ->
-          pure $ Left (prettyEvaluatorError err)
+          let encoded = Aeson.encode (SimpleError err)
+          in pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
         Right (Right rwr, _) ->
           let encoded = Aeson.encode (SimpleResponse rwr)
           in pure $ Right (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))

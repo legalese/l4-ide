@@ -314,6 +314,7 @@ printUserEvalExceptionShort StackOverflow                   = "stack overflow"
 printUserEvalExceptionShort (DivisionByZero _)              = "division by zero"
 printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"
 printUserEvalExceptionShort (Stuck _)                       = "stuck"
+printUserEvalExceptionShort RanOutOfSteps                   = "gave up"
 printUserEvalExceptionShort (UserError _)                   = "user error"
 
 -- | This is a stack data structure that is maintained while building an 'EvalPreTrace'.
@@ -536,6 +537,8 @@ nfFromTrace m = \ case
     MkNF (ValUnaryBuiltinFun b)
   ValBinaryBuiltinFun b ->
     MkNF (ValBinaryBuiltinFun b)
+  ValConnective c ->
+    MkNF (ValConnective c)
   ValTernaryBuiltinFun b ->
     MkNF (ValTernaryBuiltinFun b)
   ValPartialTernary b r1 ->
@@ -546,8 +549,10 @@ nfFromTrace m = \ case
     MkNF (ValUnappliedConstructor n)
   ValConstructor n rs ->
     MkNF (ValConstructor n (fmap rec rs))
-  ValAssumed n ->
-    MkNF (ValAssumed n)
+  ValAssumed n ty ->
+    MkNF (ValAssumed n ty)
+  ValTerm t ->
+    MkNF (ValTerm t)
   ValEnvironment env ->
     MkNF (ValEnvironment env)
   ValBreached reason ->

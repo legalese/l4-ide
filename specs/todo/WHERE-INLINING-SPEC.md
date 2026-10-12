@@ -10,6 +10,8 @@ Server: `afffcb6e5` (expansions on the wire) and `56e978951` (opt-in per request
 Client: `ec7cae39e` (call panels) and `ab06af184` (real fixture, the IDE's click spreading, folded answers drive current).
 §10's line citations are to the tree at `e6e037d81`._
 
+_§10.7, named and polymorphic calls (smucclaw/l4-ide#1033), is built on branch `mengwong/ladder-dustpan`, not merged when this was written._
+
 **One-line summary.** `x WHERE x MEANS e` and `e` mean the same thing to the evaluator and
 different things to the analyser. This spec makes them mean the same thing to the analyser too:
 local bindings are substituted before analysis (§5), and a call to another rule is read through
@@ -176,20 +178,21 @@ inlineLocalBindings :: Expr Resolved -> Expr Resolved
 inlineLocalBindingsInDecide :: Decide Resolved -> Decide Resolved
 ```
 
-Both are in `jl4-core/src/L4/Transform.hs` (`:92` and `:259`).
+Both are in `jl4-core/src/L4/Transform.hs` (`:93` and `:307`).
 Algorithm, per `Where`/`LetIn` node, innermost first:
 
-1. Collect candidates: every `LocalDecide` that `unfoldableDecide` accepts (`Transform.hs:151-159`), with any number of parameters.
+1. Collect candidates: every `LocalDecide` that `unfoldableDecide` accepts (`Transform.hs:152-161`), with any number of parameters.
    It refuses a definition whose body applies one of its own parameters as a function (§9.2).
    Key by the bound name's unique, and keep the parameters' uniques in order.
 2. Drop from the candidate set any binding reachable from its own definiens (self- or mutual
    recursion), computed as a reachability closure over references among the candidates
-   (`pruneRecursive`, `Transform.hs:172`).
-3. Substitute surviving candidates into each other's definienda, iterating to a fixed point (`closeUnder`, `Transform.hs:185`), and then into the body.
+   (`pruneRecursive`, `Transform.hs:219`).
+3. Substitute surviving candidates into each other's definienda, iterating to a fixed point (`closeUnder`, `Transform.hs:232`), and then into the body.
    Termination follows from step 2: the reference graph among the candidates is now acyclic, so each pass strictly reduces the number of remaining references.
-4. A reference is a call `App _ r args` to a candidate **whose argument count equals the candidate's parameter count**, replaced by the definiens with each argument in place of its parameter (`unfoldOnce`, `Transform.hs:208-216`).
+4. A reference is a call `App _ r args` to a candidate **whose argument count equals the candidate's parameter count**, replaced by the definiens with each argument in place of its parameter (`unfoldOnce`, `Transform.hs:256-264`).
+   Since 2026-10-11 a call written with named arguments is such a call too, read as the positional call it stands for (`positionalCall`, `Transform.hs:201`; §10.7).
    A reference at another arity is left alone, per §3.
-5. A binding is dropped once nothing refers to it any more, which for a zero-arity binding is always; a parameterised one can still be referenced at another arity (`Transform.hs:114-137`).
+5. A binding is dropped once nothing refers to it any more, which for a zero-arity binding is always; a parameterised one can still be referenced at another arity (`Transform.hs:115-138`).
    If every binding was dropped, the node collapses to the substituted body; otherwise the node is retained carrying only the bindings that survived.
 
 **Annotations.** The definiens is spliced with its own `Anno`, so a finding at an inlined
@@ -258,9 +261,13 @@ Meng's ruling (BETAMAX): substitute through calls, arguments included.
 
 The second paragraph is the design, and it is the one that took a measurement to find (§9.4).
 
+_Changed 2026-10-11 (smucclaw/l4-ide#1033, §10.7):_ a call written with named arguments, `` `big` WITH k IS n ``, is such a leaf too, read as the positional call it stands for; until then it stayed an opaque atom.
+Assumed, not ruled: R2 says "each leaf that is a call", and a named call is one.
+
 ### 9.2 Beta reduction, and why nothing can be captured
 
 `L4.Transform.unfoldOnce` replaces a call `App _ r args` whose callee is known **and whose argument count equals the callee's parameter count** by the callee's body with each argument in place of its parameter.
+A call with named arguments is read as its positional call first (`positionalCall`, since 2026-10-11, §10.7).
 The arity check is the guard: a reference at another arity is the rule passed as a value, not a call, and is left alone.
 `inlineLocalBindings` uses the same step for local bindings, so a `WHERE` helper with parameters is now substituted too (§3's first row).
 
@@ -376,7 +383,7 @@ How a panel and a NOT's bubble are drawn was ruled the same day and is recorded 
 > A call box's key is the called rule together with the C1 keys of its arguments.
 > An expansion's leaves are keyed in the **caller's** context after substitution: the called rule's body, with the call's arguments in place of its parameters, is keyed as if the caller had written it.
 > So the `a` inlined from `limb a b` is the caller's own `a`, `limb a b` and `limb c d` share no atom, and two copies of `limb a b` share every atom.
-> The `atomId` is that key's implementation; today's printed-label `atomId` (below) is interim, and wherever it differs from the C1 key that is a defect, not behaviour (smucclaw/l4-ide#1013).
+> The `atomId` is that key's implementation; the printed-label `atomId` in place when this was ruled was interim, and wherever it differed from the C1 key that was a defect, not behaviour (smucclaw/l4-ide#1013).
 
 Ruling, 2026-10-07, asked inline in session `ladder-ref-trans`: option "C1's term key", over "the printed label, as built" and "no sharing across copies"; condition: the key stays stable across recompiles and the ladder and the query plan agree on it (#935); Meng's note: "seems like we should be prioritizing correctness over ease of implementation".
 What prompted the rule is Meng's question of 2026-10-05, quoted above ("clicking in one term should toggle all instances to match"), and its basis is the evaluator's identity ruling, C1 of `UNKNOWN-EVALUATION-SPEC.md` (bench card C1, accepted by Meng 2026-10-01, recorded at `:1171`), of which R3 is the ladder's projection.
@@ -384,9 +391,46 @@ C1 keys every term by its structure: "an input, a field path, a built-in operati
 A call to a rule the module defines is not an atom there; it is unfolded, so `older 18` leaves no trace of `older` (`:308-309`).
 The ladder keeps the call as a box, because that is what the reader wrote, but the call's expansion is that unfolding, and R3 gives each of its leaves the key it would have if the caller had written the argument in place.
 
-The implementation is not yet exact.
-The ladder's `atomId` is a UUID5 over the function name, the leaf's **printed label**, and the labels of its transitive input references (`atomIdByUnique` and `atomIdsOfLabels`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:206-275`).
-That equals C1's term key only where printing is injective, and it is not everywhere (§10.6).
+**Implemented** by legalese/l4-ide#598 (branch `feat/r3-c1-atom-key`, smucclaw/l4-ide#1013), not yet merged when this was written.
+_Changed:_ until then the `atomId` was a UUID5 over the function name, the leaf's **printed label**, and the labels of its transitive input references, which equals C1's term key only where printing is injective, and it is not everywhere (§10.6).
+
+The key is `L4.Viz.AtomKey.termKey` in `jl4-core`, and the `atomId` is a UUID5 over the function name and that key (`atomIdOfKey`).
+`termKey` strips every annotation from the leaf's expression and renames every name, so two keys are equal exactly when the two terms are structurally equal after renaming:
+
+- a binder defined inside the leaf (a quantifier or lambda variable, a pattern variable) is named by its scope, de Bruijn style, so alpha-equivalent leaves share a key, and so do two copies of one lambda that substitution put into one leaf;
+- a free name of the module becomes its binder path, from `mkKeyEnv`: the top-level declaration and the name, qualified by the named sections around it only where an earlier binder took that path, and by a source-order ordinal only where that is taken too, so renaming or inserting a section heading moves no id; binders that only ever occur inside one leaf get no path;
+- a free name of another module, or a builtin, keeps that module's own number for it, beside the module's file name, numbered apart where two modules share one.
+
+A `WHERE` or `LET` local is not a name of its own in the key: the leaf's own local bindings, and the decision's `WHERE` locals it reads, are put in before keying (`inlineLocalBindings`), as a callee's are before its expansion is drawn, so a caller's `total GREATER THAN 3 WHERE total MEANS n PLUS 1` and the same text in a callee key alike.
+A local that cannot be put in (a recursive one) stays in the term with its definition, so two unfolded copies of it with different arguments stay apart; keyed by name, they were one atom, and `l4 verify` reported a satisfiable rule unsatisfiable.
+A leaf whose value depends on when it is evaluated, because it reads or writes the ledger or the network or calls a rule of the module that does, is keyed per occurrence instead, numbered in drawing order (C1's `fresh`): C1 keys a built-in by its term because it is a function of its operands, and a `RECALL` is not, so two occurrences either side of a `RECORD` can be FALSE and TRUE in one evaluation.
+Keyed by term, they were one atom, and `l4 verify` reported such a rule unsatisfiable; it now also keeps these apart across the meanings it reads through (`getFreshLeaves`).
+Before showing the term, the key also drops an inference variable's counter (an untyped lambda parameter's type carries one, and it moves when anything checked earlier changes) and writes a call whose arguments are all named as the positional call.
+It puts back the one thing the term does not carry: the type a `JSONDECODE` decodes into, which the evaluator reads off the node's annotation.
+Each of these was found by adversarial review of the design or of the built key, and each has a test (`AtomKeySpec`, `LadderTermKeySpec`, `LadderCallExpansionSpec`, and `l4-cli-test`'s `verify-recursive-local-copies.l4`).
+
+Both ladder builders key every leaf this way while they draw, including each leaf of an expansion over the substituted body, and record the key under the leaf's id (`getLeafKeys`); the query plan reads those keys (`leafKeyByUnique`) instead of computing ids of its own, so the diagram and the plan cannot disagree.
+A call box is the term `f a b`, so its key is the rule's path with its arguments' keys, as R3 says.
+
+> **R3a** (**ANSWERED 2026-10-09**, ruled by Meng). The four choices #598 made without a ruling stand as built.
+> (1) An `atomId` keeps the decision's name, so ids are scoped per diagram, although R3's text read literally names a proposition without it.
+> (2) Section names enter a binder path only where two binders would otherwise collide, so renaming or inserting a heading moves no id.
+> (3) `WHERE` and `LET` locals are put into keys, so a call to a local keys as its unfolding, unlike a call to a rule, which is a call box.
+> (4) A leaf that reads or writes the ledger or the network, or calls a rule of the module that does, is keyed per occurrence (C1's `fresh`); a bare reference to such a rule of no parameters is not, since it is evaluated once and shared.
+
+Ruling, 2026-10-09, asked inline in session `ladder-ref-trans` (offered as a bench, SOMMELIER, not built): all four as recommended; no conditions; Meng's note: "i think we can skip SOMMELIER if i just say i accept your recommendations".
+
+What it knowingly leaves, by kind of failure:
+
+- **Silent, and the safe direction: equal propositions can get two keys** where they are different terms, such as `a AND b` and `b AND a` inside one leaf.
+  That says "two questions" where the truth is one, never the reverse (C1).
+- **An `atomId` is stable across recompiles and edits elsewhere in the module, not across everything.**
+  It moves when a binder with the same name is added above one it names (the later of the two is then told apart by its sections), when an imported module it names changes, or on an L4 release that changes the AST, since the key is `show` of it.
+  A per-occurrence leaf (R3a (4)) is numbered in drawing order, so it also moves when such a leaf is added or removed earlier in the same decision.
+- **The planner still holds twins as two variables.**
+  Two occurrences of one term share an `atomId`, and a binding by `atomId` reaches both, but the BDD does not know they are equal, so `X AND NOT X` over a compound `X` is undetermined rather than `FALSE`.
+  `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here (smucclaw/l4-ide#1032).
+- **Silent, and the unsafe direction, pre-existing: `carameliseExpr` resets an `INERT`'s AND/OR context under a comparison**, so two comparisons that evaluate differently are drawn as one term and share an `atomId` (smucclaw/l4-ide#1031).
 
 ### 10.2 What was measured before building (2026-10-05)
 
@@ -437,6 +481,8 @@ Making it opt-in was a choice made on this branch for cost (§10.5), not a rulin
 The query plan's variables keep exactly the ids they had.
 Every other leaf, an `App`'s arguments and every leaf inside an expansion, is named by the same function over the same dependency closure (`atomIdsOfLabels`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:228`), with its references rendered against the plan's own labels.
 An inlined leaf that **is** a plan variable, such as the caller's `a` inlined from `limb a b`, carries that variable's unique and so gets its id.
+_Changed (smucclaw/l4-ide#1013):_ the one namespace is now that of §10.1's term key: every leaf's id is the hash of the key the ladder recorded for it, and `atomIdsOfLabels` is gone.
+The caller's `a` inlined from `limb a b` gets the caller's id because it is the same term.
 Expansion leaves are not added to the plan's variables: `vizExprToBoolExpr` makes a call one variable and descends into neither its arguments nor its expansion.
 
 **The rest of the server.**
@@ -483,6 +529,7 @@ The server half went through three adversarial reviews before `afffcb6e5`; these
   A first fix rendered references with the extra leaves' labels added, and then the call `limb OF the season is open, a` had one `atomId` drawn directly and another inside `wrap a`'s expansion (measured 2026-10-05).
   References now render against the plan's labels only.
   The cost is stated in the code: a reference to a module rule that is not a plan variable renders by its unique, so it is never taken for a caller input that shadows it, but its `atomId` moves when a line is added above (`jl4-query-plan/src/L4/Decision/QueryPlan.hs:223-227`); the stability test covers leaves whose references are inputs.
+  _Changed (smucclaw/l4-ide#1013):_ that cost is gone; the term key names a module rule by its path, and `LadderCallExpansionSpec` pins the rule's `atomId` across a line added above.
 - **`l4/queryPlan` stopped drawing again.**
   It ran every deepening pass and translated every expansion on each request, which the webview sends on every change to the bindings, only for the plan to discard the expansions: 536 ms per request against 9 ms after, on a module with 254 expansions (`afffcb6e5`'s message).
 - **Service parity.**
@@ -525,9 +572,11 @@ With the mixfix labels of §10.6 and the folded-call conduction fix of `ladder-d
   Guarded by `VisualiseExpansionOptInSpec.hs` (the fixture above, with and without expansions; it failed with the stamping reverted) and by a `LadderModel` test on the captured shape.
   **Still open in `jl4-service`**, whose compiled module carries no registry: there a mixfix call still prints its head keyword only, so the service and the IDE give such a call different labels and `atomId`s, and two calls sharing a head keyword still share one.
   This is the clearest case of the printed key falling short of C1's term key, and under R3 it is a defect (smucclaw/l4-ide#1013).
+  _Changed (smucclaw/l4-ide#1013):_ the `atomId` half is closed everywhere, the service included, since the term key names each operator by its own definition (`LadderTermKeySpec`); the service's LABELS still print the head keyword only.
 - **The printed label is not C1's term key.**
   R3 requires the ladder's `atomId` to move onto C1's key (smucclaw/l4-ide#1013); the alignment point is #556 (UNKNOWN-EVALUATION step 3, stacked on #554, #553 and #541), which keys atoms by evaluated term in `jl4-core`; steps 4 to 7 of that spec are parked (MOTHBALL, #538).
-  Not done yet.
+  _Changed (smucclaw/l4-ide#1013):_ done for the ladder (§10.1), without waiting for #556, whose `Term` compares names by `Unique` and so cannot be the stable key as it stands.
+  Owed when #556 lands: a test that the ladder's key and #556's `Term` agree where both are defined, which is only partly (an evaluator term exists only for what evaluation reached), and the name function shared between them, so the two cannot drift.
 - **`hasDefForInlining` still compares against `cfg.moduleUri`** (`Ladder.hs:338`), the URI derived from the document id a caller passes, which is the pitfall §9.6 names; the `App []` case beside it already uses the typechecker's own URI (`Ladder.hs:584-588`).
   A caller that passes a synthetic document id would get no `canInline` and no expansions.
   No caller that turns expansions on does that today; not fixed here.
@@ -541,3 +590,46 @@ With the mixfix labels of §10.6 and the folded-call conduction fix of `ladder-d
   The sidebar's `setValueForUnique` still binds one Unique, so it still leaves such a twin unanswered.
 - **`ts-apps/charge-generator`** substitutes call arguments itself and keys by rule name, so two calls of one rule with different arguments collapse; it could consume `expansion` instead.
   Not in scope here.
+
+### 10.7 Named and polymorphic calls (2026-10-11, smucclaw/l4-ide#1033)
+
+_Built on branch `mengwong/ladder-dustpan`; not merged when this was written._
+
+smucclaw/l4-ide#1033 named three places where the ladder said less than R3's key does, measured after #598.
+This section closes the first two.
+The third, `p's adult` against `adult p`, was a ruling, not a defect; Meng ruled it on 2026-10-11 (fold them), and it is built on its own branch, `mengwong/ladder-record-accessor`, which records the ruling as R3b in §10.1 (not merged when this was written).
+
+**A call with named arguments opened no expansion.**
+`` `big` n `` opened into its panel and `` `big` WITH k IS n `` drew as one closed leaf, although R3 already keyed the two call boxes alike: the ladder matched only `App`, and so did every unfolding pass in `L4.Transform`.
+`Transform.positionalCall` now reads a named call as the positional call it stands for when the checker's order says its arguments supply parameters `0 .. n-1`, each once, and every pass goes through it: `unfoldOnce`, `unfoldableCallSites`, `unfoldableDecide`, and `L4.Viz.AtomKey.positional`, so the key and the expansion agree by construction.
+`callees` counts the head of every named call.
+Three things follow beyond the panel.
+
+- `l4 verify` reads a named call through, as §9.1 now says (`verify-unfold-named-calls.l4`).
+- A `WHERE` helper that only a named call refers to is unfolded; `inlineLocalBindings` used to drop it, leaving the call pointing at nothing.
+- A rule that calls itself, or another rule that calls it, through a named call is now seen as recursive and left opaque, like positional recursion. Base missed the edge and unfolded such a rule one level, which happened to be sound, so a few findings base made by accident are gone: with `` `r` n IF n > 5 AND (n < 3 OR (`r` WITH n IS n - 1)) ``, base found `` `r` n AND NOT n > 5 `` unsatisfiable, and the positional twin never was.
+
+A named call is drawn as that call, its label and argument boxes in the order written, by both ladders; for an all-BOOLEAN one that is a call box over its arguments, with or without expansions, so the IDE's default lens shows the change too.
+The panel title joins its arguments with commas (`callLabel`).
+`positionalCall` refuses a named call the checker rejected and recovered from, since the IDE draws modules with type errors: an argument name it could not resolve is `OutOfScope`, and a named call to a rule of no parameters has no arguments.
+A named call that supplies a section `GIVEN` (a negative order entry) stays opaque, since substituting for the parameters alone would not be the call.
+
+**A polymorphic callee's `IF` was one opaque leaf inside its expansion.**
+In `` `whichever applies` cond x y MEANS IF cond THEN x ELSE y `` under `GIVEN a IS A TYPE`, the `IF` carries type `a` in its annotation (rewriting that annotation is what makes it draw, as the gap-2 tests measure), substituting BOOLEAN arguments left it as it was, and the guarded-chain case draws an `IF` as structure only when it is BOOLEAN.
+`instantiateTypes` (`LSP.L4.Viz.Ladder`) reads what each type variable stands for off the call, matching the body's type against the call's and each parameter's type, as annotated where the body uses it, against its argument's, and puts that in for every type in the body: annotations through the checker's final substitution, types written in the syntax as written.
+The expand gesture (`l4/inlineExprs`) instantiates the same way.
+
+**Measured over the corpus** (2026-10-11, `l4 verify` on every `.l4` under `jl4/examples`, `jl4-core/libraries` and `doc`, base `def9a5e41` against the branch at `b569edfa6`): 843 of 844 files give byte-identical output; the 844th, `ok/pattern-matching-literal-clauses.l4`, finishes on neither (base at 600 s, the branch at 180 s).
+So no corpus file's findings move; what moves is drawing, in the IDE.
+
+**Adversarial review** (four lanes, each with probe binaries built from base and from the branch) found five defects in the first build, all fixed with a test each: the expand gesture did not instantiate, so it drew the `IF` the panel had opened as one box; an untyped lambda's parameter type was resolved in the callee's copy only, which keyed it apart from the caller's identical lambda; jl4-core's copy of the ladder still drew a named all-BOOLEAN call as one leaf; panel titles kept the printer's line breaks; and ill-typed named calls opened onto meanings the checker had refused.
+
+**What it knowingly leaves**, by kind of failure:
+
+- **Silent, the safe direction: a polymorphic helper defined as a `WHERE` local INSIDE a callee is not instantiated**, so its `IF` stays one leaf, as before; `inlineLocalBindings` puts it in without types to match against. A polymorphic local of the decision itself is instantiated.
+- **Silent, the safe direction: `l4 verify` does not read a polymorphic rule through**, since it reads only rules whose body is BOOLEAN, so the IDE now opens a call that `verify` leaves opaque.
+- **Slow, and loud only as a timeout: `l4 verify` on a chain of named calls whose meaning doubles at each level** builds the meaning up to the unfold budget (200,000 nodes) before `--max-nodes` refuses it. That was already so for positional calls; named ones now reach it (measured by the review, under load: a 12-level chain took 1.3 s on base and 27.4 s here for the whole file, and with `--decision top` 0.15 s against 8.0 s; its positional twin took 6.9 s on base). A size test before drawing the meaning would avoid it; not done here.
+- **The node budget is all or nothing.** A polymorphic expansion now costs its full size, so a large one can push a decision over `expansionNodeBudget` and cost every call in it its expansion, as a large monomorphic one already could.
+- **An all-BOOLEAN named call's argument ladders count against `l4 verify --max-nodes`**, as a positional call's already did.
+- **Pre-existing, now reaching named calls:** a call box copied into a later row's negated prefix by `GuardedRows` gets a fresh id, and its evaluation maker is registered under the original's, so `l4/evalApp` on the copy finds none.
+- **Not reachable today: if a named call may one day omit a defaulted parameter** (TYPICALLY-ONE-BEHAVIOUR-SPEC row W4), `positionalCall` cannot see the callee's arity, and the term key would read such a call as a shorter positional one. The unfolding passes compare arities and stay right.

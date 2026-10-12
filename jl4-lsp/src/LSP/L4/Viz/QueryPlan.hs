@@ -12,6 +12,7 @@ module LSP.L4.Viz.QueryPlan (
 
 import Base
 import Data.IntMap.Lazy (IntMap)
+import qualified Data.IntMap.Lazy as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -19,6 +20,7 @@ import qualified Data.Set as Set
 
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import qualified L4.Decision.QueryPlan as QP
+import L4.Viz.AtomKey (atomIdOfKey)
 
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.VizExpr as VizExpr
@@ -31,97 +33,51 @@ buildParamsByUnique ladderInfo =
     | p <- ladderInfo.funDecl.params
     ]
 
--- | Rewrite every leaf's @atomId@ into the query plan's namespace, deriving that
--- namespace from the ladder itself.
+-- | Stamp every leaf's @atomId@ from the keys the ladder recorded, under the
+-- diagram's own function name.
 --
--- Convenience wrapper over 'annotateLadderWithAtomIdsUsing' for callers that do
--- not already hold a compiled cache; it pays for a fresh BDD compile. A caller
--- that has one — jl4-service does — should call the @Using@ form and hand over
--- the function name it will later run the plan under, since the name is the
--- first component of every atomId and taking it from the diagram instead is an
--- assumption, not a fact.
+-- The ladder already names its atoms this way ('LadderViz.getLeafKeys'), so for
+-- a diagram drawn under its own name this changes nothing. It is kept for
+-- callers that hold a diagram and a state that may have come apart; a caller
+-- that serves the function under some other name — jl4-service does — should
+-- call the @Using@ form with 'ladderAtomIds' under THAT name, since the name is
+-- the first component of every atomId.
 annotateLadderWithAtomIds ::
   VizExpr.RenderAsLadderInfo ->
   LadderViz.VizState ->
   VizExpr.RenderAsLadderInfo
 annotateLadderWithAtomIds ladderInfo vizState =
   annotateLadderWithAtomIdsUsing
-    (ladderAtomIds ladderInfo.funDecl.fnName.label (buildParamsByUnique ladderInfo) cache ladderInfo.funDecl.body)
+    (Map.fromList
+      [ (u, atomIdOfKey ladderInfo.funDecl.fnName.label key)
+      | (u, key) <- IntMap.toList (LadderViz.getLeafKeys vizState)
+      ])
     ladderInfo
- where
-  cache = buildQueryPlanCache ladderInfo vizState
 
--- | The plan-side atomId of EVERY leaf on the wire, not only of the plan's
--- variables (WHERE-INLINING-SPEC §10).
+-- | The atomId of EVERY leaf on the wire, not only of the plan's variables
+-- (WHERE-INLINING-SPEC §10): an App's arguments and the leaves of a call's
+-- expansion are leaves too, though the planner does not see them as variables.
 --
--- 'QP.atomIdByUnique' names the leaves the planner sees: 'vizExprToBoolExpr'
--- makes a whole call ONE variable and descends neither into an 'VizExpr.App's
--- arguments nor into a call's @expansion@. Left there, those leaves would keep
--- the visualiser's numeric-ref ids — a second namespace on the same wire, so a
--- click on the inlined copy of a proposition could not find the direct one.
---
--- So the other leaves are named by the same function, over the same dependency
--- closure ('QP.atomIdsOfLabels'). A plan variable keeps exactly the id it had
--- (the union is left-biased), so nothing the planner answers with moves; and an
--- inlined leaf that IS a plan variable — the caller's own @a@, inlined from
--- @limb a b@ — carries the variable's unique and so gets the variable's id.
---
--- The other leaves' refs render against the PLAN's labels, not with the other
--- leaves' labels added to them. Adding them once made a ref to the module's rule
--- @the season is open@ render by label inside an expansion and by unique at the
--- top, so the call @limb OF the season is open, a@ had one atomId drawn directly
--- and another drawn inside @wrap a@'s expansion (measured 2026-10-05).
+-- Each is the hash of the leaf's C1 term key (R3, "L4.Viz.AtomKey"), recorded
+-- by the ladder while it drew, so a leaf inside an expansion is keyed in the
+-- caller's context: the @a@ inlined from @limb a b@ IS the caller's @a@, and
+-- gets its id because it is the same term, not because it carries the same
+-- unique.
 ladderAtomIds ::
   -- | The function name the plan runs under.
   Text ->
-  -- | Parameter labels keyed by unique.
-  Map Int Text ->
   QP.CachedDecisionQuery ->
-  VizExpr.IRExpr ->
   Map Int Text
-ladderAtomIds funName paramsByUnique cache body =
-  Map.union planIds otherIds
- where
-  planIds = QP.atomIdByUnique funName paramsByUnique cache
-  others =
-    Map.fromList
-      [ (u, l)
-      | (u, l) <- wireLeaves body
-      , not (Map.member u cache.varLabelByUnique)
-      ]
-  otherIds = QP.atomIdsOfLabels funName paramsByUnique cache others
-
--- | Every leaf that carries an atomId, with its label: through an 'VizExpr.App's
--- arguments and through every expansion.
-wireLeaves :: VizExpr.IRExpr -> [(Int, Text)]
-wireLeaves = \case
-  VizExpr.And _ xs -> concatMap wireLeaves xs
-  VizExpr.Or _ xs -> concatMap wireLeaves xs
-  VizExpr.Not _ x -> wireLeaves x
-  VizExpr.Implies _ p q _ -> wireLeaves p <> wireLeaves q
-  VizExpr.UBoolVar _ nm _ _ _ _ x -> (nm.unique, nm.label) : foldMap wireLeaves x
-  VizExpr.App _ nm args _ x -> (nm.unique, nm.label) : concatMap wireLeaves args <> foldMap wireLeaves x
-  VizExpr.TrueE{} -> []
-  VizExpr.FalseE{} -> []
-  VizExpr.InertE{} -> []
+ladderAtomIds = QP.leafAtomIds
 
 -- | Rewrite every leaf's @atomId@ using a precomputed @unique -> atomId@ map.
 --
--- WHY THIS EXISTS AT ALL. The ladder and the query plan both mint atomIds as a
--- UUID5 over @"fn|label|refs=…"@, but they disagree on how a ref renders:
--- 'L4.Viz.Ladder.generateAtomId' writes each ref as its numeric @rootUnique@
--- over the atom's DIRECT refs, while 'QP.atomIdByUnique' writes it as the ref's
--- LABEL over the TRANSITIVE closure. They therefore differ for every atom with a
--- non-empty ref set — which is every ordinary leaf.
---
--- The query plan's rendering is the one to keep, and not merely because it came
--- second: a @unique@ is a compilation artefact that moves when an unrelated
--- declaration is added to the file, so a numeric-ref atomId is not stable across
--- recompiles, and an id whose whole job is to survive a redeploy must be.
---
--- Reconciling here rather than in 'generateAtomId' is deliberate: the visualiser
--- runs before the dependency closure exists, so it cannot compute this id, only
--- be corrected with it.
+-- History. The ladder and the query plan once minted atomIds by two different
+-- hashes of a leaf's printed label and input refs, and disagreed on every
+-- ordinary leaf (smucclaw/l4-ide#935); this function was the reconciliation.
+-- Both now name an atom by the hash of its term's C1 key, recorded once by the
+-- ladder (R3), so what is left for this to do is restamp a diagram under a
+-- different function name ('ladderAtomIds').
 annotateLadderWithAtomIdsUsing ::
   Map Int Text ->
   VizExpr.RenderAsLadderInfo ->
@@ -157,7 +113,8 @@ annotateLadderWithAtomIdsUsing atomIds ladderInfo =
     -- not descend. 'ladderAtomIds' covers them, and both jl4-lsp and jl4-service
     -- pass its map; a caller that passes a plan-only map does not.
     --
-    -- Such a leaf keeps the id the visualiser gave it. This used to fall back to
+    -- Such a leaf keeps the id the ladder gave it, which is already the hash of
+    -- its term under the diagram's own name. This used to fall back to
     -- @show unique@, which was wrong twice over: it threw away a perfectly good
     -- UUID for a decimal that is not stable across recompiles, and it made the
     -- leaf's @atomId@ collide with the OTHER thing @query-plan@ accepts as a
@@ -192,6 +149,7 @@ buildQueryPlanCache ladderInfo vizState =
             inputRefs
       , compiled
       , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+      , leafKeyByUnique = LadderViz.getLeafKeys vizState
       }
 
 queryPlanFromLadder ::

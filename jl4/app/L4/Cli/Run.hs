@@ -9,7 +9,7 @@ module L4.Cli.Run
   , runCmd
   ) where
 
-import Base (for_)
+import Base (for_, toList)
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
@@ -23,7 +23,8 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException, prettyReductionOutcome, undeterminedJson)
+import L4.Print (termNeedText)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -85,10 +86,10 @@ runCmd opts = do
       -- If silence is ever wanted, add a `-q`/`--quiet-eval` option that
       -- restores exit 0 for this case; do NOT flip the default back.
       --
-      -- Note the deliberate asymmetry: a crash is a failure, but an `Assertion
-      -- False` (a directive that evaluated cleanly to a false assertion) is
-      -- NOT, and neither is any other #EVAL outcome. Only the crash was ruled
-      -- on; widening this to assertions is a separate decision.
+      -- A FAILED #ASSERT fails the run too (ruled by Meng 2026-09-29): an
+      -- assertion is a test, and a test runner that exits 0 on a failing test
+      -- cannot gate anything. See 'evalDirectiveFailsRun' for which outcomes
+      -- count; a REFUSED assertion and every other #EVAL value do not.
       --
       -- "Crash" is every 'EvalException', which is broader than a CONSIDER
       -- hole. It notably includes 'Stuck': an ASSUME-style module typechecks
@@ -97,17 +98,17 @@ runCmd opts = do
       -- 0. That is the intent — a module that cannot evaluate should not
       -- report success — but it is the widest-reaching consequence of the
       -- ruling, so it is called out here rather than left to be rediscovered.
-      evalCrashed = any evalDirectiveCrashed evalResults
+      evalFailed = any evalDirectiveFailsRun evalResults
       -- Exit code is otherwise based on Shake rule results and structural
       -- diagnostics, NOT on the raw log stream. #EVAL directive outcomes are
       -- published as source="eval" diagnostics (Information for values, Error
       -- for a failed assertion / eval exception); 'hasBlockingError' excludes
       -- source="eval", so #EVAL outcomes reach the exit code only through
-      -- 'evalCrashed' above. Non-#EVAL Error diagnostics (parse/type errors,
+      -- 'evalFailed' above. Non-#EVAL Error diagnostics (parse/type errors,
       -- failed imports, an import cycle) do fail the run — including cycles
       -- whose diagnostic the engine attaches to a transitively-imported file
       -- rather than the entry.
-      overallOk = typecheckOk && not (hasBlockingError diags) && not evalCrashed
+      overallOk = typecheckOk && not (hasBlockingError diags) && not evalFailed
 
   if opts.runJsonOut
     then do
@@ -138,11 +139,11 @@ runCmd opts = do
             _ -> pure ()
           exitFailure
 
--- | Did this directive crash during evaluation, rather than produce a value or
--- an assertion outcome? A crashed directive fails @l4 run@ (see 'runCmd'); a
--- directive that merely evaluated to @Assertion False@ does not.
-evalDirectiveCrashed :: EvalDirectiveResult -> Bool
-evalDirectiveCrashed r = case r.result of
+-- | Does this directive fail @l4 run@ (see 'runCmd')? It does if it crashed
+-- during evaluation, if it is undetermined, or if it is an @#ASSERT@ that
+-- evaluated to false. A value, a refusal, and a satisfied assertion do not.
+evalDirectiveFailsRun :: EvalDirectiveResult -> Bool
+evalDirectiveFailsRun r = case r.result of
   Reduction (ReducedErrored _) -> True
   Reduction (Reduced _)        -> False
   -- A REFUSAL is not a crash. The model declined to answer and said why: that
@@ -151,14 +152,20 @@ evalDirectiveCrashed r = case r.result of
   Reduction (ReducedRefused _) -> False
   -- An assertion whose expression RAISED did not evaluate cleanly: it is the
   -- same crash as a raising #EVAL, and the ruling above covers every
-  -- 'EvalException'. (Before the exception was reported distinctly it was
-  -- collapsed into @Assertion False@ and so exited 0 — that was the hiding,
-  -- not a ruling.) A clean @Assertion Fails@ stays exit 0.
+  -- 'EvalException'.
   Assertion (Errored _)      -> True
+  -- A refused assertion is neither true nor false: the model declined to
+  -- answer, which is a designed outcome, as for a refusing #EVAL above.
   Assertion (Refused _)      -> False
   Assertion Holds            -> False
-  Assertion Fails            -> False
-  Assertion (FailsBecause _) -> False
+  -- A clean false is a failed test (ruled by Meng 2026-09-29).
+  Assertion Fails            -> True
+  Assertion (FailsBecause _) -> True
+  -- An UNDETERMINED directive is no answer at all, as a Stuck one always
+  -- was, so it fails the run as the ruling above has every Stuck do
+  -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b, U7b).
+  Reduction (ReducedUndetermined _) -> True
+  Assertion (Undetermined _)        -> True
 
 ----------------------------------------------------------------------------
 -- JSON shape
@@ -193,6 +200,23 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
       -- consumer counting assertions must still see it) with a null value —
       -- neither true nor false — and the reason under "error".
       Assertion a@(Errored _) -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
+      -- An UNDETERMINED assertion keeps kind "assertion", as a refused one
+      -- does, since a consumer counting assertions must still count it, with
+      -- a null value and what it waits on under "undetermined" (decided by
+      -- Claude overnight 2026-10-03, pending Meng's review;
+      -- UNKNOWN-EVALUATION-SPEC §8 step 3).
+      Assertion (Undetermined _) ->
+        ("assertion", Aeson.Null,
+         [Key.fromString "undetermined" Aeson..= undeterminedJson result])
+      -- An UNDETERMINED #EVAL gets its OWN kind, as a refusing one does: it
+      -- is neither a value nor an error. "needs" names what it waits on, each
+      -- once, in the order evaluation reached it, and "message" is the
+      -- default report's text (UNKNOWN-EVALUATION-SPEC §4.7.4).
+      Reduction o@(ReducedUndetermined needs) ->
+        ("undetermined", Aeson.Null,
+         [ Key.fromString "needs"   Aeson..= map termNeedText (toList needs)
+         , Key.fromString "message" Aeson..= prettyReductionOutcome o
+         ])
       -- A refusing #EVAL gets its OWN kind. It is neither a value nor an
       -- error, and a consumer must be able to tell all three apart.
       Reduction (ReducedRefused ref) ->

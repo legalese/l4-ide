@@ -112,12 +112,15 @@ DECIDE `the section 43(1) grounds are made out on` g IF
 ``ASSUME `is unreasonable` IS A FUNCTION FROM Conduct TO BOOLEAN`` at `:28` — and carries its own
 warning at `:30-33`: "this function is NOT @export. Its body calls function-typed `ASSUME`s … which
 stay uninterpreted at runtime — exporting it would produce a tool that fails with 'assumed term'
-errors on every invocation." Measured, that is exactly what happens, and `l4 run` exits 1:
+errors on every invocation." Measured, that is exactly what happens, and `l4 run` exits 1. With
+the function and the conduct both left unsupplied, ``#EVAL `is unreasonable` OF `the conduct` ``
+names both (build-step-3 binary; one from before names only the function):
 
 ```
-I could not continue evaluating, because I needed to know the value of
+I could not continue evaluating, because I needed to know the values of
   `is unreasonable`
-but it is an assumed term.
+  `the conduct`
+but they are assumed terms.
 ```
 
 A boolean field on a record answers the same question, evaluates, exports, and appears on the form

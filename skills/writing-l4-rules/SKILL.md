@@ -323,13 +323,14 @@ provided at [scripts/validate.sh](scripts/validate.sh) for environments
 where `PATH` is problematic. Type errors are reported with line numbers —
 iterate until the check passes.
 
-**Read the diagnostics, not the exit code.** `l4 run` exits 0 on a failing
-`#ASSERT` (it prints `assertion failed` at `DiagnosticSeverity_Error` and
-carries on) and on a refusing `#EVAL`. It exits non-zero on a parse or check
-error and on an `#EVAL` that reaches an unsupplied section `GIVEN`. So
-`l4 run f.l4 && echo green` reports a file with failing assertions as green;
-check the output for `DiagnosticSeverity_Error` as well, which is what
-`doc/test-docs.sh` does.
+**Read the diagnostics as well as the exit code.** `l4 run` exits non-zero on
+a parse or check error, on an `#EVAL` that crashes (one that reaches an
+unsupplied section `GIVEN` is one), and on an `#ASSERT` that fails or cannot be
+evaluated. It exits 0 on a refusing `#EVAL` or `#ASSERT`. A binary built before
+legalese/l4-ide#518 exits 0 on a failing `#ASSERT`, so on one of those
+`l4 run f.l4 && echo green` reports a file with failing assertions as green.
+Only the diagnostics say which directive failed: check the output for
+`DiagnosticSeverity_Error`, which is what `doc/test-docs.sh` does.
 
 **Every result is printed twice, and `#CHECK` is the exception.** `l4 run`
 emits a diagnostics section first, then one `Evaluation[n]` block per directive
@@ -730,7 +731,12 @@ that back typechecks and evaluates. See [Record construction and access](#record
 - `@desc` — human-readable description behind any line or `GIVEN` parameter (internal unless paired with `@export`)
 - `@export` — atop the `GIVEN`. mark a function for deployment
 - `@nlg` — natural-language generation hint. A rule's goes on its own line immediately ABOVE the definition — trailing the definition line never reaches the rule, and can silently land on the next `DECLARE`. A parameter's trails its own line, or goes on its own line BELOW it — under the LAST parameter only when indented past `GIVEN`, since at `GIVEN`'s column it describes what follows; a record field's goes on its own line BELOW the field. Takes a language subtag and several per name — `@nlg:he`, `@nlg:en` — selected with `l4 nlg --lang he` or `l4 render --lang he`, and `@lang he` sets what an untagged one means. [gotchas](references/gotchas.md) has the measured placements and what the tag does not buy.
-- `@ref`, `@ref-src`, `@ref-map` — cross-reference to a legal source
+- `@ref`, `@ref-map` — cross-reference to a legal source.
+  An `@ref` on its own line binds to the next syntax node, so it goes above the rule it cites.
+  To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [`source-locators.md`](../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
+- `@ref-src` — accepted and ignored.
+  It once loaded a CSV of citation links, and that loading was removed; `@ref-src missing.csv` passes `l4 check` without a message.
+  [gotchas](references/gotchas.md) has the evidence.
 
 ### Imports
 

@@ -203,6 +203,11 @@ fillTests fields oracle m =
           ([], [ note t "evaluating it in L4 raised" ])
         Just (Assertion (Errored _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        Just (Reduction (ReducedUndetermined _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
+        Just (Assertion (Undetermined _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
         -- A refusal is not an oracle either, and it is not a raise: say which,
         -- so a reader of the run does not go hunting for a crash.
         Just (Reduction (ReducedRefused _)) ->

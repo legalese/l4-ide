@@ -76,6 +76,68 @@ DECIDE `exempt — packing and distribution are two` IF
 #EVAL `exempt — packing is one activity`          FALSE         -- FALSE
 #EVAL `exempt — packing and distribution are two` FALSE TRUE    -- TRUE
 
+§ `Oakhurst — grouping`
+
+-- 26 M.R.S.A. § 664(3)(F), as the First Circuit quoted it:
+--   "The canning, processing, preserving, freezing, drying, marketing,
+--    storing, packing for shipment or distribution of: (1) Agricultural
+--    produce; (2) Meat and fish products; and (3) Perishable foods."
+-- The goods limb was not in dispute (milk is a perishable food), so it is
+-- left out. The two decisions below have the same tokens in the same order
+-- and differ only in indentation. `..` is an asyndetic OR: the comma.
+
+GIVEN `canning`      IS A BOOLEAN
+      `processing`   IS A BOOLEAN
+      `preserving`   IS A BOOLEAN
+      `freezing`     IS A BOOLEAN
+      `drying`       IS A BOOLEAN
+      `marketing`    IS A BOOLEAN
+      `storing`      IS A BOOLEAN
+      `packing`      IS A BOOLEAN
+      `shipment`     IS A BOOLEAN
+      `distribution` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `exempt, as the drivers read it` IF
+        `canning`
+    ..  `processing`
+    ..  `preserving`
+    ..  `freezing`
+    ..  `drying`
+    ..  `marketing`
+    ..  `storing`
+    ..  `packing` ... "for"
+        ...     `shipment`
+            OR  `distribution`
+
+GIVEN `canning`      IS A BOOLEAN
+      `processing`   IS A BOOLEAN
+      `preserving`   IS A BOOLEAN
+      `freezing`     IS A BOOLEAN
+      `drying`       IS A BOOLEAN
+      `marketing`    IS A BOOLEAN
+      `storing`      IS A BOOLEAN
+      `packing`      IS A BOOLEAN
+      `shipment`     IS A BOOLEAN
+      `distribution` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `exempt, as the dairy read it` IF
+        `canning`
+    ..  `processing`
+    ..  `preserving`
+    ..  `freezing`
+    ..  `drying`
+    ..  `marketing`
+    ..  `storing`
+    ..  `packing` ... "for"
+        ...     `shipment`
+    OR  `distribution`
+
+-- A driver who distributes but does not pack, can, process, preserve,
+-- freeze, dry, market or store: owed overtime on one reading, exempt on
+-- the other.
+#EVAL `exempt, as the drivers read it` FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE   -- FALSE
+#EVAL `exempt, as the dairy read it`   FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE   -- TRUE
+
 § `Rogers — attachment`
 
 GIVEN `initial term is running`        IS A BOOLEAN

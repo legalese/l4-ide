@@ -18,7 +18,7 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import qualified Data.Text.Encoding as TE
-import Control.Exception (SomeException, catch)
+import Control.Exception (IOException, catch)
 import qualified Optics
 import System.IO.Unsafe (unsafePerformIO)
 import Prettyprinter
@@ -230,9 +230,14 @@ mixfixCanonicalByUnique reg = Map.fromList
 --
 -- A pass rather than an environment threaded through 'LayoutPrinter': the
 -- class has ~100 instances and none of the others wants a registry.
+--
+-- It also marks the names the compiler made up ('markGeneratedNames'), the
+-- other thing a module printed back to source needs, so that every path that
+-- prints one gets both.
 restoreMixfixPatterns :: TC.MixfixRegistry -> Module Resolved -> Module Resolved
 restoreMixfixPatterns reg m0 =
-    ( Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
+    ( markGeneratedNames
+    . Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
     . Optics.over (Optics.gplate @(Expr Resolved)) deepExpr
     ) m0
  where
@@ -277,6 +282,48 @@ restoreMixfixPatterns reg m0 =
     MkAppForm ann n ns@(_ : _) maka | Just c <- look n ->
       MkAppForm (Optics.set annMixfixCanonical (Just c) ann) n ns maka
     _ -> a
+
+-- | Mark every name the compiler made up ('isGeneratedName'), so that the
+-- printer spells it as no source can be read.
+--
+-- A module printed back to source should never write one. Only what a
+-- multi-clause group compiles to holds one, and a group prints as the clauses
+-- the drafter wrote ('writtenClauses'). A group that fell back to printing
+-- its tree would write them as text, where each is an ordinary name. The
+-- printed module would read back with no error, and where a drafter's
+-- definition or a pattern variable shared a generated name's text, it would
+-- capture it and the module would answer differently with exit 0 (@l4 batch@
+-- and the REPL run it). No corpus module falls back so today, but a pass that
+-- reshaped the tree could make one. Marked, the name prints as @⟪input 1⟫@,
+-- which does not lex, so the printed module fails to read back instead: at
+-- the corpus round-trip check in @jl4/tests/Main.hs@; in @l4 batch@, as status
+-- "error" with the parser's diagnostic; in the REPL, which loads the file and
+-- then answers every expression with "Failed to type check expression".
+--
+-- It fails closed: a fallback whose answers would have been right fails too.
+-- That is the point of a tripwire. A fallback should not happen, so any one
+-- that does is reported, not judged.
+--
+-- The mark is a leading NUL ('generatedNameMark'), which does not lex either,
+-- so a printer path that wrote the name's text without the 'RawName' instance
+-- would still fail to read back, with a lexer message about the NUL. Neither
+-- NUL nor @⟪@ fails inside an inline NLG annotation (@[the %⟪y⟫% thing]@),
+-- but nothing prints a generated name there. The mark stays a 'PreDef', so
+-- 'writtenSignature' and the plain-definition fallback still find the inputs
+-- the desugarer named.
+--
+-- Only the paths that print a module back to source mark one. Anywhere else
+-- (a trace, a hover, a message) a generated name reads as its text.
+markGeneratedNames :: Module Resolved -> Module Resolved
+markGeneratedNames = Optics.over (Optics.gplate @Name) mark
+ where
+  mark (MkName ann (PreDef t))
+    | not (generatedNameMark `Text.isPrefixOf` t) = MkName ann (PreDef (generatedNameMark <> t))
+  mark n = n
+
+-- | See 'markGeneratedNames'.
+generatedNameMark :: Text
+generatedNameMark = "\0"
 
 -- | A canonical pattern split into its keyword runs and its slots.
 --
@@ -390,7 +437,11 @@ instance LayoutPrinter RawName where
     -- printed to unparseable source.
     QualifiedName qs t ->
       pretty (Text.intercalate "." (fmap quoteIfNeeded (NE.toList qs) <> [quoteIfNeeded t]))
-    PreDef t -> pretty $ quoteIfNeeded t
+    -- Marked on the way to being printed back as source: see
+    -- 'markGeneratedNames'. @⟪@ starts no token, so this does not lex.
+    PreDef t
+      | Just t' <- Text.stripPrefix generatedNameMark t -> pretty ("⟪" <> t' <> "⟫")
+      | otherwise -> pretty $ quoteIfNeeded t
 
 instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
   printWithLayout = \ case
@@ -663,6 +714,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
         [ "@desc" <+> pretty (Text.strip (getDesc d))
         | Just d <- [Optics.view annDesc ann]
         ]
+        -- The same for @nonassertable: a printed module must keep the mark,
+        -- or a re-print (l4 batch, the REPL) would let a request assert a
+        -- node its author closed.
+        <> [ "@nonassertable"
+           | Just _ <- [Optics.view annNonassertable ann]
+           ]
         <> case writtenClauses ann appForm expr of
           -- A multi-clause group prints as the clauses the drafter wrote. Its
           -- tree is what they compile to, and that names things the desugarer
@@ -707,7 +764,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
 -- be read back as a group (no pattern in it tells it from a plain
 -- definition): those print as the tree, as everything else does.
 writtenClauses :: LayoutPrinterWithName a => Anno -> AppForm a -> Expr a -> Maybe [Doc ann]
-writtenClauses ann (MkAppForm _ hd _ maka) expr = do
+writtenClauses ann (MkAppForm _ hd _ _) expr = do
   matrix <- Optics.view annPmMatrix ann
   let patterns = map (.patterns) matrix.clauses
   guard (all ((== length matrix.scrutinees) . length) patterns)
@@ -715,13 +772,21 @@ writtenClauses ann (MkAppForm _ hd _ maka) expr = do
   let clauses = zip patterns bodies
   guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
   pure
-    [ vcatHard
-        [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . parensIfNeeded) pats
-            <> (if i == 0 then foldMap ((space <>) . printWithLayout) maka else mempty)
+    [ vcatHard $
+        -- What was written for each clause alone ('PmMatrixClause'): its
+        -- @AKA@, and for a later clause the @\@desc@s and @\@export@s above
+        -- it and its head as written (with any @\@nlg@ on it). A run of bare
+        -- names that the checker separates into overloads gives each its
+        -- own, so a printed module must keep them with their clauses.
+        [ "@desc" <+> pretty (Text.strip (getDesc d)) | i > 0, d <- cl.clauseDescs ]
+        <>
+        [ "DECIDE" <+> (if i == 0 then printWithLayout hd else printWithLayout cl.clauseHead)
+            <> foldMap ((space <>) . parensIfNeeded) pats
+            <> foldMap ((space <>) . printWithLayout) cl.clauseAka
             <+> "IS"
         , indent 2 (printWithLayout body)
         ]
-    | (i, (pats, body)) <- zip [0 :: Int ..] clauses
+    | (i, cl, (pats, body)) <- zip3 [0 :: Int ..] matrix.clauses clauses
     ]
 
 -- | Names for the inputs of a group whose only clause left matches anything
@@ -743,6 +808,13 @@ unusedInputNames n body = take n (filter (`notElem` used) candidates)
 -- ('patAlwaysMatchesAs'), its body is under their first branches, and the
 -- clauses after it are under the binding of the later clauses. 'Nothing'
 -- when the tree is not shaped so.
+--
+-- Only two clauses may have no binding of the clauses after them: the last,
+-- and one that matches anything, after which the checker dropped the binding
+-- of clauses never tried. Any other clause without one is in a tree a pass
+-- has reshaped since, by inlining that binding, say; its body is no longer
+-- marked off from the clauses after it, and reading it as the last clause
+-- would print the group as its first clauses alone.
 clauseBodies :: [Name] -> [[Pattern Name]] -> Expr a -> Maybe [Expr a]
 clauseBodies scrutinees = go
   where
@@ -750,8 +822,9 @@ clauseBodies scrutinees = go
     go (pats : rest) e = case e of
       LetIn _ [LocalDecide _ (MkDecide dann _ _ later)] tree
         | isLaterClauses dann -> (:) <$> bodyOf pats tree <*> go rest later
-      -- the last clause, or one that matches anything, the rest dropped
-      _ -> (: []) <$> bodyOf pats e
+      _ | null rest || matchesAnything pats -> (: []) <$> bodyOf pats e
+        | otherwise -> Nothing
+    matchesAnything pats = and (zipWith patAlwaysMatchesAs scrutinees pats)
     bodyOf pats = under (length (filter not (zipWith patAlwaysMatchesAs scrutinees pats)))
     under :: Int -> Expr a -> Maybe (Expr a)
     under 0 e = Just e
@@ -1033,7 +1106,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Refuse _ msg ->
       "REFUSE" <+> printWithLayout msg
     Inert _ txt _ctx ->
-      surround (pretty $ escapeStringLiteral txt) "\"" "\""
+      surround (pretty $ escapeSourceStringLiteral txt) "\"" "\""
 
   parensIfNeeded :: LayoutPrinter a => Expr a -> Doc ann
   parensIfNeeded e = case e of
@@ -1407,7 +1480,7 @@ instance LayoutPrinter Lit where
   printWithLayout = \ case
     -- exact, not through Double: a re-printed module must be the same program
     NumericLit _ t -> pretty (prettyRatioExact t)
-    StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
+    StringLit _ t -> surround (pretty $ escapeSourceStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where
   printWithLayout = \ case
@@ -1594,13 +1667,15 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValNil                    -> "EMPTY"
     Lazy.ValCons v1 v2             -> "(" <> printWithLayout v1 <> " FOLLOWED BY " <> printWithLayout v2 <> ")" -- TODO: parens
     Lazy.ValClosure{}              -> "<function>"
+    Lazy.ValConnective{}           -> "<function>"
     Lazy.ValNullaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValUnaryBuiltinFun{}      -> "<builtin-function>"
     Lazy.ValBinaryBuiltinFun{}     -> "<function>"
     Lazy.ValTernaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValPartialTernary{}       -> "<partial-function>"
     Lazy.ValPartialTernary2{}      -> "<partial-function>"
-    Lazy.ValAssumed r              -> bareName r
+    Lazy.ValAssumed r _            -> bareName r
+    Lazy.ValTerm t                 -> printWithLayout t
     Lazy.ValUnappliedConstructor r -> bareName r
     Lazy.ValConstructor r vs       -> bareName r <> case vs of
       [] -> mempty
@@ -1631,10 +1706,68 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValDateTime{}             -> printWithLayout v
     Lazy.ValNil                    -> "EMPTY"
     Lazy.ValClosure{}              -> printWithLayout v
+    Lazy.ValConnective{}           -> printWithLayout v
     Lazy.ValUnappliedConstructor{} -> printWithLayout v
     Lazy.ValAssumed{}              -> printWithLayout v
     Lazy.ValConstructor r []       -> bareName r
     _ -> surround (printWithLayout v) "(" ")"
+
+-- | A term (UNKNOWN-EVALUATION-SPEC §4.2) as L4 source over the inputs it
+-- reads, so that it can be read, and pasted back, as a rule: @x AND (NOT y)@,
+-- @(n PLUS 1) GREATER THAN 3@, @d's age@. Every compound operand is
+-- bracketed, whatever the operator's precedence, so that the text reads one
+-- way only. Names print bare, as in a value.
+instance LayoutPrinter Lazy.Term where
+  printWithLayout = \ case
+    Lazy.TInput r _     -> bareName r
+    Lazy.TNumber q      -> pretty (prettyRatio q)
+    Lazy.TString s      -> surround (pretty $ escapeStringLiteral s) "\"" "\""
+    Lazy.TDate day      -> printWithLayout (Lazy.ValDate day :: Lazy.Value Lazy.NF)
+    Lazy.TTime tod      -> printWithLayout (Lazy.ValTime tod :: Lazy.Value Lazy.NF)
+    Lazy.TDateTime u tz -> printWithLayout (Lazy.ValDateTime u tz :: Lazy.Value Lazy.NF)
+    Lazy.TNil           -> "EMPTY"
+    t@(Lazy.TCons a rest) -> case termList t of
+      Just ts -> "LIST" <+> hsep (punctuate comma (map termOperand ts))
+      Nothing -> termOperand a <+> "FOLLOWED BY" <+> termOperand rest
+    Lazy.TCon c []      -> bareName c
+    Lazy.TCon c ts      -> bareName c <+> "OF" <+> hsep (punctuate comma (map termOperand ts))
+    Lazy.TField b f _   -> termOperand b <> "'s" <+> bareName f
+    Lazy.TCall f ts     -> hsep (termOperand f : map termOperand ts)
+    Lazy.TBin op a b    -> termOperand a <+> printWithLayout op <+> termOperand b
+    Lazy.TNot a         -> "NOT" <+> termOperand a
+    Lazy.TConn c a b    -> termOperand a <+> connectiveKeyword c <+> termOperand b
+    where
+      termList = \ case
+        Lazy.TNil         -> Just []
+        Lazy.TCons a rest -> (a :) <$> termList rest
+        _                 -> Nothing
+      connectiveKeyword = \ case
+        Lazy.ConnAnd     -> "AND"
+        Lazy.ConnOr      -> "OR"
+        Lazy.ConnImplies -> "IMPLIES"
+        Lazy.ConnNot     -> "NOT"
+
+-- | A name an undetermined result waits on, for a JSON @needs@ list, spelled
+-- as L4 source and so as the message lists it: an input's name, quoted when
+-- it has to be (@`has criminal record`@), or the path to a field of one
+-- (@`the applicant`'s `age in years`@); any other term likewise. Unquoted,
+-- a path with spaces could not be split back into its parts.
+termNeedText :: Lazy.Term -> Text
+termNeedText = \ case
+  Lazy.TInput r _ -> prettyLayout r
+  t               -> prettyLayout t
+
+-- | A term in an operand position: bracketed unless it is a name, a literal
+-- or a nullary constructor.
+termOperand :: Lazy.Term -> Doc ann
+termOperand t = case t of
+  Lazy.TInput{}    -> printWithLayout t
+  Lazy.TNumber{}   -> printWithLayout t
+  Lazy.TString{}   -> printWithLayout t
+  Lazy.TNil        -> printWithLayout t
+  Lazy.TCon _ []   -> printWithLayout t
+  Lazy.TField{}    -> printWithLayout t
+  _                -> surround (printWithLayout t) "(" ")"
 
 -- | Pretty-print an 'NF' value, using named fields (WITH / IS syntax) for
 -- constructors whose field names are provided in the map.
@@ -1686,6 +1819,7 @@ prettyNFWithConstructorFields fields = goNF
       Lazy.ValDateTime{}             -> goVal v
       Lazy.ValNil                    -> "EMPTY"
       Lazy.ValClosure{}              -> goVal v
+      Lazy.ValConnective{}           -> goVal v
       Lazy.ValUnappliedConstructor{} -> goVal v
       Lazy.ValAssumed{}              -> goVal v
       Lazy.ValConstructor _ []       -> goVal v
@@ -1808,6 +1942,7 @@ instance LayoutPrinter Lazy.NF where
     MkNF (Lazy.ValString{})               -> printWithLayout v
     MkNF Lazy.ValNil                      -> printWithLayout v
     MkNF (Lazy.ValClosure{})              -> printWithLayout v
+    MkNF (Lazy.ValConnective{})           -> printWithLayout v
     MkNF (Lazy.ValUnappliedConstructor{}) -> printWithLayout v
     MkNF (Lazy.ValAssumed{})              -> printWithLayout v
     MkNF (Lazy.ValConstructor r [])       -> printWithLayout r
@@ -1905,6 +2040,27 @@ escapeStringLiteral = Text.concatMap (\ case
   c -> Text.singleton c
   )
 
+-- | 'escapeStringLiteral' for a string literal printed as SOURCE, which also
+-- writes a line break, tab or carriage return as its escape.
+--
+-- A raw newline handed to 'pretty' becomes a layout line break, and a layout
+-- line break takes the current nesting: @"line\nnext"@ printed inside an
+-- indented body came out as @"line@, then a new line @  next"@, which reads
+-- back as a different string. @l4 batch@ re-prints the module and runs the
+-- printed text, so it answered @"line\n  next"@ with status success
+-- (smucclaw/l4-ide#1028). The lexer reads these escapes back
+-- (@Lexer.charLiteral@), so the printed source means what the tree does.
+--
+-- A value being displayed ('Lazy.ValString') still goes through
+-- 'escapeStringLiteral', so @l4 run@ shows a multi-line string as before.
+escapeSourceStringLiteral :: Text -> Text
+escapeSourceStringLiteral = Text.concatMap (\ case
+  '\n' -> "\\n"
+  '\t' -> "\\t"
+  '\r' -> "\\r"
+  c -> escapeStringLiteral (Text.singleton c)
+  )
+
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text
 formatDateTimeIso utc tzName =
@@ -1923,8 +2079,22 @@ tryLoadTZPure :: Text -> Maybe TZ.TZ
 tryLoadTZPure name = unsafePerformIO $ tryLoadTZ (Text.unpack name)
 {-# NOINLINE tryLoadTZPure #-}
 
+-- | Load a timezone by its IANA name; 'Nothing' if the name is unknown.
+--
+-- 'TZ.loadTZFromDB' reads the zone file from the data directory of the @tzdata@
+-- package: a path Cabal fixed when @tzdata@ was built (@tzdata_datadir@ overrides
+-- it), not the operating system's zoneinfo.
+-- When that directory is missing or unreadable, the open fails, and we use the
+-- copy of the same database compiled into the binary instead.
+--
+-- The handler catches 'IOException' and nothing wider, and that is load-bearing.
+-- The file is opened here and parsed later, when the zone is first used, so the
+-- open is the only thing in this scope that can fail.
+-- A 'SomeException' handler would also catch the asynchronous exception that
+-- 'System.Timeout.timeout' throws, once, to stop an evaluation (smucclaw/l4-ide#1001).
+-- That would be taken for a missing database and the evaluation would carry on
+-- with its timeout spent.
 tryLoadTZ :: String -> IO (Maybe TZ.TZ)
 tryLoadTZ name =
-  (Just <$> TZ.loadTZFromDB name) `catch` \(_ :: SomeException) ->
-    -- Fall back to the embedded timezone database when the system DB is unavailable.
+  (Just <$> TZ.loadTZFromDB name) `catch` \(_ :: IOException) ->
     pure $ TZAll.tzByLabel <$> TZAll.fromTZName (TE.encodeUtf8 (Text.pack name))
