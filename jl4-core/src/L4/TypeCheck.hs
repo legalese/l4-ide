@@ -407,6 +407,7 @@ checkProgram written = do
   rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
   withDeclares rdeclares do
     module' <- separateOverloads written
+    warnClauseArityChange module'
     rdecides <- scanFunSigModule module'
     withDecides rdecides do
       (rprog, topEnv) <- inferProgram module'
@@ -414,6 +415,36 @@ checkProgram written = do
       -- so it can be propagated to importing modules
       let localMixfixRegistry = buildMixfixRegistry rdecides
       pure (rprog, topEnv, localMixfixRegistry)
+
+-- | Warn about a definition that looks like one more clause of the group above
+-- it and is not: it has the group's name and no GIVEN of its own, and another
+-- number of inputs than the group has patterns.
+--
+-- @DECIDE f Red IS 1@, @DECIDE f c IS 2@ and @DECIDE f Red Blue IS 3@: the
+-- parser gathers the clauses that have the same name and the same number of
+-- patterns, so the third is read as a definition of its own, which takes two
+-- inputs and calls them @Red@ and @Blue@. It checks, and @f Green Red@ gives
+-- 3. A GIVEN of its own would have said that a rule of its own is meant, so a
+-- definition with one is not asked about. Only a definition that is not itself
+-- a group is: two or more clauses with a distinguishable pattern are a
+-- deliberate rule. Run on the module as 'separateOverloads' leaves it, so a
+-- run of overloads is not mistaken for a group.
+warnClauseArityChange :: Module Name -> Check ()
+warnClauseArityChange (MkModule _ _ sec) = goSection sec
+  where
+    goSection (MkSection _ _ _ _ decls) = do
+      for_ (zip decls (drop 1 decls)) \ case
+        (Decide _ (MkDecide gann _ (MkAppForm _ ghd _ _) _), Decide _ (MkDecide dann (MkTypeSig _ (MkGivenSig _ []) Nothing) (MkAppForm _ hd args _) _))
+          | Just matrix <- view annPmMatrix gann
+          , Nothing <- view annPmMatrix dann
+          , rawName hd == rawName ghd
+          , length args /= length matrix.scrutinees
+          , Just r <- rangeOf hd ->
+              addWarning (ClauseArityChanged r hd (length matrix.scrutinees) args)
+        _ -> pure ()
+      for_ decls \ case
+        Section _ sub -> goSection sub
+        _ -> pure ()
 
 -- | Turn each run of clauses that the parser grouped only because their bare
 -- names differ ('L4.Parser.decidePatternMatch') back into the separate
@@ -8110,6 +8141,14 @@ prettyCheckWarning = \ case
     [ "This clause of " <> quotedName headName <> " is never used."
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
+    ]
+  ClauseArityChanged _ headName patterns inputs ->
+    [ "This definition of " <> quotedName headName <> " is not another clause of the clauses above it."
+    , "Each of those has " <> Text.textShow patterns <> " pattern" <> (if patterns == 1 then "" else "s")
+        <> ", and this one has " <> Text.textShow (length inputs) <> " input" <> (if length inputs == 1 then "" else "s")
+        <> (if null inputs then "" else ", " <> Text.intercalate " and " (map quotedName inputs))
+        <> ", so it is a separate rule, and what follows its name is the names it gives its inputs, not patterns."
+    , "If it is meant as another clause, give it as many patterns as the others have; if it is a rule of its own, give it a GIVEN of its own."
     ]
   ClauseAnnotationUnused _ headName k annotation hasGiven ->
     [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."
