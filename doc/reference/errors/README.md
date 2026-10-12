@@ -16,6 +16,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Boolean literal case](#boolean-literal-case)
   - [Parentheses required for field access](#parentheses-required-for-field-access)
   - [Curly quotes and dashes from a word processor](#curly-quotes-and-dashes-from-a-word-processor)
+  - [A clause written like a rule with a word between its inputs](#a-clause-written-like-a-rule-with-a-word-between-its-inputs)
 - [Indentation Errors](#indentation-errors)
   - [Body less indented than definition](#body-less-indented-than-definition)
   - [Multi-line function arguments](#multi-line-function-arguments)
@@ -247,6 +248,92 @@ usually comes from pasted text; replace it with an ordinary space.
 ```
 
 **How to fix it:** click the lightbulb on the flagged space and choose "Replace with an ordinary space" — or run "Straighten all smart punctuation in this file", which replaces every non-breaking space in the document as well as any curly quotes, dashes and ellipses it finds.
+
+### A clause written like a rule with a word between its inputs
+
+**Error message:**
+
+```
+This clause is written the way a rule with a word between its inputs is written, like this one:
+
+  c `costs` n
+
+A rule written that way is one definition, so it cannot be split into clauses.
+Write it once and tell the cases apart inside it with CONSIDER, or write the clauses with a name of their own first, one pattern for each input, as in DECIDE price Red 0 IS ...
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS n
+Red `costs` 0 MEANS 1
+```
+
+**What went wrong:** A rule can be written with a word between its inputs, so that a call reads like a sentence: ``c `costs` n`` defines a rule, and ``Red `costs` 0`` calls it. This is called a **"mixfix"** rule. It is one definition, and L4 finds it by its word wherever it is called.
+It has no clauses.
+The last line looks like one more case of it, "when the colour is Red and the number is 0, the answer is 1", but it is not one.
+A list of clauses is a different way of writing a rule: the rule's name comes first, then one pattern for each input (`DECIDE price Red 0 IS 1`).
+A line with the word in the middle is the first kind, so L4 refuses it, once, at its first word, rather than read it as a clause of a rule named `Red`.
+
+The same error appears when every line of the rule is written that way, with no one-definition form to compare with:
+
+```l4
+c `costs` 0 MEANS 0
+c `costs` n MEANS n
+```
+
+There L4 recognises the form from the first word of the line being one of the `GIVEN` inputs (`c`), followed by a word that is none (`costs`).
+That is how a rule with a word between its inputs begins. A clause begins with the rule's name instead, and a rule cannot be named like one of its own inputs.
+This message begins "This clause begins with c, an input of the GIVEN, and then the word `costs`."
+
+A line in the same form with a bare name for every input, and no literal, is not read as a clause, because nothing in it tells cases apart; it is read as a definition:
+
+```l4
+c `costs` n MEANS n
+Red `costs` n MEANS 1
+```
+
+and is refused too, for the same reason. Its message begins "This definition is written the way the rule", shows the rule, and says which name in the line (`Red`) the `GIVEN` does not name.
+
+**How to fix it:** Two ways, whichever reads better.
+
+Write the rule once, and tell its cases apart inside it with `CONSIDER`:
+
+```l4
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS
+  CONSIDER c
+  WHEN Red THEN IF n EQUALS 0 THEN 1 ELSE n
+  OTHERWISE n
+
+#EVAL Red `costs` 0
+```
+
+or write the cases as clauses with a name of their own in front, one pattern for each input, in the order of the `GIVEN`:
+
+```l4
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE price Red 0 IS 1
+DECIDE price c n IS n
+
+#EVAL price Red 0
+```
+
+The second way is called as `price Red 0`, not as ``Red `costs` 0``. Do not reuse the word of a rule that is written with a word between its inputs as the name of the clauses: in a file with both ``c `costs` n`` and a rule of clauses named `costs`, the call `costs Red 0` finds the one-definition rule.
+
+**What this does not catch:** The check has to be able to see the rule. It sees a rule written with a word between its inputs when the file, or a file it imports, defines it in one piece; and it sees a line that begins with one of the `GIVEN` inputs followed by a word that is none.
+Two shapes are not recognised.
+A rule whose every line begins with a constructor, ``Red `costs` 0`` and ``Green `costs` n`` with no ``c `costs` n`` anywhere, is accepted as clauses of rules named `Red` and `Green`, and a call written ``Red `costs` 0`` does not find them.
+A rule whose words come first, `` `tax on` x `item costing` y ``, written as clauses is still refused as having more patterns than the `GIVEN` names inputs ([Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)), in several messages.
 
 ---
 
