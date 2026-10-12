@@ -3,13 +3,17 @@ Typechecking successful
 Evaluation successful
 section-given-typically.l4:20:1-14:
   6
+  NOTE: the rate took its default 3 (declared at section-given-typically.l4:9:44-45)
 section-given-typically.l4:21:1-35:
   10
 section-given-typically.l4:22:1-27:
   0
+  NOTE: the rate took its default 3 (declared at section-given-typically.l4:9:44-45)
 section-given-typically.l4:24:1-25:
   assertion satisfied
+  NOTE: the rate took its default 3 (declared at section-given-typically.l4:9:44-45)
 section-given-typically.l4:25:1-49:
   assertion satisfied
 section-given-typically.l4:26:1-38:
   assertion satisfied
+  NOTE: the rate took its default 3 (declared at section-given-typically.l4:9:44-45)

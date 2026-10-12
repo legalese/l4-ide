@@ -1,0 +1,21 @@
+§ `Rates`
+
+-- Four assertions for the encoding skill's check.sh (skills/encoding-a-subject/assets/check.sh),
+-- which counts them from the text of `l4 run`: the first three read a TYPICALLY default,
+-- so each carries a NOTE line, which moves its message to the lines below `Message:`;
+-- the fourth supplies the value with WITH and keeps its message on that line.
+-- Counted as satisfied 3 and failed 1 (the failed one is the module's one error).
+
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+          `the standard deduction` IS A NUMBER TYPICALLY 100
+
+GIVETH A NUMBER
+doubled MEANS `the rate` TIMES 2
+
+GIVETH A NUMBER
+`net` MEANS 1000 MINUS `the standard deduction`
+
+#ASSERT doubled EQUALS 6
+#ASSERT `net` EQUALS 900
+#ASSERT doubled EQUALS 7
+#ASSERT (doubled WITH `the rate` IS 5) EQUALS 10

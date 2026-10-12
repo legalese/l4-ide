@@ -33,6 +33,7 @@ module L4.EvaluateLazy
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
 , prettyNotes
+, defaultNotes
 , prettyAssertionOutcome
 , prettyReductionOutcome
 , prettyUndetermined
@@ -278,6 +279,9 @@ runConfigStep = \ case
     next <- backward whnf
     runConfig next
   EvalRefMachine r -> do
+    -- W8: a default being forced for the first time is an event of its own,
+    -- and it comes before the force it belongs to, in the caller's trace
+    traceDefaultForce r
     traceEval (SetRef r)
     next <- evalRef r
     runConfig next
@@ -337,8 +341,16 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- likewise the notes the run raised while producing this value (R-X6's
   -- early act, the empty window): read before the fresh ref is discarded
   directiveNotes <- map (\ (MkNote t) -> t) . toList <$> readEvalRef (.notes)
-  -- and the defaults it forced (W8's event), for the same reason
-  directivePresumed <- presumedEvents <$> readEvalRef (.presumed)
+  -- and the defaults it forced (W8's event), for the same reason, each with its
+  -- value as it stands: a default that was forced is evaluated by now, and
+  -- 'peekNF' forces nothing, so reading it cannot change what the directive did
+  loggedDefaults <- presumedEvents <$> readEvalRef (.presumed)
+  valuedDefaults <- for loggedDefaults \ (p, rf) ->
+    (p,) <$> (peekWHNF rf >>= traverse peekNF)
+  let
+    directivePresumed = [ p { valueText = defaultValueText <$> mnf } | (p, mnf) <- valuedDefaults ]
+    -- a trace cut off before it reached a default's step still shows the default
+    shownTrace = completeDefaults valuedDefaults <$> finalTrace
   reached <- reachedUnknowns
   let
     -- What a directive that could not be decided waits on
@@ -410,7 +422,7 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- pending Meng's review).
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
+  pure (MkEvalDirectiveResult r v' shownTrace directiveLedger directiveNotes directivePresumed, steps)
   where
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
@@ -471,7 +483,7 @@ postprocessTrace actions =
                   Nothing -> err
                   Just t  -> t
     err = error "postprocessTrace: no trace for main value"
-    mainPreTrace = either err id mainTrace
+    mainPreTrace = hangUnplacedDefaults actions tracedHeap (either err id mainTrace)
     finalTrace = simplifyEvalTrace (buildEvalTrace labels tracedHeap Nothing mainPreTrace)
   in
     finalTrace
@@ -498,9 +510,11 @@ data EvalDirectiveResult =
     , presumed :: ![Presumed]
       -- ^ The @TYPICALLY@ defaults the run actually forced while producing
       -- the value, in the order forced: W8's \"took its default\" event
-      -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). Not rendered by the
-      -- printers here; @l4 batch@ and @jl4-service@ turn it into their
-      -- @presumed@ list.
+      -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). The trace shows the
+      -- same events ('TraceDefault'); a plain directive says them in its
+      -- @NOTE:@ lines ('defaultNotes'), each with its value ('Presumed.valueText',
+      -- read when the directive ended), and @l4 batch@ and @jl4-service@ turn
+      -- the list into their @presumed@ list.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -658,9 +672,10 @@ renderProvenance prov =
 -- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns presumed) =
    prettyEvalDirectiveValue res
    <> prettyNotes ns
+   <> prettyNotes (defaultNotes mtrace presumed)
    <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
@@ -669,9 +684,10 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presu
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns presumed) =
    prettyEvalDirectiveValueWithFields fields res
    <> prettyNotes ns
+   <> prettyNotes (defaultNotes mtrace presumed)
    <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
@@ -681,6 +697,26 @@ prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtr
 -- there are none (the usual case), so no older output moves.
 prettyNotes :: [Text] -> Text
 prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
+
+-- | W11 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4.3): a directive that took a
+-- @TYPICALLY@ default says so beside its value, one line for each default that
+-- took effect, with its value and where it was declared ('defaultNoteText'):
+--
+-- > 6
+-- > NOTE: the rate took its default 3 (declared at rates.l4:2:44-45)
+--
+-- R8: "Every directive and trace output names each parameter that took its
+-- default", and its example is "alpha took its default 10". A traced directive
+-- has the event in its trace already, so it is not said twice; a default its
+-- trace does not show (one that failed to post-process, which leaves no step to
+-- hang an event on) is still said here.
+defaultNotes :: Maybe EvalTrace -> [Presumed] -> [Text]
+defaultNotes mtrace presumed = defaultNoteText <$> untracedDefaults mtrace presumed
+
+-- | A default's value for the line that names it: on one line, as the printer
+-- gives it everywhere else, with what was still unevaluated shown as @…@.
+defaultValueText :: NF -> Text
+defaultValueText = Text.intercalate " " . map Text.strip . Text.lines . prettyLayout
 
 -- ----------------------------------------------------------------------------
 -- ToJSON instances for batch --json output
@@ -954,6 +990,7 @@ withDefaultsKnown evalConfig rootFills m imported st =
               { path       = [rawNameToText (rawName (getActual b.resolved))]
               , declaredAt = rangeOf d
               , origin     = FromSectionBinder
+              , valueText  = Nothing
               }
           )
         | (u, b) <- Map.toList (sectionBinders m)
@@ -1003,11 +1040,11 @@ requestPresumed presume fieldName inputs events =
   nubOrd (mapMaybe entry events)
  where
   entry p = case (p.origin, p.path) of
-    (FromDecode root, path)
-      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+    (FromDecode _, _)
+      | not presume -> Just (presumedName fieldName p)
       | otherwise   -> Nothing
-    (_, n : rest)
-      | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
+    (_, n : _)
+      | fieldName n `Set.member` inputs -> Just (presumedName fieldName p)
     _ -> Nothing
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching

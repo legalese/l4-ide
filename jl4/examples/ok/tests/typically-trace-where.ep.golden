@@ -1,0 +1,79 @@
+-- W8 (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, §4.2): where the "took its default"
+-- event hangs when the rule that read the default does not run among the
+-- main expression's own steps.
+--
+-- The event stays where the default was read: under the step that needed it,
+-- inside the trace of that run, also when the run is late (the result is
+-- written out after the main expression has finished). Only an event that the
+-- trace has nowhere to show is put on the main expression: the last two
+-- directives below.
+
+IMPORT prelude
+
+-- a definition with no inputs, which the trace does not unfold, decodes JSON
+-- of its own: the field it leaves out takes its default inside it
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Config
+`parse config` s MEANS JSONDECODE s
+
+GIVETH A NUMBER
+`total budget` MEANS
+  CONSIDER `parse config` "{\"retries\": 2}"
+  WHEN RIGHT c THEN c's timeout PLUS c's retries
+  WHEN LEFT e THEN 0
+
+§ `Rates`
+    GIVEN `the rate`     IS A NUMBER  TYPICALLY 3
+          `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+GIVETH A NUMBER
+doubled MEANS IF `has capacity` THEN `the rate` TIMES 2 ELSE 0
+
+GIVETH A NUMBER
+tripled MEANS `the rate` TIMES 3
+
+-- each of these runs `doubled` only when the answer is written out
+GIVETH A MAYBE NUMBER
+`maybe doubled` MEANS JUST doubled
+
+GIVETH A LIST OF NUMBER
+`both as a list` MEANS LIST doubled, tripled
+
+GIVETH A NUMBER
+`add rate` n MEANS n PLUS `the rate`
+
+GIVETH A LIST OF NUMBER
+`all plus the rate` MEANS map `add rate` (LIST 1, 2)
+
+-- a record field nothing computes with: no run of a rule to hang it on
+DECLARE Quote HAS rate IS A NUMBER
+
+GIVETH A Quote
+`quote at the rate` MEANS Quote `the rate`
+
+-- two sections, each with an input of one name and a default of its own
+§ `First`
+    GIVEN `the span` IS A NUMBER TYPICALLY 4
+
+GIVETH A NUMBER
+`first span` MEANS `the span`
+
+§ `Second`
+    GIVEN `the span` IS A NUMBER TYPICALLY 9
+
+GIVETH A NUMBER
+`second span` MEANS `the span`
+
+GIVETH A NUMBER
+`both spans` MEANS `first span` PLUS `second span`
+
+#EVALTRACE `maybe doubled`
+#EVALTRACE `both as a list`
+#EVALTRACE `all plus the rate`
+#EVALTRACE `both spans`
+#EVALTRACE `quote at the rate`
+#EVALTRACE `total budget`

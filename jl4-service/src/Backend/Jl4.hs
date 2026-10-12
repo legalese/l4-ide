@@ -17,6 +17,7 @@ import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.TracePolicy (apiDefaultPolicy, TracePolicy(..))
 import qualified L4.TracePolicy as TracePolicy
 import L4.Names
+import L4.Parser.SrcSpan (SrcRange (..))
 import L4.Print
 import qualified L4.Print as Print
 import L4.Syntax
@@ -497,6 +498,7 @@ rootFill ctx path d = do
             { Eval.path = path
             , Eval.declaredAt = rangeOf d
             , Eval.origin = Eval.FromRootFill
+            , Eval.valueText = Nothing
             }
         }
   put (i + 1, fill : fills)
@@ -925,6 +927,37 @@ wrapperPresumed :: Presumption -> WrapperPlan -> [Eval.Presumed] -> [Text]
 wrapperPresumed presumption plan =
   Eval.requestPresumed (presumption == PresumeSoft) unInputField plan.wpInputs
 
+-- | The trace of a wrapper's run, with the @declared at@ of each default put
+-- where the author wrote the default.
+--
+-- A wrapper is evaluated as the author's source followed by generated code, and
+-- a range reported from it can be wrong in two ways:
+--
+-- * the generated @InputArgs@ record copies a rule @GIVEN@'s @TYPICALLY@, and the
+--   decoder fills the field from that copy, so the range is of the generated
+--   text; it is replaced by the range of the author's own default
+--   ('inputDefaults');
+-- * the module under evaluation is named for the wrapper, which for a deontic
+--   function is the function's name and not the author's file; a range in it
+--   is put back in the module the function was compiled from. Its lines are the
+--   author's, because the directives filtered from the source leave blank lines
+--   ('filterIdeDirectivesText').
+--
+-- A range in any other module, an import's, is already the author's.
+wrapperTrace :: Module Resolved -> Decide Resolved -> Eval.EvalDirectiveResult -> Maybe EvalTrace
+wrapperTrace m decide r = mapDefaultEvents relocate <$> r.trace
+  where
+    MkModule _ authorUri _ = m
+    wrapperUri = (\ rng -> rng.moduleUri) <$> r.range
+    authors = Map.mapMaybe rangeOf (inputDefaults m decide)
+    relocate p = MkPresumed { path = p.path, origin = p.origin, declaredAt = placed p, valueText = p.valueText }
+    placed p = case (p.origin, p.path, p.declaredAt) of
+      (FromRequest, [field], _)
+        | Just at <- Map.lookup (unInputField field) authors -> Just at
+      (_, _, Just rng)
+        | Just rng.moduleUri == wrapperUri -> Just (MkSrcRange rng.start rng.end rng.length authorUri)
+      (_, _, declared) -> declared
+
 -- | The wrapper names a field @x (input)@ ('Backend.CodeGen.inputFieldName');
 -- messages and @presumed@ name the input.
 unInputField :: Text -> Text
@@ -978,8 +1011,8 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
   -- Handle result
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
-    Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
+    Just [r@Eval.MkEvalDirectiveResult{result}] ->
+      handleEvalResult compiled.compiledEntityInfo result (wrapperTrace compiled.compiledModule compiled.compiledDecide r) fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
         (wrapperPresumed presumption plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
@@ -1193,8 +1226,8 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
   -- Handle result
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
-    Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
+    Just [r@Eval.MkEvalDirectiveResult{result}] ->
+      handleEvalResult compiled.compiledEntityInfo result (wrapperTrace compiled.compiledModule compiled.compiledDecide r) fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
         (wrapperPresumed presumption plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
@@ -1228,7 +1261,10 @@ evaluateWrapperInContext presumption filepath wrapperCode sourceText modContext 
 filterIdeDirectivesText :: Text -> Text
 filterIdeDirectivesText = Text.unlines . filterLines . Text.lines
   where
-    -- Filter lines, tracking whether we're inside a multiline directive
+    -- Filter lines, tracking whether we're inside a multiline directive.
+    -- A line that is removed leaves an EMPTY line in its place, so that every
+    -- line that stays keeps its number: the evaluation reports ranges, and
+    -- the service quotes them (@declared at f.l4:9:49-53@) as the author's.
     filterLines :: [Text] -> [Text]
     filterLines = go Nothing
       where
@@ -1240,10 +1276,10 @@ filterIdeDirectivesText = Text.unlines . filterLines . Text.lines
           | isDirectiveLine line =
               -- Start of a directive - skip it and enter directive state
               let baseIndent = lineIndentation line
-              in go (Just baseIndent) rest
+              in "" : go (Just baseIndent) rest
           | Just baseIndent <- mIndent, isContinuationLine baseIndent line =
               -- Continuation of a multiline directive - skip it
-              go mIndent rest
+              "" : go mIndent rest
           | otherwise =
               -- Not a directive or continuation - keep it and reset state
               line : go Nothing rest
@@ -1474,8 +1510,8 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 -- 8. Handle result
                 case mEvalRes of
                   Nothing -> throwError $ InterpreterError (mconcat errs)
-                  Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
-                    handleEvalResult tcRes.entityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz tcRes.module'
+                  Just [r@Eval.MkEvalDirectiveResult{result}] ->
+                    handleEvalResult tcRes.entityInfo result (wrapperTrace tcRes.module' funDecide r) fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz tcRes.module'
                       (wrapperPresumed presumption plan r.presumed)
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
@@ -1943,6 +1979,23 @@ buildReasoningTree Nothing  = emptyReasoning
 buildReasoningTree (Just t) = traceToReasoning t
 
 traceToReasoning :: EvalTrace -> Reasoning
+-- A @TYPICALLY@ default that took effect (W8) is a node of its own: its name
+-- as its code, the same sentence the text trace says as its explanation, and
+-- the value. A computed default shows what it did below it. The code is the
+-- string the response's @presumed@ list uses for the same default ('presumedName'),
+-- so a client can mark the nodes of the list by comparing strings; the wrapper's
+-- own name for a field (@x (input)@) is put back to the input's.
+traceToReasoning (TraceDefault p steps val) =
+  Reasoning
+    { exampleCode = [presumedName unInputField p]
+    , explanation = [defaultEventText named, resultLine val]
+    , children = [traceToReasoning (Trace Nothing steps val) | not (null steps)]
+    }
+  where
+    path = case p.path of
+      n : rest -> unInputField n : rest
+      []       -> []
+    named = MkPresumed { path, declaredAt = p.declaredAt, origin = p.origin, valueText = p.valueText }
 traceToReasoning (Trace lbl [] val) =
   Reasoning
     { exampleCode = labelExample lbl

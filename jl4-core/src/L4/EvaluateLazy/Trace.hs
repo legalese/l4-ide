@@ -4,11 +4,13 @@ module L4.EvaluateLazy.Trace where
 import Base
 import qualified Base.DList as DList
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.Annotation (emptyAnno)
 import L4.Syntax
 import L4.Evaluate.ValueLazy
 import L4.EvaluateLazy.Exceptions (EvalException(..), InternalEvalException(..), UserEvalException(..), Refusal(..), prettyEvalException)
+import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
 import L4.Print
 import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.Utils.RevList
@@ -93,6 +95,7 @@ data EvalTraceAction =
   | AllocPre Resolved Reference      -- ^ allocation, used for mutually recursive let/where
   | Push                             -- ^ explicit push
   | Pop                              -- ^ explicit pop (would not be needed / could be combined with Exit)
+  | TookDefault Presumed Reference   -- ^ W8: the reference is a @TYPICALLY@ default being forced for the first time; always emitted immediately before the 'SetRef' of that force
   deriving stock Show
 
 -- | This instance is primarily used for debugging. It shows individual actions
@@ -109,6 +112,116 @@ instance LayoutPrinter EvalTraceAction where
     AllocPre x r      -> "??p " <+> printWithLayout x <+> "=" <+> printWithLayout r
     Push              -> "+++ "
     Pop               -> "--- "
+    TookDefault p r   -> "def " <+> pretty (renderPresumedPath p.path) <+> printWithLayout r
+
+-- Note [Defaults in the trace]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- R8 asks the trace to record a defaulted binder as its own event, with the
+-- declaration and the value (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, W8).
+--
+-- The event is raised where the default is FORCED for the first time
+-- ('L4.EvaluateLazy.Machine.traceDefaultForce'), not where it is filled in, so
+-- a default nothing read leaves no event (T6). It is emitted as a 'TookDefault'
+-- action immediately BEFORE the 'SetRef' of that force, so that it lands in the
+-- list of the frame doing the forcing, beside the expression that needed the
+-- value. After the 'SetRef' it would land in the list of the default's own
+-- address, which a module-level definition never gets placed from: the whole
+-- point of the event is to show up.
+--
+-- In the pre-trace it is a 'PreDefault', a placeholder for the default's own
+-- address with the event attached; zonking gives a 'TraceDefault' whose steps
+-- are the evaluation of the default, and whose value is the default's.
+--
+-- Where it hangs: on the last expression entered in the nearest frame that has
+-- entered one, so a builtin operator's frame (pushed to wait for its operands,
+-- with no expression of its own) is passed over to the application waiting on
+-- it, and the event is a child of that application.
+--
+-- A default can also be read where the trace has nowhere to show it: while the
+-- RESULT is being normalised, after the main expression has finished (a
+-- defaulted field of a returned record that nothing else read), or inside a
+-- definition with no inputs, whose evaluation the trace does not unfold. Such an
+-- event is NOT dropped. 'hangUnplacedDefaults' finds every event that the
+-- finished pre-trace does not reach and hangs it on the main expression, on its
+-- last step, in the order the defaults were read: the trace shows a line for each
+-- default the directive's @presumed@ lists, and where it cannot say which step
+-- needed it, it hangs the line on the main expression.
+--
+-- An event that the trace CAN reach stays where it was read, also when the thing
+-- that read it ran late: a rule that runs while the result is written out
+-- (@JUST (rule …)@, a list of rule results, every service request that goes
+-- through the wrapper) shows the event under the step that needed the value,
+-- inside the trace of that run.
+--
+-- 'addDefaultToStack' never fails and never hides a frame: with no frame to
+-- hang from, or one that has its result already, the event is not placed there,
+-- and 'hangUnplacedDefaults' places it.
+
+-- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
+-- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
+-- rests on it.
+--
+-- Recorded when the default is FORCED, not when it is filled in: an input the
+-- rule never reads did not shape the answer, and T6 lists only the defaults
+-- that did. That is why the event is raised by 'evalRef' rather than at the
+-- fill site, wherever the fill happened.
+data Presumed =
+  MkPresumed
+    { path       :: ![Text]
+      -- ^ Where the default landed: the input's name, then the field names
+      -- below it, with a list element written as its index.
+    , declaredAt :: !(Maybe SrcRange)
+      -- ^ The @TYPICALLY@ that supplied the value.
+    , origin     :: !PresumedOrigin
+    , valueText  :: !(Maybe Text)
+      -- ^ The default's value on one line, as far as it had been evaluated when
+      -- the directive ended ('L4.EvaluateLazy.nfDirectiveWith'): what a plain
+      -- directive's @NOTE:@ line says ('defaultNoteText'). 'Nothing' everywhere
+      -- else: on an event in a trace, which has its value as the node's, on a
+      -- default that is registered and not yet forced, and on one whose forcing
+      -- did not finish. Not part of what makes two events the same default
+      -- ('presumedKey').
+    }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | What makes two events the same default: where it landed, which fill site
+-- supplied it, and the @TYPICALLY@ it came from. The last matters when two
+-- sections each declare an input of one name with a default of their own: they
+-- are two defaults, each an event, though 'path' names them alike. The value is
+-- not part of it.
+type PresumedKey = ([Text], PresumedOrigin, Maybe SrcRange)
+
+presumedKey :: Presumed -> PresumedKey
+presumedKey p = (p.path, p.origin, p.declaredAt)
+
+-- | Which fill site supplied a default. A consumer keeps only the events that
+-- belong to its request (T6b): an L4 program may decode JSON of its own.
+data PresumedOrigin
+  = FromSectionBinder
+    -- ^ A section @GIVEN@'s default, filled at the root by 'L4.Discharge'.
+  | FromRootFill
+    -- ^ A default the caller filled at the root ('presumableDefs').
+  | FromRequest
+    -- ^ A field of the request's own decode ('EvalState.requestRecord'),
+    -- filled from its @DECLARE@, or a MAYBE there filled with NOTHING.
+  | FromDecode !Text
+    -- ^ A field of a decode the RULES made, filled the same way; the text is
+    -- the type that decode started from.
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass NFData
+
+-- | A decode path as one string: field names joined with dots, a list index
+-- written straight after its list (@people[0].age@).
+renderPresumedPath :: [Text] -> Text
+renderPresumedPath = Text.concat . go True
+  where
+    go _ [] = []
+    go atStart (s : ss)
+      | "[" `Text.isPrefixOf` s = s : go False ss
+      | atStart                 = s : go False ss
+      | otherwise               = "." : s : go False ss
 
 -- | A pre-trace has the same hierarchical structure as the final trace, but it contains
 -- only WHNFs as results, and it contains placeholders with the idea that other parts
@@ -117,9 +230,17 @@ instance LayoutPrinter EvalTraceAction where
 data EvalPreTrace =
     PreTrace [(Expr Resolved, [EvalPreTrace])] (Either EvalException WHNF)
   | PrePlaceholder Address
+  | PreDefault Presumed Address
+    -- ^ W8: a placeholder for the trace of a default's own evaluation, which
+    -- also records that the default took effect here.
 
 data EvalTrace =
     Trace (Maybe Resolved) [(Expr Resolved, [EvalTrace])] (Either EvalException NF)
+  | TraceDefault Presumed [(Expr Resolved, [EvalTrace])] (Either EvalException NF)
+    -- ^ W8: a @TYPICALLY@ default took effect at this point. The steps are the
+    -- evaluation of the default itself and are empty when it is a plain value
+    -- (every literal default); the last field is its value. See Note [Defaults
+    -- in the trace].
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -194,6 +315,13 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
       -- We end at level -1, because we generate a 'Pop' for the final *attempt*
       -- to pop the stack when it is empty.
       m
+    go (-1) [] m (TookDefault _ _ : as) =
+      -- A default first forced while the result is being normalised, with
+      -- nothing open to hang it from. It is left out of the lists here, and
+      -- 'hangUnplacedDefaults' puts it on the main expression (see Note
+      -- [Defaults in the trace]). The 'SetRef' that follows it is handled by
+      -- the next equation.
+      go (-1) [] m as
     go (-1) [] m as@(SetRef _ : _) =
       -- This case occurs if after we're done with the main expression, we
       -- have other subexpressions left to evaluate (because we're computing
@@ -248,6 +376,8 @@ instance LayoutPrinter EvalTrace where
 -- | Shows a lazy evaluation trace. Keeps track of the level.
 printEvalTrace :: forall ann. Int -> EvalTrace -> Doc ann
 printEvalTrace lvl = \ case
+  TraceDefault p steps v ->
+    printDefaultEvent lvl p steps v
   Trace _ [] v ->
     pre lvl <> "•" <> " " <> printExceptionOrNF v
   Trace _mlabel (esubs : otheresubs) v ->
@@ -283,6 +413,115 @@ printEvalTrace lvl = \ case
   where
     pre :: Int -> Doc ann
     pre i = pretty (replicate i '│')
+
+-- | A default's event as a trace node, laid out like a binding: what happened
+-- on the first line, the value on the last. See Note [Defaults in the trace].
+--
+-- When the default is computed ('steps' is not empty) its own evaluation
+-- is shown between the two.
+printDefaultEvent :: forall ann. Int -> Presumed -> [(Expr Resolved, [EvalTrace])] -> Either EvalException NF -> Doc ann
+printDefaultEvent lvl p steps v =
+  vcat $
+       [ pre <> "┌ " <> defaultEventHeader p ]
+    <> [ printEvalTrace (lvl + 1) (Trace Nothing steps v) | not (null steps) ]
+    <> valueLines
+  where
+    pre :: Doc ann
+    pre = pretty (replicate lvl '│')
+
+    valueLines :: [Doc ann]
+    valueLines = case docLines (printExceptionOrNF v) of
+      []     -> [pre <> "└"]
+      l : ls -> (pre <> "└ " <> l) : [ pre <> "  " <> d | d <- ls ]
+
+-- | How a service names a default in its @presumed@ list, and as the code of the
+-- node that shows the event: the input's name, or the path to a field below it
+-- (@cfg.timeout@), and for a field of a decode the RULES made
+-- @JSONDECODE Settings: limit@, naming the type the rules decoded. @fieldName@
+-- maps a wrapper's own field name back to the input's. One function, so that a
+-- client can match a node to an entry of the list by comparing the two strings.
+presumedName :: (Text -> Text) -> Presumed -> Text
+presumedName fieldName p = case (p.origin, p.path) of
+  (FromDecode root, path) -> "JSONDECODE " <> root <> ": " <> renderPresumedPath path
+  (_, n : rest)           -> renderPresumedPath (fieldName n : rest)
+  (_, [])                 -> ""
+
+-- | Rewrite the default events of a trace, wherever they hang, and their steps.
+mapDefaultEvents :: (Presumed -> Presumed) -> EvalTrace -> EvalTrace
+mapDefaultEvents f = go
+  where
+    go = \ case
+      Trace l steps v        -> Trace l (goSteps steps) v
+      TraceDefault p steps v -> TraceDefault (f p) (goSteps steps) v
+    goSteps = fmap (second (fmap go))
+
+-- | What the event says, without its value: @the rate took its default
+-- (declared at f.l4:4:30-31)@. A default that no @TYPICALLY@ supplied is
+-- D7.3's @NOTHING@ for a @MAYBE@ left out of a JSON record.
+--
+-- Every surface that shows the event says it in these words.
+defaultEventText :: Presumed -> Text
+defaultEventText p =
+  renderPresumedPath p.path <> " took its default " <>
+    case p.declaredAt of
+      Just r  -> "(declared at " <> prettySrcRange r <> ")"
+      Nothing -> "(a MAYBE left out is NOTHING)"
+
+defaultEventHeader :: Presumed -> Doc ann
+defaultEventHeader = pretty . defaultEventText
+
+-- | The sentence a plain directive says beside its answer (W11), where there is
+-- no trace to carry the value on a line of its own: 'defaultEventText' with the
+-- value in it, as R8 words the line (\"alpha took its default 10\"):
+--
+-- > the rate took its default 3 (declared at rates.l4:2:44-45)
+--
+-- The value is what the directive ended with ('Presumed.valueText'); without one
+-- the sentence is the event's. A @MAYBE@ left out says what it is, and not its
+-- value, which would only repeat it.
+defaultNoteText :: Presumed -> Text
+defaultNoteText p =
+  renderPresumedPath p.path <> " took its default " <>
+    case p.declaredAt of
+      Just r  -> maybe "" (<> " ") p.valueText <> "(declared at " <> prettySrcRange r <> ")"
+      Nothing -> "(a MAYBE left out is NOTHING)"
+
+-- | The defaults a trace shows.
+tracedDefaults :: EvalTrace -> [Presumed]
+tracedDefaults = \ case
+  Trace _ steps _        -> foldMap (foldMap tracedDefaults . snd) steps
+  TraceDefault p steps _ -> p : foldMap (foldMap tracedDefaults . snd) steps
+
+-- | The defaults of a directive that its trace does not show.
+untracedDefaults :: Maybe EvalTrace -> [Presumed] -> [Presumed]
+untracedDefaults mtrace presumed =
+  [ p | p <- presumed, presumedKey p `Set.notMember` shown ]
+  where
+    shown = Set.fromList (presumedKey <$> maybe [] tracedDefaults mtrace)
+
+-- | Make a finished trace show every default the directive took: an event the
+-- trace does not carry is hung on the main expression's last step, with its
+-- value (the one 'L4.EvaluateLazy.nfDirectiveWith' read when the directive
+-- ended), as 'hangUnplacedDefaults' does for one that no step could show.
+--
+-- The event can be missing here because 'buildEvalTrace' ran out of nodes
+-- ('maxTraceNodes') before it reached the step that read the default. Without
+-- this a truncated trace said nothing of a default the answer rests on, while the
+-- directive's @presumed@ list had it.
+--
+-- A trace with no step of its own (the stand-in 'L4.EvaluateLazy.tracePostprocessFailed'
+-- leaves) has nowhere to hang an event, and is left as it is: a plain directive's
+-- line ('L4.EvaluateLazy.defaultNotes') says the default instead.
+completeDefaults :: [(Presumed, Maybe NF)] -> EvalTrace -> EvalTrace
+completeDefaults [] t = t
+completeDefaults valued t = case t of
+  Trace lbl steps v
+    | (_ : _) <- missing, (e, kids) : earlier <- reverse steps ->
+        Trace lbl (reverse ((e, kids <> [ TraceDefault p [] (Right (fromMaybe Omitted mnf)) | (p, mnf) <- missing ]) : earlier)) v
+  _ -> t
+  where
+    shown   = Set.fromList (presumedKey <$> tracedDefaults t)
+    missing = [ (p, mnf) | (p, mnf) <- valued, presumedKey p `Set.notMember` shown ]
 
 -- | Helper function to display an exception or final value in a trace.
 printExceptionOrNF :: Either EvalException NF -> Doc ann
@@ -335,6 +574,7 @@ buildEvalPreTrace :: [EvalTraceAction] -> EvalPreTrace
 buildEvalPreTrace as = case as of
   Enter _ : _ -> go [PreTraceFrame emptyRevList Nothing] as -- outer expression starts with Enter
   Push : _ -> go [] as -- everything else starts with an update frame
+  TookDefault _ _ : rest -> buildEvalPreTrace rest -- nothing to hang a default from yet, see Note [Defaults in the trace]
   _ -> error "buildEvalPreTrace: unexpected start of actions"
   where
     go :: PreTraceStack -> [EvalTraceAction] -> EvalPreTrace
@@ -358,6 +598,8 @@ buildEvalPreTrace as = case as of
       go (addSubTraceToFrame (PrePlaceholder r.address) frame : stack) actions
     go (frame : stack) (AllocPre _e r : actions) =
       go (addSubTraceToFrame (PrePlaceholder r.address) frame : stack) actions
+    go stack@(_ : _) (TookDefault p r : actions) =
+      go (addDefaultToStack (PreDefault p r.address) stack) actions
     go [frame] [] =
       case closeFrame frame of
         Nothing -> error $ "buildEvalPreTrace: top-level trace frame is hidden"
@@ -390,6 +632,24 @@ buildEvalPreTrace as = case as of
     closeFrame (PreTraceFrame _ Nothing)      = Nothing -- error "closeFrame: trying to close frame without value"
     closeFrame HiddenFrame                    = Nothing
 
+    -- Hangs a default's event on the expression being evaluated (see Note
+    -- [Defaults in the trace]): the last one entered in the nearest frame
+    -- that has entered one. A builtin operator's frame, which is pushed to
+    -- wait for its operands and enters no expression of its own, is passed
+    -- over, so the event hangs on the application that needed the value.
+    --
+    -- Unlike 'addSubTraceToFrame' this never fails and never hides a frame:
+    -- with no such frame, or one that already has its result, the event is
+    -- dropped.
+    addDefaultToStack :: EvalPreTrace -> PreTraceStack -> PreTraceStack
+    addDefaultToStack _ [] = []
+    addDefaultToStack t (frame : stack) = case frame of
+      PreTraceFrame (MkRevList ((e, subs) : esubs')) Nothing ->
+        PreTraceFrame (MkRevList ((e, pushRevList t subs) : esubs')) Nothing : stack
+      PreTraceFrame (MkRevList []) Nothing -> frame : addDefaultToStack t stack
+      HiddenFrame                          -> frame : addDefaultToStack t stack
+      PreTraceFrame _ (Just _)             -> frame : stack
+
     -- Adds a new sub-trace (subcomputation) to the current frame. This fails if the current
     -- frame already has a result.
     addSubTraceToFrame :: EvalPreTrace -> PreTraceFrame -> PreTraceFrame
@@ -400,6 +660,48 @@ buildEvalPreTrace as = case as of
 
 buildEvalPreTraces :: Map (Maybe Address) (Either WHNF [EvalTraceAction]) -> Map (Maybe Address) (Either WHNF EvalPreTrace)
 buildEvalPreTraces = Map.map (bimap id buildEvalPreTrace)
+
+-- | Hang on the main expression every default event that the pre-trace does not
+-- reach, on its last step and in the order the actions give (see Note
+-- [Defaults in the trace]).
+--
+-- An event is reached when its 'PreDefault' is in the main pre-trace, or in the
+-- pre-trace of a placeholder that is reached, which is what zonking inlines
+-- ('buildEvalTrace'). The walk follows each placeholder once, so a thunk that is
+-- referenced from many places is not walked again for each. With no event in
+-- the actions it costs one pass over them.
+hangUnplacedDefaults
+  :: [EvalTraceAction]
+  -> Map (Maybe Address) (Either WHNF EvalPreTrace)
+  -> EvalPreTrace
+  -> EvalPreTrace
+hangUnplacedDefaults actions heap root = case root of
+  PreTrace esubs w
+    | (_ : _) <- unplaced, (e, subs) : earlier <- reverse esubs ->
+        PreTrace (reverse ((e, subs <> [PreDefault p a | (p, a) <- unplaced]) : earlier)) w
+  _ -> root
+  where
+    unplaced :: [(Presumed, Address)]
+    unplaced = [ (p, r.address) | TookDefault p r <- actions, r.address `Set.notMember` reached ]
+
+    reached :: Set.Set Address
+    reached = snd (visit (Set.empty, Set.empty) root)
+
+    -- the placeholders followed so far, and the defaults reached
+    visit :: (Set.Set Address, Set.Set Address) -> EvalPreTrace -> (Set.Set Address, Set.Set Address)
+    visit acc = \ case
+      PreTrace esubs _ -> foldl' visit acc (concatMap snd esubs)
+      PrePlaceholder a -> follow acc a
+      PreDefault _ a   -> follow (second (Set.insert a) acc) a
+
+    follow :: (Set.Set Address, Set.Set Address) -> Address -> (Set.Set Address, Set.Set Address)
+    follow acc@(followed, found) a
+      | a `Set.member` followed = acc
+      | otherwise =
+          let acc' = (Set.insert a followed, found)
+          in case Map.lookup (Just a) heap of
+               Just (Right t) -> visit acc' t
+               _              -> acc'
 
 collectTraceLabels :: [EvalTraceAction] -> Map Address Resolved
 collectTraceLabels = foldl' go Map.empty
@@ -445,6 +747,18 @@ buildEvalTrace labels m label0 pt0 = evalState (go label0 pt0) maxTraceNodes
           put (budget - 1)
           esubs' <- goEsubs esubs
           pure (Trace label esubs' (second (nfFromTrace m) w))
+    go label (PreDefault p a) = do
+      budget <- get
+      if budget <= 0
+        then pure (truncatedTrace label)
+        else do
+          put (budget - 1)
+          -- the default's own evaluation, found as for any placeholder; its
+          -- steps and value become the event's
+          inner <- go label (PrePlaceholder a)
+          pure $ case inner of
+            Trace _ steps v        -> TraceDefault p steps v
+            TraceDefault _ steps v -> TraceDefault p steps v
     go label (PrePlaceholder a) =
       let label' =
             case label of
@@ -478,9 +792,22 @@ buildEvalTrace labels m label0 pt0 = evalState (go label0 pt0) maxTraceNodes
 
 -- | Implements step 5 of Note [Lazy evaluation tracing]
 simplifyEvalTrace :: EvalTrace -> EvalTrace
+simplifyEvalTrace (TraceDefault p steps v) =
+  case simplifyEvalTrace (Trace Nothing steps v) of
+    Trace _ steps' v' -> TraceDefault p steps' v'
+    other             -> other
 simplifyEvalTrace (Trace lbl children v) = Trace lbl (second (concatMap go) <$> children) v
   where
     go :: EvalTrace -> [EvalTrace]
+    -- A default's event is never trivial, whatever the default is: it is
+    -- the record that the default was used. What is trivial is the
+    -- default's own evaluation, when it is a plain value, so its steps go
+    -- by the rules below, applied to the default as if it were a node.
+    go (TraceDefault p dsteps dv)          = [TraceDefault p dsteps' dv]
+      where
+        dsteps' = case go (Trace Nothing dsteps dv) of
+          [Trace _ ss _] -> ss
+          _              -> []
     go t@(Trace _ [] (Right (MkNF (ValString s))))
       | s == traceTruncatedMessage         = [t]   -- always keep truncation markers
     go (Trace _ [] (Right _))              = []   -- eliminate trivial successful trace nodes
@@ -573,6 +900,7 @@ nfFromTrace m = \ case
     extractVal (PreTrace _ (Left _))  = Omitted
     extractVal (PreTrace _ (Right v)) = nfFromTrace m v
     extractVal (PrePlaceholder a)     = rec' a
+    extractVal (PreDefault _ a)       = rec' a
 
 -- | This function exists purely for debugging / internal error messages.
 --

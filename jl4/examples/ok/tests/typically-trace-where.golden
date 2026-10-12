@@ -1,0 +1,151 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-trace-where.l4:74:1-27:
+  JUST OF 6
+  ─────
+  ┌ `maybe doubled` OF `the rate`, `has capacity`
+  │┌ `maybe doubled`
+  │└ <function>
+  ├ JUST OF (doubled OF `the rate`, `has capacity`)
+  │┌ doubled OF `the rate`, `has capacity`
+  ││┌ doubled
+  ││└ <function>
+  │├ IF `has capacity` THEN (`the rate` TIMES 2) ELSE 0
+  ││┌ `has capacity`
+  │││┌ has capacity took its default (declared at typically-trace-where.l4:31:49-53)
+  │││└ TRUE
+  ││└ TRUE
+  │├ `the rate` TIMES 2
+  ││┌ the rate took its default (declared at typically-trace-where.l4:30:49-50)
+  ││└ 3
+  │└ 6
+  └ JUST OF 6
+typically-trace-where.l4:75:1-28:
+  LIST 6, 9
+  ─────
+  ┌ `both as a list` OF `the rate`, `has capacity`
+  │┌ `both as a list`
+  │└ <function>
+  ├ LIST (doubled OF `the rate`, `has capacity`), (tripled OF `the rate`)
+  ├ (doubled OF `the rate`, `has capacity`) FOLLOWED BY (LIST (tripled OF `the rate`))
+  │┌ doubled OF `the rate`, `has capacity`
+  ││┌ doubled
+  ││└ <function>
+  │├ IF `has capacity` THEN (`the rate` TIMES 2) ELSE 0
+  ││┌ `has capacity`
+  │││┌ has capacity took its default (declared at typically-trace-where.l4:31:49-53)
+  │││└ TRUE
+  ││└ TRUE
+  │├ `the rate` TIMES 2
+  ││┌ the rate took its default (declared at typically-trace-where.l4:30:49-50)
+  ││└ 3
+  │└ 6
+  │┌ LIST (tripled OF `the rate`)
+  │├ (tripled OF `the rate`) FOLLOWED BY (LIST )
+  ││┌ tripled OF `the rate`
+  │││┌ tripled
+  │││└ <function>
+  ││├ `the rate` TIMES 3
+  ││└ 9
+  ││┌ LIST 
+  ││└ EMPTY
+  │└ LIST 9
+  └ LIST 6, 9
+typically-trace-where.l4:76:1-31:
+  LIST 4, 5
+  ─────
+  ┌ `all plus the rate` OF `the rate`
+  │┌ `all plus the rate`
+  │└ <function>
+  ├ map OF (GIVEN `_eta0` YIELD `add rate` OF `_eta0`, `the rate`), (LIST 1, 2)
+  │┌ GIVEN `_eta0` YIELD `add rate` OF `_eta0`, `the rate`
+  │└ <function>
+  │┌ LIST 1, 2
+  │├ 1 FOLLOWED BY (LIST 2)
+  ││┌ LIST 2
+  ││├ 2 FOLLOWED BY (LIST )
+  │││┌ LIST 
+  │││└ EMPTY
+  ││└ LIST 2
+  │└ LIST 1, 2
+  │┌ map
+  │└ <function>
+  ├ CONSIDER list
+  │   WHEN EMPTY THEN EMPTY
+  │   WHEN x FOLLOWED BY xs THEN (f OF x) FOLLOWED BY (map OF f, xs)
+  ├ (f OF x) FOLLOWED BY (map OF f, xs)
+  │┌ f OF x
+  ││┌ f
+  ││└ <function>
+  │├ `add rate` OF `_eta0`, `the rate`
+  ││┌ `add rate`
+  ││└ <function>
+  │├ n PLUS `the rate`
+  ││┌ the rate took its default (declared at typically-trace-where.l4:30:49-50)
+  ││└ 3
+  │└ 4
+  │┌ map OF f, xs
+  ││┌ map
+  ││└ <function>
+  │├ CONSIDER list
+  ││   WHEN EMPTY THEN EMPTY
+  ││   WHEN x FOLLOWED BY xs THEN (f OF x) FOLLOWED BY (map OF f, xs)
+  │├ (f OF x) FOLLOWED BY (map OF f, xs)
+  ││┌ f OF x
+  │││┌ f
+  │││└ <function>
+  ││├ `add rate` OF `_eta0`, `the rate`
+  │││┌ `add rate`
+  │││└ <function>
+  ││├ n PLUS `the rate`
+  ││└ 5
+  ││┌ map OF f, xs
+  │││┌ map
+  │││└ <function>
+  ││├ CONSIDER list
+  │││   WHEN EMPTY THEN EMPTY
+  │││   WHEN x FOLLOWED BY xs THEN (f OF x) FOLLOWED BY (map OF f, xs)
+  ││├ EMPTY
+  ││└ EMPTY
+  │└ LIST 5
+  └ LIST 4, 5
+typically-trace-where.l4:77:1-24:
+  13
+  ─────
+  ┌ `both spans` OF `the span`, `the span`
+  │┌ `both spans`
+  │└ <function>
+  ├ (`first span` OF `the span`) PLUS (`second span` OF `the span`)
+  │┌ `first span` OF `the span`
+  ││┌ `first span`
+  ││└ <function>
+  │├ `the span`
+  ││┌ the span took its default (declared at typically-trace-where.l4:60:44-45)
+  ││└ 4
+  │└ 4
+  │┌ `second span` OF `the span`
+  ││┌ `second span`
+  ││└ <function>
+  │├ `the span`
+  ││┌ the span took its default (declared at typically-trace-where.l4:66:44-45)
+  ││└ 9
+  │└ 9
+  └ 13
+typically-trace-where.l4:78:1-31:
+  Quote OF 3
+  ─────
+  ┌ `quote at the rate` OF `the rate`
+  │┌ `quote at the rate`
+  │└ <function>
+  ├ Quote OF `the rate`
+  │┌ the rate took its default (declared at typically-trace-where.l4:30:49-50)
+  │└ 3
+  └ Quote OF 3
+typically-trace-where.l4:79:1-26:
+  32
+  ─────
+  ┌ `total budget`
+  │┌ timeout took its default (declared at typically-trace-where.l4:16:33-35)
+  │└ 30
+  └ 32

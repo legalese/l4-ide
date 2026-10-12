@@ -1,0 +1,16 @@
+§ `Truncated trace default fixture`
+
+-- Review N2 of W8: a trace is cut off at 10000 nodes. `fib 16` fills it before the
+-- default is read, so the step that read `the rate` is never reached; the trace must
+-- still show the default, once, and not as a line outside the trace.
+
+    GIVEN `the rate` IS A NUMBER TYPICALLY 3
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+fib n MEANS IF n < 2 THEN n ELSE fib (n MINUS 1) PLUS fib (n MINUS 2)
+
+GIVETH A NUMBER
+`big then rate` MEANS fib 16 PLUS `the rate`
+
+#EVALTRACE `big then rate`
