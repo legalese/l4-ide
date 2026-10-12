@@ -62,6 +62,20 @@ guaranteed to match the binary you're running. This is the **prod** regime:
 an installed `l4`, the VSCode extension, `jl4-service` — none of them need any
 environment setup or files on disk.
 
+**Reading the stdlib from your editor.** Go-to-definition on a stdlib name (say
+`sum`, after `IMPORT prelude`) opens a **read-only** tab named `prelude.l4`.
+It is not a file on disk: its address is `jl4-embedded:/prelude.l4`, and the
+language server supplies the text — the exact copy compiled into the binary, so
+what you read is what your program runs. Hover and go-to-definition work inside
+it. To change the stdlib, edit `jl4-core/libraries/` and see the next section.
+
+The limits: this works in the VSCode extension, which asks the server for the
+text with a custom request, `l4/embeddedLibrary` (params `{"uri": …}`, reply
+`{"text": …}`). Another editor connected to `jl4-lsp` receives the same
+`jl4-embedded:` address and has to make the same request to show it. When
+`JL4_LIBRARY_PATH` is set, the embedded copy is not consulted and
+go-to-definition lands on a real file instead.
+
 ### I'm developing the standard library itself (editing `jl4-core/libraries/*.l4`)
 
 Pin the resolver at your worktree, in the shell where you build and test:
