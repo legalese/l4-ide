@@ -45,7 +45,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify)
+import qualified L4.Transform as Transform (simplify, positionalCall)
 import L4.Desugar
 import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -455,7 +455,31 @@ translateExpr shouldSimplify = top
             | u.moduleUri /= thisModule -> leafFromExpr e
           _ -> varLeaf vid vname resolved
 
-      App appAnno _fnResolved args -> do
+      App appAnno _fnResolved args -> call e appAnno args
+
+      -- A call with named arguments that 'Transform.positionalCall' reads is
+      -- drawn as that call, its arguments in the order written. Mirrors
+      -- 'LSP.L4.Viz.Ladder' (smucclaw/l4-ide#1033).
+      AppNamed appAnno _fnResolved nes _
+        | isJust (Transform.positionalCall e) -> call e appAnno [x | MkNamedExpr _ _ x <- nes]
+
+      -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@, @BRANCH@,
+      -- @CONSIDER@ -- is ladder structure, not a leaf. See "L4.Viz.GuardedRows".
+      -- Every bail-out lands on 'leafFromExpr', i.e. the pre-existing behaviour.
+      _ -> do
+        isBool <- hasBooleanType (getAnno e)
+        case normaliseGuarded e of
+          Just rows
+            | isBool
+            , not (any (hasEffectfulNode . fst) rows.grRows) ->
+                guardedToLadder getFresh go rows
+          _ -> leafFromExpr e
+
+    -- A call @e@, whose arguments in the order they are drawn are @args@: a box
+    -- over its arguments when the call and every argument are BOOLEAN, otherwise
+    -- a leaf.
+    call :: Expr Resolved -> Anno -> [Expr Resolved] -> Viz IRExpr
+    call e appAnno args = do
         fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
         if fnOfAppIsFnFromBooleansToBoolean
           then do
@@ -469,18 +493,6 @@ translateExpr shouldSimplify = top
             VizExpr.App vid vname <$> traverse go args <*> pure atomId <*> pure Nothing
           else
             leafFromExpr e
-
-      -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@, @BRANCH@,
-      -- @CONSIDER@ -- is ladder structure, not a leaf. See "L4.Viz.GuardedRows".
-      -- Every bail-out lands on 'leafFromExpr', i.e. the pre-existing behaviour.
-      _ -> do
-        isBool <- hasBooleanType (getAnno e)
-        case normaliseGuarded e of
-          Just rows
-            | isBool
-            , not (any (hasEffectfulNode . fst) rows.grRows) ->
-                guardedToLadder getFresh go rows
-          _ -> leafFromExpr e
 
 -- | How the seam is labelled in the picture (DESIGN §25e).
 --

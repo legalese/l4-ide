@@ -100,7 +100,7 @@ import Optics
 import L4.Annotation (Anno_ (..), emptyAnno)
 import L4.Syntax
 import L4.TypeCheck.Environment (jsonDecodeUnique)
-import qualified L4.Transform as Transform (inlineLocalBindings)
+import qualified L4.Transform as Transform (inlineLocalBindings, positionalCall)
 import qualified L4.Crypto.UUID5 as UUID5
 
 -- | What 'termKey' needs to know about the module a term comes from.
@@ -362,21 +362,23 @@ eraseInfVars = transformOf (gplate @(Type' Resolved)) $ \case
 
 -- | A call with named arguments, all of them given, is the positional call it
 -- stands for (R3: a call box is its rule and its arguments), so
--- @f WITH b IS y, a IS x@ and @f x y@ key alike. The checker records which
--- parameter each argument supplies; a negative entry supplies a section binder
--- rather than a parameter, and such a call keeps its named form, with each
--- supply keyed by the name it supplies.
+-- @f WITH b IS y, a IS x@ and @f x y@ key alike. Which named calls those are is
+-- 'Transform.positionalCall''s to say, the same function the ladder expands a
+-- call through, so a call that is keyed as its positional form is also drawn
+-- with its positional form's expansion. The checker records which parameter
+-- each argument supplies; a negative entry supplies a section binder rather than
+-- a parameter, and such a call keeps its named form, with each supply keyed by
+-- the name it supplies.
 positional :: Expr Resolved -> Expr Resolved
 positional = transformOf (gplate @(Expr Resolved)) $ \case
-  AppNamed ann f nes (Just order)
-    | sort order == [0 .. length nes - 1] ->
-        App ann f [e | i <- [0 .. length nes - 1], (MkNamedExpr _ _ e, j) <- zip nes order, j == i]
-    -- Some arguments supply section binders (a negative entry). The checker
-    -- resolves such a name in the CALLER's scope, but what it supplies is matched
-    -- by name, so the same call written in two sections names two binders for
-    -- one supply. Key a supply by the name it supplies, after the parameters, in
-    -- name order.
-    | otherwise ->
+  call@(AppNamed ann f _ _)
+    | Just (_, args) <- Transform.positionalCall call -> App ann f args
+  -- Some arguments supply section binders (a negative entry). The checker
+  -- resolves such a name in the CALLER's scope, but what it supplies is matched
+  -- by name, so the same call written in two sections names two binders for
+  -- one supply. Key a supply by the name it supplies, after the parameters, in
+  -- name order.
+  AppNamed ann f nes (Just order) ->
         let pairs = zip nes order
             params = sortOn snd [p | p@(_, j) <- pairs, j >= 0]
             supplies =
