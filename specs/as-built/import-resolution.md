@@ -2,12 +2,14 @@
 
 As built on `main` by this PR.
 Source spec: `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`, which is on `unstable` and not on `main`; this page stands in for it here.
-Differences from the source spec: its §2 and §2.1 describe the code before #134 (embedded copy last, a `resolveLibraryFromFilesystem`, two resolvers); it covers #134 only, not #64, #148, #167, #87, #102 or #93; its §8 acceptance 1 (the winning copy is visible) is not met on the CLI; its §7 calls the in-memory layer "orthogonal and correct", but the API/WASM resolver ranks the embedded copy above it; the shadow warning can list one file twice (details under Limits).
 The work came from `unstable`; this page describes only what `main` has.
-Line numbers are in this PR's tree, on `main` at `00298eb60`.
+Line numbers hold at the head of this PR, which is `main` at `00298eb60` plus this PR's commits.
 
-Units: PRs #87, #102, #134, #148, #167 and #93; #64 (inside #77, branch commit `17dee68a4`, fix `b54d4d403`, both on unstable); and the one import-resolution hunk of #143.
-The rest of #143 is the DMN exporter, which is not part of this change, and #134's diff also carries 22 unrelated `paper/` files, which are not part of this feature.
+Differences from the source spec: its §2 and §2.1 describe the code before #134 (embedded copy last, a `resolveLibraryFromFilesystem`, two resolvers); it covers #134 only, not #64, #148, #167, #87, #102, #93, #630 or #627; its §8 acceptance 1 (the winning copy is visible) is not met on the CLI; its §7 calls the in-memory layer "orthogonal and correct", but the API/WASM resolver ranks the embedded copy above it.
+
+Units: PRs #87, #102, #134, #148, #167 and #93; #64 (inside #77, branch commit `17dee68a4`, fix `b54d4d403`, both on unstable); and the two follow-ups that came out of reviewing them, #630 (the service's ladder, one warning per mistake and per file, the staleness wording) and #627 (opening the stdlib from VS Code).
+#143 is not carried: its one import-resolution hunk (the `entityInfo` union in `Resolution.hs`) is subsumed by `unionImportedCheckEnv` (#543, already on `main`), and the rest of it is the DMN exporter, which is not part of this change.
+#134's diff also carries 22 unrelated `paper/` files, which are not part of this feature.
 #451 (an unresolved `IMPORT` is an error at its line; percent-escaped basenames resolve) is a separate change on unstable and is not on `main`.
 
 ## Labels the code comments use
@@ -18,39 +20,61 @@ Comments in `Rules.hs`, `Shake.hs`, `EmbeddedLibraries/TH.hs`, `Cli/Common.hs`, 
 - Option E: the shadow warning (Behaviour, and Diagnostics).
 - §3.1: the incident the ordering guards against, a machine-global XDG symlink silently shadowing the stdlib the binary was built with.
 - §3.3: one module name resolves to one source per build, for parsing and type checking alike.
-- §3.4: the embedded stdlib is frozen at build time by a Template Haskell splice.
+- §3.4: the embedded stdlib is read when GHC compiles `L4.API.EmbeddedLibraries`, which Cabal does not trigger by itself when only a library changes.
 - §6: an open question, whether the VS Code bundle's `libraries/` directory is still needed now that the binary embeds the stdlib.
 
 ## What it does
 
 `IMPORT <name>` finds one source for `<name>` by a fixed ladder, and the same source serves every importer in a build.
 A project's own copy of a library beats the stdlib compiled into the binary, and the compiled-in stdlib beats machine-global copies (XDG store, VS Code bundle).
-When several differing copies are visible, a warning names them all: on stderr from the CLI, in the language server's log from the editor.
+When several differing copies are visible, a warning names them all, each file once: on stderr from the CLI, in the language server's log from the editor.
+An `IMPORT` that resolves to nothing is announced once, as a Warning.
 Diamond imports (A imports B and C, both import D) type-check C against D's exports, not against an empty environment.
 A build that would ship an `l4` with no embedded stdlib fails at compile time, and CI checks the sdist carries the libraries.
 Editor hover shows inferred types with stable names (`a`, `b`) instead of raw inference variables such as `x10`.
+`jl4-service` resolves a deployment's `IMPORT`s against the deployment's own files and the stdlib built into the service, and nothing from the machine it runs on.
+In VS Code, go-to-definition into the stdlib opens a read-only tab with the embedded text.
+
+## What users and operators will notice
+
+Each of these is a change in output or behaviour that a reader of this PR would not see in the diff of a single file.
+Measured on 2026-10-13 with the `l4`, `jl4-lsp` and `jl4-service` built from plain `main` and from this PR, with `JL4_LIBRARY_PATH` unset and an empty XDG store.
+
+- **`--json` diagnostics gain Warning entries.** `l4 check --json` and `l4 run --json` carry the resolver's Warning lines in `diagnostics`. For `main.l4` beside a project-local `prelude.l4`, `diagnostics` goes from `[]` on `main` to one entry, `Warning | [Import Resolution] Multiple differing copies of module `prelude` are visible: …`.
+- **`l4 render --format json` reports stdlib blocks at a `jl4-embedded:` URI.** For a file that writes `IMPORT prelude`, the 107 prelude blocks have `"sourceModule":"jl4-embedded:/prelude.l4"`; on `main` they say `"file://prelude.l4"`. A program that reads `sourceModule` as a path must be told.
+- **Go-to-definition into the stdlib returns a `jl4-embedded:/prelude.l4` URI.** With the VS Code extension's bundled `libraries/` directory beside the binary, `main` answered a real file URI, `file:///…/libraries/prelude.l4`, which the editor could open. This PR ranks the embedded copy above that tier, so it answers `jl4-embedded:/prelude.l4`, and VS Code opens that read-only through this PR's content provider, which asks the server with `l4/embeddedLibrary`. With no libraries on disk, `main` answered `file://prelude.l4`, which names no file. Another editor receives the same `jl4-embedded:` URI and has to make that request to show it. With `JL4_LIBRARY_PATH` set the answer is still a real file.
+- **The CLI prints new Warning lines on stderr:** the shadow warning when two differing copies of a module are visible, and `Module not found: <mod>` once for an unresolved import.
+- **`jl4-service` logs two new `WARN` lines.** At start-up, `JL4_LIBRARY_PATH is set and ignored` with the path, when the variable is set. At every compile of a bundle that ships a file named like a stdlib module with different text, `Bundle file stands in for a standard library module`, naming the deployment, the file and the module.
+- **An unresolved `IMPORT` still checks "succeeded" on `main`.** `l4 check` prints the diagnostic and exits 0; this PR does not change that (#451 does, on unstable).
 
 ## Where it lives
 
-- `jl4-lsp/src/LSP/L4/Rules.hs:287-325`: `resolveLibrary` builds the ladder (`cands`, l.305-307), probes it, and returns every existing candidate in order.
-- `jl4-lsp/src/LSP/L4/Rules.hs:395-545`: `resolveImportShared` is the in-memory tier, then `resolveLibrary`, the log lines, the shadow warning (`warnOnLibraryShadow`, l.527-545), and the returned `ImportOutcome`.
-- `jl4-lsp/src/LSP/L4/Rules.hs:547-553`: `jl4Rules` creates the session's warn-once set (l.551) and binds `resolveImport`, which both `GetMixfixRegistry` (l.603) and `GetImports` (l.636) call.
-- `jl4-lsp/src/LSP/L4/Rules.hs:346-384`: `ImportOutcome`, `EmbedStatus` (`EmbedSkipped`, `EmbedEmpty`, `EmbedMissing n`) and `renderEmbedStatus` (from #167).
-- `jl4-lsp/src/LSP/Core/Shake.hs:363-404`: `embeddedLibraryUriScheme` (`"jl4-embedded"`), `embeddedLibraryUri`, `embeddedLibraryVfs` and `getVirtualFile`'s fallback to it; `addVirtualFileUri` at l.410.
+- `jl4-lsp/src/LSP/L4/Rules.hs:238-255`: `LibraryScope`, `AmbientLibraries` (the whole ladder) or `EmbeddedStdlibOnly` (the stdlib built into the binary and nothing else).
+- `jl4-lsp/src/LSP/L4/Rules.hs:291-362`: `resolveLibrary` takes a scope; the `EmbeddedStdlibOnly` clause (l.314-324) is the embedded copy alone, and the ambient clause builds the ladder (`cands`, l.342-344), probes it, and returns every existing candidate in order.
+- `jl4-lsp/src/LSP/L4/Rules.hs:381-401`: `distinctCopies` keeps each file once, by canonical path, at the rank of its first appearance.
+- `jl4-lsp/src/LSP/L4/Rules.hs:445-485`: `resolveImportShared` calls `resolveImportQuietly` and announces an unresolved import once per (importing module, module name), clearing the key when it resolves.
+- `jl4-lsp/src/LSP/L4/Rules.hs:487-606`: `resolveImportQuietly` is the in-memory tier (l.500-535), then `resolveLibrary`, the log lines, the shadow warning (`warnOnLibraryShadow`, l.613-634) and the returned `ImportOutcome`.
+- `jl4-lsp/src/LSP/L4/Rules.hs:636-649`: `jl4Rules` is `jl4RulesIn AmbientLibraries`; `jl4RulesIn` creates the session's two warn-once sets and binds `resolveImport`, which both `GetMixfixRegistry` (l.699) and `GetImports` (l.732) call.
+- `jl4-lsp/src/LSP/L4/Rules.hs:403-443`: `ImportOutcome`, `EmbedStatus` (`EmbedSkipped`, `EmbedEmpty`, `EmbedMissing n`) and `renderEmbedStatus` (from #167).
+- `jl4-lsp/src/LSP/L4/Oneshot.hs:30-56`: `oneshotL4ActionAndErrorsIn` and `oneshotL4ActionIn` run a one-shot session under a chosen scope; the old names are the same with `AmbientLibraries`.
+- `jl4-lsp/src/LSP/Core/Shake.hs:338-403`: `embeddedLibraryUriScheme` (`"jl4-embedded"`), `embeddedLibraryUri`, `embeddedLibraryVfs`, `embeddedLibraryText`, and `getVirtualFile`'s fallback to it; `addVirtualFileUri` at l.422.
+- `jl4-lsp/src/LSP/L4/EmbeddedLibrary.hs`: the `l4/embeddedLibrary` request, `{uri}` to `{text}`, served from the same map the build graph reads; `jl4-lsp/app/LSP/L4/Handlers.hs:825-838` registers it.
+- `ts-apps/vscode/src/embedded-library.ts`: the document selector that forwards `jl4-embedded:` documents to the server and the content provider that serves their text; `ts-apps/vscode/src/extension.mts:306` and `:395-406` wire them in, `ts-apps/vscode/src/sidebar-provider.ts:1281` keeps embedded modules out of deploy zips, and `ts-shared/jl4-client-rpc/custom-protocol.ts:253` defines the request type.
 - `jl4-core/src/L4/Import/Resolution.hs:180-252`: `resolveImports`, the API/WASM resolver; the already-resolved branch at l.190-191 is #102's fix.
-- `jl4-core/src/L4/TypeCheck/Types.hs:395-417`: `unionImportedCheckEnv` (#543, already on `main`): `entityInfo` is unioned left-biased (l.417), and the comment above it (l.395-399) gives the same rationale #143 wrote into `combineResolvedImports` (`jl4-core/src/L4/Import/Resolution.hs:347`; see Later changes).
+- `jl4-core/src/L4/TypeCheck/Types.hs:395-417`: `unionImportedCheckEnv` (#543, already on `main`): `entityInfo` is unioned left-biased (l.417), and the comment above it (l.395-399) gives the rationale that #143 wrote into `combineResolvedImports` (`jl4-core/src/L4/Import/Resolution.hs:347`).
 - `jl4-core/src/L4/API/EmbeddedLibraries.hs:44-95`: the TH splice that embeds `jl4-core/libraries/*.l4`; its `fail` at l.79 is #167's.
 - `jl4-core/jl4-core.cabal:21`: `data-files: libraries/*.l4`, above every section, with the reason in l.7-20 (l.7 begins "KEEP THIS ABOVE THE `flag` STANZAS").
 - `jl4/app/L4/Cli/Common.hs:185-194`: `isProgressChatter` drops Info/Debug `[Import Resolution]` lines and keeps Warning/Error ones.
-- `jl4-service/src/Backend/Jl4.hs:157-199`: a bundle registers each embedded library at `embeddedLibraryUri`, unless the bundle ships a file of the same basename.
+- `jl4-service/src/Backend/Jl4.hs:133-146`: `bundleScope = Rules.EmbeddedStdlibOnly`, which every session the service opens runs under (l.203, l.1102, l.1355, l.1375); l.172-215 registers each embedded library at `embeddedLibraryUri`, unless the bundle ships a file of the same basename.
+- `jl4-service/src/Compiler.hs:43-63` and `:87`: `logStdlibStandIns`, the `WARN` for a bundle file that stands in for a stdlib module; `jl4-service/src/Application.hs:109-116` logs the ignored `JL4_LIBRARY_PATH`.
 - `jl4-lsp/src/LSP/L4/Actions.hs:385-397`: hover renders a type through `prettyTypeForDisplay` (`jl4-core/src/L4/Print.hs:119`).
-- `jl4-lsp/jl4-lsp.cabal:155-172`: the `jl4-lsp-test` suite, created by #93.
-- User docs: `doc/reference/libraries/resolution.md` (the ladder table at l.26-34) and `jl4-core/libraries/README.md` (l.18-65), both from #134.
+- `jl4-lsp/jl4-lsp.cabal:156-176`: the `jl4-lsp-test` suite, created by #93.
+- User docs: `doc/reference/libraries/resolution.md` (the ladder table at l.26-34) and `jl4-core/libraries/README.md`, both from #134, and `doc/reference/libraries/IMPORT.md`, whose resolution rule this PR corrects.
 
 ## Behaviour and rules
 
-In-memory tier (tier 0), probed first through the memoising `GetFileContents` rule: `project:/<mod>.l4`, then the importing file's directory, then the root directory (`Rules.hs:416-444`).
-Then the ladder, first existing copy wins (`Rules.hs:298-307`):
+In-memory tier (tier 0), probed first through the memoising `GetFileContents` rule: `project:/<mod>.l4`, then the importing file's directory, then the root directory (`Rules.hs:500-535`).
+Then the ladder, first existing copy wins (`Rules.hs:335-344`):
 
 1. `$JL4_LIBRARY_PATH/<mod>.l4`, only when the variable is set;
 2. `<root>/<mod>.l4`;
@@ -59,61 +83,72 @@ Then the ladder, first existing copy wins (`Rules.hs:298-307`):
 5. `<XDG data>/jl4/libraries/<mod>.l4`;
 6. `<exeDir>/../../libraries/<mod>.l4`.
 
-The CLI's root directory is the entry file's own directory (`jl4-lsp/src/LSP/L4/Oneshot.hs:38-41`), so tiers 2 and 3 coincide for the entry file.
-When `JL4_LIBRARY_PATH` is set, tier 4 is removed from the probe list, and the candidate table and the shadow warning are not produced (`Rules.hs:463`), so goldens that pin the variable stay machine-independent.
-Parser-hint resolution and type-check resolution share this one code path, so an import cannot parse against one source and type-check against another; each import is therefore logged twice in a run.
-An embedded winner resolves to `jl4-embedded:/<mod>.l4`, and no VFS write happens (`Rules.hs:497-507`).
+Under `EmbeddedStdlibOnly` the ladder is tier 4 alone, whatever the environment and the working directory hold; `JL4_LIBRARY_PATH` is not read, so `hasExplicitPath` is `False` (`Rules.hs:314-324`).
+`jl4-service` runs every session under that scope.
+Before this PR it registered the stdlib up front at `./<name>.l4`, a key the in-memory tier hits first, so the host's files could not stand in for the stdlib; registering it at `jl4-embedded:` made the host's `prelude.l4` (in the working directory, or in a directory named by `JL4_LIBRARY_PATH`) win silently, and the scope is what keeps `main`'s deployments immune.
+Measured: with the scope removed, a deployment of `IMPORT prelude` and `sum xs` deploys ("applied") and every call answers 422 `sum is not in scope`; with it, 200.
+A file in the bundle with the stdlib module's name still wins, as any project copy does (it is in the in-memory tier), and the service warns.
+The CLI's root directory is the entry file's own directory (`jl4-lsp/src/LSP/L4/Oneshot.hs:48-51`), so tiers 2 and 3 coincide for the entry file.
+When `JL4_LIBRARY_PATH` is set, tier 4 is removed from the probe list, and the candidate table and the shadow warning are not produced (`Rules.hs:556`), so goldens that pin the variable stay machine-independent.
+Parser-hint resolution and type-check resolution share this one code path, so an import cannot parse against one source and type-check against another; each import is therefore resolved, and its Info lines logged, twice in a run, while its Warning lines are announced once.
+An embedded winner resolves to `jl4-embedded:/<mod>.l4`, and no VFS write happens (`Rules.hs:590-604`).
 `getVirtualFile` falls back to `embeddedLibraryVfs`, so an embedded module is readable from the start of the build and a probe cannot memoise it as missing (smucclaw/l4-ide#906).
-The URI is not a `file:` URI, so no speculative in-memory probe can name it; on unstable, with #64's original `./<mod>.l4` key, `l4 check main.l4` (root `"."`) let the embedded prelude beat the project's own `prelude.l4` until #148 (per #148's commit message); `main` never had that key, and `l4 check main.l4` run from that fixture's directory (the case at `jl4/tests-cli/Main.hs:633`) passes on plain `main` too (measured).
+The URI is not a `file:` URI, so no speculative in-memory probe can name it.
+`main` registered the embedded fallback at `./<mod>.l4` instead, a VFS key, and with the entry file named bare (root `"."`) that key collides: measured on plain `main`, `cd project && l4 run total.l4` for a file that writes `IMPORT prelude` and uses `sum` fails with "I could not find a definition for the identifier `sum`" and exits 1, while `l4 run project/total.l4` works; this PR makes both work.
 An embedded importer has no directory (`uriToNormalizedFilePath` is `Nothing`), so its own imports are ranked by the same ladder as everyone else's, and one module name stays bound to one source per build.
-Shadow warning: when two or more candidates exist and at least two contents differ (byte comparison), it lists every existing candidate, marks the winner `[chosen]` and the rest `[shadowed]`, and shows each symlink's real target; identical copies stay silent; each (module, list) pair warns once per session (`Rules.hs:527-545`).
-Winner logging, only when the variable is unset: Info "Found on filesystem (candidate i of n): <path>[ -> <real path>]" or "Found in embedded libraries (candidate i of n): <mod>", and a Debug candidate table with `(hit)`/`(miss)` per entry (`Rules.hs:464-500`).
+Shadow warning: when two or more distinct files exist and at least two contents differ (byte comparison), it lists every distinct copy, marks the winner `[chosen]` and the rest `[shadowed]`, and shows each symlink's real target; identical copies stay silent; each (module, list) pair warns once per session (`Rules.hs:613-634`).
+Two tiers that name one file, as the root and importer-relative tiers do from the CLI, are one copy (`distinctCopies`), so the file is not listed as shadowing itself.
+Winner logging, only when the variable is unset: Info "Found on filesystem (candidate i of n): <path>[ -> <real path>]" or "Found in embedded libraries (candidate i of n): <mod>", and a Debug candidate table with `(hit)`/`(miss)` per entry (`Rules.hs:556-600`).
 Core resolver (API/WASM): `resolved` maps each module name to its type-checked record, and a module met again hands back that record, so a diamond's second sibling sees the shared module's exports (#102, smucclaw/l4-ide#904).
 Merging imported environments keeps the first `entityInfo` entry on a key collision; a collision is the same entity reached by two paths, so the values agree.
-Build: if the TH splice finds no `prelude.l4` in the Cabal datadir, `./libraries` or `./jl4-core/libraries`, compilation fails; the embed is frozen at build time, so a plain `cabal build` does not pick up edits to a checkout's libraries (`jl4-core/src/L4/API/EmbeddedLibraries/TH.hs:41-51`), a gotcha that is documented rather than fixed.
+Build: if the TH splice finds no `prelude.l4` in the Cabal datadir, `./libraries` or `./jl4-core/libraries`, compilation fails (`jl4-core/src/L4/API/EmbeddedLibraries/TH.hs:41-51`).
+The embed is read when GHC compiles `L4.API.EmbeddedLibraries`; editing a library alone leaves nothing for Cabal to rebuild, so `cabal build` prints `Up to date` and the binary keeps the old stdlib (measured, `doc/reference/libraries/resolution.md`, "The embed-staleness gotcha").
 CI step "The sdist must carry the standard library" (`.github/workflows/pr-checks.yml:171-187`, job `haskell`) fails on a `cabal check` parser warning or an sdist without `libraries/prelude.l4`.
 
 ## Diagnostics
 
-- Shadow warning (Warning, printed to stderr by the CLI): "Multiple differing copies of module `<mod>` are visible:", one row per copy, then "The [chosen] copy is used wherever this module is imported. To use a" / "different copy, set JL4_LIBRARY_PATH or place <mod>.l4 in the project root or beside the importing file." (`Rules.hs:539-545`).
-- Not found (Warning log): "Module not found: <mod>", or "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): <mod>" (`Rules.hs:512-520`).
-- Not-found diagnostic, embedded entry (#167): "the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)", "... (<n> modules, not among them)", or the multi-line "... -- WHICH IS EMPTY." build-defect text (`Rules.hs:374-384`); `EmbedEmpty` cannot occur in an `l4` that compiled, because the splice fails the build first.
-- The diagnostic itself reads "I could not find a module with this name: <mod>" / "I have tried the following locations:", then the tried URIs and paths with exact duplicates removed, then the embedded entry last (`Rules.hs:640-659`).
+- Shadow warning (Warning, printed to stderr by the CLI): "Multiple differing copies of module `<mod>` are visible:", one row per copy, then "The [chosen] copy is used wherever this module is imported. To use a" / "different copy, set JL4_LIBRARY_PATH or place <mod>.l4 in the project root or beside the importing file." (`Rules.hs:628-634`).
+- Not found (Warning): "Module not found: <mod>", or "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): <mod>", once per (importing module, module name) until the import resolves (`Rules.hs:445-485`).
+- Not-found diagnostic, embedded entry (#167): "the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)", "... (<n> modules, not among them)", or the multi-line "... -- WHICH IS EMPTY." build-defect text (`Rules.hs:433-443`); `EmbedEmpty` cannot occur in an `l4` that compiled, because the splice fails the build first.
+- The diagnostic itself reads "I could not find a module with this name: <mod>" / "I have tried the following locations:", then the tried URIs and paths with exact duplicates removed, then the embedded entry last (`Rules.hs:742-755`); `doc/reference/errors/README.md` quotes it.
 - Build failure: "L4.API.EmbeddedLibraries: found no standard library to embed.", followed by the three probed paths and the cwd (`EmbeddedLibraries.hs:79-93`).
 - Core API: "Module not found: <mod> (searched: embedded libraries, project VFS)" (`Resolution.hs:305`).
+- Service: "JL4_LIBRARY_PATH is set and ignored: deployments resolve IMPORTs against their own files and the standard library built into this binary" (`Application.hs:113-116`), and "Bundle file stands in for a standard library module" (`Compiler.hs:57-62`).
+- `l4/embeddedLibrary`: "Not an embedded library: <uri>" for a URI that is not a `jl4-embedded:` module this binary carries, such as a `file:` URI (`Handlers.hs:825-838`).
 
 ## Tests and fixtures that pin it
 
-- `jl4-lsp/test/LibraryResolutionSpec.hs:103-171`: nine table-driven `resolveLibrary` cases over environment variable, root, sibling, XDG and symlink sandboxes (#134).
-- `jl4/tests-cli/Main.hs:546-619`: five black-box cases for the shadow order and warning, with fixtures `jl4/tests-cli/fixtures/library-shadow/{embedded-wins,sibling-wins,xdg-extra}/` (#134).
-- `jl4/tests-cli/Main.hs:520-544`: embedded-only diamond (#87), with fixture `jl4/tests-cli/fixtures/embedded-diamond/main.l4`.
-- `jl4/tests-cli/Main.hs:621-661`: bare entry path (#148), two cases that run `l4 check main.l4` from inside the `sibling-wins` and `embedded-wins` fixture directories.
+- `jl4-lsp/test/LibraryResolutionSpec.hs`: table-driven `resolveLibrary` cases over environment variable, root, sibling, XDG and symlink sandboxes (#134), two for `EmbeddedStdlibOnly` (it ignores the variable, the root, the sibling and the XDG store; it finds nothing the embed lacks) and three for `distinctCopies` (#630).
+- `jl4-lsp/test/EmbeddedLibrarySpec.hs`: `l4/embeddedLibrary` serves exactly the embedded text for every module, refuses a `file:` URI, an unknown module and a path-shaped URI, and speaks `{uri}` to `{text}` (#627).
+- `jl4-service/test/StdlibResolutionSpec.hs`: with a stray `prelude.l4` in the service's working directory, and with `JL4_LIBRARY_PATH` naming a directory that holds one, a deployment answers 200 from the real stdlib; a bundle's own `prelude.l4` wins and is warned about; a byte-for-byte copy of the stdlib's is not (#630). The first two fail on this PR's first commit with 422, and the warning case with no log line.
+- `jl4/tests-cli/Main.hs:520-548`: embedded-only diamond (#87), with fixture `jl4/tests-cli/fixtures/embedded-diamond/main.l4`.
+- `jl4/tests-cli/Main.hs:550-628`: black-box cases for the shadow order and warning, with fixtures `jl4/tests-cli/fixtures/library-shadow/{embedded-wins,sibling-wins,xdg-extra}/` (#134). The poisoned-XDG case asserts the two rows whole, `[chosen]   embedded stdlib` and `[shadowed] XDG data dir`.
+- `jl4/tests-cli/Main.hs:630-773`: entry-path spelling and embedded importers: a bare entry path (#148) for the project override and for the embedded stdlib; the stdlib's names in scope under a bare entry path (measured failing on `main`); the two embedded-importer cases of #148, adapted (below); one row per copy in the shadow warning; one `Module not found` warning per mistake in stderr, `check --json`, `run --json` and `ast` (#630).
 - `jl4-core/test/ImportResolutionSpec.hs:88`: both diamond siblings type-check clean (#102).
 - `jl4-lsp/test/HoverDisplaySpec.hs:63-64`: hover shows `a`, never `x10` (#93).
+- `ts-apps/vscode/src/unit-tests/embedded-library.test.ts`: the document selector forwards `jl4-embedded:` documents, and the content provider asks for exactly the URI it is given, waits for the client, passes the text through untouched, and names the document when the server errors (#627).
 - No golden changed with this PR. The two goldens that #134 re-blessed on unstable, `section-scoping-import-collision` and `set-equals-ambiguous`, are not on `main`.
 
-## What this PR leaves out
+Run against the `l4` built from plain `main`, eight of the CLI cases fail: the embedded diamond, the poisoned XDG copy, the symlink naming, the differing copies, both embedded-importer cases, one row per copy, and one warning per mistake.
 
-The two "an embedded library sees the project-local override" cases of #148 are not here.
-They expect `l4 check` to fail on an error inside an imported module, which needs `hasBlockingError` from unstable's #52, and that is not on `main`.
-Measured on this PR's build: `l4 check main.l4`, run from inside the fixture directory with `JL4_LIBRARY_PATH` unset, prints the arity mismatch in `actus-schedule` as a diagnostic on `jl4-embedded:/actus-schedule.l4`, which shows the embedded importer bound to the project's `daydate`, and then prints "Check succeeded." and exits 0, so a case that expects a non-zero exit fails here.
-Their fixture (`jl4/tests-cli/fixtures/library-shadow/embedded-importer/`) and its constants (`shadowImporterDir`, `shadowImporterEntry`, `jl4/tests-cli/Main.hs:266-273`) are here, but no case in the suite runs the fixture.
-The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:283-290`) is not extended for any of the new fixtures.
-Nothing of #143 is carried: its one in-scope hunk is subsumed by `unionImportedCheckEnv`.
+## Adapted from unstable
+
+The two "an embedded library sees the project-local override" cases of #148 assert that `l4 check` exits non-zero on an error inside an imported module, which needs `hasBlockingError` from unstable's #52, not on `main`.
+On `main` that error is printed and `l4 check` still exits 0, so here the cases keep their three stderr assertions (the arity error names `actus-schedule`; the shadow warning names `daydate`; `[chosen]   project root`) and drop the exit code.
+Measured: they fail against `main`'s `l4`, where the embedded `actus-schedule` keeps the embedded `daydate` and `l4 check` prints no diagnostic, and pass against this PR's.
+The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:283-290`) is not extended for the new fixtures.
 
 ## Limits and known defects (verified by reading the code)
 
 - The two resolvers disagree: the ladder puts a project copy above the embedded one, but `apiModuleLookup` tries embedded first (`jl4-core/src/L4/API/VirtualFS.hs:99-101`); this is latent because every non-test caller passes `emptyVFS` (eight sites in `jl4-core/src/L4/API.hs`, and `jl4-wasm/app/QueryPlanWasm.hs:40`).
 - That API path also has no filesystem tiers and no shadow warning, and its not-found list is hard-coded (`Resolution.hs:200`).
-- The shadow warning does not deduplicate by real path: from the CLI, where root and importer directory coincide, one file is listed as both "[chosen] project root" and "[shadowed] importer-relative"; no CLI case on `main` asserts the rows.
-- Spec §8 acceptance 1 is not met on the CLI: winner lines are Info (`Rules.hs:495`, `:498`) and the CLI drops Info resolution lines, so the chosen copy is shown only when a shadow warning fires; `resolution.md:145-146` says the Info/Debug lines are in the language server's log only, because no `l4` command has a verbose mode (`runOneshotVerbose` has no caller).
-- Stale comments: `Rules.hs:393-394` says an embedded winner "is registered as a Shake virtual file", contradicted by l.502-507; `jl4-service/src/Backend/Jl4.hs:1089-1091`, `:1342-1344` and `:1361-1363` say embedded libraries resolve "via JL4_LIBRARY_PATH or Paths_jl4_core data-dir".
-- `Backend/Jl4.hs:159` says registering the libraries makes `IMPORT prelude` resolve "via the VFS"; the in-memory tier never probes a `jl4-embedded:` URI, so read in code the import resolves at tier 4 and the registration duplicates `embeddedLibraryVfs` (not run).
-- `doc/reference/libraries/IMPORT.md:61-62` (older text, not from these units) says library names resolve to `jl4-core/libraries/` and relative names to the current directory.
+- Spec §8 acceptance 1 is not met on the CLI: winner lines are Info (`Rules.hs:588`, `:591`) and the CLI drops Info resolution lines, so the chosen copy is shown only when a shadow warning fires; the language server's log has them, because no `l4` command has a verbose mode (`runOneshotVerbose` has no caller).
+- The `jl4-service` restart probe from unstable (`etc/probe-service-restart.mjs`) fails on `main` and on this PR alike: the query plan of an ordinary rule answers 200 before a restart and 400 after one. Unstable fixed that in `d2dd71f94`, which is not on `main`.
+- A bundle that ships its own `prelude.l4` is honoured and warned about; nothing stops it from defining a `sum` of another type, which is the right of a bundle and the reason for the warning.
+- The embed-staleness measurement is of a checkout built with `cabal build`; `cabal install` from an sdist and a Nix build were not measured.
+- The `ts-apps/vscode` part is checked by its unit tests, the type check and lint, not by opening a tab in VS Code; the claim that a read-only `prelude.l4` tab opens rests on the content provider and the selector, which the unit tests pin.
 
 ## Later changes
 
-- #451, a separate change on unstable that is not on `main`, adds `tiersInOrder` and `roundTrippingFileUri` (smucclaw/l4-ide#971), lists the not-found locations in ladder order deduplicated by file, and adds the line "Nothing it defines is in scope here; ...".
-  It also stops an unresolved import from producing the importer's own URI (the source of "Your module depends on itself"), and adds `ImportDiagnosticSpec` and `ImportUriSpec` to `jl4-lsp-test`.
-- #543 moved the import-boundary merge into `unionImportedCheckEnv` before this PR, so #143's rewritten `Map.union` line and comment in `combineResolvedImports` do not apply on `main`.
+- #451, a separate change on unstable that is not on `main`, adds `tiersInOrder` and `roundTrippingFileUri` (smucclaw/l4-ide#971), lists the not-found locations in ladder order deduplicated by file, adds the line "Nothing it defines is in scope here; ...", stops an unresolved import from producing the importer's own URI (the source of "Your module depends on itself"), and adds `ImportDiagnosticSpec` and `ImportUriSpec` to `jl4-lsp-test`.
 - On unstable the CLI runner `runL4EmbeddedOnly` (added by #87) later moved to a `CliTest/Common.hs`; `main` has no such file, and the runner is in `jl4/tests-cli/Main.hs:182`.

@@ -486,7 +486,7 @@ See [Libraries](../libraries/README.md) for the full list of available libraries
 
 ### Module not found
 
-**Error message:** `Error: cannot resolve import 'modulename'`
+**Error message:** `I could not find a module with this name: modulename`, then `I have tried the following locations:` and the list of places that were tried, which ends with the standard library built into the binary, for example `the stdlib embedded in this binary (20 modules, not among them)`, or `the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)` when that variable is set. On stderr `l4` also prints one line, `Warning | [Import Resolution] Module not found: modulename`.
 
 **What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
 

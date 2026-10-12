@@ -349,8 +349,12 @@ class Typeable a => IsIdeGlobal a where
 -- The old @.\/\<name\>.l4@ key was forgeable in exactly that way, twice over:
 --
 --   * @l4 check main.l4@ (no directory component) makes @rootDirectory@ @"."@,
---     so the root candidate for @prelude@ /is/ @.\/prelude.l4@ — the embedded
---     prelude then silently beat the project's own @prelude.l4@;
+--     so the root candidate for @prelude@ /is/ @.\/prelude.l4@. On unstable the
+--     embedded prelude then silently beat the project's own @prelude.l4@; on
+--     main, which registered the embedded copy at that key only after the
+--     filesystem tiers had missed, the same spelling left the prelude's names
+--     out of scope (@l4 run total.l4@ with @IMPORT prelude@ could not find
+--     @sum@; measured);
 --   * an embedded importer's own URI was @file:\/\/\<name\>.l4@, so
 --     @takeDirectory@ of it was @"."@ and its dependencies' relative candidates
 --     hit the same keys — binding one module name to two different sources

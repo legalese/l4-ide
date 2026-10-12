@@ -121,8 +121,10 @@ supported mechanism.
   jl4-core datadir), so a bare `cabal test jl4-test` works. Locally you still
   want the worktree pin from the previous section so the goldens run against
   the sources you're editing.
-- **`l4-cli-test`** manufactures its own hermetic environments per test
-  (fabricated `XDG_DATA_HOME`, env var dropped) — nothing to set.
+- **`l4-cli-test`**: the library-resolution cases manufacture their own
+  environment per case (a fabricated `XDG_DATA_HOME`, the variable dropped), so
+  they need nothing set. The rest of the suite runs in the environment it is
+  given.
 
 ### I'm packaging / deploying
 
@@ -154,8 +156,11 @@ historical one-line form).
 
 ```
 Info | [Import Resolution] Found in embedded libraries (candidate 3 of 5): prelude
-Info | [Import Resolution] Found on filesystem (candidate 2 of 5): ./prelude.l4
+Info | [Import Resolution] Found on filesystem (candidate 1 of 5): /work/prelude.l4
 ```
+
+(The first when nothing in the project shadows the stdlib, the second when the
+project root holds its own `prelude.l4`.)
 
 **The full candidate table**, at Debug priority:
 

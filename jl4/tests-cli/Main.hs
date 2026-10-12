@@ -134,8 +134,8 @@ runL4WithEnv = runL4In Nothing
 -- project (root directory @"."@) exercises a different resolution path than
 -- @l4 check some/dir/main.l4@ run from the package root. Every fixture path in
 -- this suite carries a directory component, so without this the @"."@ case is
--- never covered — which is how the embedded stdlib came to outrank
--- project-local libraries for a whole release without a red test.
+-- never covered — which is how a bare @l4 run total.l4@ lost the stdlib's names
+-- (measured on plain main) without a red test.
 runL4In :: Maybe FilePath -> Maybe [(String, String)] -> FilePath -> [String] -> IO Output
 runL4In mCwd mEnv bin args = do
   let cp = (proc bin args)
@@ -178,7 +178,7 @@ runL4WithXdgHomeIn mCwd xdgHome bin args = do
 -- | Run l4 with library resolution forced onto the embedded-library fallback:
 -- no @JL4_LIBRARY_PATH@, and an /empty/ XDG store (so no user-level
 -- @~/.local/share/jl4/libraries@ on the runner interferes). This is the exact
--- regime issue #906 is about.
+-- regime smucclaw/l4-ide#906 is about.
 runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
 runL4EmbeddedOnly = runL4EmbeddedOnlyIn Nothing
 
@@ -246,7 +246,7 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalTraceFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 
--- Diamond over the embedded-library fallback (issue #906): main imports two
+-- Diamond over the embedded-library fallback (smucclaw/l4-ide#906): main imports two
 -- embedded siblings that share the embedded 'daydate' bottom.
 embeddedDiamondEntry :: FilePath
 embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
@@ -524,9 +524,13 @@ spec bin = do
   -- `actus-schedule` uses `Days in month`, defined in `daydate`. Run under the
   -- embedded-only regime (no JL4_LIBRARY_PATH, empty XDG) so the whole closure
   -- is served by the LSP/Shake embedded fallback — exactly the path CI's
-  -- JL4_LIBRARY_PATH normally hides. Before the fix this exited non-zero with
-  -- "I could not find a definition for the identifier `Days in month`".
-  describe "l4 embedded-library diamond imports (#906)" $ do
+  -- JL4_LIBRARY_PATH normally hides. Before the fix `l4 check` printed
+  -- "I could not find a definition for the identifier ..." errors for the
+  -- starved sibling (and still exited 0, so the assertion on the text below is
+  -- what fails). The same starvation stops an ordinary user file that writes
+  -- `IMPORT prelude` and `IMPORT daydate` from finding `sum`; that file exits 1
+  -- before the fix.
+  describe "l4 embedded-library diamond imports (smucclaw/l4-ide#906)" $ do
     it "threads a transitive re-export into both diamond siblings" $ do
       Output code sout serr <- runL4EmbeddedOnly bin ["check", embeddedDiamondEntry]
       let combined = sout ++ "\n" ++ serr
@@ -569,11 +573,16 @@ spec bin = do
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
       -- Option E: two differing copies were visible; the warning names them
-      -- and the chosen one, at a priority the CLI actually prints.
+      -- and the chosen one, at a priority the CLI actually prints. The two rows
+      -- are asserted whole, with their markers: that the words "embedded
+      -- stdlib" and "XDG data dir" appear somewhere in the output proves
+      -- nothing, because the unresolved-import error and the parse error in
+      -- the poisoned file name them too. On plain main, which has no warning,
+      -- the poisoned file is reported as a parse error and the check still
+      -- exits 0.
       serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
-      serr `shouldSatisfy` ("[chosen]" `isInfixOf`)
-      serr `shouldSatisfy` ("embedded stdlib" `isInfixOf`)
-      serr `shouldSatisfy` ("XDG data dir" `isInfixOf`)
+      serr `shouldSatisfy` ("[chosen]   embedded stdlib" `isInfixOf`)
+      serr `shouldSatisfy` ("[shadowed] XDG data dir" `isInfixOf`)
 
     it "dereferences symlinks when naming the shadowed copy" $ do
       tmp <- getTemporaryDirectory
@@ -622,7 +631,9 @@ spec bin = do
   -- reach embedded importers, not just the top-level module. Neither property
   -- was covered: every fixture path above carries a directory component, so
   -- @rootDirectory@ was never "."; and no fixture put a project copy of a module
-  -- that an EMBEDDED library imports. Both gaps hid live precedence inversions.
+  -- that an EMBEDDED library imports. Both gaps hid live precedence inversions
+  -- on unstable. Plain main shows only the second: the bare-entry cases pass
+  -- there too, and the embedded-importer cases are what fail.
   describe "l4 library resolution: entry-path spelling and embedded importers" $ do
     -- `l4 check main.l4`, run from inside the project — the ordinary way a user
     -- invokes the CLI, and the one that makes the resolver's root directory ".".
@@ -636,10 +647,12 @@ spec bin = do
       -- must not depend on the spelling: main.l4 uses `shadow marker`, which
       -- only the fixture's own prelude.l4 defines.
       --
-      -- It used to. With rootDirectory ".", the root candidate URI for `prelude`
-      -- normalised to exactly the key the embedded stdlib was registered under,
-      -- and the VFS tier hit it before library resolution ran — so this exited 1
-      -- with "I could not find a definition for the identifier `shadow marker`".
+      -- Plain main passes this too. It is here because the change makes the
+      -- embedded stdlib a candidate URI of its own (`jl4-embedded:`), and a
+      -- version of the idea that registered it at a file-shaped key made the
+      -- embedded prelude beat the project's when the root directory was ".",
+      -- so this exited 1 with "I could not find a definition for the identifier
+      -- `shadow marker`".
       Output code sout serr <- checkFrom shadowSiblingDir
       case code of
         ExitSuccess -> pure ()
@@ -660,6 +673,58 @@ spec bin = do
           "Expected the embedded prelude to serve a bare entry path, but l4 exited "
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
+
+    -- The names, not just the import. embedded-wins/main.l4 above only writes
+    -- the `IMPORT`, so it cannot tell a prelude that is in scope from one that
+    -- is not. With the entry file named bare and nothing on disk to find, plain
+    -- main binds none of the prelude's names: `cd project && l4 run total.l4`
+    -- answers "I could not find a definition for the identifier `sum`" and
+    -- exits 1, while `l4 run project/total.l4` works.
+    it "a bare entry path still brings the stdlib's names into scope" $ do
+      tmp <- getTemporaryDirectory
+      let work = tmp </> "l4-bare-entry-stdlib-names"
+      removePathForcibly work
+      createDirectoryIfMissing True work
+      writeFile (work </> "total.l4") (unlines ["IMPORT prelude", "", "#EVAL sum (LIST 1, 2, 3)"])
+      Output code sout serr <- runL4EmbeddedOnlyIn (Just work) bin ["run", "total.l4"]
+      removePathForcibly work
+      let combined = sout ++ "\n" ++ serr
+      when ("could not find a definition" `isInfixOf` combined) $
+        expectationFailure ("`sum` was not in scope after IMPORT prelude:\n" ++ combined)
+      code `shouldBe` ExitSuccess
+
+    -- One module name, one source, including for importers that are themselves
+    -- embedded libraries. embedded-importer/daydate.l4 is a deliberately
+    -- narrower override of a module the embedded `actus-schedule` imports and
+    -- uses; binding `actus-schedule` to it must surface an arity error against
+    -- `actus-schedule` itself. Before the change this checked clean: `main` saw
+    -- the project `daydate` while `actus-schedule` quietly kept the embedded one.
+    --
+    -- The exit code is not asserted. On main an error inside an imported module
+    -- is printed as a diagnostic and `l4 check` still exits 0, so the evidence
+    -- is the text: the arity error names `actus-schedule`, and the shadow
+    -- warning names the chosen project copy.
+    --
+    -- The positive control is the `embedded-diamond` test above: the same
+    -- embedded closure with no project override checks clean.
+    let expectEmbeddedImporterSeesOverride label run =
+          it label $ do
+            Output _code _sout serr <- run
+            -- The diagnostic must land on the EMBEDDED importer, which is the
+            -- whole point: that is the module that changed source.
+            serr `shouldSatisfy` ("actus-schedule" `isInfixOf`)
+            -- ...and the shadow warning must be telling the truth when it says
+            -- the chosen copy is used wherever the module is imported.
+            serr `shouldSatisfy` ("Multiple differing copies of module `daydate`" `isInfixOf`)
+            serr `shouldSatisfy` ("[chosen]   project root" `isInfixOf`)
+
+    expectEmbeddedImporterSeesOverride
+      "an embedded library sees the project-local override too"
+      (runL4EmbeddedOnly bin ["check", shadowImporterEntry])
+
+    expectEmbeddedImporterSeesOverride
+      "...and also when the entry file is named bare"
+      (checkFrom shadowImporterDir)
 
     -- With the entry file named bare, the project root and the importing
     -- file's directory are the same directory, so the root tier and the
@@ -688,6 +753,23 @@ spec bin = do
       let work    = tmp </> "l4-import-missing-warns-once"
           warning = "Module not found: zz no such module"
           occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+      removePathForcibly work
+      createDirectoryIfMissing True work
+      writeFile (work </> "importer.l4") "IMPORT `zz no such module`\n"
+      let runIn args = runL4EmbeddedOnlyIn (Just work) bin args
+      Output _ _ serr <- runIn ["check", "importer.l4"]
+      occurrences warning serr `shouldBe` 1
+      -- `l4 check --json` and `l4 run --json` carry the Warning lines in
+      -- `diagnostics`; each must carry this one once.
+      Output _ checkJson _ <- runIn ["check", "--json", "importer.l4"]
+      occurrences warning checkJson `shouldBe` 1
+      Output _ runJson _ <- runIn ["run", "--json", "importer.l4"]
+      occurrences warning runJson `shouldBe` 1
+      -- Positive control: `l4 ast` never typechecks, so the rule that collects
+      -- dependencies never runs and the parser-hint rule is the only one that
+      -- tells you. One warning must not become none.
+      Output _ _ astErr <- runIn ["ast", "importer.l4"]
+      occurrences warning astErr `shouldBe` 1
       removePathForcibly work
 
 -- | Run one row through @l4 batch@ and return its result, failing the test

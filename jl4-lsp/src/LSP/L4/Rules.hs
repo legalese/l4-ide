@@ -596,7 +596,7 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
               -- No VFS write: the embedded copy is already readable at its
               -- canonical URI via 'Shake.embeddedLibraryVfs'. Registering it
               -- here would only re-introduce the mid-rule VFS mutation whose
-              -- ordering-dependence caused #906 in the first place.
+              -- ordering-dependence caused smucclaw/l4-ide#906 in the first place.
               pure $ outcome $ Just $ Shake.embeddedLibraryUri (Text.pack modName)
             Nothing ->
               -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
