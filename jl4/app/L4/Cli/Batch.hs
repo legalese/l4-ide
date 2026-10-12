@@ -447,16 +447,22 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
     Left err -> Left err
     Right (_, rows) -> Right (map (BatchRow FromCsv . rowToJson) (Vector.toList rows))
       where
-        -- A case that will be evaluated keeps each cell as the text written
-        -- (an empty cell is @null@): only the export's declared input types can
-        -- say whether @123456@ is a number or a code ('declareInputs').
+        -- A BLANK cell (empty, spaces only, or a quoted @""@) is left out of
+        -- the case, exactly as if its column were missing from the file. CSV has
+        -- no spelling of null, and a blank cell is not text (T3c, ruled in
+        -- @specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@ on unstable): an input
+        -- that has to be given is then reported as missing, and a @MAYBE@ input
+        -- is @NOTHING@, as a missing JSON key is.
+        --
+        -- A case that will be evaluated keeps each other cell as the text
+        -- written: only the export's declared input types can say whether
+        -- @123456@ is a number or a code ('declareInputs').
         rowToJson :: Csv.NamedRecord -> Aeson.Value
-        rowToJson record = Aeson.Object $ KeyMap.fromList $
-          map (\(k, v) -> (Key.fromText (decodeUtf8 k), csvText (decodeUtf8 v))) $
-          HashMap.toList record
-        csvText t
-          | Text.null (Text.strip t) = Aeson.Null
-          | otherwise                = Aeson.String t
+        rowToJson record = Aeson.Object $ KeyMap.fromList
+          [ (Key.fromText (decodeUtf8 k), Aeson.String (decodeUtf8 v))
+          | (k, v) <- HashMap.toList record
+          , not (Text.null (Text.strip (decodeUtf8 v)))
+          ]
   other -> Left ("Unsupported format: " ++ Text.unpack other)
 
 -- | A case with each value typed by what the export declares for that input.
@@ -467,10 +473,11 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
 -- not read as one is left alone, so that the decode error names the value it
 -- could not read.
 --
--- A STRING input keeps its text exactly as written. JSON and YAML already say
--- what a string is, so a number sent for one stays the error it was; a CSV
--- cell is never a number just because it looks like one (@123456@, @1.50@,
--- @018956@ are all codes to a STRING input).
+-- A STRING input keeps its text exactly as written (a blank CSV cell is not
+-- text: 'parseBatchInput' leaves it out). JSON and YAML already say what a
+-- string is, so a number sent for one stays the error it was; a CSV cell is
+-- never a number just because it looks like one (@123456@, @1.50@, @018956@
+-- are all codes to a STRING input).
 --
 -- An input whose type is not one of those three, or which the export does not
 -- declare, is not typed here: JSON and YAML values are left alone, and a CSV

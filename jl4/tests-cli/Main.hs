@@ -199,6 +199,13 @@ batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 
+-- | Blank CSV cells (T3c): one STRING input that has to be given and one MAYBE
+-- STRING input that need not be, and an income column left blank.
+batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv :: FilePath
+batchBlankFixture   = fixtureDir </> "batch-blank.l4"
+batchBlankCsv       = fixtureDir </> "batch-blank.csv"
+batchBlankIncomeCsv = fixtureDir </> "batch-blank-income.csv"
+
 -- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
 batchLineBreakFixture, batchLineBreakJson :: FilePath
 batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
@@ -435,6 +442,51 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    -- T3c (ruled, specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md on unstable): a
+    -- blank CSV cell is ABSENT, exactly like a column missing from the file, for
+    -- every kind of input. Plain main answered an empty STRING cell with "" and
+    -- a blank MAYBE STRING cell with JUST "", and an empty NUMBER cell with a
+    -- decode error under status "success".
+    describe "a blank CSV cell is absent, not null and not an empty string" $ do
+      let blankRows args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          diagnosticsOf row = show (objField row "diagnostics")
+          resultOfRow row = case objField row "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+
+      it "makes a required STRING input missing, and a MAYBE STRING input NOTHING" $ do
+        (code, rows) <- blankRows [batchBlankFixture, "--inputs", batchBlankCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows
+          `shouldBe` map (Just . String) ["error", "error", "success", "success", "success"]
+        case rows of
+          [empty, spaces, noNote, blankNote, note] -> do
+            diagnosticsOf empty  `shouldSatisfy` ("Missing required field 'code'" `isInfixOf`)
+            diagnosticsOf spaces `shouldSatisfy` ("Missing required field 'code'" `isInfixOf`)
+            resultOfRow noNote    `shouldBe` Just (String "nothing")
+            resultOfRow blankNote `shouldBe` Just (String "nothing")
+            resultOfRow note      `shouldBe` Just (String "hello")
+            -- the case as read leaves the blank cell out
+            (objField noNote "input" >>= (`objField` "note")) `shouldBe` Nothing
+            (objField empty "input" >>= (`objField` "code")) `shouldBe` Nothing
+          other -> expectationFailure ("expected 5 rows, got " ++ show (length other))
+
+      it "makes a required NUMBER input missing too" $ do
+        (code, rows) <- blankRows [batchEligFixture, "--inputs", batchBlankIncomeCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["error", "error", "success"]
+        map diagnosticsOf (take 2 rows) `shouldSatisfy` all ("Missing required field 'income'" `isInfixOf`)
+
+      it "is reported by --validate-only as a missing field" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchBlankIncomeCsv, "--validate-only", "--continue-on-error"]
+        code `shouldSatisfy` (/= ExitSuccess)
+        length (filter ("Missing required field: 'income'" `isInfixOf`) (lines sout)) `shouldBe` 2
 
     it "keeps a line break inside a string literal as it is written" $ do
       -- batch runs the re-printed module; before #1028 the newline came back

@@ -297,9 +297,9 @@ Natural-language names work too: exported functions and parameters written with 
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
 Text that does not spell one is left as it is, and the line is an error that names the text.
-A parameter declared as `STRING` keeps a CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
+A parameter declared as `STRING` keeps a non-blank CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
-An empty CSV cell is `null`.
+A blank CSV cell is not text, for a `STRING` parameter as for any other: an empty cell, a cell holding only spaces and a quoted `""` all leave the fact out, exactly as a column missing from the file does. A fact that has to be given is then missing, which makes the line an error that says `Missing required field` and names it; a `MAYBE` fact is `NOTHING`.
 A CSV cell for any other kind of parameter is typed by its content: `true` or `false` (any case) is a boolean, a plain number such as `3.5` is a number (a cell containing `e` or `E` stays text), and anything else is a string.
 
 `--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
