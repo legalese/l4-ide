@@ -318,6 +318,7 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
 verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
+verifyClauseGroupCallFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -326,6 +327,7 @@ verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
+verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -444,6 +446,7 @@ coreFixtures =
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
+  , verifyClauseGroupCallFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
@@ -2626,6 +2629,26 @@ spec bin = do
       sout `shouldSatisfy` ("\"analysed\":2" `isInfixOf`)
       sout `shouldSatisfy` ("\"skipped\":0" `isInfixOf`)
       sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
+
+    -- The two forms are one rule, so `l4 verify` counts them alike: the same
+    -- leaves, the same questions among them (one atomId each), the same ladder,
+    -- and a call in a clause is read through as it is in the CONSIDER.
+    it "counts a clause group's atoms, and reads its calls, as it does the CONSIDER written by hand" $ do
+      for_ [ (verifyClauseGroupFixture, "covered", "`covered by hand`", 0)
+           , (verifyClauseGroupCallFixture, "paid", "`paid by hand`", 1) ] \ (fixture, clauses, hand, calls) -> do
+        env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+        let stats nm =
+              [ (k, v)
+              | Just (Array ds) <- [objField env "decisions"]
+              , d <- toList ds
+              , objField d "name" == Just (String nm)
+              , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "callsReadThrough", "callsLeftOpaque", "findings"]
+              , Just v <- [objField d k]
+              ]
+        length (stats clauses) `shouldBe` 7
+        lookup "analysed" (stats clauses) `shouldBe` Just (Bool True)
+        lookup "callsReadThrough" (stats clauses) `shouldBe` Just (Number calls)
+        stats clauses `shouldBe` stats hand
 
     it "records a non-boolean DECIDE as skipped, never as clean" $ do
       env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]

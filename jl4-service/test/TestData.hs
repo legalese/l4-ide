@@ -40,6 +40,8 @@ module TestData (
   handMixedJL4,
   clauseGroupSingleJL4,
   handSingleJL4,
+  clauseGroupCallJL4,
+  handCallJL4,
   clauseGroupNoGivethJL4,
   clauseGroupLetResultJL4,
   rowsClauseGroupJL4,
@@ -1240,6 +1242,49 @@ GIVETH A BOOLEAN
 DECIDE rule m IS
   CONSIDER m
     WHEN JUST b THEN b
+|]
+
+-- | A clause that calls another rule. The call is a box over its two BOOLEAN
+-- arguments, and its atomId is the hash of the call's term (R3), so the group
+-- and its hand-written CONSIDER must name it alike.
+clauseGroupCallJL4 :: Text
+clauseGroupCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS `both hold` a b
+DECIDE rule c a b IS a OR b
+|]
+
+handCallJL4 :: Text
+handCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN `both hold` a b
+    OTHERWISE a OR b
 |]
 
 -- | A BOOLEAN group with no GIVETH: the type is inferred, not declared.

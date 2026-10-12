@@ -45,7 +45,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1825,6 +1825,48 @@ spec = describe "integration" do
       -- inference variable the service never resolves), so the group without one is
       -- compared with the hand-written rule that has one.
       sameAsHandWritten "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAsHandWritten "call" clauseGroupCallJL4 handCallJL4
+
+      -- The plans above are compared whole, atomIds included. This compares the
+      -- atomIds alone, so that a failure names them, and adds what the whole-plan
+      -- compare does not: GET /ladder of both forms, and, within one rule, the
+      -- plan's questions among the ladder's atoms. A leaf's atomId is the hash
+      -- of its term (R3), and a group is read through to the CONSIDER it stands
+      -- for before it is drawn, so each of its leaves is keyed as the
+      -- hand-written leaf is.
+      let sameAtomIds :: Text -> Text -> Text -> SpecWith ()
+          sameAtomIds name clauses hand =
+            it (Text.unpack ("names every atom as its hand-written CONSIDER does, on /ladder and /query-plan: " <> name)) do
+              withServiceFromSources ("cga-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hwa-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+                  qpC <- queryPlan' baseUrl mgr ("cga-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hwa-" <> name) "rule" noArguments
+                  ldC <- getLadder baseUrl mgr ("cga-" <> name) "rule"
+                  ldH <- getLadder baseUrl' mgr' ("hwa-" <> name) "rule"
+                  for_ [qpC, qpH, ldC, ldH] \r -> statusCode' r `shouldBe` 200
+                  let ladderIds r = case lookupKey "funDecl" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object fd) -> List.sort (List.nub (ladderAtomIds fd))
+                        _ -> []
+                      planIds r = case lookupKey "impactByAtomId" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object m) -> List.sort (map Aeson.Key.toText (Aeson.KeyMap.keys m))
+                        _ -> []
+                  -- both are non-empty, so the equalities below mean something
+                  ladderIds ldC `shouldSatisfy` (not . null)
+                  planIds qpC `shouldSatisfy` (not . null)
+                  -- the two forms name their atoms alike, on both routes
+                  ladderIds ldC `shouldBe` ladderIds ldH
+                  planIds qpC `shouldBe` planIds qpH
+                  -- within one rule, every question the plan asks is an atom of
+                  -- the ladder the route serves, and the plan embeds that ladder
+                  for_ [(qpC, ldC), (qpH, ldH)] \(qp, ld) -> do
+                    filter (`notElem` ladderIds ld) (planIds qp) `shouldBe` []
+                    lookupKey "ladder" (decodeObject (responseBody qp)) `shouldBe` (Aeson.decode (responseBody ld) :: Maybe Aeson.Value)
+      sameAtomIds "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAtomIds "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAtomIds "single" clauseGroupSingleJL4 handSingleJL4
+      sameAtomIds "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAtomIds "call" clauseGroupCallJL4 handCallJL4
 
     it "and evaluation still works across that restart" do
       -- The control. /evaluation needs no type annotations, so it kept working

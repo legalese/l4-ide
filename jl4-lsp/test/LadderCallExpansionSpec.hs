@@ -12,6 +12,7 @@ module LadderCallExpansionSpec (spec) where
 import Control.Exception (evaluate)
 import Data.List (nub, (\\))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Maybe (isJust)
 import qualified Data.Text as T
@@ -757,6 +758,42 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
         Left e -> expectationFailure (show e)
         Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
 
+  -- A BOOLEAN rule written as DECIDE clauses is read through to the CONSIDER it
+  -- stands for before it is drawn, so a call in one of its clauses is the call
+  -- box of the hand-written CONSIDER: the same label, the same atomId and the
+  -- same panel. Each form is its own module with the same names, as two
+  -- deployments of one rule are, so that their atomIds can be compared.
+  describe "a rule written as DECIDE clauses" $ do
+    let header =
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+          , ""
+          , "GIVEN x IS A BOOLEAN"
+          , "      y IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `both hold` x y IS x AND y"
+          , ""
+          , "GIVEN c IS A Colour"
+          , "      a IS A BOOLEAN"
+          , "      b IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          ]
+        clauses =
+          [ "DECIDE rule Red a b IS `both hold` a b"
+          , "DECIDE rule c a b IS a OR b"
+          ]
+        hand =
+          [ "DECIDE rule c a b IS"
+          , "  CONSIDER c"
+          , "    WHEN Red THEN `both hold` a b"
+          , "    OTHERWISE a OR b"
+          ]
+    it "draws a call in a clause as the hand-written CONSIDER draws it: box, atomIds and panel" $ do
+      rC <- render "clauses-call" (T.unlines (header <> clauses)) "rule"
+      rH <- render "hand-call" (T.unlines (header <> hand)) "rule"
+      -- the call is a box that opens, so the comparison below covers a panel
+      [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+      withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
   it "the wire omits `expansion` when a leaf has none" $ do
     r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
     let direct = [e | e@(V.UBoolVar _ nm _ _ _ _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
@@ -770,6 +807,13 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
     topDisjuncts = \case
       V.Or _ xs -> xs
       e -> [e]
+
+-- | A drawing as it goes on the wire, less the numbering of its nodes.
+withoutIds :: Aeson.Value -> Aeson.Value
+withoutIds = \case
+  Aeson.Object o -> Aeson.Object (KeyMap.map withoutIds (KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutIds xs)
+  v -> v
 
 -- | Every node drawn directly: through App arguments, not into expansions.
 directUniverse :: V.IRExpr -> [V.IRExpr]
