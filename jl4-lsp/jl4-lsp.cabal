@@ -162,6 +162,7 @@ test-suite jl4-lsp-test
     AtomKeySizeSpec
     AtomKeySweepSpec
     CheckSource
+    ClauseGeneratedNamesSpec
     CorpusSweep
     EmbeddedLibrarySpec
     HoverDisplaySpec
@@ -191,4 +192,5 @@ test-suite jl4-lsp-test
     lsp-types,
     mtl,
     optics,
-    text
+    text,
+    text-rope

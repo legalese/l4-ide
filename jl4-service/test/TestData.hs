@@ -73,6 +73,7 @@ module TestData (
   heavyMainJL4,
   deepJL4,
   partialClausesJL4,
+  lineBreakJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -219,6 +220,25 @@ constantJL4 =
 GIVETH A NUMBER
 DECIDE the_answer IS 42
 |]
+
+-- | A function whose answer is a string holding a line break or a tab.
+--
+-- The reasoning tree prints each step as source code, so the literal reaches
+-- @exampleCode@ spelled the way the source spells it (@"line\nnext"@, a
+-- backslash and an n), while @explanation@ prints the VALUE and keeps the
+-- break. Written as plain lines, not through the interpolating quasi-quoter,
+-- which would turn the backslash pairs into the characters they spell.
+lineBreakJL4 :: Text
+lineBreakJL4 =
+  Text.unlines
+    [ "@export default the text"
+    , "GIVEN x IS A NUMBER"
+    , "GIVETH A STRING"
+    , "DECIDE s x IS"
+    , "    IF x > 0"
+    , "    THEN \"line\\nnext\""
+    , "    ELSE \"tab\\there\""
+    ]
 
 -- | L4 source for the "compute_qualifies" function used in integration tests.
 qualifiesJL4 :: Text

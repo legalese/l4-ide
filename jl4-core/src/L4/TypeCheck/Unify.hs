@@ -97,17 +97,29 @@ synonymExpansionFuel = 1000
 -- expand in 'expandAndUnify', and once we've established we cannot
 -- expand, we handle the remaining cases in 'unifyBase'.
 --
--- Before all of that, 'plainTypeEqUnder' short-circuits types that are
--- structurally identical once the substitution is read through.
--- Besides being cheap, this is what keeps unification linear when both
--- sides are the same synonym application: expanding a synonym whose
--- body mentions a parameter more than once (or a chain of such
--- synonyms) duplicates work exponentially if we expand first and
--- compare later. The short-circuit does not help when the two sides
--- are *different* spellings of the same exponentially-large expansion
--- (two acyclic towers of the same shape under different names, say);
--- that residual pathology is pre-existing and is reachable by an
--- acyclic tower, not only by a cycle.
+-- Before all of that, 'sameUnderSubstitution' short-circuits two types
+-- that are structurally identical once the substitution is read
+-- through, but only in the two places where that pays: the same
+-- inference variable, which must not be bound to itself, and the same
+-- type synonym applied to the same arguments. The second is what keeps
+-- unification linear when both sides are the same synonym application:
+-- expanding a synonym whose body mentions a parameter more than once
+-- (or a chain of such synonyms) duplicates work exponentially if we
+-- expand first and compare later. The short-circuit does not help when
+-- the two sides are *different* spellings of the same
+-- exponentially-large expansion (two acyclic towers of the same shape
+-- under different names, say); that residual pathology is pre-existing
+-- and is reachable by an acyclic tower, not only by a cycle.
+--
+-- It is not tried at other type constructors, because a comparison
+-- walks to the first difference, and in a type nested on the left,
+-- @P OF (P OF (... a ...), a), a@, the first difference is at the
+-- bottom. Tried at every level of the descent it costs the square of
+-- the depth: unifying such a type 16000 deep with its instance took 15
+-- times as long as 4000 deep, where 4 times is linear. Descending
+-- without it visits each node once. A synonym applied to a type nested
+-- on the left is still compared as a whole at every synonym on the way
+-- down.
 --
 unify :: Type' Resolved -> Type' Resolved -> Check Bool
 unify = unifyFuel synonymExpansionFuel
@@ -138,12 +150,45 @@ walkHeadIn _ t                = t
 --
 unify' :: Int -> Type' Resolved -> Type' Resolved -> Check Bool
 unify' fuel t1 t2 = do
-  s <- use #substitution
-  if plainTypeEqUnder s t1 t2 then pure True else go t1 t2
+  same <- sameUnderSubstitution t1 t2
+  if same then pure True else go t1 t2
   where
     go (InfVar _ann1 _pre1 i1) t2' = bindChecked i1 t2'
     go t1' (InfVar _ann2 _pre2 i2) = bindChecked i2 t1'
     go t1' t2'                     = expandAndUnify fuel t1' t2'
+
+-- | Whether two types, heads already walked, are the same type as the
+-- substitution reads them, for the cases where answering is worth a
+-- comparison that can reach the bottom of the types: the same inference
+-- variable, and the same type synonym. A type constructor with no
+-- arguments, which is most of the leaves, is the same as itself without
+-- looking it up. Anything else is left to the descent, which finds the
+-- same answer node by node.
+--
+sameUnderSubstitution :: Type' Resolved -> Type' Resolved -> Check Bool
+sameUnderSubstitution t1 t2 = case (t1, t2) of
+  (InfVar _ _ i1, InfVar _ _ i2) -> pure (i1 == i2)
+  (TyApp _ n1 [], TyApp _ n2 [])
+    | getUnique n1 == getUnique n2 -> pure True
+  (TyApp _ n1 ts1, TyApp _ n2 ts2)
+    | getUnique n1 == getUnique n2
+    , length ts1 == length ts2 -> do
+        synonym <- isExpandableSynonym n1
+        if synonym
+          then do
+            s <- use #substitution
+            pure (plainTypeEqUnder s t1 t2)
+          else pure False
+  _ -> pure False
+
+-- | Whether a type name stands for another type, that is, whether
+-- expanding it can do anything. A synonym in a cycle has no body, and
+-- stands for nothing.
+--
+isExpandableSynonym :: Resolved -> Check Bool
+isExpandableSynonym r = asks \ env -> case Map.lookup (getUnique r) env.entityInfo of
+  Just (_, KnownType _ _ (Just _)) -> True
+  _                                -> False
 
 -- | Bind an unbound inference variable to a type, unless the variable
 -- occurs in it. The type is substituted in full first: a variable that
