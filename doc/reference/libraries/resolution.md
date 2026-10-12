@@ -45,9 +45,28 @@ Three rules of thumb fall out of the table:
   consulted _at all_ — the operator has taken full control of the library
   store. (The ambient tiers are still searched after it, for extras.)
 
+**`jl4-service` uses a shorter ladder.** A service that runs bundles other
+people uploaded cannot let its own machine stand in for the standard library.
+So a deployment's `IMPORT`s are resolved against the bundle's own files (tier 0)
+and then the standard library built into the service binary (tier 4), and
+nothing else: tiers 1, 2, 3, 5 and 6 are not consulted, and neither is
+`JL4_LIBRARY_PATH`. A `prelude.l4` in the service's working directory, or a
+library directory exported into its environment, has no effect on any
+deployment. (Without this rule it would: the deploy reports "applied" and every
+call then answers 422 `sum is not in scope`.) The service says at start-up, at
+`WARN`, when `JL4_LIBRARY_PATH` is set and therefore ignored.
+
+A bundle that ships a file with the name of a standard library module, such as
+its own `prelude.l4`, is still honoured, as any project copy is: the importers
+that can see that file — those in the same directory — get it instead of the
+library's. The service says so, at `WARN`, each time it compiles such a bundle
+(`Bundle file stands in for a standard library module`, naming the file and the
+module), unless the file is exactly the library's own text.
+
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
-(unit, table-driven) and the `l4 library resolution shadow (B′)` group in
-`jl4/tests-cli/Main.hs` (black-box CLI).
+(unit, table-driven), the `l4 library resolution shadow (B′)` group in
+`jl4/tests-cli/Main.hs` (black-box CLI), and, for the service's shorter ladder,
+`jl4-service/test/StdlibResolutionSpec.hs`.
 
 ---
 
@@ -98,6 +117,8 @@ extension additionally ships `libraries/*.l4` next to the bundled binary
 (tier 6); since the embed already carries the full stdlib, that directory only
 matters for libraries _not_ in the embed. (Whether it can be dropped entirely
 is an open question — see §6 in `specs/as-built/import-resolution.md`.)
+`jl4-service` consults neither: see
+[the shorter ladder above](#the-resolution-order).
 
 ### I want machine-global extra libraries
 
@@ -144,6 +165,20 @@ different copy, set JL4_LIBRARY_PATH or place prelude.l4 in the project root or 
 
 The CLI (`l4 check`, `l4 run`, …) prints Warning-level resolution lines to
 stderr; Info/Debug lines are visible in the LSP log channel only.
+`l4 check --json` and `l4 run --json` carry the same Warning lines in the
+`diagnostics` array of their output, so a program that reads that array sees a
+shadow warning there too.
+
+An `IMPORT` that resolves to nothing is announced once, at Warning priority, as
+`Module not found: myhelpers`: once for each importing file, however many of the
+toolchain's rules go looking for the import. (`l4 ast`, which never
+typechecks, prints that one line on stderr and exits 0.) The diagnostic that
+accompanies it is described under [Module not found](../errors/README.md#module-not-found).
+
+When two tiers name the same file — the CLI sets the project root to the
+importing file's own directory, so the root tier and the importer-relative tier
+probe one path — the shadow warning lists that file once, not as both
+`[chosen]` and `[shadowed]`.
 
 **Debugging "my edit didn't take effect":**
 
@@ -161,20 +196,36 @@ stderr; Info/Debug lines are visible in the LSP log channel only.
 ## The embed-staleness gotcha
 
 The embedded stdlib is captured at **build** time by a Template Haskell splice
-(`L4.API.EmbeddedLibraries`). The splice asks Cabal for the `jl4-core` datadir
-_at compile time_ and reads `libraries/*.l4` from there — commonly a path like
-`~/.cabal/share/…/jl4-core-*/libraries`, **not** your checkout. The
-`addDependentFile` recompilation hook tracks that same build-time path.
+(`L4.API.EmbeddedLibraries`), which reads `libraries/*.l4` while GHC compiles
+that module. For a checkout it reads the checkout's own `jl4-core/libraries/`
+(the dependency GHC records is `<checkout>/jl4-core/libraries/prelude.l4`, with
+a content hash), so GHC itself would re-embed a library that changed. The catch
+is that Cabal does not ask it to.
+
+Measured on 2026-10-13, a checkout built with `cabal build` (GHC 9.10.3,
+Cabal 3.16):
+
+- Appending a definition to `jl4-core/libraries/prelude.l4` and running
+  `cabal build` prints `Up to date`. Nothing is rebuilt, and the binary keeps
+  serving the old prelude. `touch`-ing `L4.API.EmbeddedLibraries` changes
+  nothing either: Cabal compares content, not modification times.
+- The same edit plus any real change to a `jl4-core` source file (the test was a
+  comment on an unrelated module) makes Cabal call GHC. GHC sees the new content
+  hash, recompiles `L4.API.EmbeddedLibraries`, and the rebuilt binary serves the
+  new prelude.
 
 Consequences:
 
-- Editing `jl4-core/libraries/prelude.l4` in a worktree does **not**
-  invalidate the splice. `cabal build` rebuilds nothing, and the binary keeps
-  serving the old prelude.
-- To force a re-embed: make a real content change to
-  `L4.API.EmbeddedLibraries` or its TH module, or clean-rebuild `jl4-core`.
+- Editing `jl4-core/libraries/prelude.l4` in a worktree and running a plain
+  `cabal build` leaves the binary on the old prelude.
+- To force a re-embed without the pin: make a real content change to a
+  `jl4-core` source file, or clean-rebuild `jl4-core`.
 - Which is why the supported dev workflow is the `JL4_LIBRARY_PATH` pin, not
   "rebuild and hope". The pin outranks the embed deterministically.
+
+This was measured for a checkout. A build from somewhere else — `cabal install`
+from an sdist, a Nix build — reads the `libraries/` of the directory it is built
+in; this page does not claim to have measured those.
 
 This is documented at the code site too
 (`jl4-core/src/L4/API/EmbeddedLibraries/TH.hs`) and in

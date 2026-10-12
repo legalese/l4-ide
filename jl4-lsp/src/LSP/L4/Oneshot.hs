@@ -27,18 +27,28 @@ instance Pretty Log where
     StoreLog l -> pretty l
 
 oneshotL4ActionAndErrors :: EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
-oneshotL4ActionAndErrors evalConfig fp act = do
+oneshotL4ActionAndErrors = oneshotL4ActionAndErrorsIn Rules.AmbientLibraries
+
+-- | 'oneshotL4ActionAndErrors' under a chosen 'Rules.LibraryScope'. A host that
+-- serves bundles somebody else uploaded asks for 'Rules.EmbeddedStdlibOnly', so
+-- that nothing on the host can stand in for the stdlib.
+oneshotL4ActionAndErrorsIn :: Rules.LibraryScope -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
+oneshotL4ActionAndErrorsIn scope evalConfig fp act = do
   (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
-  res <- oneshotL4Action recorder evalConfig fp act
+  res <- oneshotL4ActionIn scope recorder evalConfig fp act
   errs <- getLog
   pure (errs, res)
 
 oneshotL4Action :: Recorder (WithPriority Log) -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO b
-oneshotL4Action recorder evalConfig fp act = do
+oneshotL4Action = oneshotL4ActionIn Rules.AmbientLibraries
+
+-- | 'oneshotL4Action' under a chosen 'Rules.LibraryScope'.
+oneshotL4ActionIn :: Rules.LibraryScope -> Recorder (WithPriority Log) -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO b
+oneshotL4ActionIn scope recorder evalConfig fp act = do
   let curDir = takeDirectory fp
   state <- Shake.oneshotIdeState (cmapWithPrio ShakeLog recorder) curDir do
     Store.fileStoreRules (cmapWithPrio StoreLog recorder) (const $ pure False)
-    Rules.jl4Rules evalConfig curDir (cmapWithPrio RulesLog recorder)
+    Rules.jl4RulesIn scope evalConfig curDir (cmapWithPrio RulesLog recorder)
 
   let nfp = normalizeFilePath fp
 

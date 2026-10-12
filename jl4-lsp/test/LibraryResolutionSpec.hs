@@ -30,6 +30,8 @@ import Language.LSP.Protocol.Types (toNormalizedFilePath)
 import LSP.L4.Rules
   ( LibraryCandidate (..)
   , LibraryResolution (..)
+  , LibraryScope (..)
+  , distinctCopies
   , resolveLibrary
   )
 
@@ -79,8 +81,11 @@ withSandbox act = bracket acquire release (act . fst)
 
 -- | Resolve @modName@ as if imported by a file in the sandbox's sibling dir.
 resolveIn :: Sandbox -> String -> IO LibraryResolution
-resolveIn sb modName =
-  resolveLibrary sb.rootDir (Just (toNormalizedFilePath (sb.siblingDir </> "importer.l4"))) modName
+resolveIn = resolveInScope AmbientLibraries
+
+resolveInScope :: LibraryScope -> Sandbox -> String -> IO LibraryResolution
+resolveInScope scope sb modName =
+  resolveLibrary scope sb.rootDir (Just (toNormalizedFilePath (sb.siblingDir </> "importer.l4"))) modName
 
 plant :: FilePath -> String -> IO FilePath
 plant dir modName = do
@@ -169,3 +174,47 @@ spec = around withSandbox $
       realWinner <- traverse canonicalizePath (winnerFile res)
       realTarget <- canonicalizePath target
       realWinner `shouldBe` Just realTarget
+
+    -- A host that serves uploaded bundles must not let its own files or
+    -- environment replace the stdlib (jl4-service). Every tier but the embedded
+    -- copy is switched off, whatever is planted where.
+    describe "EmbeddedStdlibOnly" $ do
+      it "ignores JL4_LIBRARY_PATH, the project root, the importer's directory and the XDG store" $ \sb -> do
+        _ <- plant sb.envLibs embeddedMod
+        _ <- plant sb.rootDir embeddedMod
+        _ <- plant sb.siblingDir embeddedMod
+        _ <- plant sb.xdgLibs embeddedMod
+        setEnv "JL4_LIBRARY_PATH" sb.envLibs
+        res <- resolveInScope EmbeddedStdlibOnly sb embeddedMod
+        winnerIsEmbedded res `shouldBe` True
+        res.candidates `shouldBe` [EmbeddedCandidate]
+        res.searchedPaths `shouldBe` []
+        -- the variable is set but this scope does not read it, so the embed
+        -- is consulted and the logs take the ordinary (unpinned) form
+        res.hasExplicitPath `shouldBe` False
+
+      it "does not find a module the embed lacks, even where the ambient tiers hold one" $ \sb -> do
+        _ <- plant sb.rootDir strayMod
+        _ <- plant sb.xdgLibs strayMod
+        res <- resolveInScope EmbeddedStdlibOnly sb strayMod
+        res.winner `shouldSatisfy` isNothing
+        res.existing `shouldBe` []
+
+    describe "distinctCopies" $ do
+      it "keeps a file once when two tiers name it, at the rank of the first" $ \sb -> do
+        p <- plant sb.rootDir embeddedMod
+        let existing = [(1, FileCandidate "project root" p), (2, FileCandidate "importer-relative" p), (3, EmbeddedCandidate)]
+        distinctCopies existing `shouldReturn` [(1, FileCandidate "project root" p), (3, EmbeddedCandidate)]
+
+      it "merges a symlink with its target" $ \sb -> do
+        target <- plant sb.elsewhere strayMod
+        let link = sb.xdgLibs </> strayMod <.> "l4"
+        createFileLink target link
+        let existing = [(1, FileCandidate "project root" target), (2, FileCandidate "XDG data dir" link)]
+        distinctCopies existing `shouldReturn` [(1, FileCandidate "project root" target)]
+
+      it "keeps two different files, and never merges the embed with a file" $ \sb -> do
+        a <- plant sb.rootDir strayMod
+        b <- plant sb.siblingDir strayMod
+        let existing = [(1, FileCandidate "project root" a), (2, FileCandidate "importer-relative" b), (3, EmbeddedCandidate)]
+        distinctCopies existing `shouldReturn` existing

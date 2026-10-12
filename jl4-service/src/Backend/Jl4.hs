@@ -24,7 +24,7 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo, Environment)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
+import LSP.L4.Oneshot (oneshotL4ActionAndErrorsIn)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
@@ -130,6 +130,21 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
 
+-- | Where the 'IMPORT's of a deployed bundle may be resolved: the bundle's own
+-- files (the VFS tier, consulted first), then the standard library built into
+-- this binary, and nothing from the host. The service serves bundles that
+-- somebody else uploaded, to callers who cannot see the machine it runs on, so
+-- a `prelude.l4` in the working directory or a `JL4_LIBRARY_PATH` in the
+-- environment must not be able to replace the stdlib for every deployment.
+-- (Before this scope existed the service registered the stdlib at
+-- `./<name>.l4`, which the VFS tier hits first, so the host could not replace
+-- it either; registering it at `jl4-embedded:` made the host's files win,
+-- silently — a deploy "applied" and every call answered 422 `sum is not in
+-- scope` — and this scope is what makes that impossible.) Every session the
+-- service opens uses this.
+bundleScope :: Rules.LibraryScope
+bundleScope = Rules.EmbeddedStdlibOnly
+
 -- | Typecheck and evaluate all files in a bundle in a SINGLE Shake session.
 -- This avoids creating N independent IDE sessions that redundantly re-parse
 -- and re-typecheck overlapping imports. Shake caches intermediate results
@@ -154,24 +169,25 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  -- Core libraries (prelude, …) to register as stable virtual files, unless the
-  -- deployment ships its own copy of the same name (which then shadows the
-  -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand embedded fallback
-  -- (LSP.L4.Rules). That fallback used to mutate the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yielded an
-  -- unstable/duplicate prelude module and spurious overload ambiguity (e.g.
-  -- `count xs >= n` → "ambiguous __GEQ__"). Verified: the same source is
-  -- rejected via the embedded fallback and accepted when the library is a real
-  -- virtual file. The libraries stay *dependencies* (NOT added to `allUris`),
-  -- so they are never serialized or surfaced as deployment files — only
-  -- resolved when imported.
+  -- Core libraries (prelude, …) to register as virtual files, unless the
+  -- deployment ships a file of the same basename. They are registered at
+  -- `Shake.embeddedLibraryUri`, the one URI the resolver hands back for an
+  -- embedded winner, so every importer that falls through to the embedded tier
+  -- names the same module: a bundle must not hold two `prelude` modules (the
+  -- duplicate-module ambiguity, e.g. "ambiguous __GEQ__" on `count xs >= n`).
+  -- This service used to register them at `./<name>.l4`; see
+  -- `Shake.embeddedLibraryUriScheme` for why that key is forgeable.
   --
-  -- They are registered at `Shake.embeddedLibraryUri`, the one URI the resolver
-  -- hands back for an embedded winner. Registering them anywhere else would
-  -- give a bundle two `prelude` modules whenever some importer resolves via the
-  -- VFS tier and another falls through to the embedded tier — which is how the
-  -- duplicate-module ambiguity above arises.
+  -- This registration does NOT make `IMPORT prelude` resolve to the stdlib.
+  -- The VFS tier probes `project:/` and `./<module>.l4` keys, which a
+  -- `jl4-embedded:/` URI can never match, so what makes the stdlib the answer
+  -- is the resolver's embedded tier, and what keeps anything else from
+  -- standing in for it is that every session below runs under
+  -- `Rules.EmbeddedStdlibOnly` ('bundleScope'). Since 'Shake.getVirtualFile'
+  -- serves the same libraries from a pure map, these writes are redundant for
+  -- lookup; they stay *dependencies* (NOT added to `allUris`), so they are
+  -- never serialized or surfaced as deployment files — only resolved when
+  -- imported.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
         [ (name, content)
@@ -184,7 +200,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   case allFiles of
     [] -> pure ([], StrictMap.empty, StrictMap.empty)
     ((firstPath, _) : _) -> do
-      (errs, (tcMap, evalMap)) <- oneshotL4ActionAndErrors evalConfig firstPath $ \_nfp -> do
+      (errs, (tcMap, evalMap)) <- oneshotL4ActionAndErrorsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -1083,11 +1099,12 @@ buildImportEnvironment filepath source moduleContext _entityInfo = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  result <- oneshotL4ActionAndErrors evalConfig filepath $ \nfp -> do
+  result <- oneshotL4ActionAndErrorsIn bundleScope evalConfig filepath $ \nfp -> do
     let uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1335,12 +1352,13 @@ typecheckModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text]
 typecheckModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1354,12 +1372,13 @@ evaluateModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text],
 evaluateModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)

@@ -8,7 +8,7 @@ import DataPlane (DataPlaneApi, dataPlaneHandler, ShortRoutes, shortRoutesHandle
 import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
 import DeploymentLoader (loadAndRegister)
-import Logging (Logger, logInfo, logDebug, logError, newLogger)
+import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
 import Options (Options (..), buildOpts)
 import OpenApiDoc (buildOpenApiDoc)
 import Shared (collectDeploymentMetadata)
@@ -27,6 +27,7 @@ import Control.Concurrent.Async (mapConcurrently_)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
 import Control.Exception (SomeException, finally, displayException)
 import Control.Monad (forM_)
+import System.Environment (lookupEnv)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT (..), ask)
 import Data.IORef (newIORef, readIORef, atomicModifyIORef')
@@ -104,6 +105,15 @@ defaultMain = do
     , ("evalTimeout", toJSON options.evalTimeout)
     , ("compileTimeout", toJSON options.compileTimeout)
     ]
+
+  -- A deployment's IMPORTs resolve against its own files and the stdlib built
+  -- into this binary, and nothing else ('Backend.Jl4.bundleScope'), so this
+  -- variable does nothing here. An operator who set it to override the stdlib
+  -- should hear that it no longer does.
+  ignoredLibraryPath <- lookupEnv "JL4_LIBRARY_PATH"
+  forM_ ignoredLibraryPath $ \libraryPath ->
+    logWarn logger "JL4_LIBRARY_PATH is set and ignored: deployments resolve IMPORTs against their own files and the standard library built into this binary"
+      [("path", toJSON libraryPath)]
 
   logInfo logger "Initializing bundle store"
     [("path", toJSON storePath)]
