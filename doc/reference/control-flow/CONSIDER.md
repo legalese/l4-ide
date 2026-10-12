@@ -133,7 +133,7 @@ Adding the missing constructor branch or an OTHERWISE catch-all silences the war
 **Numbers, text and dates:** a NUMBER, a STRING or a DATE has no end of values, so a WHEN with a number or a piece of text, even nested (`WHEN JUST 1`), matches one value, and a CONSIDER over such a scrutinee is complete only with an OTHERWISE, which the warning suggests.
 `EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value; any other `EXACTLY` counts for nothing over a number, a piece of text or a date, and stops the check over any other type.
 An `EXACTLY` of the scrutinee's own name, `WHEN EXACTLY n` in `CONSIDER n`, matches every value, as `OTHERWISE` does, so the branches after it are reported as redundant.
-A branch that matches anything is redundant after one that already does: an `OTHERWISE`, a name such as `WHEN v`, or `` WHEN `_` `` that follows another of those, or a `WHEN EXACTLY n` of that kind, is reported.
+A branch that matches anything (an `OTHERWISE`, a name such as `WHEN v`, `` WHEN `_` ``, or `WHEN EXACTLY n` in `CONSIDER n`) is reported as redundant when it follows another such branch.
 An `OTHERWISE` after branches that between them name every constructor is not reported, so a defensive catch-all there is allowed.
 An `EXACTLY` of any other expression that mentions the scrutinee, such as `WHEN EXACTLY (n PLUS 1)`, stops the check over any type, with no warning, since such a branch may match any number of the scrutinee's values.
 A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is a redundant branch.
