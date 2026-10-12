@@ -1,6 +1,6 @@
 # `TYPICALLY`: one behaviour
 
-**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539, merged 2026-10-06), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); `T WITHAL`, the spelling T1 left open for a construction in which every field is defaulted, ruled 2026-10-09 and built in `feat/withal` on top of `feat/typically-w4w5` (local commits, not pushed, not reviewed: §4.3); W7, expression defaults, withdrawn by Meng's ruling HAIRCUT, 2026-10-12 (§4); the rest not built.
+**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539, merged 2026-10-06), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); `T WITHAL`, the spelling T1 left open for a construction in which every field is defaulted, ruled 2026-10-09 and built in `feat/withal` on top of `feat/typically-w4w5` (local commits, not pushed, not reviewed: §4.3); W7, expression defaults, withdrawn by Meng's ruling HAIRCUT, 2026-10-12 (§4); W10, the documentation, restacked on it in `restack/w10-haircut` (§4.4); the rest not built.
 This spec is an implementation plan, not a new design.
 The design was ruled on 2026-09-04 as **R8** (`IMPLICIT-PROPS-DESIGN.md` §11.5) and extended on 2026-09-06 by **D7.3** (`SURFACE-SUGAR-CLUSTER-2026-09.md`).
 R8 is the owning ruling, and anything this spec settles is recorded back there (repo `CLAUDE.md` §4).
@@ -632,6 +632,57 @@ An independent review on 2026-10-11 found no silent wrong answer caused by this 
 Before that review, two claims of the author's own were corrected before commit: a comment that said the overload refusal prevents a silent resolution by elimination (measured with the refusal off: the same single error), and a first draft of the page that said a whole batch row `{}` builds a record (a row builds no record; the claim is now the `JSONDECODE` one above).
 
 ---
+
+### 4.4 W10 restacked on HAIRCUT (2026-10-12)
+
+Built in `restack/w10-haircut`, on top of `restack/w7-haircut`.
+It is documentation and records, with no code: `git diff --stat restack/w7-haircut..restack/w10-haircut` lists files under `doc/` and `specs/todo/` only.
+It restacks #558 (`feat/typically-w10`: the 16 commits of `origin/feat/typically-w7..origin/feat/typically-w10`) on the literal-only `TYPICALLY` that HAIRCUT ruled (§4), so everything that assumed an expression default is dropped or rewritten.
+
+**What each of W10's items became.**
+
+- **`doc/reference/types/TYPICALLY.md`.**
+  The one behaviour is stated once, at the top: `TYPICALLY d` on a name means that when nothing supplies a value for the name, at the point where a value has to come from outside the rule, the rule uses `d`.
+  Three things hold wherever it is written (a supplied value wins; "not known" is not "left out"; inside a file a call or a construction by position gives everything), and a table says how a name comes to be left out for each place it is written.
+  What was left of the "everywhere else: metadata only" half is the `ASSUME`, now said plainly in a section of its own ("On an `ASSUME`: checked and recorded, not used", with what each tool does).
+  The "Landed in stages" note is gone, "What changed" says what the page used to say, as R8's own note asks (`IMPLICIT-PROPS-DESIGN.md` §11.5), and "When the usual value is worked out from other facts" (HAIRCUT's own section) is where a calculation goes.
+  The sections on a default that is worked out, and the limits at the boundary that belong to one, are not carried: there is no such default.
+- **`typically-example.l4`.**
+  Holds each example the page quotes, and an `#ASSERT` for every answer the page gives (11, all satisfied under `l4 run`); the part about a default that is worked out is replaced by a pointer to `typically-worked-out-example.l4`.
+- **`ok/typically-basic.l4`.** Its header already points at the page and at the corpus files that exercise a default, and is left as it is.
+- **`TYPICALLY-DEFAULTS-SPEC.md` and `RUNTIME-INPUT-STATE-SPEC.md`.**
+  Status headers say what is built and where, and that the body below each is the December 2025 design.
+  The second's "BLOCKED - depends on TYPICALLY" is gone: what exists of its four cells is `L4.Presumption.fillDecision`.
+- **`IMPLICIT-PROPS-DESIGN.md`.**
+  The trace-event item in the deferred list says what exists (the event, not a trace line) and what a trace shows (re-measured on this branch); the `ASSUME … TYPICALLY` item and the T5 item are added; the construction that leaves out every field is not listed as open, because `T WITHAL` is built.
+- **`doc/reference/query-planning/README.md` and `GLOSSARY.md`, `ASSUME.md`, `errors/README.md`.**
+  The planner's page says it ranks by information gain with `TYPICALLY` priors, as `BooleanDecisionQuery.hs` and `decision-query.ts` do and `QueryPlanSpec` ("TYPICALLY question ordering (end-to-end)") pins; the `ASSUME` pages say that moving an `ASSUME` that carries a `TYPICALLY` changes the answer.
+
+**The 16 commits.**
+
+- **Carried as they were** (cherry-picks, clean): `3f0af62a4` (the `ASSUME` pages) and `d41696537` (the planner page's tidy-ups).
+- **Rewritten:**
+  `826c2b511` (the page and the example: re-ported by hand onto this branch's page, without the expression sections);
+  `97c4e4d6e` (the wizard still reads an `ASSUME`'s default: folded into the `ASSUME` section of the page);
+  `1cba981e0` (the planner page: "an expression for instance" dropped from the sentence on priors);
+  `73cf3f424` (the two status headers, the props design and the citations: the headers say what this branch carries, `checkTypicallyLiteral` is `isTypicallyLiteral`, the "no spelling for every field" item is false after `T WITHAL`);
+  `1cc51433e` (the citations anchored to `7768812fa` and R10's optionality half; its records of the service's internal error are not carried);
+  `637b86326` (the wire table of `RUNTIME-INPUT-STATE-SPEC.md`, the `null` bullet and "What changed" of the page, with the sentence "A default had to be a fixed value wherever it was written" replaced by the ruling that keeps it so);
+  `8d6d64c01` (its §4.4, replaced by this section).
+- **Dropped:**
+  `e5ab9c564` (the refusal of a default that names a definition two sections define: there is no such default);
+  `dff4aaff9`, `aed6e636b` and `3b1182ebf` (the pages and the specs on what `l4 batch` and the service do with such a name);
+  `11f290e89` and `bcd85b262` (counts in the dropped §4.4);
+  `24de7d627` (formatting of a bullet of the expression limits).
+
+**What was measured here** (`l4` and `jl4-service` built from this branch's parent, `restack/w7-haircut`, 2026-10-12), for the claims the page and the specs now make that are not pinned by a test in the gate:
+the `ASSUME` example stops, saying `person has capacity` is an assumed term;
+`l4 batch` refuses a case that leaves it out (`Missing required field 'person has capacity' in JSON object`), the published list has it under `required` with no `default`, the service's direct path says `ASSUME 'person has capacity': missing required parameter`, and its wrapper path answers when the rules never read the fact and stops, saying it is an assumed term, when they do;
+an `ASSUME` that takes inputs gives "you have not supplied these inputs" for a `WITH` that leaves out one that has a `TYPICALLY`, in the file that declares it and in one that imports it;
+the same rule over a section `GIVEN` works out `TRUE` and `l4 batch` lists `person has capacity` under `presumed`;
+`null` on a fact with a default is refused by name on `l4 batch` and the service's direct path, and on the wrapper path is an assumed term;
+and `typically-example.l4` and `typically-worked-out-example.l4` run with every `#ASSERT` satisfied.
+Not re-measured, carried from the W10 build: that the ladder the service publishes carries a boolean `ASSUME` default as the fact's presumed value and the query plan uses it as a prior (`QueryPlanSpec` pins the ordering for a section `GIVEN` and for an `ASSUME`), and the planner's prior weights (0.9 and 0.1).
 
 ## 5. Rulings this needs
 
