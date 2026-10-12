@@ -42,13 +42,17 @@ a warning naming all of them (symlinks dereferenced) and the one chosen. See
 
 ## Editing these files? Read this first (the staleness gotcha)
 
-The embedded copy is frozen at **build** time, from whatever directory the TH
-splice resolved _then_ — usually the Cabal datadir (`~/.cabal/share/…`), not
-your checkout. Consequently:
+The embedded copy is captured at **build** time, when GHC compiles
+`L4.API.EmbeddedLibraries`. For a checkout it reads the checkout's own
+`jl4-core/libraries/`, and GHC re-embeds a library whose content changed — but
+only if Cabal calls GHC at all. Measured 2026-10-13 (GHC 9.10.3, Cabal 3.16):
 
-- Editing `jl4-core/libraries/*.l4` in a worktree does **not** re-embed on a
-  plain `cabal build`. The binary keeps serving the old stdlib and your edit
-  "mysteriously" doesn't take effect.
+- Editing `jl4-core/libraries/*.l4` and nothing else does **not** re-embed on a
+  plain `cabal build`: it prints `Up to date`, rebuilds nothing, and the binary
+  keeps serving the old stdlib, so your edit "mysteriously" doesn't take
+  effect. `touch`-ing a source file does not help (Cabal compares content).
+- A real change to any `jl4-core/src` file makes Cabal call GHC, and GHC then
+  notices the edited library and re-embeds it.
 - The reliable way to develop stdlib changes is to pin the resolver at your
   worktree:
 
@@ -58,8 +62,8 @@ your checkout. Consequently:
 
   which outranks every other source, including the (possibly stale) embed.
 
-- To actually refresh the embed, make a real content change to
-  `L4.API.EmbeddedLibraries` (or its TH module), or clean-rebuild `jl4-core`.
+- To actually refresh the embed without the pin, make a real content change to
+  a `jl4-core` source file, or clean-rebuild `jl4-core`.
 
 Note: the local test suites want `JL4_LIBRARY_PATH` set anyway (CI exports
 it), so the pin above is the normal dev configuration.

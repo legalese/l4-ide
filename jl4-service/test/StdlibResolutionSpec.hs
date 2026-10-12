@@ -153,11 +153,12 @@ spec = describe "a bundle's IMPORTs resolve against the bundle and the built-in 
     it "says at WARN that the bundle's file stands in for a stdlib module" do
       (result, logLines) <- withHost (const Nothing) \_ -> compileLogged bundle
       result `shouldBe` Right ()
-      case mentions "\"level\":\"WARN\"" (mentions "standard library" logLines) of
+      case mentions "standard library" logLines of
         [warned] -> do
+          warned `shouldSatisfy` BS8.isInfixOf "\"level\":\"warn\""
           warned `shouldSatisfy` BS8.isInfixOf "\"module\":\"prelude\""
           warned `shouldSatisfy` BS8.isInfixOf "\"deploymentId\":\"spec\""
-        other -> expectationFailure ("expected exactly one WARN line, got " <> show (length other))
+        other -> expectationFailure ("expected exactly one log line about a stdlib stand-in, got " <> show (length other))
 
     it "stays quiet about a copy that is byte-for-byte the stdlib's (positive control)" do
       case EmbeddedLibraries.lookupEmbeddedLibrary "prelude" of

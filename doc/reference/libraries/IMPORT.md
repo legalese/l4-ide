@@ -70,12 +70,15 @@ L4 includes several standard libraries:
 
 1. Every library, `prelude` included, has to be asked for by name. Nothing is in scope until
    you write its `IMPORT` line
-2. Library names resolve to `jl4-core/libraries/`
-3. Relative names resolve to the current directory
+2. A file of that name in your own project is used first: one in the project root, or one beside
+   the file that writes the `IMPORT`
+3. Failing that, the standard library built into the `l4` you are running is used. It matches that
+   `l4` exactly and needs no files on disk
 
-L4 looks in more places than those two, and in a fixed order — a copy sitting beside your file
-outranks the copy built into the compiler, for instance. [Library Resolution](resolution.md)
-sets out the whole order and when each step matters.
+L4 also looks in a few places that an operator or an installer controls (the `JL4_LIBRARY_PATH`
+environment variable, a per-user library folder, the editor extension's own copy), and in a fixed
+order — a copy sitting beside your file outranks the copy built into the compiler, for instance.
+[Library Resolution](resolution.md) sets out the whole order and when each step matters.
 
 An `IMPORT` that resolves to nothing is an error, even if your file never uses anything from it: the
 message names the module and every location that was searched. It fails `l4 check` and `l4 run`;
