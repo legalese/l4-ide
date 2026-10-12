@@ -3626,7 +3626,8 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 -- ones are silenced, by the mark on the node: a CONSIDER the drafter wrote
 -- inside any clause's body is checked like any other. (A one-clause group's
 -- warnings are only withdrawn once the matrix has answered; see
--- 'settleOneClause'.)
+-- 'settleOneClause'.) Their redundant branches are never reported either:
+-- the only branch of theirs that can be redundant is the OTHERWISE they were given.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
@@ -3686,7 +3687,11 @@ checkConsider ec ann e branches t = do
   -- is silenced; redundancy is a bug regardless of intended partiality.
   unless (inNonexhaustive || leftToClauseMatrix || null missing) do
     addWarning $ PatternMatchesMissing missing
-  unless (null redundant) do
+  -- A CONSIDER the clauses compiled to is @WHEN p@ and an OTHERWISE for the
+  -- clauses after it, which nobody wrote, and which nothing reaches when @p@
+  -- is a new name. That finding is about the clauses, and
+  -- 'warnUnreachableClauses' makes it in their terms.
+  unless (null redundant || isJust generated) do
     addWarning $ PatternMatchRedundant redundant
 
   -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
@@ -5574,10 +5579,15 @@ maxMissingSuggestions = 64
 --     ('Nabla's) describing every value not matched by the branches seen so
 --     far; it starts as the unconstrained set (everything).
 --   * A branch whose guard conjunction is inconsistent with EVERY current
---     'Nabla' covers nothing new: redundant. (Guard-less arms — OTHERWISE
---     and bare binders — are deliberately exempt, preserving the
---     long-standing behaviour that a defensive trailing catch-all is not
---     flagged; they still consume the remaining value space.)
+--     'Nabla' covers nothing new: redundant. That holds of a branch with no
+--     guards (an OTHERWISE, a bare binder, an @EXACTLY@ of the scrutinee
+--     itself) too: it is consistent with every 'Nabla', so it is redundant
+--     when there is none, which is when an earlier branch with no guards has
+--     taken the whole value space (its residue is empty). After branches
+--     that merely name every constructor the 'Nabla's stay, each with every
+--     constructor excluded, so a defensive trailing catch-all there is not
+--     flagged. That is deliberate: the refinement-tree analysis this
+--     replaced did not flag it either.
 --   * Splitting a 'Nabla' against a branch with guards @g1..gk@ yields the
 --     standard residue: @nabla ∧ ¬g1@, @nabla ∧ g1 ∧ ¬g2@, …; inconsistent
 --     conjunctions die immediately.
@@ -5608,7 +5618,7 @@ analyzeGuardRows branches = do
       let coversSomething =
             any (\nab -> isJust (foldM (flip addConstraint) nab (map guardEq guards))) uncovered
           redundant'
-            | not coversSomething, not (null guards) = b : redundant
+            | not coversSomething = b : redundant
             | otherwise = redundant
           uncovered' =
             nubNablas (concatMap (splitByGuards guards) uncovered)
