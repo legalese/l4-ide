@@ -346,8 +346,8 @@ Metadata annotations for documentation and generation.
 | `@desc`           | Human-readable description                                    |
 | `@nlg`            | Natural language generation hint                              |
 | `@ref`            | Cross-reference to legal source                               |
-| `@ref-src`        | Source reference                                              |
-| `@ref-map`        | Reference mapping                                             |
+| `@ref-src`        | Accepted and ignored (CSV loading was removed)                |
+| `@ref-map`        | Name-to-URL mapping for `@ref`                                |
 | `@export`         | Mark a function for export/deployment                         |
 | `@export default` | Mark the default exported function (entry point of a service) |
 

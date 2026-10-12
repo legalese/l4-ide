@@ -478,11 +478,18 @@ text in a citation, and `>` is ordinary text in an `@nlg` annotation. Each
 annotation escapes only what would otherwise be read as punctuation in that
 annotation.
 
-### @ref-src / @ref-map
+### @ref-map
 
-Source references and mappings.
+Gives a name a URL: `@ref-map NAME URL`.
+Everything before the last space is the name and the last word is the URL.
+A citation written with `@ref` (or `<<` `>>`) whose text equals the name, ignoring case, is shown in the IDE as a link to the URL.
+See [jl4/README.md](../../../jl4/README.md#how-to-use-annotations-for-citations) for an example.
 
-See [annotation-example.l4](annotation-example.l4)
+### @ref-src
+
+Accepted and ignored.
+The annotation used to load name-to-URL mappings from a CSV file; that was removed so that the language core needs no file access, and `@ref-map` replaces it.
+A `@ref-src` that names a file which does not exist passes `l4 check`.
 
 ### @export
 

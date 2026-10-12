@@ -163,8 +163,10 @@ Now for evaluating traces against this provision, there are two ways of doing it
 Similarly to the NLG annotations, there are annotations to allow for citing (and making hover annotations available) within JL4 source code.
 
 ```
-@ref-src citations.csv
 @ref-map foo bar baz https://example.com
+@ref-map 1981/61 sec. 2 https://www.legislation.gov.uk/ukpga/1981/61/section/2
+@ref-map SG-c-2025-sghcf-14 https://www.elitigation.sg/gd/s/2025_sghcf_14
+@ref-map SG-c-2025-sghcf-12 https://www.elitigation.sg/gd/s/2025_sghcf_12
 GIVEN x IS A BOOLEAN, y IS A BOOLEAN @ref foo bar baz
 GIVETH A BOOLEAN @ref 1981/61 sec. 2
 DECIDE xor x y IS  @ref SG-c-2025-sghcf-14
@@ -172,22 +174,18 @@ DECIDE xor x y IS  @ref SG-c-2025-sghcf-14
   OR (NOT x) AND y @nlg Locally overwrite the annotation for %y%
 ```
 
-Citation files can be loaded via the `@ref-src` annotation at any toplevel location of an L4 file.
+A mapping is one `@ref-map` line at any toplevel location of an L4 file.
+Everything before the last space is the name, and the last word is the URL, so the URL cannot contain a space.
+The name is compared with the text of an `@ref` (or of a `<<` `>>` citation) verbatim and without regard to case.
+An `@ref` that matches no mapping is still a citation, with no link.
+The code is `withRefMap` and `mkReferences` in `jl4-core/src/L4/Citations.hs`.
 
-These csv files have the following shape:
+There is no CSV loading and no regex mapping.
+Both were removed so that the language core needs no file access (`specs/done/REF-ANNOTATION-SPEC.md`).
+The lexer still accepts `@ref-src FILE`, so that older files parse, and ignores it: a `@ref-src` that names a file which does not exist passes `l4 check`, and nothing is read from the file.
+To migrate a CSV file, write each row as one `@ref-map` line, with the first column as the name and the second as the URL.
+A `regex:` row has to become one `@ref-map` line for each citation it matched.
 
-```csv
-"regex:sg-c-(\d{4})-([a-z]+)-(\d+)","https://www.elitigation.sg/gd/s/$1_$2_$3"
-"1981/61 sec. 2","https://www.legislation.gov.uk/ukpga/1981/61/section/2"
-"1981/61 sec. 3","https://www.legislation.gov.uk/ukpga/1981/61/section/3"
-"2002/8 sec. 1","https://www.legislation.gov.uk/ukpga/2002/8/section/1"
-```
+The annotations can be initiated using either `@ref` or `<<` and `>>` as shown in the example above.
 
-I.e. you can put verbatim citations (and a link that belongs to it), or you can put regexes by first prefixing your regex with `regex:` and then putting a link where the captures are reinserted again.
-This can be used to programatically generate reference mapping links.
-
-The `@ref-map` annotations can be used to amend the existing mapping in the same vein.
-
-Now the annotations can be initiated using either `@ref` or `<<` and `>>` as shown in the example above.
-
-When using this feature in the IDE, it will show the generated or verbatim links in the reference mapping as a hover link that can be clicked on.
+When using this feature in the IDE, it will show the link of the matching `@ref-map` mapping as a hover link that can be clicked on.
