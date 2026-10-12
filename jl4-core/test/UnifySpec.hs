@@ -30,8 +30,12 @@ checks source = do
 -- | Whether a snippet checks, and the members of each synonym cycle it is
 -- reported to contain, under the same watchdog as 'checks'.
 cycleReport :: Text -> IO (Bool, [[Text]])
-cycleReport source = do
-  mb <- timeout (30 * 1000000) $ case checkWithImports emptyVFS source of
+cycleReport = cycleReportWith emptyVFS
+
+-- | 'cycleReport' for a snippet that imports from a VFS.
+cycleReportWith :: VFS -> Text -> IO (Bool, [[Text]])
+cycleReportWith vfs source = do
+  mb <- timeout (30 * 1000000) $ case checkWithImports vfs source of
     Left errs -> fail ("unexpected pipeline failure: " <> show errs)
     Right r -> do
       let cycles = [ rawNameToText . rawName <$> ns | MkCheckErrorWithContext (CyclicTypeSynonyms ns) _ <- r.tcdErrors ]
@@ -247,9 +251,10 @@ spec = describe "Unification" $ do
 
     it "still quarantines a cyclic synonym that names itself with the wrong number of arguments" $ do
       -- `B` takes one parameter and its body says `B` bare, which is a kind
-      -- error; the checker still resolves the name to B. A detector that
-      -- looked only for the right number of arguments would miss that, and
-      -- leave two doubling bodies live.
+      -- error; the checker still resolves the name to B. The spelling-based
+      -- pass, which reads only uses with the right number of arguments,
+      -- does not see that; the pass over the resolved bodies does, and
+      -- without it two doubling bodies would stay live.
       (ok, cycles) <- cycleReport $ Text.unlines
         [ "IMPORT prelude"
         , ""
@@ -262,6 +267,77 @@ spec = describe "Unification" $ do
         ]
       ok `shouldBe` False
       cycles `shouldMatchList` [["B"], ["C"]]
+
+    it "accepts a synonym that shares its name with a record of another arity" $ do
+      -- The record `Box a` takes one argument, so `Box OF NUMBER` is the
+      -- record and the bare `Box` is the synonym. The synonym does not refer
+      -- to itself, and `Box OF 41` is a box of a number.
+      (ok, cycles) <- cycleReport $ Text.unlines
+        [ "DECLARE Box a HAS item IS AN a"
+        , ""
+        , "DECLARE Box IS A Box OF NUMBER"
+        , ""
+        , "GIVEN b IS A Box"
+        , "GIVETH A NUMBER"
+        , "contents b MEANS b's item"
+        , ""
+        , "GIVETH A NUMBER"
+        , "answer MEANS contents (Box OF 41) + 1"
+        ]
+      (ok, cycles) `shouldBe` (True, [])
+
+    it "accepts a synonym whose alias is a record's name, used inside a list at that record's arity" $ do
+      -- `Crate OF NUMBER` is the one-parameter record; the synonym `Shelf`
+      -- answers to `Crate` bare, which takes no arguments.
+      (ok, cycles) <- cycleReport $ Text.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Crate a HAS item IS AN a"
+        , "DECLARE Shelf AKA Crate IS A LIST OF (Crate OF NUMBER)"
+        , ""
+        , "GIVETH A Shelf"
+        , "shelf MEANS LIST (Crate OF 1)"
+        ]
+      (ok, cycles) `shouldBe` (True, [])
+
+    it "accepts a synonym whose alias is a two-parameter record's name, applied to two arguments" $ do
+      (ok, cycles) <- cycleReport $ Text.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Pair2 a b HAS one IS AN a"
+        , "                      two IS A b"
+        , "DECLARE Cell AKA Pair2 IS A Pair2 OF NUMBER, STRING"
+        , ""
+        , "GIVETH A Cell"
+        , "cell MEANS Pair2 OF 1, \"x\""
+        ]
+      (ok, cycles) `shouldBe` (True, [])
+
+    it "accepts a synonym whose alias is a record's name, where the record's field is an enum" $ do
+      (ok, cycles) <- cycleReport $ Text.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Status IS ONE OF Active, Closed"
+        , "DECLARE Tagged a HAS tag IS A Status"
+        , "                     val IS AN a"
+        , "DECLARE Account AKA Tagged IS A Tagged OF NUMBER"
+        , ""
+        , "GIVETH A Account"
+        , "account MEANS Tagged OF Active, 100"
+        ]
+      (ok, cycles) `shouldBe` (True, [])
+
+    it "accepts a synonym that shares its alias with an imported record of another arity" $ do
+      let vfs = vfsFromList [ ( "boxlib", "DECLARE Box a HAS item IS AN a\n" ) ]
+      (ok, cycles) <- cycleReportWith vfs $ Text.unlines
+        [ "IMPORT boxlib"
+        , ""
+        , "DECLARE Shelf AKA Box IS A Box OF NUMBER"
+        , ""
+        , "GIVETH A Shelf"
+        , "w MEANS Box OF 1"
+        ]
+      (ok, cycles) `shouldBe` (True, [])
 
     it "terminates when the cyclic synonyms come from an imported module" $ do
       -- Imports are acyclic, and the imported module's own check quarantines
