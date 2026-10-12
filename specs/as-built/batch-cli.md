@@ -35,6 +35,7 @@ CSV cells (`inferCsvCell`): after stripping whitespace, an empty cell becomes `n
 Entrypoint: `--entrypoint` names the export exactly; else the `@export default` function; else the first export; else the error `no @export functions found in module`.
 Parameters: the export's GIVENs become call arguments.
 Evaluation pipeline, read in code: the checked module goes through `filterIdeDirectives` (dropping every `#EVAL`/`#ASSERT`) and is re-emitted as source by `prettyLayout` (`:205-206`).
+A string literal in that printed source has its line breaks, tabs and carriage returns written as escapes (`escapeSourceStringLiteral`, `jl4-core/src/L4/Print.hs:896-901`, used at `:580`), because a raw newline would become a layout line break that takes the body's indentation (smucclaw/l4-ide#1028, from #595).
 Per row, a generated wrapper is appended to that text: `DECLARE InputArgs HAS …`, a `decodeArgs` function using `JSONDECODE`, `DECIDE inputJson IS "<row JSON>"`, and one `#EVAL` of `CONSIDER decodeArgs inputJson` applying the export.
 The combined text is registered as the virtual file `<FILE>.batch<N>.l4`, next to FILE, and evaluated with `Rules.EvaluateLazy` in a fresh one-shot build (`:308-314`).
 Envelope (evaluate mode): `{input, output, status, diagnostics}`; `output` is the array of directive results, e.g. `[{"result":20,"trace":null}]`.
@@ -52,9 +53,10 @@ Validation messages (`:356-370`): `Missing required field: '<p>'`, `Field '<p>' 
 
 ## Tests and fixtures that pin it
 
-- From #47: `jl4/tests-cli/Main.hs:345-434` (NDJSON default, CSV inference, `--format json`, `--format csv`, `--output`, stop-on-error, `--continue-on-error`, `--validate-only`, exponent cells kept as strings, `MAYBE` validation).
-- Their fixtures: `jl4/tests-cli/fixtures/batch-elig.l4`, `batch-data.json`, `batch-data.csv`, `batch-mixed.json`, `batch-code.l4`, `batch-exponent.csv`, `batch-maybe.l4`, `batch-maybe-bad.json`.
-- Other `l4 batch` tests on `main` are not part of this change: the printer-bracket and grouping cases `describe "l4 batch keeps the grouping the rule wrote"` and `describe "l4 batch agrees with l4 run"` (`jl4/tests-cli/Main.hs:522` and `:541`).
+- From #47: `jl4/tests-cli/Main.hs:350-450` (NDJSON default, CSV inference, `--format json`, `--format csv`, `--output`, stop-on-error, `--continue-on-error`, `--validate-only`, exponent cells kept as strings, `MAYBE` validation); the case at `:429-438`, a line break and a tab inside a string literal, is #595's.
+- From #595: `jl4-core/test/PrintRoundtripSpec.hs:27` (a string with a line break and a tab prints with its escapes and re-parses) and the fixtures `jl4/tests-cli/fixtures/batch-string-line-break.l4` and `.json`.
+- Their fixtures (#47): `jl4/tests-cli/fixtures/batch-elig.l4`, `batch-data.json`, `batch-data.csv`, `batch-mixed.json`, `batch-code.l4`, `batch-exponent.csv`, `batch-maybe.l4`, `batch-maybe-bad.json`.
+- Other `l4 batch` tests on `main` are not part of this change: the printer-bracket and grouping cases `describe "l4 batch keeps the grouping the rule wrote"` and `describe "l4 batch agrees with l4 run"` (`jl4/tests-cli/Main.hs:538` and `:557`).
 
 ## Limits and known defects
 
@@ -78,6 +80,7 @@ Measured with the `l4` built from plain `main` and the one built from this PR, o
 
 - #51: the row JSON is quoted with the lexer's `showStringLit` instead of the hand-rolled escape.
 - #214: `prettyLayout` made to re-emit parseable, re-checkable source, and a `batch` help text that says input is json|yaml|csv.
+- #595: its change to the `Inert` arm of the printer is not here; `main` prints an inert string as `"..." <+> dquotes (pretty txt)` (`Print.hs:440-441`), which needs its own change first.
 - #328: read ASSUMEs are bound by name via `rewriteModuleAssumes`, not passed as positional arguments.
 - #330: an `#ASSERT` that raises counts as a row exception.
 - #334: the `refused` status, which neither fails nor stops the batch.
