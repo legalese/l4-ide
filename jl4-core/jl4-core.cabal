@@ -171,6 +171,8 @@ test-suite jl4-core-test
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec
+    CheckDirectiveResultsSpec
+    PrintRoundtripSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

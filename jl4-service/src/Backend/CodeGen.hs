@@ -4,6 +4,8 @@ module Backend.CodeGen
   , generateDeonticEvalWrapper
   , isDeonticType
   , GeneratedCode(..)
+  , AnswerShape(..)
+  , RequiredInput(..)
   -- Exported for testing
   , inputFieldName
   , transformJsonKeys
@@ -80,10 +82,45 @@ unwrappedVar name
 data GeneratedCode = GeneratedCode
   { generatedWrapper :: Text
     -- ^ The L4 code to append after the filtered source
-  , decodeFailedSentinel :: Text
-    -- ^ The sentinel value to check for decode failure
+  , answerShape :: AnswerShape
+    -- ^ How the wrapper's #EVAL delivers the function's answer
+  , requiredInputs :: [RequiredInput]
+    -- ^ The inputs the wrapper cannot go on without, in the order it unwraps
+    -- them: every one that is neither a BOOLEAN nor a MAYBE. When one of them
+    -- is absent, or is a DATE, TIME or DATETIME string that does not parse,
+    -- the wrapper answers NOTHING without calling the function.
   }
   deriving (Show, Eq)
+
+-- | How a generated wrapper's #EVAL delivers the function's answer.
+data AnswerShape
+  = WrappedInJust
+    -- ^ @JUST answer@; or @NOTHING@, without calling the function, for the
+    -- reasons given at 'requiredInputs'
+  | Bare
+    -- ^ the answer itself: a function with no inputs has nothing to decode
+  deriving (Show, Eq)
+
+-- | An input the wrapper cannot go on without.
+data RequiredInput = RequiredInput
+  { inputName :: Text
+  , isRuleGiven :: Bool
+    -- ^ one of the rule's own GIVENs, rather than an ASSUME
+  , parsedAs :: Maybe Text
+    -- ^ DATE, TIME or DATETIME, when the wrapper parses the input from a string
+  }
+  deriving (Show, Eq)
+
+-- | Whether the wrapper unwraps an input with a nested CONSIDER, and so answers
+-- NOTHING when it is absent: every input that is neither a BOOLEAN nor a MAYBE.
+isRequiredInput :: ((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool) -> Bool
+isRequiredInput (_, isB, _, _, isM) = not isB && not isM
+
+-- | The inputs for which 'isRequiredInput' holds.
+requiredInputsOf :: [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)] -> [RequiredInput]
+requiredInputsOf ps =
+  [ RequiredInput name isGiven (Text.drop 2 <$> convFn)  -- "TODATE" parses a DATE
+  | p@((name, _), _, isGiven, convFn, _) <- ps, isRequiredInput p ]
 
 -- | Generate L4 wrapper code for JSONDECODE-based evaluation
 --
@@ -115,7 +152,8 @@ generateEvalWrapper funName givenParams assumeParams inputJson traceLevel = do
           , ""
           , generateSimpleEval funName traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = Bare
+      , requiredInputs = []
       }
     else
       -- Deep Maybe lifting: all parameters get MAYBE types
@@ -147,7 +185,8 @@ generateEvalWrapper funName givenParams assumeParams inputJson traceLevel = do
           , ""
           , generateEvalDirectiveLiftedWithAssumes funName givenParamInfo assumeParamInfo traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = WrappedInJust
+      , requiredInputs = requiredInputsOf allParamInfo
       }
 
 -- | Generate simple EVAL/EVALTRACE for zero-parameter functions
@@ -230,8 +269,7 @@ generateEvalDirectiveLiftedWithAssumes funName givenParamInfo assumeParamInfo tr
 
       -- Params that need CONSIDER unwrapping:
       -- non-boolean AND not originally-MAYBE (isMaybe=False)
-      needsUnwrap (_, isB, _, _, isM) = not isB && not isM
-      nonBoolNonMaybeParams = filter needsUnwrap allParams
+      nonBoolNonMaybeParams = filter isRequiredInput allParams
 
       -- Generate the value expression for a single parameter
       paramValueExpr :: (Text, Bool, Maybe Text, Bool) -> Text
@@ -540,7 +578,8 @@ generateDeonticEvalWrapper funName givenParams assumeParams inputJson startTime 
           [ ""
           , generateSimpleDeonticEval funName startTimeExpr eventListExpr traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = Bare
+      , requiredInputs = []
       }
     else
       -- Deep Maybe lifting: all parameters get MAYBE types (same as generateEvalWrapper)
@@ -568,7 +607,8 @@ generateDeonticEvalWrapper funName givenParams assumeParams inputJson startTime 
           [ ""
           , generateDeonticEvalDirectiveLifted funName givenParamInfo assumeParamInfo startTimeExpr eventListExpr traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = WrappedInJust
+      , requiredInputs = requiredInputsOf allParamInfo
       }
 
 -- | Generate simple EVALTRACE for zero-parameter deontic functions
@@ -595,8 +635,7 @@ generateDeonticEvalDirectiveLifted funName givenParamInfo assumeParamInfo startT
 
       allParams = givenParamInfo <> assumeParamInfo
 
-      needsUnwrap (_, isB, _, _, isM) = not isB && not isM
-      nonBoolNonMaybeParams = filter needsUnwrap allParams
+      nonBoolNonMaybeParams = filter isRequiredInput allParams
 
       paramValueExpr :: (Text, Bool, Maybe Text, Bool) -> Text
       paramValueExpr (name, isBoolean, convFn, isM)

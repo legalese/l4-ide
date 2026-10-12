@@ -15,10 +15,10 @@ float.l4:14:1-26:
   1.1557281271943252
 float.l4:17:1-23:
   Division by zero in the operation:
-  DIVIDED
+  DIVIDED BY
 float.l4:18:1-21:
   Division by zero in the operation:
-  DIVIDED
+  DIVIDED BY
 float.l4:21:1-18:
   0
 float.l4:22:1-22:

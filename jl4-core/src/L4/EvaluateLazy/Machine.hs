@@ -22,6 +22,11 @@ module L4.EvaluateLazy.Machine
 , getEvalTime
 , getModuleUri
 , getSafeMode
+-- * The string parsers TODATE, TOTIME and TODATETIME use, for callers that must
+-- agree with them (jl4-service names the input one of them refused).
+, parseDateText
+, parseTimeText
+, parseDatetimeText
 , Config (..)
 , forwardExpr
 , matchBranches

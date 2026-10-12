@@ -18,6 +18,7 @@ module Types (
   BatchResponse (..),
   InputCase (..),
   OutputCase (..),
+  CaseOutcome (..),
   OutputSummary (..),
   Outcomes (..),
   OutcomeObject (..),
@@ -410,7 +411,16 @@ data OutputCase = OutputCase
   { id :: Id
   , attributes :: Map Text FnLiteral
   , graphviz :: Maybe GraphVizResponse
+  , outcome :: CaseOutcome
+    -- ^ whether the case was answered; an error as @\@error@
   }
+  deriving stock (Show, Eq, Ord)
+
+-- | How one case of the batch endpoint ended. An errored case is still
+-- returned, with its message, rather than only counted.
+data CaseOutcome
+  = CaseAnswered
+  | CaseErrored Text
   deriving stock (Show, Eq, Ord)
 
 data BatchResponse = BatchResponse
@@ -502,17 +512,23 @@ instance FromJSON OutputCase where
   parseJSON = Aeson.withObject "OutputCase" $ \o -> do
     caseId <- o .: "@id"
     graphvizVal <- o .:? "@graphviz"
+    errorVal <- o .:? "@error"
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@error" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
+        outcomeVal = maybe CaseAnswered CaseErrored errorVal
     parsedAttrs <- traverse parseJSON attrs
-    pure $ OutputCase caseId parsedAttrs graphvizVal
+    pure $ OutputCase caseId parsedAttrs graphvizVal outcomeVal
 
 instance ToJSON OutputCase where
   toJSON oc =
     Aeson.object $
       [ "@id" .= oc.id
       ] <> maybe [] (\gv -> ["@graphviz" .= gv]) oc.graphviz
+        <> case oc.outcome of
+             CaseAnswered  -> []
+             CaseErrored e -> ["@error" .= e]
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 
 instance FromJSON OutputSummary where

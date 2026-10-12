@@ -116,7 +116,8 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 - Deployment IDs: max 36 characters, `[a-zA-Z0-9_-]` only, no `..` sequences
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
-- Duplicate detection: if the uploaded sources match an existing deployment (by content hash), the existing deployment is returned instead of recompiling
+- Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned, as `ready` with no `updateId`, instead of recompiling
+- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and refuses every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#571, an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
 
 ### Data Plane
 
@@ -161,6 +162,38 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
   -H "Content-Type: application/json" \
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
+
+#### Answers
+
+The direct path and the wrapper path described below encode an answer the same way.
+A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
+A list is a JSON array, even when it has one element.
+An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
+A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
+A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
+
+The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
+
+#### Missing inputs
+
+An input left out of `arguments`, or sent as `null`, is missing.
+Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
+
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
+On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
+A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
+A batch case refused this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
+
+Limits, measured 2026-10-07:
+
+- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
+  A function with a `BOOLEAN` input fails the same way, because the wrapper reads it with `prelude`'s `fromMaybe`.
+- On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
+- On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+- On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
+- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+  A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
 
 #### Trace Output
 
@@ -208,6 +241,35 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
     ]
   }'
 ```
+
+The response has one entry per case, in the order the cases were sent, each under its `@id`:
+
+```json
+{
+  "cases": [
+    { "@id": 1, "value": true },
+    { "@id": 2, "value": false },
+    { "@id": 3, "value": false }
+  ],
+  "summary": {
+    "casesIgnored": 0,
+    "casesProcessed": 3,
+    "casesRead": 3,
+    "processorCasesPerSec": 0,
+    "processorDurationSec": 0,
+    "processorQueuedSec": 0
+  }
+}
+```
+
+An answered case carries the function's result under `value`.
+A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is refused in a batch and answered as text in a single request.
+A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
+Every case of a batch starts at once on one core, so each case's clock also counts the other cases' work, and a large batch of quick cases can fail this way: measured 2026-10-07 with `--eval-timeout 3`, 10 cases of a rule that answers a single request in about 0.12 s all answer, and 40 fail the batch.
+Unstable returns such a case with `@error` and `@limit` and keeps the others (legalese/l4-ide#549, commits `0765fef5d` and `a09544dd6`); this version does not carry that.
+Until legalese/l4-ide#571, a failed case was left out of `cases` and only counted.
+The three `processor…` fields of `summary` are not measured, and are always `0`.
 
 ### Query Planning
 
