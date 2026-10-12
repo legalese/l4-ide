@@ -142,6 +142,11 @@ data CheckError =
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
   | CyclicTypeSynonyms [Name]
     -- ^ Circular dependency between type synonym declarations (cycle members)
+  | SynonymExpansionLimit Int Resolved
+    -- ^ Comparing two types followed this many type synonyms in a row and
+    -- stopped at the one given, which still stands for another type. The
+    -- types are not known to differ, so this is not a 'TypeMismatch'. See
+    -- 'L4.TypeCheck.Unify.synonymExpansionFuel'.
   | MisattachedSectionGiven Name (Maybe Name)
     -- ^ A column-1 @GIVEN@ that opens a section and declares a name the
     -- declaration it attaches to never uses. Carries the unused parameter name

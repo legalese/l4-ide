@@ -8,6 +8,7 @@ import type { VSCodeL4LanguageClient } from './vscode-l4-language-client.js'
 import { type AuthManager, LEGALESE_CLOUD_DOMAIN } from './auth.js'
 import type { ServiceClient } from './service-client.js'
 import { installDeploymentSkill } from './deployment-install.js'
+import { isEmbeddedLibraryUri } from './embedded-library.js'
 import { installMarketplaceToHarness } from './harness-config.js'
 import { getWebviewContent } from './webview-panel.js'
 import {
@@ -1273,6 +1274,11 @@ async function collectL4Sources(
   // Collect main file first, then all imports
   await collectFile(fileUri)
   for (const importUri of importUris) {
+    // The stdlib jl4-lsp carries inside its binary. The deployed service
+    // registers its own copy unless the bundle ships a same-named file
+    // (`typecheckAndEvalBundle` in jl4-service's Backend/Jl4.hs), so zipping
+    // this machine's would pin it over the service's.
+    if (isEmbeddedLibraryUri(importUri)) continue
     await collectFile(importUri)
   }
 

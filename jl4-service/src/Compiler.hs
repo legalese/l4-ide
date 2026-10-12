@@ -16,7 +16,7 @@ import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import BundleStore (SerializedBundle (..), StoredMetadata (..))
 import Types
-import Control.Monad (forM, unless)
+import Control.Monad (forM, forM_, unless)
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
@@ -37,7 +37,30 @@ import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
 import Logging (Logger, logInfo, logWarn)
 import qualified LSP.L4.Rules as Rules
-import System.FilePath (takeExtension)
+import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
+import System.FilePath (takeBaseName, takeExtension)
+
+-- | Say, at WARN, which files of a bundle have the name of a standard library
+-- module and a different text.
+--
+-- A bundle's own files are consulted before the stdlib, so an importer that can
+-- see such a file (one beside it, or at the bundle root) gets that file where
+-- the stdlib's module was meant. That is a right a bundle has, and sometimes
+-- uses on purpose, but nothing else in the service says it happened: the
+-- resolver reports a shadowing copy only when one is found on the filesystem
+-- tiers, and the bundle's files are not. A copy of the stdlib's own text is
+-- not a stand-in and is not reported.
+logStdlibStandIns :: Logger -> Text -> [(FilePath, Text)] -> IO ()
+logStdlibStandIns logger deployId l4Files =
+  forM_ l4Files $ \(path, content) ->
+    case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (takeBaseName path)) of
+      Just stdlib | stdlib /= content ->
+        logWarn logger "Bundle file stands in for a standard library module"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON path)
+          , ("module", toJSON (takeBaseName path))
+          ]
+      _ -> pure ()
 
 -- | Compile an in-memory source map into a deployment-ready function registry.
 --
@@ -60,6 +83,8 @@ compileBundle logger deployId sources = do
     else do
       let moduleContext = sources
           allPaths = map fst l4Files
+
+      logStdlibStandIns logger deployId l4Files
 
       -- Phase 1: Typecheck ALL files in one Shake session.
       -- Pass all paths as needing eval environments — we'll discover which have

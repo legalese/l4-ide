@@ -36,18 +36,21 @@ embedOneLibrary libDir fileName = do
   let name = takeBaseName fileName
       path = libDir </> fileName
 
-  -- Register dependency so rebuilds happen when files change.
+  -- Register dependency so that GHC re-embeds a library that changed.
   --
-  -- STALENESS GOTCHA: @path@ is whatever directory the splice in
-  -- 'L4.API.EmbeddedLibraries' resolved at /build/ time — typically the Cabal
-  -- install datadir (e.g. @~/.cabal/share/.../jl4-core-*/libraries@), NOT your
-  -- checkout. So editing a worktree's @jl4-core/libraries/*.l4@ does not
-  -- invalidate this splice, and a plain @cabal build@ keeps the old embedded
-  -- stdlib. To pick up stdlib edits either force a re-embed (touch
-  -- EmbeddedLibraries.hs / clean-rebuild jl4-core) or — the reliable way while
-  -- developing — set @JL4_LIBRARY_PATH@ to your worktree's
-  -- @jl4-core/libraries@, which outranks the embed in import resolution.
-  -- See jl4-core/libraries/README.md and LIBRARY-RESOLUTION-SHADOW-SPEC §3.4.
+  -- STALENESS GOTCHA, measured 2026-10-13 (GHC 9.10.3, Cabal 3.16, a checkout
+  -- built with @cabal build@): @path@ is the checkout's own
+  -- @jl4-core/libraries/<name>.l4@, and GHC records it in
+  -- "L4.API.EmbeddedLibraries"'s interface with a content hash, so when GHC
+  -- runs it does notice an edited library and re-embeds it. But editing only
+  -- @libraries/*.l4@ leaves nothing for Cabal to rebuild: @cabal build@ prints
+  -- @Up to date@, never calls GHC, and the binary keeps the old stdlib.
+  -- @touch@ does not help either (Cabal compares content). Any real change to
+  -- a jl4-core source file makes Cabal call GHC, which then re-embeds. While
+  -- developing the stdlib the reliable way is to set @JL4_LIBRARY_PATH@ to your
+  -- worktree's @jl4-core/libraries@, which outranks the embed in import
+  -- resolution. See jl4-core/libraries/README.md and
+  -- LIBRARY-RESOLUTION-SHADOW-SPEC §3.4.
   addDependentFile path
   
   -- Read file contents at compile time
