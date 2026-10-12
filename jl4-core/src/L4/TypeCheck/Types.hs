@@ -152,6 +152,13 @@ data CheckWarning
     -- (counting from 1), the annotation as written (@\@export@, say), and
     -- whether the group has a GIVEN, which is where its @\@desc@ and
     -- @\@export@ go.
+  | ClauseArityChanged SrcRange Name Int [Name]
+    -- ^ A definition with no GIVEN of its own, right after a multi-clause
+    -- group of the same name, that has another number of inputs than the
+    -- group has patterns ('L4.TypeCheck.warnClauseArityChange'). It is not a
+    -- clause of the group: it is a rule of its own, and the names after its
+    -- head are its inputs. Carries the head's range, the name, the number of
+    -- patterns each clause above has, and the definition's input names.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -270,6 +277,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
   rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
+  rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)

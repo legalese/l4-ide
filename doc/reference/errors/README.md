@@ -32,6 +32,7 @@ If you already know what error you are looking at, use the table of contents bel
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
   - [Clause that is never used](#clause-that-is-never-used)
   - [Annotation above a later clause](#annotation-above-a-later-clause)
+  - [A definition after clauses that is not another clause](#a-definition-after-clauses-that-is-not-another-clause)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
   - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
@@ -699,6 +700,46 @@ Definitions that share a name but are told apart by their types, such as `DECIDE
 **How to fix it:** Move the annotation to where the rule's own annotations go, or remove it.
 An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause if it has no `GIVEN`.
 An `@nlg` goes on the line above the first clause.
+
+---
+
+### A definition after clauses that is not another clause
+
+**Warning message:**
+
+```
+This definition of `f` is not another clause of the clauses above it.
+Each of those has 1 pattern, and this one has 2 inputs, `Red` and `Blue`, so it is a separate rule, and what follows its name is the names it gives its inputs, not patterns.
+If it is meant as another clause, give it as many patterns as the others have; if it is a rule of its own, give it a GIVEN of its own.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE f Red IS 1
+DECIDE f c IS 2
+DECIDE f Red Blue IS 3
+```
+
+**What went wrong:** Clauses that follow one another are gathered into one rule when they have the same name and the same number of patterns after it.
+The first two clauses have one pattern each, so they are one rule.
+The third has two, so it is not a clause of that rule: it is a rule of its own that takes two inputs and calls them `Red` and `Blue`, whatever else those words mean elsewhere.
+It checks, and `f Green Red` gives 3, where a reader of the three lines might have expected L4 to be looking for the colour Red and the colour Blue.
+The warning appears once, at the name in the definition, and only for a definition that has no `GIVEN` of its own and follows a rule written as clauses directly.
+
+**How to fix it:** If the line was meant as another clause of the rule above, give it as many patterns as the clauses above have (here, one).
+If it is a rule of its own, say so with a `GIVEN` of its own, which also gives its inputs their types:
+
+```l4
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+f c d MEANS 3
+```
 
 ---
 
