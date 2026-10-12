@@ -4829,7 +4829,7 @@ extractFieldNamesAndTypes ty = case ty of
 cannotDecode :: DecodeAt -> Text -> Aeson.Value -> Text -> Machine a
 cannotDecode at typeName jsonValue why =
   userException $ UserError $
-    "Could not decode " <> TE.decodeUtf8 (LBS.toStrict (Aeson.encode jsonValue))
+    "Could not decode " <> TE.decodeUtf8 (BS.toStrict (Aeson.encode jsonValue))
       <> " as " <> typeName <> atField at <> ": " <> why
 
 -- | What a value of a choice type is given as in JSON, for 'cannotDecode':
