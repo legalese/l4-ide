@@ -405,7 +405,8 @@ Natural-language names work too: exported functions and parameters written with 
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
 Text that does not spell one is left as it is, and the line is an error that names the text.
-A parameter declared as `STRING` keeps a CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
+A parameter declared as `STRING` keeps a non-blank CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
+A blank CSV cell is not text, for a `STRING` parameter as for any other: it leaves the fact out, as described under [Facts a case leaves out](#facts-a-case-leaves-out).
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
 
 A fact whose type is a list of choices (`DECLARE Colour IS ONE OF Red, Green, Blue`) is given as the name of one choice, written as text: `"c": "Red"`, or a `Red` cell in a CSV file.
@@ -445,7 +446,7 @@ The first case took the usual value, and the answer rests on it. The second supp
 What counts as leaving a fact out:
 
 - **The usual value works the same wherever the `TYPICALLY` is written**: on a section `GIVEN` as above, on a rule's own `GIVEN`, or on a field of a record the rule takes as an input. A field is listed by its path, such as `config.timeout`.
-- **Leaving the name out of the case is leaving the fact out.** In a CSV file, an empty cell means the same, and so does a cell holding only spaces or a quoted `""`, so one file can let one row take the usual value while the next row supplies its own. A blank line is not a case, and neither is a line holding only spaces or tabs; a quoted `"   "` is a case whose one cell is empty. A line with more or fewer cells than the header is an error that names its line number, because a cell missing from a short line would otherwise take its usual value without anyone having said so. A file saved as Excel's "CSV UTF-8", which starts with an invisible byte-order mark, reads the same as one without, and so does a file with Windows line ends.
+- **Leaving the name out of the case is leaving the fact out.** In a CSV file, a blank cell means the same, exactly as a column missing from the file does: an empty cell, a cell holding only spaces, or a quoted `""`. That holds for every kind of fact, a `STRING` included. So a fact with a usual value takes it, a `MAYBE` fact with none is `NOTHING`, and any other fact is missing, which makes the line an error that says `Missing required field` and names it. One file can let one row take the usual value while the next row supplies its own. A blank line is not a case, and neither is a line holding only spaces or tabs; a quoted `"   "` is a case whose one cell is empty. A line with more or fewer cells than the header is an error that names its line number, because a cell missing from a short line would otherwise take its usual value without anyone having said so. A file saved as Excel's "CSV UTF-8", which starts with an invisible byte-order mark, reads the same as one without, and so does a file with Windows line ends.
 - **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact. That holds for every fact that is not a `MAYBE`, whether or not it has a usual value. `{}` given as a fact's value means the same as `null`, a fact that is a record included, and so does `{}` as an item of a list; a whole case `{}` supplies nothing, so every usual value applies. There is not yet a way to say "this record, with every field at its usual value"; leave out each field you mean to leave to its usual value.
 - **A misspelled name is an error where a usual value is taken.** In a case that leaves out a fact with a usual value, a name that matches no fact (a JSON key, or a CSV column) is an error that names it and the nearest fact, `Unknown field 'has capasity' (did you mean 'has capacity'?)`, because it may be the fact that was left out. The same holds inside a record. In a case where nothing takes a usual value, an extra name is ignored, as it always was. `--validate-only` reports it the same way.
 - **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before, and that is listed under `presumed` too: it is a presumption that the case is silent because there is nothing to say.
@@ -457,6 +458,65 @@ To see what the rules establish without any usual values, pass `--presumption ha
 `presumed` appears in every output format, on every line that was evaluated, including one that ended in an error. With `--format csv` it is a column holding the same list as compact JSON, `[]` when nothing was presumed; a list rather than names joined by a separator, because a name may itself contain a comma or a semicolon. `--validate-only` evaluates nothing, so its lines have no `presumed`.
 
 One limit, measured 2026-10-02: a rule that overrides a section `GIVEN` for part of a calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, does not run under `l4 batch`, although `#EVAL` answers it. The line is an error that says _You are giving named inputs to `inner` … but it is not a function, so it takes none._, because `l4 batch` supplies a section `GIVEN` by replacing it with a plain value, which a `WITH` can no longer reach. This was so before `TYPICALLY` defaults reached `l4 batch`, and is not changed by them.
+
+#### What each line says
+
+Every case that is run produces one line, or one item with `--format json`, `yaml` or `csv`, with five keys:
+
+- `input` is the case as the rules read it: a CSV cell is shown as the number, boolean or text it was read as, and a blank cell that was left out is not shown.
+- `output` is what the rules came to for the case: a list holding one `result`, or `null` when no answer could be reached at all.
+- `status` says how the case went, as below.
+- `presumed` lists the usual values the answer rests on (see above).
+- `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
+
+`status` is one of four words:
+
+- `success`: the rules gave an answer.
+- `error`: the rules could not be run on the case, or raised an error. A fact is missing or `null`, a value cannot be read as the type the fact declares, a CSV line has the wrong number of cells, or the rules themselves failed; `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+- `undetermined`: the rules need a fact the case does not supply (see [Needed the value of an assumed term](../../reference/errors/README.md#needed-the-value-of-an-assumed-term)). The batch carries on.
+- `refused`: the rules declined to answer this case, and `diagnostics` says why. That is an answer, not a failure, and the batch carries on.
+
+The command exits with status 0 when every case was `success` or `refused`, and 1 when any case was `error` or `undetermined`, once every case that was going to run has run.
+
+#### Checking cases without running them
+
+`--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not five: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The problems are the ones a run reports under `diagnostics`, so `errors` is how a validation line says what `diagnostics` says in a run. A case that could not be read at all, such as a CSV line with the wrong number of cells, is `invalid` here and `error` in a run. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
+
+It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does.
+
+**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+
+```l4
+@export Echo a date
+GIVEN d IS A DATE
+GIVETH A DATE
+`echo date` MEANS d
+```
+
+and the cases `[{"d": "2024-01-15"}, {"d": "not a date"}]`, validation passes both, and a run refuses the second:
+
+```
+$ l4 batch echo-date.l4 --inputs dates.json --validate-only
+{"errors":[],"input":{"d":"2024-01-15"},"status":"valid"}
+{"errors":[],"input":{"d":"not a date"},"status":"valid"}
+
+$ l4 batch echo-date.l4 --inputs dates.json
+{"diagnostics":[],"input":{"d":"2024-01-15"},"output":[{"result":"2024-01-15","trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":["Could not parse date string 'not a date'. Expected format: YYYY-MM-DD"],"input":{"d":"not a date"},"output":[{"result":{"error":"Could not parse date string 'not a date'. Expected format: YYYY-MM-DD\n"},"trace":null}],"presumed":[],"status":"error"}
+```
+
+So `valid` means a case has the right shape, not that the rules will accept every value in it.
+
+#### When the command cannot start
+
+If `l4 batch` cannot read the cases or the rules, it prints no line for any case and exits with status 1. It says why in one plain line that starts `Error:`, on standard output, which is where the case lines go, so a script that reads the output as JSON should look at the exit status before it parses:
+
+- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV;
+- `Error: --input-format is required when the extension can't be inferred (e.g. reading from stdin)`;
+- `Error: type checking failed` for rules that do not type-check, with the type errors themselves on standard error;
+- `Error: no @export functions found in module`, or `Error: no @export function named 'name' found` when `--entrypoint` names one that is not there.
+
+A cases file or a rules file that does not exist ends the command with the operating system's message on standard error instead.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
