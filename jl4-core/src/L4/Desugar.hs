@@ -892,8 +892,12 @@ exprFieldRefs fieldNames expr =
 -- the sibling found no cycle where the checker saw @W = W@; with two
 -- such synonyms unifying them branched twice per expansion, a thousand
 -- deep. A use whose argument count matches no synonym of that spelling
--- is a kind error the checker reports, but it still resolves the name
--- to one of them, so it is taken to refer to all of them.
+-- refers to none of them: it is a record or an enum that takes that many
+-- arguments (@DECLARE Box IS A Box OF NUMBER@ beside @DECLARE Box a HAS
+-- ...@), or a kind error. Taking it for a synonym reported a cycle in
+-- valid programs. A kind error can be a cycle, as in @DECLARE B a IS A
+-- PAIR OF B, B@; that is found among the resolved bodies by
+-- 'L4.TypeCheck.quarantineResolvedSynonymCycles', not here.
 detectTypeSynonymCycles :: Module Name -> [[Name]]
 detectTypeSynonymCycles (MkModule _ _ section) =
   let
@@ -913,11 +917,7 @@ detectTypeSynonymCycles (MkModule _ _ section) =
     -- sections this pass does not see.
     referents :: (RawName, Int) -> [RawName]
     referents (spelling, argc) =
-      case Map.findWithDefault [] spelling bySpelling of
-        []         -> []
-        candidates -> case [ p | (p, arity) <- candidates, arity == argc ] of
-          []    -> fst <$> candidates
-          exact -> exact
+      [ p | (p, arity) <- Map.findWithDefault [] spelling bySpelling, arity == argc ]
     graphData =
       [ (n, rawName n, Set.toList deps)
       | (n, _aliases, params, ty) <- synonyms
