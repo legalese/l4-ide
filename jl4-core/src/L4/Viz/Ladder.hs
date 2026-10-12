@@ -45,7 +45,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget)
+import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget)
 import L4.Desugar
 import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -62,6 +62,10 @@ data VizError
   | InvalidDecideMustHaveBoolRetType
   | ClauseGroupTooLarge Int
     -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
+  | ClauseGroupTooLong Int
+    -- ^ a rule written as DECIDE clauses that, written out as the CONSIDER it
+    -- stands for, has more expression nodes than this
+    -- ('L4.Transform.letInliningNodeBudget')
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -73,6 +77,8 @@ prettyPrintVizError = \case
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
   ClauseGroupTooLarge budget ->
     "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
+  ClauseGroupTooLong budget ->
+    "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than " <> Text.pack (show budget) <> " parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Monad
@@ -316,19 +322,22 @@ vizProgram :: VersionedDocId -> Decide Resolved -> Viz RenderAsLadderInfo
 vizProgram verDocId decide = MkRenderAsLadderInfo verDocId <$> translateDecide decide
 
 translateDecide :: Decide Resolved -> Viz FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) = do
+translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) = do
   -- Asked before anything is read through: a rule that returns a number is not
   -- too large to draw, it is not a ladder at all.
   unlessM (hasBooleanType (getAnno body0)) $
     throwError InvalidDecideMustHaveBoolRetType
   -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
-  let isClauseGroup = Transform.hasGeneratedClauses body0
+  -- Whether it was is read off the rule as written, not off its body: a rule
+  -- written by hand that has a call to a clause group unfolded into it (the
+  -- IDE's l4/inlineExprs) is still a rule written by hand.
+  let isClauseGroup = Transform.writtenAsClauses asWritten
   body <- case Transform.inlineLetsForViz body0 of
     Right inlined -> pure inlined
     -- Too big to read through. Clauses are refused, for a plan of any size
     -- they would be drawn as one leaf that asks nothing. Anything else is
     -- drawn as written: a LET the drafter wrote is never read through.
-    Left _ | isClauseGroup -> throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
+    Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
            | otherwise     -> pure body0
 
   let funName = mkPrettyVizName funResolved

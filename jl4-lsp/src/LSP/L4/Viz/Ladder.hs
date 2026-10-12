@@ -57,7 +57,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindings, positionalCall)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindings, readClausesAsConsider, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -461,6 +461,10 @@ data VizError
   | InvalidDecideMustHaveBoolRetType
   | ClauseGroupTooLarge Int
     -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
+  | ClauseGroupTooLong Int
+    -- ^ a rule written as DECIDE clauses that, written out as the CONSIDER it
+    -- stands for, has more expression nodes than this
+    -- ('L4.Transform.letInliningNodeBudget')
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -473,6 +477,8 @@ prettyPrintVizError = \ case
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
   ClauseGroupTooLarge budget ->
     "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
+  ClauseGroupTooLong budget ->
+    "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than " <> Text.pack (show budget) <> " parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Entrypoint: Visualise
@@ -539,11 +545,13 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     defs = defsForInliningOf cfg.module'
     -- Inlining a definition's locals before its parameters are substituted
     -- gives what inlining them after would: the parameters are free in the body
-    -- and substitution is by unique, so nothing is captured.
+    -- and substitution is by unique, so nothing is captured. A called rule
+    -- written as clauses opens onto the CONSIDER it stands for, as it is drawn
+    -- on its own ('translateDecide').
     expansionBodyOf (_, Transform.MkUnfoldable ps rhs)
       | bindsLocally flat = Nothing
       | otherwise = Just (ps, flat)
-      where flat = Transform.inlineLocalBindings rhs
+      where flat = Transform.readClausesAsConsider (Transform.inlineLocalBindings rhs)
     seedFrom
       | cfg.expandCalls = toListOf (gplate @Unique) cfg.module'
       | otherwise = toListOf (gplate @Unique) body
@@ -581,20 +589,23 @@ typeVariablesOf = Map.fromList . foldTopLevelDecides (foldDecides one)
 --
 -- Simple implementation: Translate Decide iff <= 1 Given
 translateDecide :: Decide Resolved -> Viz V.FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
+translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
   do
     -- Asked before anything is read through: a rule that returns a number is not
     -- too large to draw, it is not a ladder at all.
     unlessM (hasBooleanType (getAnno body0)) $
       throwError InvalidDecideMustHaveBoolRetType
     -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
-    let isClauseGroup = Transform.hasGeneratedClauses body0
+    -- Whether it was is read off the rule as written, not off its body: a rule
+    -- written by hand that has a call to a clause group unfolded into it (the
+    -- IDE's l4/inlineExprs) is still a rule written by hand.
+    let isClauseGroup = Transform.writtenAsClauses asWritten
     body <- case Transform.inlineLetsForViz body0 of
       Right inlined -> pure inlined
       -- Too big to read through. Clauses are refused, for a plan of any size
       -- they would be drawn as one leaf that asks nothing. Anything else is
       -- drawn as written: a LET the drafter wrote is never read through.
-      Left _ | isClauseGroup -> throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
+      Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
              | otherwise     -> pure body0
 
     -- functionName, defsForInlining, maxId and typicallyDefaults are already

@@ -21,6 +21,7 @@ import qualified Base.Text as Text
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..))
 import L4.Names (getName)
 import L4.Syntax
+import qualified L4.Transform as Transform
 import qualified L4.Viz.VizExpr as V
 
 import qualified LSP.L4.Viz.Ladder as Ladder
@@ -336,6 +337,83 @@ clauseGroupNoGivethByHand =
   \    WHEN Green THEN FALSE\n\
   \    WHEN Blue THEN FALSE\n"
 
+-- | A table of two columns whose rows share the first column and differ in the
+-- second. The desugarer tests the colour again in every later clause.
+clauseTable :: Text
+clauseTable =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant Red TRUE IS TRUE\n\
+  \DECIDE compliant Red FALSE IS FALSE\n\
+  \DECIDE compliant Green b IS b\n\
+  \DECIDE compliant Blue b IS NOT b\n"
+
+clauseTableByHand :: Text
+clauseTableByHand =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant c b IS\n\
+  \  CONSIDER c\n\
+  \    WHEN Red THEN\n\
+  \      CONSIDER b\n\
+  \        WHEN TRUE THEN TRUE\n\
+  \        WHEN FALSE THEN FALSE\n\
+  \    WHEN Green THEN b\n\
+  \    WHEN Blue THEN NOT b\n"
+
+-- | A table of @k@ rows over an enum of @k@ values and a BOOLEAN: each value
+-- with TRUE is TRUE, and anything else FALSE.
+enumTable :: Int -> Text
+enumTable k =
+  "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "V" <> Text.pack (show i) | i <- [0 .. k - 1] ] <> "\n"
+    <> "GIVEN c IS A Big\n      b IS A BOOLEAN\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE compliant V" <> Text.pack (show i) <> " TRUE IS TRUE" | i <- [0 .. k - 1] ]
+    <> "DECIDE compliant c b IS FALSE\n"
+
+enumTableByHand :: Int -> Text
+enumTableByHand k =
+  "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "V" <> Text.pack (show i) | i <- [0 .. k - 1] ] <> "\n"
+    <> "GIVEN c IS A Big\n      b IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE compliant c b IS\n  CONSIDER c\n"
+    <> Text.unlines [ "    WHEN V" <> Text.pack (show i) <> " THEN\n      CONSIDER b\n        WHEN TRUE THEN TRUE\n        OTHERWISE FALSE" | i <- [0 .. k - 1] ]
+    <> "    OTHERWISE FALSE\n"
+
+-- | A last clause whose pattern is a new name, not the input's own.
+clauseNewName :: Text
+clauseNewName =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \      a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant Red a b IS a\n\
+  \DECIDE compliant Green a b IS b\n\
+  \DECIDE compliant other a b IS a AND b\n"
+
+clauseNewNameByHand :: Text
+clauseNewNameByHand =
+  colourDecl <>
+  "GIVEN c IS A Colour\n\
+  \      a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \DECIDE compliant c a b IS\n\
+  \  CONSIDER c\n\
+  \    WHEN Red THEN a\n\
+  \    WHEN Green THEN b\n\
+  \    OTHERWISE a AND b\n"
+
+-- | @k@ rows each with a long numeric body, so that written out the rule passes
+-- 'Transform.letInliningNodeBudget' though its ladder would be small.
+longRows :: Int -> Int -> Text
+longRows k width =
+  "GIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE compliant " <> Text.pack (show i) <> " IS n" <> Text.concat (replicate width " + 1") <> " GREATER THAN 0" | i <- [0 .. k - 1] ]
+    <> "DECIDE compliant n IS FALSE\n"
+
 spec :: Spec
 spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)" $ do
   -- The whole chain collapses to the guard itself. Note simplify=False: this is our
@@ -509,6 +587,33 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
 
     it "does not hold a CONSIDER the drafter wrote to the clause-group budget" $
       vizResult False (considerRows 600) `shouldSatisfy` either (const False) (const True)
+
+    -- The desugarer tests an earlier column again in every later clause. Each
+    -- generated test is read with what the branches around it already decided,
+    -- so the table is the CONSIDER a drafter writes for it, not a copy of every
+    -- later clause under every earlier case (29 leaves against 6, before).
+    it "is the same ladder as its hand-written CONSIDER: a table of two columns" $ do
+      let clauses = vizBody False clauseTable
+      shapeOf clauses `shouldBe` shapeOf (vizBody False clauseTableByHand)
+      countLeaves clauses `shouldBe` 6
+
+    it "draws a table of an enum by a BOOLEAN in a size linear in its rows" $
+      for_ [2, 6, 24] \k -> do
+        let clauses = vizBody False (enumTable k)
+        shapeOf clauses `shouldBe` shapeOf (vizBody False (enumTableByHand k))
+        countLeaves clauses `shouldBe` 2 * k
+
+    it "reads a clause whose pattern is a new name as the OTHERWISE" $
+      shapeOf (vizBody False clauseNewName) `shouldBe` shapeOf (vizBody False clauseNewNameByHand)
+
+    -- Written out, these clauses pass the bound on the work of reading them
+    -- through, though their ladder would be small; the refusal says which.
+    it "refuses clauses too long to write out, saying that and not that the ladder is too large" $
+      case vizResult False (longRows 60 200) of
+        Left e -> do
+          e `shouldBe` Ladder.ClauseGroupTooLong Transform.letInliningNodeBudget
+          Ladder.prettyPrintVizError e `shouldSatisfy` Text.isInfixOf "too long to draw"
+        Right _ -> expectationFailure "clauses past the bound on reading them through were drawn"
 
     it "names nothing the desugarer made up" $
       for_ [clauseGroup, clauseGroupTwoInputs, clauseGroupOfOne, clauseGroupNoGiveth] \src ->

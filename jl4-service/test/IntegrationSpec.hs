@@ -47,7 +47,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1828,6 +1828,13 @@ spec = describe "integration" do
       -- compared with the hand-written rule that has one.
       sameAsHandWritten "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
       sameAsHandWritten "call" clauseGroupCallJL4 handCallJL4
+      -- Rows that share an earlier column: the desugarer tests it again in every
+      -- later clause, and the ladder reads each test with what the branches
+      -- around it already decided.
+      sameAsHandWritten "table" clauseTableJL4 handTableJL4
+      sameAsHandWritten "table2" clauseTable2JL4 handTable2JL4
+      -- A last clause whose pattern is a new name is the OTHERWISE.
+      sameAsHandWritten "newname" clauseNewNameJL4 handNewNameJL4
 
       -- The plans above are compared whole, atomIds included. This compares the
       -- atomIds alone, so that a failure names them, and adds what the whole-plan
@@ -1869,6 +1876,9 @@ spec = describe "integration" do
       sameAtomIds "single" clauseGroupSingleJL4 handSingleJL4
       sameAtomIds "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
       sameAtomIds "call" clauseGroupCallJL4 handCallJL4
+      sameAtomIds "table" clauseTableJL4 handTableJL4
+      sameAtomIds "table2" clauseTable2JL4 handTable2JL4
+      sameAtomIds "newname" clauseNewNameJL4 handNewNameJL4
 
     it "and evaluation still works across that restart" do
       -- The control. /evaluation needs no type annotations, so it kept working

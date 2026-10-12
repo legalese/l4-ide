@@ -794,6 +794,35 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
       withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
 
+    -- A called rule written as clauses opens onto the CONSIDER it stands for, as
+    -- it is drawn on its own, not onto the nested CONSIDERs it compiles to.
+    it "opens a call to a clause group onto the panel of a call to its hand-written CONSIDER" $ do
+      let calling callee = T.unlines $
+            [ "DECLARE Colour IS ONE OF Red, Green, Blue", "", "GIVEN c IS A Colour", "GIVETH A BOOLEAN" ]
+            <> callee
+            <> [ "", "GIVEN c IS A Colour", "      a IS A BOOLEAN", "GIVETH A BOOLEAN", "DECIDE rule c a IS warm c AND a" ]
+      rC <- render "calls-clauses" (calling ["DECIDE warm Red IS TRUE", "DECIDE warm Green IS FALSE", "DECIDE warm Blue IS FALSE"]) "rule"
+      rH <- render "calls-hand" (calling ["DECIDE warm c IS", "  CONSIDER c", "    WHEN Red THEN TRUE", "    WHEN Green THEN FALSE", "    WHEN Blue THEN FALSE"]) "rule"
+      [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+      withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- The limit on a ladder drawn from clauses is about the rule as written. A
+    -- rule written by hand that has a large clause group unfolded into it by the
+    -- expand gesture is still a rule written by hand, and is drawn.
+    it "l4/inlineExprs on a hand-written caller of a large clause group is drawn, not refused" $ do
+      let src = T.unlines $
+            [ "GIVEN n IS A NUMBER", "GIVETH A BOOLEAN" ]
+            <> [ "DECIDE callee " <> T.pack (show i) <> " IS " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. 599 :: Int] ]
+            <> [ "DECIDE callee n IS FALSE", ""
+               , "GIVEN q IS A NUMBER", "      flag IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE caller q flag IS callee q OR flag" ]
+      r <- render "inline-large-group" src "caller"
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure ("the unfolded caller was refused: " <> show e)
+        Right (_, info, _, _) -> length (directLeaves info.funDecl.body) `shouldSatisfy` (> 300)
+
   it "the wire omits `expansion` when a leaf has none" $ do
     r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
     let direct = [e | e@(V.UBoolVar _ nm _ _ _ _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]

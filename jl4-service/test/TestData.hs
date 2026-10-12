@@ -42,6 +42,12 @@ module TestData (
   handSingleJL4,
   clauseGroupCallJL4,
   handCallJL4,
+  clauseTableJL4,
+  handTableJL4,
+  clauseTable2JL4,
+  handTable2JL4,
+  clauseNewNameJL4,
+  handNewNameJL4,
   clauseGroupNoGivethJL4,
   clauseGroupLetResultJL4,
   rowsClauseGroupJL4,
@@ -1285,6 +1291,110 @@ DECIDE rule c a b IS
   CONSIDER c
     WHEN Red THEN `both hold` a b
     OTHERWISE a OR b
+|]
+
+-- | A table of two columns whose rows share the first column and differ in the
+-- second. The desugarer tests the colour again in every later clause; the
+-- ladder reads each test with what the branches around it already decided.
+clauseTableJL4 :: Text
+clauseTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red TRUE IS TRUE
+DECIDE rule Red FALSE IS FALSE
+DECIDE rule Green b IS b
+DECIDE rule Blue b IS NOT b
+|]
+
+handTableJL4 :: Text
+handTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c b IS
+  CONSIDER c
+    WHEN Red THEN
+      CONSIDER b
+        WHEN TRUE THEN TRUE
+        WHEN FALSE THEN FALSE
+    WHEN Green THEN b
+    WHEN Blue THEN NOT b
+|]
+
+-- | Two BOOLEAN columns, the input's own name standing for "any value".
+clauseTable2JL4 :: Text
+clauseTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule TRUE TRUE IS TRUE
+DECIDE rule TRUE q IS q
+DECIDE rule p TRUE IS p
+DECIDE rule p q IS FALSE
+|]
+
+handTable2JL4 :: Text
+handTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule p q IS
+  CONSIDER p
+    WHEN TRUE THEN
+      CONSIDER q
+        WHEN TRUE THEN TRUE
+        OTHERWISE q
+    OTHERWISE
+      CONSIDER q
+        WHEN TRUE THEN p
+        OTHERWISE FALSE
+|]
+
+-- | A last clause whose pattern is a new name, not the input's own: it always
+-- matches, so it is the OTHERWISE.
+clauseNewNameJL4 :: Text
+clauseNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS a
+DECIDE rule Green a b IS b
+DECIDE rule other a b IS a AND b
+|]
+
+handNewNameJL4 :: Text
+handNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN a
+    WHEN Green THEN b
+    OTHERWISE a AND b
 |]
 
 -- | A BOOLEAN group with no GIVETH: the type is inferred, not declared.

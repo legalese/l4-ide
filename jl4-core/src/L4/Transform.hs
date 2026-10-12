@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import Optics
 
 import Data.Maybe (isJust)
+import Data.Text (Text)
 
 simplify :: Expr Resolved -> Expr Resolved
 simplify = cnf . nnf
@@ -183,15 +184,20 @@ inlineLocalBindingsWhere wanted = transformOf (gplate @(Expr Resolved)) step
 -- every place it is used, and a chain of @LET@s that each use the one before
 -- twice grows past anything that can be drawn.
 --
--- The nested CONSIDERs the desugarer generates for one input are then joined
--- into one, as a drafter writes it: @CONSIDER c WHEN A THEN x OTHERWISE
+-- The generated CONSIDERs are then read with what their enclosing branches
+-- already decided, so that a later clause does not ask again about an input an
+-- earlier one has settled ('pruneGeneratedConsiders'), and the nested
+-- CONSIDERs the desugarer generates for one input are joined into one, as a
+-- drafter writes it: @CONSIDER c WHEN A THEN x OTHERWISE
 -- CONSIDER c WHEN B THEN y@ is @CONSIDER c WHEN A THEN x WHEN B THEN y@ (the
 -- first match wins in both). Only generated CONSIDERs on the same input are
 -- joined; a nested CONSIDER the drafter wrote is left alone.
 --
 -- A group of several inputs refers to the same later clauses from more than one
--- branch, so inlining copies them, and a long group of many inputs would copy
--- them exponentially. @Left n@ means the expression grew past
+-- branch, so inlining copies them. Pruning drops the copies whose answer the
+-- branch around them already settles, but not the rest (behind a pattern that
+-- binds a name, say), and a long group of many inputs could still copy those
+-- exponentially. @Left n@ means the expression grew past
 -- 'letInliningNodeBudget' (it had reached @n@), and the caller should not draw
 -- it.
 inlineLetsForViz :: Expr Resolved -> Either Int (Expr Resolved)
@@ -199,7 +205,7 @@ inlineLetsForViz e
   | genSize > letInliningNodeBudget = Left genSize
   | otherwise = Right (joinGeneratedConsiders generated)
   where
-    generated = inlineGeneratedLets e
+    generated = pruneGeneratedConsiders (inlineGeneratedLets e)
     -- Lazy on purpose: only the first budget + 1 nodes are built.
     genSize = length (take (letInliningNodeBudget + 1) (nodes generated))
     nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
@@ -211,29 +217,34 @@ letInliningNodeBudget :: Int
 letInliningNodeBudget = 20000
 
 -- | The most nodes a ladder may have when the rule was written as DECIDE
--- clauses. A group of several inputs repeats the later clauses in each
--- branch, and the query plan of a ladder grows faster than its node count:
--- measured through jl4-service on randomly generated boolean groups, 128 nodes
--- gave a 0.16 MB plan in 0.5 s, 271 nodes 2.1 MB in 1.1 s, 811 nodes 29 MB in
--- 3.9 s and 3441 nodes 325 MB in 20 s. 300 is the largest of those that
--- stays in a few megabytes and about a second.
+-- clauses. It bounds the drawing, not the work of planning what is drawn.
 --
--- Those times were measured on 539cad5fd. On 708c40f72, once an atomId was the
--- hash of its leaf's term (R3), naming the atoms made large ladders far slower,
--- whoever wrote the rule: @l4 verify@ on 200 @n EQUALS i@ disjuncts took 13 s,
--- and a 598-row group (300 nodes) did not answer /query-plan inside 30 s.
--- #626 and #629 removed that cost: with eda1e3be5 merged in, the same rule
--- takes 0.44 s, and the 598-row group 0.85 s under @l4 verify@ and about a
--- second for both jl4-service routes. The limit was not changed either time.
+-- It was chosen from plans measured through jl4-service on 539cad5fd, before
+-- 'pruneGeneratedConsiders', on randomly generated groups over three to six
+-- BOOLEAN inputs: 128 nodes gave a 0.16 MB plan in 0.5 s, 271 nodes 2.1 MB in
+-- 1.1 s, 811 nodes 29 MB in 3.9 s and 3441 nodes 325 MB in 20 s. With
+-- eda1e3be5 merged in, 598 single-column rows (300 nodes) give a 23 MB plan in
+-- about a second.
+--
+-- A plan's cost is not a function of the ladder's size. A table of an enum of
+-- 20 values by a BOOLEAN input draws 61 nodes and took 11 to 18 s of CPU to plan
+-- (in two runs), and of 24 values, 73 nodes and about four minutes (measured in
+-- review); the same rule written as a CONSIDER by hand costs the same. This
+-- limit does not bound that.
+--
+-- On 708c40f72, before #626 and #629, naming the atoms (R3) also made large
+-- ladders far slower whoever wrote the rule: @l4 verify@ on 200 @n EQUALS i@
+-- disjuncts took 13 s, against 0.44 s with those merged in.
 clauseGroupLadderBudget :: Int
 clauseGroupLadderBudget = 300
 
--- | Did the clause desugarer generate any of this expression?
-hasGeneratedClauses :: Expr Resolved -> Bool
-hasGeneratedClauses = any marked . nodes
-  where
-    marked x = isJust (view annPmSynthetic (getAnno x))
-    nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
+-- | Was this rule written as DECIDE clauses? The parser records the clauses as
+-- written on the decision it compiles them to ('annPmMatrix'), and that mark
+-- stays on the decision whatever is later put into its body: a rule written by
+-- hand that has a call to a clause group unfolded into it (the IDE's
+-- @l4/inlineExprs@) is still a rule written by hand.
+writtenAsClauses :: Decide Resolved -> Bool
+writtenAsClauses (MkDecide ann _ _ _) = isJust (view annPmMatrix ann)
 
 -- | Join a generated CONSIDER whose last branch is an OTHERWISE holding another
 -- generated CONSIDER on the same input. Bottom-up, so a run of three joins.
@@ -255,6 +266,138 @@ joinGeneratedConsiders = transformOf (gplate @(Expr Resolved)) \ case
     unsnoc' xs = case xs of
       [] -> Nothing
       _  -> Just (init xs, last xs)
+
+-- | Read a rule written as DECIDE clauses as the CONSIDER a drafter would write
+-- for it: the generated CONSIDERs pruned by what their enclosing branches
+-- already decided ('pruneGeneratedConsiders'), then joined
+-- ('joinGeneratedConsiders').
+readClausesAsConsider :: Expr Resolved -> Expr Resolved
+readClausesAsConsider = joinGeneratedConsiders . pruneGeneratedConsiders
+
+-- | Drop what the enclosing generated branches make impossible.
+--
+-- The clause desugarer is a backtracking automaton: a clause that fails on a
+-- later column falls through to the clauses after it, which test the earlier
+-- columns again. Once 'inlineGeneratedLets' has put the fall-through in, the
+-- branch @WHEN Red@ on @c@ holds a copy of every later clause, each of which
+-- asks about @c@ again. Drawn as it stands, a two-column table of four rows had
+-- 29 leaves where the CONSIDER a drafter writes for it has 6, and its impossible
+-- limbs were findings for @l4 verify@.
+--
+-- So each generated CONSIDER on an input is read with what is already known
+-- about that input: inside @WHEN p@, that it is @p@; after @WHEN p1 .. pn@, that
+-- it is none of them. Only a constructor with no arguments, or a literal, is
+-- known this way (the patterns 'L4.Viz.GuardedRows' can test for equality).
+-- Under first-match, inside @WHEN p@ a generated CONSIDER on the same input
+-- takes its arm for @p@ if it has one, and its OTHERWISE if not; an arm for a
+-- value already excluded is never taken, and is dropped.
+--
+-- A WHEN whose pattern is a plain name (@DECIDE rule other a b IS a AND b@,
+-- where @other@ is not the input's own name) always matches, so it is the
+-- OTHERWISE, with the input put in for the name; the arms after it are never
+-- tried. Any other pattern (one that binds, such as @JUST x@ or a list) is left
+-- as it is, and what follows it is read without assuming it failed.
+--
+-- When no arm can be taken and there is no OTHERWISE, no clause matches: the
+-- rule fails there. An OTHERWISE that can only lead there is dropped, which
+-- fails the same way; a WHEN that can only lead there is kept, as written, since
+-- dropping it would hand its value to the next arm.
+--
+-- Only CONSIDERs the desugarer generated are read this way. What is known is
+-- forgotten inside anything that binds a name (a lambda, a LET, a WHERE), and is
+-- only ever about an input written as a bare name.
+pruneGeneratedConsiders :: Expr Resolved -> Expr Resolved
+pruneGeneratedConsiders = total Map.empty
+  where
+    -- Never stuck: where pruning finds no arm can be taken, read the expression
+    -- with nothing known instead, which keeps every arm.
+    total :: Map.Map Unique Known -> Expr Resolved -> Expr Resolved
+    total known e = case go known e of
+      Just e' -> e'
+      Nothing -> case go Map.empty e of
+        Just e' -> e'
+        Nothing -> e
+
+    -- 'Nothing': no arm of this generated CONSIDER can be taken.
+    go :: Map.Map Unique Known -> Expr Resolved -> Maybe (Expr Resolved)
+    go known e = case e of
+      Consider ann s brs
+        | Just PmConsider{} <- view annPmSynthetic ann
+        , App _ r [] <- s ->
+            arms ann s (getUnique r) (Map.lookup (getUnique r) known) [] known brs
+      Lam{}   -> Just (over (gplate @(Expr Resolved)) (total Map.empty) e)
+      Where{} -> Just (over (gplate @(Expr Resolved)) (total Map.empty) e)
+      LetIn{} -> Just (over (gplate @(Expr Resolved)) (total Map.empty) e)
+      _       -> Just (over (gplate @(Expr Resolved)) (total known) e)
+
+    -- Walk the arms of a generated CONSIDER on input @u@, about which @fact@ is
+    -- known; @kept@ are the arms kept so far, in reverse.
+    arms ann s u fact kept known = \ case
+      [] -> finish ann s u fact kept known Nothing
+      br@(MkBranch ba (When wa p) body) : rest -> case classify p of
+        Ground k -> case fact of
+          Just (Is k')
+            | k /= k'    -> arms ann s u fact kept known rest
+            | null kept  -> go known body
+            | otherwise  -> Just (Consider ann s (reverse (MkBranch ba (When wa p) (total known body) : kept)))
+          _
+            | excluded k -> arms ann s u fact kept known rest
+            | otherwise  ->
+                arms ann s u (Just (IsNot (k : excludedKeys))) (MkBranch ba (When wa p) (total (Map.insert u (Is k) known) body) : kept) known rest
+        Binds v -> finish ann s u fact kept known (Just (substParams [(getUnique v, s)] body))
+        Uncertain mk -> case (fact, mk) of
+          (Just (Is k'), Just k) | k /= k' -> arms ann s u fact kept known rest
+          _ -> arms ann s u fact (over branchBody (total (withFact u fact known)) br : kept) known rest
+      MkBranch _ (Otherwise _) body : _ -> finish ann s u fact kept known (Just body)
+      where
+        excludedKeys = case fact of
+          Just (IsNot ks) -> ks
+          _               -> []
+        excluded k = k `elem` excludedKeys
+
+    -- The arms are done. @other@ is what is left when none of them is taken.
+    finish ann s u fact kept known other =
+      let known' = withFact u fact known
+       in case (kept, other) of
+            ([], Nothing) -> Nothing
+            ([], Just o)  -> go known' o
+            (_, Nothing)  -> Just (Consider ann s (reverse kept))
+            (_, Just o)   -> case go known' o of
+              Nothing -> Just (Consider ann s (reverse kept))
+              Just o' -> Just (Consider ann s (reverse (MkBranch emptyAnno (Otherwise emptyAnno) o' : kept)))
+
+    withFact u fact known = maybe known (\ f -> Map.insert u f known) fact
+
+    branchBody :: Lens' (Branch Resolved) (Expr Resolved)
+    branchBody = lens (\ (MkBranch _ _ b) -> b) (\ (MkBranch a l _) b -> MkBranch a l b)
+
+    classify :: Pattern Resolved -> PatternShape
+    classify = \ case
+      PatApp _ ctor []                  -> Ground (GroundCtor (getUnique ctor))
+      PatApp _ ctor _                   -> Uncertain (Just (GroundCtor (getUnique ctor)))
+      PatLit _ lit                      -> Ground (litKey lit)
+      PatExpr _ (Lit _ lit)             -> Ground (litKey lit)
+      PatVar _ v                        -> Binds v
+      _                                 -> Uncertain Nothing
+
+    litKey = \ case
+      NumericLit _ x -> GroundNum x
+      StringLit _ t  -> GroundStr t
+
+-- | What is known about an input inside a generated branch.
+data Known = Is GroundKey | IsNot [GroundKey]
+
+-- | A value a pattern can name exactly: a constructor with no arguments, or a
+-- literal.
+data GroundKey = GroundCtor Unique | GroundNum Rational | GroundStr Text
+  deriving stock (Eq)
+
+data PatternShape
+  = Ground GroundKey
+  | Binds Resolved
+  -- ^ a plain name, which always matches
+  | Uncertain (Maybe GroundKey)
+  -- ^ anything else; the constructor it tests, if any
 
 -- | A definition that a call can be unfolded into: its parameters, in order, and
 -- its body.
