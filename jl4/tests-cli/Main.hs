@@ -11,7 +11,7 @@
 module Main where
 
 import Control.Monad (unless)
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isSuffixOf)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
@@ -184,8 +184,9 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
-evalTraceFixture :: FilePath
+evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
+evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
 
 batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
 batchEligFixture = fixtureDir </> "batch-elig.l4"
@@ -193,18 +194,26 @@ batchDataJson    = fixtureDir </> "batch-data.json"
 batchDataCsv     = fixtureDir </> "batch-data.csv"
 batchMixedJson   = fixtureDir </> "batch-mixed.json"
 
-batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson :: FilePath
 batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
+
+-- | A CSV with columns no input declares, run against 'batchEligFixture'.
+batchUndeclaredColumnCsv :: FilePath
+batchUndeclaredColumnCsv = fixtureDir </> "batch-undeclared-column.csv"
 
 -- | Blank CSV cells (T3c): one STRING input that has to be given and one MAYBE
 -- STRING input that need not be, and an income column left blank.
-batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv :: FilePath
+batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv, batchSingleObjectJson :: FilePath
 batchBlankFixture   = fixtureDir </> "batch-blank.l4"
 batchBlankCsv       = fixtureDir </> "batch-blank.csv"
 batchBlankIncomeCsv = fixtureDir </> "batch-blank-income.csv"
+
+-- | A cases file that holds one object, not an array.
+batchSingleObjectJson = fixtureDir </> "batch-single-object.json"
 
 -- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
 batchLineBreakFixture, batchLineBreakJson :: FilePath
@@ -371,9 +380,11 @@ spec bin = do
       nonBlankLines sout `shouldBe` 2
       sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
 
-    it "infers CSV cell types so numeric params typecheck" $ do
+    it "reads a CSV cell for a NUMBER or BOOLEAN input as the number or boolean it spells" $ do
       -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
-      -- the rows would come back status=error; success proves inference works.
+      -- the rows would come back status=error; success proves the declared
+      -- types were applied. (Every column here is declared, so this does not
+      -- reach 'inferCsvCell'; the undeclared-column test below does.)
       Output code sout _ <-
         runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
       code `shouldBe` ExitSuccess
@@ -382,6 +393,14 @@ spec bin = do
       let statuses = [ s | Object o <- rows
                          , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
       statuses `shouldBe` ["success", "success"]
+
+    it "reads a cases file that holds one object as one case" $ do
+      -- Plain main answered a JSON object where it expected an array with
+      -- "failed to parse inputs: ... expected Array, but encountered Object".
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchSingleObjectJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 1
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
 
     it "emits a single JSON array with --format json" $ do
       Output code sout _ <-
@@ -433,15 +452,32 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
 
-    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+    it "keeps an exponent-form CSV cell (1E5) for a STRING input as written, not a number" $ do
       -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
       -- but must survive as the string "1E5" against a STRING param rather
-      -- than being coerced to 100000.
+      -- than being coerced to 100000. (A STRING input is read by its declared
+      -- type, so this does not reach 'inferCsvCell' either.)
       Output code sout _ <-
         runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    -- The one place a CSV cell is still typed by how it looks ('inferCsvCell'):
+    -- a column that no input declares, which the case echoes under `input`.
+    -- The columns are `lot`, `flag` and `serial`; batchEligFixture declares
+    -- none of them. The exponent form must stay text here too, because JSON's
+    -- number grammar would otherwise turn the lot code 1E5 into 100000.
+    it "types a CSV cell by how it looks when no input declares its column, and keeps 1E5 text" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchUndeclaredColumnCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      let cell k r = objField r "input" >>= (`objField` k)
+      map (cell "lot")    rows `shouldBe` [Just (String "1E5"), Just (Number 123456)]
+      map (cell "flag")   rows `shouldBe` [Just (Bool True), Just (Bool False)]
+      -- 007 is not a JSON number, and a date is text
+      map (cell "serial") rows `shouldBe` [Just (String "007"), Just (String "2026-10-13")]
 
     -- T3c (ruled, specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md on unstable): a
     -- blank CSV cell is ABSENT, exactly like a column missing from the file, for
@@ -489,7 +525,7 @@ spec bin = do
         length (filter ("Missing required field: 'income'" `isInfixOf`) (lines sout)) `shouldBe` 2
 
     it "keeps a line break inside a string literal as it is written" $ do
-      -- batch runs the re-printed module; before #1028 the newline came back
+      -- batch runs the re-printed module; before smucclaw/l4-ide#1028 the newline came back
       -- followed by the body's indentation ("line\\n  next"), status success.
       Output code sout _ <- runL4 bin ["batch", batchLineBreakFixture, "--inputs", batchLineBreakJson]
       code `shouldBe` ExitSuccess
@@ -572,6 +608,39 @@ spec bin = do
             diagnostics `shouldSatisfy` ("lots" `isInfixOf`)
             diagnostics `shouldNotSatisfy` ("25" `isInfixOf`)
           other -> expectationFailure ("expected 1 row, got " ++ show (length other))
+
+      -- A MAYBE input is read by the type it wraps, so "25" is 25 for a MAYBE
+      -- NUMBER. Plain main answered it with a decode error (an object holding
+      -- the message) under status "success"; nothing tested the new reading.
+      it "reads text for a MAYBE NUMBER input as the number it spells, and refuses text that is not one" $ do
+        (code, _, rows) <- rowsOf [batchMaybeFixture, "--inputs", batchMaybeTextJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "error", "success"]
+        case rows of
+          [text, notANumber, number] -> do
+            resultOf text   `shouldBe` Just (Number 25)
+            resultOf number `shouldBe` Just (Number 25)
+            show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
+          other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
+
+  -- A step of a trace is printed as source, and a string literal in source is
+  -- spelled with escapes: a line break as \n, a tab as \t. #595 made the printer
+  -- do that so that `l4 batch` keeps a string that holds a line break; it also
+  -- changed every other surface that prints a step: the trace `l4 trace`
+  -- reports, and the `exampleCode` of the jl4-service reasoning tree (pinned in
+  -- jl4-service-test). Before it, a step broke across lines inside the literal.
+  -- The VALUE a trace ends in is not source and keeps its line break. `l4 run`
+  -- prints no trace steps on main ("no trace captured"), so it is not pinned.
+  -- Assumed, not ruled (2026-10-13): the escaped form is kept.
+  describe "a string literal in a trace step" $ do
+    it "is spelled as source in the trace `l4 trace` reports" $ do
+      Output code _ serr <- runL4 bin ["trace", evalTraceLineBreakFixture]
+      code `shouldBe` ExitSuccess
+      let err = map (filter (/= '\r')) (lines serr)
+          escapedStep = "IF (x GREATER THAN 0) THEN \"line\\nnext\" ELSE \"tab\\there\""
+      err `shouldSatisfy` any (escapedStep `isInfixOf`)
+      -- no step ends inside a literal
+      err `shouldNotSatisfy` any ("THEN \"line" `isSuffixOf`)
 
   describe "l4 trace (output path safety)" $ do
     it "never runs a shell for the output path, so metacharacters can't inject" $ do

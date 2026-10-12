@@ -51,7 +51,7 @@ Available commands:
   format                   Reformat an L4 file and print to stdout
   ast                      Dump the parsed AST of an L4 file
   batch                    Evaluate an @export function against many input rows
-                           (NDJSON streaming)
+                           (json|yaml|csv in, NDJSON streaming out)
   trace                    Render #EVALTRACE evaluation traces as GraphViz
                            (dot|png|svg)
   state-graph              Extract regulative-rule state transition graphs as
@@ -303,6 +303,62 @@ A blank CSV cell is not text, for a `STRING` parameter as for any other: an empt
 A CSV cell for any other kind of parameter is typed by its content: `true` or `false` (any case) is a boolean, a plain number such as `3.5` is a number (a cell containing `e` or `E` stays text), and anything else is a string.
 
 `--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
+
+#### What each line says
+
+Every case that is run produces one line, or one item with `--format json` or `yaml`, with four keys:
+
+- `input` is the case as the rules read it: a CSV cell is shown as the number, boolean or text it was read as, and a blank cell that was left out is not shown.
+- `output` is what the rules came to for the case: a list holding one `result`, or `null` when no answer could be reached at all.
+- `status` says how the case went, as below.
+- `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
+
+`status` is one of two words:
+
+- `success`: the rules gave an answer.
+- `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+
+The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
+
+#### Checking cases without running them
+
+`--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not four: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
+
+It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does.
+
+**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+
+```l4
+@export Echo a date
+GIVEN d IS A DATE
+GIVETH A DATE
+`echo date` MEANS d
+```
+
+and the cases `[{"d": "2024-01-15"}, {"d": "not a date"}]`, validation passes both, and a run fails the second:
+
+```
+$ l4 batch echo-date.l4 --inputs dates.json --validate-only
+{"errors":[],"input":{"d":"2024-01-15"},"status":"valid"}
+{"errors":[],"input":{"d":"not a date"},"status":"valid"}
+
+$ l4 batch echo-date.l4 --inputs dates.json --continue-on-error
+{"diagnostics":[],"input":{"d":"2024-01-15"},"output":[{"result":"2024-01-15","trace":null}],"status":"success"}
+{"diagnostics":["Could not parse date string 'not a date'. Expected format: YYYY-MM-DD"],"input":{"d":"not a date"},"output":[{"result":{"error":"Could not parse date string 'not a date'. Expected format: YYYY-MM-DD\n"},"trace":null}],"status":"error"}
+```
+
+So `valid` means a case has the right shape, not that the rules will accept every value in it.
+
+#### When the command cannot start
+
+If `l4 batch` cannot read the cases or the rules, it prints no line for any case and exits with status 1. It says why in one plain line that starts `Error:`, on standard output, which is where the case lines go, so a script that reads the output as JSON should look at the exit status before it parses:
+
+- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV;
+- `Error: --input-format is required when the extension can't be inferred (e.g. reading from stdin)`;
+- `Error: type checking failed` for rules that do not type-check, with the type errors themselves on standard error;
+- `Error: no @export functions found in module`, or `Error: no @export function named 'name' found` when `--entrypoint` names one that is not there.
+
+A cases file or a rules file that does not exist ends the command with the operating system's message on standard error instead.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
