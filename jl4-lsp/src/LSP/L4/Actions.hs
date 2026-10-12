@@ -273,6 +273,24 @@ decideNodeStartsAtPos pos d = Just pos == do
 -- LSP Code Actions
 -- ----------------------------------------------------------------------------
 
+-- | The inputs of a definition that the outline lists: the ones the drafter
+-- wrote. The desugarer of a multi-clause definition names the inputs a GIVEN
+-- does not ('L4.Parser.generatedName'), and the outline leaves those out.
+-- Here rather than in the document-symbol handler, which the tests cannot
+-- reach (@jl4-lsp\/app@).
+outlineGivenParams :: [OptionallyTypedName Resolved] -> [OptionallyTypedName Resolved]
+outlineGivenParams = filter \ (MkOptionallyTypedName _ pn _) ->
+  not (isGeneratedName (rawName (getOriginal pn)))
+
+-- | The local definitions of a body that the outline lists. The bindings a
+-- multi-clause definition is compiled to ('PmSynthetic') are not things the
+-- drafter wrote, so they are left out.
+outlineLocals :: Expr Resolved -> [LocalDecl Resolved]
+outlineLocals = \ case
+  Where _ _ locals -> filter (not . isClausesBinding) locals
+  LetIn _ locals _ -> filter (not . isClausesBinding) locals
+  _                -> []
+
 completions :: Rope -> NormalizedUri -> TypeCheckResult -> Position -> [CompletionItem]
 completions rope nuri typeCheck pos@(Position ln col) = do
   let textBeforeCursor =
