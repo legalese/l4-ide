@@ -159,7 +159,10 @@ test-suite jl4-lsp-test
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    AtomKeySizeSpec
+    AtomKeySweepSpec
     CheckSource
+    CorpusSweep
     EmbeddedLibrarySpec
     HoverDisplaySpec
     ImportDiagnosticSpec
@@ -187,4 +190,5 @@ test-suite jl4-lsp-test
     jl4-query-plan,
     lsp-types,
     mtl,
+    optics,
     text

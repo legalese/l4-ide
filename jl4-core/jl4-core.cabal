@@ -231,6 +231,8 @@ test-suite jl4-core-test
     TemporalContextSpec
     UnifySpec
     DeprecatedAssumeSpec
+    AtomKeyDigestSpec
+    AtomKeyFixtures
     AtomKeySpec
     LadderFreshIdSpec
     MixfixParserSpec
