@@ -18,6 +18,7 @@ import type {
   Scene,
   ScenePrim,
   Pt,
+  Rect,
   State,
   NodeId,
   And,
@@ -835,6 +836,40 @@ function hCurve(
     state,
   };
 }
+function cubicAt(c: Curve, t: number): Pt {
+  const u = 1 - t;
+  const [a, b, d, e] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+  return {
+    x: a * c.from.x + b * c.c1.x + d * c.c2.x + e * c.to.x,
+    y: a * c.from.y + b * c.c1.y + d * c.c2.y + e * c.to.y,
+  };
+}
+/** The rectangles a connector must not run through: every drawn box, NOT frame and panel. */
+function solidRects(prims: ScenePrim[]): Rect[] {
+  return prims.flatMap((q): Rect[] =>
+    q.kind === "box" || q.kind === "frame"
+      ? [q.rect]
+      : q.kind === "panel"
+        ? [{ x: q.at.x, y: q.at.y, w: q.w, h: q.h }]
+        : [],
+  );
+}
+/** Does the curve pass strictly inside any of the rectangles (1px inset, so a curve that
+ *  merely touches an edge does not count)? */
+function curveCrosses(c: Curve, rects: Rect[]): boolean {
+  for (let i = 1; i < 64; i++) {
+    const q = cubicAt(c, i / 64);
+    for (const r of rects)
+      if (
+        q.x > r.x + 1 &&
+        q.x < r.x + r.w - 1 &&
+        q.y > r.y + 1 &&
+        q.y < r.y + r.h - 1
+      )
+        return true;
+  }
+  return false;
+}
 function cubicMid(c: Curve): Pt {
   return {
     x: (c.from.x + 3 * c.c1.x + 3 * c.c2.x + c.to.x) / 8,
@@ -1273,7 +1308,12 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   // `has qualifying skills a` folded). Such an OR keeps its fan inside the bus lanes, which
   // no branch enters, and runs a straight stub from the lane to each branch's port. An OR
   // with no panel below it is drawn exactly as before.
-  const lanes = rungs.some((r) => drawsPanel(r.node, ctx.vs.foldSet));
+  // The same banking cuts plain boxes too, whenever a narrower branch sits beyond a wider
+  // one: the dairy's reading of the Oakhurst exemption drew `distribution`'s connector
+  // through `packing` and `shipment`, the rung above it (2026-10-07). So emit() also takes
+  // the lanes when any sprung curve would cross a box, frame or panel of another branch.
+  // An OR whose fan crosses nothing is still drawn exactly as before.
+  const panelLanes = rungs.some((r) => drawsPanel(r.node, ctx.vs.foldSet));
 
   return {
     w: totalW,
@@ -1289,12 +1329,16 @@ function measureOr(e: Or, ctx: Ctx): Measured {
       let y = top;
       // the leader reaches the fan iff the OR's input is energized (DESIGN §20)
       const leaderIn = !!ctx.em?.get(e.id)?.inE;
-      rungs.forEach(({ node, m }, i) => {
+      // Place every branch first, each into its own buffer, so the fan can be routed
+      // knowing where all of them are; the buffers go out in the old order, so the
+      // drawing order (and every scene that does not collide) is unchanged.
+      const placed = rungs.map(({ node, m }, i) => {
+        const buf: ScenePrim[] = [];
         if (i > 0) {
           const k = i - 1;
           const gh = gapH(k);
           if (gapLabel[k])
-            out.push({
+            buf.push({
               kind: "text",
               at: { x: ox + totalW / 2, y: y + gh / 2 + 4 },
               text: gapLabel[k] as string,
@@ -1305,7 +1349,21 @@ function measureOr(e: Or, ctx: Ctx): Measured {
           y += gh;
         }
         const cx = ox + BUS_PAD + (colW - m.w) / 2; // <-- centered horizontally
-        const p = m.emit(cx, y, out);
+        const p = m.emit(cx, y, buf);
+        y += m.h;
+        return { node, m, p, buf, rects: solidRects(buf) };
+      });
+      const lanes =
+        panelLanes ||
+        placed.some(({ p }, i) => {
+          const others = placed.flatMap((q, j) => (j === i ? [] : q.rects));
+          return (
+            curveCrosses(hCurve(groupIn, p.inPort, "inert"), others) ||
+            curveCrosses(hCurve(p.outPort, groupOut, "inert"), others)
+          );
+        });
+      placed.forEach(({ node, m, p, buf }) => {
+        out.push(...buf);
         // organic Bézier fan: group port -> rung port, and back (DESIGN §17a).
         // Clicking a fan curve folds this OR (DESIGN §19).
         const fold = { t: "fold", id: e.id } as const;
@@ -1360,7 +1418,6 @@ function measureOr(e: Or, ctx: Ctx): Measured {
             state: m.state,
           });
         }
-        y += m.h;
       });
       if (head)
         out.push({

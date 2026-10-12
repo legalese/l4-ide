@@ -20,8 +20,8 @@ module L4.Viz.Ladder
   , InputRef(..)
   , getAtomDeps
   , getAtomInputRefs
+  , getLeafKeys
     -- * Utilities (shared with LSP)
-  , generateAtomId
   , collectTypicallyDefaults
   , seamLabel
   ) where
@@ -36,25 +36,22 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import qualified Data.Map as DMap
 import qualified Data.List.NonEmpty as NE
-import qualified Data.List as List
 import Optics.State.Operators ((<%=), (%=))
 import Optics
 import Control.Monad.Extra (unlessM)
-import qualified Data.Text.Encoding as TextEncoding
-
-import qualified L4.Crypto.UUID5 as UUID5
 
 import qualified L4.TypeCheck as TC
 import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget)
+import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, hasGeneratedClauses, clauseGroupLadderBudget)
 import L4.Desugar
 import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
 import L4.Viz.GuardedRows (guardedToLadder, hasEffectfulNode, normaliseGuarded, GuardedRows (..))
+import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful)
 
 ------------------------------------------------------
 -- Errors
@@ -104,6 +101,14 @@ data VizState = MkVizState
     -- deliberately excluded (a numeric default is not a probability over a
     -- derived comparison). Consumed as a per-atom prior for question ordering
     -- and as tentative-render provenance.
+  , keyEnv :: KeyEnv
+    -- ^ What names a leaf's term (R3, "L4.Viz.AtomKey"). Lazy: a pass that never
+    -- forces an atomId never walks the module.
+  , leafKeys :: IntMap Text
+    -- ^ Leaf id -> the C1 key of its term. The query plan names its atoms from
+    -- these, so the diagram and the plan cannot disagree (smucclaw/l4-ide#935).
+  , freshLeaves :: !Int
+    -- ^ How many leaves keyed apart per occurrence ('keyLeaf') so far.
   }
   deriving stock (Generic)
 
@@ -125,6 +130,9 @@ mkInitialState uri mod' subst simp = MkVizState
   , atomDeps = Map.empty
   , atomInputRefs = Map.empty
   , typicallyDefaults = Map.empty
+  , keyEnv = withTypeExpander (TC.applyFinalSubstitution subst uri) (mkKeyEnv mod')
+  , leafKeys = Map.empty
+  , freshLeaves = 0
   }
 
 ------------------------------------------------------
@@ -238,6 +246,10 @@ getAtomDeps = (.atomDeps)
 -- | Get atom input references from VizState.
 getAtomInputRefs :: VizState -> IntMap (Set InputRef)
 getAtomInputRefs = (.atomInputRefs)
+
+-- | The C1 key of every leaf's term, by leaf id ('L4.Viz.AtomKey').
+getLeafKeys :: VizState -> IntMap Text
+getLeafKeys = (.leafKeys)
 
 -- | Find all DECIDE rules that can be visualized.
 -- Rather than just checking types, we try to visualize each DECIDE
@@ -450,27 +462,26 @@ translateExpr shouldSimplify = top
 
       App _ resolved [] -> do
         vid <- getFresh
+        thisModule <- use (#module' % to (\(MkModule _ uri _) -> uri))
         let vname = mkPrettyVizName resolved
         case getUnique resolved of
           u | u == TC.trueUnique  -> pure $ VizExpr.TrueE vid vname
             | u == TC.falseUnique -> pure $ VizExpr.FalseE vid vname
+            -- A name from ANOTHER module cannot be keyed by its unique's Int:
+            -- every module numbers its own names from the same start, so an
+            -- imported name can share an Int with one of this module's, and the
+            -- planner would read the two as ONE variable. Such a leaf gets a fresh
+            -- id like any compound leaf. Mirrors 'LSP.L4.Viz.Ladder'.
+            | u.moduleUri /= thisModule -> leafFromExpr e
           _ -> varLeaf vid vname resolved
 
-      App appAnno _fnResolved args -> do
-        fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
-        if fnOfAppIsFnFromBooleansToBoolean
-          then do
-            vid <- getFresh
-            let uniq = vid.id
-                label = prettyLayout e
-                vname = VizExpr.MkName uniq label
-            refs <- freeInputRefsExpanded Set.empty e
-            recordAtomInputRefs uniq refs
-            functionName <- use #functionName
-            let atomId = generateAtomId functionName label refs
-            VizExpr.App vid vname <$> traverse go args <*> pure atomId <*> pure Nothing
-          else
-            leafFromExpr e
+      App appAnno _fnResolved args -> call e appAnno args
+
+      -- A call with named arguments that 'Transform.positionalCall' reads is
+      -- drawn as that call, its arguments in the order written. Mirrors
+      -- 'LSP.L4.Viz.Ladder' (smucclaw/l4-ide#1033).
+      AppNamed appAnno _fnResolved nes _
+        | isJust (Transform.positionalCall e) -> call e appAnno [x | MkNamedExpr _ _ x <- nes]
 
       -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@, @BRANCH@,
       -- @CONSIDER@ -- is ladder structure, not a leaf. See "L4.Viz.GuardedRows".
@@ -483,6 +494,25 @@ translateExpr shouldSimplify = top
             , not (any (hasEffectfulNode . fst) rows.grRows) ->
                 guardedToLadder getFresh go rows
           _ -> leafFromExpr e
+
+    -- A call @e@, whose arguments in the order they are drawn are @args@: a box
+    -- over its arguments when the call and every argument are BOOLEAN, otherwise
+    -- a leaf.
+    call :: Expr Resolved -> Anno -> [Expr Resolved] -> Viz IRExpr
+    call e appAnno args = do
+        fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
+        if fnOfAppIsFnFromBooleansToBoolean
+          then do
+            vid <- getFresh
+            let uniq = vid.id
+                label = prettyLayout e
+                vname = VizExpr.MkName uniq label
+            refs <- freeInputRefsExpanded Set.empty e
+            recordAtomInputRefs uniq refs
+            atomId <- keyLeaf uniq e
+            VizExpr.App vid vname <$> traverse go args <*> pure atomId <*> pure Nothing
+          else
+            leafFromExpr e
 
 -- | How the seam is labelled in the picture (DESIGN §25e).
 --
@@ -535,8 +565,7 @@ varLeaf vid vname resolved = do
     Nothing -> pure (Set.singleton (MkInputRef vname.unique []))
     Just body -> freeInputRefsExpanded (Set.singleton vname.unique) body
   recordAtomInputRefs vname.unique refs
-  functionName <- use #functionName
-  let atomId = generateAtomId functionName vname.label refs
+  atomId <- keyLeaf vname.unique (App emptyAnno resolved [])
   defaults <- use #typicallyDefaults
   let mTypically = Map.lookup (getUnique resolved).unique defaults
   pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically Nothing
@@ -548,9 +577,8 @@ leafFromExpr expr = do
   let uniq = tempUniqueTODO.id
   refs <- freeInputRefsExpanded Set.empty expr
   recordAtomInputRefs uniq refs
-  functionName <- use #functionName
+  atomId <- keyLeaf uniq expr
   let label = prettyLayout expr
-      atomId = generateAtomId functionName label refs
   -- A compound leaf is not a bare boolean binder, so it carries no TYPICALLY
   -- prior (question-ordering spec §4: priors come only from boolean binders
   -- whose atom is the binder itself). Bare-var leaves go through 'varLeaf'.
@@ -626,26 +654,28 @@ freeInputRefs expr =
 -- AtomId generation
 ------------------------------------------------------
 
-generateAtomId :: Text -> Text -> Set InputRef -> Text
-generateAtomId functionName label refs =
-  let renderInputRef :: InputRef -> Text
-      renderInputRef ref =
-        let rootTxt = Text.pack (show ref.rootUnique)
-            pathTxt = case ref.path of
-              [] -> ""
-              xs -> "." <> Text.intercalate "." xs
-        in rootTxt <> pathTxt
-
-      sortedRefs = List.sort
-        [ renderInputRef ref
-        | ref <- Set.toList refs
-        ]
-
-      canonical = Text.intercalate "|"
-        ( [functionName, label]
-          <> ["refs=" <> Text.intercalate ";" sortedRefs | not (null sortedRefs)]
-        )
-  in UUID5.toText (UUID5.generateNamed UUID5.namespaceURL (TextEncoding.encodeUtf8 canonical))
+-- | Key a leaf's term (R3, "L4.Viz.AtomKey"), remember the key under the leaf's
+-- id for the query plan, and name its atom in this decision's diagram.
+keyLeaf :: Int -> Expr Resolved -> Viz Text
+keyLeaf uniq expr = do
+  env <- use #keyEnv
+  locals <- getLocalDecls
+  let term = withLocalsInScope locals expr
+      bareReference = case expr of
+        App _ _ [] -> True
+        _ -> False
+  -- A leaf whose value depends on when it is evaluated (a ledger read, or a call
+  -- to a rule that makes one) is C1's @fresh@: each occurrence is its own atom,
+  -- numbered in drawing order so the number survives an edit elsewhere.
+  key <-
+    if not bareReference && isEffectful env term
+      then do
+        n <- #freshLeaves <%= (+ 1)
+        pure (termKey env term <> "|occurrence " <> Text.pack (show n))
+      else pure (termKey env term)
+  #leafKeys %= Map.insert uniq key
+  functionName <- use #functionName
+  pure (atomIdOfKey functionName key)
 
 ------------------------------------------------------
 -- Boolean type checking

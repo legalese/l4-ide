@@ -62,6 +62,7 @@ l4QueryPlan source uriText functionName bindingsJson =
                         fmap (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path)) inputRefs
                     , compiled = compiled
                     , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+                    , leafKeyByUnique = Ladder.getLeafKeys vizState
                     }
 
                   -- Parse bindings from JSON

@@ -243,6 +243,18 @@ test("callLabel: drops backticks, the top-level OF and argument commas, and noth
   assert.equal(callLabel("`limb`"), "limb");
   assert.equal(callLabel("f OF (g OF x, y), `p, q`"), "f (g OF x, y) p, q");
   assert.equal(callLabel("`proof OF x` OF a"), "proof OF x a");
+  // a call with named arguments, laid out one argument to a line (smucclaw/l4-ide#1033)
+  assert.equal(
+    callLabel(
+      "whichever WITH y IS r\n               cond IS p\n               x IS q",
+    ),
+    "whichever WITH y IS r, cond IS p, x IS q",
+  );
+  assert.equal(callLabel("big WITH k IS n"), "big WITH k IS n");
+  assert.equal(
+    callLabel("`may lend` WITH b IS (f OF x,\n  y)\n  a IS `p, q`"),
+    "may lend WITH b IS (f OF x,\n  y), a IS p, q",
+  );
   // a string literal is copied untouched, commas and all (review 2026-10-05)
   assert.equal(
     callLabel('`has role` OF a, "owner, director"'),

@@ -212,6 +212,11 @@ export function fromVizExpr(
  * shown as `a is older than b`; from a server that does not stamp them (jl4-service) it
  * arrives in prefix form (`` `is older than` OF a, b ``) and is shown as
  * `is older than a b`.
+ *
+ * A call written with named arguments arrives as the printer lays it out, one argument
+ * to a line (`` whichever WITH y IS r⏎               cond IS p ``); the panel says
+ * `whichever WITH y IS r, cond IS p`. Only a line break at the top level separates two
+ * arguments.
  */
 export function callLabel(wire: string): string {
   const parts: string[] = [];
@@ -220,6 +225,7 @@ export function callLabel(wire: string): string {
   let quoted = false; // inside backticks
   let str = false; // inside a "string literal"
   let sawOf = false;
+  let sawWith = false;
   for (let i = 0; i < wire.length; i++) {
     const c = wire[i]!;
     if (str) {
@@ -248,6 +254,13 @@ export function callLabel(wire: string): string {
       parts.push(cur);
       cur = "";
       i += 1;
+      continue;
+    }
+    if (top && !sawOf && !sawWith && wire.startsWith(" WITH ", i))
+      sawWith = true;
+    if (top && sawWith && c === "\n") {
+      cur = cur.trimEnd() + ", ";
+      while (i + 1 < wire.length && /\s/.test(wire[i + 1]!)) i++;
       continue;
     }
     cur += c;

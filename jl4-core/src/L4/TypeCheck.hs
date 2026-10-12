@@ -90,7 +90,7 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.ResolveAnnotation (pickDesc)
-import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
+import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
@@ -1171,32 +1171,68 @@ asValue = local \ env -> env { enclosingObligation = (\ enc -> enc { direct = Fa
 -- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
 -- computes it per declaration.
 inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
-inferTopDecl _ (Declare ann declare) = do
+inferTopDecl _ (Declare ann declare@(MkDeclare _ _ (MkAppForm _ dn _ _) _)) = do
+  rejectNonassertable "a declaration" (Just (rawNameToText (rawName dn))) ann
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
 inferTopDecl _ (Decide ann decide) = do
+  rejectNonassertableOnInput decide
   refuseExportedClausesWithoutGiven decide
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
-inferTopDecl origin (Assume ann assume) = do
+inferTopDecl origin (Assume ann assume@(MkAssume _ _ (MkAppForm _ an _ _) _ _)) = do
+  rejectNonassertable "an input" (Just (rawNameToText (rawName an))) ann
   (rassume, extends) <- prune $ inferAssume origin assume
   pure (Assume ann rassume, extends)
 inferTopDecl _ (Directive ann directive) = do
+  rejectNonassertable "a directive" Nothing ann
   rdirective <- inferDirective directive
   pure (Directive ann rdirective, [])
 inferTopDecl _ (Import ann import_) = do
+  rejectNonassertable "an import" Nothing ann
   rimport_ <- inferImport import_
   pure (Import ann rimport_, [])
 inferTopDecl _ (Section ann sec) = do
+  rejectNonassertable "a section heading or its inputs" Nothing (getAnno sec)
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
 inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+  rejectNonassertable "a timezone" Nothing ann
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
   -- source range for that diagnostic. See T4.
   (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
+
+-- | @\@nonassertable@ marks a named step; on anything else, above it or
+-- among its lines, it is an error named for what it sits on, at the
+-- annotation's own range ('L4.Parser.ResolveAnnotation' gives every mark on
+-- such a construct to it).
+rejectNonassertable :: Text -> Maybe Text -> Anno -> Check ()
+rejectNonassertable what mname ann =
+  for_ (ann ^. annNonassertable) \ na ->
+    addError (NonassertableOnNonDefinition what mname (rangeOf na))
+
+-- | The marks the resolver found on a definition's GIVEN lines
+-- ('annNonassertableOnInputs'): one error each, naming the input on the
+-- mark's line, or the next one when the mark has a line of its own among
+-- them; on every surface, since 'L4.Export.isNonassertableDecide' never
+-- reads these.
+rejectNonassertableOnInput :: Decide Name -> Check ()
+rejectNonassertableOnInput decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ inputs) _) _ _) =
+  for_ (getAnno decide ^. annNonassertableOnInputs) \ na -> do
+    let lineOf :: Maybe SrcRange -> Maybe Int
+        lineOf = fmap (\ r -> r.start.line)
+        markLine = lineOf (rangeOf na)
+        inputName (MkOptionallyTypedName _ n _ _) = rawNameToText (rawName n)
+        atOrAfter :: OptionallyTypedName Name -> Bool
+        atOrAfter (MkOptionallyTypedName _ n _ _) = lineOf (rangeOf n) >= markLine
+        mname = case (filter atOrAfter inputs, reverse inputs) of
+          (next : _, _) -> Just (inputName next)
+          ([], lastInput : _) -> Just (inputName lastInput)
+          ([], []) -> Nothing
+    addError (NonassertableOnNonDefinition "an input" mname (rangeOf na))
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
 -- there is a potential problem. If we use type-directed name resolution but
@@ -7670,6 +7706,17 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (NonassertableOnNonDefinition what mname _) =
+  [ "@nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert."
+  , "Here it is on " <> maybe what (\ n -> "`" <> n <> "`, " <> what) mname <> ", " <> why
+  ]
+ where
+  -- An input is what a request supplies, so "cannot be asserted" would read
+  -- as though it were already closed; say what the request does with it,
+  -- and where the mark would have to go to close the definition instead.
+  why
+    | what == "an input" = "which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
+    | otherwise = "which cannot be asserted in any case; move it above the definition it is meant for, or remove it."
 prettyCheckError (FixityAnnotationMalformed _ raw) =
   [ "I could not parse this fixity annotation:"
   , ""

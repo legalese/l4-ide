@@ -1,0 +1,28 @@
+-- @nonassertable marks a named step; above anything else it is a check error
+-- naming what it sits on (specs/todo/presumption-assertion/CONTRACT.md §6).
+-- Errors expected, one each: the DECLARE, the ASSUME, the section heading, the
+-- directive, and a mark on a definition's GIVEN line, which names the input.
+-- The marks above the two definitions are fine.
+
+@nonassertable
+DECLARE Person HAS name IS A STRING
+
+@nonassertable
+ASSUME `is adult` IS A BOOLEAN
+
+@nonassertable
+`can vote` MEANS `is adult`
+
+@nonassertable
+§ `Part Two`
+    GIVEN `is resident` IS A BOOLEAN
+
+@nonassertable
+`can stand` MEANS `is resident`
+
+@nonassertable
+#EVAL `can vote`
+
+GIVEN x IS A BOOLEAN @nonassertable
+GIVETH A BOOLEAN
+`signature marked` MEANS x

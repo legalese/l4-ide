@@ -1,7 +1,7 @@
 # Specification: Evaluating with unknowns — connectives as an algebra, not as `IF`
 
 **Status:** proposed (2026-10-01); build step 1 of §8 is built (2026-10-02), its two regulative sites under LOUDHAILER and the rest in the change that wrote this line; build steps 2 and 3 are built (2026-10-03).
-On 2026-10-02 Meng authorised build steps 1 to 3 (STABILISERS), not landed, and parked steps 4 to 7 until a user asks for them (MOTHBALL, §8).
+On 2026-10-02 Meng authorised build steps 1 to 3 (STABILISERS) and parked steps 4 to 7 until a user asks for them (MOTHBALL, §8); steps 1 to 3 landed on `unstable` as legalese/l4-ide#553, #554 and #556 (merged 2026-10-08 and 2026-10-09), and `UNKNOWNS-BACKEND-CONTRACT.md` describes what each surface does since.
 Nothing else in this document is in the tree.
 §4, which defines the evaluation once, was added on 2026-10-01 after the rulings of §9 were made; §5 to §8 were restated against it the same day, and §4.11 (the correspondence with the established designs) and D1 were added later that day; the seven rulings of the bench "Symbolic Evaluation Conflicts" on §4.13 were recorded in §9 and applied to §4 the same evening.
 Every statement about today's behaviour is a probe result or a `file:line` read on `unstable` at `f9a504b77`, and says which.

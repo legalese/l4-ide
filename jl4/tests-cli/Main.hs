@@ -119,6 +119,10 @@ evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
 evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
 evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
 
+-- | Typechecks cleanly; one @#ASSERT@ holds and one evaluates to FALSE.
+assertFailsFixture :: FilePath
+assertFailsFixture = fixtureDir </> "assert-fails.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -157,6 +161,24 @@ batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
+-- | A choice type with one constructor that has a field and one that has
+-- none. Only the second can be given as JSON input; every other value is
+-- refused by name rather than passed on as NOTHING or as itself
+-- (smucclaw/l4-ide#1012).
+batchChoiceFixture, batchChoiceJson :: FilePath
+batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
+batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
+
+-- | A choice type declared under a § section (smucclaw/l4-ide#947).
+batchSectionEnumFixture, batchSectionEnumJson :: FilePath
+batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
+batchSectionEnumJson    = fixtureDir </> "batch-section-enum.json"
+
+-- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
+batchLineBreakFixture, batchLineBreakJson :: FilePath
+batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
+batchLineBreakJson    = fixtureDir </> "batch-string-line-break.json"
 
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
@@ -312,15 +334,25 @@ verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 
+-- Two read-through copies of a recursive WHERE local, one per call, with
+-- different arguments: two atoms, not one (smucclaw/l4-ide#1013).
+verifyRecursiveLocalCopiesFixture :: FilePath
+verifyRecursiveLocalCopiesFixture = fixtureDir </> "verify-recursive-local-copies.l4"
+
+-- A ledger read before and after a RECORD: two atoms, not one.
+verifyLedgerReadsFixture :: FilePath
+verifyLedgerReadsFixture = fixtureDir </> "verify-ledger-reads.l4"
+
 -- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
 -- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
 -- carries its own control; see its header.
 verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture :: FilePath
-verifyUnfoldRecursiveFixture :: FilePath
+verifyUnfoldRecursiveFixture, verifyUnfoldNamedCallsFixture :: FilePath
 verifyUnfoldCallsFixture     = fixtureDir </> "verify-unfold-calls.l4"
 verifyUnfoldImportsFixture   = fixtureDir </> "verify-unfold-imports.l4"
 verifyUnfoldRulesFixture     = fixtureDir </> "verify-unfold-rules.l4"
 verifyUnfoldRecursiveFixture = fixtureDir </> "verify-unfold-recursive.l4"
+verifyUnfoldNamedCallsFixture = fixtureDir </> "verify-unfold-named-calls.l4"
 
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
@@ -414,7 +446,8 @@ coreFixtures =
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
-  , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
+  , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
+  , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
@@ -700,6 +733,25 @@ spec bin = do
             arrayField waiting "needs" `shouldBe` Just [String "x", String "y"]
           other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Ruled by Meng 2026-09-29: an #ASSERT that evaluates cleanly to FALSE is a
+    -- failed test, and fails the run. Without this, no script or CI job could
+    -- catch a failing assertion by exit status.
+    it "fails the run when an #ASSERT evaluates to false" $ do
+      Output code sout _ <- runL4 bin ["run", assertFailsFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "returns ok=false in JSON when an #ASSERT evaluates to false" $ do
+      env <- jsonEnvelope bin ["run", assertFailsFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> map (`objField` "value") (toList v) `shouldBe` [Just (Bool True), Just (Bool False)]
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the failing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertFailsFixture] "Check succeeded."
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
@@ -1524,6 +1576,52 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
+      -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
+      -- and 42. Before #1012 the last four decoded to NOTHING or to
+      -- themselves, reached the fixture's OTHERWISE, and came back
+      -- "status":"success" with the answer "other".
+      Output code sout _ <-
+        runL4 bin ["batch", batchChoiceFixture, "--inputs", batchChoiceJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let rows = filter (not . all isSpace) (lines sout)
+      length rows `shouldBe` 5
+      case rows of
+        (sq : refused) -> do
+          sq `shouldSatisfy` ("\"result\":\"square\"" `isInfixOf`)
+          sq `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          flip mapM_ refused $ \r -> do
+            r `shouldSatisfy` ("Could not decode" `isInfixOf`)
+            r `shouldSatisfy` ("as Shape for field 's'" `isInfixOf`)
+            r `shouldSatisfy` ("one of: Square." `isInfixOf`)
+            r `shouldSatisfy` (not . ("\"other\"" `isInfixOf`))
+        [] -> expectationFailure "l4 batch printed no rows"
+      sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
+      sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "decodes a constructor of a choice type declared under a section by its bare name" $ do
+      -- "Red" is what JSONENCODE writes for Red, and what a request sends;
+      -- the constructor is stored as `Part A.Red`. Before #947's fix every
+      -- row answered FALSE, success; after #1012 alone, every row was refused.
+      Output code sout _ <- runL4 bin ["batch", batchSectionEnumFixture, "--inputs", batchSectionEnumJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [red, blue] -> do
+          red  `shouldSatisfy` ("\"result\":true" `isInfixOf`)
+          blue `shouldSatisfy` ("\"result\":false" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
+
+    it "keeps a line break inside a string literal as it is written" $ do
+      -- batch runs the re-printed module; before #1028 the newline came back
+      -- followed by the body's indentation ("line\\n  next"), status success.
+      Output code sout _ <- runL4 bin ["batch", batchLineBreakFixture, "--inputs", batchLineBreakJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [broken, tabbed] -> do
+          broken `shouldSatisfy` ("\"result\":\"line\\nnext\"" `isInfixOf`)
+          tabbed `shouldSatisfy` ("\"result\":\"tab\\there\"" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
       -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
@@ -2590,6 +2688,22 @@ spec bin = do
       Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
 
+    -- An atomId is the hash of a leaf's term (R3). Unfolding `f a` and `f b` makes
+    -- two copies of a recursive WHERE local that keep its one name; keyed by the
+    -- name alone they were one atom, and a satisfiable rule was reported
+    -- unsatisfiable. `same` is the control: its two copies are one proposition.
+    it "keeps two read-through copies of a recursive local apart, and joins two that are one" $ do
+      env <- jsonEnvelope bin ["verify", verifyRecursiveLocalCopiesFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "top" found `shouldBe` Just []
+      lookup "same" found `shouldBe` Just ["unsat"]
+
+    -- A RECALL is not a function of its operands, so two occurrences of one RECALL
+    -- term on either side of a RECORD are two atoms (C1's `fresh`).
+    it "does not join two ledger reads that a RECORD between them can tell apart" $ do
+      env <- jsonEnvelope bin ["verify", verifyLedgerReadsFixture, "--format", "json"]
+      lookup "top" (findingsByDecision env) `shouldBe` Just []
+
     -- Reading through calls. `the arrow is broken` asks for an exception and the
     -- offence it defeats at once; with calls as opaque leaves that was two
     -- unrelated atoms and no finding. Its twin over an offence that forgets the
@@ -2603,6 +2717,14 @@ spec bin = do
       case objField env "summary" >>= (`objField` "callsReadThrough") of
         Just (Number n) -> n `shouldSatisfy` (> 0)
         other -> expectationFailure ("expected summary.callsReadThrough, got " ++ show other)
+
+    -- A call written with named arguments is read through like a positional one
+    -- (smucclaw/l4-ide#1033); before, it stayed an opaque atom.
+    it "reads through a call written with named arguments" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldNamedCallsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`named and negated`" found `shouldBe` Just ["unsat"]
+      lookup "`named and narrower`" found `shouldBe` Just []
 
     -- Across an import, where the rules' return types are INFERRED: the imported
     -- bodies must be zonked with their own module's substitution before they can
