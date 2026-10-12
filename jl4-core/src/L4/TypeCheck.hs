@@ -123,7 +123,7 @@ import Data.Function (on)
 import Control.Exception (assert)
 import Data.Char (isPrint)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -152,7 +152,6 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
-    , cyclicSynonyms = Set.empty
     , sectionBinderNames = Set.empty
     , sectionBinderDecls = Map.empty
     , importedImplicitReaders = Set.empty
@@ -188,10 +187,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
   let cycleErrors =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
-        ]
-        ++
-        [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
-        | cyc@(synName : _) <- synonymCycles
         ]
         ++
         -- The dedent hazard of R4: a section binder pushed back to column 1
@@ -246,7 +241,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
       fieldsOf c =
         nubBy (\ a b -> rawName a == rawName b)
           [ c'.fieldRead | c' <- fieldCollisions, c'.binders == c.binders ]
-      synonymCycles = detectTypeSynonymCycles program
       -- Section binders are elaborated LAST, so that the ASSUME each one becomes
       -- sits at the very head of its section's declaration list. Computed-field
       -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
@@ -262,7 +256,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
           (desugarSectionGivens (desugarComputedFields program))
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
-        , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
         , sectionBinderNames = collectSectionBinderNames program
         , sectionBinderDecls = collectSectionBinderDecls program
         }
@@ -513,8 +506,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne eo h i lb apos) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne eo h i lb apos
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo h i lb apos) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo h i lb apos
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -2218,20 +2211,12 @@ inferTypeNameAndSynonym rappForm Nothing = do
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 inferTypeNameAndSynonym rappForm (Just t) = do
-  cyclic <- asks (.cyclicSynonyms)
   let
     rs = appFormHeads rappForm
-    -- A synonym that is a member of a declaration-time cycle gets NO
-    -- body: it has no finite expansion, and letting the expansion
-    -- machinery at it can blow up exponentially even under fuel. The
-    -- cycle itself is reported as CyclicTypeSynonyms; the body is still
-    -- checked below so its other errors surface.
-    quarantined = case rs of
-      (r : _) -> rawName (getOriginal r) `Set.member` cyclic
-      []      -> False
-    kt body = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) body
   rt <- inferType t
-  pure $ makeKnownMany rs (kt (if quarantined then Nothing else Just rt))
+  -- A synonym in a cycle is stripped of this body afterwards, once every
+  -- body is resolved: 'quarantineResolvedSynonymCycles'.
+  pure $ makeKnownMany rs (KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) (Just rt))
 
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
 inferConDecl rappForm (MkConDecl ann n tns) = do
@@ -5892,28 +5877,28 @@ matchPatFunTy  r t args =
 -- Forward References high level helpers
 -- ----------------------------------------------------------------------------
 
--- | The second line of defence against a type synonym that refers to itself.
+-- | The guard against a type synonym that refers to itself.
 --
--- 'detectTypeSynonymCycles' reads spellings, before anything is resolved,
--- and a spelling can hide a reference: a section-qualified name
--- (@`One`.Loop@), an alias that a same-arity sibling in another section
--- also answers to, which the checker settles by section and this pass does
--- not see, or a use at the wrong number of arguments (a kind error, which
--- the checker still resolves to the synonym; the pass over spellings leaves
--- such uses alone, since a record or enum of that arity may be meant). A
--- cycle it misses keeps its bodies, and the fuel in "L4.TypeCheck.Unify"
--- bounds the depth of their expansion, not its work: two such synonyms
--- that each name themselves twice, unified with each other, ran past 4 GiB.
+-- A recursive synonym has no finite expansion, so it would send the
+-- synonym-expanding loops of "L4.TypeCheck.Unify" into infinite regress. The
+-- fuel there bounds the depth of that regress, not its work: two synonyms that
+-- each name themselves twice, unified with each other, ran past 4 GiB. So a
+-- synonym in a cycle is given no body at all, and reported as
+-- 'CyclicTypeSynonyms'.
 --
--- So once every body is resolved, this reads the references themselves. A
--- body names the 'Unique' of the synonym each type application in it
--- resolved to, whatever it was spelled, and a name that did not resolve (an
--- ambiguity, an unknown name) names none. A cycle among those is a cycle of
--- expansions, and its members are given no body and reported as
--- 'CyclicTypeSynonyms', as the spelling-based check does. A cycle that check
--- already caught has no body left to follow, so this finds only what it
--- missed. It cannot reject a program the other accepts correctly: a
--- reference cycle among synonyms has no finite expansion.
+-- This reads the references themselves, once every body is resolved. A body
+-- names the 'Unique' of the synonym each type application in it resolved to,
+-- whatever it was spelled (an alias, a section-qualified name, a name two
+-- sections both declare), and a name that did not resolve (an ambiguity, an
+-- unknown name) names none. A cycle among those is a cycle of expansions.
+-- It cannot reject a program the checker accepts correctly: a reference
+-- cycle among synonyms has no finite expansion.
+--
+-- It replaced a pass over spellings, run before anything was resolved,
+-- which was both too narrow (it could not see through a qualified name) and
+-- too wide: it keyed synonyms by name, so a record, an import, or a synonym
+-- of the same name and another arity was taken for the synonym itself and
+-- valid programs were rejected.
 quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
 quarantineResolvedSynonymCycles decls = do
   for_ cycles \ cyc -> case cyc of

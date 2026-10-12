@@ -92,6 +92,7 @@ DECLARE Pong IS A Ping
 The names a synonym is known by after `AKA` count as names for that synonym.
 In `DECLARE W AKA B IS A B` the `B` has no arguments after it, so it is `W` itself and not some other synonym called `B` that takes one (`DECLARE B a IS A LIST OF a`); that declaration is circular too.
 `B OF NUMBER` would be the one that takes an argument.
+Two synonyms, or a synonym and a record, may share a name when they take different numbers of arguments, and a use is read as the one that takes as many as it is given.
 A synonym that names itself by its section-qualified name (`` `One`.L1 `` inside `§ One`) is circular in the same way.
 
 **There is a limit to how long a chain can be.**
