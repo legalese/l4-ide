@@ -22,7 +22,7 @@ test.l4  ──►  MLIR (textual IR)
 
 ## Why
 
-Running rules via the HTTP evaluator is convenient but slow; on the auth-proxy `test.l4` fixture each call costs ~160 ms of Haskell CPU. Compiling the same rules to wasm drops per-call cost to tens of microseconds and lets the rules execute anywhere — edge workers, in-browser agents, embedded in other services — without Haskell on the host. See [Performance](#performance).
+Running rules via the HTTP evaluator is convenient but slow; on a 12-function `test.l4` fixture each call costs ~160 ms of Haskell CPU. Compiling the same rules to wasm drops per-call cost to tens of microseconds and lets the rules execute anywhere — edge workers, in-browser agents, embedded in other services — without Haskell on the host. See [Performance](#performance).
 
 ## Build
 
@@ -112,7 +112,7 @@ Known gaps:
 
 ## Performance
 
-Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `validation/test.l4` fixture — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and returned the same `SimpleResponse` envelope as of the README's first commit (2026-04-12), before the service added `presumed` to its responses (2026-10-02).
+Benchmark on the same `test.l4` fixture (kept outside this repo) — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and returned the same `SimpleResponse` envelope as of the README's first commit (2026-04-12), before the service added `presumed` to its responses (2026-10-02).
 
 | Backend                                       |  Wall time | Per-call avg | Server RSS |
 | --------------------------------------------- | ---------: | -----------: | ---------: |
