@@ -89,7 +89,6 @@ import L4.Print (clauseBodies, prettyLayout, quotedName)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
-import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.TypeCheck.Types as X
 import L4.TypeCheck.Unify
 import L4.TypeCheck.With as X
@@ -2075,18 +2074,22 @@ builtinConstructorLookup =
 -- was @WHEN EXACTLY Red@.
 --
 -- A CONSIDER written by hand goes to the clauses' engine too, with or
--- without a number in it, unless a value of its scrutinee's type can hold a
--- MAYBE, a LIST, an EITHER or a type declared in another module
--- ('holdsUnlistedType'), whose values that engine does not tell apart:
--- there it would stand down, where main's own analysis still lists part of
--- what is missing (HIGHLANDER, 2026-10-10, which named MAYBE and LIST;
--- EITHER and another module's types are assumed, not ruled, as they stand
--- down the same way: @WHEN LEFT Basic@ over @EITHER Tier Tier@ was told
--- @WHEN LEFT Gold@, and through the clauses' engine nothing). Main's own
--- analysis lists a constructor's arguments as one set of constraints, so
--- below a constructor whose arms name several combinations of arguments it
--- listed some missing ones and not others: @WHEN faz qux qux@ alone asked
--- for six of the eight missing @faz@ arms (smucclaw/l4-ide#1030). When the
+-- without a number in it, unless one of its arms names a constructor that
+-- engine does not list ('armsNameUnlisted': a MAYBE's, a LIST's, an
+-- EITHER's, or one of a type declared in another module). There the engine
+-- would stand down, where main's own analysis still lists part of what is
+-- missing (HIGHLANDER, 2026-10-10, which named MAYBE and LIST). The test is
+-- on the arms and not on the scrutinee's type (NAMEDROP, 2026-10-12): that
+-- type can hold a MAYBE and the arms still name none, as in @WHEN Row v1 v2@
+-- over a record with a MAYBE or a LIST field, where main's own analysis
+-- asked for cases after an arm that matches everything. EITHER and another
+-- module's types are assumed, not ruled, as they stand down the same way:
+-- @WHEN LEFT Basic@ over @EITHER Tier Tier@ was told @WHEN LEFT Gold@, and
+-- through the clauses' engine nothing. Main's own analysis lists a
+-- constructor's arguments as one set of constraints, so below a constructor
+-- whose arms name several combinations of arguments it listed some missing
+-- ones and not others: @WHEN faz qux qux@ alone asked for six of the eight
+-- missing @faz@ arms (smucclaw/l4-ide#1030). When the
 -- clauses' engine gives up on such a CONSIDER, as it does past
 -- 'maxMissingClauses' rows or 'clauseMatrixFuel' steps, main's own analysis
 -- reads it instead, so that it warns as it did before (assumed, not ruled,
@@ -2111,11 +2114,9 @@ checkConsider ec ann e branches t = do
         Just (PmConsider g _ _) -> g.clauseCount >= 2
         _ -> False
   rbranches <- traverse (checkBranch ec patternEc te t) branches
-  ei <- asks (.entityInfo)
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
-  resolvedTe <- applySubst te
   let withLiteral = any armHasLiteral rbranches
-      byHighlander = not withLiteral && isNothing generated && not (holdsUnlistedType ei resolvedDecls resolvedTe)
+      byHighlander = not withLiteral && isNothing generated && not (armsNameUnlisted (constructorFamilies resolvedDecls) rbranches)
       ownAnalysis = considerWithoutLiterals generated leftToClauseMatrix re te rbranches
   if withLiteral || byHighlander
     then considerWithLiterals (if byHighlander then Just ownAnalysis else Nothing) generated leftToClauseMatrix re te rbranches
@@ -2132,47 +2133,29 @@ checkConsider ec ann e branches t = do
       PatApp _ _ ps   -> any patternHasLiteral ps
       PatCons _ p1 p2 -> patternHasLiteral p1 || patternHasLiteral p2
 
--- | Whether a value of this type can hold a value whose constructors the
--- clauses' engine does not list ('constructorFamilies'): a MAYBE, a LIST or
--- an EITHER, or a type declared in another module, as the type itself, one
--- of its arguments, or a field of a type this module declares, at any depth
--- ('declareDeclarations', the declarations 'constructorFamilies' reads).
--- The other builtin types are listed (BOOLEAN) or have no constructors, and
--- a type variable has none. A field is read as the use of its type
--- instantiates it (@Pair Tier@'s fields are @Tier@s). Synonyms are
--- expanded, and a type already on the way down is not read again, so a
--- recursive type ends.
-holdsUnlistedType :: EntityInfo -> [DeclChecked (Declare Resolved)] -> Type' Resolved -> Bool
-holdsUnlistedType ei decls = go Set.empty
+-- | Whether an arm names a constructor that the clauses' engine does not
+-- list ('constructorFamilies'), at any depth: a MAYBE's, an EITHER's or a
+-- LIST's (@FOLLOWED BY@ and @EMPTY@), or one of a type declared in another
+-- module. Where an arm names one the engine stands down, so main's own
+-- analysis reads the CONSIDER; where no arm does, the engine reads every
+-- arm and answers, whatever the scrutinee's type can hold: a variable in
+-- the place of a MAYBE or a LIST is a wildcard.
+armsNameUnlisted :: Map Unique [(Resolved, Int)] -> [Branch Resolved] -> Bool
+armsNameUnlisted families = any \ case
+  MkBranch _ (When _ p) _ -> go p
+  MkBranch _ (Otherwise {}) _ -> False
   where
-    declared =
-      Map.fromList
-        [ (getUnique tr, (params, td))
-        | d <- decls
-        , let MkDeclare _ _ (MkAppForm _ tr params _) td = d.payload
-        ]
-    go seen ty = case expandSynonymsIn ei (8 :: Int) ty of
-      TyApp _ r ts
-        | getUnique r `elem` [maybeUnique, listUnique, eitherUnique] -> True
-        | any (go seen) ts -> True
-        | getUnique r `Set.member` seen -> False
-        | Just (params, td) <- Map.lookup (getUnique r) declared ->
-            -- the fields as this use of the type instantiates them
-            let atThisUse = substituteType (Map.fromList (zip (map getUnique params) ts))
-            in any (go (Set.insert (getUnique r) seen) . atThisUse) (fieldTypes td)
-        | Just (_, KnownTypeVariable) <- Map.lookup (getUnique r) ei -> False
-        | otherwise -> (getUnique r).moduleUri /= builtinUri
-      _ -> False
-    fieldTypes = \ case
-      RecordDecl _ _ fields -> storedTypes fields
-      EnumDecl _ cds -> concat [ storedTypes fields | MkConDecl _ _ fields <- cds ]
-      SynonymDecl _ t -> [t]
-    storedTypes fields = [ t | MkTypedName _ _ t Nothing <- fields ]
+    go = \ case
+      PatVar {}     -> False
+      PatApp _ c ps -> not (Map.member (getUnique c) families) || any go ps
+      PatCons {}    -> True
+      PatLit {}     -> False
+      PatExpr {}    -> False
 
 -- | Main's own analysis of a CONSIDER with no number, piece of text or
--- EXACTLY in it whose scrutinee can hold a MAYBE, a LIST, an EITHER or a
--- type declared in another module ('holdsUnlistedType'), and of a CONSIDER
--- generated from clauses with none of them ('checkConsider').
+-- EXACTLY in it, one of whose arms names a constructor of a MAYBE, a LIST,
+-- an EITHER or a type declared in another module ('armsNameUnlisted'), and
+-- of a CONSIDER generated from clauses with none of them ('checkConsider').
 considerWithoutLiterals :: Maybe PmSynthetic -> Bool -> Expr Resolved -> Type' Resolved -> [Branch Resolved] -> Check ()
 considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
@@ -2211,18 +2194,19 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
     addWarning $ PatternMatchRedundant redundant
 
 -- | A CONSIDER with a number, a piece of text or an EXACTLY in it, or one
--- written by hand whose scrutinee holds no MAYBE, LIST, EITHER or type of
--- another module, analysed by the clauses' engine as a group of one column
--- whose input is the scrutinee ('checkConsider'): each arm is read by
--- 'coveragePattern', an arm it cannot count is left out and one it cannot
--- read stands the analysis down, as for a clause, and the scrutinee stands
--- in for the input, so an EXACTLY whose expression mentions a name the
--- scrutinee mentions stands it down too. A missing case is a WHEN, or
--- OTHERWISE where the scrutinee itself is left open. An arm is redundant
--- when the arms above it match everything it matches ('coveredBy'); an arm
--- that matches anything (OTHERWISE, a new name) is never reported, as
--- unstable never reports one, and the arms of a CONSIDER that a
--- multi-clause group compiles to are left to 'checkClauseMatrix', as below.
+-- written by hand none of whose arms names a constructor of a MAYBE, LIST,
+-- EITHER or type of another module ('armsNameUnlisted'), analysed by the
+-- clauses' engine as a group of one column whose input is the scrutinee
+-- ('checkConsider'): each arm is read by 'coveragePattern', an arm it
+-- cannot count is left out and one it cannot read stands the analysis
+-- down, as for a clause, and the scrutinee stands in for the input, so an
+-- EXACTLY whose expression mentions a name the scrutinee mentions stands it
+-- down too. A missing case is a WHEN, or OTHERWISE where the scrutinee
+-- itself is left open. An arm is redundant when the arms above it match
+-- everything it matches ('coveredBy'); an arm that matches anything
+-- (OTHERWISE, a new name) is never reported, as unstable never reports one,
+-- and the arms of a CONSIDER that a multi-clause group compiles to are left
+-- to 'checkClauseMatrix', as below.
 --
 -- When the missing-case analysis stands down or gives up, the first
 -- argument, if there is one, analyses the CONSIDER instead, and this one

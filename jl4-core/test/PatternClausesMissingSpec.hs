@@ -1272,8 +1272,10 @@ considerSpec = describe "CONSIDER over numbers, text and EXACTLY" $ do
       ]
     missingArms ws `shouldBe` ["OTHERWISE"]
 
--- | A CONSIDER with no number, text or EXACTLY in it, which main's own
--- analysis checks ('L4.TypeCheck.considerWithoutLiterals').
+-- | A CONSIDER written by hand with no number, text or EXACTLY in it, which
+-- the clauses' engine reads ('L4.TypeCheck.considerWithLiterals') unless an
+-- arm names a constructor it does not list ('L4.TypeCheck.armsNameUnlisted'),
+-- and main's own analysis ('L4.TypeCheck.considerWithoutLiterals') then does.
 plainConsiderSpec :: Spec
 plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
   let shape body = Text.unlines $
@@ -1340,10 +1342,9 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
     full <- considerWarnings (foz ("qux qux" : asked <> ["bar qux", "baz qux"]))
     full `shouldBe` []
 
-  it "reads a field of a type with a parameter as the scrutinee's type fills it in" $ do
-    -- `Pair Tier` holds no MAYBE or LIST, so it is read by the clauses'
-    -- engine; read through `Pair`'s declaration, its fields were `a`, which
-    -- kept it on main's own analysis and its #1030 list.
+  it "lists what a CONSIDER over a type with a parameter leaves out" $ do
+    -- `Pair Tier` holds no MAYBE or LIST, and no arm names a constructor the
+    -- clauses' engine does not list, so it reads this CONSIDER.
     ws <- considerWarnings $ Text.unlines
       [ "DECLARE Tier IS ONE OF Basic, Gold"
       , "GIVEN a IS A TYPE"
@@ -1358,6 +1359,46 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       , "    WHEN Pair Basic Basic THEN 1"
       ]
     missingArms ws `shouldBe` ["WHEN Pair Basic Gold THEN", "WHEN Pair Gold `_` THEN"]
+
+  it "reads a CONSIDER over a type that holds a MAYBE when no arm names a MAYBE's constructor (NAMEDROP)" $ do
+    -- HIGHLANDER kept main's own analysis for every CONSIDER over this
+    -- record, because its type can hold a MAYBE, and main's own analysis
+    -- asked for `WHEN Row `_` Basic` after `WHEN Row v1 v2`, an arm that
+    -- matches everything. No arm here names `NOTHING` or `JUST`, so the
+    -- clauses' engine reads them all, and a variable stands for the MAYBE.
+    let row arms = Text.unlines $
+          [ "DECLARE Tier IS ONE OF Basic, Gold"
+          , "DECLARE Row HAS f1 IS A MAYBE NUMBER"
+          , "                f2 IS A Tier"
+          , ""
+          , "GIVEN r IS A Row"
+          , "GIVETH A NUMBER"
+          , "f r MEANS"
+          , "  CONSIDER r"
+          ] <> [ "    WHEN Row " <> arm <> " THEN 0" | arm <- arms ]
+    catchAll <- considerWarnings (row ["v1 v2", "v1 Gold"])
+    missingArms catchAll `shouldBe` []
+    map (mentions "WHEN Row v1 Gold THEN 0") (filter (mentions "redundant") catchAll) `shouldBe` [True]
+    partial <- considerWarnings (row ["m Basic"])
+    missingArms partial `shouldBe` ["WHEN Row `_` Gold THEN"]
+    complete <- considerWarnings (row ["m Basic", "m Gold"])
+    complete `shouldBe` []
+
+  it "keeps main's own analysis where an arm names NOTHING" $ do
+    -- The clauses' engine does not list a MAYBE's constructors and stands
+    -- down; main's own analysis lists `WHEN Row NOTHING Gold`.
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Gold"
+      , "DECLARE Row HAS f1 IS A MAYBE NUMBER"
+      , "                f2 IS A Tier"
+      , ""
+      , "GIVEN r IS A Row"
+      , "GIVETH A NUMBER"
+      , "f r MEANS"
+      , "  CONSIDER r"
+      , "    WHEN Row NOTHING Basic THEN 0"
+      ]
+    missingArms ws `shouldBe` ["WHEN Row NOTHING Gold THEN"]
 
   it "still warns when its missing branches are more than the clauses' engine lists" $ do
     -- 208 missing values: past 64 rows the clauses' engine gives up, and
