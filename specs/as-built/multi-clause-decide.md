@@ -1,12 +1,12 @@
 # Multi-clause pattern-matching DECIDE (as built on main)
 
-This describes branch `carve/multi-clause-decide` (PR #545, into `main`), re-measured on 2026-10-09.
+This describes branch `carve/multi-clause-decide` (PR #545, into `main`), re-measured on 2026-10-12 (the `file:line` citations and the goldens); a measurement dated earlier in the text keeps its date.
 Every `file:line` below is at the commit that last changed this file; every probe below was run on a binary built from it.
 The branch carries work first merged into unstable, one PR at a time, and each section below names its unstable source.
 The unstable commits named here are on unstable only: none of them is on this branch or on main.
 
 This branch, oldest first: `d0905e1d8` (the clauses, from #49), `d6594578b` (exact-print, from #130), `17e944423` (the missing-case warning, adapted from #185), `1a67532c7` (clause hygiene, from #569), `f02f0a6b7` (a merge of main), `ee407387b` (ruling M1), `b7c54a6cb` (generated names, printing, editor and render, from #581), `f2d938863` (the missing-case check's limits in the user documentation; this file rewritten for main), `36c549226` (`l4 run --json` reports an evaluation error in the drafter's terms), `6d0146f27` (ruling M2, from legalese/l4-ide#587), the round-2 review's `c8907bf66`, `21df62c92`, `526f70396`, `d0f4c7afa` and `232e14b1b`, the commit that wrote that review into this file (`b1002d9af`), the round-3 fixes `8e4c920ca`, `05559e4ec` and `2113516a1`, the commit that wrote those into this file (`0350c079b`), the second round-3 fix `67d0903c2`, `764671496` (the round-3 fixtures' goldens, made on main), the commit that wrote those into this file (`03bf38dc4`), `2dd411963` (a warning at an annotation above a later clause), the commit that wrote that into this file (`c09a64cd9`), `b42394622` (a group's annotations read as a plain definition's, and a warning at each later one), the commit that wrote that into this file (`ce2b10bda`), the round-4 fixes `fb719cd6d` and `07a84815a`, the commit that wrote those into this file (`93be32d32`), the second round-4 fixes `436d9ed26` and `eeac2e4de`, the commit that wrote those into this file (`860824ffc`), `e7b13bbfe` (an annotation inside a group that nothing of it claims is not the next rule's), and the commit that wrote that into this file.
-The literal-pattern work, 36 commits from `8da1c4eaa` to `028b04f93` (branch `deadbolt/clause-literals-main`, on top of `2113516a1`), is merged into this branch and is described under "Literal patterns" below.
+The literal-pattern work, 36 commits from `8da1c4eaa` to `028b04f93` (on top of `2113516a1`), is merged into this branch as `395984253` and is described under "Literal patterns" below.
 
 Source spec: `specs/done/PATTERN-MATCHING-SPEC.md`.
 Differences from the source spec, each probed on this branch:
@@ -191,7 +191,7 @@ The `clauseSpec` cases are: the 14 from `17e944423` less the number silence, inc
 
 ## Generated names, printing, editor and render (from #581)
 
-Unstable PR #581 (branch `fix/multi-clause-names`, six commits ending at `796cc8eb1`, not merged into unstable when this was carried) is carried as one commit, `b7c54a6cb`, because each part needed adapting to main's printer, test harnesses and AST, and the parts depend on each other.
+Unstable PR #581 (branch `fix/multi-clause-names`, six commits ending at `796cc8eb1`; merged into unstable on 2026-10-07, after this was carried) is carried as one commit, `b7c54a6cb`, because each part needed adapting to main's printer, test harnesses and AST, and the parts depend on each other.
 
 Where it lives:
 
@@ -263,7 +263,7 @@ User documentation: `doc/reference/errors/README.md` ("An @export of clauses wit
 ## Review round 2 (items 1, 2, 3, 5 and 6)
 
 The second review of #545 asked for six changes; item 4, literal patterns in the missing-case check, is under "Literal patterns (review round 2, item 4)" below.
-Items 1 to 3 were made for unstable first, on branch `fix/clause-group-round3` (`64e917f1d`, `cdd3e5515`, `cb1167363`), and item 5 is legalese/l4-ide#591 (`635507a96`); none of these commits is on this branch.
+Items 1 to 3 were made for unstable first, on branch `fix/clause-group-round3`, merged into unstable as legalese/l4-ide#604 (`64e917f1d`, `cdd3e5515`, `cb1167363`, on unstable); item 5 is legalese/l4-ide#591 (`635507a96`, on unstable); item 4 is legalese/l4-ide#605 (branch `fix/clause-literals`, merged into unstable on 2026-10-10 as `539cad5fd`); none of these commits is on this branch.
 
 Item 1, overloads.
 A run of bare-name clauses whose names differ is grouped by the parser, which cannot tell `TRUE` / `FALSE` from two overloads told apart by their types.
@@ -299,7 +299,7 @@ Not done here, for later: literal patterns in `jl4-mlir`, which compile as "alwa
 
 ## Review round 3 (the refutation of round 2's fixes)
 
-A refuter probed the round-2 fixes on unstable and found three defects that this branch had too; each was fixed on unstable first, on `fix/clause-group-round3` (`fd4209700`, `0c1844c22`, `182dff94e`), and carried here as `8e4c920ca`, `05559e4ec` and `2113516a1`.
+A refuter probed the round-2 fixes on unstable and found three defects that this branch had too; each was fixed on unstable first, on `fix/clause-group-round3` (legalese/l4-ide#604; `fd4209700`, `0c1844c22`, `182dff94e`, on unstable), and carried here as `8e4c920ca`, `05559e4ec` and `2113516a1`.
 A second refuter pass found that the L2 fix made the parse quadratic in the number of definitions (F1, below), fixed on unstable as `99f9f9075` and here as `67d0903c2`.
 
 S1 and L1, the overloads' own annotations.
@@ -332,7 +332,7 @@ The group now reads its `@desc` and `@export` as a plain `DECIDE` with the same 
 A fourth finding, that a warning from an imported module shows in `l4 run`, needed no change: `l4 run` prints the diagnostics of every module in the run, each under its own `File:` line (measured on this branch with a module that imports a library with an `@desc` and an `@export` between clauses, and with one that imports a group missing a case).
 A difference from unstable that the fixture shows: main has no `signatureBeforeKeyword`, so a plain definition's `@nlg` between its `GIVETH` and its `DECIDE` lands on the `GIVETH`'s type name (`NUMBER` in `GIVETH A NUMBER`; read in `l4 ast`), and `#EVAL hue Green` renders "`hue` with `Green`" in `ok/pattern-matching-first-clause-annotations.nlg.golden`, where unstable renders "the hue of `Green`".
 The group's `@nlg` lands on its head and is used, which unstable's plain definition does too.
-Tests: `ok/pattern-matching-later-clause-annotations.l4` for the answers and that nothing is published, `ok/pattern-matching-first-clause-annotations.l4` for the annotations above the first clause (each beside a plain twin), and five `PatternClausesMissingSpec` cases for the warnings, because main's goldens record none.
+Tests: `ok/pattern-matching-later-clause-annotations.l4` for the answers and that nothing is published, `ok/pattern-matching-first-clause-annotations.l4` for the annotations above the first clause (each beside a plain twin), and five `PatternClausesMissingSpec` cases for the warnings; main's golden harness prints warnings, so `ok/tests/pattern-matching-later-clause-annotations.golden` records them as well.
 Each of the three fixes fails a test with the fix disabled: A1 the fixture's `nlg.golden`, A2 "does not warn at the annotations above a group's first clause", and A3 "warns at each of several annotations stacked above a later clause".
 Test: `ok/pattern-matching-overloads-own-annotations.l4`, and the jl4-service case "publishes the overload whose @export is written above it".
 Its second `AKA` is `c` here and `b` on unstable: main reads the input `b` in `DECIDE shown b IS b AND TRUE` as ambiguous with an `AKA` named `b`, where unstable lets the input win.
@@ -359,7 +359,7 @@ It compared wall-clock time, and on a busy machine it failed (the refuter, on un
 `PatternMatchParserSpec` now compares the process's CPU time for 250 and 2,000 lines, and fails at a ratio of 24 (linear is about 8, quadratic about 64).
 Since F1 it also times definitions with different names, at 1,000 and 12,000 lines, failing at 24, twice linear, because at 250 and 2,000 lines F1's quadratic part was too small to show (measured on unstable: 8.4, where linear is 8).
 With F1's recorder that test failed 3 runs of 3 on this branch (ratios 59.9 to 108.9); with the fix both guards passed 10 runs of 10 at a load average of about 8.
-The parse-scaling probe (`etc/probe-parse-scaling.mjs` on `docs/main-pre-review`, 1,000 and 4,000 lines, `l4 check`) gives 5.1 for different names and 4.0 for one name at `67d0903c2`, and 7.5 and 3.6 at `2113516a1`; it passes both.
+The parse-scaling probe (`etc/probe-parse-scaling.mjs`, on unstable, 1,000 and 4,000 lines, `l4 check`) gives 5.1 for different names and 4.0 for one name at `67d0903c2`, and 7.5 and 3.6 at `2113516a1`; it passes both.
 
 Not carried, because main lacks what they changed: the wording of unstable's hint for a name close to a value (main has no such hint), and a sentence in `specs/done/PATTERN-MATCHING-SPEC.md` (main's copy has no sentence about overloads).
 The user documentation's claim that the warning naming a new name "holds for every rule" is corrected: it is not given when a pattern of the rule does not fit its input's type, and not for a new name inside a larger pattern (`doc/reference/errors/README.md`).
@@ -370,7 +370,7 @@ With `DECLARE Colour IS ONE OF Red, Green`, `DECIDE show Red IS Red + 1` / `DECI
 ## Review round 4 (the refutation of the later-clause warning's contract)
 
 A refuter probed the warning at `887dcb763` on unstable and found holes in what it claims to do.
-They were fixed on unstable first, on `fix/clause-group-round3` (`7c3c9857e`, `35c57a026`, `dc33afa39`, `3c7c616fd`), and what applies here is carried as `fb719cd6d` and `07a84815a`.
+They were fixed on unstable first, on `fix/clause-group-round3` (legalese/l4-ide#604; `7c3c9857e`, `35c57a026`, `dc33afa39`, `3c7c616fd`, on unstable), and what applies here is carried as `fb719cd6d` and `07a84815a`.
 
 S1, the rule after a group.
 After a rule written as clauses, an `@nlg` written above the next rule was swallowed when that rule had no `GIVEN`.
@@ -426,7 +426,7 @@ Each fails with its fix disabled: the after-group golden without the S1 fix, the
 ## Literal patterns (review round 2, item 4)
 
 The reviewer's item 4: let the missing-case check cope with number and text patterns instead of giving up (`hasOpaque`).
-Designed in the session's `scratchpad/clause-literals/wf-finalDesign.md`, critiqued adversarially there (`wf-soundness.md`, `wf-fit.md`), built on unstable first (branch `fix/clause-literals`, on unstable's guard model, not merged as of 2026-10-09) and then here on main's own engine (ruling M1), in two commits that can be reverted alone, plus one per fix after the review of this build (see below).
+Designed and critiqued adversarially in the session that built it (those notes are not kept in the tree), built on unstable first (legalese/l4-ide#605, branch `fix/clause-literals`, on unstable's guard model, merged into unstable on 2026-10-10 as `539cad5fd`) and then here on main's own engine (ruling M1), in two commits that can be reverted alone, plus one per fix after the review of this build (see below).
 
 What changed, 2026-10-09:
 
@@ -454,6 +454,13 @@ Decisions, all assumed, not ruled, 2026-10-09, each kept so that it can be rever
   So is a constructor of a type declared in another module, assumed, not ruled: a record declared here with a field of an imported enumeration, `Paint HAS c IS A Colour, t IS A Tier`, and the one arm `WHEN Paint Red Basic`, is told `WHEN Paint Red Gold` by main's own analysis and nothing by the clauses' engine, whose constructor families are this module's declarations.
   The arm `WHEN Paint col Basic` names no imported constructor, and is read by the clauses' engine.
   A `CONSIDER` generated from clauses keeps the routing by numbers, text and `EXACTLY`.
+  Where the two spellings of one rule agree and where they do not, measured on this branch's binary on 2026-10-13 with a clause group and a `CONSIDER` of the same rule in one file (probe files not kept in the tree):
+  over enumerations declared in the same file, numbers, text and `EXACTLY`, both name the same missing case (the clauses as a `DECIDE` line, the `CONSIDER` as `WHEN … THEN` or `OTHERWISE`);
+  a repeated enumeration value, number or piece of text is reported as redundant by the `CONSIDER` only (M-B);
+  over a `MAYBE Colour`, `JUST Red` with `NOTHING` draws no warning from the clauses and `WHEN JUST Green` and `WHEN JUST Blue` from the `CONSIDER`, and so does `LEFT Red` with `RIGHT Green` over an `EITHER Colour Colour`, which lists four branches;
+  a record with a field of an enumeration declared in another file (`Row Basic TRUE` and `Row Plus TRUE`) is listed by the `CONSIDER` only (`Row Basic FALSE`, `Row Plus FALSE`);
+  the other way round, a record with a `LIST` field (`Row TRUE EMPTY` and `Row TRUE ys`) is listed by the clauses only (``Row FALSE `_` ``);
+  a bare `LIST` input, or a bare input whose enumeration is declared in another file, gets no warning in either spelling.
   When the clauses' engine gives up on a `CONSIDER` HIGHLANDER sent it (past 64 rows or 10000 steps), main's own analysis reads that `CONSIDER` instead, assumed, not ruled, 2026-10-10, after refute-gander found it silent: `Rec HAS f0, f1, f2` over six values with three arms has 208 missing values, of which ceeeca095 lists 108 and the build before this fallback none; on 150 random incomplete tables of 2 to 5 such fields, ceeeca095 warned where that build was silent 32 times, and this one never.
   The fallback brings back main's own analysis's cost with its answers: where ceeeca095 runs past 15 s on a table (5 of those 150; 30 s and 137 s for the two timed alone), so does this build, where the build before was silent at once; of those two, one ends with no warning and the other lists 24576 rows.
   A generated `CONSIDER` keeps the silent cap, as a group of clauses does.
@@ -461,31 +468,31 @@ Decisions, all assumed, not ruled, 2026-10-09, each kept so that it can be rever
   100, 200 and 300 levels take 0.34 s, 2.24 s and 6.64 s here, and 0.44 s, 3.15 s and 9.37 s on unstable, which has the same code (refute-gander measured 33 s and 44 s at 500); base unstable takes 0.06 s to 0.09 s, warning at no level; residency stays at 1 to 6 MB.
   Searching each level once would need an identity for a level, or a new field in the context's type, which every diagnostic is built with, so it was left.
   It fixes smucclaw/l4-ide#1030: main's own analysis read a constructor's fields as one set of constraints, so `WHEN fab` / `WHEN faz qux qux` was told six of the eight missing `faz` arms, and with those six added nothing, though `faz bar qux` and `faz baz qux` still failed at run time; the clauses' engine lists ``faz bar `_` ``, ``faz baz `_` ``, `faz qux bar` and `faz qux baz`, and then the two.
-  Measured with the session's fuzzer (`scratchpad/clause-literals/gander/fzm/fuzz5.py`, seeds 91 to 94, 600 groups each): the clause form and the `CONSIDER` form of a group disagree on whether it warns 12 times on the build before HIGHLANDER, 3 times with the exception decided by the scrutinee's type, and once with it decided by the arms (`C-FALSE-INCOMPLETE` 11, 2, 0; `C-RESIDUE-SILENT` 373 on all three).
+  Measured with a fuzzer that is not kept in the tree (seeds 91 to 94, 600 groups each): the clause form and the `CONSIDER` form of a group disagree on whether it warns 12 times on the build before HIGHLANDER, 3 times with the exception decided by the scrutinee's type, and once with it decided by the arms (`C-FALSE-INCOMPLETE` 11, 2, 0; `C-RESIDUE-SILENT` 373 on all three).
   The two it fixed were main's own analysis asking for cases after an arm that matches everything (`WHEN Row1 v1 v2` / `WHEN Row1 v1 TRUE` over a `LIST` and a `BOOLEAN` was told ``Row1 `_` FALSE``; `WHEN Row2 v1 v2` / `WHEN Row2 Gold v2` over a `Tier` and a `MAYBE` was told ``Row2 Basic `_` `` and ``Row2 Premium `_` ``), and no arm of either names a `MAYBE` or a `LIST`.
   The one left has the single arm `WHEN Row (JUST m) TRUE`, which names `JUST`, so main's own analysis reads it and lists ``WHEN Row (JUST `_`) FALSE`` and not the `NOTHING` cases, where a rule written as clauses stands down.
   A redundant arm prints as written (`prettyBranchAsWritten`): the generic printer wrote the redundant `WHEN 1.0` after `WHEN 1` as `WHEN 1`, naming the other arm.
 - Beyond the design, in its own commit: an `EXACTLY` whose expression mentions the input itself, such as `EXACTLY (n PLUS 0)`, which matches every `n`, stands the group down on any input, because the design's argument for leaving such a clause out (it matches one value of the column per value of the other columns) does not hold for it; by the algorithm as designed, `f (EXACTLY (n PLUS 0))` / `f 0` would have suggested `f n`, a clause that would never be used.
   Unstable's first fix for the same hole stood the group down when the expression named any input, in any column; main's rule is the narrower one, and it holds (an expression naming only other inputs still matches one value of its column per value of theirs: `f a (EXACTLY a)` / `f 0 b` lists `a b`, and `f 1 2` has no clause).
-  Unstable adopted it on 2026-10-09 (`433bee2d9` on `fix/clause-literals`), so both branches now use this rule.
+  Unstable adopted it on 2026-10-09 (`b6f3b34cf`, on unstable), so both branches now use this rule.
 
-Measured on this build, in `jl4-core/test/PatternClausesMissingSpec.hs` and the probes under the session's `scratchpad/clause-literals/impl-main/`:
+Measured on this build, in `jl4-core/test/PatternClausesMissingSpec.hs` and in probe files that are not kept in the tree:
 
 - The cap: 63 keys × `Basic` over `Tier` list the 63 keyed rows and `n t`; 64 keys would list 65, over the cap, so the coarse tier lists `n t` alone; the enumeration control (E1..E64 × `Basic`) still lists 64 rows and falls silent at 65.
 - The fuel: a row of wildcards ends the recursion, so the nine-input `pick` table (each input tested for `Red` in one clause and for `Green` in another), which used to run out of steps, lists `Blue` nine times, and its twin over numbers lists `n1 … n9`; a cross table of 100 keys on each of two inputs lists `n k`.
   None of the tests reaches the 10000-step limit on this build; it is kept as a guard.
 - Residues against unstable, all predicted by the design: `MAYBE` and `LIST` values are read here only as far as the analysis need not tell them apart (`show NOTHING` / `show (JUST 0)` is silent; `f (JUST 0)` alone suggests `f m`, where unstable lists `NOTHING` and ``(JUST `_`)``); the one-clause `f Red (JUST x)` keeps its CONSIDER warning (`WHEN Green THEN`, `WHEN Blue THEN`), where unstable lists three clauses; `@nonexhaustive` is a lexer error here.
-  Not predicted, and cosmetic: unstable listed rows in another order (by how many numbers or texts they name, and in its engine's order among rows that name none: `E63 Premium` … `E1 Premium`, `Blue n` before `Red n`); since 2026-10-09 it lists them in main's order (`d07697484` on `fix/clause-literals`).
+  Not predicted, and cosmetic: unstable listed rows in another order (by how many numbers or texts they name, and in its engine's order among rows that name none: `E63 Premium` … `E1 Premium`, `Blue n` before `Red n`); since 2026-10-09 it lists them in main's order (`0cb94ec8e`, on unstable).
   Not a difference in the check: `§` followed by an indented `GIVEN n` is a section binder on unstable, an assumed value that is not the definition's input, and the definition's own `GIVEN` here, so the same clauses `f 0` / `f 1` under it list `f n` here and ``f `_` `` there, and `f 0 IS n PLUS 100` gives `100` here and asks for `n` there.
 
 Fixed after the adversarial review of this build (2026-10-09), one commit each: a text key printed with the lexer token's Haskell-style escapes (`"S\227o Paulo"`); a number input declared under another name (`DECLARE Age IS A NUMBER`) stopped the group on an `EXACTLY` of a constant instead of counting it for nothing; the coarse tier re-ran the same rows for a group with no number or text; and the tests the review asked for: `EXACTLY n` beside an enumeration (`f 0 Red` / `f (EXACTLY n) Green` lists `0 Blue`, `n Red`, `n Blue`, and reads as `n c` alone without the own-name case), a `MAYBE` below a key that reaches the coarse tier (`f 0 (JUST x)` / `f 1 m` lists `n m`), the silence boundary for lists, `MAYBE` values and another file's enumeration, the nested `EXACTLY` under a record's field, a negative key, and keys written under `EXACTLY`.
 
 Aligned with unstable after its own review (2026-10-09), one commit each: an `EXACTLY` of a constant at a number position inside a pattern counts for nothing, as at the top level, where it stood the group down because the re-check's substitution was dropped before the position's type was read (`f (Box (EXACTLY zero)) Premium` / `f (Box n) Basic` lists ``(Box `_`) Premium``; the test that pinned the silence now pins the warning); and a field declared under another name for a number is a number position, as an input already was.
-And, after the refutation of unstable's `99b1936cf` the same day: a group with a clause left out gets the coarse list alone, because the exact partition could list a keyed gap the left-out clause covers (`f 2 "b"` / `f (EXACTLY two) s` / `f 1 s` listed `2 s` and `n s`, and every `(2, s)` meets the second clause; `g (EXACTLY b) (EXACTLY a) Standard` / `g a "c" Plus` / `g "c" "a" p` / `g a "c" Gold` listed `"c" "c" Standard`); each coarse row still holds a value no clause matches, since a left-out clause matches one value of its position for each value of the others.
+And, after the refutation of unstable's `3369077b2` (on unstable) the same day: a group with a clause left out gets the coarse list alone, because the exact partition could list a keyed gap the left-out clause covers (`f 2 "b"` / `f (EXACTLY two) s` / `f 1 s` listed `2 s` and `n s`, and every `(2, s)` meets the second clause; `g (EXACTLY b) (EXACTLY a) Standard` / `g a "c" Plus` / `g "c" "a" p` / `g a "c" Gold` listed `"c" "c" Standard`); each coarse row still holds a value no clause matches, since a left-out clause matches one value of its position for each value of the others.
 
 Tests for literal patterns, in `PatternClausesMissingSpec`, by group: numbers and text with and without a catch-all (`describe`, `code`, `sign`, `half`); `EXACTLY` of a number, of a value of the input's type, of a constant on an enumeration input, over another file's enumeration, over a `MAYBE` value, of the input's own name (alone and beside an enumeration), of a constant on a number input and under a record's field, and of an expression that mentions the input itself or another input; tables keyed by a number, by text, by a number beside an enumeration, by two numbers, and the gap under one key before the rest; one-clause groups over a number, with and without an enumeration beside it; a record with a number field; the silences for lists, `MAYBE` values and another file's enumeration and their boundary; the coarse tier for a `MAYBE` under every clause's number and below a key; a repeated number and `1` after `1.0`; a key's first spelling, every digit, the sign, `EXACTLY`'s spelling and a text key's characters; the cap at sixty-four rows against its enumeration control; the nine-input tables over enumerations and over numbers; a group without a `GIVEN`; a synonym of `NUMBER`, as an input and as a record's field; and the coarse list alone when a clause is left out, for an `EXACTLY` of a constant and for one that names only other inputs.
 
 Tests for a `CONSIDER` written by hand, in the same file (`considerSpec`, eight cases, GANDER): the arm after `WHEN EXACTLY Red` is reached and the `CONSIDER` whose only arm it is lists `Green` and `Blue` (v07, both red on `7bbe2499f`); `OTHERWISE` for a number and for a text; a repeated number as a redundant arm; the gap under a key in a record, spelled as the arm spells it; `EXACTLY` of a constant over a number and over an enumeration; an `EXACTLY` that mentions the scrutinee; and the coarse list alone when an arm is left out.
 And for one with none of them (`plainConsiderSpec`): a constructor no arm names is written with a `_` per field, and every missing combination of a constructor's fields is listed, before and after the asked-for arms are added (smucclaw/l4-ide#1030, HIGHLANDER; red on `ceeeca095`); a `CONSIDER` over a type with a parameter; a record with a `MAYBE` field read by the clauses' engine when no arm names `JUST` or `NOTHING` (`WHEN Row v1 v2` / `WHEN Row v1 Gold` warns of no missing case, `WHEN Row m Basic` lists ``WHEN Row `_` Gold``; NAMEDROP, red on `e195a903c`, which lists ``WHEN Row `_` Basic`` after the first); and the same record with the one arm `WHEN Row NOTHING Basic`, which keeps main's own analysis and lists `WHEN Row NOTHING Gold`.
 
-Corpus: `ok/pattern-matching-literal-clauses.l4` is new, with this tree's goldens recording only its `#EVAL`s; `ok/pattern-matching-one-clause-fallback.l4`'s number example became the `MAYBE` one; `not-ok/tc/pattern-matching-export-without-given.l4`'s golden gains the warning for `discount 0`.
+Corpus: `ok/pattern-matching-literal-clauses.l4` is new, with its golden recording its `#EVAL`s and 14 missing-case warnings (main's golden harness prints warnings); `ok/pattern-matching-one-clause-fallback.l4`'s number example became the `MAYBE` one; `not-ok/tc/pattern-matching-export-without-given.l4`'s golden gains the warning for `discount 0`.

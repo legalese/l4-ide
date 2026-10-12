@@ -26,7 +26,7 @@ What L4 accepts and computes does not change.
 - Schema golden encoding: `jl4JsonSchemaGolden`, `Main.hs:181-221`, the fix at `:197-211`, its import at `:8` (#419).
 - `jl4/jl4.cabal:101` adds `text` to `jl4-test`'s build-depends, which `Data.Text.Encoding` needs; on `unstable` that line came from #399.
 - Directive-results filter: `checkDirectiveResults`, `jl4-core/src/L4/TypeCheck/Types.hs:237-247` (#567).
-  It is called at `jl4-lsp/app/LSP/L4/Handlers.hs:209` (the directive-results notification) and `:797` (the `#CHECK` result lookup).
+  It is called at `jl4-lsp/app/LSP/L4/Handlers.hs:209` (the directive-results notification) and `:803` (the `#CHECK` result lookup).
 
 ## Behaviour and rules (read in code)
 
