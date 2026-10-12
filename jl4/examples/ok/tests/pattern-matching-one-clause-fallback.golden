@@ -1,6 +1,153 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+pattern-matching-one-clause-fallback.l4:20:8-39:
+  I found a problem while checking the definition of `one clause with a MAYBE value`:
+    The following branches still need to be considered:
+    
+      WHEN Green THEN
+      WHEN Blue THEN
+    
+pattern-matching-one-clause-fallback.l4:31:8-34:
+  I found a problem while checking the definition of `one clause three columns`:
+    The following branches still need to be considered:
+    
+      WHEN Boxed B02 THEN
+      WHEN Boxed B03 THEN
+      WHEN Boxed B04 THEN
+      WHEN Boxed B05 THEN
+      WHEN Boxed B06 THEN
+      WHEN Boxed B07 THEN
+      WHEN Boxed B08 THEN
+      WHEN Boxed B09 THEN
+      WHEN Boxed B10 THEN
+      WHEN Boxed B11 THEN
+      WHEN Boxed B12 THEN
+      WHEN Boxed B13 THEN
+      WHEN Boxed B14 THEN
+      WHEN Boxed B15 THEN
+      WHEN Boxed B16 THEN
+      WHEN Boxed B17 THEN
+      WHEN Boxed B18 THEN
+      WHEN Boxed B19 THEN
+      WHEN Boxed B20 THEN
+      WHEN Boxed B21 THEN
+      WHEN Boxed B22 THEN
+      WHEN Boxed B23 THEN
+      WHEN Boxed B24 THEN
+      WHEN Boxed B25 THEN
+    
+pattern-matching-one-clause-fallback.l4:31:8-34:
+  I found a problem while checking the definition of `one clause three columns`:
+    The following branches still need to be considered:
+    
+      WHEN Boxed B02 THEN
+      WHEN Boxed B03 THEN
+      WHEN Boxed B04 THEN
+      WHEN Boxed B05 THEN
+      WHEN Boxed B06 THEN
+      WHEN Boxed B07 THEN
+      WHEN Boxed B08 THEN
+      WHEN Boxed B09 THEN
+      WHEN Boxed B10 THEN
+      WHEN Boxed B11 THEN
+      WHEN Boxed B12 THEN
+      WHEN Boxed B13 THEN
+      WHEN Boxed B14 THEN
+      WHEN Boxed B15 THEN
+      WHEN Boxed B16 THEN
+      WHEN Boxed B17 THEN
+      WHEN Boxed B18 THEN
+      WHEN Boxed B19 THEN
+      WHEN Boxed B20 THEN
+      WHEN Boxed B21 THEN
+      WHEN Boxed B22 THEN
+      WHEN Boxed B23 THEN
+      WHEN Boxed B24 THEN
+      WHEN Boxed B25 THEN
+    
+pattern-matching-one-clause-fallback.l4:31:8-34:
+  I found a problem while checking the definition of `one clause three columns`:
+    The following branches still need to be considered:
+    
+      WHEN Boxed B02 THEN
+      WHEN Boxed B03 THEN
+      WHEN Boxed B04 THEN
+      WHEN Boxed B05 THEN
+      WHEN Boxed B06 THEN
+      WHEN Boxed B07 THEN
+      WHEN Boxed B08 THEN
+      WHEN Boxed B09 THEN
+      WHEN Boxed B10 THEN
+      WHEN Boxed B11 THEN
+      WHEN Boxed B12 THEN
+      WHEN Boxed B13 THEN
+      WHEN Boxed B14 THEN
+      WHEN Boxed B15 THEN
+      WHEN Boxed B16 THEN
+      WHEN Boxed B17 THEN
+      WHEN Boxed B18 THEN
+      WHEN Boxed B19 THEN
+      WHEN Boxed B20 THEN
+      WHEN Boxed B21 THEN
+      WHEN Boxed B22 THEN
+      WHEN Boxed B23 THEN
+      WHEN Boxed B24 THEN
+      WHEN Boxed B25 THEN
+    
+pattern-matching-one-clause-fallback.l4:37:8-32:
+  I found a problem while checking the definition of `one clause two columns`:
+    This clause does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B02) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B03) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B04) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B05) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B06) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B07) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B08) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B09) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B10) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B11) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B12) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B13) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B14) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B15) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B16) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B17) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B18) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B19) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B20) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B21) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B22) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B23) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B24) IS
+      DECIDE `one clause two columns` (Boxed B01) (Boxed B25) IS
+      DECIDE `one clause two columns` (Boxed B02) y IS
+      DECIDE `one clause two columns` (Boxed B03) y IS
+      DECIDE `one clause two columns` (Boxed B04) y IS
+      DECIDE `one clause two columns` (Boxed B05) y IS
+      DECIDE `one clause two columns` (Boxed B06) y IS
+      DECIDE `one clause two columns` (Boxed B07) y IS
+      DECIDE `one clause two columns` (Boxed B08) y IS
+      DECIDE `one clause two columns` (Boxed B09) y IS
+      DECIDE `one clause two columns` (Boxed B10) y IS
+      DECIDE `one clause two columns` (Boxed B11) y IS
+      DECIDE `one clause two columns` (Boxed B12) y IS
+      DECIDE `one clause two columns` (Boxed B13) y IS
+      DECIDE `one clause two columns` (Boxed B14) y IS
+      DECIDE `one clause two columns` (Boxed B15) y IS
+      DECIDE `one clause two columns` (Boxed B16) y IS
+      DECIDE `one clause two columns` (Boxed B17) y IS
+      DECIDE `one clause two columns` (Boxed B18) y IS
+      DECIDE `one clause two columns` (Boxed B19) y IS
+      DECIDE `one clause two columns` (Boxed B20) y IS
+      DECIDE `one clause two columns` (Boxed B21) y IS
+      DECIDE `one clause two columns` (Boxed B22) y IS
+      DECIDE `one clause two columns` (Boxed B23) y IS
+      DECIDE `one clause two columns` (Boxed B24) y IS
+      DECIDE `one clause two columns` (Boxed B25) y IS
+    
 pattern-matching-one-clause-fallback.l4:39:1-51:
   5
 pattern-matching-one-clause-fallback.l4:40:1-69:

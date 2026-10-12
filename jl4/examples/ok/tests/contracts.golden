@@ -12,6 +12,12 @@ contracts.l4:33:1-36:31:
   FULFILLED
 contracts.l4:38:1-70:
   FULFILLED
+contracts.l4:55:3-56:26:
+  I found a problem while checking the definition of `foo`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    
 contracts.l4:58:1-60:30:
   FULFILLED
 contracts.l4:69:1-72:28:

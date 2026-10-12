@@ -1,6 +1,18 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+pattern-matching-first-clause-annotations.l4:12:8-13:13:
+  I found a problem while checking the definition of `steps`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `steps` n IS
+    
+pattern-matching-first-clause-annotations.l4:27:8-28:12:
+  I found a problem while checking the definition of `hops`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `hops` n IS
+    
 pattern-matching-first-clause-annotations.l4:50:1-14:
   2
 pattern-matching-first-clause-annotations.l4:51:1-13:
