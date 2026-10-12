@@ -470,7 +470,7 @@ GIVETH A BOOLEAN
   AND <<Section 4(1)(b)>> resident
 ```
 
-The first line cites the rule `is eligible`; the `<<…>>` cites `resident`, the expression that follows it.
+The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the expression that follows it.
 A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
 Blank lines and comments between a `@ref` and that construct make no difference.
 
@@ -493,7 +493,7 @@ Both are warnings, so `l4 check` still succeeds, and the IDE marks the `@ref` it
 
 **A `@ref` that follows code on its line.**
 A `@ref` written at the end of a line, after the code it means to cite, cites the next construct, not that code.
-It still binds to the next construct, as it always did; what is new is the warning, which names the code it trails:
+Such a `@ref` still binds to the next construct. The warning names the code it trails:
 
 > This @ref (`1981/61 sec. 2`) follows code on its line, but a @ref binds to what follows it, so it will bind to the next construct instead. Put it on the line above `GIVETH A BOOLEAN`.
 
