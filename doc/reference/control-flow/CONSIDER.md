@@ -69,14 +69,14 @@ area s MEANS
 
 ### Using Wildcards
 
-Use `_` to ignore values:
+Use `` `_` ``, an underscore in backquotes, to ignore a value:
 
 ```l4
 GIVEN xs IS A LIST OF NUMBER
 firstElement xs MEANS
   CONSIDER xs
   WHEN EMPTY THEN 0
-  WHEN head FOLLOWED BY _ THEN head
+  WHEN head FOLLOWED BY `_` THEN head
 ```
 
 ## OTHERWISE
@@ -112,7 +112,19 @@ describe s MEANS
 
 Adding the missing constructor branch or an OTHERWISE catch-all silences the warning.
 
-**Primitive-type caveat:** the analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE. These types have effectively infinite value sets, so exhaustiveness cannot be decided by enumerating constructors. Matches on such values are never warned about — include an OTHERWISE branch to avoid runtime failures. BOOLEAN (just TRUE/FALSE) is checked normally; the builtin container types MAYBE, EITHER, and LIST are not yet analysed.
+**Numbers, text and dates:** a NUMBER, a STRING or a DATE has no end of values, so a WHEN with a number or a piece of text matches one value, and a CONSIDER over such a scrutinee is complete only with an OTHERWISE, which the warning suggests.
+`EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value; any other `EXACTLY` counts for nothing over a number, a piece of text or a date, and stops the check over any other type.
+An `EXACTLY` of the scrutinee's own name, `WHEN EXACTLY n` in `CONSIDER n`, matches every value, as `OTHERWISE` does, so the branches after it are reported as redundant.
+A branch that matches anything (an `OTHERWISE`, a name such as `WHEN v`, `` WHEN `_` ``, or `WHEN EXACTLY n` in `CONSIDER n`) is reported as redundant when it follows another such branch.
+An `OTHERWISE` after branches that between them name every constructor is not reported, so a defensive catch-all there is allowed.
+An `EXACTLY` of any other expression that mentions the scrutinee, such as `WHEN EXACTLY (n PLUS 1)`, stops the check over any type, with no warning, since such a branch may match any number of the scrutinee's values.
+A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is a redundant branch.
+A CONSIDER reads these as a rule written as clauses does ([Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits)), so the two spellings of one rule warn alike about missing cases.
+They differ on branches that are never used: a CONSIDER reports `WHEN 1.0` after `WHEN 1`, or `WHEN Red` twice, as redundant, while a rule written as clauses reports a clause as never used only when a clause above it matches every input, so `DECIDE f 1.0` after `DECIDE f 1`, or `DECIDE f Red` twice, draws no warning.
+One limit, which warns rather than stays silent: an `EXACTLY` of a name that a `WHERE` or a `LET` defines as the scrutinee itself (`WHEN EXACTLY y` in `CONSIDER x`, with `y MEANS x`) is read as a value the check cannot name, so the check asks for an `OTHERWISE` that would never be used; write that branch as `OTHERWISE`.
+BOOLEAN (just TRUE/FALSE) is checked normally.
+The builtin container types MAYBE, EITHER and LIST are checked only inside: their own constructors are not listed, so a CONSIDER with only `WHEN JUST x`, only `WHEN NOTHING`, only `WHEN LEFT x` or only `WHEN EMPTY` gets no warning, but what they hold is, so `WHEN JUST Basic` over a `MAYBE Tier` asks for `WHEN JUST Premium` and `WHEN JUST Gold`, and not for `WHEN NOTHING`.
+A CONSIDER with no number, text or `EXACTLY` in it whose missing branches are too many for that check to list (more than 64, or more than 10000 steps to find them, the [limits](../functions/multi-clause-DECIDE.md#limits) at which a rule written as clauses with no number or text gets no warning) still warns: it is checked the older way instead, which lists some of the missing branches, not always all of them, and on such tables can take a long time: from 30 seconds to over two minutes for the widest tried, records of five fields of four to eight values each.
 
 The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
 

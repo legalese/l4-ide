@@ -1,3 +1,3 @@
-`one clause with a literal` with 1 and `Red`
+`one clause with a MAYBE value` with `Red` and `JUST` with 5
 `one clause three columns` with `Boxed` with `B01`, `Boxed` with `B01` and `Boxed` with `B01`
 `one clause two columns` with `Boxed` with `B01` and `Boxed` with `B01`

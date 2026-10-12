@@ -468,7 +468,7 @@ WHEN Closed THEN "stopped"
 OTHERWISE "unknown"
 ```
 
-**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+**Note:** A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests OTHERWISE; a WHEN with a number or a piece of text, and `EXACTLY` of one or of a value of an enumeration, is read as that value, exactly as in a [rule written as clauses](#multi-clause-decide-does-not-cover-all-cases), and a number repeated in another spelling is a redundant branch. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
 
@@ -509,12 +509,17 @@ DECIDE price c IS 0
 
 When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
 
-**Note:** Only rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked.
-Rules that match numbers, text, lists or `MAYBE` values, or an enumeration declared in another file, get no warning.
-Neither does a rule with a number, a piece of text or an `EXACTLY` pattern anywhere in its clauses, even if its other inputs are enumerations.
-Neither does a rule that would need more than 64 clauses listed, or more than 10000 steps to find them.
+**Note:** Rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked, and so are rules whose clauses match particular numbers or texts.
+A number or a piece of text is one value of its input, and there is no end of the others, so such a rule is complete only with a clause written with the input's name, and the warning suggests that clause: ``DECIDE `describe` n IS`` for `DECIDE describe 0 IS "zero"` and `DECIDE describe 1 IS "one"`.
+The other inputs of the same rule are still analysed, the gaps under each number first and then the clause for every other number.
+Rules that match lists or `MAYBE` values, or an enumeration declared in another file, get no warning where the check would have to tell such values apart, not even for a number nested inside one; where the other inputs settle the question first it still warns, and when every clause of such a rule has a number or a piece of text in it, the warning suggests the one clause with every input's name and nothing finer.
+`EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value, and `EXACTLY` of the input's own name matches every input; any other `EXACTLY` counts for nothing on a number, text or date input, and in such a field of a record, stops the check on an enumeration input, and stops it on any input when its expression mentions the input itself.
+An input or a field declared under another name for a number (`DECLARE Age IS A NUMBER`) is a number to the check.
+When a clause counts for nothing that way, the warning lists only what the clauses without a number or a piece of text leave open, since a keyed gap could be one that clause covers.
+A suggested number prints as the clauses spelled it, and a suggested piece of text as L4 writes it, with `"` and `\` escaped.
+A rule whose clauses match enumeration values only gets no warning when it would need more than 64 clauses listed, or more than 10000 steps to find them; when its clauses match numbers or texts, the warning lists instead only the clauses that the clauses without a number or a piece of text leave open, which, when every clause names a number or a text, is the clause with every input's name alone.
 [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#limits) gives an example of each.
-A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER over a number or a piece of text gives none.
+A rule of one clause that is not checked keeps whatever warning a CONSIDER would give (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)), listing WHEN branches, now at the clause; a CONSIDER reads numbers, texts and `EXACTLY` the same way, so the same rule warns alike written either way.
 See [Multi-clause DECIDE](../functions/multi-clause-DECIDE.md#missing-cases).
 
 ---
