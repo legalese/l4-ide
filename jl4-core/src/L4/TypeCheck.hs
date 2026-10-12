@@ -2088,11 +2088,11 @@ builtinConstructorLookup =
 --
 -- A CONSIDER with a number, a piece of text or an EXACTLY in any arm is
 -- analysed by the clauses' engine instead, as a group of one column with the
--- scrutinee as its input, so that either spelling reports a missing case
--- over those (as-built spec, "Literal patterns", M-D; 'considerWithLiterals').
--- Main's own analysis below reads such an arm as matching anything, which
--- called a reachable arm redundant after @WHEN EXACTLY Red@ and passed a
--- CONSIDER whose only arm was @WHEN EXACTLY Red@.
+-- scrutinee as its input, so that either spelling reports a missing case over
+-- those (specs/as-built/multi-clause-decide.md, "Literal patterns", M-D;
+-- 'considerWithLiterals'). Main's own analysis below reads such an arm as
+-- matching anything, which called a reachable arm redundant after
+-- @WHEN EXACTLY Red@ and passed a CONSIDER whose only arm was @WHEN EXACTLY Red@.
 --
 -- A CONSIDER written by hand goes to the clauses' engine too, with or
 -- without a number in it, unless one of its arms names a constructor that
