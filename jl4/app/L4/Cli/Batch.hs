@@ -58,7 +58,7 @@ import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Control.Monad (void)
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word8)
 import Data.Char (isAlpha, isAlphaNum)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -432,7 +432,7 @@ processRow opts _ _ _ _ _ _ _ _ _ (RefusedRow input reason)
           , Key.fromString "diagnostics" Aeson..= [reason]
           ]
       , RowFailed )
-processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes idx (BatchRow input)
+processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes idx (BatchRow source cells)
   | opts.batchValidateOnly =
       let errs = validateRow opts.batchPresumption schema shapes input
           ok   = null errs
@@ -491,6 +491,10 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
         "error"        -> RowFailed
         "undetermined" -> RowUndetermined
         _              -> RowFine)
+  where
+    -- the case as the export's inputs declare it: what validation, the
+    -- wrapper and the echoed @input@ all see
+    input = declareInputs schema source cells
 
 -- | The inputs whose default this row's answer rests on (T6): every default
 -- the evaluation forced that belongs to the request, as the input's name or,
@@ -700,26 +704,35 @@ jsonKindName = \case
 -- | One case read from the input, or a CSV record refused while reading it,
 -- with the cells it had (named against the header as far as they go) and why.
 data BatchRow
-  = BatchRow Aeson.Value
+  = BatchRow RowSource Aeson.Value
   | RefusedRow Aeson.Value Text
+
+-- | Where a case came from, which decides how much its values already say.
+data RowSource
+  = FromStructured
+    -- ^ JSON or YAML, which carry their own types: a number is a number and a
+    -- string is a string
+  | FromCsv
+    -- ^ CSV, which has none: every value is the text of its cell, and it is
+    -- the input's declared type that says what the text means ('declareInputs')
 
 parseBatchInput :: Text -> BSL.ByteString -> Either String [BatchRow]
 parseBatchInput fmt bytes = case Text.toLower fmt of
   "json" -> case Aeson.eitherDecode' bytes of
     Left err -> Left err
-    Right (Aeson.Array arr) -> Right (map BatchRow (Vector.toList arr))
-    Right single            -> Right [BatchRow single]
+    Right (Aeson.Array arr) -> Right (map (BatchRow FromStructured) (Vector.toList arr))
+    Right single            -> Right [BatchRow FromStructured single]
   "yaml" -> case Yaml.decodeEither' (BSL.toStrict bytes) of
     Left err -> Left (Yaml.prettyPrintParseException err)
     Right val -> case val of
-      Aeson.Array arr -> Right (map BatchRow (Vector.toList arr))
-      single          -> Right [BatchRow single]
+      Aeson.Array arr -> Right (map (BatchRow FromStructured) (Vector.toList arr))
+      single          -> Right [BatchRow FromStructured single]
   "csv" -> case csvRows bytes of
     Left err -> Left err
     Right rows -> Right
       [ case r of
-          CsvRecord record         -> BatchRow (rowToJson record)
-          CsvRagged record reason  -> RefusedRow (rowToJson record) reason
+          CsvRecord record         -> BatchRow FromCsv (rowToJson Aeson.String record)
+          CsvRagged record reason  -> RefusedRow (rowToJson inferCsvCell record) reason
       | r <- rows ]
       where
         -- An EMPTY cell is left out of the row, exactly as if its column were
@@ -727,13 +740,59 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
         -- takes its TYPICALLY default (or, for a MAYBE input with none,
         -- NOTHING), and with presumption hard it is missing. CSV has no
         -- spelling of null; T3c adds one only when a user needs it.
-        rowToJson :: Csv.NamedRecord -> Aeson.Value
-        rowToJson record = Aeson.Object $ KeyMap.fromList
-          [ (Key.fromText (decodeUtf8 k), inferCsvCell v)
+        --
+        -- A case that will be evaluated keeps each cell as the text written:
+        -- only the export's declared input types can say whether @123456@ is
+        -- a number or a code ('declareInputs'). A refused record is not
+        -- evaluated, and is shown with the cells typed by what they look like.
+        rowToJson :: (Text -> Aeson.Value) -> Csv.NamedRecord -> Aeson.Value
+        rowToJson cell record = Aeson.Object $ KeyMap.fromList
+          [ (Key.fromText (decodeUtf8 k), cell (decodeUtf8 v))
           | (k, v) <- HashMap.toList record
           , not (Text.null (Text.strip (decodeUtf8 v)))
           ]
   other -> Left ("Unsupported format: " ++ Text.unpack other)
+
+-- | A case with each value typed by what the export declares for that input.
+--
+-- A NUMBER or BOOLEAN input (a @MAYBE@ one too) given as text is read as the
+-- number or boolean the text spells, from any format: a spreadsheet cell is
+-- text, and so is @"25"@ in a hand-written JSON or YAML file. Text that does
+-- not read as one is left alone, so that the decode error names the value it
+-- could not read.
+--
+-- A STRING input keeps its text exactly as written. JSON and YAML already say
+-- what a string is, so a number sent for one stays the error it was; a CSV
+-- cell is never a number just because it looks like one (@123456@, @1.50@,
+-- @018956@ are all codes to a STRING input).
+--
+-- An input whose type is not one of those three, or which the export does not
+-- declare, is not typed here: JSON and YAML values are left alone, and a CSV
+-- cell is typed by what it looks like ('inferCsvCell').
+declareInputs :: [ExportedParam] -> RowSource -> Aeson.Value -> Aeson.Value
+declareInputs schema source (Aeson.Object o) = Aeson.Object (KeyMap.mapWithKey declare o)
+  where
+    kinds = Map.fromList [ (p.paramName, k) | p <- schema, Just k <- [primKind p.paramType] ]
+    declare key v = case (Map.lookup (Key.toText key) kinds, v) of
+      (Just KNum,  Aeson.String s) -> fromMaybe v (jsonNumber s)
+      (Just KBool, Aeson.String s) -> fromMaybe v (jsonBool s)
+      (Just KStr,  _)              -> v
+      (Nothing,    Aeson.String s) | FromCsv <- source -> inferCsvCell s
+      _                            -> v
+declareInputs _ _ v = v
+
+-- | The number a text spells, in JSON's grammar (so @1.50@ and @1e3@ are
+-- numbers, and @007@, @1,000@ and @+5@ are not).
+jsonNumber :: Text -> Maybe Aeson.Value
+jsonNumber s = case Aeson.decodeStrict (encodeUtf8 (Text.strip s)) of
+  Just n@(Aeson.Number _) -> Just n
+  _                       -> Nothing
+
+jsonBool :: Text -> Maybe Aeson.Value
+jsonBool s = case Text.toLower (Text.strip s) of
+  "true"  -> Just (Aeson.Bool True)
+  "false" -> Just (Aeson.Bool False)
+  _       -> Nothing
 
 -- | One record of a CSV file, named against the header the way cassava names
 -- it, or refused because its cell count is not the header's.
@@ -805,8 +864,9 @@ csvRows = AL.eitherResult . AL.parse file
         go n (_ : rest)       = go n rest
         go n []               = n
 
--- | Infer a JSON value for a raw, non-empty CSV cell (an empty one never gets
--- here: it is left out of the row, see 'parseBatchInput'):
+-- | Infer a JSON value for the text of a non-empty CSV cell (an empty one never
+-- gets here: it is left out of the row, see 'parseBatchInput'), when no
+-- declared input type says what it is ('declareInputs'):
 --
 --   * @true@/@false@ (ci)   -> boolean
 --   * a plain integer or simple decimal literal -> number
@@ -821,17 +881,14 @@ csvRows = AL.eitherResult . AL.parse file
 -- grammar accepts exponent notation, which would otherwise silently turn
 -- product/lot codes like @1E5@ or @3e2@ into @100000@ / @300@. Exponent-form
 -- identifiers therefore always stay STRING.
-inferCsvCell :: BS.ByteString -> Aeson.Value
-inferCsvCell raw =
-  let rawText = decodeUtf8 raw
-      s       = Text.strip rawText
+inferCsvCell :: Text -> Aeson.Value
+inferCsvCell rawText =
+  let s = Text.strip rawText
   in case Text.toLower s of
        "true"  -> Aeson.Bool True
        "false" -> Aeson.Bool False
        _ | Text.any (\c -> c == 'e' || c == 'E') s -> Aeson.String rawText
-         | otherwise -> case Aeson.decodeStrict (encodeUtf8 s) :: Maybe Aeson.Value of
-             Just n@(Aeson.Number _) -> n
-             _                       -> Aeson.String rawText
+         | otherwise -> fromMaybe (Aeson.String rawText) (jsonNumber s)
 
 ----------------------------------------------------------------------------
 -- Output writers (buffered formats)

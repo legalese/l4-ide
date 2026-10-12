@@ -287,10 +287,11 @@ When a file says `IMPORT daydate` (or `time`, `currency`, ...), the tools resolv
 1. The `JL4_LIBRARY_PATH` environment variable (user/operator override)
 2. The project root directory
 3. The directory of the importing file
-4. The XDG data directory (`~/.local/share/jl4/libraries/`)
-5. The libraries bundled with the VS Code extension
+4. The standard library built into the `l4` you are running
+5. The XDG data directory (`~/.local/share/jl4/libraries/`)
+6. The libraries bundled with the VS Code extension
 
-When `JL4_LIBRARY_PATH` is set, it takes explicit control: the embedded fallback libraries are skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
+When `JL4_LIBRARY_PATH` is set, it takes explicit control: the built-in standard library is skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
 
 ```bash
 JL4_LIBRARY_PATH=jl4-core/libraries l4 run myfile.l4
@@ -401,7 +402,12 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
-Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
+Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
+A value is read as the type its parameter declares, whichever kind of file the case comes from.
+A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
+Text that does not spell one is left as it is, and the line is an error that names the text.
+A parameter declared as `STRING` keeps a CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
+A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
 
 A fact whose type is a list of choices (`DECLARE Colour IS ONE OF Red, Green, Blue`) is given as the name of one choice, written as text: `"c": "Red"`, or a `Red` cell in a CSV file.
 A choice that carries facts of its own, such as `Circle HAS size IS A NUMBER`, cannot be given as input: there is no way yet to write one in a case.

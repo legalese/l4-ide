@@ -342,7 +342,7 @@ emit opts = \case
 
 analyseModule :: VerifyOptions -> Rules.TypeCheckResult -> [DecisionReport]
 analyseModule opts tc =
-  [ analyseDecide opts tc callees decide
+  [ analyseDecide opts callees cfg decide
   | decide <- topLevelDecides tc
   -- Filter on the name as written BEFORE analysing: a report's name comes out of
   -- the analysis, so filtering on it analysed every decision just to discard
@@ -351,6 +351,10 @@ analyseModule opts tc =
   ]
   where
     callees = unfoldableRules tc
+    -- ONE config for the whole file. It carries the key environment, which walks
+    -- the module, so a config made per decision (or per call a decision reads
+    -- through) paid for that walk each time: quadratic in the size of the file.
+    cfg = vizConfig opts tc
     wanted nm
       | null opts.verifyDecisions = True
       | otherwise = any (`matches` nm) opts.verifyDecisions
@@ -417,9 +421,9 @@ decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = prettyLayout (getOriginal n)
 -- context, say — is not reported here. The callee has its own entry in the report,
 -- where its structure is its own text. See specs/todo/WHERE-INLINING-SPEC.md §9.
 analyseDecide
-  :: VerifyOptions -> Rules.TypeCheckResult -> Map Unique Transform.Unfoldable -> Decide Resolved -> DecisionReport
-analyseDecide opts tc callees decide0 =
-  case LadderViz.doVisualize decide (vizConfig opts tc True) of
+  :: VerifyOptions -> Map Unique Transform.Unfoldable -> LadderViz.VizConfig -> Decide Resolved -> DecisionReport
+analyseDecide opts callees cfg decide0 =
+  case LadderViz.doVisualize decide cfg of
     Left err ->
       DecisionReport
         { drName = decideName decide
@@ -450,7 +454,7 @@ analyseDecide opts tc callees decide0 =
                   -- the atomId is the only identity that crosses a rule boundary,
                   -- so --no-coalesce-atoms turns it off too.
                   meanings
-                    | opts.verifyCoalesce = callMeanings opts tc callees decide fnName atomIds labels' vizState order'
+                    | opts.verifyCoalesce = callMeanings opts callees cfg decide fnName atomIds labels' vizState order'
                     | otherwise = noMeanings
                in DecisionReport
                     { drName = fnName
@@ -468,8 +472,11 @@ analyseDecide opts tc callees decide0 =
   where
     decide = Transform.inlineLocalBindingsInDecide decide0
 
-vizConfig :: VerifyOptions -> Rules.TypeCheckResult -> Bool -> LadderViz.VizConfig
-vizConfig opts tc = LadderViz.mkVizConfig verDocId tc.module' tc.substitution
+-- | The config every decision of the file is drawn from, with simplification on
+-- (a call's meaning is drawn without it: 'LadderViz.withSimplification', which
+-- keeps the key environment).
+vizConfig :: VerifyOptions -> Rules.TypeCheckResult -> LadderViz.VizConfig
+vizConfig opts tc = LadderViz.mkVizConfig verDocId tc.module' tc.substitution True
   where
     verDocId =
       LSP.VersionedTextDocumentIdentifier
@@ -517,8 +524,8 @@ noMeanings = CallMeanings Map.empty [] []
 -- normal form, stays opaque and is named in 'cmOpaque'.
 callMeanings
   :: VerifyOptions
-  -> Rules.TypeCheckResult
   -> Map Unique Transform.Unfoldable
+  -> LadderViz.VizConfig
   -> Decide Resolved
   -> Text
   -> Map Int Text
@@ -526,7 +533,7 @@ callMeanings
   -> LadderViz.VizState
   -> [Int]
   -> CallMeanings
-callMeanings opts tc callees (MkDecide ann sig appForm _) fnName atomIds labels vizState order =
+callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels vizState order =
   CallMeanings
     { cmDefs = Map.fromList [(v, renumber d) | (v, Right d) <- attempts]
     , cmOrder = placed
@@ -554,7 +561,7 @@ callMeanings opts tc callees (MkDecide ann sig appForm _) fnName atomIds labels 
     meaningOf v = \case
       Left why -> Left why
       Right x ->
-        case LadderViz.doVisualize (MkDecide ann sig appForm (Transform.inlineLocalBindings x)) (vizConfig opts tc False) of
+        case LadderViz.doVisualize (MkDecide ann sig appForm (Transform.inlineLocalBindings x)) (LadderViz.withSimplification False cfg) of
           Left err -> Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError err)
           Right (li, vs)
             | ladderNodeCount opts.verifyMaxNodes li.funDecl.body > opts.verifyMaxNodes ->

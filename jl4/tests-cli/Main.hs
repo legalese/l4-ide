@@ -12,7 +12,7 @@ module Main where
 
 import Control.Monad (unless, when)
 import Data.Char (isSpace)
-import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, nub, sort)
+import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, nub, sort, tails)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
@@ -161,6 +161,16 @@ batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
+-- | Cases that send text for a NUMBER or BOOLEAN input (@"25"@, @"false"@) or a
+-- CSV cell for a STRING input, run against 'batchEligFixture' and
+-- 'batchCodeFixture'.
+batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv, batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson :: FilePath
+batchDeclaredStringsJson           = fixtureDir </> "batch-declared-strings.json"
+batchDeclaredStringsYaml           = fixtureDir </> "batch-declared-strings.yaml"
+batchDeclaredStringCellsCsv        = fixtureDir </> "batch-declared-string-cells.csv"
+batchDeclaredBadNumberJson         = fixtureDir </> "batch-declared-bad-number.json"
+batchDeclaredNumberForStringJson   = fixtureDir </> "batch-declared-number-for-string.json"
 
 -- | A choice type with one constructor that has a field and one that has
 -- none. Only the second can be given as JSON input; every other value is
@@ -433,6 +443,8 @@ coreFixtures =
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
+  , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
+  , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
@@ -1581,6 +1593,66 @@ spec bin = do
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
 
+    -- A value is read by the type its input declares. The merge of main into
+    -- unstable (d543d8531) dropped main's `coerceInputTypes` as "superseded by
+    -- inferCsvCell", which types a CSV cell by how it looks and knows nothing of
+    -- JSON or YAML, so each of these answered with status "error".
+    describe "reads a value by the type its input declares" $ do
+      let rowsOf args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , sout
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          statusAndResult row = (objField row "status", fst (resultAndPresumed row))
+          succeeded r = (Just (String "success"), Just r)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in JSON" $ do
+        (code, sout, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsJson]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+        -- the line shows the case as the inputs declare it
+        sout `shouldSatisfy` ("\"age\":25" `isInfixOf`)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in YAML" $ do
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsYaml]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+
+      it "validates a case that sends text for a NUMBER or BOOLEAN input" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchDeclaredStringsJson, "--validate-only"]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+      it "keeps a CSV cell for a STRING input as the text written" $ do
+        -- 123456 and 1.50 used to arrive as numbers and be refused; 018956 and
+        -- 1e3 already stayed text
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredStringCellsCsv]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows
+          `shouldBe` map (succeeded . String) ["123456", "018956", "1.50", "1e3"]
+
+      -- Assumed, not ruled: JSON and YAML carry their own types, so a number
+      -- sent for a STRING input is an error, as it is on main.
+      it "still refuses a JSON number for a STRING input" $ do
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredNumberForStringJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` [Just (String "error")]
+
+      it "leaves text that is not a number alone, so the error names the value" $ do
+        -- `age` is readable and `income` is not. The error is about `lots`;
+        -- before, it was about the `25` that came first.
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredBadNumberJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [row] -> do
+            objField row "status" `shouldBe` Just (String "error")
+            let diagnostics = show (objField row "diagnostics")
+            diagnostics `shouldSatisfy` ("lots" `isInfixOf`)
+            diagnostics `shouldNotSatisfy` ("25" `isInfixOf`)
+          other -> expectationFailure ("expected 1 row, got " ++ show (length other))
+
     it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
       -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
       -- and 42. Before #1012 the last four decoded to NOTHING or to
@@ -2220,6 +2292,24 @@ spec bin = do
       "...and also when the entry file is named bare"
       (checkFrom shadowImporterDir)
 
+    -- With the entry file named bare, the project root and the importing
+    -- file's directory are the same directory, so the root tier and the
+    -- importer-relative tier probe ONE file. The warning listed it twice, once
+    -- as [chosen] and once as [shadowed], which reads as a copy shadowing itself.
+    it "the shadow warning lists a copy once when two tiers name the same file" $ do
+      Output code sout serr <- checkFrom shadowSiblingDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr
+      serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
+      -- Two copies are visible, the project's prelude.l4 and the embedded
+      -- stdlib: two rows, the first chosen and the second shadowed.
+      let rows = [ l | l <- lines serr, "  [chosen]" `isPrefixOf` l || "  [shadowed]" `isPrefixOf` l ]
+      map (takeWhile (/= ']')) rows `shouldBe` ["  [chosen", "  [shadowed"]
+      length (filter ("prelude.l4" `isInfixOf`) rows) `shouldBe` 1
+
   -- smucclaw/l4-ide#971: an IMPORT that resolves to nothing has to say so, and a
   -- candidate URI has to read back as the path it was built from.
   --
@@ -2354,6 +2444,30 @@ spec bin = do
           filter ("file:" `isPrefixOf`) paths `shouldBe` []
           -- ...and no location is listed twice.
           nub (map asFile paths) `shouldBe` map asFile paths
+
+    -- Two rules resolve every IMPORT: the one that collects parser hints
+    -- (GetMixfixRegistry) and the one that collects typecheck dependencies
+    -- (GetImports). Each used to log "Module not found" at Warning, so one
+    -- mistake printed two warnings, and both landed in `--json` diagnostics.
+    it "warns once about an unresolved import, not once per rule that resolves it" $
+      sandbox "l4-import-missing-warns-once"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          let warning = "Module not found: zz no such module 971"
+              occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          Output _code _sout serr <- runIn dir ["check", "importer.l4"]
+          occurrences warning serr `shouldBe` 1
+          -- `l4 check --json` and `l4 run --json` carry the Warning lines in
+          -- `diagnostics`; each must carry this one once.
+          Output _ checkJson _ <- runIn dir ["check", "--json", "importer.l4"]
+          occurrences warning checkJson `shouldBe` 1
+          Output _ runJson _ <- runIn dir ["run", "--json", "importer.l4"]
+          occurrences warning runJson `shouldBe` 1
+          -- Positive control: `l4 ast` never typechecks, so the rule that
+          -- collects dependencies never runs, and the parser-hint rule is the
+          -- only one that tells you. One warning must not become none.
+          Output _ _ astErr <- runIn dir ["ast", "importer.l4"]
+          occurrences warning astErr `shouldBe` 1
 
   -- `l4 export` and the DMN engine checks. Called here rather than with the
   -- other backends below because this is where those describes have always

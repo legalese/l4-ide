@@ -82,6 +82,13 @@ module L4.Viz.AtomKey
   , mkKeyEnv
   , emptyKeyEnv
   , termKey
+  , termKeyWith
+  , textKey
+  , digestKey
+  , DigestStats (..)
+  , digestPrefix
+  , digestThreshold
+  , inlinedSize
   , atomIdOfKey
   , withTypeExpander
   , withLocalsInScope
@@ -92,16 +99,20 @@ module L4.Viz.AtomKey
 
 import Base
 import qualified Base.Text as Text
+import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as Text (encodeUtf8)
+import Numeric (showHex)
 import Optics
 
 import L4.Annotation (Anno_ (..), emptyAnno)
 import L4.Syntax
 import L4.TypeCheck.Environment (jsonDecodeUnique)
 import qualified L4.Transform as Transform (inlineLocalBindings, positionalCall)
+import qualified L4.Crypto.SHA1 as SHA1
 import qualified L4.Crypto.UUID5 as UUID5
+import qualified L4.Transform as Transform (Unfoldable (..), callees, pruneRecursive, unfoldableDecide)
 
 -- | What 'termKey' needs to know about the module a term comes from.
 data KeyEnv = MkKeyEnv
@@ -309,9 +320,168 @@ withLocalsInScope locals e
        in if seen' == seen then seen else grow seen'
     namesIn x = Set.fromList [getUnique r | r <- toList x, Map.member (getUnique r) defined]
 
+-- | The size, in expression nodes, past which a leaf is no longer keyed by the
+-- 'show' of its term. ASSUMED, NOT RULED (WHERE-INLINING-SPEC §10.1, R3c). Compared
+-- with the leaf's 'inlinedSize': the number of nodes of the leaf with its locals put
+-- in, which is the size of the term the key is a key OF.
+--
+-- The unit is expression nodes, not time. The largest leaf over every .l4 under
+-- jl4/examples that is not a deliberate error (537 files, 8,085 leaves),
+-- jl4-core/libraries and doc (130 files, 687 leaves), with its locals put in, is
+-- 313 nodes (measured 2026-10-12), and the largest with a local in it is 267; the
+-- threshold is the next power of two above four times the largest. A leaf at the
+-- threshold has a key of about 600,000 characters (305 a node, measured on a body
+-- of AND, NOT and variables).
+digestThreshold :: Int
+digestThreshold = 2048
+
+-- | How many expression nodes 'Transform.inlineLocalBindings' would leave of this
+-- term, worked out WITHOUT putting the locals in: a pass over the term, plus one
+-- evaluation of each local for each distinct set of argument sizes it is called
+-- with. The sizes saturate just above 'digestThreshold', so nothing here is ever
+-- exponential, and a result over the threshold means only "over".
+--
+-- An estimate, not the pass. It equals the real count for the body of every rule
+-- the ladder can draw under jl4/examples/ok and legal (jl4-lsp's AtomKeySizeSpec,
+-- which also requires more than ten of them to have a WHERE or a LET; canon
+-- agreed too, run once), and on the shapes in jl4-core's AtomKeySpec. Where it can
+-- differ is a declaration that STAYS (one that cannot be put in, or is still named
+-- after the calls are): which of the others it keeps is decided by a rule that can
+-- keep one more than the real pass does ('scope'). The exponential of a chain of
+-- locals is the one thing it never counts.
+inlinedSize :: Expr Resolved -> Int
+inlinedSize = inlinedSizeUpTo digestThreshold
+
+-- | 'inlinedSize' saturating just above the given limit instead.
+inlinedSizeUpTo :: Int -> Expr Resolved -> Int
+inlinedSizeUpTo limit expr = evalState (size Set.empty Map.empty expr) Map.empty
+  where
+    cap = limit + 1
+    clamp = min cap
+
+    -- Every local the term declares that can be put in, wherever it sits: names
+    -- are resolved to Uniques, so one flat map is as good as scoping.
+    usable :: Map Unique Transform.Unfoldable
+    usable =
+      Transform.pruneRecursive . Map.fromList $
+        [ p
+        | LocalDecide _ d <- concatMap localsOf (toListOf (cosmosOf (gplate @(Expr Resolved))) expr)
+        , Just p <- [Transform.unfoldableDecide d]
+        ]
+
+    localsOf = \case
+      Where _ _ ds -> ds
+      LetIn _ ds _ -> ds
+      _ -> []
+
+    -- @blocked@ are the locals whose calls are NOT put in here: inside a
+    -- declaration that stays, the pass that puts in its own scope's locals has
+    -- already run past it.
+    size :: Set Unique -> Map Unique Int -> Expr Resolved -> State (Map (Unique, [Int]) Int) Int
+    size blocked params e = case e of
+      Where _ body ds -> scope blocked params body ds
+      LetIn _ ds body -> scope blocked params body ds
+      -- a parameter is replaced by its argument, whole
+      App _ r [] | Just n <- Map.lookup (getUnique r) params -> pure n
+      _ | Just (r, args) <- Transform.positionalCall e
+        , not (Set.member (getUnique r) blocked)
+        , Just (Transform.MkUnfoldable ps body) <- Map.lookup (getUnique r) usable
+        , length args == length ps -> do
+            sizes <- traverse (size blocked params) args
+            call (getUnique r) ps body sizes
+      _ -> do
+        ks <- traverse (size blocked params) (toListOf (gplate @(Expr Resolved)) e)
+        pure (clamp (1 + sum ks))
+
+    -- A scope disappears when every local in it is put in and none is named again;
+    -- otherwise it stays round the body, with the declarations that are left. Those
+    -- are the ones that cannot be put in, and the ones that can but are still named
+    -- after the calls are replaced: a call at another arity (a local passed as a
+    -- value), or a mention in a declaration that stays. This takes every mention in
+    -- the body and the local bodies, whether or not the call it sits in is
+    -- replaced, so it can keep a declaration that 'Transform.inlineLocalBindings'
+    -- drops.
+    scope blocked params body ds = do
+      b <- size blocked params body
+      let here = Map.fromList [(u, length ps) | d <- ds, Just (u, Transform.MkUnfoldable ps _) <- [unfoldable d], Map.member u usable]
+          stays = [d | d <- ds, not (putIn d)]
+          bodiesPutIn = [e | d <- ds, Just (u, Transform.MkUnfoldable _ e) <- [unfoldable d], Map.member u usable]
+          named =
+            foldMap (offArity here) (body : bodiesPutIn)
+              <> foldMap Transform.callees [e | d <- stays, e <- toListOf (gplate @(Expr Resolved)) d]
+          stillNamed = [d | d <- ds, putIn d, Just (u, _) <- [unfoldable d], Set.member u named]
+          left = stays <> stillNamed
+      ks <- traverse (declSize (blocked <> Map.keysSet here) params) left
+      pure (clamp (if null left then b else 1 + b + sum ks))
+
+    unfoldable = \case
+      LocalDecide _ d -> Transform.unfoldableDecide d
+      _ -> Nothing
+
+    putIn d = case unfoldable d of
+      Just (u, _) -> Map.member u usable
+      Nothing -> False
+
+    declSize blocked params d = sum <$> traverse (size blocked params) (toListOf (gplate @(Expr Resolved)) d)
+
+    -- The memo is keyed by the callee and the sizes of its arguments: the size of
+    -- a call depends on nothing else about them.
+    call u ps body sizes = do
+      memo <- get
+      case Map.lookup (u, sizes) memo of
+        Just n -> pure n
+        Nothing -> do
+          n <- size Set.empty (Map.fromList (zip ps sizes)) body
+          modify' (Map.insert (u, sizes) n)
+          pure n
+
+-- | The locals of the given arities (by Unique) that the expression names other
+-- than by a call with exactly that many arguments: a local passed as a value, or
+-- called with too few or too many. Such a local is not put in at that name, so it
+-- stays.
+offArity :: Map Unique Int -> Expr Resolved -> Set Unique
+offArity here = foldMapOf (cosmosOf (gplate @(Expr Resolved))) \e ->
+  case e of
+    App _ r _ -> check r e
+    AppNamed _ r _ _ -> check r e
+    _ -> Set.empty
+  where
+    check r e = case Map.lookup (getUnique r) here of
+      Just arity | maybe True ((/= arity) . length . snd) (Transform.positionalCall e) -> Set.singleton (getUnique r)
+      _ -> Set.empty
+
 -- | The C1 key of a term (see the module header).
+--
+-- A key is a function of the TREE the leaf means: the leaf with its locals put in.
+-- Two spellings of one tree (a @LET@, and its body written out where it is used)
+-- have one key. Which form the key takes depends only on the size of that tree
+-- ('digestThreshold'):
+--
+-- * at or under it, the key is 'textKey': the 'show' of the tree, as it has
+--   always been, so no id that exists moves;
+-- * over it, the key is 'digestKey': 'digestPrefix' and a digest of the same tree
+--   computed without building it, which a chain of locals that each name the
+--   previous one twice (exponential once put in, linear in the source) needs.
+--
+-- 'digestKey' declines a term it cannot digest exactly (see there), and such a
+-- term is keyed by 'textKey' at any size: exponentially, if it is a doubling
+-- chain that ALSO has a recursive local, or a local passed as a value, or a
+-- binder of its own (a lambda, a quantifier, a pattern variable).
 termKey :: KeyEnv -> Expr Resolved -> Text
-termKey env expr =
+termKey = termKeyWith digestThreshold
+
+-- | 'termKey' with the threshold given, so a test can reach the digest on a term
+-- too small to need it.
+termKeyWith :: Int -> KeyEnv -> Expr Resolved -> Text
+termKeyWith threshold env expr
+  | inlinedSizeUpTo threshold expr > threshold
+  , Just (key, _) <- digestKey env expr =
+      key
+  | otherwise = textKey env expr
+
+-- | The key of a term as the 'show' of the term with its locals put in.
+textKey :: KeyEnv -> Expr Resolved -> Text
+textKey env expr =
   Text.pack (show (fmap nameKey normalised)) <> decodes
   where
     -- A local binding inside the term (a LET, or the WHERE that
@@ -337,20 +507,25 @@ termKey env expr =
       , getUnique r == jsonDecodeUnique
       ]
 
-    nameKey r =
-      let u = getUnique r
-       in if
-            | u.moduleUri == boundUri -> "bound#" <> Text.pack (show u.unique)
-            | u.moduleUri == supplyUri -> Text.pack (show ("WITH" :: Text, nameText r))
-            | u.moduleUri == env.thisModule ->
-                fromMaybe
-                  (Text.pack (show (unmappedMarker, nameText r, u.sort, u.unique)))
-                  (Map.lookup u env.paths)
-            | otherwise ->
-                Text.pack
-                  (show
-                    ( Map.findWithDefault (uriTail u.moduleUri) u.moduleUri env.modules
-                    , nameText r, u.sort, u.unique ))
+    nameKey = nameKeyIn env
+
+-- | How a key names a name. See 'termKey'.
+nameKeyIn :: KeyEnv -> Resolved -> Text
+nameKeyIn env r =
+  let u = getUnique r
+   in if
+        | u.moduleUri == boundUri -> "bound#" <> Text.pack (show u.unique)
+        | u.moduleUri == supplyUri -> Text.pack (show ("WITH" :: Text, nameText r))
+        | u.moduleUri == holeUri -> "child#"
+        | u.moduleUri == env.thisModule ->
+            fromMaybe
+              (Text.pack (show (unmappedMarker, nameText r, u.sort, u.unique)))
+              (Map.lookup u env.paths)
+        | otherwise ->
+            Text.pack
+              (show
+                ( Map.findWithDefault (uriTail u.moduleUri) u.moduleUri env.modules
+                , nameText r, u.sort, u.unique ))
 
 -- | An inference variable carries the checker's counter, which moves whenever
 -- anything checked before it changes; an untyped lambda's parameter type is one.
@@ -370,7 +545,11 @@ eraseInfVars = transformOf (gplate @(Type' Resolved)) $ \case
 -- a parameter, and such a call keeps its named form, with each supply keyed by
 -- the name it supplies.
 positional :: Expr Resolved -> Expr Resolved
-positional = transformOf (gplate @(Expr Resolved)) $ \case
+positional = transformOf (gplate @(Expr Resolved)) positionalStep
+
+-- | 'positional' at one node.
+positionalStep :: Expr Resolved -> Expr Resolved
+positionalStep = \case
   call@(AppNamed ann f _ _)
     | Just (_, args) <- Transform.positionalCall call -> App ann f args
   -- Some arguments supply section binders (a negative entry). The checker
@@ -428,6 +607,10 @@ boundUri = toNormalizedUri (Uri "jl4:bound")
 supplyUri :: NormalizedUri
 supplyUri = toNormalizedUri (Uri "jl4:supply")
 
+-- | Where the stand-in for a child expression lives ('digestKey'). No module has it.
+holeUri :: NormalizedUri
+holeUri = toNormalizedUri (Uri "jl4:child")
+
 -- | The binders an expression node defines itself, not inside one of its child
 -- expressions: a lambda's parameters, a pattern's variables, a @WHERE@'s or
 -- @LET@'s local names and their parameters. In order, with repeats.
@@ -466,3 +649,161 @@ firstOccurrences = go Set.empty
     go seen (x : xs)
       | Set.member x seen = go seen xs
       | otherwise = x : go (Set.insert x seen) xs
+
+------------------------------------------------------------------------
+-- The digest key
+------------------------------------------------------------------------
+
+-- | What 'digestKey' did, for the tests: counts, so that a test can say how the
+-- work grows without timing anything.
+data DigestStats = MkDigestStats
+  { callsEvaluated :: !Int
+  -- ^ A local evaluated, once for each distinct set of argument digests it is
+  -- called with.
+  , nodesDigested :: !Int
+  -- ^ Nodes of the term, and of the bodies of the locals, digested.
+  }
+  deriving stock (Eq, Show)
+
+-- | Begins every 'digestKey'. No 'textKey' begins with it: a 'textKey' is the
+-- 'show' of an 'Expr', and that begins with the name of a constructor, which is a
+-- capital letter. So the two kinds of key can never be equal, and a reader can
+-- tell them apart.
+digestPrefix :: Text
+digestPrefix = "~"
+
+data Walk = MkWalk
+  { memo :: !(Map (Unique, [BS.ByteString]) BS.ByteString)
+  , calls :: !Int
+  , nodes :: !Int
+  }
+
+-- | The key of a term as a digest of the tree it means, worked out without
+-- building the tree: 'Nothing' for a term this cannot do exactly.
+--
+-- The tree is the term with its locals put in (what 'textKey' shows). A node's
+-- digest is a hash of the node with each child expression replaced by a stand-in
+-- (its 'show', the same one 'textKey' is made of), and of its children's digests,
+-- in order. A reference to a local, or a call of one, has the digest of the local's
+-- body with the arguments' digests in place of its parameters, and that is
+-- remembered by the local and the digests it was given. So a chain of locals that
+-- each name the previous one twice digests each local once, not twice each time.
+-- Because the digest of a node does not depend on how its child was written, a
+-- @LET@ and its body written out where it is used have one digest, as they have
+-- one 'textKey'.
+--
+-- What it declines ('Nothing'), after which the term is keyed by 'textKey', which
+-- for a chain of locals is exponential:
+--
+-- * a local that cannot be put in (a recursive one, or one that applies a
+--   parameter as a function), or one put in at one name and not another (a local
+--   passed as a value), because such a local stays in the tree, with its
+--   definition, and this does not digest that;
+-- * two declarations of one Unique, which happens when the same local is copied by
+--   unfolding two calls, and means the one definition 'locals' would find is not
+--   always the right one;
+-- * a binder of the term's own (a lambda, a quantifier, a pattern variable). The
+--   key names a bound variable by how many binders enclose it, so the digest of a
+--   subterm depends on where it is put, and a local's body or an argument is put
+--   in several places. Without binders there is nothing to name by depth.
+--
+-- Not covered here, and wanted when @fieldReads@ lands (R3b): it rewrites a node
+-- before the annotations go, so it belongs in 'digestKey' in the same place, at
+-- the node, before 'stripNode'.
+digestKey :: KeyEnv -> Expr Resolved -> Maybe (Text, DigestStats)
+digestKey env expr
+  | not eligible = Nothing
+  | otherwise =
+      let (root, w) = runState (digest Map.empty expr) (MkWalk Map.empty 0 0)
+       in Just (digestPrefix <> hexDigest root, MkDigestStats w.calls w.nodes)
+  where
+    decls = concat [ds | e <- toListOf (cosmosOf (gplate @(Expr Resolved))) expr, ds <- [declsOf e]]
+    declsOf = \case
+      Where _ _ ds -> ds
+      LetIn _ ds _ -> ds
+      _ -> []
+
+    unfoldables = [p | LocalDecide _ d <- decls, Just p <- [Transform.unfoldableDecide d]]
+    locals :: Map Unique Transform.Unfoldable
+    locals = Map.fromList unfoldables
+
+    eligible =
+      length unfoldables == length decls
+        && Map.size locals == length decls
+        && Map.size (Transform.pruneRecursive locals) == Map.size locals
+        && Set.null (offArity (Map.map (\(Transform.MkUnfoldable ps _) -> length ps) locals) expr)
+        && all binderFree (toListOf (cosmosOf (gplate @(Expr Resolved))) expr)
+
+    -- a node other than a scope defines no name of its own
+    binderFree = \case
+      Where {} -> True
+      LetIn {} -> True
+      e -> not (any isDef (toList (withHoles e)))
+    isDef = \case
+      Def {} -> True
+      _ -> False
+
+    -- The digest of an expression, given the digests of the parameters in scope.
+    digest :: Map Unique BS.ByteString -> Expr Resolved -> State Walk BS.ByteString
+    digest params e = case e of
+      -- a scope puts its locals in, and is not itself in the tree
+      Where _ body _ -> digest params body
+      LetIn _ _ body -> digest params body
+      App _ r [] | Just d <- Map.lookup (getUnique r) params -> pure d
+      _
+        | Just (r, args) <- Transform.positionalCall e
+        , Just (Transform.MkUnfoldable ps body) <- Map.lookup (getUnique r) locals -> do
+            ds <- traverse (digest params) args
+            call (getUnique r) ps body ds
+        | otherwise -> node params e
+
+    node params e = do
+      let e' = positionalStep e
+      ds <- traverse (digest params) (toListOf (gplate @(Expr Resolved)) e')
+      modify' (\w -> w {nodes = w.nodes + 1})
+      pure (combine (shape e') ds)
+
+    call u ps body ds = do
+      w <- get
+      case Map.lookup (u, ds) w.memo of
+        Just d -> pure d
+        Nothing -> do
+          modify' (\w' -> w' {calls = w'.calls + 1})
+          d <- digest (Map.fromList (zip ps ds)) body
+          modify' (\w' -> w' {memo = Map.insert (u, ds) d w'.memo})
+          pure d
+
+    -- The node as 'textKey' would show it, less its children: annotations gone,
+    -- inference variables erased, and what a JSONDECODE decodes into put back.
+    shape :: Expr Resolved -> Text
+    shape e =
+      Text.pack (show (fmap (nameKeyIn env) (stripNode (withHoles e)))) <> decoded
+      where
+        decoded = case e of
+          App (Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}}) r _
+            | getUnique r == jsonDecodeUnique ->
+                "|decodes " <> Text.pack (show (fmap (nameKeyIn env) (stripType (env.expandType ty))))
+          _ -> ""
+
+    stripNode = over (gplate @(Type' Resolved)) eraseInfVars . over (gplate @Anno) (const emptyAnno)
+    stripType = eraseInfVars . over (gplate @Anno) (const emptyAnno)
+
+-- | The node with each child expression replaced by one fixed stand-in, which
+-- 'nameKeyIn' shows as @child#@.
+withHoles :: Expr Resolved -> Expr Resolved
+withHoles = over (gplate @(Expr Resolved)) (const hole)
+  where
+    hole = App emptyAnno (Ref n (MkUnique 'h' 0 holeUri) n) []
+    n = MkName emptyAnno (NormalName "child")
+
+-- | A node's digest from its shape and its children's digests. The shape is given
+-- its length first, so that no two (shape, children) pairs hash the same bytes.
+combine :: Text -> [BS.ByteString] -> BS.ByteString
+combine sh ds = SHA1.sha1 (BS.concat ([Text.encodeUtf8 (Text.pack (show (BS.length bytes) <> ":")), bytes] <> ds))
+  where
+    bytes = Text.encodeUtf8 sh
+
+hexDigest :: BS.ByteString -> Text
+hexDigest = Text.pack . concatMap byte . BS.unpack
+  where
+    byte b = let h = showHex b "" in if length h == 1 then '0' : h else h

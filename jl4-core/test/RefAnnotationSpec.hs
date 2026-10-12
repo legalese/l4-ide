@@ -7,6 +7,7 @@ import qualified Data.Text as Text
 import Base
 import L4.Annotation (getAnno)
 import L4.Parser (execProgramParserWithHintPass)
+import L4.Parser.ResolveAnnotation (Warning (..), WithSpan (..))
 import L4.Syntax
   ( Decide (..)
   , Expr (..)
@@ -55,6 +56,23 @@ decideBodyRefs' uriStr src = do
         [ (body, fmap getRef (view annRef (getAnno body)))
         | Decide _ (MkDecide _ _ _ body) <- decls
         ]
+
+-- | Parse a source snippet and return the last path segment of the @\@ref@
+-- (if any) on each top-level declaration, and of each @\@ref@ reported as
+-- not attached to anything, in the order reported.
+declRefsAndUnattached :: Text -> IO ([Maybe Text], [Text])
+declRefsAndUnattached src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-unattached")
+      segment = Text.takeWhileEnd (/= '/') . Text.strip . getRef
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, warnings) ->
+      pure
+        ( [ fmap segment (view annRef (getAnno d)) | d <- decls ]
+        , [ segment w.payload | RefUnattached w <- warnings ]
+        )
 
 spec :: Spec
 spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
@@ -113,6 +131,26 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       Just t  -> t `shouldSatisfy` Text.isInfixOf "section-leading"
       Nothing ->
         expectationFailure "Expected the leading @ref to attach to the first declaration"
+
+  -- A node's 'Anno' carries one 'Ref'. When several precede the same node the
+  -- nearest is attached and each of the others is reported, in source order;
+  -- so is one with no node after it. The pending refs are kept in the order
+  -- they end, and each node claims those that precede it from the front of
+  -- that list, so a mistake in keeping the order would show here: as a ref on
+  -- the wrong node, or one reported that should have attached.
+  it "attaches the nearest of several @refs before a node, and reports the others" $ do
+    (attached, unattached) <-
+      declRefsAndUnattached $
+        Text.unlines
+          [ "@ref https://example.com/one"
+          , "@ref https://example.com/two"
+          , "DECIDE a IS 1"
+          , "@ref https://example.com/three"
+          , "DECIDE b IS 2"
+          , "@ref https://example.com/four"
+          ]
+    attached `shouldBe` [Just "two", Just "three"]
+    unattached `shouldBe` ["one", "four"]
 
   -- The inline `<<…>>` form shares its lexer with `@nlg`'s `[…]` form only in
   -- the sense that both are "an annotation between heralds". They must NOT
