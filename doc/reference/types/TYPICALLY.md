@@ -265,7 +265,7 @@ A default is a **literal**, and it is checked when it is written:
 - It must be a literal, a fixed value written out: a number, a piece of text, or
   a bare name such as `TRUE`, `FALSE`, `NOTHING` or a constructor of an
   enumeration (`colour IS A Colour TYPICALLY Red`). Anything else is an error:
-  a calculation (`TYPICALLY (a PLUS 1)`), a name of another input or of a
+  a calculation (`TYPICALLY (1 PLUS 2)`), a name of another input or of a
   definition, a call, `JUST 5` (`x IS A BOOLEAN TYPICALLY (a AND b)` is the
   same error). A default that names something that does not exist is reported
   once, as that.
@@ -273,6 +273,12 @@ A default is a **literal**, and it is checked when it is written:
   usual value; it is not the place to work something out. When the usual value
   depends on other facts, write it as the page shows in
   [When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts).
+  The error says so: it ends by suggesting that the logic go inside a decision
+  function's `OTHERWISE` branch, with a `MAYBE` input that is usually `NOTHING`.
+  That advice shows for a default written in parentheses, such as
+  `TYPICALLY (1 PLUS 2)`; without the parentheses, `TYPICALLY 1 PLUS 2` or
+  `TYPICALLY Circle OF 3` stops earlier, in the parser ("unexpected PLUS",
+  "unexpected OF"), and does not give it.
 - It requires an explicit type: the name must carry an `IS A Type` annotation so
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a

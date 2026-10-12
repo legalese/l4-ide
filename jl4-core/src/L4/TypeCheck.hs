@@ -8367,6 +8367,10 @@ prettyCheckError (SuppliedComputedField fieldName) =
 prettyCheckError (TypicallyValueNotALiteral n) =
   [ "The TYPICALLY value for " <> quotedName n <> " must be a literal:"
   , "a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING."
+  , "If the usual value needs an expression, consider locating this sort of logic"
+  , "inside a decision function's OTHERWISE branch:"
+  , "declare the input IS A MAYBE … TYPICALLY NOTHING, and read it with"
+  , "CONSIDER … WHEN JUST v THEN v OTHERWISE <the expression>."
   ]
 prettyCheckError (TypicallyRequiresType n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."

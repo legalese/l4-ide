@@ -429,7 +429,10 @@ line is a check error reporting `` `the closing date` `` and `` `the offer date`
 Name every input, as above. **Not** a `TYPICALLY` default to make one reading win: a
 `TYPICALLY` value must be a literal, and `` `the staff reading` `` is a defined name of record type,
 so the typechecker rejects it — _"The TYPICALLY value for `the reading` must be a literal: a number,
-a string, or a nullary constructor such as TRUE, FALSE or NOTHING."_ A constructor of your own
+a string, or a nullary constructor such as TRUE, FALSE or NOTHING. If the usual value needs an
+expression, consider locating this sort of logic inside a decision function's OTHERWISE branch:
+declare the input IS A MAYBE … TYPICALLY NOTHING, and read it with CONSIDER … WHEN JUST v THEN v
+OTHERWISE <the expression>."_ A constructor of your own
 `ONE OF` type is a literal and is accepted, so a reading modelled as a bare enum could carry one —
 and a `WITH` call that left the input out would then take that reading without anyone having
 chosen it, which is the next **Not**. **Not**, above all, silently picking a reading and presenting it as the text.
