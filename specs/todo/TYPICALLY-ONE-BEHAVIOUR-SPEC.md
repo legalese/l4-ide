@@ -636,7 +636,9 @@ Before that review, two claims of the author's own were corrected before commit:
 ### 4.4 W10 restacked on HAIRCUT (2026-10-12)
 
 Built in `restack/w10-haircut`, on top of `restack/w7-haircut`.
-It is documentation and records, with no code: `git diff --stat restack/w7-haircut..restack/w10-haircut` lists files under `doc/` and `specs/todo/` only.
+Besides its documentation and records it carries two pieces of code: #557's printer fix (`65e6b3bf6`, with its tests, from `restack/w7-haircut`) and one comment-only change in `jl4-core/src/L4/Discharge.hs` (R8 rule 3 will not be lifted; `66f34021e`).
+`git diff --stat restack/w7-haircut..restack/w10-haircut` lists files under `doc/` and `specs/todo/` and that one comment.
+The hint at the end of the literal-default check error arrives through #551 (`1747606b1`), not through this branch.
 It restacks #558 (`feat/typically-w10`: the 16 commits of `origin/feat/typically-w7..origin/feat/typically-w10`) on the literal-only `TYPICALLY` that HAIRCUT ruled (§4), so everything that assumed an expression default is dropped or rewritten.
 
 **What each of W10's items became.**
