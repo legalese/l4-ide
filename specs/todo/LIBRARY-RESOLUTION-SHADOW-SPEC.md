@@ -225,6 +225,18 @@ path** (`Paths_jl4_core.getDataDir </> "libraries"`, resolved by the TH splice a
 This is a documentation/known-gotcha item, not a code change. Any option below that
 leans on the embedded copy must state this caveat where devs will read it.
 
+> **Corrected 2026-10-13 (measured; the mechanism above was drifted).** For a
+> checkout built with `cabal build` (GHC 9.10.3, Cabal 3.16) the datadir the
+> splice resolves **is the checkout**: GHC records
+> `<checkout>/jl4-core/libraries/<name>.l4` with a content hash, and recompiles
+> `L4.API.EmbeddedLibraries` when one changes. The bullet "unless that worktree's
+> datadir is the one `getDataDir` resolves to" therefore describes the normal case,
+> not an exception. The staleness is real but sits one step earlier: after an edit
+> to `libraries/*.l4` alone, `cabal build` prints `Up to date` and never calls GHC.
+> Any real change to a `jl4-core` source file does, and the embed then refreshes;
+> `touch` does not. Measurement and wording:
+> `doc/reference/libraries/resolution.md`, "The embed-staleness gotcha".
+
 ---
 
 ## 4. Options

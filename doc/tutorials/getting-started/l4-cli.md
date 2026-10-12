@@ -287,10 +287,11 @@ When a file says `IMPORT daydate` (or `time`, `currency`, ...), the tools resolv
 1. The `JL4_LIBRARY_PATH` environment variable (user/operator override)
 2. The project root directory
 3. The directory of the importing file
-4. The XDG data directory (`~/.local/share/jl4/libraries/`)
-5. The libraries bundled with the VS Code extension
+4. The standard library built into the `l4` you are running
+5. The XDG data directory (`~/.local/share/jl4/libraries/`)
+6. The libraries bundled with the VS Code extension
 
-When `JL4_LIBRARY_PATH` is set, it takes explicit control: the embedded fallback libraries are skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
+When `JL4_LIBRARY_PATH` is set, it takes explicit control: the built-in standard library is skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
 
 ```bash
 JL4_LIBRARY_PATH=jl4-core/libraries l4 run myfile.l4
