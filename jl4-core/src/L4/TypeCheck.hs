@@ -2188,8 +2188,7 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
   -- the clauses after it are never used ('warnUnreachableClauses'). When
   -- only some are, the OTHERWISE of the column with the new name is dead,
   -- but the clauses after it are still reached through another column's
-  -- test, so there is nothing to tell the drafter. (Unstable's analysis
-  -- never flags an OTHERWISE, so it needs no such exception.)
+  -- test, so there is nothing to tell the drafter.
   unless (null redundant || isPrimitiveScrutinee || isJust generated) do
     addWarning $ PatternMatchRedundant redundant
 
@@ -2203,10 +2202,13 @@ considerWithoutLiterals generated leftToClauseMatrix re te rbranches = do
 -- EXACTLY whose expression mentions a name the scrutinee mentions stands it
 -- down too. A missing case is a WHEN, or OTHERWISE where the scrutinee
 -- itself is left open. An arm is redundant when the arms above it match
--- everything it matches ('coveredBy'); an arm that matches anything
--- (OTHERWISE, a new name) is never reported, as unstable never reports one,
--- and the arms of a CONSIDER that a multi-clause group compiles to are left
--- to 'checkClauseMatrix', as below.
+-- everything it matches ('coveredBy'). An arm that matches anything
+-- (OTHERWISE, a new name) is redundant when an arm above it matches
+-- anything too; after arms that only name every constructor it is a
+-- defensive catch-all, which is not reported, as main's own analysis
+-- ('considerWithoutLiterals') does not report it. The arms of a CONSIDER
+-- that a multi-clause group compiles to are left to 'checkClauseMatrix', as
+-- below.
 --
 -- When the missing-case analysis stands down or gives up, the first
 -- argument, if there is one, analyses the CONSIDER instead, and this one
@@ -2243,8 +2245,10 @@ considerWithLiterals ifGivenUp generated leftToClauseMatrix re te rbranches = do
         Just rowsM ->
           [ b
           | (i, b, Just p) <- List.zip3 [0 ..] rbranches rowsM
-          , not (isWildcard p)
-          , coveredBy families [ [q] | Just q <- take i rowsM ] [p] == Just True
+          , let above = take i rowsM
+          , if isWildcard p
+              then any (maybe False isWildcard) above
+              else coveredBy families [ [q] | Just q <- above ] [p] == Just True
           ]
         Nothing -> []
       isWildcard = \ case

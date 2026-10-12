@@ -22,6 +22,7 @@ spec = do
   clauseSpec
   considerSpec
   plainConsiderSpec
+  redundantCatchAllSpec
 
 clauseSpec :: Spec
 clauseSpec = describe "Multi-clause DECIDE: missing-case warning" $ do
@@ -1418,6 +1419,169 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       ]
     length (missingArms ws) `shouldSatisfy` (> 64)
 
+-- | A branch that matches anything, after a branch that already does, is
+-- redundant: an OTHERWISE, a new name, a wildcard, or an EXACTLY of the
+-- scrutinee itself. It is reported by the clauses' engine and by main's own
+-- analysis alike, and never for the OTHERWISE that a multi-clause group is
+-- compiled with, which nobody wrote.
+redundantCatchAllSpec :: Spec
+redundantCatchAllSpec = describe "CONSIDER: a branch that matches anything after one that already does" $ do
+  let tier body = Text.unlines $
+        [ "DECLARE Tier IS ONE OF Basic, Gold"
+        , "DECLARE Colour IS ONE OF Red, Green, Blue"
+        , ""
+        , "GIVEN t IS A Tier"
+        , "      m IS A MAYBE NUMBER"
+        , "      n IS A NUMBER"
+        , "      c IS A Colour"
+        , "GIVETH A NUMBER"
+        ] <> body
+
+  it "reports an OTHERWISE after a new name, over an enumeration" $ do
+    ws <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER t"
+      , "  WHEN v THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    redundantArms ws `shouldBe` ["OTHERWISE 2"]
+    missingArms ws `shouldBe` []
+
+  it "reports it over a MAYBE too" $ do
+    ws <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER m"
+      , "  WHEN v THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    redundantArms ws `shouldBe` ["OTHERWISE 2"]
+
+  it "reports it after a wildcard" $ do
+    ws <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER t"
+      , "  WHEN `_` THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    redundantArms ws `shouldBe` ["OTHERWISE 2"]
+
+  it "reports it after an EXACTLY of the scrutinee itself, with or without a number before it" $ do
+    bare <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER n"
+      , "  WHEN EXACTLY n THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    redundantArms bare `shouldBe` ["OTHERWISE 2"]
+    keyed <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER n"
+      , "  WHEN 0 THEN 1"
+      , "  WHEN EXACTLY n THEN 2"
+      , "  OTHERWISE 3"
+      ]
+    redundantArms keyed `shouldBe` ["OTHERWISE 3"]
+
+  it "reports a second new name, and a second OTHERWISE" $ do
+    names <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER t"
+      , "  WHEN v THEN 1"
+      , "  WHEN w THEN 2"
+      ]
+    redundantArms names `shouldBe` ["WHEN w THEN 2"]
+    twice <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER n"
+      , "  WHEN 0 THEN 1"
+      , "  OTHERWISE 2"
+      , "  OTHERWISE 3"
+      ]
+    redundantArms twice `shouldBe` ["OTHERWISE 3"]
+
+  it "reports it in main's own analysis too, where an arm names NOTHING" $ do
+    ws <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER m"
+      , "  WHEN NOTHING THEN 0"
+      , "  WHEN v THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    redundantArms ws `shouldBe` ["OTHERWISE 2"]
+
+  it "does not report an OTHERWISE after branches that leave something over" $ do
+    colour <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER c"
+      , "  WHEN Red THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    colour `shouldBe` []
+    number <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER n"
+      , "  WHEN 0 THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    number `shouldBe` []
+
+  it "does not report an OTHERWISE after branches that name every constructor" $ do
+    -- A defensive catch-all, which main's own analysis has never reported.
+    enumeration <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER t"
+      , "  WHEN Basic THEN 1"
+      , "  WHEN Gold THEN 2"
+      , "  OTHERWISE 3"
+      ]
+    enumeration `shouldBe` []
+    maybes <- considerWarnings $ tier
+      [ "f t m n c MEANS"
+      , "  CONSIDER m"
+      , "  WHEN NOTHING THEN 0"
+      , "  WHEN JUST v THEN v"
+      , "  OTHERWISE 9"
+      ]
+    maybes `shouldBe` []
+
+  it "does not report the OTHERWISE a multi-clause group is compiled with" $ do
+    -- `other` and `rest` are new names, which match anything, so the
+    -- OTHERWISE after each in the CONSIDER its clause compiles to matches
+    -- nothing. The group says so in its own terms, as a clause never used.
+    ws <- warnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Gold"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE size 0     IS 1"
+      , "DECIDE size other IS 2"
+      , "DECIDE size 1     IS 3"
+      , ""
+      , "GIVEN t IS A Tier"
+      , "      k IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "DECIDE price Basic k IS 1"
+      , "DECIDE price rest  k IS 2"
+      , "DECIDE price Gold  k IS 3"
+      ]
+    filter (mentions "redundant") ws `shouldBe` []
+    length (filter (mentions "is never used") ws) `shouldBe` 2
+
+  it "reports an OTHERWISE written inside the body of a clause" $ do
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Tier IS ONE OF Basic, Gold"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "      t IS A Tier"
+      , "GIVETH A NUMBER"
+      , "DECIDE inBody 0 t IS"
+      , "  CONSIDER t"
+      , "  WHEN v THEN 1"
+      , "  OTHERWISE 2"
+      , "DECIDE inBody n t IS n"
+      ]
+    redundantArms ws `shouldBe` ["OTHERWISE 2"]
+
 -- ----------------------------------------------------------------------------
 
 -- | Every warning of a module, as (range, rendered lines), the range as
@@ -1470,6 +1634,14 @@ considerWarnings :: Text -> IO [(Maybe (Int, Int, Int), [Text])]
 considerWarnings src = filter isConsiderWarning <$> warnings src
   where
     isConsiderWarning w = mentions "still need to be considered" w || mentions "redundant" w
+
+-- | The arms the redundant-branch warnings name, trimmed.
+redundantArms :: [(Maybe (Int, Int, Int), [Text])] -> [Text]
+redundantArms ws =
+  [ t
+  | w@(_, ls) <- ws, mentions "redundant" w
+  , l <- ls, let t = Text.strip l, "WHEN " `Text.isPrefixOf` t || "OTHERWISE" `Text.isPrefixOf` t
+  ]
 
 -- | The suggested arms of the CONSIDER warnings, trimmed.
 missingArms :: [(Maybe (Int, Int, Int), [Text])] -> [Text]
