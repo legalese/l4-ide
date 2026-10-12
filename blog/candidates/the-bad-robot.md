@@ -1,23 +1,25 @@
 ---
 title: "From the Bad Man to the Bad Robot: Can Executable Law Constrain AI Agents?"
 status: draft
-date: 2026-10-08
+date: 2026-10-12
 facet: formal-methods-in-law
-words: 2491
+words: 2500
 license: CC-BY-NC-4.0
 sources_checked: "not rechecked for this replacement"
 audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
 ---
 
-**STATUS 2026-10-08: DRAFT — PROPOSED COLLABORATIVE REVISION FOR DISCUSSION WITH MENG WENG WONG.**
+**STATUS 2026-10-12: DRAFT — COLLABORATIVE WORKING DRAFT FOR REVIEW.**
 
 # From the Bad Man to the Bad Robot: Can Executable Law Constrain AI Agents?
 
+_A collaboration between Aryeh Shebson and Meng Weng Wong._
+
 Epistemic status: Research proposal, not an experimental result. The L4-backed compliance experiment is untested; the GRAM-inspired legal-lobe extension is more speculative. Formal guarantees would be relative to explicit specifications and assumptions.
 
-**TL;DR:** We need to help AI agents follow the law, and help prepare the law for AI agents. Executable representations of narrow legal rules may reduce some compliance failures; formal analysis may also expose ambiguities and loopholes for lawmakers to repair. I propose comparing the same agent given prose rules, access to an L4-backed checker, or a checker enforced at execution with duty monitoring. Assessment must be independent of the checker: accepting an action does not establish that it complies with the law or its purpose.
+**TL;DR:** We need to help AI agents follow the law, and help prepare the law for AI agents. Executable representations of narrow legal rules may reduce some compliance failures; formal analysis may also expose ambiguities and loopholes for lawmakers to repair. We propose comparing the same agent given prose rules, access to an L4-backed checker, or a checker enforced at execution with duty monitoring. Assessment must be independent of the checker: accepting an action does not establish that it complies with the law or its purpose.
 
-This proposal draws on Meng Weng Wong’s draft, [“Holmes’s bad man is a robot now”](https://github.com/legalese/l4-ide/blob/7d260a4089be4689ad39eb840e388691b823dc39/blog/candidates/the-bad-robot.md), especially its argument that law has accumulated experience with adversarial readers, and its proposal to make executable law available to both agents and their monitors. The experiment and legal-lobe extension below develop that discussion; they should not be read as Meng’s endorsement of these proposals.
+This collaboration builds on Meng Weng Wong’s earlier draft, [“Holmes’s bad man is a robot now”](https://github.com/legalese/l4-ide/blob/7d260a4089be4689ad39eb840e388691b823dc39/blog/candidates/the-bad-robot.md), especially its argument that law has accumulated experience with adversarial readers, and its proposal to make executable law available to both agents and their monitors. The experiment and legal-lobe extension below develop that discussion and remain proposals for joint review as we work on this draft.
 
 ## The question: knowing the law or constraining action?
 
@@ -42,7 +44,7 @@ Meng points to a useful cognitive-science parallel. In a familiar version of Was
 
 ## Why law, and what needs formalizing?
 
-An agent handling purchases, customer records or outbound messages faces constraints that depend on the activity and jurisdiction. Meng argues that public law supplies an institutional source for those constraints that a model developer’s policy cannot replace. I think this is a reason to connect agents to legal institutions and their revision processes. It does not make every law legitimate or every lawful action safe; lab policies and other safeguards still have work to do.
+An agent handling purchases, customer records or outbound messages faces constraints that depend on the activity and jurisdiction. Meng argues that public law supplies an institutional source for those constraints that a model developer’s policy cannot replace. This gives us a reason to connect agents to legal institutions and their revision processes. It does not make every law legitimate or every lawful action safe; lab policies and other safeguards still have work to do.
 
 The law’s wording can itself leave an important choice unresolved. Meng uses _O’Connor v. Oakhurst Dairy_ to illustrate this: the dispute turned on whether an overtime exemption included distribution as a separate activity, or only packing for shipment or distribution. His two L4 encodings make those groupings explicit and return different answers for a worker who distributes without packing.[^oakhurst]
 
@@ -64,7 +66,7 @@ This needs reliable facts, identities and state, plus a connection between the a
 
 ## L4 and related work
 
-My interest comes from working on rules as code: making a bounded set of rules explicit enough to inspect, execute and test. [Legalese’s L4](https://legalese.com/l4) is a useful candidate for this experiment. It is an open-source language for expressing legal rules and contracts as executable specifications, including obligations, permissions and prohibitions.
+Aryeh’s interest comes from his work on rules as code: making a bounded set of rules explicit enough to inspect, execute and test. [Legalese’s L4](https://legalese.com/l4) is a useful candidate for this experiment. It is an open-source language for expressing legal rules and contracts as executable specifications, including obligations, permissions and prohibitions.
 
 Legalese [documents exposing L4 rules through REST APIs and MCP tools](https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment). That gives an agent a way to consult a rule. Enforcement would require additional integration: consequential actions would need to pass through a gate checking proposals against the encoded rules and trusted state. The language supplies no alignment guarantee by itself.
 
@@ -104,7 +106,7 @@ The practical output could be a reviewed encoding published alongside suitable l
 
 ## A proposed test
 
-Encode a small, independently reviewed set of authorization rules in L4 and compare the same agent on held-out cases under three conditions:
+We propose encoding a small, independently reviewed set of authorization rules in L4 and comparing the same agent on held-out cases under three conditions:
 
 1. Natural-language rules alone.
 2. Those rules plus an L4-backed checker the agent can consult.
