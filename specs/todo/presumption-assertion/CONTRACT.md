@@ -258,7 +258,7 @@ A `TYPICALLY` on a definition is a parse error today (`../PRESUMPTION-SCENARIOS.
 **Semantics if ruled.**
 Derive when the definition decides; when the derivation is unknown (its inputs absent-with-none under hard, or three-valued unknown under `UNKNOWN-EVALUATION-SPEC` §4), take the presumed value under soft and refuse-at-force under hard; an assertion beats both.
 Listed under `presumed` when forced, by the node's name.
-Only a literal of the node's result type (`isTypicallyLiteral`, `TypeCheck.hs:2044`).
+Only a literal of the node's result type (`isTypicallyLiteral`, `TypeCheck.hs:2044`), which is no limit of this proposal: HAIRCUT (2026-10-12) made literal-only the rule for every `TYPICALLY`.
 The ladder's `defaults` map gains group entries, and `types.ts:38` is amended.
 
 **What works today instead** is route 2 of `../PRESUMPTION-SCENARIOS.md` §1: a `TYPICALLY` input read only in the `NOTHING` arm.
