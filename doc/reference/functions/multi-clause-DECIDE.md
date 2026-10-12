@@ -165,8 +165,9 @@ These were measured with the `l4` built from this version of L4.
 
 **Only at the top level, and only with a plain name first.**
 Clauses make one rule only where the rule is defined at the top level of a file or of a section, not inside `WHERE` or `LET`: there, `DECIDE rank Red IS 1` and `DECIDE rank x IS 2` are two definitions, and the first is reported for not matching its `GIVEN`.
-A rule whose name sits between or after its inputs, such as ``c `costs` n MEANS n``, cannot be written as clauses either: a line ``Red `costs` 0 MEANS 1`` below it is not read as a clause of that rule, and ``Red `costs` 0`` gives `0`.
+A rule whose name sits between or after its inputs, such as ``c `costs` n MEANS n``, cannot be written as clauses either: a line ``Red `costs` 0 MEANS 1`` below it is an error, reported once at `Red`: "This clause is written the way a rule with a word between its inputs is written, like this one", followed by the rule, ``c `costs` n``, and the two ways to write the cases.
 Write such a rule with `CONSIDER` instead.
+[A clause written like a rule with a word between its inputs](../errors/README.md#a-clause-written-like-a-rule-with-a-word-between-its-inputs) gives the whole message, the other shapes it covers, and what it does not catch.
 
 **A bare `_` is not a wildcard.**
 `DECIDE f _ IS 2` is a syntax error, `unexpected '_'`.
