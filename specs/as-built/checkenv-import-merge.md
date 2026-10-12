@@ -11,7 +11,7 @@ The commit reports no behaviour change at `-O1`.
 
 ## Where it lives
 
-- `unionImportedCheckEnv`: `jl4-core/src/L4/TypeCheck/Types.hs:1068-1091 @ 73a953821`, with its design comment at `:1040-1067`.
+- `unionImportedCheckEnv`: `jl4-core/src/L4/TypeCheck/Types.hs:1076-1099 @ 73a953821`, with its design comment at `:1048-1075`.
 - Core caller: `combineOne` inside `combineResolvedImports`, `jl4-core/src/L4/Import/Resolution.hs:355, 382-410 @ 73a953821` (call at `:409`).
   This path serves `checkWithImports`, i.e. the API and WASM entry points.
 - LSP caller: `unionCheckEnv`, `jl4-lsp/src/LSP/L4/Rules.hs:880-881 @ 73a953821`, folded over the dependencies at `:884`.
