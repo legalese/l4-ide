@@ -4,15 +4,26 @@ Attaches a default value to a name. The default is a _rebuttable presumption_:
 it records what should be presumed when nobody supplies a value, and a rule that
 is given no value uses it.
 
-It is used wherever the name is left out:
+## One behaviour
 
-- **on a section `GIVEN`**, by every rule that reads the name and is given no
-  value for it;
-- **on a rule's own `GIVEN`**, by a call that names its inputs with
-  [`WITH`](../functions/WITH.md) and leaves this one out;
-- **on a record field**, by a construction that leaves the field out; and
-- **at the boundary**, `l4 batch` and the decision service, by a case that
-  leaves the fact out.
+`TYPICALLY d` on a name means one thing.
+When nothing supplies a value for the name, at the point where a value has to come from outside the rule, the rule uses `d`.
+That holds wherever the name is declared, and in every tool that runs rules: `#EVAL` and `l4 run`, `l4 batch`, and the decision service, except for the [limits at the boundary](#at-the-boundary-l4-batch-and-the-decision-service), where a tool differs from `#EVAL` and the section says how.
+Three places accept a `TYPICALLY` and no run of the rules uses it: an `ASSUME`, which is deprecated ([below](#on-an-assume-checked-and-recorded-not-used)); a lambda's own `GIVEN`; and a field of an enum constructor that carries data ([below](#on-a-record-field-leaving-a-field-out-of-a-construction)).
+
+Three things hold wherever a `TYPICALLY` is written:
+
+- **A value that is supplied wins.** A default is never an override.
+- **"Not known" is not "left out".** At the boundary, `null` says that the fact is not known, and a fact that is not known never takes its default.
+- **Inside a file, a call or a construction by position gives every input and every field.** There is nothing left for a default to fill, so only a call or a construction that names its inputs with [`WITH`](../functions/WITH.md) may leave one out.
+
+What differs from one place to the next is only how a name comes to be left out:
+
+| `TYPICALLY` is written on | it is left out when                                                                                                       | for example              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| a section `GIVEN`         | a rule reads the name and the call, or the case, gives it no value; at the boundary, the case does not mention it         | `doubled`                |
+| a rule's own `GIVEN`      | a call that names the rule's inputs with `WITH` leaves it out; at the boundary, the case does not mention it              | `scaled WITH base IS 10` |
+| a record field            | a construction that names the fields with `WITH` leaves the field out; at the boundary, the JSON object has no key for it | `Paint WITH coats IS 2`  |
 
 Each is described below, with what a default does _not_ excuse.
 
@@ -34,8 +45,10 @@ names listed after `GIVEN`). `TYPICALLY` may appear on:
 3. **A `GIVEN` under a section heading** (a **"section `GIVEN`"**) — default
    values for a name declared once for every rule in the section
 4. **`ASSUME` declarations, in older files** — default values for assumed
-   names. `ASSUME` is deprecated (ruled 2026-09-04) and still works; a fact
-   supplied for each case belongs under its section's heading instead. See
+   names, which are checked and recorded and not used (see
+   [below](#on-an-assume-checked-and-recorded-not-used)). `ASSUME` is
+   deprecated (ruled 2026-09-04) and still works; a fact supplied for each case
+   belongs under its section's heading instead. See
    [the section `GIVEN`](../syntax/section-given.md) and
    [ASSUME (deprecated)](ASSUME.md).
 
@@ -120,7 +133,8 @@ out takes the new value. Writing the input at the call, as
   so the call can only mean the rule.
 - **It does not reach an `ASSUME`.** An `ASSUME` that takes inputs (`ASSUME` is
   deprecated) keeps its inputs' `TYPICALLY` as a note only, in the file that
-  declares it and in a file that imports it alike.
+  declares it and in a file that imports it alike (see
+  [below](#on-an-assume-checked-and-recorded-not-used)).
 
 ### Two rules with the same name
 
@@ -256,6 +270,37 @@ What the mark does and does not tell you:
 - **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, a field default in a record the rules decode with `JSONDECODE`, and, in either mode, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
 - **The words are English in `l4 render`, whatever `--lang` says.** `l4 nlg --lang he` prints `כברירת מחדל` from a draft entry in its table of Hebrew phrases, which no Hebrew-speaking lawyer has reviewed, and `l4 render` does not use that table yet ([the syntax reference](../syntax/README.md) says so).
 
+## On an `ASSUME`: checked and recorded, not used
+
+[`ASSUME`](ASSUME.md) is deprecated (ruled 2026-09-04) and is being retired.
+A `TYPICALLY` on one is checked against the type, as anywhere else, and kept, and no run of the rules uses it:
+
+```l4
+ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `person has capacity`
+
+#EVAL `may contract` TRUE     -- stops: `person has capacity` is an assumed term, not TRUE
+```
+
+- **`#EVAL` and `l4 run`** stop when the rules need the fact, saying it is an assumed term, with the deprecation warning, where a section `GIVEN` would give `TRUE`.
+- **`l4 batch` and the decision service** still ask for the fact.
+  The published list of facts has it under `required`, with no `default`.
+  `l4 batch` refuses a case that leaves it out (`Missing required field 'person has capacity' in JSON object`), and so does the service's direct path (`ASSUME 'person has capacity': missing required parameter`).
+  The service's other path, for a request that sends `{}` for any input, treats the fact as an assumed term instead: the request is answered when the rules never read it, and stops, saying the fact is an assumed term, when they do.
+- **An input of an `ASSUME` that takes inputs** is the same.
+  A call that names the inputs and leaves out one that has a `TYPICALLY` is told it has not supplied it, in the file that declares the `ASSUME` and in a file that imports it.
+- **The question wizard still reads it.**
+  The ladder the service publishes carries a boolean default on an `ASSUME` as the fact's presumed value, and the query plan uses it as a prior, as it does for a section `GIVEN`.
+  They order the questions and draw a tentative answer, and never answer for the rules, so for an `ASSUME` they presume a value that no evaluation uses.
+
+To make the default count, move the declaration under its section's heading, as a section `GIVEN`.
+The same rule then works out `TRUE`, and `l4 batch` and the service take the default and list it under `presumed`.
+That changes the answer, so it is more than a respelling.
+The `GIVEN` line the deprecation warning suggests carries the `TYPICALLY` across.
+
 ## What the default must be
 
 A default is a **literal**, and it is checked when it is written:
@@ -283,8 +328,9 @@ A default is a **literal**, and it is checked when it is written:
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
-- **On an `ASSUME` it is still not used** ([`ASSUME`](ASSUME.md) is deprecated);
-  move the declaration under its section's heading to make the default count.
+- **On an `ASSUME` it is not used** (see
+  [above](#on-an-assume-checked-and-recorded-not-used)); a section `GIVEN` is
+  where a default counts.
 
 ## When the usual value is worked out from other facts
 
@@ -338,8 +384,12 @@ govern what counts as leaving a fact out:
   given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
   and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
-  takes its default: the case is refused, naming the fact. `{}` means the same,
-  for a record too. The one exception is a `MAYBE` fact, which is allowed to
+  takes its default. `l4 batch` and the service's direct path refuse the case,
+  naming the fact. The service's other path, for a request that sends `{}` for any
+  input, treats the fact as an assumed term, as it does one left out that has no
+  default: the request is answered when the rules never read it, and stops, saying
+  the fact is an assumed term, when they do. `{}` means the same as `null`, for a
+  record too. The one exception is a `MAYBE` fact, which is allowed to
   have no value: `null` on it is `NOTHING`, a value, and nothing is presumed or
   refused.
 - **A name that matches nothing is refused where a default is taken.** In a
@@ -400,15 +450,6 @@ JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
 
-_Landed in stages (2026-10-02, 2026-10-03 and 2026-10-09). A **section** `GIVEN` may be left
-out, and a rule that reads it then uses the default; the published list of facts
-asks for a defaulted fact as optional, which the boundary then honours; a
-**rule's own** `GIVEN` and a **record field** may be left out at a call that
-names its inputs and at a construction; and `T WITHAL` leaves out every field of
-a record. A default does not name another `GIVEN`, and will not: it is a fixed
-value written out (ruled 2026-10-12; see
-[When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts))._
-
 ## Examples
 
 **Example file:** [typically-example.l4](typically-example.l4)
@@ -460,10 +501,11 @@ ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
 ```
 
 `ASSUME` is deprecated (ruled 2026-09-04) and still works. On an `ASSUME` the
-default stays metadata, as does the default of an input of an `ASSUME` that takes
-inputs; moving the declaration under its section's heading, as the previous
-example does, is what makes the default take effect for a rule given no value.
-The companion file no longer carries this spelling.
+default is checked and recorded and no rule uses it, nor the default of an input
+of an `ASSUME` that takes inputs; moving the declaration under its section's
+heading, as the previous example does, is what makes the default take effect for
+a rule given no value. The companion file does not use this spelling, because it
+draws a deprecation warning.
 
 ## Behavior
 
@@ -475,9 +517,25 @@ The companion file no longer carries this spelling.
   fields by position, give all of them: only `WITH` may leave one out, and
   `WITHAL` leaves out every field of a record.
 - On a computed field (one with a MEANS clause) a TYPICALLY is an error.
+- On an `ASSUME` a `TYPICALLY` is checked and recorded, and no run of the rules
+  uses it.
 - For anything a fixed value cannot express, write an ordinary definition
   instead; for a usual value worked out from other facts, use a `MAYBE` input and
   a `CONSIDER` ([When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts)).
+
+## What changed
+
+Earlier versions of L4 took a `TYPICALLY` only on a section `GIVEN`, and only inside a file.
+On a rule's own `GIVEN` and on a record field it was a note that no evaluation used, so a call or a construction that left such a name out was an error.
+A `TYPICALLY` on a computed field, which never did anything, is now a check error.
+An `ASSUME` is as it was.
+
+At the boundary, `l4 batch` refused a case that left out a fact with a default, a section `GIVEN`'s included (`Missing required field 'has capacity' in JSON object`), and the published list of facts asked for every defaulted fact under `required`.
+A case may now leave it out.
+The answer lists the default it took under `presumed`, the published list leaves the fact out of `required` and carries its `default`, and `l4 batch --presumption hard`, or `"presumption": "hard"` in a request, brings the refusal back (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service)).
+A client that relied on the refusal, or on `required`, will now get an answer, or a list that does not ask for the fact.
+
+A default is still a literal, as it was: a decision of 2026-10-12 keeps it so (see [What the default must be](#what-the-default-must-be)).
 
 ## See Also
 
@@ -490,5 +548,7 @@ The companion file no longer carries this spelling.
 - [GIVEN](../functions/GIVEN.md) — the inputs of one rule
 - [Query Planning](../query-planning/README.md) — how a stored default becomes
   the per-atom prior `w_v` for the question-ordering wizard
+- [Exports](../../exports/README.md) — the Catala, docassemble and Blawx pages
+  say what each does with a default
 - [Web Form Generation](../../courses/advanced/module-a4-production.md#web-form-generation)
   — using TYPICALLY defaults in an autogenerated wizard
