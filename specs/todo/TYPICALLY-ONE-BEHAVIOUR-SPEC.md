@@ -150,6 +150,43 @@ Each is independently landable unless it names a dependency.
 Meng's words, verbatim, 2026-10-12 in chat: _"if we radically simplified TYPICALLY to prohibit complex expressions and only allowed simple values we increase simplicity without making the desired ideas impossible to express; the programmer just has to find other existing ways of saying the same thing, no?"_ and _"It just feels like we're asking the TYPICALLY keyword to do the job of an OTHERWISE branch."_
 Lane C cards L1 to L6 become moot; L1 is the ruling's card.
 
+**Restack on HAIRCUT, 2026-10-12 (`restack/w7-haircut`).**
+#557 (`feat/typically-w7`: 31 commits on #551's head, `cf6f68269`) is expression defaults and does not land.
+One commit survives, because the defect it fixes does not depend on expression defaults: `ac16910e3`, several `WITH` arguments printed on one line.
+It is carried with its tests rewritten for literal defaults (a printer unit test, a corpus file `ok/typically-multiarg.l4`; the batch fixture, the service tests and the schema test went with the expression defaults they printed).
+The other 30 commits are dropped:
+
+- `8c8ed0475` typecheck, discharge: a section GIVEN's TYPICALLY default is an expression, and a default that reads itself is a check error (W7, R8 rule 3)
+- `71d3d68a6` schema: a TYPICALLY default that is an expression is published as its source text (W7, R8 surface)
+- `2fd8442fe` typecheck, evaluate: a rule's input and a record's field may take an expression, worked out where the call is (W7)
+- `ccb3b8b6f` catala: carry the definitions a TYPICALLY default names (W7, T5)
+- `e17bfc2a6` docs, skills, specs: a TYPICALLY default is an expression, and the cycle check (W7)
+- `cbd5b1e98` comments: say what W7 made false (Discharge mints two Uniques; a default is not a literal)
+- `55274cfea` specs: record W7's evaluation differential, and how its tests were shown to fail before
+- `1777d33a8` typecheck: a rule's input or a record's field may not take a default that reads a section input
+- `afd9d9193` discharge: a default that supplies the input it would read is no circle (W7 review F6)
+- `3dc9f0c87` export: an export's input default that reaches an imported reader is refused like a body that does (W7 review F7)
+- `b02d2e711` typecheck: a WITH given to a section input says so, not that the input is unread (W7 review F8)
+- `556eb5a51` typecheck: a default keeps its closed types across an IMPORT (W7, advisor D2)
+- `14f527776` docs, skills, comments: say what a TYPICALLY default does after the W7 review, no more
+- `4421b05fe` specs: W7 as built after the review of its first build, with what is open for Meng
+- `46a08db52` typecheck: a default may not name another input of its own rule or record, by spelling
+- `931680dc2` typecheck: a record field's default is looked up in the section its DECLARE is in
+- `ee9635d72` discharge: the record a request is decoded into is not the author's, and takes no part in the refusal of a default that reads an input (W7 s
+- `e7d2e8772` export: a written ASSUME that an export's own input's default reads is an input of the export again (W7 second review, rulings S4)
+- `e7627ee82` discharge: a WITH written in a definition is refused when only a default reads what it supplies, as it was before defaults could read inputs
+- `6bae06a5b` discharge: a default that supplies the input it would read is not refused for what that input's own default reads (W7 second review, silent
+- `fa95f6f4f` export: a record field's default that reaches an imported reader is refused like an input default that does (W7 second review, rulings S5 an
+- `ec061f473` typecheck: an exported rule's default may not name a section's definition that the top level also defines, by the same name
+- `e48fa5d08` typecheck: a default that calls a rule or builds a record may leave out an input whose own default is an expression (W7 second review, silen
+- `b585642a8` typecheck: say of a WITH given to a section input what a WITH is for, not that there is nothing for it to reach (advisor W7-D7)
+- `bb963ebea` export: the closure over an export's input defaults adds written ASSUMEs only, not a section input a default supplies
+- `9d1d83b87` docs, skills, specs: say what the second review found, and what a root is (W7)
+- `b2efe15fd` tests: a positive control for an export's input default that names an imported rule reading no input (advisor W7-D8)
+- `fc7f1f224` typecheck: ask whether a default names a sibling where it is checked, not of every module afterwards
+- `4c08827ad` specs: the tests the second review's fixes added, how each was shown to fail, and the names it introduced
+- `dc89b3286` test: an expression TYPICALLY default meeting a multi-clause group and CONSIDER (W7, review of the rebase onto #569)
+
 ### 4.1 W2 and W3, as built (2026-10-02)
 
 Built in #539 on top of #530 (W1).
@@ -294,6 +331,7 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   The §3.2.1 evaluation differential was owed for that edit, and was run on 2026-10-03 over 433 corpus files: 272 give identical `Result:` blocks, 158 have none on either side, and three differ.
   `ok/every/run-blame.l4` differs only in the file name and line a refusal message embeds, the same on the W2+W3 binary.
   The other two are this branch's `ok/typically-named-site.l4` and `ok/typically-import-use.l4`, whose printed copy does not parse back, because an `#ASSERT (f WITH a IS 1, b IS 2) EQUALS n` prints its second named argument on a new line inside the parentheses; that is the printer's layout of an explicit multi-argument `WITH` in a directive, which this branch did not change (it is not seen by `l4 batch`, which filters directives before it prints).
+  Fixed on `restack/w7-haircut` (2026-10-12) by the carried print change: re-measured with the §3.2.1 differential over 468 files, those two files and the new `ok/typically-multiarg.l4` give identical `Result:` blocks (15, 6 and 3), 160 files have none on either side, and the four that differ are the known ones (`ok/every/run-blame.l4`: the file name and line a message embeds; `ok/excel-date/serials.l4`, `ok/ledger/bitemporal-stamps.l4` and `ok/ledger/record-flat.l4`: wall-clock stamps).
   With those directives rewritten as `#EVAL`s the printed copies agree with the originals, 15 of 15 and 6 of 6 results, and the printed text leaves the default out.
 - **The event.**
   When `App` allocates an argument that carries a `DefaultFill` it registers it with W8's registry (`registerPresumable`, origin `FromNamedApp rule`), so the event is raised the first time the value is forced and not before: an input the rule never reads is not listed (T6; `use` FALSE in the batch and service tests lists nothing).
