@@ -1,0 +1,36 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-overloaded.l4
+  Hidden: no
+  Range: 14:7-14:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      Paint
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      Paint (defined at withal-overloaded.l4:12:1-6) of type FUNCTION FROM NUMBER TO NUMBER
+      Paint (defined at withal-overloaded.l4:7:9-14) of type FUNCTION FROM STRING TO Paint
+
+File: withal-overloaded.l4
+  Hidden: no
+  Range: 25:7-25:20
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      Marker
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      Marker (defined at withal-overloaded.l4:23:1-7) of type FUNCTION FROM NUMBER TO NUMBER
+      Marker (defined at withal-overloaded.l4:19:9-15) of type Marker

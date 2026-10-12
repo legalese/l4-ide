@@ -1,0 +1,32 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-unresolved.l4
+  Hidden: no
+  Range: 6:31-6:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      zzz
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: typically-unresolved.l4
+  Hidden: no
+  Range: 11:31-11:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      yyy
+
+    which I have inferred to be of type: 
+
+      NUMBER

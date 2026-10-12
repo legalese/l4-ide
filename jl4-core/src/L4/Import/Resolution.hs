@@ -282,6 +282,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdImplicitReaders :: Set Unique
     -- ^ Definitions with a non-empty read-set, this module's and its imports'.
     -- See 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
+  , tcdInputDefaults :: TypeCheck.InputDefaults
+    -- ^ The @TYPICALLY@ defaults of this module's rules and records, and its
+    -- imports'. See 'L4.TypeCheck.Types.CheckResult.inputDefaults'.
   }
   deriving stock (Generic)
 
@@ -345,6 +348,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdUri = uri
             , tcdSectionPaths = result.sectionPaths
             , tcdImplicitReaders = result.implicitReaders
+            , tcdInputDefaults = result.inputDefaults
             }
 
 -- ----------------------------------------------------------------------------
@@ -371,6 +375,7 @@ combineResolvedImports uri imports =
         , TypeCheck.constBodies = finalState.constBodies
         , TypeCheck.sectionPaths = finalState.sectionPaths
         , TypeCheck.deferredChoices = 0
+        , TypeCheck.overloadedCallees = Map.empty
         }
     , finalEnv
     )
@@ -405,8 +410,9 @@ combineResolvedImports uri imports =
                -- imported 'Unique' is still never ranked (spec §5.5, FIX C).
              , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
+             , TypeCheck.overloadedCallees = Map.empty
              }
-         , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
+         , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders r.inputDefaults
          )
 
 -- | Update a module's import declarations with resolved URIs.

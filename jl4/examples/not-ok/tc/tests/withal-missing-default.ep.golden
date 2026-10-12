@@ -1,0 +1,23 @@
+-- `T WITHAL` takes the default of every field, so a record with a field that
+-- has none is an error, and the error names each such field
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng 2026-10-09). The same
+-- record built with WITH, naming those fields, is fine.
+
+DECLARE Paint
+  HAS colour IS A STRING
+      coats  IS A NUMBER
+      label  IS A STRING TYPICALLY "plain"
+
+-- two of the three fields have no default: the error names `colour` and `coats`
+#EVAL Paint WITHAL
+
+-- a record none of whose fields has a default: the error names all of them
+DECLARE Point
+  HAS x IS A NUMBER
+      y IS A NUMBER
+
+#EVAL Point WITHAL
+
+-- the repair the error offers: name the fields that have no default
+#EVAL Paint WITH colour IS "red", coats IS 1
+#EVAL Point WITH x IS 1, y IS 2

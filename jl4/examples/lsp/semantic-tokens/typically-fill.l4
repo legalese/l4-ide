@@ -1,0 +1,23 @@
+-- A named site and a construction that leave out a TYPICALLY default
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4, W5). The checker adds the default as one
+-- more argument the author did not write; the Check phase below must still have
+-- tokens for this file, and none at the place the default was declared.
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER
+
+GIVETH A NUMBER
+`one` MEANS scaled WITH base IS 1
+
+GIVETH A Paint
+`two` MEANS Paint WITH coats IS 2
+
+#EVAL `one`

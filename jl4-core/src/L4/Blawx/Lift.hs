@@ -2442,7 +2442,7 @@ ident t
   reserved :: [Text]
   reserved =
     [ "IF", "THEN", "ELSE", "AND", "OR", "NOT", "MEANS", "DECIDE", "DECLARE"
-    , "GIVEN", "GIVETH", "HAS", "IS", "A", "AN", "THE", "OF", "WITH", "LIST"
+    , "GIVEN", "GIVETH", "HAS", "IS", "A", "AN", "THE", "OF", "WITH", "WITHAL", "LIST"
     , "TRUE", "FALSE", "JUST", "NOTHING", "MAYBE", "BOOLEAN", "STRING"
     , "NUMBER", "WHERE", "YIELD", "EQUALS", "IMPORT", "ASSUME", "CONSIDER"
     , "WHEN", "OTHERWISE", "TYPE", "ONE", "FROM", "TO", "AT", "BY", "FOR"

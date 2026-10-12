@@ -58,6 +58,7 @@ module L4.EvaluateLazy.Machine
 , Presumed (..)
 , PresumedOrigin (..)
 , PresumedLog
+, presumedOwner
 , emptyPresumedLog
 , presumedEvents
 , renderPresumedPath
@@ -404,6 +405,16 @@ data EvalState =
       -- whatever modules the caller passed beside it. The JSON decoder fills an
       -- absent field from here (T1b). Static for the run, and deliberately
       -- lazy: only a run that decodes JSON pays for walking the modules.
+    , recordOwners :: Map Unique Text
+      -- ^ How a decode the rules make names a record type that is declared
+      -- under a section heading in the evaluated module: the type's declared
+      -- name behind its headings, spelled and quoted as the owner of a @WITH@
+      -- default is ('presumedOwner'), keyed by the type's 'Unique'. It is what
+      -- @JSONDECODE T: path@ in @presumed@ names, whatever spelling the decode
+      -- site used for the type. A type declared at the top of the module, or
+      -- in an imported module, is not here and is named as the site spelled it
+      -- (decision O6, assumed: the headings of an imported module do not
+      -- reach the evaluator). Static for the run, and lazy like 'recordDefaults'.
     , presumed :: !(IORef PresumedLog)
       -- ^ The defaults that took effect during this directive, in the order
       -- they were forced: W8's \"took its default\" event. Per directive,
@@ -456,8 +467,33 @@ data PresumedOrigin
   | FromDecode !Text
     -- ^ A field of a decode the RULES made, filled the same way; the text is
     -- the type that decode started from.
+  | FromNamedApp !Text
+    -- ^ An input or field a named application left out and the checker filled
+    -- from its @TYPICALLY@ ('DefaultFill'): W4 for a rule's inputs, W5 for a
+    -- record's fields. The text is the rule or record constructor the site
+    -- applies. The path is the one input or field.
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
+
+-- | How the owner of a default reads in a @presumed@ entry: the way L4 writes
+-- the name in source ('L4.Print.quoteIfNeeded'), so that an entry can be split
+-- back into its parts and two different names do not print alike. A name
+-- behind the headings it is declared under is spelled as L4 spells a qualified
+-- name in an ambiguity error and when it prints source: each part that L4
+-- would write in backticks has them, so a heading with a space or a dot
+-- (@Part 1. Fees@) stays one part. A name with no heading in front of it is
+-- quoted the same way, so a top-level rule called @Pricing.scaled@ prints as
+-- @`Pricing.scaled`@ and not as the rule @scaled@ under @§ Pricing@.
+-- Two declarations with the same name under the same sections print the same
+-- entry: the entry names the sections, not the file, so the same name in two
+-- imported files shares one, and a @WHERE@ or @LET@ local, which is named
+-- bare, shares one with a top-level rule of that name.
+-- Assumed, not ruled: overnight card O6, 2026-10-11, where Meng ruled that the
+-- headings are named and not how they are quoted.
+presumedOwner :: RawName -> Text
+presumedOwner = \ case
+  q@QualifiedName{} -> prettyLayout q
+  other             -> quoteIfNeeded (rawNameToText other)
 
 -- | Report a default that took effect ('EvalState.presumed'), once.
 tellPresumed :: Presumed -> Eval ()
@@ -1695,7 +1731,19 @@ forwardExpr env = \ case
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
               _ -> Nothing
-        rs <- traverse (`allocate_` env) es
+        rs <- traverse (allocateArgument env) es
+        -- An argument the checker added from a TYPICALLY default
+        -- ('DefaultFill') reports itself when it is first forced, like every
+        -- other default that takes effect ('registerPresumable'). It has a
+        -- cell of its own ('allocateArgument'), so what is registered is this
+        -- default and nothing else.
+        for_ (zip es rs) \ (e, rf) ->
+          for_ (exprDefaultFill e) \ fill ->
+            registerPresumable rf MkPresumed
+              { path       = [rawNameToText fill.binder]
+              , declaredAt = fill.declaredAt
+              , origin     = FromNamedApp (presumedOwner fill.owner)
+              }
         pushFrame (App1 rs expectedType)
         -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
         -- evaluation tracer records as the function being entered, so short-
@@ -4952,10 +5000,16 @@ data DecodeAt = MkDecodeAt
 decodeRoot :: Type' Resolved -> Machine DecodeAt
 decodeRoot ty = do
   rr <- asks (.requestRecord)
+  owners <- asks (.recordOwners)
   let isRequest = case (rr, ty) of
         (Just r, TyApp _ tyRef []) -> nameToText (TypeCheck.getName tyRef) == r
         _                          -> False
-  pure (MkDecodeAt (prettyLayout ty) [] isRequest)
+      -- a record declared under a heading is named behind it, as a WITH default
+      -- is, whichever way the decode site spelled the type
+      root = case ty of
+        TyApp _ tyRef [] | Just owner <- Map.lookup (getUnique tyRef) owners -> owner
+        _                                                                    -> prettyLayout ty
+  pure (MkDecodeAt root [] isRequest)
 
 -- | @ for field 'a.b'@, or nothing at the root of the decode.
 atField :: DecodeAt -> Text
@@ -4976,8 +5030,8 @@ renderPresumedPath = Text.concat . go True
 
 -- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
 -- a number, a string, or a nullary constructor. 'Nothing' for anything else,
--- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
--- will need an environment here.
+-- which the checker does not admit: HAIRCUT (2026-10-12) ruled that a default
+-- is a literal, so expression defaults (R8 rule 3, W7) are withdrawn.
 typicallyLiteralValue :: Expr Resolved -> Maybe WHNF
 typicallyLiteralValue = \ case
   Lit _ (NumericLit _ r) -> Just (ValNumber r)
@@ -6722,6 +6776,21 @@ preAllocate :: [Resolved] -> Machine Environment
 preAllocate ns = do
   pairs <- traverse preAllocateRef ns
   pure (Map.fromList pairs)
+
+-- | Allocate the cell of one argument of an application.
+--
+-- A default the checker added ('DefaultFill') always gets a cell of its own,
+-- even when it is a bare constructor (@TRUE@, @NOTHING@, an enum value).
+-- 'allocate_' would hand such an argument the one cell every use of that
+-- constructor shares, and 'registerPresumable' would then mark that shared
+-- cell: every later force of @FALSE@ anywhere in the run would report the
+-- default, whether or not the rule read it, and two defaults that are the same
+-- constructor would take the one registry slot between them. A numeric or
+-- string default was never affected, because a literal always gets a cell.
+allocateArgument :: Environment -> Expr Resolved -> Machine Reference
+allocateArgument env e
+  | isJust (exprDefaultFill e) = fst <$> allocateRecursive e (const env)
+  | otherwise                  = allocate_ e env
 
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
 allocate_ (Var _ann n) env = do

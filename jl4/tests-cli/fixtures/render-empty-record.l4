@@ -1,0 +1,24 @@
+-- How `l4 render` and `l4 nlg` show `T WITHAL` on a record with no fields.
+-- It checks to a named application with nothing written, so there is no field
+-- list to show and no "where" to say: it reads as the record's own name.
+
+DECLARE Marker HAS
+
+DECLARE Holder HAS
+  mark IS A Marker
+  n    IS A NUMBER
+
+GIVETH A Marker
+`the marker` MEANS Marker WITHAL
+
+GIVEN m IS A Marker
+GIVETH A BOOLEAN
+`is marker` m MEANS TRUE
+
+GIVETH A BOOLEAN
+`check` MEANS `is marker` (Marker WITHAL)
+
+-- An empty record as the value of a field in a record that has fields.
+`a holder` MEANS Holder WITH mark IS (Marker WITHAL), n IS 1
+
+#ASSERT `is marker` (Marker WITHAL)

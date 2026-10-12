@@ -1,0 +1,26 @@
+-- Two records of one name, each with a TYPICALLY default on a field, in sibling
+-- sections: `presumed` names each behind the heading it is declared under
+-- (overnight card O6, 2026-10-11). The rows take Alpha's timeout 30, Beta's 60,
+-- and both (90).
+
+§ `Alpha`
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 30
+      retries IS A NUMBER
+
+§ `Beta`
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 60
+      retries IS A NUMBER
+
+§ `Use`
+
+@export default Combine
+GIVEN useAlpha IS A BOOLEAN
+      useBeta  IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS
+  (IF useAlpha THEN (`Alpha`.Config WITH retries IS 1)'s timeout ELSE 0)
+    PLUS (IF useBeta THEN (`Beta`.Config WITH retries IS 1)'s timeout ELSE 0)

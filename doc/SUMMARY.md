@@ -8,6 +8,7 @@
 
 - [Overview](reference/README.md)
 - [Types](reference/types/README.md)
+  - [WITHAL](reference/types/WITHAL.md)
 - [Functions](reference/functions/README.md)
 - [Control Flow](reference/control-flow/README.md)
   - [REFUSE](reference/control-flow/REFUSE.md)

@@ -1,0 +1,21 @@
+-- l4 batch over an exported rule whose body calls an overloaded `scaled` at a
+-- named site that leaves out `rate`, the input only the first `scaled` defaults.
+-- The second `scaled` takes a STRING for `base` and the request's `n` is a
+-- NUMBER, so the written input settles which rule the site means and the
+-- default is taken (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, the overload decision O3).
+-- The same two rules with a NUMBER `base` in both leave the site ambiguous
+-- (not-ok/tc/typically-overloaded-site.l4).
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A STRING
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS factor
+
+@export default Combine the pieces
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE combine IS scaled WITH base IS n

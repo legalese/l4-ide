@@ -1,0 +1,15 @@
+-- A default taken at the root of a section GIVEN is not marked by `l4 nlg`:
+-- the call is printed without `surcharge`, so there is no argument for the
+-- words "by default" to follow. The decision service's `presumed` list is the
+-- account of this default. The second call writes the value, and it prints.
+
+§ `Rates`
+    GIVEN surcharge IS A NUMBER TYPICALLY 2
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`tax on` amount MEANS
+    amount PLUS surcharge
+
+#ASSERT (`tax on` WITH amount IS 10) EQUALS 12
+#ASSERT (`tax on` WITH amount IS 10, surcharge IS 7) EQUALS 17

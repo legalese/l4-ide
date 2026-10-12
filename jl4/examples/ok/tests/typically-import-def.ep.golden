@@ -1,0 +1,16 @@
+-- The defining half of ok/typically-import-use.l4: a rule and a record whose
+-- TYPICALLY defaults a MODULE THAT IMPORTS THIS ONE may leave out
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5 across an IMPORT).
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER
+      note   IS A MAYBE STRING TYPICALLY NOTHING
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+      colour IS A Colour TYPICALLY Green
+GIVETH A NUMBER
+`imported scaled` MEANS IF colour EQUALS Green THEN rate TIMES base ELSE 0

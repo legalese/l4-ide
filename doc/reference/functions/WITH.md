@@ -128,10 +128,14 @@ bump n MEANS n TIMES `the rate`
   to a common heading. This one used to be accepted and then hand the rule a
   value of the wrong type at run time — a rule declared `GIVETH A NUMBER`
   returning a `STRING`, with nothing reported at any stage.
-- **A rule's own defaulted parameter cannot yet be omitted at a named site.**
-  `TYPICALLY` on a _section_ input is honoured when nobody supplies it (see
-  [TYPICALLY](../types/TYPICALLY.md)); on a rule's own `GIVEN` the checker still
-  asks for the input.
+- **A rule's own defaulted input may be left out, and only here.** A `WITH` call
+  that names its inputs may leave out one that carries a
+  [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out
+  a field that does; the default is taken. A call that gives its inputs by
+  position still gives them all. An input with no default is still asked for.
+- **A construction that writes no field is `WITHAL`.** There is no `Paint WITH`
+  followed by nothing; a record built from every field's default is written
+  `Paint WITHAL`. See [`WITHAL`](../types/WITHAL.md).
 
 ## Example
 
@@ -147,3 +151,4 @@ Every call on this page, in one file you can run:
 - [`LET`](LET.md) and [`WHERE`](WHERE.md) — local definitions, which do not
   reach into the rules a definition calls
 - [`TYPICALLY`](../types/TYPICALLY.md) — a default for an input nobody supplies
+- [`WITHAL`](../types/WITHAL.md) — a record built from every field's default

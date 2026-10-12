@@ -1,0 +1,12 @@
+-- WITHAL is standalone: nothing may follow it, because WITH already covers an
+-- override and one construction should not have two spellings
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng 2026-10-09).
+-- This file is a parse error. The override is written WITH:
+-- `Paint WITH label IS "gloss"`.
+
+DECLARE Paint
+  HAS label IS A STRING TYPICALLY "plain"
+      coats IS A NUMBER TYPICALLY 2
+
+GIVETH A Paint
+glossy MEANS Paint WITHAL label IS "gloss"

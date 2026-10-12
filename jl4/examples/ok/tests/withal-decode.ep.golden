@@ -1,0 +1,33 @@
+-- Where `T WITHAL` and a decode of "{}" agree, and where they do not
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng 2026-10-09, section 4.3).
+--
+-- Decoding the whole object "{}" into a record takes every field's TYPICALLY
+-- default, and so does `T WITHAL`: for a record every field of which has one,
+-- the two are the same value. A field declared MAYBE with no TYPICALLY is the
+-- difference: the decode fills it NOTHING (D7.3), and `T WITHAL` is a check
+-- error naming it (not-ok/tc/withal-maybe-field.l4). WITHAL does not infer a
+-- default from a field's type.
+
+GIVEN text IS A STRING
+GIVETH AN EITHER STRING Paint
+`read paint` MEANS JSONDECODE text
+
+GIVEN text IS A STRING
+GIVETH AN EITHER STRING Settings
+`read settings` MEANS JSONDECODE text
+
+-- every field has a TYPICALLY: the decode of {} is the record WITHAL builds
+DECLARE Paint
+  HAS colour IS A STRING TYPICALLY "red"
+      coats  IS A NUMBER TYPICALLY 2
+
+#ASSERT `read paint` "{}" EQUALS RIGHT (Paint WITHAL)
+
+-- a field declared MAYBE with no TYPICALLY: the decode fills it NOTHING, so the
+-- record it gives can only be written out, not built with WITHAL
+DECLARE Settings
+  HAS limit IS A NUMBER TYPICALLY 10
+      note  IS A MAYBE STRING
+
+#ASSERT `read settings` "{}" EQUALS RIGHT (Settings WITH limit IS 10, note IS NOTHING)
+#EVAL `read settings` "{}"

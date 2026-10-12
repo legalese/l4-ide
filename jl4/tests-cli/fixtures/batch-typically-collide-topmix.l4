@@ -1,0 +1,19 @@
+-- Names with no section in front of them are quoted the way L4 writes them in
+-- source, as they are under a section (overnight card O6, 2026-10-11; found in
+-- review): a mixfix rule `scaled by` and a rule `two words` at the top of a
+-- file print as `` `scaled by` `` and `` `two words` ``. The input is not quoted.
+
+GIVEN base IS A NUMBER
+      factor IS A NUMBER TYPICALLY 2
+GIVETH A NUMBER
+base `scaled by` factor MEANS base TIMES factor
+
+GIVEN `the rate` IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+`two words` MEANS `the rate` TIMES base
+
+@export default Combine
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE combine IS (`scaled by` WITH base IS n) PLUS (`two words` WITH base IS n)

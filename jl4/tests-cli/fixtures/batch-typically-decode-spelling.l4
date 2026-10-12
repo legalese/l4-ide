@@ -1,0 +1,37 @@
+-- l4 batch over a record declared under a section heading and decoded by the
+-- rules twice, once with the type written behind its heading and once bare
+-- (the sections nest: `Settings` resolves to the `Pricing` one from `Use`).
+-- A decode names the record as it is DECLARED, behind its heading, whichever way
+-- the decode site spelled the type, so the two decodes are one entry, and it
+-- is the entry the WITH default of the same record carries (assumed, not ruled:
+-- the review of the combined branch, 2026-10-12, following overnight card O6).
+
+§ `Pricing`
+
+DECLARE Settings HAS
+  limit IS A NUMBER TYPICALLY 10
+
+§ `Use`
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING `Pricing`.Settings
+parseQ s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseB s MEANS JSONDECODE s
+
+GIVETH A NUMBER
+lq MEANS CONSIDER parseQ "{}"
+    WHEN RIGHT st THEN st's limit
+    WHEN LEFT e THEN 0
+
+GIVETH A NUMBER
+lb MEANS CONSIDER parseB "{}"
+    WHEN RIGHT st THEN st's limit
+    WHEN LEFT e THEN 0
+
+@export default go
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+DECIDE go amount IS lq PLUS lb PLUS (Settings WITHAL)'s limit PLUS (`Pricing`.Settings WITHAL)'s limit

@@ -132,6 +132,7 @@ l4Hover source line col =
             , descMap = result.tcdDescMap
             , sectionPaths = result.tcdSectionPaths
             , implicitReaders = result.tcdImplicitReaders
+            , inputDefaults = result.tcdInputDefaults
             }
       -- Use the URI from type checking result to ensure infoMap lookup works
       in case lookupInfoAtPos result.tcdUri pos checkResult of

@@ -1,0 +1,24 @@
+-- l4 batch over rules that take a TYPICALLY default at a NAMED site
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 for a rule's input, W5 for a record's
+-- field). The exported rule has an input of its own called `rate`, the same
+-- spelling as the input `scaled` leaves out: the answer must list the default
+-- `scaled` took, under `scaled`, and never the request's `rate`.
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 30
+      retries IS A NUMBER
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+@export default Combine the pieces
+GIVEN n IS A NUMBER
+      rate IS A NUMBER
+      use IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS
+  IF use
+  THEN (scaled WITH base IS n) PLUS (Config WITH retries IS rate)'s timeout
+  ELSE 0

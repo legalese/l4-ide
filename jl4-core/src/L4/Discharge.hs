@@ -130,12 +130,13 @@ sectionBinders (MkModule _ _ sect) =
 -- spelling half of 'suppliesBinder' ever flip a match.
 --
 -- A binder's @TYPICALLY@ default is deliberately NOT an edge here. A default
--- is literal-only today ('L4.TypeCheck.checkTypically'), so it reads nothing;
--- and when that restriction is lifted (R8 rule 3) a default that reads another
--- binder must be reached through the ROOT's supply, which is a different
--- mechanism from a reader's parameter — adding the edge here would turn every
--- reference to the defaulted binder, including a reader's own value-bound
--- parameter, into an application.
+-- is a literal ('L4.TypeCheck.checkTypically'), so it reads nothing, and that
+-- will not change: HAIRCUT (Meng, 2026-10-12) withdrew R8 rule 3, expression
+-- defaults. Were a default ever to read another binder, it would have to be
+-- reached through the ROOT's supply, which is a different mechanism from a
+-- reader's parameter — adding the edge here would turn every reference to the
+-- defaulted binder, including a reader's own value-bound parameter, into an
+-- application.
 readSets :: Module Resolved -> Map.Map Unique Binder -> Map.Map Unique [Binder]
 readSets mod' binders
   | Map.null binders = Map.empty

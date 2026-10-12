@@ -1,0 +1,50 @@
+-- A written value that contains a call that names its inputs is not checked
+-- against the other rules of the callee's name (not-ok/tc/typically-overloaded-nested.l4):
+-- a site is compared with its rivals only by the values it writes, and checking a
+-- value that holds such a call, at every rival and on every branch of the
+-- search, cost about 3^d for a call nested d deep. The #EVAL in section 1 nests
+-- fourteen deep: measured on 2026-10-11 it took 53 seconds with the value
+-- checked and 0.35 seconds without.
+-- The sites that are left alone still check as before: a value without a named
+-- call (sections 2 and 3) is compared with the other rule's types, so the types
+-- settle which rule a call means.
+
+-- 1. Two `f` rules; the first takes its default for `b`, the second takes `a`
+-- alone and is the one the site means. Every site below has the first `f` as a
+-- rival that could take `a`. Each level doubles the value: 2^14 = 16384.
+GIVEN a IS A NUMBER
+      b IS A NUMBER TYPICALLY 1
+GIVETH A NUMBER
+f MEANS a PLUS b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+f MEANS a TIMES 2
+
+#EVAL (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS (f WITH a IS 1))))))))))))))
+
+-- 2. A value that is a positional call is checked, so the types settle the choice.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A STRING
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS factor
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+double MEANS x TIMES 2
+
+#EVAL scaled WITH base IS (double 5)               -- 30: `rate` takes its default
+
+-- 3. A value that holds a named call can be given a name first, and the name is
+-- checked.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+viaWhere MEANS scaled WITH base IS m
+  WHERE m MEANS double WITH x IS n
+
+#EVAL viaWhere 5                                   -- 30

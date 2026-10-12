@@ -227,11 +227,15 @@ data ResponseWithReason = ResponseWithReason
   , reasoning :: Reasoning
   , graphviz :: Maybe GraphVizResponse
   , presumed :: [Text]
-  -- ^ The arguments the request left out whose TYPICALLY default the answer
-  -- rests on: each took its default and the evaluation read it (T6 of
-  -- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). An argument's name, or the
-  -- path to a record field inside one (@config.timeout@). Always present, and
-  -- empty when the answer rests on no default.
+  -- ^ The defaults the answer rests on (T6 of
+  -- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). Most entries are arguments
+  -- the request left out whose TYPICALLY default the evaluation read: an
+  -- argument's name, or the path to a record field inside one
+  -- (@config.timeout@). A default the rules themselves took is listed too,
+  -- written @WITH rule: input@, and one from a decode the rules made as
+  -- @JSONDECODE T: path@, in either presumption mode, so an entry with such a
+  -- prefix is not an input of the request. Always present, and empty when the
+  -- answer rests on no default.
   }
   deriving (Show, Read, Ord, Eq, Generic)
   deriving anyclass (NFData)
@@ -295,8 +299,10 @@ data EvaluatorError
     -- server fault, and a refusal is a designed answer of the model.
     --
     -- The list is the refusal's @presumed@ (T6: "every service response"):
-    -- a refusal that rests on a default is one that supplying the input might
-    -- turn into an answer, so the caller must be able to see it.
+    -- a refusal that rests on a default says which, so the caller can see it.
+    -- For an entry that names an input of the request, supplying that input
+    -- might turn the refusal into an answer. A @WITH rule: input@ entry is a
+    -- default the rules took at their own call, which no request can supply.
   | EvaluatorLimited !LimitHit !Text
     -- ^ The evaluation was stopped by one of the service's limits before it
     -- finished, with the message the batch endpoint reports. Not an

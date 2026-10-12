@@ -215,7 +215,7 @@ Steps 4 to 7 are parked under MOTHBALL (`:977`), so **the open item is un-parkin
 
 Presumption mode is a property of a request, and a construction inside the rules has no request (T4b).
 Today a `WITH` that omits a defaulted field is refused in every mode on `unstable`, and filled in every mode on #551 (`../PRESUMPTION-SCENARIOS.md` §2.5).
-This document does not change that; it notes that #551 lists such a fill under `presumed` as `WITH Record: field` **under hard only**, which is the right disclosure.
+This document does not change that; it notes that #551 lists such a fill under `presumed` as `WITH Record: field` **in both modes** (Meng, 2026-10-11, card O1 of the overnight bench), which is the right disclosure.
 
 ### 5.6 The ladder's evaluators and the query planner
 
@@ -258,7 +258,7 @@ A `TYPICALLY` on a definition is a parse error today (`../PRESUMPTION-SCENARIOS.
 **Semantics if ruled.**
 Derive when the definition decides; when the derivation is unknown (its inputs absent-with-none under hard, or three-valued unknown under `UNKNOWN-EVALUATION-SPEC` §4), take the presumed value under soft and refuse-at-force under hard; an assertion beats both.
 Listed under `presumed` when forced, by the node's name.
-Only a literal of the node's result type (`isTypicallyLiteral`, `TypeCheck.hs:2044`).
+Only a literal of the node's result type (`isTypicallyLiteral`, `TypeCheck.hs:2044`), which is no limit of this proposal: HAIRCUT (2026-10-12) made literal-only the rule for every `TYPICALLY`.
 The ladder's `defaults` map gains group entries, and `types.ts:38` is amended.
 
 **What works today instead** is route 2 of `../PRESUMPTION-SCENARIOS.md` §1: a `TYPICALLY` input read only in the `NOTHING` arm.
@@ -361,7 +361,7 @@ Open for Meng, each a ruling and not a slice:
 
 **Round one** found 28 problems, 7 overturning a sentence; each was re-verified against the tree before it was applied.
 The overturned: "the picture decides" (U10b holds the ladder to the Haskell evaluator); "section `GIVEN`s do not make a definition parameterised" (discharge adds them as trailing parameters; the assertion now pins every application); the trace "records" a presumed event; the ladder's evaluators "already honour" a group override (neither does; U10b retires `eval.ts`); §7 "amends T1" (T1 is about a computed field; §7 is unruled); `fillInDefault` as the seam (it never enters a `WHERE`); and the lazy-binding test's expected rows.
-The rest: line numbers at the new base; `energize` over-counts; `provenance` is a declaration-site mark, so the ladder gains an `asserted` set; a 0-ary `WHERE` local is drawn as a leaf; locals are re-allocated per activation; imported definitions are out of reach; `null` on a `MAYBE` node asserts `NOTHING`; MCP's flat arguments and the `/batch` endpoint's `@` keys; service refusals are 422; #551 lists a `WITH` fill under hard only; `@nonassertable` must be its own token; OpenFisca refuses `WHERE`, Catala lowers it to `let`; `presumed` consumer list corrected; `TYPICALLY NOTHING` has two test-fixture uses; `not-ok` golden counts; the inverted test is `:1730`.
+The rest: line numbers at the new base; `energize` over-counts; `provenance` is a declaration-site mark, so the ladder gains an `asserted` set; a 0-ary `WHERE` local is drawn as a leaf; locals are re-allocated per activation; imported definitions are out of reach; `null` on a `MAYBE` node asserts `NOTHING`; MCP's flat arguments and the `/batch` endpoint's `@` keys; service refusals are 422; #551 then listed a `WITH` fill under hard only (it lists it in both modes now); `@nonassertable` must be its own token; OpenFisca refuses `WHERE`, Catala lowers it to `let`; `presumed` consumer list corrected; `TYPICALLY NOTHING` has two test-fixture uses; `not-ok` golden counts; the inverted test is `:1730`.
 
 **Round two** found 20 problems, 4 overturning a sentence, and confirmed six of the seven round-one overturns resolved; the seventh (the trace sentence) is now resolved in §4.2.
 The overturned: the `@` spellings "avoid a collision" (L4 accepts `@assertions` as a name; §4.1 now reserves per surface and refuses the collision); "one schema source" (three builders, §4.3); the seam as a pass over the compiled module (the Shake surfaces evaluate source text with `noRootFills`, so the seam is `EvalConfig`, §9); and Catala's "module-level `context` variable" (`context` marks a scope variable; helper nodes are unassertable there, §8).

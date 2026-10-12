@@ -7,6 +7,7 @@ module L4.Desugar (
   --
   desugarComputedFields,
   detectComputedFieldCycles,
+  detectTypicallyOnComputedFields,
   extractComputedFieldNames,
   -- * Field opening (R5)
   --
@@ -849,6 +850,27 @@ detectCFCDeclare (MkDeclare _ _ appForm (RecordDecl _ _ tns))
         ]
     in [ (recordName, cyc) | CyclicSCC cyc <- stronglyConnComp graphData ]
 detectCFCDeclare _ = []
+
+-- | A computed field (one with a @MEANS@ clause) that also declares a
+-- @TYPICALLY@. Returns each such field, in source order.
+--
+-- A computed field is derived from the other fields, so a default for it could
+-- never be used: construction does not accept it (it is not supplied), the JSON
+-- boundary does not decode it, and the value always comes from the @MEANS@
+-- expression. TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1 makes the pair a check error
+-- rather than metadata that does nothing, now that a @TYPICALLY@ on any other
+-- field is a default a construction takes.
+--
+-- Read off the parsed module, because 'desugarComputedFields' moves the
+-- computed field out of its record, taking its @TYPICALLY@ with it.
+detectTypicallyOnComputedFields :: Module Name -> [Name]
+detectTypicallyOnComputedFields (MkModule _ _ section) = go section
+ where
+  go (MkSection _ _ _ _ topDecls) = concatMap top topDecls
+  top (Declare _ (MkDeclare _ _ _ (RecordDecl _ _ tns))) =
+    [ fn | MkTypedName _ fn _ (Just _) (Just _) <- tns ]
+  top (Section _ s) = go s
+  top _ = []
 
 -- | Extract field name references from a MEANS expression.
 -- Uses the 'Foldable' instance on 'Expr' to collect all names, then
