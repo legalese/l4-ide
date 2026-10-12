@@ -103,6 +103,22 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
   it "parses definitions with different names in time linear in their number" $
     parsesInLinearTime 1000 12000 24 \ i -> "f" <> T.pack (show i) <> " x MEANS " <> T.pack (show i)
 
+  -- Not about clauses: it is here for the timing helper below, which is
+  -- private to this module (assumed, not ruled).
+  --
+  -- An @\@ref@ goes to the first node that starts at or after its end, and
+  -- every node visited used to scan every ref not yet claimed, so a file with
+  -- a citation on each of n definitions took time quadratic in n: 16,000 of
+  -- them took 38 s to check, where the same definitions without citations
+  -- took 4 s. The warnings are forced as well as the definitions, so that the
+  -- whole pass has run when the clock stops. Measured with the scan, 8,000
+  -- definitions took 34 to 35 times as long as 1,000; without it, 8.4 to 8.7
+  -- times, which is what the same definitions with no citations take (8.1 to
+  -- 8.7). So this times 1,000 and 8,000 lines and fails above twice linear.
+  it "attaches @ref citations in time linear in their number" $
+    parsesInLinearTimeWith parseDecidesForcingWarnings 1000 8000 16 \ i ->
+      "@ref https://example.com/s" <> T.pack (show i) <> "\nf" <> T.pack (show i) <> " x MEANS " <> T.pack (show i)
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 
@@ -114,13 +130,17 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
 -- again, up to twice, so that one pause does not fail it. See the comments
 -- at its uses.
 parsesInLinearTime :: Int -> Int -> Double -> (Int -> T.Text) -> Expectation
-parsesInLinearTime smallSize largeSize limit line = do
+parsesInLinearTime = parsesInLinearTimeWith parseDecides
+
+-- | 'parsesInLinearTime', with the parse it times given by the caller.
+parsesInLinearTimeWith :: (T.Text -> IO [Decide Name]) -> Int -> Int -> Double -> (Int -> T.Text) -> Expectation
+parsesInLinearTimeWith parse smallSize largeSize limit line = do
   let file k = T.unlines (map line [1 .. k])
       timeParse k = do
         src <- evaluate (file k)
         _ <- evaluate (T.length src)
         t0 <- getCPUTime
-        n <- length <$> parseDecides src
+        n <- length <$> parse src
         t1 <- getCPUTime
         n `shouldBe` k
         pure (fromIntegral (t1 - t0) :: Double)
@@ -134,12 +154,25 @@ parsesInLinearTime smallSize largeSize limit line = do
   r `shouldSatisfy` (< limit)
 
 parseDecides :: T.Text -> IO [Decide Name]
-parseDecides src =
+parseDecides src = fst <$> parseDecidesAndWarningCount src
+
+-- | 'parseDecides', having also forced the warnings, which depend on the last
+-- state of every pass that attaches annotations to the tree: so each of them
+-- has run to the end.
+parseDecidesForcingWarnings :: T.Text -> IO [Decide Name]
+parseDecidesForcingWarnings src = do
+  (decides, warningCount) <- parseDecidesAndWarningCount src
+  _ <- evaluate warningCount
+  pure decides
+
+-- | The definitions, and a count of the warnings that is not yet evaluated.
+parseDecidesAndWarningCount :: T.Text -> IO ([Decide Name], Int)
+parseDecidesAndWarningCount src =
   case execProgramParser (toNormalizedUri (Uri "file:///pattern-match-spec")) src of
     Left errs ->
       fail ("Parser failed with: " <> show (NE.toList errs))
-    Right (MkModule _ _ (MkSection _ _ _ _ decls), _warnings) ->
-      pure [ d | Decide _ d <- decls ]
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), warnings) ->
+      pure ([ d | Decide _ d <- decls ], length warnings)
 
 decideHeadText :: Decide Name -> T.Text
 decideHeadText (MkDecide _ _ (MkAppForm _ n _ _) _) = rawNameToText (rawName n)
