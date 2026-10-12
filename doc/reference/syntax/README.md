@@ -474,8 +474,6 @@ The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the exp
 A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
 Blank lines and comments between a `@ref` and that construct make no difference.
 
-This is the opposite of `@nlg`, which goes after the name it describes.
-
 **Several citations.** Write them one above the other.
 The construct below keeps all of them, in the order written.
 
