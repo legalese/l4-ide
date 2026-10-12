@@ -39,6 +39,7 @@ import System.Directory
   , removePathForcibly
   , withCurrentDirectory
   )
+import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (hClose, openTempFile)
@@ -73,10 +74,11 @@ withHost libraryPath act = bracket acquire release body
   where
     acquire = do
       saved <- lookupEnv "JL4_LIBRARY_PATH"
-      tmp <- getTemporaryDirectory
-      let base = tmp </> "jl4-service-stdlib-resolution-spec"
-          host = Host { root = base, cwd = base </> "cwd", envLib = base </> "envlib" }
-      removePathForcibly base
+      -- A directory that is new on every call, as 'TestStoreDir' does for the
+      -- stores: two gates running this suite at once must not share, and so
+      -- must not delete, each other's working directory.
+      base <- getCanonicalTemporaryDirectory >>= \tmp -> createTempDirectory tmp "jl4-service-stdlib-resolution-spec"
+      let host = Host { root = base, cwd = base </> "cwd", envLib = base </> "envlib" }
       mapM_ (createDirectoryIfMissing True) [host.cwd, host.envLib]
       mapM_ (\d -> writeFile (d </> "prelude.l4") strayPrelude) [host.cwd, host.envLib]
       pure (saved, host)

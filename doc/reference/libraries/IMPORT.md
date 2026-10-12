@@ -70,8 +70,8 @@ L4 includes several standard libraries:
 
 1. Every library, `prelude` included, has to be asked for by name. Nothing is in scope until
    you write its `IMPORT` line
-2. A file of that name in your own project is used first: one in the project root, or one beside
-   the file that writes the `IMPORT`
+2. A file of that name in your own project is used before the standard library: one in the project
+   root, or one beside the file that writes the `IMPORT`
 3. Failing that, the standard library built into the `l4` you are running is used. It matches that
    `l4` exactly and needs no files on disk
 
