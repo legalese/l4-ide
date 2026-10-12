@@ -63,7 +63,7 @@ For `presumed OR a OR b`, with `presumed` declared first and `TYPICALLY FALSE`, 
 With no `TYPICALLY` it asks them in the order of the diagram, `presumed` first.
 A `TYPICALLY TRUE` in an `AND` sinks the same way.
 A `TYPICALLY` on an [`ASSUME`](../types/TYPICALLY.md#on-an-assume-checked-and-recorded-not-used) gives a prior too, although no evaluation uses that default.
-A default that is not a plain `TRUE` or `FALSE`, an expression for instance, gives no prior.
+A default that is not a plain `TRUE` or `FALSE` gives no prior.
 
 The server's planner and the browser's both rank this way; where each lives, and the test that holds the ordering, is under [Implementation](#implementation).
 
