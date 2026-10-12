@@ -218,12 +218,13 @@ letInliningNodeBudget = 20000
 -- 3.9 s and 3441 nodes 325 MB in 20 s. 300 is the largest of those that
 -- stays in a few megabytes and about a second.
 --
--- Those times were measured on 539cad5fd, before an atomId was the hash of its
--- leaf's term (R3). On 708c40f72 naming the atoms costs far more: @l4 verify@
--- on a rule of 200 @n EQUALS i@ disjuncts takes 13 s, against 0.24 s with
--- @--no-coalesce-atoms@ and 1.1 s on 704ce98d8 (a rule with no clauses, so the
--- cost is not the clauses'), and a 598-row group (300 nodes) no longer answers
--- /query-plan inside 30 s. The limit was not changed for that.
+-- Those times were measured on 539cad5fd. On 708c40f72, once an atomId was the
+-- hash of its leaf's term (R3), naming the atoms made large ladders far slower,
+-- whoever wrote the rule: @l4 verify@ on 200 @n EQUALS i@ disjuncts took 13 s,
+-- and a 598-row group (300 nodes) did not answer /query-plan inside 30 s.
+-- #626 and #629 removed that cost: with eda1e3be5 merged in, the same rule
+-- takes 0.44 s, and the 598-row group 0.85 s under @l4 verify@ and about a
+-- second for both jl4-service routes. The limit was not changed either time.
 clauseGroupLadderBudget :: Int
 clauseGroupLadderBudget = 300
 
