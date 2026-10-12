@@ -274,9 +274,10 @@ All **[E]**. The selection layer is `L4.Export`:
   written above a top-level definition attaches to the **TopDecl** `Decide ann d` node, not to
   the inner `MkDecide`; above a `WHERE` binding it attaches to `LocalDecide ann d`
   (`l4 ast` on `citations.l4`, three `LocalDecide` annos each carrying a `MkRef`) **[E]**. A
-  node's `Anno` holds at most one ref and the nearest preceding one wins, every other becoming a
-  `RefNotAttached` warning (`attachRef`, `ResolveAnnotation.hs:1162-1172`) **[E]** — which is why each block's
-  citation must be read from its _own_ node. The payload text **includes the herald**: `getRef`
+  node's `Anno` held at most one ref and the nearest preceding one won, every other becoming a
+  `RefNotAttached` warning (`attachRef`) **[E]** when this was written; since 2026-10-13 it holds
+  every ref that precedes it, in source order (`specs/done/REF-ANNOTATION-SPEC.md`, "Amendment").
+  Either way each block's citation must be read from its _own_ node. The payload text **includes the herald**: `getRef`
   hands back `"@ref X"` verbatim (unlike `getDesc`, which strips), and the inline form hands back
   `"<<X>>"`, delimiters and all **[E]**. `@ref-src` and `@ref-map` are dead in the AST
   (`Parser.hs:246-252` maps `refAdditionalP` to `Just ()`); the LSP hover reads `@ref-map` off the

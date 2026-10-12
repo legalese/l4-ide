@@ -3953,7 +3953,7 @@ lowerModule opts modul@(MkModule _ uri _) =
   decideRefs = Map.fromList
     [ (getUnique (decideResolved d), getRef r)
     | (ann, d) <- decidesAnn
-    , Just r <- [listToMaybe (catMaybes [view annRef ann, view annRef (getAnno d)])]
+    , Just r <- [listToMaybe (view annRefs ann <> view annRefs (getAnno d))]
     ]
 
   decideRanges :: Map Unique SrcRange

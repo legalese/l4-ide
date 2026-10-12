@@ -641,14 +641,14 @@ refText r =
 -- as 'decideNlg' for the same reason.
 decideRef :: Anno -> Decide Resolved -> Maybe Ref
 decideRef outer (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName _ _) body) =
-  foldr (<|>) Nothing $
-       [ outer ^. annRef
-       , decAnno ^. annRef
-       , afAnno ^. annRef
-       , body ^. annoOf % annRef
-       , getOriginal headName ^. annoOf % annRef
+  listToMaybe . concat $
+       [ outer ^. annRefs
+       , decAnno ^. annRefs
+       , afAnno ^. annRefs
+       , body ^. annoOf % annRefs
+       , getOriginal headName ^. annoOf % annRefs
        ]
-    <> [ getOriginal r ^. annoOf % annRef | MkOptionallyTypedName _ r _ _ <- names ]
+    <> [ getOriginal r ^. annoOf % annRefs | MkOptionallyTypedName _ r _ _ <- names ]
 
 mkTopDef :: EntityInfo -> Map Unique ExportedFunction -> Anno -> Decide Resolved -> TopDef
 mkTopDef ei exps outer d =
@@ -743,7 +743,7 @@ assumeDef se ei outer a@(MkAssume _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkApp
     , adResult  = if isBoolSort resultSort then Nothing else Just resultSort
     , adDesc    = listToMaybe (mapMaybe descFromAnno annos)
     , adNlg     = linearNlg <$> listToMaybe (mapMaybe (^. annNlg) annos)
-    , adRef     = refText <$> listToMaybe (mapMaybe (^. annRef) annos)
+    , adRef     = refText <$> listToMaybe (concatMap (^. annRefs) annos)
     , adRange   = rangeOf a
     , adTypically = isJust mDefault
     , adRefusal = refusal

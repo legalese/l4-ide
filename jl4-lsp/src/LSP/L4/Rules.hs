@@ -1405,9 +1405,11 @@ prettyNlgResolveWarning = \ case
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
   Resolve.RefUnattached r ->
-    "@ref `" <> getRef r.payload <> "` could not be attached to any following syntax node."
+    Resolve.refUnattachedMessage r.payload
+  Resolve.RefTrailing r code ->
+    Resolve.refTrailingMessage r.payload code
   Resolve.RefNoLocation ref ->
-    "@ref `" <> getRef ref <> "` has no source location. This might be an internal compiler error."
+    Resolve.refNoLocationMessage ref
   Resolve.FixityAnnotationMisplaced _ ->
     "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
   Resolve.FixityAnnotationNoLocation _ ->
@@ -1441,6 +1443,8 @@ rangeOfResolveWarning = \ case
   Resolve.Ambiguous name _ _ ->
     srcRangeToLspRange $ rangeOf name
   Resolve.RefUnattached r ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefTrailing r _ ->
     srcSpanToLspRange $ Just r.range
   Resolve.RefNoLocation _ ->
     srcSpanToLspRange Nothing

@@ -1004,7 +1004,9 @@ data Extension = Extension
   , nlgAlts      :: [Nlg]
     -- ^ Further renderings of the same node in OTHER languages. See 'annNlgAlts'.
   , desc         :: Maybe Desc
-  , ref          :: Maybe Ref
+  , ref          :: [Ref]
+    -- ^ Every @\@ref@ written before this node and after the node before it,
+    -- in source order. See 'annRefs'.
   , fixityAnn    :: Maybe Fixity
   , nonassertable :: Maybe Nonassertable
     -- ^ The @\@nonassertable@ annotation above a definition. See 'annNonassertable'.
@@ -1023,10 +1025,10 @@ data Extension = Extension
 
 instance Semigroup Extension where
   Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing [] Nothing Nothing [] Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -1036,7 +1038,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing [] Nothing Nothing [] Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1085,8 +1087,14 @@ nlgFor want@(Just _) a =
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
-annRef :: Lens' Anno (Maybe Ref)
-annRef = #extra % #ref
+-- | The @\@ref@ citations held by a node: every one written after the node
+-- before it and before this one, in source order. A reader that can show one
+-- citation takes the first.
+--
+-- See 'L4.Parser.ResolveAnnotation.addRefCommentsToAst' for which node holds a
+-- ref. Not kept in a bundle: 'Serialise Anno' writes only 'annPmSynthetic'.
+annRefs :: Lens' Anno [Ref]
+annRefs = #extra % #ref
 
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn
@@ -1133,8 +1141,9 @@ setNlgs n alts a = a & annNlg ?~ n & annNlgAlts .~ alts
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
 
-setRef :: Ref -> Anno -> Anno
-setRef r a = a & annRef ?~ r
+-- | Hold further refs on a node, after any it already has.
+addRefs :: [Ref] -> Anno -> Anno
+addRefs rs a = a & annRefs %~ (<> rs)
 
 setFixity :: Fixity -> Anno -> Anno
 setFixity f a = a & annFixity ?~ f
@@ -1474,6 +1483,22 @@ data Ref = MkRef Anno Text
 
 getRef :: Ref -> Text
 getRef (MkRef _ t) = t
+
+-- | The citation itself, without the herald or the angle brackets it was
+-- written with and without the spaces and carriage return the lexer keeps.
+--
+-- For a message that quotes the citation. 'getRef' is not that: it hands back
+-- the token as written, @\"\@ref X  \"@ or @\"\<\<X\>\>\"@, because the exact
+-- printer reprints it byte for byte. Each exporter that reads a citation
+-- strips what it needs from 'getRef' for itself, and not all of them strip
+-- the same things, so the stored text stays as it is.
+refCitation :: Ref -> Text
+refCitation r =
+  let stripped = Text.strip (getRef r)
+      afterHerald = Text.strip (fromMaybe stripped (Text.stripPrefix "@ref" stripped))
+  in case Text.stripPrefix "<<" afterHerald of
+       Just inner -> Text.strip (fromMaybe inner (Text.stripSuffix ">>" inner))
+       Nothing    -> afterHerald
 
 data Desc = MkDesc Anno Text
   deriving stock (Show, Eq, Ord, GHC.Generic)

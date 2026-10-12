@@ -220,7 +220,7 @@ isBooleanTy = \case
 refLabel :: Anno -> Anno -> Maybe Text
 refLabel outerAnn innerAnn = listToMaybe (mapMaybe citationText (refsOf [outerAnn, innerAnn]))
  where
-  refsOf anns = [ getRef r | ann <- anns, Just r <- [ann ^. annRef] ]
+  refsOf anns = [ getRef r | ann <- anns, r <- ann ^. annRefs ]
   citationText raw =
     let stripped    = Text.strip raw
         afterHerald = Text.strip (fromMaybe stripped (Text.stripPrefix "@ref" stripped))

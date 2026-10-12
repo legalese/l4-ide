@@ -260,10 +260,10 @@ collectTopDecides (MkModule _ _ section) = goSection section
 -- node (@Decide ann d@), and one written above a @WHERE@ binding attaches to
 -- the @LocalDecide ann d@ node — not to the inner @MkDecide@ — so both annos
 -- are consulted, outer first, exactly as the DMN lowerer does. A node's anno
--- can hold at most one ref and the nearest preceding one wins, every other
--- becoming a @RefNotAttached@ warning (@attachRef@,
--- @ResolveAnnotation.hs:1162-1172@) — which is why each definition is read from
--- its /own/ node and never from a neighbour's.
+-- holds every ref that precedes it, in source order (@attachRef@), and the
+-- definition's citation is the first one with any text in it, so a stack of
+-- refs above a definition shows the top one. Each definition is read from its
+-- /own/ node and never from a neighbour's.
 --
 -- The gloss is read from the inner @MkDecide@, where 'attachLeadingDesc' puts
 -- it.
@@ -274,7 +274,7 @@ decideAnns outerAnn (MkDecide innerAnn _ _ _) = MkDefAnns
   }
 
 refsOf :: [Anno] -> [Text]
-refsOf anns = [ getRef r | ann <- anns, Just r <- [ann ^. annRef] ]
+refsOf anns = [ getRef r | ann <- anns, r <- ann ^. annRefs ]
 
 -- | The user-facing text of a @\@ref@, with L4's own syntax removed.
 --

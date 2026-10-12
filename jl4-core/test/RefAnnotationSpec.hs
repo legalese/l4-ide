@@ -7,18 +7,23 @@ import qualified Data.Text as Text
 import Base
 import L4.Annotation (getAnno)
 import L4.Parser (execProgramParserWithHintPass)
-import L4.Parser.ResolveAnnotation (Warning (..), WithSpan (..))
+import L4.Parser.ResolveAnnotation (refWarningMessage)
 import L4.Syntax
-  ( Decide (..)
+  ( Anno
+  , Decide (..)
   , Expr (..)
   , Module (..)
   , Name
   , Section (..)
   , TopDecl (..)
-  , annRef
+  , annRefs
   , getRef
   )
 import Test.Hspec
+
+-- | The text of the first @\@ref@ an annotation holds, if any.
+firstRef :: Anno -> Maybe Text
+firstRef anno = getRef <$> listToMaybe (view annRefs anno)
 
 -- | Parse a source snippet and return the @\@ref@ text (if any) attached to
 -- the 'Module' node and to the first top-level declaration ('TopDecl').
@@ -30,9 +35,9 @@ moduleAndFirstDeclRefs src = do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
     Right (m@(MkModule _ _ (MkSection _ _ _ _ decls)), _, _) -> do
-      let moduleRef = fmap getRef (view annRef (getAnno m))
+      let moduleRef = firstRef (getAnno m)
       firstDeclRef <- case decls of
-        (d : _) -> pure $ fmap getRef (view annRef (getAnno d))
+        (d : _) -> pure $ firstRef (getAnno d)
         []      -> do
           expectationFailure "Expected at least one top-level declaration"
           error "unreachable"
@@ -53,16 +58,17 @@ decideBodyRefs' uriStr src = do
       error "unreachable"
     Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
       pure
-        [ (body, fmap getRef (view annRef (getAnno body)))
+        [ (body, firstRef (getAnno body))
         | Decide _ (MkDecide _ _ _ body) <- decls
         ]
 
--- | Parse a source snippet and return the last path segment of the @\@ref@
--- (if any) on each top-level declaration, and of each @\@ref@ reported as
--- not attached to anything, in the order reported.
-declRefsAndUnattached :: Text -> IO ([Maybe Text], [Text])
-declRefsAndUnattached src = do
-  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-unattached")
+-- | Parse a source snippet and return, for each top-level declaration, the last
+-- path segment of every @\@ref@ attached to it, in the order they are held;
+-- and the message of every warning about where a @\@ref@ sits, in the order
+-- reported.
+declRefsAndMessages :: Text -> IO ([[Text]], [Text])
+declRefsAndMessages src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-messages")
       segment = Text.takeWhileEnd (/= '/') . Text.strip . getRef
   case execProgramParserWithHintPass uri src of
     Left errs -> do
@@ -70,8 +76,8 @@ declRefsAndUnattached src = do
       error "unreachable"
     Right (MkModule _ _ (MkSection _ _ _ _ decls), _, warnings) ->
       pure
-        ( [ fmap segment (view annRef (getAnno d)) | d <- decls ]
-        , [ segment w.payload | RefUnattached w <- warnings ]
+        ( [ fmap segment (view annRefs (getAnno d)) | d <- decls ]
+        , mapMaybe refWarningMessage warnings
         )
 
 spec :: Spec
@@ -132,15 +138,16 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       Nothing ->
         expectationFailure "Expected the leading @ref to attach to the first declaration"
 
-  -- A node's 'Anno' carries one 'Ref'. When several precede the same node the
-  -- nearest is attached and each of the others is reported, in source order;
-  -- so is one with no node after it. The pending refs are kept in the order
-  -- they end, and each node claims those that precede it from the front of
-  -- that list, so a mistake in keeping the order would show here: as a ref on
-  -- the wrong node, or one reported that should have attached.
-  it "attaches the nearest of several @refs before a node, and reports the others" $ do
-    (attached, unattached) <-
-      declRefsAndUnattached $
+  -- Every @ref that precedes a node is held by that node, in source order.
+  -- (A node used to hold one, the nearest, and every other was reported as
+  -- unattached, which was false: it had been outranked, not left without a
+  -- node.) The pending refs are kept in the order they end, and each
+  -- node claims those that precede it from the front of that list, so a
+  -- mistake in keeping the order would show here: as a ref on the wrong node,
+  -- or one reported that should have attached.
+  it "keeps every @ref before a node, in source order, and reports only the one with nothing after it" $ do
+    (attached, messages) <-
+      declRefsAndMessages $
         Text.unlines
           [ "@ref https://example.com/one"
           , "@ref https://example.com/two"
@@ -149,8 +156,75 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
           , "DECIDE b IS 2"
           , "@ref https://example.com/four"
           ]
-    attached `shouldBe` [Just "two", Just "three"]
-    unattached `shouldBe` ["one", "four"]
+    attached `shouldBe` [["one", "two"], ["three"]]
+    messages `shouldBe` [endOfFile "https://example.com/four"]
+
+  describe "a @ref with nothing after it" $ do
+    it "says so, naming the citation" $ do
+      (attached, messages) <-
+        declRefsAndMessages "DECIDE a IS 1\n@ref https://example.com/last\n"
+      attached `shouldBe` [[]]
+      messages `shouldBe` [endOfFile "https://example.com/last"]
+
+    it "names the citation without its herald, its trailing spaces or a carriage return" $ do
+      (_, messages) <-
+        declRefsAndMessages "DECIDE a IS 1\r\n@ref https://example.com/crlf   \r\n"
+      messages `shouldBe` [endOfFile "https://example.com/crlf"]
+      any (Text.any (== '\r')) messages `shouldBe` False
+
+    it "names an inline citation without its angle brackets" $ do
+      (_, messages) <- declRefsAndMessages "DECIDE a IS 1\n<<s.5 (1)>>\n"
+      messages `shouldBe` [endOfFile "s.5 (1)"]
+
+  describe "a @ref that follows code on its line" $ do
+    -- It still binds to what follows, as it always did: the warning is what is
+    -- new. A ref cannot be moved to the node before it without making a rule
+    -- that puts every other ref in the corpus one node late.
+    it "warns, and still binds to the construct after it" $ do
+      (attached, messages) <-
+        declRefsAndMessages "DECIDE a IS 1 @ref https://example.com/cite\nDECIDE b IS 2\n"
+      attached `shouldBe` [[], ["cite"]]
+      messages `shouldBe` [afterCode "https://example.com/cite" "DECIDE a IS 1"]
+
+    it "warns once, and not also as having nothing after it, at the end of the file" $ do
+      (_, messages) <-
+        declRefsAndMessages "DECIDE a IS 1 @ref https://example.com/cite\n"
+      messages `shouldBe` [afterCode "https://example.com/cite" "DECIDE a IS 1"]
+
+    it "warns about an inline <<...>> at the end of a code line" $ do
+      (_, messages) <-
+        declRefsAndMessages "GIVEN x IS A BOOLEAN\nDECIDE p IF x <<s.5>>\n  AND TRUE\n"
+      messages `shouldBe` [afterCode "s.5" "DECIDE p IF x"]
+
+    it "does not warn about an inline <<...>> in the middle of a line, which binds to the next word" $ do
+      (_, messages) <-
+        declRefsAndMessages "GIVEN x IS A BOOLEAN\nDECIDE p IF x AND <<s.5>> TRUE\n"
+      messages `shouldBe` []
+
+  describe "a @ref on a line of its own" $ do
+    it "binds to the construct below it and draws no warning" $ do
+      (attached, messages) <-
+        declRefsAndMessages "@ref https://example.com/own\nDECIDE a IS 1\n\n-- a comment\nDECIDE b IS 2\n"
+      attached `shouldBe` [["own"], []]
+      messages `shouldBe` []
+
+    it "still binds to the construct below it across a blank line and a comment" $ do
+      (attached, messages) <-
+        declRefsAndMessages "DECIDE a IS 1\n@ref https://example.com/far\n\n-- a comment\n\nDECIDE b IS 2\n"
+      attached `shouldBe` [[], ["far"]]
+      messages `shouldBe` []
+
+    it "is held by the section heading below it, together with every other @ref above the heading" $ do
+      (attached, messages) <-
+        declRefsAndMessages $
+          Text.unlines
+            [ "@ref https://example.com/act"
+            , "@ref https://example.com/part"
+            , "§ `Part 1`"
+            , "DECIDE a IS 1"
+            ]
+      attached `shouldBe` [["act", "part"]]
+      messages `shouldBe` []
 
   -- The inline `<<…>>` form shares its lexer with `@nlg`'s `[…]` form only in
   -- the sense that both are "an annotation between heralds". They must NOT
@@ -225,3 +299,14 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       case bodies of
         [(_, Just t)] -> t `shouldSatisfy` Text.isInfixOf "s.5 > onward"
         _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+-- | The message for a @\@ref@ with nothing after it. Quoted in
+-- @doc/reference/syntax/README.md@, which is the page to change with it.
+endOfFile :: Text -> Text
+endOfFile citation =
+  "This @ref (`" <> citation <> "`) is at the end of the file, so there is nothing after it to attach to."
+
+-- | The message for a @\@ref@ that follows the given code on its line.
+afterCode :: Text -> Text -> Text
+afterCode citation code =
+  "This @ref (`" <> citation <> "`) follows code on its line, but a @ref binds to what follows it, so it will bind to the next construct instead. Put it on the line above `" <> code <> "`."
