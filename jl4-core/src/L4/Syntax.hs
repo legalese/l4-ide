@@ -1004,7 +1004,7 @@ data Extension = Extension
   , nlgAlts      :: [Nlg]
     -- ^ Further renderings of the same node in OTHER languages. See 'annNlgAlts'.
   , desc         :: Maybe Desc
-  , ref          :: [Ref]
+  , ref          :: Refs
     -- ^ Every @\@ref@ written before this node and after the node before it,
     -- in source order. See 'annRefs'.
   , fixityAnn    :: Maybe Fixity
@@ -1023,12 +1023,32 @@ data Extension = Extension
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | The refs a node holds; 'annRefs' reads them as a list.
+--
+-- A newtype only so that 'show' of an EMPTY one is @Nothing@, as it was when
+-- the field was a @Maybe Ref@. An atomId is the hash of 'show' of a term with
+-- its annotations emptied (L4.Viz.AtomKey), and 'show' of an 'Extension' lists
+-- every field, so @ref = []@ where there was @ref = Nothing@ would move every
+-- atomId a deployed service has handed out, though no leaf changed. A key only
+-- ever sees the empty case, because the annotations are emptied first; a
+-- non-empty one shows as the list it is.
+newtype Refs = MkRefs [Ref]
+  deriving stock (GHC.Generic, Eq, Ord)
+  deriving newtype (Semigroup, Monoid, NFData)
+
+instance Show Refs where
+  showsPrec _ (MkRefs []) = showString "Nothing"
+  showsPrec d (MkRefs rs) = showsPrec d rs
+
+instance ToExpr Refs where
+  toExpr (MkRefs rs) = toExpr rs
+
 instance Semigroup Extension where
   Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 =
     Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing [] Nothing Nothing [] Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -1038,7 +1058,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing [] Nothing Nothing [] Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1094,7 +1114,7 @@ annDesc = #extra % #desc
 -- See 'L4.Parser.ResolveAnnotation.addRefCommentsToAst' for which node holds a
 -- ref. Not kept in a bundle: 'Serialise Anno' writes only 'annPmSynthetic'.
 annRefs :: Lens' Anno [Ref]
-annRefs = #extra % #ref
+annRefs = #extra % #ref % iso (\(MkRefs rs) -> rs) MkRefs
 
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn
@@ -1797,6 +1817,7 @@ deriving anyclass instance Serialise Nlg
 deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
+deriving anyclass instance Serialise Refs
 deriving anyclass instance Serialise Desc
 deriving anyclass instance Serialise Fixity
 deriving anyclass instance Serialise Nonassertable

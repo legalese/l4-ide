@@ -884,7 +884,7 @@ warnDeprecatedAssume origin ann n role mReplacement aliases =
         _                  -> AtTopLevel
     , replacement = mReplacement
     , aliases
-    , annotated = isJust ann.extra.desc || not (null ann.extra.ref)
+    , annotated = isJust ann.extra.desc || not (null (view annRefs ann))
     }
 
 -- | R3: the deprecation warning for an @EXACTLY@ written in a regulative

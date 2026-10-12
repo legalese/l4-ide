@@ -237,7 +237,8 @@ The attachment rule itself is unchanged: a `@ref` attaches to the first node tha
 
 What changed:
 
-1. `Extension.ref` is `[Ref]`, not `Maybe Ref`, and `annRef` is `annRefs` (`jl4-core/src/L4/Syntax.hs`).
+1. `Extension.ref` holds a list of refs, not a `Maybe Ref`, and `annRef` is `annRefs` (`jl4-core/src/L4/Syntax.hs`).
+   The list is the newtype `Refs`, whose `show` is `Nothing` when empty, because an atomId is the hash of `show` of a term with its annotations emptied (`L4.Viz.AtomKey`), and a plain `ref = []` would have moved every atomId.
    A node keeps every ref that precedes it, in source order.
    Until now it kept the nearest and reported each of the others as "could not be attached to any following syntax node", which was untrue of a ref that had only been outranked.
 2. The one "unattached" warning is for a ref with nothing after it, and says so: "This @ref (`…`) is at the end of the file, so there is nothing after it to attach to."
