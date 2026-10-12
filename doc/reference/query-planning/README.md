@@ -157,14 +157,35 @@ DECIDE `warm, by hand` c IS
 ```
 
 L4 reads the clauses as the `CONSIDER` they stand for.
-So the ladder diagram in the editor, the query plan behind the wizard (the `/query-plan` route of `jl4-service`, the service that publishes rules), and `l4 verify` treat the two alike: the same boxes, the same questions, asked in the same order.
+Clauses may share an earlier input and differ in a later one, as the rows of a decision table do:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `colour rule` Red   TRUE  IS TRUE
+DECIDE `colour rule` Red   FALSE IS FALSE
+DECIDE `colour rule` Green b     IS b
+DECIDE `colour rule` Blue  b     IS NOT b
+```
+
+L4 reads each clause knowing what the clauses above it have already settled, so this is drawn as the nested `CONSIDER` a drafter would write: one question about the colour, and for `Red` one question about `b`.
+A clause whose pattern is a new name, such as `DECIDE warm other IS FALSE`, matches anything that reaches it, and is read as `OTHERWISE`.
+
+So the ladder diagram in the editor, the query plan behind the wizard (the `/query-plan` route of `jl4-service`, the service that publishes rules), and `l4 verify` treat the two forms alike: the same boxes, the same questions, asked in the same order.
+That holds when every pattern in the clauses is an enum value, a literal (a number, a piece of text, `TRUE` or `FALSE`), or a name.
+
+### Patterns that are not broken down
+
+A pattern with something inside it, such as `JUST TRUE`, `JUST x` or a list, is not broken down into questions.
+The rule, or the part of it that tests that input, is drawn as one box, as it is for a `CONSIDER` written by hand.
+`l4 verify` lists a rule written as clauses whose whole ladder is that one box as `NOT ANALYSED`, saying that it was not broken down into questions, rather than reporting that it found nothing.
 
 ### At most 300 boxes
 
-Read as a `CONSIDER`, a list of clauses can draw far more boxes than it has clauses.
-Each clause applies only when none of the clauses above it matched, so in a rule with several inputs every later clause is repeated under each earlier case that leaves it open.
-The query plan grows faster still than the drawing.
-
+Read as a `CONSIDER`, a list of clauses can draw more boxes than it has clauses: in a rule with several inputs, a later clause is drawn again under each earlier case that leaves it open.
 So L4 draws at most 300 boxes for a rule written as clauses.
 A rule over that limit is not drawn or planned.
 The ladder diagram and the query plan refuse it with this message (the service answers with a 400 error):
@@ -175,6 +196,15 @@ These clauses would draw a ladder of more than 300 boxes, too many to show. Spli
 
 and `l4 verify` lists the rule as `NOT ANALYSED`, with the same reason.
 
+Clauses with very long bodies can be refused before they are drawn, when written out as the `CONSIDER` they stand for they come to more than 20,000 parts:
+
+```
+These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules.
+```
+
+In the editor, a rule refused for either reason keeps the lens above it, which then reads `No decision graph: these clauses would draw more than 300 boxes`, or `No decision graph: these clauses are too long to draw`.
+Clicking it shows the whole message.
+
 Only the picture and the plan are refused.
 The rule still runs: `#EVAL`, `l4 run` and the service's evaluation answer it as usual.
 
@@ -183,9 +213,16 @@ The rule still runs: `#EVAL`, `l4 run` and the service's evaluation answer it as
 - **Give part of the rule a name of its own.** Move a group of clauses into a separate rule, named for what it decides, and use that rule in the clauses that remain. The rule that uses it shows the call, not the clauses behind it, so they do not count towards its 300; the new rule is drawn, and counted, on its own.
 - **Split one long list into smaller lists**, each deciding one part of the question, and combine their answers with `AND` or `OR`.
 
-The limit applies only to a rule written as clauses.
-A `CONSIDER` you write yourself is drawn as you wrote it.
+The limit applies only to a rule written as clauses, and it is the rule as you wrote it that counts.
+A `CONSIDER` you write yourself is drawn as you wrote it, and so is a rule you wrote by hand after the editor unfolds a call to a clause group into it.
 A rule that answers something other than yes or no, such as a number, is not drawn as a ladder at all, however it is written, and L4 says that first.
+
+### The limit is on the drawing, not on planning
+
+The 300 bounds how much is drawn, not how long the wizard's plan takes.
+A plan's cost depends on how its questions combine, not only on how many boxes there are.
+A table of 20 rows over an enum of 20 values and a yes-or-no input draws 61 boxes and took between 11 and 18 seconds to plan when measured; one of 24 rows draws 73 boxes and took about four minutes.
+The same rule written as a `CONSIDER` by hand takes as long.
 
 ## Implementation
 
