@@ -385,11 +385,18 @@ topLevelDecides tc = foldTopLevelDecides (\d -> [d]) tc.module'
 -- What the ladder and the verifier must agree about is what a rule MEANS; how
 -- much of it either chooses to draw at once is a separate question, and the
 -- @l4\/inlineExprs@ gesture exists precisely so a reader can choose.
+--
+-- A definition the clause desugarer generated is not counted: the @LET@ that
+-- binds "the clauses not yet tried" of a rule written as DECIDE clauses
+-- ('PmSynthetic'). No drafter wrote it, and the rule around it is analysed as
+-- the CONSIDER it stands for, with that @LET@ read through
+-- ('L4.Transform.inlineLetsForViz'), so nothing in it went unvisited.
 nestedNotVisited :: Rules.TypeCheckResult -> Int
 nestedNotVisited tc =
-  sum [length (foldDecides (\_ -> [() :: ()]) d) | d <- tops] - length tops
+  sum [length (foldDecides drafted d) - length (drafted d) | d <- topLevelDecides tc]
   where
-    tops = topLevelDecides tc
+    drafted :: Decide Resolved -> [()]
+    drafted (MkDecide ann _ _ _) = [() | isNothing (view annPmSynthetic ann)]
 
 -- | A decision's name as the drafter wrote it.
 decideName :: Decide Resolved -> Text

@@ -318,7 +318,7 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
 verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
-verifyClauseGroupCallFixture :: FilePath
+verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -328,6 +328,7 @@ verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
 verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
+verifyClauseGroupWhereFixture = fixtureDir </> "verify-clause-group-where.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -446,7 +447,7 @@ coreFixtures =
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
-  , verifyClauseGroupCallFixture
+  , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
@@ -2667,6 +2668,27 @@ spec bin = do
       case objField env "summary" >>= (`objField` "nestedNotVisited") of
         Just (Number n) -> n `shouldBe` 1
         other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
+
+    -- A rule written as DECIDE clauses is compiled to a CONSIDER and a LET for
+    -- the clauses after the first. No drafter wrote that LET, and verify reads
+    -- the group as the CONSIDER with the LET read through, so it is not a
+    -- decision left unvisited; a WHERE the drafter wrote inside a clause is.
+    it "does not count what a clause group is compiled to as WHERE-nested decisions" $ do
+      let nestedLine = "nested in a WHERE clause were NOT visited" :: String
+          nestedCount fixture = do
+            env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+            pure (objField env "summary" >>= (`objField` "nestedNotVisited"))
+      -- three clauses, nothing the drafter nested
+      Output _ groupText _ <- runL4 bin ["verify", verifyClauseGroupFixture]
+      groupText `shouldSatisfy` (not . (nestedLine `isInfixOf`))
+      nestedCount verifyClauseGroupFixture `shouldReturn` Just (Number 0)
+      -- three clauses, one WHERE the drafter wrote inside the second
+      Output _ whereText _ <- runL4 bin ["verify", verifyClauseGroupWhereFixture]
+      whereText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
+      nestedCount verifyClauseGroupWhereFixture `shouldReturn` Just (Number 1)
+      -- a hand-written WHERE-nested DECIDE outside any clause group
+      Output _ handText _ <- runL4 bin ["verify", verifyNestedFixture]
+      handText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
 
     -- This test used to assert the OPPOSITE, as a tripwire: "a future change
     -- which starts descending announces itself here rather than by silently
