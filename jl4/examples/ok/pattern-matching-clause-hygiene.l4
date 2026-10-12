@@ -1,9 +1,9 @@
 -- =============================================================================
 -- Multi-clause DECIDE groups are reported in terms of the clauses the drafter
 -- wrote, not the CONSIDERs they compile to (review of legalese/l4-ide#545,
--- items 2 to 4). Warnings do not stop a file, so this one lives in ok/. This
--- tree's golden records only what each #EVAL gives; the warnings described
--- below are pinned in jl4-core/test/PatternClausesMissingSpec.hs.
+-- items 2 to 4). Warnings do not stop a file, so this one lives in ok/. Main's
+-- golden harness prints warnings after "Typechecking successful", so the golden
+-- records them too; also pinned in jl4-core/test/PatternClausesMissingSpec.hs.
 -- =============================================================================
 DECLARE Colour IS ONE OF Red, Green, Blue
 DECLARE Size IS ONE OF Small, Large
@@ -39,9 +39,9 @@ DECIDE `matches anything first` Red   IS 1
 DECIDE `matches anything first` Green IS 2
 
 -- (3) A fresh name matches anything too, so the last clause is never used,
--- and neither is a clause that repeats an earlier one. Neither draws a
--- warning in this tree: that needs the redundant clauses of a coverage
--- analysis this tree does not have (the reference page says so).
+-- and the warning says so; a clause that repeats an earlier one is never used
+-- either, but draws no warning in this tree: that needs the redundant clauses
+-- of a coverage analysis this tree does not have (the reference page says so).
 GIVEN c IS A Colour
 GIVETH A NUMBER
 DECIDE `fresh name in the middle` Red   IS 1

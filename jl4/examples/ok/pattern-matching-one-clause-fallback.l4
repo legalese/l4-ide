@@ -5,8 +5,8 @@
 -- clause rather than at no location. Two ways the check gives up, and a
 -- control (review of legalese/l4-ide#545; probes m01, p02, p02b; round 2
 -- item 4 swapped the first example, since a number no longer stops the
--- check). This tree's golden records only what each #EVAL gives; the
--- warnings are pinned in jl4-core/test/PatternClausesMissingSpec.hs.
+-- check). Main's golden harness prints warnings, so the golden records them
+-- too; they are also pinned in jl4-core/test/PatternClausesMissingSpec.hs.
 -- =============================================================================
 DECLARE Colour IS ONE OF Red, Green, Blue
 

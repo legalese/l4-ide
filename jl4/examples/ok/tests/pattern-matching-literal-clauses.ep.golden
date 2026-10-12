@@ -5,11 +5,11 @@
 -- with the input's name, and the missing-clause warning suggests that clause.
 -- The enumeration inputs of the same rule are still analysed (review of
 -- legalese/l4-ide#545, round 2, item 4). The groups below are the rows of the
--- design's test plan that are pinned by golden. This tree's golden records
--- only what each #EVAL gives; the warnings are pinned in
--- jl4-core/test/PatternClausesMissingSpec.hs, and unstable's copy of this
--- file pins them by golden. Unstable also reports a clause that repeats a
--- number as never used, and accepts @nonexhaustive; main does neither.
+-- design's test plan that are pinned by golden. Main's golden harness prints
+-- warnings, so this tree's golden records them as well as each #EVAL; they are
+-- also pinned in jl4-core/test/PatternClausesMissingSpec.hs. Unstable also
+-- reports a clause that repeats a number as never used, and accepts
+-- @nonexhaustive; main does neither.
 -- =============================================================================
 
 IMPORT time

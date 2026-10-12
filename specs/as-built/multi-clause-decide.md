@@ -100,7 +100,7 @@ The clauses after one in which every column matches without a test are bound too
 - `jl4/examples/lsp/hover/multi-clause-hover.l4`, with its positions in `jl4/tests/Hover.hs`.
 - `jl4/tests-cli`: `l4 format` "reproduces multi-clause DECIDE and MEANS groups byte-for-byte" (fixture `multi-clause-format.l4`); `l4 check` "warns that a multi-clause DECIDE misses a case, and still succeeds" (`multi-clause-missing.l4`); "multi-clause groups: the names they are compiled to" (`multi-clause-render.l4`, through `l4 render` and `l4 trace`); and "l4 batch: re-prints a multi-clause group as its clauses" (the `batch-multi-clause*` fixtures).
 
-Main's golden harness prints only infos after "Typechecking successful", so no golden under `ok/` shows a warning; the warnings are pinned in `PatternClausesMissingSpec`.
+Main's golden harness prints warnings after "Typechecking successful" (`6ca1fc34c`, described in `specs/as-built/golden-harness.md`), so the golden of an `ok/` file has to record the warnings of its source; `PatternClausesMissingSpec` pins them as well.
 
 ## Exact-print of a clause group (from #130)
 
