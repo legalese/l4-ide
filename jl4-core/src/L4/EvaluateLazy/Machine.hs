@@ -4984,8 +4984,8 @@ renderPresumedPath = Text.concat . go True
 
 -- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
 -- a number, a string, or a nullary constructor. 'Nothing' for anything else,
--- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
--- will need an environment here.
+-- which the checker does not admit: HAIRCUT (2026-10-12) ruled that a default
+-- is a literal, so expression defaults (R8 rule 3, W7) are withdrawn.
 typicallyLiteralValue :: Expr Resolved -> Maybe WHNF
 typicallyLiteralValue = \ case
   Lit _ (NumericLit _ r) -> Just (ValNumber r)

@@ -235,8 +235,21 @@ its `MEANS`, so a default could never be used, and the checker says so.
 
 **Not** a default that is itself a calculation. A `TYPICALLY` value must be a fixed value written
 out (`28`, `"yes"`, `TRUE`, `NOTHING`, a constructor of your own `ONE OF` type); it cannot name another
-`GIVEN` or a definition. For a default that is worked out, or one a provision should be able to cite,
-write it as in [7.3](#e7-3): a named definition plus `fromMaybe`.
+`GIVEN` or a definition, and that is ruled (HAIRCUT, 2026-10-12), not a gap. For a default that is
+worked out, or one a provision should be able to cite, write it as in [7.3](#e7-3): a named definition
+plus `fromMaybe`. Where the input may be left out of a call or a case and its usual value depends on
+other facts, make it a `MAYBE` whose default is `NOTHING` and work the fallback out where it is read:
+
+```l4
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A MAYBE NUMBER TYPICALLY NOTHING
+
+GIVETH A NUMBER
+`the discount` MEANS CONSIDER discount
+                       WHEN JUST d THEN d
+                       OTHERWISE `list price` DIVIDED BY 10
+```
 
 **Not** a way to show that an answer rests on a presumption inside the file. `#EVAL` does not list the
 defaults it took. `l4 batch` and the service list, under `presumed`, a default a case left out and the

@@ -22,6 +22,9 @@ Each is described below, with what a default does _not_ excuse.
 name IS A Type TYPICALLY literal
 ```
 
+A **literal** is a fixed value written out: a number, a piece of text, `TRUE`, `FALSE`, `NOTHING`, or a constructor of an enumeration.
+Nothing else is a default: see [What the default must be](#what-the-default-must-be).
+
 A rule is told some facts about the case in front of it (its **"inputs"**, the
 names listed after `GIVEN`). `TYPICALLY` may appear on:
 
@@ -255,21 +258,65 @@ What the mark does and does not tell you:
 
 ## What the default must be
 
-A default is checked when it is written, and has to be a fixed value:
+A default is a **literal**, and it is checked when it is written:
 
 - It is type-checked against the annotated type
   (`x IS A BOOLEAN TYPICALLY 42` is a type error).
-- It must be a fixed value written out: a number, a piece of text, or a bare
-  name such as `TRUE`, `FALSE`, `NOTHING` or a constructor of an enumeration
-  (`colour IS A Colour TYPICALLY Red`). `x IS A BOOLEAN TYPICALLY (a AND b)` is
-  an error. A default that names something that does not exist is reported once,
-  as that.
+- It must be a literal, a fixed value written out: a number, a piece of text, or
+  a bare name such as `TRUE`, `FALSE`, `NOTHING` or a constructor of an
+  enumeration (`colour IS A Colour TYPICALLY Red`). Anything else is an error:
+  a calculation (`TYPICALLY (a PLUS 1)`), a name of another input or of a
+  definition, a call, `JUST 5` (`x IS A BOOLEAN TYPICALLY (a AND b)` is the
+  same error). A default that names something that does not exist is reported
+  once, as that.
+- This is a decision, not a gap that a later version will fill. A default is a
+  usual value; it is not the place to work something out. When the usual value
+  depends on other facts, write it as the page shows in
+  [When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts).
 - It requires an explicit type: the name must carry an `IS A Type` annotation so
   the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
 - **On an `ASSUME` it is still not used** ([`ASSUME`](ASSUME.md) is deprecated);
   move the declaration under its section's heading to make the default count.
+
+## When the usual value is worked out from other facts
+
+Sometimes the usual value of one input depends on another: a discount that is, unless someone says otherwise, a tenth of the list price.
+`TYPICALLY` cannot say that, because a default is a literal.
+Writing `discount IS A NUMBER TYPICALLY (`list price` DIVIDED BY 10)` is the error above.
+
+Say it with two things that already exist.
+Make the input that may be left out a `MAYBE` whose usual value is `NOTHING`, and let the rule that reads it choose between "a value was given" and "none was":
+
+```l4
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A MAYBE NUMBER TYPICALLY NOTHING
+
+GIVETH A NUMBER
+`the discount` MEANS CONSIDER discount
+                       WHEN JUST d THEN d
+                       OTHERWISE `list price` DIVIDED BY 10
+
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS `the discount`
+```
+
+[typically-worked-out-example.l4](typically-worked-out-example.l4) is this file with its checks.
+
+A case that gives a discount uses it, and a case that leaves it out gets a tenth of the list price.
+With a list price of 1000, `final price` is 900 when no discount is given and 950 when the discount is 50.
+
+- **The fallback is worked out where it is read.**
+  A call written inside another rule that changes the list price changes the fallback with it:
+  `` `final price` WITH `list price` IS 1000 `` is 900 wherever it is written, because the fallback discount is a tenth of the list price that call gives.
+- **The boundary treats it like any other default.**
+  A case sent to `l4 batch` or the decision service that leaves `discount` out takes `NOTHING` and lists `discount` under `presumed`.
+  Under `--presumption hard` a case that leaves `discount` out is refused, naming it, as for any defaulted input.
+- **Why not a bigger `TYPICALLY`?**
+  A default that is a calculation asks the keyword to do the job of an `OTHERWISE` branch.
+  The branch is already there, and it is where a reader looks for "what happens when nothing was given".
 
 ## At the boundary: `l4 batch` and the decision service
 
@@ -352,8 +399,9 @@ out, and a rule that reads it then uses the default; the published list of facts
 asks for a defaulted fact as optional, which the boundary then honours; a
 **rule's own** `GIVEN` and a **record field** may be left out at a call that
 names its inputs and at a construction; and `T WITHAL` leaves out every field of
-a record. Still to come: a default may not yet name another `GIVEN` (it must be
-a fixed value written out)._
+a record. A default does not name another `GIVEN`, and will not: it is a fixed
+value written out (ruled 2026-10-12; see
+[When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts))._
 
 ## Examples
 
@@ -416,13 +464,14 @@ The companion file no longer carries this spelling.
 - A default is used where the name is left out, and nowhere else: a value
   supplied always wins, and `null` (not known) is never an omission.
 - The default must match the annotated type, or type checking fails.
-- The default must be a fixed value written out, like `18` or `"yes"`.
+- The default must be a literal, a fixed value written out, like `18` or `"yes"`.
 - A call that gives its inputs by position, and a construction that gives its
   fields by position, give all of them: only `WITH` may leave one out, and
   `WITHAL` leaves out every field of a record.
 - On a computed field (one with a MEANS clause) a TYPICALLY is an error.
 - For anything a fixed value cannot express, write an ordinary definition
-  instead.
+  instead; for a usual value worked out from other facts, use a `MAYBE` input and
+  a `CONSIDER` ([When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts)).
 
 ## See Also
 
