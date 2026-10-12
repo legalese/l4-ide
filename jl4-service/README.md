@@ -189,7 +189,7 @@ A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer to
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
 **A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
-`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so it is refused by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation` refuses it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`); MCP and batch take it to the wrapper path instead (below). A type that is a synonym for a `MAYBE` is a `MAYBE`.
 For this rule:
 
 ```l4
@@ -214,9 +214,10 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
-Two kinds of request go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list, and every request to a `DEONTIC` function.
-On that path a missing `BOOLEAN` input is an assumed term, which costs nothing if the rule never needs its value.
-If the rule needs it — tests it with `IF`, `AND`, `OR` or `NOT`, compares it, or returns it — evaluation stops and names it:
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every `/evaluation` request to a `DEONTIC` function; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
+On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
+A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
+If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -224,16 +225,20 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
+It stops however the rule reads the input, including through a `CONSIDER` with an `OTHERWISE` branch: before UNKNOWN-EVALUATION-SPEC §8 step 1 the `OTHERWISE` took the missing input, and the request answered `200` with that branch's value, where it now answers `422` and names the input.
+
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
 A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
 
+Every evaluation and batch response says which report it carries, as `"report": "default"`.
+The default report is the only one so far: it shows an answer that is still waiting for an input as the `422` above (UNKNOWN-EVALUATION-SPEC §4.7.4).
+
 Limits, measured 2026-10-02:
 
-- **A `CONSIDER` with an `OTHERWISE` branch does not stop.** It reads an assumed term, matches none of its `WHEN` patterns, and takes the `OTHERWISE` branch, with no error: `ASSUME x IS A BOOLEAN` then `CONSIDER x WHEN TRUE THEN 1 OTHERWISE 2` gives `2`. So on the wrapper path, a missing `BOOLEAN` that the rule reads only through such a `CONSIDER` gets the catch-all answer. Build step 1 (§8) of `UNKNOWN-EVALUATION-SPEC.md`, specified in legalese/l4-ide#526 (merged as a spec) and not built yet, makes such a `CONSIDER` stop and name the input.
 - On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
-- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. This extends the early/late split above; it did not create it.
-- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. Inputs declared with a section `GIVEN` are delivered.
+- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused by `/evaluation`, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. MCP and batch take a top-level `null` to the wrapper path whatever else the request holds, so there a `BOOLEAN` sent as `null` is refused only if the rule reads it, even with no `{}` beside it (smucclaw/l4-ide#1021). This extends the early/late split above; it did not create it.
+- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
 
@@ -319,7 +324,7 @@ The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describ
 
 #### When a case reaches a limit
 
-Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is, with the gaps listed under [What the limits do not cover yet](#what-the-limits-do-not-cover-yet).
+Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is, with what is still outside them listed under [What the limits do not cover yet](#what-the-limits-do-not-cover-yet).
 A case that reaches one fails on its own: the other cases keep their answers, and the batch is still a `200`.
 It carries `@error`, and `@limit` beside it:
 
@@ -356,6 +361,8 @@ On one core the whole batch takes as long as its cases take together, and more c
 #### What a batch can cost
 
 A batch whose cases all run to the time limit takes about ⌈cases ÷ cores⌉ × `--eval-timeout`, and longer while other batches are in flight, since the requests take turns at the same slots.
+A case's time includes finishing its answer: a number the evaluator leaves unfinished is computed inside the case's clock, while it holds its slot.
+Measured on 2026-10-07 on an M-series Mac, on single evaluations under a 1-second limit: a number that takes 3.1 s to finish (an exponent of 20,000) and one that takes 12.2 s (40,000) both came back as the limit at 1.0 s, where before they answered after 3.1 s and 12.2 s.
 The service sets no limit on the number of cases in a batch.
 It also goes on working through a batch after the client has disconnected: measured on 2026-10-02 at `+RTS -N4`, 24 cases that each ran to a 2-second limit kept more than three cores busy for about 12 s, although the client gave up after 6 s.
 
@@ -407,13 +414,42 @@ diagram calls its leaves.
 > apart from a `unique` binding key. `QueryPlanSpec`'s
 > `atom identity, across shapes` group pins both the containment and its exception.
 
-> **An atomId names a QUESTION, not a node.** It is a UUID5 over
-> `"function | label | refs"`, so two occurrences of one condition — which a
-> ladder in AND/OR normal form produces routinely, since reaching that form
+> **An atomId names a QUESTION, not a node.** It is a UUID5 over the function
+> name and the **term** the leaf stands for, so two occurrences of one condition —
+> which a ladder in AND/OR normal form produces routinely, since reaching that form
 > distributes OR over AND — carry the **same** `atomId` and different `unique`s.
 > That is intended: binding the atomId binds every occurrence at once, which is
 > what "the user answered that question" means. If you need to address a single
 > occurrence, bind its `unique` (as a decimal string) instead.
+>
+> Two leaves get one `atomId` exactly when they are the same term: the same
+> structure, naming the same things (WHERE-INLINING-SPEC §10.1, ruling R3). Two
+> leaves that merely **print** alike — two mixfix operators sharing a head keyword,
+> or an input and a rule of the same name — get two. A name counts by what it
+> refers to, never by its spelling or its position in the file.
+>
+> **How long an `atomId` lasts.** It survives a redeploy of the same source, and
+> an edit elsewhere in the module: adding or moving other rules, and renaming or
+> inserting section headings, do not change it. It changes when what the leaf
+> says changes, including a `WHERE` definition the leaf reads, since a leaf is
+> keyed by what it means and not by the name of a local it uses. It can also
+> change when a binder with the same name is added above one it names (the later
+> of the two is then told apart by its sections), when an imported module it
+> names changes, or on an L4 release that changes how terms are represented. A
+> `unique`, by contrast, changes whenever anything above it in the file does, so
+> store `atomId`s, not `unique`s.
+>
+> **One exception: a leaf whose value depends on when it is evaluated** — it
+> reads the ledger (`RECALL`), records to it, fetches or posts, or calls a rule
+> that does. Two occurrences of such a leaf can disagree in one evaluation, so
+> each gets its own `atomId`, numbered in drawing order within its decision. Such
+> an id moves when a leaf of that kind is added or removed earlier in the same
+> decision.
+>
+> **Every `atomId` changed once** (upstream `smucclaw/l4-ide#1013`), when it
+> stopped being a hash of the leaf's printed label and became the hash of its
+> term. An id saved from a build without that change names nothing in a build
+> with it; fetch the diagram again.
 >
 > This was broken until 2026-08-03 (upstream `smucclaw/l4-ide#935`): the two
 > surfaces minted ids in different namespaces, so a binding keyed by a ladder
@@ -600,7 +636,7 @@ By default, error responses return generic messages (e.g., `"Deployment compilat
 The service enforces several resource limits to protect against abuse:
 
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
-- **Evaluation memory**: Each evaluation on the direct path is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`; on the wrapper path it is not yet (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
+- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`, on the thread that evaluates: the calling thread on the direct path, and on the wrapper path the thread the evaluator runs on for the module and for each module it imports (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). The limit covers finishing the answer as well as evaluating it, so a trace counts: a traced single evaluation allocates the trace as well, and a call that fits without `?trace=full` can pass the limit with it (a 1,000-step recursion allocated 6.7 MB untraced and 79 MB traced, measured on 2026-10-07). A batch does not write the reasoning tree, so its cases are not charged for building it; but a traced batch case still pays for recording the trace, and without `graphviz=true` the batch writes nothing from it (measured on 2026-10-07: a 1,000-step case was answered at 40 MB and stopped at 38 MB with `?trace=full`, and needs about 7 MB without it). That waste was there before the limits forced the response. Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
 - **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` and `"@limit": "time"` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. Batch cases, counting every batch in flight, never run more at once than there are cores, so batch cases do not slow each other down by sharing a core. A batch case's clock still counts the garbage collector's pauses, which every running evaluation shares, and any of the work that takes no slot (single evaluations, MCP calls, compiles, query plans, ladder and state-graph rendering, response encoding) that is sharing its core at the time.
 - **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
@@ -610,11 +646,13 @@ The service enforces several resource limits to protect against abuse:
 
 ### What the limits do not cover yet
 
-Three gaps, each measured on 2026-10-03, and none fixed yet:
+Three gaps listed here until 2026-10-07 are closed: the memory limit on the wrapper path (smucclaw/l4-ide#1018), arithmetic left unfinished by the evaluator (#1019), and a limit hit inside an imported value (#1020).
+What is still outside the limits:
 
-- **The memory limit does not reach the wrapper path.** A request that goes through the generated wrapper (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)), such as one with a `null` inside a record input, is stopped by the time limit only. Four such batch cases under a 64 MB limit came back as `"time"` after 2 s, where the same cases on the direct path came back as `"memory"` at once.
-- **Arithmetic the evaluator leaves unfinished is finished while the response is encoded, outside both limits.** A number built up lazily is only computed when the answer is written out, so a 1-second limit returned an 8 MB number after 1.7 s, and the review that found this saw a 64 MB one after 16.9 s. The worst-case time under [What a batch can cost](#what-a-batch-can-cost) leaves this out.
-- **A single or MCP evaluation that hits a limit inside an imported value spoils that connection.** Later calls on the same kept-alive connection answer `Infinite loop detected while trying to evaluate` instead of evaluating; a new connection evaluates again. Batch cases are not affected: the same batch case after such a call came back with `"@limit": "time"`.
+- **On the wrapper path the memory limit applies to each module separately.** The evaluator runs the module you call, and each module it imports, as separate build tasks on separate threads, and each thread gets the whole `--max-eval-memory-mb`. A call that imports modules can therefore allocate up to that limit once per module before it is stopped. The time limit is not split this way: it covers the whole call. The direct path has one thread and so one limit.
+- **`X-Eval-Alloc-Bytes` counts the calling thread only.** On the wrapper path that is not where the evaluating happens, so the header understates what the call allocated: measured on 2026-10-07, a wrapper-path call that spent 1.2 s evaluating reported 29,520 bytes.
+- **Turning the answer into JSON text is outside both limits.** The answer is fully computed inside them, but writing it out happens after. That work grows with the size of the answer, not with how it was reached; it has not been measured separately, but the largest answer tried, 400 KB of digits, came back whole in 0.76 s end to end under a 1-second limit.
+- **A limit that stops a very deep recursion answers a little late.** Before it answers, the evaluator makes the values it was part-way through usable again, and that cannot be cut short. It costs about 0.2 µs for each frame of the evaluator's own stack, and the evaluator stops at 1,000,000 frames. A frame is not a level of recursion: a non-tail recursion such as `sum to` takes about 2.2 frames a level (measured on 2026-10-07, `sum to 400000` answers and `sum to 500000` is refused for exceeding 1,000,000). So the cost is at most about a quarter of a second, and only for a recursion some 450,000 levels deep. Measured with a 1-second limit and a call of `sum to 900000`, which the limit stops before it finishes, the answer came back after 1.12 to 1.27 s, where before it came back after 1.00 to 1.09 s.
 
 ## Persistence
 

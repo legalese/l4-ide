@@ -25,5 +25,5 @@ data BinOp =
   | BinOpWhenLast        -- DATE → (DATE → BOOLEAN) → MAYBE DATE
   | BinOpWhenNext        -- DATE → (DATE → BOOLEAN) → MAYBE DATE
   | BinOpValueAt         -- DATE → (DATE → a) → a
-  deriving stock (Show, Generic)
+  deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)

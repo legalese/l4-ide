@@ -108,7 +108,9 @@ govern what counts as leaving a fact out:
   and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
   takes its default: the case is refused, naming the fact. `{}` means the same,
-  for a record too.
+  for a record too. The one exception is a `MAYBE` fact, which is allowed to
+  have no value: `null` on it is `NOTHING`, a value, and nothing is presumed or
+  refused.
 - **A name that matches nothing is refused where a default is taken.** In a
   case that leaves out a fact with a default, a name that is not a fact is
   refused, naming the nearest one, since it may misspell the fact left out.

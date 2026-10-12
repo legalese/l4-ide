@@ -1,0 +1,49 @@
+`x` and `FALSE`
+`x` or `TRUE`
+`x` and not `TRUE`
+every item of list of `TRUE`, `x` and `FALSE` is true
+`x` implies `TRUE`
+not `x`
+`TRUE` and `x` implies `TRUE`
+`x` implies `TRUE` and `y` implies `TRUE`
+`x` and `y`
+`x` and `y`
+not `x` and `y`
+`x` is equal to `x`
+the sum of `n` and 1 is equal to the sum of `n` and 1
+`d` 's `age` is equal to `d` 's `age`
+`x` is equal to `TRUE`
+`n` is equal to 3
+3 is equal to `n`
+`older` with 18 and not `older` with 65
+`age` is at least 18 or `age` is less than 18
+the sum of `n` and 1
+`n` is one of list of 1 and 2
+`d` 's `age`
+`d` 's `age` is at least 18
+`g` with 3 and not `g` with 4
+`FALSE` and `g` with 3
+`g` is one of list of `g`
+3 is one of list of 3 and `n`
+3 is one of list of `n` and 3
+`true or` with `x`
+`or true` with `x`
+`FALSE` and `and an error` with `TRUE`
+`FALSE` and the result of dividing 1 by 0 is greater than 0
+the result of dividing 1 by 0 is greater than 0 and `FALSE`
+`TBD` and `x`
+`FALSE` and `TBD`
+`x` and `TBD`
+`x` and the result of dividing 1 by 0 is greater than 0
+`x` or `count up from` with 0 is equal to 20000
+consider the case distinctions of `x` and `y` :  when `TRUE` has  then 1. in any other case 2
+consider the case distinctions of `m` :  when `NOTHING` has  then 1. when `JUST` has `z` then 2
+consider the case distinctions of `m` :  when `JUST` has `z` then 2. in any other case 1
+if `n` is greater than 3 then 1 else 2
+`n` as string
+`JSONENCODE` with `n`
+list of `n` and `total`
+list of `n` and `count up from` with 0
+list of `x` and `y` or `TRUE`
+list of `n` and the sum of `n` and 1
+`JUST` with `x` and `y`

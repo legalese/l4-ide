@@ -1,0 +1,18 @@
+`combine` with `__AND__`, `TRUE` and `TRUE`
+`combine` with `__AND__`, `TRUE` and `FALSE`
+`combine` with `__OR__`, `FALSE` and `FALSE`
+`combine` with `__OR__`, `FALSE` and `TRUE`
+`combine` with `__IMPLIES__`, `TRUE` and `FALSE`
+`combine` with `__IMPLIES__`, `TRUE` and `TRUE`
+`apply` with `__NOT__` and `TRUE`
+`apply` with `__NOT__` and `FALSE`
+`combine` with `__AND__`, `FALSE` and `has a positive reciprocal` with 0
+`combine` with `__OR__`, `TRUE` and `has a positive reciprocal` with 0
+`combine` with `__IMPLIES__`, `FALSE` and `has a positive reciprocal` with 0
+`combine` with `__AND__`, `TRUE` and `has a positive reciprocal` with 0
+`FALSE` and `has a positive reciprocal` with 0
+`TRUE` or `has a positive reciprocal` with 0
+`combine` with `__AND__`, `TRUE` and `FALSE`
+`combine` with `__OR__`, `TRUE` and `has a positive reciprocal` with 0
+`apply` with `__NOT__` and `TRUE`
+`TRUE` and `FALSE` or `has a positive reciprocal` with 2

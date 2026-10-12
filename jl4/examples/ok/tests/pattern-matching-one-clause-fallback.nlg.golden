@@ -1,3 +1,5 @@
 `one clause with a literal` with 1 and `JUST` with 5
 `one clause three columns` with `JUST` with `B01`, `JUST` with `B01` and `JUST` with `B01`
 `one clause two columns` with `JUST` with `B01` and `JUST` with `B01`
+`one clause four columns` with 1, `JUST` with `B01`, `JUST` with `B01` and `JUST` with `B01`
+`two clauses three columns` with `JUST` with `B01`, `JUST` with `B01` and `JUST` with `B01`

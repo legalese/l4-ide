@@ -17,7 +17,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.Map as Map
 import qualified Data.Text as Text
-import Schema ()
+import Schema (serverOpenApi)
 import Servant.API (FromHttpApiData (..))
 import Types
 import qualified Test.Hspec.QuickCheck as Hspec
@@ -28,6 +28,15 @@ import Data.Time.Calendar (fromGregorian)
 spec :: Spec
 spec = do
   describe "Schema" do
+    describe "BatchResponse" do
+      it "describes the report every batch response states (UNKNOWN-EVALUATION-SPEC U7b)" do
+        let at k v = case v of
+              Aeson.Object o -> Aeson.KeyMap.lookup k o
+              _              -> Nothing
+            report = at "components" (Aeson.toJSON (serverOpenApi Nothing))
+              >>= at "schemas" >>= at "BatchResponse" >>= at "properties" >>= at "report"
+        (report >>= at "enum") `shouldBe` Just (Aeson.toJSON ["default" :: Text.Text])
+
     describe "Param Schema" do
       describe "FnLiteral" do
         Hspec.prop "Int" $ \(n :: Integer) ->

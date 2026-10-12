@@ -25,12 +25,15 @@ If you already know what error you are looking at, use the table of contents bel
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
   - [Wrong number of inputs](#wrong-number-of-inputs)
+  - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
   - [APPEND vs append](#append-vs-append)
   - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
+  - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
   - [Clause that is never used](#clause-that-is-never-used)
+  - [Annotation above a later clause](#annotation-above-a-later-clause)
   - [ASSUME is being retired](#assume-is-being-retired)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
@@ -455,6 +458,55 @@ result MEANS
 
 ---
 
+### Clauses with more or fewer patterns than the GIVEN names
+
+**Error message:**
+
+```
+Each clause of `g` has 2 patterns, but its GIVEN names 1 input.
+A clause needs one pattern for each input the GIVEN names, in the same order.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE g Red   Red IS 1
+DECIDE g Green c   IS 2
+```
+
+**What went wrong:** A rule written as a list of clauses takes its inputs from the `GIVEN` above the clauses, in order.
+The first pattern in each clause is matched against the first input the `GIVEN` names, the second pattern against the second input, and so on.
+Here each clause has two patterns, but the `GIVEN` names only one input, `c`, so L4 cannot tell which input each pattern is about.
+The error appears once, at the first clause.
+A clause body may still read an input the `GIVEN` names; L4 checks it against the type the `GIVEN` declares, so only a body that uses it as something else draws a second error.
+L4 says nothing about missing or unused clauses until the counts agree.
+
+A `GIVEN` that declares only a type, such as `GIVEN a IS A TYPE`, names no inputs, so clauses with patterns under it draw the same error, ending "its GIVEN names no inputs".
+
+**How to fix it:** Name one input in the `GIVEN` for each pattern, in the order the patterns appear:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+DECIDE g Red   Red IS 1
+DECIDE g Green d   IS 2
+```
+
+or give every clause one pattern for each input the `GIVEN` names.
+
+A list of clauses with no `GIVEN` at all is allowed.
+L4 then works out the type of each input from the patterns and the clause bodies, and where it has to name an input, as `l4 render` does, it calls them `input 1`, `input 2`, and so on.
+Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
+
+---
+
 ### APPEND vs append
 
 **Error message:** Unexpected type error involving strings or lists
@@ -540,6 +592,52 @@ still compile such a file even though `l4 check` refuses to publish it.
 
 ---
 
+### An @export of clauses with no GIVEN
+
+**Error message:**
+
+```
+`size` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input by name, as a value of that input's type.
+A rule written as clauses with patterns and no `GIVEN`, whether one clause or several, has neither.
+L4 names its inputs itself, `input 1`, `input 2` and so on, and works out their types from the patterns and the clause bodies, so a request could not say which input a value is for, and there is no declared type to check the value against.
+So an `@export` of such a rule is an error, reported at the `@export` line, because that is where the missing `GIVEN` goes.
+The error stops the whole file from checking: `l4 run`, the REPL, `l4 batch` and every exporter refuse the file, the `#EVAL`s of its other rules included, until you add the `GIVEN` or remove the `@export`.
+`@export default` is refused the same way.
+Without `@export`, clauses with no `GIVEN` are fine.
+
+**How to fix it:** Add a `GIVEN` below `@export` that names and types each input, in the order the patterns appear, and say what the rule gives back with `GIVETH`:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+```
+
+The rule is then published with the inputs `c` and `n`.
+Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
 ## Compiler Warnings
 
 Warnings do not stop compilation, but they flag code that is likely to fail at runtime or that contains dead branches.
@@ -584,9 +682,44 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `label` Suspended IS
 ```
 
-When the rule has only one clause, the first line reads "This clause does not cover all cases." instead. The check works out the missing clauses only when no pattern in the rule contains a number or a piece of text, even nested as in `(JUST 1)`, or is an `EXACTLY` pattern, and gives up when there would be more than 64 of them to list. A rule of several clauses then gets no warning. A rule of one clause gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover, but that warning has the same two limits: `DECIDE f (JUST 1) IS 1` on its own gets no warning at all.
+When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
 
-**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions. Whatever the type, a CONSIDER in which any branch's pattern contains a number or a piece of text, even nested (`WHEN JUST 1`), or is an `EXACTLY` pattern, gets no warning either way, and neither does one with more than 64 missing branches to list. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+A number or a piece of text in a clause matches one value of its input, and there is no end of the other values.
+So a rule whose clauses match particular numbers or texts is complete only with a clause written with the input's name, and the warning suggests that clause:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE describe 0 IS "zero"
+DECIDE describe 1 IS "one"
+```
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `describe` n IS
+```
+
+The other inputs of the same rule are still analysed: a table keyed by a number and a `Tier` that has no clause for `Gold` is told so, for the keyed rows first, in the order the clauses first name the keys, and then for every other number.
+The same goes for a number or a piece of text nested inside a pattern, as in `(JUST 1)` or `(Box 0)`: the clause for the other values is suggested with `` `_` `` in that place.
+A suggested number is written as the first clause that names it spells it (`1.50`, `1_000`, every digit of `0.1234567890123456789`), and a suggested piece of text as L4 writes it, every printable character as it is (`"São Paulo"`) and a character that does not print escaped (`"tab\there"`).
+An input declared under another name for a number, a piece of text or a date (`DECLARE Money IS A NUMBER`) is one to the check.
+`EXACTLY` of a number, a piece of text, or a value of an enumeration is read as that value, and `EXACTLY` of the input's own name matches every input, as the bare name does.
+Any other `EXACTLY`, such as `EXACTLY someConstant`, or `EXACTLY (m PLUS 1)` with `m` another input, compares the input with a value the check cannot name.
+Where that input is a number, a piece of text or a date, at the top of the clause or inside a pattern as in `(Box (EXACTLY zero))`, the clause counts for nothing: it matches one value of the input for each value of the other inputs, and only the clause with the input's name covers the rest, which covers that one too.
+Such a clause may still match some of the inputs the other clauses miss, so the warning then lists only what the clauses without a number or a piece of text leave open, with each input's name in its number and text positions; for a rule keyed only on numbers and texts, that is the one clause with every input's name.
+With `two MEANS 2`, the clauses `DECIDE f 2 "b" IS 1`, `DECIDE f (EXACTLY two) s IS 2` and `DECIDE f 1 s IS 3` list ``DECIDE `f` n s IS`` alone, not `f 2 s`, which the second clause covers.
+Where it is anything else, such as an enumeration or a record, it stops the check for the rule.
+So does an `EXACTLY` whose expression mentions the input it is matched against, as `EXACTLY (n PLUS 0)` does for `n`, since such a clause may match any number of that input's values.
+When there would be more than 64 clauses to list, a rule whose clauses name numbers or texts is told instead what the clauses without a number or a piece of text leave open; when every clause names one, that is the clause with every input's name alone, and a gap inside the table is not listed.
+A rule whose clauses name no number or text gets no missing-clause warning past that cap, and neither does one whose shorter list is also longer than 64 clauses; a clause that is never used is reported either way.
+A rule declared partial on purpose, with `@nonexhaustive` before its `GIVEN`, gets no missing-clause warning.
+A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down where the clause's does, for an `EXACTLY` it cannot read, so `DECIDE f (EXACTLY someColour) IS 1` on its own, with `c IS A Colour`, gets no warning at all.
+
+**Note:** A CONSIDER written by hand reads numbers, pieces of text and `EXACTLY` exactly as the clauses above do, so the two spellings of one rule warn alike.
+A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests OTHERWISE; a keyed gap inside a pattern is suggested as a WHEN, with the key as the branches spell it; a number repeated in another spelling is a redundant branch.
+BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions.
+Past 64 missing branches to list, a CONSIDER is told only what the branches without a number or a piece of text leave open, as clauses are, and gets no warning when that list is too long as well. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
 
 ---
 
@@ -624,11 +757,60 @@ DECIDE describe Closed IS "stopped"
 
 **What went wrong:** A rule written as a list of clauses tries them from the top, and the first clause that matches is the one that applies. The first clause here matches every status, because its pattern is `status`, the name of the input itself. So `describe Active` is `"some status"`, and the two clauses below it are never reached. The warning appears once, at the first clause that cannot be reached, and says how many more follow it.
 
-The same warning has a second form, "Every input it matches is already matched by a clause above it", for a clause that repeats an earlier one, or that comes after a clause whose pattern is a new name such as `other` (a new name also matches anything). This second form is only given when no pattern in the rule contains a number or a piece of text, or is an `EXACTLY` pattern: in a table keyed by amounts or codes, a repeated clause, or one after `other`, draws no warning. (`TRUE` and `FALSE` are not numbers or text; a table keyed by them is checked.) The first form does not have that limit.
+A pattern that is not a value of its input's type is a new name, such as `other`, or `Gren` where `Green` was meant, and a new name matches anything too.
+The clauses after such a clause get a second form of the warning, which names it:
+
+```
+This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input.
+`Gren` is not a value of its input's type, so it is a new name, and a new name matches anything.
+If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+```
+
+This form is given in rules that match numbers or text too.
+It is not given when a pattern of the rule does not fit its input's type, and not for a new name inside a larger pattern: after `(JUST Gren)`, a clause for `(JUST Blue)` gets the third form below instead.
+When the new name is very close to a value that no clause matches, as `Gren` is to `Green`, a hint at the pattern says so as well.
+
+A third form, "Every input it matches is already matched by a clause above it", is for a clause that repeats an earlier one, or that is covered by a larger pattern above it.
+It is given for numbers and text too: `1` and `1.0` are the same number, so `DECIDE h 1 IS "one"` followed by `DECIDE h 1.0 IS "one point zero"` draws it, and so does a repeated code in a table keyed by text, or a clause after `EXACTLY n` where `n` is the input's own name.
+It is not given when the check stands down for an `EXACTLY` it cannot read (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match)).
 
 A clause that is never used is still checked against the rule's `GIVEN` and `GIVETH`, so a mistake inside it, such as a misspelt name or an answer of the wrong type, is still reported.
 
 **How to fix it:** Put the clauses for particular cases first and the clause that matches anything last, or remove the clause that can never be reached.
+
+---
+
+### Annotation above a later clause
+
+**Warning message:**
+
+```
+This @export is above the second clause of `colour code`, where it is not used.
+A rule written as clauses takes its @export from above its GIVEN only.
+Move it there, or remove it.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `colour code` Red IS 1
+@export the green code
+DECIDE `colour code` Green IS 2
+```
+
+**What went wrong:** A rule written as clauses is one rule, and its annotations are written once, where a rule written as one definition has them.
+An `@export` between two clauses does not publish the rule, a `@desc` there does not describe it, and an `@nlg` there is not used when the rule is put into words.
+The warning appears once at each such annotation.
+
+Definitions that share a name but are told apart by their types, such as `DECIDE show n IS n + 1` followed by `DECIDE show b IS b AND TRUE`, are separate definitions rather than one rule, and each keeps the annotations above it, so they draw no warning.
+
+**How to fix it:** Move the annotation to where the rule's own annotations go, or remove it.
+An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause if it has no `GIVEN`.
+An `@nlg` goes on the line above the first clause.
 
 ---
 
@@ -740,6 +922,8 @@ Add a clause for this case, or end the clauses with one that matches every input
 
 Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning described under [Non-exhaustive pattern match](#non-exhaustive-pattern-match) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
 
+A value that nobody supplied never produces this message: a `CONSIDER` on it stops with [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term) instead, `OTHERWISE` or not.
+
 ---
 
 ### DEONTIC rule does not execute
@@ -768,7 +952,18 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and evaluation stops at the blank. A directive that stops this way makes `l4 run` exit non-zero.
+**What went wrong:** The rule you evaluated reads a name that stands for a fact to be supplied for each case, and nothing supplied it for this run. Two spellings produce that kind of name: a section `GIVEN`, indented under a `§` heading, and, in older files, a module-level `ASSUME` (deprecated). Both are blanks in the rule rather than values, and the answer depends on the blank. The message names, one per line, each blank evaluation reached and needed before it stopped, and a field of a blank record by its path, such as `` `the applicant`'s age ``. A blank it never reached is not named: `#EVAL IF x THEN y ELSE FALSE` names only `x`, though `y` may be needed once `x` is known. Nor is one it would have reached after giving up: working a rule out over a blank may take at most 250,000 steps, and ``#EVAL x OR ((`count up from` 0 EQUALS 20000) OR y)``, which takes more, names only `x`. A directive that stops this way makes `l4 run` exit non-zero.
+
+Evaluation carries a blank along where it can: a comparison (`EQUALS`, `GREATER THAN`, `LESS THAN`, `AT LEAST`, `AT MOST`), `PLUS`, `MINUS` and `TIMES`, and a field of a blank record are worked out in terms of the blank, and `AND`, `OR` and `NOT` combine such answers, so `x AND FALSE` is `FALSE` whatever `x` is. `DIVIDED BY`, `MODULO`, `EXPONENT` and the one-input built-ins such as `FLOOR` and `ROUND` stop at the blank instead, so `(n DIVIDED BY 2 GREATER THAN 1) AND FALSE` waits for `n` where `(n TIMES 2 GREATER THAN 1) AND FALSE` is `FALSE`. So does a field of a blank whose type is declared `IS ONE OF` several kinds, since it may be a kind without that field. It stops when the directive's answer still depends on the blank, and also wherever it would have to choose by the blank's value: to test it with `IF` or `CONSIDER`, to turn it into text with `AS STRING`, `TOSTRING` or `JSONENCODE`, or as the answer, day by day, of `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST` or `WHEN NEXT`. A `CONSIDER` stops even when it has an `OTHERWISE` branch, if a branch before the `OTHERWISE` could still match depending on the blank: `OTHERWISE` is not taken just because the blank is there, since the blank could be any value (see [CONSIDER](../control-flow/CONSIDER.md#otherwise)). An `#EVAL` whose answer _is_ the blank, such as `#EVAL rate`, or `#EVAL TRUE AND eligible` with `eligible` a blank, stops the same way rather than print the name as though it were the answer. A rule that only carries the blank along gives its answer with the name in it: `#EVAL LIST rate, 6` prints `LIST rate, 6`.
+
+An answer that is waiting for a blank is not an error, and the tools say so, each in its own way:
+
+| where           | what it shows                                                                                                                                                                                                                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4 run`        | the message above, and the run exits non-zero                                                                                                                                                                                                                                                                               |
+| `l4 run --json` | an `#EVAL` gets `"kind": "undetermined"`, with `"needs"`, the list of blanks it waits for, each spelled as the message spells it, and `"message"`; an `#ASSERT` keeps `"kind": "assertion"` with a null `"value"` and the two under `"undetermined"`                                                                        |
+| `l4 batch`      | the row's `"status"` is `"undetermined"`; the batch does not stop on it, and exits non-zero once every row has run                                                                                                                                                                                                          |
+| `jl4-service`   | a single evaluation answers with the message above, as the `422` it has always been, and an MCP tool with an error whose text is that `422`'s body; a batch keeps the case in `"cases"` with an `"@error"` carrying the message, and counts it in the summary's `"casesIgnored"`; every response says `"report": "default"` |
 
 **How to fix it:** Decide which of three things you meant.
 

@@ -19,6 +19,8 @@ NOT turns TRUE into FALSE and vice versa. In legal rules it typically encodes ne
 | TRUE  | FALSE |
 | FALSE | TRUE  |
 
+In a trace (`#EVALTRACE`, or the reasoning a service returns), a NOT appears as itself, with its operand and that operand's value beneath it (unless the operand is written as plain `TRUE` or `FALSE`).
+
 ## Examples
 
 **Example file:** [not-example.l4](not-example.l4)

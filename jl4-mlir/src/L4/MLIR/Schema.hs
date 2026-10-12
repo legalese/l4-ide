@@ -81,7 +81,7 @@ import L4.StateGraph.Dot (stateGraphToDot, defaultStateGraphOptions)
 import L4.FunctionSchema
   ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
   )
-import L4.TypeCheck.Environment (contractUnique)
+import L4.TypeCheck.Environment (andUnique, contractUnique, falseUnique, impliesUnique, notUnique, orUnique, trueUnique)
 
 -- ---------------------------------------------------------------------------
 -- Bundle types
@@ -222,15 +222,16 @@ data TraceNode = TraceNode
   , tnExampleCode :: !Text
   , tnResultKind  :: !Int
   , tnSpecial     :: !(Maybe Text)
-    -- ^ M5 slice 4A — flags that ask the runtime to inject a synthetic
-    -- desugar-shaped sub-tree to match jl4-service's @traceToReasoning@.
+    -- ^ M5 slice 4A — flags that ask the runtime to reshape a node's
+    -- sub-tree to match jl4-service's @traceToReasoning@.
     --
-    --   * @\"AND\"@ — @__AND__ a b@ desugars to @IF a THEN b ELSE FALSE@;
-    --     the runtime appends an IF sub-tree and applies short-circuit
-    --     filtering (drops the rhs child when lhs is FALSE).
-    --   * @\"OR\"@ — @__OR__ a b@ desugars to @IF a THEN TRUE ELSE b@;
-    --     symmetric — drops rhs when lhs is TRUE.
-    --   * @\"NOT\"@ — @__NOT__ a@ desugars to @IF a THEN FALSE ELSE TRUE@.
+    --   * @\"AND\"@, @\"OR\"@, @\"IMPLIES\"@ — the built-in connectives.
+    --     jl4-core evaluates their right operand only when the left does
+    --     not decide (UNKNOWN-EVALUATION-SPEC §4.4), while the eager wasm
+    --     codegen may emit both operand frames, so the runtime drops the
+    --     rhs child when the lhs decided: FALSE for AND and IMPLIES, TRUE
+    --     for OR. The connectives are frames, not closures, so there is no
+    --     @IF@ sub-tree to synthesise.
     --   * @\"FN_VALUE\"@ — synthetic fn-value frame emitted at the
     --     start of every @<fn>$trace@; renders as @Result: \<function\>@.
     --   * @\"PROJ\"@ (M5 slice 4G) — property selector @record's
@@ -1284,6 +1285,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
           "__GEQ__"    -> 1
           "__AND__"    -> 1
           "__OR__"     -> 1
+          "__IMPLIES__" -> 1
           "__NOT__"    -> 1
           -- Try the per-fn return-type map FIRST. The typechecker
           -- sometimes attaches an unresolved polymorphic-instance
@@ -1384,19 +1386,19 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
                 Nothing  -> rmap
           in foldExprChildren goE (next + 1) acc' rmap' e
 
-    -- | Recognise the few prelude-desugared shapes whose trace nodes
-    -- need extra synthetic children to match @traceToReasoning@.
+    -- | Recognise the few shapes whose trace nodes the runtime must
+    -- reshape to match @traceToReasoning@.
     specialOf :: Expr Resolved -> Maybe Text
     specialOf (And _ _ _) = Just "AND"
     specialOf (Or _ _ _)  = Just "OR"
-    specialOf (Not _ _)   = Just "NOT"
+    specialOf (Implies _ _ _) = Just "IMPLIES"
     specialOf (Proj _ _ _) = Just "PROJ"
     specialOf (App _ headRes _) =
       case rawNameToText (rawName (getActual headRes)) of
-        "__AND__" -> Just "AND"
-        "__OR__"  -> Just "OR"
-        "__NOT__" -> Just "NOT"
-        _         -> Nothing
+        "__AND__"     -> Just "AND"
+        "__OR__"      -> Just "OR"
+        "__IMPLIES__" -> Just "IMPLIES"
+        _             -> Nothing
     specialOf _ = Nothing
 
     -- | M5 slice 4G — for @Proj record fieldRes@ expressions, bake
@@ -1496,13 +1498,13 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       -> Expr Resolved
       -> ([TraceNode], Map TraceRangeKey (Int, Int), Int)
     foldExprChildren k n a r expr = case expr of
-      And        _ a' b   -> chain2 k n a r a' b
-      Or         _ a' b   -> chain2 k n a r a' b
+      And        _ a' b   -> connective2 k n a r a' b
+      Or         _ a' b   -> connective2 k n a r a' b
       RAnd       _ a' b   -> chain2 k n a r a' b
       ROr        _ a' b   -> chain2 k n a r a' b
-      Implies    _ a' b   -> chain2 k n a r a' b
+      Implies    _ a' b   -> connective2 k n a r a' b
       Equals     _ a' b   -> chain2 k n a r a' b
-      Not        _ x      -> k False n a r x
+      Not        _ x      -> k (isVariable x) n a r x
       Plus       _ a' b   -> chain2 k n a r a' b
       Minus      _ a' b   -> chain2 k n a r a' b
       Times      _ a' b   -> chain2 k n a r a' b
@@ -1515,6 +1517,12 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Gt         _ a' b   -> chain2 k n a r a' b
       Proj       _ x _    -> k False n a r x
       Lam        _ _ body -> k False n a r body
+      App        _ f [a', b]
+        | getUnique f `elem` [andUnique, orUnique, impliesUnique]
+                          -> connective2 k n a r a' b
+      App        _ f [x]
+        | getUnique f == notUnique
+                          -> k (isVariable x) n a r x
       App        _ _ xs   -> chainList k n a r xs
       AppNamed   _ _ ns _ -> chainList k n a r [e' | MkNamedExpr _ _ e' <- ns]
       -- M5 slice 4A: IF branches are *force*-traceable — jl4-core's
@@ -1587,6 +1595,21 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
     chain2 k n a r x y =
       let (a1, r1, n1) = k False n  a  r  x
       in              k False n1 a1 r1 y
+
+    -- UNKNOWN-EVALUATION-SPEC §8 step 2 — jl4-core evaluates a built-in
+    -- connective's left operand as a child of the connective, so a
+    -- variable shows in its trace while a TRUE or FALSE constructor is
+    -- pruned as trivial, and its right operand, when it is needed, in
+    -- tail position, as a step of its own that is never pruned. Force-
+    -- trace the operands the same way.
+    connective2 k n a r x y =
+      let (a1, r1, n1) = k (isVariable x) n a r x
+      in              k True n1 a1 r1 y
+
+    -- A bare name that is not the TRUE or FALSE constructor.
+    isVariable :: Expr Resolved -> Bool
+    isVariable (App _ v []) = getUnique v `notElem` [trueUnique, falseUnique]
+    isVariable _            = False
     chainList _ n a r []     = (a, r, n)
     chainList k n a r (x:xs) =
       let (a1, r1, n1) = k False n a r x
@@ -1766,6 +1789,18 @@ exprDisambiguator = \case
   Gt{}         -> Just "Gt"
   Proj{}       -> Just "Proj"
   Lam{}        -> Just "Lam"
+  -- The built-in connectives as calls, which is how type checking leaves
+  -- them, get the surface forms' tags: @NOT p@ shares its 'SrcRange' with
+  -- @p@ when @p@ is a name, and with @p AND q@ in @NOT (p AND q)@, so under
+  -- one "App" tag the operand's entry overwrote the connective's and its
+  -- trace frame opened under the operand's node. A NOT's tag also carries
+  -- its operand's, because in @NOT (NOT p)@ all three share one range.
+  App _ f [x]
+    | getUnique f == notUnique                    -> Just ("Not(" <> fromMaybe "" (exprDisambiguator x) <> ")")
+  App _ f [_, _]
+    | getUnique f == andUnique                    -> Just "And"
+    | getUnique f == orUnique                     -> Just "Or"
+    | getUnique f == impliesUnique                -> Just "Implies"
   App{}        -> Just "App"
   AppNamed{}   -> Just "AppNamed"
   IfThenElse{} -> Just "IfThenElse"

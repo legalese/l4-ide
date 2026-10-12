@@ -1,0 +1,26 @@
+-- Groups with no GIVEN whose first clause matches anything, beside a
+-- drafter's `input 1`. The clauses after it are never tried, the checker
+-- drops them, and a single clause with no distinguishing pattern prints
+-- as a plain definition. Printed with the desugarer's names for its inputs,
+-- `input 1` in the body became the input, and `through Red` answered Red
+-- with status "success" (probe p3/fb1). Every answer is Blue.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+`input 1` MEANS Blue
+
+DECIDE h `_` IS `input 1`
+DECIDE h Red IS Green
+
+DECIDE h2 `_` `_` IS `input 1`
+DECIDE h2 Red Red IS Green
+
+@export one
+GIVEN c IS A Colour
+GIVETH A Colour
+DECIDE one c IS h c
+
+@export two
+GIVEN c IS A Colour
+GIVETH A Colour
+DECIDE two c IS h2 c c

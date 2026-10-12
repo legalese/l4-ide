@@ -1,0 +1,13 @@
+-- Clauses indented with tabs (probe q/tab2): printed from the source
+-- text, they did not parse again.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default fee
+GIVEN c IS A Colour
+GIVETH A NUMBER
+	DECIDE fee Red   IS 1
+	DECIDE fee Green IS
+		2 + 1
+	DECIDE fee c     IS 3
+

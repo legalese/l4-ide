@@ -11,6 +11,7 @@ module L4.TypeCheck
   , doCheckProgramWithDependencies
   , initialCheckState
   , initialCheckEnv
+  , isClausesBinding
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
@@ -88,8 +89,9 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
-import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
+import L4.Parser.ResolveAnnotation (pickDesc)
+import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
+import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
 import L4.TypeCheck.Annotation
@@ -100,6 +102,7 @@ import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
 import L4.Lexer (FixityDirection (..), fixityHerald)
 import qualified L4.Lexer as Lexer
+import qualified L4.ExactPrint as ExactPrint
 import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
 import qualified L4.Discharge as Discharge
 import qualified L4.Export as Export
@@ -113,10 +116,11 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.))
+import Optics ((%~), (^.), gplate)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
+import Data.Char (isPrint)
 import Text.Read (readMaybe)
 import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
@@ -395,13 +399,101 @@ suppressResolutionCascade errs
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
-checkProgram module' = do
-  withScanTypeAndSigEnvironment scanTyDeclModule inferTyDeclModule scanFunSigModule module' \rdecides -> do
-    (rprog, topEnv) <- inferProgram module'
-    -- Build the mixfix registry from THIS module's function signatures
-    -- so it can be propagated to importing modules
-    let localMixfixRegistry = buildMixfixRegistry rdecides
-    pure (rprog, topEnv, localMixfixRegistry)
+checkProgram written = do
+  -- 'withScanTypeAndSigEnvironment', with one step between scanning the
+  -- types and scanning the definitions: once the module's constructors are
+  -- known, a run of clauses that the parser grouped on bare names alone is
+  -- told apart from a run of overloads ('separateOverloads').
+  rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
+  withDeclares rdeclares do
+    module' <- separateOverloads written
+    rdecides <- scanFunSigModule module'
+    withDecides rdecides do
+      (rprog, topEnv) <- inferProgram module'
+      -- Build the mixfix registry from THIS module's function signatures
+      -- so it can be propagated to importing modules
+      let localMixfixRegistry = buildMixfixRegistry rdecides
+      pure (rprog, topEnv, localMixfixRegistry)
+
+-- | Turn each run of clauses that the parser grouped only because their bare
+-- names differ ('L4.Parser.decidePatternMatch') back into the separate
+-- definitions it would have been without clause groups, when none of those
+-- names is a constructor.
+--
+-- The parser groups @DECIDE f TRUE IS 1@ / @DECIDE f FALSE IS 0@, and also
+-- @show n MEANS n + 1@ / @show b MEANS b AND TRUE@, because a bare name in a
+-- pattern could be a constructor or a new name, and only resolving it tells
+-- which. The second run is two overloads, told apart by their types; read as
+-- one group, its first clause matched every input and the second was never
+-- used, and a file that runs on @main@ did not check. So here, where
+-- constructors are known: a run in which no pattern is a literal, an applied
+-- constructor or a name that resolves to a constructor is checked as the
+-- definitions it is made of, the first with the run's signature and the rest
+-- with none, as the parser reads them when it does not group them, and each
+-- with its own clause's head, @AKA@ and annotations ('PmMatrixClause'). A run
+-- with a name that is a constructor stays a group, misspellings included:
+-- @Red@ / @Gren@ / @Blue@ is a group whose @Gren@ binds a new name, and
+-- whose last clause is reported as never used.
+--
+-- A name that is its column's own input matches anything rather than naming
+-- a constructor, as the desugarer reads it ('patAlwaysMatchesAs'), so it is
+-- not asked about. Only top-level definitions are ever grouped.
+separateOverloads :: Module Name -> Check (Module Name)
+separateOverloads (MkModule mann uri sec) = MkModule mann uri <$> goSection sec
+  where
+    goSection (MkSection sann mn maka mgiven decls) =
+      MkSection sann mn maka mgiven . concat <$> traverse goDecl decls
+    goDecl = \ case
+      Decide tann d -> overloadsOf d >>= \ case
+        Just (d1 : ds) -> pure (Decide tann d1 : map (Decide emptyAnno) ds)
+        _ -> pure [Decide tann d]
+      Section sann sub -> List.singleton . Section sann <$> goSection sub
+      other -> pure [other]
+
+    overloadsOf :: Decide Name -> Check (Maybe [Decide Name])
+    overloadsOf (MkDecide ann sig (MkAppForm aann hd _ _) body) =
+      case view annPmMatrix ann of
+        Just matrix
+          | let patterns = map (.patterns) matrix.clauses
+          , length patterns >= 2
+          , Just names <- traverse (traverse barePatternName) patterns -> do
+              let asked = [ n | ns <- names, (s, n) <- zip matrix.scrutinees ns, rawName n /= rawName s ]
+              anyConstructor <- or <$> traverse (fmap isJust . quietly . resolveConstructor) asked
+              pure if anyConstructor then Nothing else do
+                bodies <- clauseBodies matrix.scrutinees patterns body
+                guard (length bodies == length names)
+                pure
+                  [ if i == 0
+                      then MkDecide (set annPmMatrix Nothing ann) sig (MkAppForm aann hd ns cl.clauseAka) b
+                      else MkDecide (clauseAnno cl b) noSignature (MkAppForm emptyAnno cl.clauseHead ns cl.clauseAka) b
+                  | (i, cl, ns, b) <- List.zip4 [0 :: Int ..] matrix.clauses names bodies
+                  ]
+        _ -> pure Nothing
+
+    barePatternName = \ case
+      PatApp _ n [] -> Just n
+      _ -> Nothing
+
+    noSignature = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
+
+
+    -- From the clause's head to the end of its body: the key under which its
+    -- signature is found ('scanFunSigDecide'), distinct for every clause.
+    clauseSpan cl b = do
+      h <- cl.headRange
+      r <- rangeOf b
+      pure MkSrcRange { start = h.start, end = r.end, length = h.length + r.length, moduleUri = h.moduleUri }
+
+    -- A location without tokens, read off a hole as a name's is
+    -- ('L4.Parser.givenInputBinding'); the tokens stay with the first
+    -- definition, whose annotation holds the whole run's.
+    rangedAnno r = mkAnno [mkHoleWithSrcRangeHint r]
+
+    -- A later definition carries what was written for its own clause: the
+    -- @\@desc@ or @\@export@ above it, one of them if there are several, as
+    -- a definition keeps ('PmMatrixClause' @clauseDescs@, 'pickDesc'); its
+    -- head, with any @\@nlg@ above it, and its @AKA@ come with the clause.
+    clauseAnno cl b = maybe id setDesc (pickDesc cl.clauseDescs) (rangedAnno (clauseSpan cl b))
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
@@ -1079,31 +1171,68 @@ asValue = local \ env -> env { enclosingObligation = (\ enc -> enc { direct = Fa
 -- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
 -- computes it per declaration.
 inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
-inferTopDecl _ (Declare ann declare) = do
+inferTopDecl _ (Declare ann declare@(MkDeclare _ _ (MkAppForm _ dn _ _) _)) = do
+  rejectNonassertable "a declaration" (Just (rawNameToText (rawName dn))) ann
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
 inferTopDecl _ (Decide ann decide) = do
+  rejectNonassertableOnInput decide
+  refuseExportedClausesWithoutGiven decide
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
-inferTopDecl origin (Assume ann assume) = do
+inferTopDecl origin (Assume ann assume@(MkAssume _ _ (MkAppForm _ an _ _) _ _)) = do
+  rejectNonassertable "an input" (Just (rawNameToText (rawName an))) ann
   (rassume, extends) <- prune $ inferAssume origin assume
   pure (Assume ann rassume, extends)
 inferTopDecl _ (Directive ann directive) = do
+  rejectNonassertable "a directive" Nothing ann
   rdirective <- inferDirective directive
   pure (Directive ann rdirective, [])
 inferTopDecl _ (Import ann import_) = do
+  rejectNonassertable "an import" Nothing ann
   rimport_ <- inferImport import_
   pure (Import ann rimport_, [])
 inferTopDecl _ (Section ann sec) = do
+  rejectNonassertable "a section heading or its inputs" Nothing (getAnno sec)
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
 inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+  rejectNonassertable "a timezone" Nothing ann
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
   -- source range for that diagnostic. See T4.
   (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
+
+-- | @\@nonassertable@ marks a named step; on anything else, above it or
+-- among its lines, it is an error named for what it sits on, at the
+-- annotation's own range ('L4.Parser.ResolveAnnotation' gives every mark on
+-- such a construct to it).
+rejectNonassertable :: Text -> Maybe Text -> Anno -> Check ()
+rejectNonassertable what mname ann =
+  for_ (ann ^. annNonassertable) \ na ->
+    addError (NonassertableOnNonDefinition what mname (rangeOf na))
+
+-- | The marks the resolver found on a definition's GIVEN lines
+-- ('annNonassertableOnInputs'): one error each, naming the input on the
+-- mark's line, or the next one when the mark has a line of its own among
+-- them; on every surface, since 'L4.Export.isNonassertableDecide' never
+-- reads these.
+rejectNonassertableOnInput :: Decide Name -> Check ()
+rejectNonassertableOnInput decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ inputs) _) _ _) =
+  for_ (getAnno decide ^. annNonassertableOnInputs) \ na -> do
+    let lineOf :: Maybe SrcRange -> Maybe Int
+        lineOf = fmap (\ r -> r.start.line)
+        markLine = lineOf (rangeOf na)
+        inputName (MkOptionallyTypedName _ n _ _) = rawNameToText (rawName n)
+        atOrAfter :: OptionallyTypedName Name -> Bool
+        atOrAfter (MkOptionallyTypedName _ n _ _) = lineOf (rangeOf n) >= markLine
+        mname = case (filter atOrAfter inputs, reverse inputs) of
+          (next : _, _) -> Just (inputName next)
+          ([], lastInput : _) -> Just (inputName lastInput)
+          ([], []) -> Nothing
+    addError (NonassertableOnNonDefinition "an input" mname (rangeOf na))
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
 -- there is a potential problem. If we use type-directed name resolution but
@@ -1132,7 +1261,9 @@ inferDecide dec@(MkDecide ann _tysig _appForm expr) = do
     -- whole body, WHERE-bound helpers included. Redundancy warnings stay
     -- active. See 'L4.Export.isNonexhaustiveDecide' / 'DescFlags'.
     withNonexhaustiveFlag $ lookupFunTypeSigByAnno ann >>= \ dHead -> do
-        decide <- extendKnownMany dHead.arguments $ do
+        -- The respelled inputs come first, so that each input's own name is
+        -- the one its entity is recorded under.
+        decide <- extendKnownMany (clauseInputSpellings dec dHead <> dHead.arguments) $ do
           rexpr <- settleOneClause do
             rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
             -- Clause-matrix exhaustiveness for multi-clause pattern-matching
@@ -1172,9 +1303,10 @@ inferDecide dec@(MkDecide ann _tysig _appForm expr) = do
 -- A one-clause group's generated CONSIDERs miss exactly what the clause
 -- misses, so 'checkConsider' still reports them; but in WHEN terms, located
 -- nowhere. When the matrix reached a verdict, it has said the same thing as a
--- clause, at the clause, so they are withdrawn. When it gave up (a literal
--- pattern, or more missing clauses than it lists), they are the only warning
--- the group gets, and are kept, moved to the definition's own location.
+-- clause, at the clause, so they are withdrawn. When it gave up (an @EXACTLY@
+-- it cannot read, or more missing clauses than it lists even after the
+-- coarse tier of 'analyseResolvedRows'), they are the only warning the group
+-- gets, and are kept, moved to the definition's own location.
 -- A group of two clauses or more never reaches here: its generated CONSIDERs
 -- do not report at all.
 --
@@ -1219,6 +1351,97 @@ isClausesBinding = \ case
     Just (PmUnreachable _) -> True
     _ -> False
   LocalAssume {} -> False
+
+-- | A multi-clause group whose clauses have a different number of patterns
+-- than its GIVEN names inputs, a GIVEN that declares only type parameters
+-- included. The desugarer then made up a name for each input
+-- ('L4.Parser.desugarPatternClauses'), so the GIVEN and the definition
+-- disagree on every name, and every message about that would be about names
+-- the drafter never wrote. Say what is wrong once, at the first clause, and
+-- check the group as if its GIVEN named the made-up inputs, untyped, after any
+-- type parameters it declares, so that nothing else is reported about them.
+--
+-- The inputs the GIVEN does name are no inputs of the group, but a clause
+-- body may still read one; each is kept in scope at the type the GIVEN
+-- declares ('givenInputsInScope'), so that such a body is checked as written
+-- and draws no error about the name.
+--
+-- Returns the signature to check the definition against, and those inputs.
+clauseInputsAgainstGiven :: Decide Name -> Check (TypeSig Name, [OptionallyTypedName Name])
+clauseInputsAgainstGiven dec@(MkDecide ann tysig@(MkTypeSig tann (MkGivenSig gann otns) mgiveth) appForm _) =
+  case view annPmMatrix ann of
+    Just matrix | givenMisnamesInputs dec -> do
+      let firstHead = listToMaybe matrix.clauses >>= (.headRange)
+          givenInputs = filter isTerm otns
+      addError (ClausePatternCountMismatch firstHead (getName appForm) (length matrix.scrutinees) (length givenInputs))
+      pure (MkTypeSig tann (MkGivenSig gann (filter (not . isTerm) otns <> map untyped matrix.scrutinees)) mgiveth, givenInputs)
+    _ -> pure (tysig, [])
+  where
+    untyped n = MkOptionallyTypedName emptyAnno n Nothing Nothing
+
+-- | The inputs a GIVEN names when they are no inputs of its multi-clause group
+-- ('clauseInputsAgainstGiven'), in scope at the type the GIVEN declares, or at
+-- one nothing constrains when it declares none. Run where the GIVEN's type
+-- parameters are in scope, so that a declared type may mention them.
+givenInputsInScope :: [OptionallyTypedName Name] -> Check [CheckInfo]
+givenInputsInScope = traverse \ (MkOptionallyTypedName _ n mty _) -> do
+  rn <- def n
+  ty <- maybe (fresh (rawName n)) inferType mty
+  pure (makeKnown rn (KnownTerm ty Local))
+
+-- | Does this multi-clause group have a GIVEN, but not one that names one
+-- input per pattern? (The desugarer made up the inputs' names when it does
+-- not; with no GIVEN at all, that is how the inputs are meant to be named.)
+givenMisnamesInputs :: Decide Name -> Bool
+givenMisnamesInputs (MkDecide ann (MkTypeSig _ (MkGivenSig _ otns) _) _ _) =
+  case view annPmMatrix ann of
+    Just matrix -> matrix.synthesizedScrutinees && not (null otns)
+    Nothing     -> False
+
+-- | Refuse an @\@export@ of a definition written as clauses with patterns,
+-- one clause or several, with no GIVEN (ruling M2, option A, 2026-10-08). The
+-- desugarer made up its inputs' names ('L4.Parser.generatedName'), and
+-- nothing declares their types, so an export would publish inputs that no
+-- request can name and that have no declared type to check a value against:
+-- jl4-service published @input 1@ and @input 2@, typed "object", and every
+-- call failed. Every spelling of @\@export@ counts, as it does for
+-- publication ('L4.Export.isExportedDecide'). Clauses with a GIVEN that
+-- misnames their inputs are already refused ('clauseInputsAgainstGiven'), and
+-- are not refused twice.
+--
+-- The error is at the @\@export@, which is where the GIVEN it asks for goes.
+-- 'L4.Export.isExportedDecide' holds only where there is an @\@export@, and
+-- that is parsed from source tokens, so it has a range; the first clause's
+-- head is a defensive fallback.
+-- Only top-level definitions are published, so 'inferTopDecl' calls this.
+refuseExportedClausesWithoutGiven :: Decide Name -> Check ()
+refuseExportedClausesWithoutGiven dec@(MkDecide ann (MkTypeSig _ (MkGivenSig _ otns) _) appForm _) =
+  case view annPmMatrix ann of
+    Just matrix
+      | matrix.synthesizedScrutinees
+      , not (null matrix.scrutinees)
+      , null otns
+      , Export.isExportedDecide dec ->
+          let at = (view annDesc ann >>= rangeOf) <|> (listToMaybe matrix.clauses >>= (.headRange))
+          in addError (ExportedClausesWithoutGiven at (getName appForm))
+    _ -> pure ()
+
+-- | The names a multi-clause group's generated CONSIDERs read its GIVEN
+-- inputs by ('L4.Parser.scrutineeRef'): each input's name respelled with
+-- 'PreDef', which no source can write, made another name of the same input.
+-- A pattern variable that a clause binds, which may have the input's name,
+-- then cannot capture the reference. A group with no GIVEN for its inputs
+-- needs none: the desugarer's names for them are spelled so already.
+clauseInputSpellings :: Decide Name -> FunTypeSig -> [CheckInfo]
+clauseInputSpellings dec dHead = case view annPmMatrix (getAnno dec) of
+  Just matrix | not matrix.synthesizedScrutinees ->
+    [ makeKnown (Def (getUnique r) (MkName (getAnno o) (PreDef (nameToText o)))) ci.checkEntity
+    | ci <- dHead.arguments
+    , r <- ci.names
+    , let o = getOriginal r
+    , rawName o `elem` map rawName matrix.scrutinees
+    ]
+  _ -> []
 
 -- | Check the @LET@ a multi-clause group is compiled to: a binding of the
 -- clauses not yet tried ('PmFallthrough', or 'PmUnreachable' after a clause
@@ -1316,17 +1539,42 @@ speculatively m = MkCheck \ e s ->
 -- 'warnUnreachableClauses').
 --
 -- Every bail below is FAIL-OPEN to no-warning, the same contract as
--- 'analyzePatternMatch': no warning is better than a wrong one or a hang.
+-- 'literalTiers': no warning is better than a wrong one or a hang.
 checkClauseMatrix :: Decide Name -> FunTypeSig -> Check Bool
 checkClauseMatrix dec dHead =
   case view annPmMatrix (getAnno dec) of
+    -- The clauses do not match the GIVEN ('clauseInputsAgainstGiven'), so
+    -- which clauses are missing, or never used, is a question to ask once
+    -- they do. Saying it is settled also withdraws a one-clause group's
+    -- CONSIDER warnings ('settleOneClause').
+    Just matrix | givenMisnamesInputs dec -> do
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
+      pure True
     Just matrix -> do
-      (answered, redundant) <- analyseMatrix matrix
-      warnUnreachableClauses matrix (getName dHead.rappForm) redundant
+      warnLaterClauseAnnotations matrix (getName dHead.rappForm)
+      recordInputPatterns matrix
+      (answered, redundant, byNewName) <- analyseMatrix matrix
+      warnUnreachableClauses matrix (getName dHead.rappForm) redundant byNewName
       pure answered
     Nothing -> pure False
   where
     MkAppForm _ _ colScruts _ = dHead.rappForm
+
+    -- | A pattern that is its input's own name compiles to nothing
+    -- ('L4.Parser.patAlwaysMatchesAs'), so no checked node sits under it.
+    -- Record the input's type there, so that hover on it answers as it does
+    -- on the input, not with whatever node encloses it.
+    recordInputPatterns :: PmMatrix -> Check ()
+    recordInputPatterns matrix = do
+      ei <- asks (.entityInfo)
+      for_ matrix.clauses \ cl ->
+        for_ (zip colScruts cl.patterns) \ (r, p) -> case p of
+          PatApp _ n []
+            | rawName n == rawName (getName r)
+            , Just range <- rangeOf n
+            , Just (_, KnownTerm ty _) <- Map.lookup (getUnique r) ei
+            -> addInfoForSrcRange range (TypeInfo ty (Just Local))
+          _ -> pure ()
 
     -- @nonexhaustive: the author declares the group deliberately partial, so
     -- the missing-clause warning is silenced. Unreachable clauses are a bug
@@ -1334,9 +1582,17 @@ checkClauseMatrix dec dHead =
     warnMissing = not (Export.isNonexhaustiveDecide dec)
 
     -- | Warns about missing clauses. Returns whether it reached a verdict on
-    -- them (not when it bails, nor when there are more than it lists), and
-    -- the indices of the clauses it found redundant (none when it bails).
-    analyseMatrix :: PmMatrix -> Check (Bool, [Int])
+    -- them (not when it bails, nor when there are more than it lists), the
+    -- indices of the clauses it found redundant (none when it bails), and the
+    -- first clause that matches every input because its patterns are new
+    -- names, with those names ('newNameCatchAll').
+    --
+    -- The patterns are resolved even where the analysis of missing clauses
+    -- stands down for an @EXACTLY@ it cannot read ('clauseVerdict'), because
+    -- reading a name as new or as a value does not depend on it; the hints
+    -- about names that look like values ('hintSuspiciousClausePatterns')
+    -- come from the same resolution.
+    analyseMatrix :: PmMatrix -> Check (Bool, [Int], Maybe (Int, [Name]))
     analyseMatrix matrix = do
       ei <- asks (.entityInfo)
       let clauseRows = matrix.clauses
@@ -1345,11 +1601,6 @@ checkClauseMatrix dec dHead =
           columnCountOk =
             not (null colScruts)
               && all (\ cl -> length cl.patterns == length colScruts) clauseRows
-          -- Opaque bail: any literal or expression pattern anywhere stands
-          -- the whole analysis down — same rule and rationale as
-          -- 'checkConsider' (the guard model would treat them as
-          -- irrefutable, which is wrong in both directions).
-          hasOpaque = any (any patternHasOpaque . (.patterns)) clauseRows
           -- Column types, read off the GIVEN binders' entityInfo entries
           -- (in scope: we are called inside @extendKnownMany
           -- dHead.arguments@); NOT via 'getEntityInfo', which reports a
@@ -1361,7 +1612,7 @@ checkClauseMatrix dec dHead =
                   _ -> Nothing)
               colScruts
       case mColTypes of
-        Just colTypes0 | columnCountOk, not hasOpaque -> do
+        Just colTypes0 | columnCountOk -> do
           colTypes <- traverse applySubst colTypes0
           -- Re-resolve each clause's patterns against the column types,
           -- 'quietly': the same patterns were already checked inside the
@@ -1375,66 +1626,133 @@ checkClauseMatrix dec dHead =
               forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
                 if patIsColumnWildcard scrutR pat
                   then pure (Just (PatVar (getAnno pat) scrutR))
-                  else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+                  else quietly do
+                    (rpat, _) <- checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty
+                    -- The substitution this check extends is dropped with
+                    -- the rest of its state, so the types the annotations
+                    -- of a nested pattern carry are resolved against it
+                    -- before it goes: 'clauseVerdict' reads them, and an
+                    -- inference variable left there stands the group down.
+                    -- Each pattern has its own, so this is once per pattern,
+                    -- not once per group; a type is resolved as it is read
+                    -- ('substituteInfVars').
+                    subst <- use #substitution
+                    pure ((gplate @(Type' Resolved) %~ substituteInfVars subst) rpat)
           case traverse sequence rpatssM of
             Just rpatss
-              | all (all patternInfoComplete) rpatss ->
-                  analyseResolvedRows matrix ei rpatss
-            _ -> pure (False, [])
-        _ -> pure (False, [])
+              | all (all patternInfoComplete) rpatss -> do
+                  hintSuspiciousClausePatterns matrix ei colTypes rpatss
+                  -- An EXACTLY the analysis cannot read drops its clause or
+                  -- stands the group down ('clauseVerdict'); every other
+                  -- pattern, literals included, is analysed.
+                  let ctorSets = constructorsInScopeFromEntityInfo ei
+                      verdicts = map (clauseVerdict ei ctorSets colTypes colScruts) rpatss
+                      counted =
+                        [ (cl, rpats)
+                        | (cl, rpats, ClauseCounts) <- List.zip3 clauseRows rpatss verdicts
+                        ]
+                  (answered, redundant) <-
+                    if BailGroup `elem` verdicts
+                      then pure (False, [])
+                      else analyseResolvedRows matrix ei (ClauseCoversNothing `elem` verdicts) counted
+                  pure (answered, redundant, newNameCatchAll matrix rpatss)
+            _ -> pure (False, [], Nothing)
+        _ -> pure (False, [], Nothing)
 
-    analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check (Bool, [Int])
-    analyseResolvedRows matrix ei rpatss = do
+    -- | The first clause whose every pattern matches anything, when at least
+    -- one of them does so because it is a new name rather than its input's
+    -- own name (the parser already knows of a clause whose patterns are all
+    -- input names: 'PmMatrix' @catchAll@). A pattern that is a new name
+    -- resolves to a 'PatVar' of that name; a column wildcard to a 'PatVar' of
+    -- the input ('patIsColumnWildcard').
+    newNameCatchAll :: PmMatrix -> [[Pattern Resolved]] -> Maybe (Int, [Name])
+    newNameCatchAll matrix rpatss =
+      listToMaybe
+        [ (i, newNames)
+        | (i, cl, rpats) <- List.zip3 [0 ..] matrix.clauses rpatss
+        , all isVarPattern rpats
+        , let newNames =
+                [ n
+                | (PatVar _ r, s, PatApp _ n []) <- List.zip3 rpats colScruts cl.patterns
+                , rawName (getName r) /= rawName (getName s)
+                ]
+        , not (null newNames)
+        ]
+      where
+        isVarPattern = \ case
+          PatVar {} -> True
+          _ -> False
+
+    -- | 'hintSuspiciousBinders' for the clauses of the group, in their terms:
+    -- a pattern that is a new name close to a value of its input's type that
+    -- no clause matches in that column. (The CONSIDERs the clauses compile to
+    -- leave this hint to here: each sees only its own clause, so a value
+    -- another clause matches would look uncovered to it.)
+    hintSuspiciousClausePatterns :: PmMatrix -> EntityInfo -> [Type' Resolved] -> [[Pattern Resolved]] -> Check ()
+    hintSuspiciousClausePatterns matrix ei colTypes rpatss = do
+      let ctorSets = constructorsInScopeFromEntityInfo ei
+      for_ (List.zip3 [0 :: Int ..] colTypes colScruts) \ (j, colTy, s) -> do
+        let column = mapMaybe (listToMaybe . drop j) rpatss
+            ctors = case colTy of
+              TyApp _ r _ -> Map.findWithDefault [] (getUnique r) ctorSets
+              _           -> []
+            covered = Set.fromList [ getUnique c | PatApp _ c _ <- column ]
+            uncovered = filter (\ c -> getUnique c `Set.notMember` covered) ctors
+        for_ column \ case
+          PatVar _ binder
+            | rawName (getName binder) /= rawName (getName s)
+            , Just ctor <- find (resemblesConstructor (lastNameSegment (getName binder))) uncovered ->
+                addError (SuspiciousClausePattern (getName dHead.rappForm) (not matrix.synthesizedScrutinees) binder ctor)
+          _ -> pure ()
+
+    -- | The clauses that count ('clauseVerdict'), with their resolved
+    -- patterns, analysed in two tiers ('literalTiers'); a column the missing
+    -- values leave open renders as its input's name.
+    analyseResolvedRows :: PmMatrix -> EntityInfo -> Bool -> [(PmMatrixClause, [Pattern Resolved])] -> Check (Bool, [Int])
+    analyseResolvedRows matrix ei leftOut counted = do
       -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
       -- (scrutinee, constructor), so cross-clause payload variables are
       -- shared (which the nabla reasoning needs) and columns cannot
       -- collide.
       rows <- flip evalStateT Map.empty $
-        forM (zip matrix.clauses rpatss) \ (cl, rpats) -> do
+        forM counted \ (cl, rpats) -> do
           gss <- sequence (zipWith desugarPat colScruts rpats)
           pure (concat gss, rowLeaf cl)
       let ctorSets = constructorsInScopeFromEntityInfo ei
-          tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rows ]
-          analysed = flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
-      case analysed of
-        -- bail to no-warning — fail-open, same contract as
-        -- 'analyzePatternMatch': no warning is better than a wrong one or a
-        -- hang (the 'maxUncoveredNablas' cap).
-        Nothing -> pure (False, [])
-        Just (uncovered, redundant) -> do
-          let arity = constructorArity ei
-              missingRows =
-                nubOrdOn (map (fmap getUnique)) $
-                  concatMap
-                    (\ nabla ->
-                       -- per-column expansion, cartesian product across
-                       -- columns (the list monad's 'sequence')
-                       sequence
-                         [ map (renderColumnWildcard scrutR) (expandToPatterns arity scrutR nabla)
-                         | scrutR <- colScruts
-                         ])
-                    uncovered
-              capped =
-                length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
-          -- cap overflow suppresses the warning entirely, the existing
-          -- capped-to-suppress convention of 'analyzePatternMatch'
-          unless (capped || null missingRows || not warnMissing) do
+          arity = constructorArity ei
+          spellings = literalSpellings (concatMap snd counted)
+          render uncovered =
+            map (map (respellLiterals spellings)) $
+            nubOrdOn (map (fmap getUnique)) $
+              concatMap
+                (\ nabla ->
+                   -- per-column expansion, cartesian product across
+                   -- columns (the list monad's 'sequence')
+                   sequence
+                     [ map (renderColumnWildcard scrutR) (expandToPatterns arity scrutR nabla)
+                     | scrutR <- colScruts
+                     ])
+                uncovered
+          (verdict, redundantAnyway) = literalTiers ctorSets leftOut render concatMap rows
+          -- A redundant leaf is identified by its anno, which is its
+          -- clause's head range ('rowLeaf').
+          redundantIndices redundant =
+            [ i
+            | (i, cl) <- zip [0 ..] matrix.clauses
+            , isJust cl.headRange
+            , any (\ b -> rangeOf b == cl.headRange) redundant
+            ]
+      case verdict of
+        Nothing -> pure (False, redundantIndices redundantAnyway)
+        Just (missingRows, redundant) -> do
+          unless (null missingRows || not warnMissing) do
             case hullRange matrix of
               -- R2: the warning must anchor at a real source range; if none
               -- can be produced at all, do not emit.
               Nothing -> pure ()
               Just hull ->
                 addWarning (PatternClausesMissing hull (getName dHead.rappForm) (length matrix.clauses) missingRows)
-          -- A redundant leaf is identified by its anno, which is its
-          -- clause's head range ('rowLeaf').
-          pure
-            ( not capped
-            , [ i
-              | (i, cl) <- zip [0 ..] matrix.clauses
-              , isJust cl.headRange
-              , any (\ b -> rangeOf b == cl.headRange) redundant
-              ]
-            )
+          pure (True, redundantIndices redundant)
 
     -- | A synthesized leaf whose only consumed parts are its identity and
     -- its anno (the clause-head range).
@@ -1464,9 +1782,9 @@ checkClauseMatrix dec dHead =
     -- desugars to nothing) — so the suggested clause is valid, pasteable
     -- L4. Nested wildcards inside applied constructors stay @`_`@.
     --
-    -- A group with no GIVEN has no such name: its columns are the
-    -- desugarer's @_pm_arg_i@, which is not the drafter's and must not be
-    -- printed, so the column stays @`_`@ like a nested wildcard.
+    -- A group with no GIVEN has no such name: its columns are names the
+    -- desugarer made up (@input 1@), which no source can write, so the
+    -- column stays @`_`@ like a nested wildcard.
     renderColumnWildcard :: Resolved -> Pattern Resolved -> Pattern Resolved
     renderColumnWildcard scrutR = \ case
       PatVar a v
@@ -1507,7 +1825,9 @@ checkClauseMatrix dec dHead =
       PatApp a _ ps   -> isJust (view annInfo a) && all patternInfoComplete ps
       PatCons a p1 p2 -> isJust (view annInfo a) && patternInfoComplete p1 && patternInfoComplete p2
       PatVar {}       -> True
-      PatExpr {}      -> True -- unreachable: the opaque bail stood down first
+      -- an EXACTLY of a value of the input's type is read as a constructor
+      -- ('desugarPat'), and needs its info; 'clauseVerdict' checks for it
+      PatExpr {}      -> True
       PatLit {}       -> True
 
 -- | Warns about the clauses of a multi-clause group that can never be tried.
@@ -1520,25 +1840,50 @@ checkClauseMatrix dec dHead =
 --   how many follow;
 --
 -- * the clauses the matrix analysis found redundant ('checkClauseMatrix'):
---   every input they match is matched by a clause above. Found only when the
---   analysis runs (no literal patterns, every pattern resolves); one warning
---   each.
+--   every input they match is matched by a clause above, a repeated number
+--   or piece of text included (@h 1@ then @h 1.0@). Found only when the
+--   analysis runs (every pattern resolves, no @EXACTLY@ it cannot read);
+--   one warning each.
 --
 -- A redundant clause is unreachable because the group tries its clauses in
 -- order and the first match wins, so this is the same finding as a redundant
 -- WHEN branch, in the terms the drafter wrote.
-warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Check ()
-warnUnreachableClauses matrix headName redundant = do
+-- | One warning for each @\@desc@, @\@export@ or @\@nlg@ written between two
+-- clauses of a group, which uses none of them: the parser keeps them on the
+-- later clause ('PmMatrixClause' @clauseDescs@ and @clauseNlgs@), for a run
+-- that turns out to be overloads ('separateOverloads'), whose definitions do
+-- use them. A group's own are those above its first clause, which the parser
+-- reads as a plain definition's.
+warnLaterClauseAnnotations :: PmMatrix -> Name -> Check ()
+warnLaterClauseAnnotations matrix headName =
+  for_ (zip [2 ..] (drop 1 matrix.clauses)) \ (k, cl) -> do
+    for_ cl.clauseDescs \ d -> for_ (rangeOf d) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k (if (Export.parseDescText (getDesc d)).flags.isExport then "@export" else "@desc") hasGiven)
+    for_ cl.clauseNlgs \ nlg -> for_ (rangeOf nlg) \ r ->
+      addWarning (ClauseAnnotationUnused r headName k "@nlg" hasGiven)
+  where
+    hasGiven = not matrix.synthesizedScrutinees
+
+warnUnreachableClauses :: PmMatrix -> Name -> [Int] -> Maybe (Int, [Name]) -> Check ()
+warnUnreachableClauses matrix headName redundant newNameCatchAll = do
   let n = length matrix.clauses
       headRangeAt i = case drop i matrix.clauses of
         cl : _ -> cl.headRange
         [] -> Nothing
-      afterCatchAll = case matrix.catchAll of
-        Just i | i + 1 < n -> [i + 1 .. n - 1]
+      -- The first clause that matches every input: by its inputs' own names
+      -- (the parser's 'PmMatrix' @catchAll@), or by new names, such as a
+      -- misspelled value ('checkClauseMatrix').
+      firstCatchAll = case (matrix.catchAll, newNameCatchAll) of
+        (Just i, Just (j, names)) | j < i -> Just (j, AfterClauseBindingNewName names)
+        (Just i, _)                       -> Just (i, AfterClauseMatchingAnything)
+        (Nothing, Just (j, names))        -> Just (j, AfterClauseBindingNewName names)
+        (Nothing, Nothing)                -> Nothing
+      afterCatchAll = case firstCatchAll of
+        Just (i, _) | i + 1 < n -> [i + 1 .. n - 1]
         _ -> []
-  case afterCatchAll of
-    firstDead : rest | Just r <- headRangeAt firstDead ->
-      addWarning (PatternClauseUnreachable r headName (AfterClauseMatchingAnything (length rest)))
+  case (afterCatchAll, firstCatchAll) of
+    (firstDead : rest, Just (_, reason)) | Just r <- headRangeAt firstDead ->
+      addWarning (PatternClauseUnreachable r headName (reason (length rest)))
     _ -> pure ()
   for_ redundant \ i ->
     unless (i `elem` afterCatchAll) $
@@ -3257,22 +3602,18 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 -- | Type-check a @CONSIDER@ and run the pattern-match analysis
 -- (missing branches, redundant branches) over its arms.
 --
--- The analysis is skipped wholesale in two situations:
---
--- * the scrutinee has a primitive type (NUMBER, STRING, DATE) — such types
---   have infinitely many literal values, so a constructor-based analysis is
---   meaningless for them;
---
--- * any arm contains a literal ('PatLit') or expression ('PatExpr') pattern
---   anywhere, including nested inside constructor patterns (@WHEN JUST 5@,
---   @WHEN EXACTLY red@, @WHEN 0 FOLLOWED BY ys@). These desugar to ZERO
---   guards, i.e. the guard model treats them as irrefutable match-alls, which
---   is wrong in both directions: a genuinely refutable literal arm would make
---   later arms look redundant (a blocking false positive on valid code), and
---   a partial literal match would be certified exhaustive (a false negative
---   that crashes at eval). Until the guard model learns opaque refutable
---   guards (see the design doc's deferred items), such CONSIDERs carry no
---   exhaustiveness or redundancy guarantee.
+-- Numbers, pieces of text and @EXACTLY@ are read as the clauses of a
+-- multi-clause group read them, so that a rule warns alike written either way
+-- (GANDER, 2026-10-09): each arm is classified ('columnVerdict') against the
+-- scrutinee's type, with the scrutinee as the input; a number or a piece of
+-- text is one value ('LitGuard'), and the analysis runs in the clauses' two
+-- tiers ('literalTiers'). An arm whose @EXACTLY@ the analysis cannot read
+-- counts for nothing over a number, a piece of text or a date, and stands the
+-- analysis down over any other type; an @EXACTLY@ whose expression mentions a
+-- name the scrutinee mentions stands it down too. A missing case over a
+-- number or a piece of text is suggested as @OTHERWISE@, a keyed one as
+-- @WHEN@ with the key as the arms spell it; a repeated key (@1@ after
+-- @1.0@) is a redundant arm.
 --
 -- A CONSIDER that 'L4.Parser.matchClauses' generated from the clauses of a
 -- multi-clause group ('PmConsider') is reported in the drafter's terms. A
@@ -3303,29 +3644,55 @@ checkConsider ec ann e branches t = do
   rbranches <- traverse (checkBranch ec patternEc te t) branches
   ei <- asks (.entityInfo)
   let cl = constructorsInScopeFromEntityInfo ei
-  (scrutVar, pt) <- desugarBranches re rbranches
-  let bs = concretizeInfo cl pt
-
-  let analysis  = analyzePatternMatch (constructorArity ei) scrutVar bs
-      missing   = maybe [] (.missingArms) analysis
-      redundant = maybe [] (.redundantArms) analysis
-
   -- We need to apply the current substitution to resolve any inference variables.
   resolvedTe <- applySubst te
-  inNonexhaustive <- asks (.inNonexhaustiveDecide)
-  let isPrimitiveScrutinee = isPrimitiveType resolvedTe
-      hasOpaquePatterns = any branchHasOpaquePattern rbranches
+  -- The arms' nested types, resolved as far as the substitution goes, for
+  -- 'columnVerdict' to read, as 'checkClauseMatrix' resolves the clauses'.
+  -- Nothing here extends the substitution, so one snapshot serves every arm,
+  -- and an arm is resolved as 'columnVerdict' reads it ('substituteInfVars').
+  subst <- use #substitution
+  let armPatterns = flip map rbranches \ case
+        MkBranch _ (When _ p) _ -> Just ((gplate @(Type' Resolved) %~ substituteInfVars subst) p)
+        MkBranch _ (Otherwise {}) _ -> Nothing
+      scrutineeName = case re of
+        Var _ x -> Just x
+        _ -> Nothing
+      mentionsScrutinee r = any (sameResolved r) (toList re)
+      verdicts = map (maybe ClauseCounts (columnVerdict ei cl resolvedTe scrutineeName mentionsScrutinee)) armPatterns
+      counted = [ b | (b, ClauseCounts) <- zip rbranches verdicts ]
+  (scrutVar, pt) <- desugarBranches re counted
+  let spellings = literalSpellings [ p | MkBranch _ (When _ p) _ <- counted ]
+      render uncovered =
+        map respellArm $
+          nubOrdOn (fmap getUnique) $
+            concatMap (expandToPattern (constructorArity ei) scrutVar) uncovered
+      respellArm = \ case
+        When a p -> When a (respellLiterals spellings p)
+        o -> o
+      rankArm ranks = \ case
+        When _ p -> ranks p
+        Otherwise {} -> [maxBound]
+      analysis = do
+        guard (BailGroup `notElem` verdicts)
+        rows <- flattenPatTree pt
+        pure (literalTiers cl (ClauseCoversNothing `elem` verdicts) render rankArm rows)
+      (missing, redundant) = case analysis of
+        Just (Just (missingArms, redundantArms), _) -> (missingArms, redundantArms)
+        Just (Nothing, redundantArms) -> ([], redundantArms)
+        Nothing -> ([], [])
 
-  -- NOTE: 'hasOpaquePatterns' and 'isPrimitiveScrutinee' come first so that
-  -- the (lazy) analysis above is never forced when we bail out anyway.
+  inNonexhaustive <- asks (.inNonexhaustiveDecide)
   -- Inside an @nonexhaustive-decorated definition only the MISSING-branch warning
   -- is silenced; redundancy is a bug regardless of intended partiality.
-  unless (hasOpaquePatterns || isPrimitiveScrutinee || inNonexhaustive || leftToClauseMatrix || null missing) do
+  unless (inNonexhaustive || leftToClauseMatrix || null missing) do
     addWarning $ PatternMatchesMissing missing
-  unless (hasOpaquePatterns || isPrimitiveScrutinee || null redundant) do
+  unless (null redundant) do
     addWarning $ PatternMatchRedundant redundant
 
-  hintSuspiciousBinders cl resolvedTe rbranches
+  -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
+  -- it leaves this hint to the group ('checkClauseMatrix').
+  unless (isJust generated) $
+    hintSuspiciousBinders cl resolvedTe rbranches
 
   pure (Consider ann re rbranches)
 
@@ -3875,13 +4242,18 @@ hintSuspiciousBinders cl scrutTy rbranches =
     uncovered =
       filter (\c -> getUnique c `Set.notMember` coveredCtorUniques) scrutCtors
 
-    suspiciouslyClose binderName ctor =
-      let ctorName = lastNameSegment (getName ctor)
-          lb = Text.toLower binderName
-          lc = Text.toLower ctorName
-      in lb == lc
-         || ( min (Text.length binderName) (Text.length ctorName) >= 4
-              && exactlyOneEditApart lb lc )
+    suspiciouslyClose = resemblesConstructor
+
+-- | Is a new name \"suspiciously close\" to this constructor, as
+-- 'hintSuspiciousBinders' means it?
+resemblesConstructor :: Text -> Resolved -> Bool
+resemblesConstructor binderName ctor =
+  let ctorName = lastNameSegment (getName ctor)
+      lb = Text.toLower binderName
+      lc = Text.toLower ctorName
+  in lb == lc
+     || ( min (Text.length binderName) (Text.length ctorName) >= 4
+          && exactlyOneEditApart lb lc )
 
 -- | The last segment of a name — for a qualified name (@foo.green@), the
 -- part after the final dot, so a qualified typo still resembles the bare
@@ -3926,24 +4298,228 @@ exactlyOneEditApart a b = case compare la lb of
           | otherwise = go (x : xs) ys True
         go _ _ _ = False
 
--- | Does this branch contain a pattern the guard model cannot reason about?
--- See the haddock on 'checkConsider'.
-branchHasOpaquePattern :: Branch Resolved -> Bool
-branchHasOpaquePattern (MkBranch _ lhs _) = case lhs of
-  When _ p     -> patternHasOpaque p
-  Otherwise {} -> False
+-- | What the missing-clause analysis makes of one clause of a multi-clause
+-- group, from its resolved patterns. In order of severity.
+data ClauseVerdict
+  = ClauseCounts
+    -- ^ every pattern is read ('desugarPat')
+  | ClauseCoversNothing
+    -- ^ the clause is left out of the analysis
+  | BailGroup
+    -- ^ the group is not analysed
+  deriving stock (Eq, Ord, Show)
 
--- | Does this pattern contain a literal or expression pattern anywhere —
--- i.e. a guard the residual-set model would (wrongly) treat as irrefutable?
--- Pass-polymorphic so 'checkClauseMatrix' can apply it to the Name-pass
--- patterns of a clause matrix before resolving them.
-patternHasOpaque :: Pattern n -> Bool
-patternHasOpaque = \ case
-  PatLit {}       -> True
-  PatExpr {}      -> True
-  PatVar {}       -> False
-  PatApp _ _ ps   -> any patternHasOpaque ps
-  PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
+-- | A number, a piece of text, @EXACTLY@ of either, @EXACTLY@ of a value of
+-- the input's type and @EXACTLY@ of the input's own name are all read
+-- exactly. Any other @EXACTLY@ (@EXACTLY someConstant@,
+-- @EXACTLY (someConstant PLUS 1)@) compares the input with a value the
+-- analysis cannot name:
+--
+-- * in a column of numbers or text, the clause counts for nothing. Of the
+--   infinitely many values of that column it matches one per value of the
+--   other columns, and only a clause written with the input's name can cover
+--   the rest of them, which also covers the one; so leaving the clause out
+--   turns neither "complete" into "incomplete" nor the reverse, and no
+--   suggested clause ever has to render it;
+--
+-- * in any other column, the group is not analysed, as before: the value is
+--   one of finitely many, and reading it either way would mis-report.
+--
+-- "One per value of the other columns" holds only of a value that does not
+-- depend on the column's own input, so an @EXACTLY@ whose expression
+-- mentions that input, at any depth (@EXACTLY (n PLUS 0)@ matches every
+-- @n@, @EXACTLY (n TIMES 0)@ only @0@), stands the group down instead:
+-- dropping it would report a gap that is not there, and the clause pasted
+-- for it would never be used. An expression that mentions only the rule's
+-- OTHER inputs (@EXACTLY (m PLUS 1)@, or @EXACTLY a@ in the column after
+-- @a@) still matches one value of this column per value of theirs, so it
+-- counts for nothing, as a constant does.
+--
+-- An input declared under another name for a number, a piece of text or a
+-- date (@DECLARE Age IS A NUMBER@) is one: synonyms are expanded, read off
+-- the entity information with no diagnostic, before a type is classified.
+-- The top-level columns are classified by their types after substitution,
+-- never by the pattern's annotation; a nested position has only its
+-- annotation, resolved as far as the substitution goes ('analyseMatrix'),
+-- and an inference variable left there is not primitive, so it stands the
+-- group down.
+clauseVerdict :: EntityInfo -> Map Unique [Resolved] -> [Type' Resolved] -> [Resolved] -> [Pattern Resolved] -> ClauseVerdict
+clauseVerdict ei ctorSets colTypes colScruts pats =
+  maximum (ClauseCounts : zipWith3 (\ colTy scrutR -> columnVerdict ei ctorSets colTy (Just scrutR) (`sameResolved` scrutR)) colTypes colScruts pats)
+
+-- | 'clauseVerdict' for one pattern, matched against an input of the given
+-- type. The input's own name, when it has one, is read at the top as
+-- matching every input; an @EXACTLY@ whose expression mentions a name for
+-- which the predicate holds depends on the input, and stands the analysis
+-- down.
+columnVerdict :: EntityInfo -> Map Unique [Resolved] -> Type' Resolved -> Maybe Resolved -> (Resolved -> Bool) -> Pattern Resolved -> ClauseVerdict
+columnVerdict ei ctorSets colTy mScrutR mentionsInput = \ case
+  PatExpr _ (Var _ r) | Just scrutR <- mScrutR, r `sameResolved` scrutR -> ClauseCounts
+  p -> nested (Just colTy) p
+  where
+    nested mty = \ case
+      PatVar {}           -> ClauseCounts
+      PatLit {}           -> ClauseCounts
+      PatApp _ _ ps       -> maximum (ClauseCounts : map (\ p -> nested (annoType p) p) ps)
+      PatCons _ p1 p2     -> max (nested (annoType p1) p1) (nested (annoType p2) p2)
+      PatExpr _ (Lit {})  -> ClauseCounts
+      PatExpr a (Var _ r)
+        | Just (_, KnownTerm cty Constructor) <- Map.lookup (getUnique r) ei
+        , Just tyUnique <- resultTypeHeadUnique cty
+        , Map.member tyUnique ctorSets
+        -> if isJust (view annInfo a) then ClauseCounts else BailGroup
+      PatExpr _ e
+        | any mentionsInput (toList e) -> BailGroup
+        | Just ty <- mty, isPrimitiveType (expandSynonyms (8 :: Int) ty) -> ClauseCoversNothing
+        | otherwise -> BailGroup
+    annoType p = case view annInfo (getAnno p) of
+      Just (TypeInfo ty _) -> Just ty
+      _ -> Nothing
+    expandSynonyms 0 ty = ty
+    expandSynonyms k ty = case ty of
+      TyApp _ r ts
+        | Just (_, KnownType _ params (Just body)) <- Map.lookup (getUnique r) ei
+        -> expandSynonyms (k - 1) (substituteType (Map.fromList (zipWith (\ p t -> (getUnique p, t)) params ts)) body)
+      _ -> ty
+
+-- | The missing-case analysis over guard rows that may test numbers and
+-- texts, shared by the clauses of a multi-clause group ('checkClauseMatrix')
+-- and a CONSIDER written by hand ('checkConsider'). The caller says how the
+-- values a tier leaves uncovered render as missing rows, and how a row is
+-- ranked from the ranks of its patterns ('missingPatternRanks').
+--
+-- Two tiers. The first analyses every row and lists every gap exactly: a
+-- number or a piece of text is one value of its position, and a position of
+-- them has no end of other values, so only a row that leaves the position
+-- open covers the rest, and the gap that remains renders as open there
+-- ('expandToPatterns'). When that list is longer than the cap, or the
+-- nablas outgrow theirs, the second tier re-analyses the rows WITHOUT a
+-- number or text (Maranget's own witness for a position whose values cannot
+-- all be named): its rows are not an exact partition, but each is needed and
+-- pasting them completes the match. Rows of literals alone leave no row to
+-- analyse, and then everything is uncovered: one row, every position open.
+-- So a position of literals with no catch-all always warns. Rows with no
+-- number or text in them have only the first tier.
+--
+-- When a row was left out ('ClauseCoversNothing'), only the second tier is
+-- reported. The first could list a keyed gap that the row left out covers:
+-- with @f 2 "b"@, @f (EXACTLY two) s@ and @f 1 s@ it would list @2 s@, and
+-- every @(2, s)@ meets the second clause. The second tier leaves every number
+-- and text position open, and each of its rows holds a value that no row
+-- matches: a left-out row matches one value of its position for each value
+-- of the others, so putting there a value that no row names and no left-out
+-- row matches gives one.
+--
+-- Returns the missing rows when a tier's list fits, ordered, with the
+-- redundant branches (fail-open otherwise, the same contract as
+-- 'analyzeGuardRows': no warning is better than a wrong one or a hang);
+-- and the redundant branches of whichever analysis ran, for when no list
+-- fits. The redundant branches come from the exact analysis when it ran,
+-- which sees every row; a branch the coarse analysis finds redundant is
+-- covered by a subset of the rows above it, so that verdict holds too.
+literalTiers
+  :: Map Unique [Resolved]
+  -- ^ the constructor sets ('constructorsInScopeFromEntityInfo')
+  -> Bool
+  -- ^ whether a row was left out
+  -> ([Nabla Resolved] -> [r])
+  -- ^ the missing rows one tier's uncovered values render as
+  -> ((Pattern Resolved -> [Int]) -> r -> [Int])
+  -- ^ a missing row's rank, from its patterns' ranks
+  -> [([Guard Info Resolved], Branch Resolved)]
+  -> (Maybe ([r], [Branch Resolved]), [Branch Resolved])
+literalTiers ctorSets leftOut render rankRow rows = (verdict, redundantAnyway)
+  where
+    -- 'Nothing' when the 'maxUncoveredNablas' cap trips.
+    analyse = \ case
+      -- No row matches anything: nothing is covered. (Zero rows must not
+      -- reach 'foldr1'.)
+      [] -> Just ([Consistent Set.empty], [])
+      rs ->
+        let tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rs ]
+        in flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
+    exact = analyse rows
+    -- Only rows with a number or a piece of text in them, or with a row
+    -- left out, have a second tier: for any other, it would re-run the same
+    -- rows.
+    coarse = do
+      guard (leftOut || any (any isLitGuard . fst) rows)
+      analyse (filter (not . any isLitGuard . fst) rows)
+    fit (uncovered, redundant) =
+      let missingRows = render uncovered
+          overCap = length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
+      in if overCap then Nothing else Just (List.sortOn (rankRow (missingPatternRanks ctorSets keyOrder)) missingRows, redundant)
+    keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
+    verdict = case guard (not leftOut) *> exact >>= fit of
+      Just v -> Just v
+      Nothing -> do
+        (missingRows, redundant2) <- coarse >>= fit
+        pure (missingRows, maybe redundant2 snd exact)
+    -- When neither tier's list fits, the missing warning is withheld, and
+    -- the branches never used are still reported, from whichever analysis
+    -- ran (the exact one when it did).
+    redundantAnyway = maybe [] snd (exact <|> coarse)
+
+-- | A missing pattern's rank, for listing missing rows in the order main's
+-- analysis lists them: through the pattern in the order it is written, a
+-- constructor by its place in its type's declaration, a number or a piece of
+-- text by the order in which the rows first name it (the keys, in that
+-- order), and an open position after both (@1 Gold@, @2 Gold@, @level Gold@).
+-- That is also an order the rows can be pasted in: where two rows first
+-- differ, the upper one names a constructor, a number or a text, which the
+-- lower one names differently or leaves open, so no row is covered by a row
+-- above it.
+missingPatternRanks :: Map Unique [Resolved] -> [LitKey] -> Pattern Resolved -> [Int]
+missingPatternRanks ctorSets keyOrder = ranks
+  where
+    ranks = \ case
+      PatApp _ c ps   -> ctorRank (getUnique c) : concatMap ranks ps
+      PatCons _ h t   -> ctorRank consUnique : ranks h <> ranks t
+      PatLit _ l      -> [keyRank (litKey l)]
+      PatVar {}       -> [maxBound]
+      PatExpr {}      -> [maxBound]
+    ctorRank u = Map.findWithDefault 0 u ctorIndex
+    -- A constructor's place in its type: the order the constructor sets list
+    -- them, which is the order they were declared in, and TRUE before FALSE,
+    -- as main lists them.
+    ctorIndex =
+      Map.fromList $
+        [ (getUnique c, i) | cs <- Map.elems ctorSets, (i, c) <- zip [0 :: Int ..] cs ]
+          <> [(trueUnique, 0), (falseUnique, 1)]
+    keyRank k = fromMaybe (length keyOrder) (List.elemIndex k keyOrder)
+
+-- | The first spelling the patterns give each number or piece of text, with
+-- its tokens, so that a suggested key prints as written ('literalAsWritten'):
+-- @1.50@ as @1.50@, not @1.5@.
+literalSpellings :: [Pattern Resolved] -> Map LitKey Lit
+literalSpellings pats =
+  Map.fromListWith (\ _ firstSpelling -> firstSpelling)
+    [ (litKey l, l) | l <- concatMap patLits pats ]
+  where
+    patLits = \ case
+      PatLit _ l          -> [l]
+      PatExpr _ (Lit _ l) -> [l]
+      PatApp _ _ ps       -> concatMap patLits ps
+      PatCons _ p1 p2     -> patLits p1 <> patLits p2
+      PatVar {}           -> []
+      PatExpr {}          -> []
+
+-- | A suggested pattern with each key in its first spelling
+-- ('literalSpellings').
+respellLiterals :: Map LitKey Lit -> Pattern Resolved -> Pattern Resolved
+respellLiterals spellings = respell
+  where
+    respell = \ case
+      PatLit a l      -> PatLit a (Map.findWithDefault l (litKey l) spellings)
+      PatApp a c ps   -> PatApp a c (map respell ps)
+      PatCons a p1 p2 -> PatCons a (respell p1) (respell p2)
+      p               -> p
+
+-- | A guard that pins the scrutinee to a number or a piece of text.
+isLitGuard :: Guard i n -> Bool
+isLitGuard = \ case
+  LitGuard {} -> True
+  MkGuard {}  -> False
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
@@ -4737,7 +5313,34 @@ data Guard i n
   , binding :: n
   , constructor :: n
   , constructorArgs :: [n] }
+  | LitGuard n LitKey
+  -- ^ the scrutinee is this number or piece of text (a literal pattern, or
+  -- @EXACTLY@ of a literal). A constructor guard's info lists the type's
+  -- other constructors; a column of numbers or text has no end of other
+  -- values, so a literal guard carries none.
   deriving stock (Eq, Show, Generic, Functor)
+
+-- | The identity of a number or a piece of text in a pattern: what the
+-- evaluator compares, so @1@ and @1.0@ are one key, and so are @0.10@ and
+-- @0.1@. Never compare a 'Lit' itself: its 'Eq' includes the annotation.
+data LitKey
+  = LitNum Rational
+  | LitStr Text
+  deriving stock (Eq, Ord, Show, Generic)
+
+litKey :: Lit -> LitKey
+litKey = \ case
+  NumericLit _ r -> LitNum r
+  StringLit _ t  -> LitStr t
+
+-- | The literal a key stands for, with no tokens. A suggested clause prints
+-- the first spelling the clauses give the key instead ('checkClauseMatrix',
+-- 'literalAsWritten'); this one prints exactly
+-- ('L4.Utils.Ratio.prettyRatioExact'), however many digits it has.
+litKeyToLit :: LitKey -> Lit
+litKeyToLit = \ case
+  LitNum r -> NumericLit emptyAnno r
+  LitStr t -> StringLit emptyAnno t
 
 type PatTree = PatTree' Info
 
@@ -4785,7 +5388,9 @@ newPatName = do
 -- payload-variable sharing is what the nabla reasoning needs; the
 -- two-component key keeps columns from colliding).
 desugarPat :: Resolved -> Pattern Resolved -> StateT VarEnv Check [Guard Info Resolved]
-desugarPat scrut' = \ case
+desugarPat scrut' pat = do
+  ei <- lift (asks (.entityInfo))
+  case pat of
     PatApp ((.extra.resolvedInfo) -> Just info) c ps ->
       Map.lookup (getUnique scrut', getUnique c) <$> get >>= \ case
         Just existingVars -> do
@@ -4820,8 +5425,23 @@ desugarPat scrut' = \ case
           pure (MkGuard info scrut' consRef [nh, nt] : ph' <> pt')
 
     PatVar _ _ -> pure []
-    PatExpr _ _ -> pure []
-    PatLit _ _ -> pure []
+    PatLit _ l -> pure [LitGuard scrut' (litKey l)]
+    PatExpr ann e -> case e of
+      -- EXACTLY 0 is 0
+      Lit _ l -> pure [LitGuard scrut' (litKey l)]
+      Var _ r
+        -- EXACTLY n, with n the scrutinee itself: the input is compared with
+        -- itself, so the pattern matches every input, like the bare name.
+        | r `sameResolved` scrut' -> pure []
+        -- EXACTLY Red is Red; EXACTLY TRUE is TRUE. The info a constructor
+        -- guard needs is on this pattern's own anno, as on a 'PatApp'.
+        | Just (_, KnownTerm _ Constructor) <- Map.lookup (getUnique r) ei
+        , Just _ <- view annInfo ann
+        -> desugarPat scrut' (PatApp ann r [])
+      -- Any other EXACTLY compares the input with a value this model cannot
+      -- name, so it gets no guard: 'columnVerdict' drops the clause or arm,
+      -- or stands the analysis down, before it reaches here.
+      _ -> pure []
     -- This wildcard fires only for a PatApp/PatCons whose anno lacks
     -- 'resolvedInfo'. That requires a RANGELESS anno: 'setAnnResolvedType'
     -- routes through 'withRange', which is a silent no-op when the anno has no
@@ -4849,6 +5469,7 @@ concretizeInfo cmap = \case
      , Just cs <- Map.lookup (getUnique r) cmap
      -> PatAnd (MkGuard cs b n ns) (concretizeInfo cmap t)
    _ -> PatAnd (MkGuard [] b n ns) (concretizeInfo cmap t)
+ PatAnd (LitGuard b k) t -> PatAnd (LitGuard b k) (concretizeInfo cmap t)
 
 -- a constraint
 data Constr n
@@ -4863,6 +5484,13 @@ data Constr n
   -- - the constructor
   -- - the variables that are scrutinized when scrutinizing this constructor's arguments
   -- - the other constructors of the type that this constraint is about
+  | IsEqLit n LitKey
+  -- ^ the scrutinized expression is this number or piece of text
+  | IsNotEqLit n LitKey
+  -- ^ the scrutinized expression is not this number or piece of text. There
+  -- is no list of "the others": a column of numbers or text has no end of
+  -- them, which is why only a clause written with the input's name covers
+  -- what is left ('expandToPatterns').
   deriving stock (Eq, Ord, Show, Generic, Functor, Foldable)
 
 data Nabla n
@@ -4879,33 +5507,49 @@ constraintName :: Constr n -> n
 constraintName = \ case
   IsEq n _ _ -> n
   IsNotEq n _ _ _ -> n
+  IsEqLit n _ -> n
+  IsNotEqLit n _ -> n
 
 -- | Add one constraint to a consistent constraint set; 'Nothing' if it
 -- contradicts a constraint already present (the refined value space is
 -- empty, so the candidate 'Nabla' dies).
+--
+-- A number or a piece of text is checked by looking its key up, not by
+-- reading every constraint on its variable: a table of n keyed arms leaves
+-- n constraints on one variable. Reading them all for each arm, together
+-- with the key 'analyzeGuardRows' built for its one nabla, made a CONSIDER
+-- of 4,000 numbers take 21 s of CPU time to check, against 5.6 s without
+-- both. Only a number or a piece of text can contradict one
+-- ('isConsistentWith'): its opposite under the same key, or, for an
+-- equality, an equality under another key.
 addConstraint :: Constr Resolved -> Nabla Resolved -> Maybe (Nabla Resolved)
 addConstraint _ Bottom = Nothing
 addConstraint c nabla@(Consistent s)
   | c `Set.member` s = Just nabla
-  | all (c `isConsistentWith`) (lookupConstraints (constraintName c) nabla) =
-      Just (Consistent (Set.insert c s))
+  | consistent = Just (Consistent (Set.insert c s))
   | otherwise = Nothing
+  where
+    consistent = case c of
+      IsNotEqLit n k -> not (IsEqLit n k `Set.member` s)
+      IsEqLit n k ->
+        not (IsNotEqLit n k `Set.member` s) && not (any (pinnedElsewhere n) [Set.lookupLT c s, Set.lookupGT c s])
+      _ -> all (c `isConsistentWith`) (lookupConstraints (constraintName c) nabla)
+    -- The equalities on one variable sort together, after the tag and the
+    -- variable, by key; @c@ is not in the set, so if one is there, it is a
+    -- neighbour of where @c@ would go.
+    pinnedElsewhere n = \ case
+      Just (IsEqLit n' _) -> n' == n
+      _ -> False
 
 isConsistentWith :: Constr Resolved -> Constr Resolved -> Bool
 IsEq n1 c1 _ `isConsistentWith` IsEq n2 c2 _ | n1 `sameResolved` n2 = c1 `sameResolved` c2
 IsNotEq n1 c1 _ _ `isConsistentWith` IsEq n2 c2 _ | n1 `sameResolved` n2 = not $ c1 `sameResolved` c2
 IsEq n1 c1 _ `isConsistentWith` IsNotEq n2 c2 _ _ | n1 `sameResolved` n2 = not $ c1 `sameResolved` c2
+-- a literal's identity is its key: 1 and 1.0 are the same number
+IsEqLit n1 k1 `isConsistentWith` IsEqLit n2 k2 | n1 `sameResolved` n2 = k1 == k2
+IsNotEqLit n1 k1 `isConsistentWith` IsEqLit n2 k2 | n1 `sameResolved` n2 = k1 /= k2
+IsEqLit n1 k1 `isConsistentWith` IsNotEqLit n2 k2 | n1 `sameResolved` n2 = k1 /= k2
 _ `isConsistentWith` _ = True
-
--- | The result of the pattern-match analysis of one CONSIDER.
-data PatternMatchAnalysis = MkPatternMatchAnalysis
-  { missingArms   :: [BranchLhs Resolved]
-    -- ^ synthesized suggestions for the uncovered cases (empty = exhaustive,
-    -- or the suggestion cap was exceeded — see 'maxMissingSuggestions')
-  , redundantArms :: [Branch Resolved]
-    -- ^ arms that can never match (their guards contradict every value
-    -- still uncovered when they are reached)
-  }
 
 -- | Give up the whole analysis when the uncovered set exceeds this many
 -- alternatives. The uncovered set grows by at most (guards per branch) per
@@ -4947,33 +5591,12 @@ maxMissingSuggestions = 64
 -- under-reporting missing arms. Each nabla is expanded to suggestions
 -- separately.
 --
--- Returns 'Nothing' when the analysis gives up: unexpected tree shape, or
--- the 'maxUncoveredNablas' cap tripped. No warning is better than a wrong
--- one or a hang.
-analyzePatternMatch
-  :: (Resolved -> Int)
-  -> Resolved
-  -> PatTree' [Resolved] Resolved
-  -> Maybe PatternMatchAnalysis
-analyzePatternMatch ctorArity scrut tree = do
-  branches <- flattenPatTree tree
-  (uncovered, redundant) <- analyzeGuardRows branches
-  let suggestions =
-        nubOrdOn (fmap getUnique) $
-          concatMap (expandToPattern ctorArity scrut) uncovered
-      capped = length (take (maxMissingSuggestions + 1) suggestions) > maxMissingSuggestions
-  pure MkPatternMatchAnalysis
-    { missingArms   = if capped then [] else suggestions
-    , redundantArms = redundant
-    }
-
--- | The residual-set fold itself, factored out of 'analyzePatternMatch' so
--- that the single-CONSIDER wrapper above and the clause-matrix path
--- ('checkClauseMatrix') share 'analyzeBranch', 'splitByGuards' and the
--- 'maxUncoveredNablas' cap. Returns the uncovered nablas and the redundant
--- branches (in source order); 'Nothing' when the cap trips — bail to
--- no-warning: fail-open, the same contract as 'analyzePatternMatch' (no
--- warning is better than a wrong one or a hang).
+--
+-- Shared by the clauses of a multi-clause group and a CONSIDER, through
+-- 'literalTiers'. Returns the uncovered nablas and the redundant branches
+-- (in source order); 'Nothing' when the 'maxUncoveredNablas' cap trips —
+-- bail to no-warning: fail-open (no warning is better than a wrong one or a
+-- hang).
 analyzeGuardRows
   :: [([Guard [Resolved] Resolved], Branch Resolved)]
   -> Maybe ([Nabla Resolved], [Branch Resolved])
@@ -4988,7 +5611,7 @@ analyzeGuardRows branches = do
             | not coversSomething, not (null guards) = b : redundant
             | otherwise = redundant
           uncovered' =
-            nubOrdOn nablaKey (concatMap (splitByGuards guards) uncovered)
+            nubNablas (concatMap (splitByGuards guards) uncovered)
       in if length (take (maxUncoveredNablas + 1) uncovered') > maxUncoveredNablas
            then Nothing
            else Just (uncovered', redundant')
@@ -5004,7 +5627,15 @@ analyzeGuardRows branches = do
                Just nab' -> go nab' gs
 
     guardEq  (MkGuard _cs b n ns) = IsEq b n ns
+    guardEq  (LitGuard b k)       = IsEqLit b k
     guardNeq (MkGuard cs b n ns)  = IsNotEq b n ns cs
+    guardNeq (LitGuard b k)       = IsNotEqLit b k
+
+    -- One nabla is left alone: its key copies every constraint in it, and
+    -- a table of keyed arms leaves one nabla with a constraint per arm.
+    nubNablas = \ case
+      ns@[_] -> ns
+      ns     -> nubOrdOn nablaKey ns
 
     nablaKey = \ case
       Bottom       -> Nothing
@@ -5027,10 +5658,14 @@ flattenPatTree = \ case
 
 -- | What a consistent 'Nabla' says about ONE variable: pinned to a
 -- constructor ('EqCon'), excluded from some constructors ('NotEqCons'
--- carrying the remaining candidates), or unconstrained ('NoInfo').
+-- carrying the remaining candidates), pinned to a number or a piece of text
+-- ('EqLit'), or unconstrained ('NoInfo'). Excluded from some numbers or
+-- texts is 'NoInfo' too: the remaining candidates cannot be listed, and the
+-- wildcard that stands for them is right, if wide.
 data ConsistentSet n
   = EqCon n [n]
   | NotEqCons [n] [n]
+  | EqLit LitKey
   | NoInfo
 
 expandToPattern :: (Resolved -> Int) -> Resolved -> Nabla Resolved -> [BranchLhs Resolved]
@@ -5061,14 +5696,19 @@ expandToPatterns ctorArity scrut = \ case
   toConsistentSet :: [Constr Resolved] -> ConsistentSet Resolved
   toConsistentSet cs' = case [ (c, ns) | IsEq _ c ns <- cs' ] of
     (c, ns) : _ -> EqCon c ns
-    []          -> goNeq cs'
+    []          -> case [ k | IsEqLit _ k <- cs' ] of
+      k : _ -> EqLit k
+      []    -> goNeq cs'
     where
       goNeq [] = NoInfo
       goNeq (IsNotEq _ c ns cs : rest) = case goNeq rest of
         NotEqCons _ ncs -> NotEqCons ns (delByUnq c ncs)
         NoInfo          -> NotEqCons ns (delByUnq c cs)
         e@EqCon {}      -> e
+        e@EqLit {}      -> e
       goNeq (IsEq {} : rest) = goNeq rest
+      goNeq (IsEqLit {} : rest) = goNeq rest
+      goNeq (IsNotEqLit {} : rest) = goNeq rest
 
   delByUnq = deleteBy sameResolved
 
@@ -5092,6 +5732,7 @@ expandToPatterns ctorArity scrut = \ case
       -- argument position, so the rendered missing branch is valid L4 the
       -- user can paste (a bare non-nullary constructor would not be)
       NotEqCons _ns ncs -> map (\n' -> mkSuggestedPattern n' (replicate (ctorArity n') (PatVar emptyAnno underscoreRef))) ncs
+      EqLit k -> [PatLit emptyAnno (litKeyToLit k)]
       NoInfo -> [PatVar emptyAnno underscoreRef]
 
   -- The builtin cons constructor must be suggested in its surface form,
@@ -6333,7 +6974,9 @@ scanFunSigLocalDecl = \ case
 scanFunSigDecide :: Decide Name -> Check FunTypeSig
 scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
   decideErrorContext d do
-    (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig
+    (inputsSig, givenInputs) <- clauseInputsAgainstGiven d
+    (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm inputsSig
+    unboundInputs <- extendKnownMany extendsTySig (givenInputsInScope givenInputs)
     -- Determine if this DECIDE is a synthetic computed field function
     cfMap <- asks (.computedFields)
     let funcRawName = rawName (getName appForm)
@@ -6366,7 +7009,7 @@ scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
       , rappForm
       , resultType = result
       , name = name'
-      , arguments = extendsTySig <> extendsAppForm
+      , arguments = extendsTySig <> extendsAppForm <> unboundInputs
       , mixfixInfo = mMixfix
       }
 
@@ -6716,6 +7359,13 @@ anchorWords = \ case
   AnchorAt{}       -> "…"
 
 prettyCheckError :: CheckError -> [Text]
+prettyCheckError (SuspiciousClausePattern headName hasGiven binder ctor) =
+  [ "The pattern " <> quotedName (getName binder) <> " in this clause of " <> quotedName headName
+      <> " is a new name, which matches every input."
+  , "It is very close to " <> quotedName (getName ctor) <> ", a value of its input's type that no clause matches."
+  , "If you meant that value, correct the spelling; if you meant to match anything, "
+      <> (if hasGiven then "use the input's GIVEN name." else "write `_` in backquotes.")
+  ]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   [ "This CONSIDER branch introduces a new name"
   , ""
@@ -6944,6 +7594,16 @@ prettyCheckError (InconsistentNameInAppForm n (Just n'))   =
   , ""
   , "  " <> prettyNameWithRange n'
   ]
+prettyCheckError (ExportedClausesWithoutGiven _ n) =
+  [ quotedName n <> " is published with @export, but its inputs have no names: add a GIVEN that names and types each one." ]
+prettyCheckError (ClausePatternCountMismatch _ n patterns inputs) =
+  [ "Each clause of " <> quotedName n <> " has " <> counted patterns "pattern"
+      <> ", but its GIVEN names " <> counted inputs "input" <> "."
+  , "A clause needs one pattern for each input the GIVEN names, in the same order."
+  ]
+  where
+    counted 0 noun = "no " <> noun <> "s"
+    counted k noun = Text.textShow k <> " " <> noun <> (if k == 1 then "" else "s")
 prettyCheckError (AmbiguousTermError n rs)                 =
   [ "There are multiple definitions for the identifier"
   , ""
@@ -7046,6 +7706,17 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (NonassertableOnNonDefinition what mname _) =
+  [ "@nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert."
+  , "Here it is on " <> maybe what (\ n -> "`" <> n <> "`, " <> what) mname <> ", " <> why
+  ]
+ where
+  -- An input is what a request supplies, so "cannot be asserted" would read
+  -- as though it were already closed; say what the request does with it,
+  -- and where the mark would have to go to close the definition instead.
+  why
+    | what == "an input" = "which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
+    | otherwise = "which cannot be asserted in any case; move it above the definition it is meant for, or remove it."
 prettyCheckError (FixityAnnotationMalformed _ raw) =
   [ "I could not parse this fixity annotation:"
   , ""
@@ -7383,7 +8054,7 @@ prettyCheckWarning = \ case
     [ "The following CONSIDER branch is redundant: "
     , ""
     ] <>
-    map (("  " <>) . prettyLayout) b
+    map (("  " <>) . prettyBranchAsWritten) b
     <> [ ""
     ]
   PatternMatchesMissing b ->
@@ -7410,11 +8081,39 @@ prettyCheckWarning = \ case
     , "The clause above it matches every input, so " <> quotedName headName <> " never gets this far."
     , "Move these clauses above that one, or remove them."
     ]
+  PatternClauseUnreachable _ headName (AfterClauseBindingNewName names k) ->
+    [ "This clause of " <> quotedName headName <> " is never used"
+        <> (case k of
+              0 -> ""
+              1 -> ", and neither is the clause after it"
+              _ -> ", and neither are the " <> Text.textShow k <> " clauses after it")
+        <> ", because the clause above it with " <> newNames <> " matches every input."
+    , listed <> (if single then " is not a value of its input's type, so it is a new name," else " are not values of their inputs' types, so they are new names,")
+        <> " and a new name matches anything."
+    , "If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others."
+    ]
+    where
+      single = length names == 1
+      listed = Text.intercalate " and " (map quotedName names)
+      newNames = (if single then "the new name " else "the new names ") <> listed
   PatternClauseUnreachable _ headName CoveredByClausesAbove ->
     [ "This clause of " <> quotedName headName <> " is never used."
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
     ]
+  ClauseAnnotationUnused _ headName k annotation hasGiven ->
+    [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."
+    , "A rule written as clauses takes its " <> annotation <> " from " <> place <> " only."
+    , "Move it there, or remove it."
+    ]
+    where
+      place
+        | annotation == "@nlg" = "the line above its first clause"
+        | hasGiven = "above its GIVEN"
+        | otherwise = "above its first clause"
+      whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
+        w : _ | k >= 1 -> "the " <> w <> " clause"
+        _ -> "clause " <> Text.textShow k
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
     , ""
@@ -7550,6 +8249,14 @@ prettyCheckWarning = \ case
           , "  REFUSE \"<the reason>\""
           ] <> manual "doc/reference/control-flow/REFUSE.md."
 
+-- | A branch the drafter wrote, for a warning about it: the pattern through
+-- 'prettyMissingPattern', so that a number prints as the branch spells it,
+-- and the body through the generic printer. The generic printer would write
+-- the redundant @WHEN 1.0 THEN …@ after @WHEN 1 THEN …@ as @WHEN 1 THEN …@,
+-- naming the other branch.
+prettyBranchAsWritten :: Branch Resolved -> Text
+prettyBranchAsWritten (MkBranch _ lhs body) = prettyMissingBranchLhs lhs <> " " <> prettyLayout body
+
 -- | Render a synthesized missing branch as valid, pasteable L4 (the
 -- pattern rendering itself is 'prettyMissingPattern').
 prettyMissingBranchLhs :: BranchLhs Resolved -> Text
@@ -7586,11 +8293,35 @@ prettyMissingPattern = go
       parensIf nested (prettyLayout (PatApp a c []) <> " " <> Text.unwords (map (go True) ps))
     go nested (PatCons _ ph pt) =
       parensIf nested (go True ph <> " FOLLOWED BY " <> go True pt)
-    -- literal and expression patterns are never synthesized as missing
-    -- branches; fall back to the generic printer just in case
+    go _ (PatLit _ lit) = literalAsWritten lit
+    -- an expression pattern is never synthesized as missing, so the generic
+    -- printer is a fallback only
     go _ p = prettyLayout p
 
     parensIf b txt = if b then "(" <> txt <> ")" else txt
+
+-- | A number as its clause spelled it: @1.0@, @0.10@, @100_000@, @-1@. The
+-- token is read off the literal's own annotation, which is the first
+-- spelling the clauses give the number ('checkClauseMatrix'), so a number
+-- with more digits than a double holds prints with every digit; a number
+-- without a token prints through the generic printer, exactly
+-- ('litKeyToLit').
+--
+-- A piece of text prints as L4 writes it: every printable character as it
+-- is, @"@ and @\\@ escaped. A text with a character that does not print (a
+-- tab, a newline) is written with Haskell-style escapes instead
+-- ('L4.Lexer.showStringLit'), which L4 reads back, so that the suggested
+-- clause stays on one line.
+literalAsWritten :: Lit -> Text
+literalAsWritten lit = case lit of
+  StringLit _ t
+    | Text.all isPrint t -> prettyLayout lit
+    | otherwise -> Lexer.showStringLit t
+  NumericLit {} -> case runExcept (ExactPrint.concreteNodesToTokens lit) of
+    Right toks
+      | (tok : _) <- [ t | t@(Lexer.MkPosToken _ (Lexer.TLiterals _)) <- toks ]
+      -> Lexer.displayPosToken tok
+    _ -> prettyLayout lit
 
 
 -- | Render a fixity declaration the way the user writes it, e.g. "@infixl 6".

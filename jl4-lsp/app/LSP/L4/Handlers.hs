@@ -341,13 +341,13 @@ handlers evalConfig recorder =
           rng = params ^. J.range
         diags <- atomically $ do
           activeFileDiagnosticsInRange (shakeExtras ide) uri rng
-        casAssume     <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
-        casConfusable <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
+        casDeclaration <- Extra.mapMaybeM (outOfScopeDeclarationQuickFix ide) diags
+        casConfusable  <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
         let casLexFix = concatMap lexErrorCodeActions diags
             casNbsp    = Maybe.mapMaybe nbspCodeAction diags
         casStraighten <- straightenWholeFileCodeAction ide uri diags
         pure $ Right $ InL $ fmap InR $
-          casAssume <> casConfusable <> casLexFix <> casNbsp <> casStraighten
+          casDeclaration <> casConfusable <> casLexFix <> casNbsp <> casStraighten
     , requestHandler SMethod_TextDocumentSemanticTokensFull $ \ide req -> do
         let
           SemanticTokensParams _ _ doc = req
@@ -530,7 +530,7 @@ handlers evalConfig recorder =
                             Just t  -> "DEONTIC" `Text.isPrefixOf` t
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) givenParams
+                        paramChildren = map (givenParamToSymbol lspRange) (filter writtenParam givenParams)
                         localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals body)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
                   Nothing -> []
@@ -632,10 +632,16 @@ handlers evalConfig recorder =
               | "FUNCTION" `Text.isPrefixOf` tyText        = SymbolKind_Field
               | otherwise                                 = SymbolKind_TypeParameter
 
+            -- The bindings a multi-clause definition is compiled to
+            -- ('PmSynthetic'), and the inputs its desugarer named, are not
+            -- things the drafter wrote, so the outline leaves them out.
             collectLocals :: Expr Resolved -> [LocalDecl Resolved]
-            collectLocals (Where _ _ locals)  = locals
-            collectLocals (LetIn _ locals _)  = locals
+            collectLocals (Where _ _ locals)  = filter (not . isClausesBinding) locals
+            collectLocals (LetIn _ locals _)  = filter (not . isClausesBinding) locals
             collectLocals _                   = []
+
+            writtenParam :: OptionallyTypedName Resolved -> Bool
+            writtenParam (MkOptionallyTypedName _ pn _ _) = not (isGeneratedName (rawName (getOriginal pn)))
 
             localDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> LSP.Range -> LocalDecl Resolved -> [DocumentSymbol]
             localDeclToSymbol moduleNuri subst entInfo parentRange = \case
@@ -1008,21 +1014,26 @@ findHover ide fileUri pos = runMaybeT $ refHover <|> tyHover
 -- LSP Code Actions
 -- ----------------------------------------------------------------------------
 
--- | The one code action: for a name no definition supplies, declare it as a
--- @GIVEN@ — of the nearest @§@ heading, or of the enclosing rule. The edit is
--- computed by 'outOfScopeGivenFix' in "LSP.L4.Actions", where it is testable
--- without an IDE; this handler only fetches the checked module and wraps the
--- result as a 'CodeAction'. (Before 2026-09-06 it inserted an @ASSUME@.)
-outOfScopeAssumeQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
-outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
+-- | The out-of-scope quick fix: for a name no definition supplies, declare
+-- it — a term as a @GIVEN@ of the nearest @§@ heading or of the enclosing
+-- rule, a type as a bodiless @DECLARE@ above the declaration that uses it.
+-- The edit is computed by 'outOfScopeFix' in "LSP.L4.Actions", where it is
+-- testable without an IDE; this handler only fetches the checked module and
+-- its tokens and wraps the result as a 'CodeAction'. (Before 2026-09-06 it
+-- inserted an @ASSUME@, and was named @outOfScopeAssumeQuickFix@ until
+-- 2026-10-07; until then, too, a type got the term's @GIVEN@.)
+outOfScopeDeclarationQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
+outOfScopeDeclarationQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
   Nothing -> pure Nothing
   Just ctx -> case ctx.kind of
     OutOfScopeError name ty -> do
-      mTypeCheck <- liftIO $ runAction "codeAction.outOfScope" ide $ do
-        use TypeCheck nuri
+      mInputs <- liftIO $ runAction "codeAction.outOfScope" ide $ do
+        mTypeCheck <- use TypeCheck nuri
+        mLex       <- use GetLexTokens nuri
+        pure ((,) <$> mTypeCheck <*> mLex)
       pure $ do
-        typeCheck <- mTypeCheck
-        fix <- outOfScopeGivenFix typeCheck.module' name ty
+        (typeCheck, (tokens, _)) <- mInputs
+        fix <- outOfScopeFix tokens typeCheck.module' name ty
         Just $ CodeAction
           { _title = fix.title
           , _kind = Just CodeActionKind_QuickFix

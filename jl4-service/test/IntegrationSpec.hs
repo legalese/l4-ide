@@ -16,6 +16,7 @@ import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger)
 import Options (Options (..))
 import Types
+import L4.FunctionSchema (Parameters (..))
 
 import Control.Concurrent.Async (concurrently, forConcurrently)
 import Control.Monad (forM_, guard, unless)
@@ -40,11 +41,12 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileExist)
+import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4)
+import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -392,6 +394,51 @@ spec = describe "integration" do
     it "stops a deontic rule instead of taking its ELSE branch" do
       withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "w1-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertNotSupplied resp "is motorway"
+
+    it "stops and names a missing BOOLEAN read by CONSIDER, not taking its OTHERWISE" do
+      withServiceFromSources "w1-consider" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-consider" "fee"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "amount" Aeson..= (10 :: Int)
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertNotSupplied resp "is member"
+
+    it "answers when a missing BOOLEAN the rule reads cannot change the answer" do
+      withServiceFromSources "w1-anyway" [("eligible.l4", decidedAnywayJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-anyway" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "unused flag" Aeson..= uncertain ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "uses a BOOLEAN read by CONSIDER when it is supplied" do
+      withServiceFromSources "w1-consider-given" [("fee.l4", considerBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-consider-given" "fee"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "amount" Aeson..= (10 :: Int)
+                , "is member" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 10)
+
+    it "stops a deontic rule instead of taking its OTHERWISE" do
+      withServiceFromSources "w1-deontic-consider" [("seatbelt.l4", deonticConsiderJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-deontic-consider" "seatbelt requirement"
           (Aeson.object
             [ "arguments" Aeson..= Aeson.object
                 [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
@@ -1032,6 +1079,8 @@ spec = describe "integration" do
             batch.summary.casesRead `shouldBe` 10
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
+        -- every response states its report (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        reportOf resp `shouldBe` Just "default"
 
     -- TRAFFICJAM (2026-10-02). A case's time limit is wall-clock, and the batch
     -- used to start every case at once. On one core each case's timer then
@@ -1131,6 +1180,267 @@ spec = describe "integration" do
         withServiceFromSourcesOpts spinOptions "spin-40-n2" [("spin.l4", spinJL4)] \baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-40-n2" (replicate 40 spinFast)
           expectBatchOutcomes resp (replicate 40 CaseAnswered)
+
+  -- SIEVE (2026-10-07): the three gaps the README listed under "What the
+  -- limits do not cover yet".
+  describe "evaluation limits that used to miss" do
+    -- smucclaw/l4-ide#1018. The wrapper path evaluates as a Shake rule on a
+    -- thread of its own, so the allocation limit set on the calling thread
+    -- never saw it. The time limit is large here so that only the memory
+    -- limit can stop the case.
+    describe "the memory limit on the wrapper path" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          wrapped n = Aeson.object
+            [ "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int), "u" Aeson..= Aeson.object []] ]
+
+      it "stops a single evaluation that allocates too much" do
+        withServiceFromSourcesOpts stingy "wrap-mem-single" [("spin.l4", spinWrapperJL4)] \baseUrl mgr -> do
+          small <- evalFunction baseUrl mgr "wrap-mem-single" "spin" (wrapped 1_000)
+          assertSuccess small \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          big <- evalFunction baseUrl mgr "wrap-mem-single" "spin" (wrapped spinFast)
+          statusCode' big `shouldBe` 500
+          LBS.toStrict (responseBody big) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+
+      it "reports the case that allocates too much, and answers the cases after it" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts stingy "wrap-mem-batch" [("spin.l4", spinWrapperJL4)] \baseUrl mgr -> do
+            let body = Aeson.object
+                  [ "outcomes" Aeson..= ([] :: [Text])
+                  , "cases" Aeson..=
+                      [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n, "u" Aeson..= Aeson.object []]
+                      | (i, n) <- zip [1 :: Int ..] [1_000, spinFast, 1_000] ]
+                  ]
+            req <- buildJsonPost (baseUrl <> "/deployments/wrap-mem-batch/functions/spin/evaluation/batch") body
+            resp <- httpLbs req mgr
+            expectBatchOutcomes resp
+              [ CaseAnswered
+              , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+              , CaseAnswered ]
+            map (Aeson.KeyMap.lookup "@limit") (rawBatchCases resp)
+              `shouldBe` [Nothing, Just (Aeson.String "memory"), Nothing]
+
+    -- Review of the first fix (2026-10-07). After the memory limit is hit, the
+    -- RTS raises again for every further 100 KB the thread allocates; the
+    -- unwinding that #1020 added allocates, and those raises used to land
+    -- outside the handler and drop the connection. A tail call (spin) has
+    -- almost no frames to unwind and hid it, so these use a recursion that is
+    -- not a tail call.
+    describe "the memory limit on the direct path, in a deep recursion" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          call n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+          tooDeep = 10_000
+          limitText = "Evaluation resource limit exceeded"
+
+      it "answers a small one, stops a deep one with a 500, and answers the next on the same connection" do
+        withServiceFromSourcesOpts stingy "deep-single" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          small <- evalFunction baseUrl mgr "deep-single" "deep" (call 10)
+          assertSuccess small \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 55)
+          hit <- evalFunction baseUrl mgr "deep-single" "deep" (call tooDeep)
+          statusCode' hit `shouldBe` 500
+          LBS.toStrict (responseBody hit) `shouldSatisfy` BS.isInfixOf limitText
+          again <- evalFunction baseUrl mgr "deep-single" "deep" (call 10)
+          assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 55)
+
+      it "reports a deep batch case as the memory limit, and answers the cases around it" do
+        withServiceFromSourcesOpts stingy "deep-batch" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          resp <- postBatchTo baseUrl mgr "deep-batch" "deep" [10, tooDeep, 10]
+          expectBatchOutcomes resp
+            [ CaseAnswered
+            , CaseLimited AllocationLimitHit "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+            , CaseAnswered ]
+
+      it "answers a deep MCP call with the limit, and the next call on the same connection" do
+        withServiceFromSourcesOpts stingy "deep-mcp" [("deep.l4", deepJL4)] \baseUrl mgr -> do
+          let callTool i n = do
+                req <- buildJsonPost (baseUrl <> "/deployments/deep-mcp/.mcp") $ Aeson.object
+                  [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (i :: Int)
+                  , "method" Aeson..= ("tools/call" :: Text)
+                  , "params" Aeson..= Aeson.object
+                      [ "name" Aeson..= ("deep" :: Text)
+                      , "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)] ] ]
+                responseBody <$> httpLbs req mgr
+          hit <- callTool 1 tooDeep
+          LBS.toStrict hit `shouldSatisfy` BS.isInfixOf limitText
+          again <- callTool 2 10
+          LBS.toStrict again `shouldSatisfy` BS.isInfixOf "55"
+
+    -- Review (2026-10-07): a batch never writes the reasoning tree, so a
+    -- traced batch must not be made to compute it. Five cases of 1,000 steps
+    -- with ?trace=full answered under 64 MB before the limits forced the
+    -- response, and all five were stopped once the tree was forced too.
+    describe "a batch with a trace" do
+      it "answers cases that fit, as it did before the response was forced" do
+        let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+        withServiceFromSourcesOpts stingy "trace-batch" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+          let body = Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= (1_000 :: Int)] | i <- [1 .. 5 :: Int] ] ]
+          req <- buildJsonPost (baseUrl <> "/deployments/trace-batch/functions/spin/evaluation/batch?trace=full") body
+          resp <- httpLbs req mgr
+          expectBatchOutcomes resp (replicate 5 CaseAnswered)
+
+    -- smucclaw/l4-ide#1019. The evaluation returns an unfinished number at
+    -- once; its digits used to be computed by the JSON encoder, after both
+    -- limits were off.
+    describe "arithmetic the evaluator leaves unfinished" do
+      let hasty = testOptions { evalTimeout = 1, maxEvalMemoryMb = 100_000 }
+          power n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+
+      it "answers a number that finishes inside the limits" do
+        withServiceFromSourcesOpts hasty "power-ok" [("power.l4", powerJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "power-ok" "power" (power 2)
+          assertSuccess resp \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt (10 ^ (80 :: Int)))
+
+      it "stops a number that does not, inside the time limit" do
+        withServiceFromSourcesOpts hasty "power-slow" [("power.l4", powerJL4)] \baseUrl mgr -> do
+          t0 <- getCurrentTime
+          resp <- evalFunction baseUrl mgr "power-slow" "power" (power powerSlow)
+          t1 <- getCurrentTime
+          statusCode' resp `shouldBe` 500
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          -- the limit is one second; finishing the number took 12 s without it
+          (realToFrac (diffUTCTime t1 t0) :: Double) `shouldSatisfy` (< 4)
+
+      it "reports a batch case whose number does not, and answers the cases around it" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts hasty "power-batch" [("power.l4", powerJL4)] \baseUrl mgr -> do
+            resp <- postBatchTo baseUrl mgr "power-batch" "power" [2, powerSlow, 2]
+            expectBatchOutcomes resp
+              [ CaseAnswered
+              , CaseLimited TimeLimitHit "Evaluation resource limit exceeded: this case did not finish within the time limit of 1 s (--eval-timeout)"
+              , CaseAnswered ]
+
+    -- smucclaw/l4-ide#1020. A limit hit while forcing an imported value left
+    -- the forcing thread's mark on the value's thunk, which outlives the
+    -- request; the next request on the same thread then met its own mark and
+    -- reported "Infinite loop detected".
+    describe "a limit hit inside an imported value" do
+      let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
+          sources = [("heavy_lib.l4", heavyLibJL4), ("heavy_main.l4", heavyMainJL4)]
+          call n = Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]
+          -- 47 MB of the case's own steps leaves too little for the value
+          tooMuch = 7_000
+          loopMessage = "Infinite loop detected"
+
+      it "does not spoil the next single evaluation on the same connection" do
+        withServiceFromSourcesOpts stingy "heavy-single" sources \baseUrl mgr -> do
+          hit <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          statusCode' hit `shouldBe` 500
+          LBS.toStrict (responseBody hit) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          again <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call 0)
+          LBS.toStrict (responseBody again) `shouldSatisfy` (not . BS.isInfixOf loopMessage)
+          assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          -- the hit above landed inside the imported value: once it is worked
+          -- out and kept, the same 47 MB of the case's own steps fit
+          cached <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          assertSuccess cached \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+      it "does not spoil the next evaluation on a new connection, or a batch case" do
+        withServiceFromSourcesOpts stingy "heavy-new" sources \baseUrl mgr -> do
+          hit <- evalFunction baseUrl mgr "heavy-new" "use-heavy" (call tooMuch)
+          statusCode' hit `shouldBe` 500
+          fresh <- newManager defaultManagerSettings
+          other <- evalFunction baseUrl fresh "heavy-new" "use-heavy" (call 0)
+          assertSuccess other \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          resp <- postBatchTo baseUrl mgr "heavy-new" "use-heavy" [0, 0]
+          expectBatchOutcomes resp [CaseAnswered, CaseAnswered]
+
+      it "does not spoil the next MCP call on the same connection" do
+        withServiceFromSourcesOpts stingy "heavy-mcp" sources \baseUrl mgr -> do
+          let rpc :: Int -> Aeson.Value -> Aeson.Value
+              rpc i params = Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= i
+                , "method" Aeson..= ("tools/call" :: Text), "params" Aeson..= params ]
+              listBody = Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (0 :: Int), "method" Aeson..= ("tools/list" :: Text) ]
+              mcp body = do
+                req <- buildJsonPost (baseUrl <> "/deployments/heavy-mcp/.mcp") body
+                responseBody <$> httpLbs req mgr
+          listed <- mcp listBody
+          let toolNames = case Aeson.decode listed of
+                Just (Aeson.Object o)
+                  | Just (Aeson.Object r) <- Aeson.KeyMap.lookup "result" o
+                  , Just (Aeson.Array ts) <- Aeson.KeyMap.lookup "tools" r ->
+                      [ n | Aeson.Object t <- toList ts, Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" t] ]
+                _ -> []
+          let tool = "use-heavy"
+          toolNames `shouldContain` [tool]
+          let callTool i n = mcp (rpc i (Aeson.object ["name" Aeson..= tool, "arguments" Aeson..= Aeson.object ["n" Aeson..= (n :: Int)]]))
+          hit <- callTool 2 tooMuch
+          LBS.toStrict hit `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          again <- callTool 3 0
+          LBS.toStrict again `shouldSatisfy` (not . BS.isInfixOf loopMessage)
+          LBS.toStrict again `shouldSatisfy` BS.isInfixOf "true"
+
+  -- U7b: the report a response carries is never left to be guessed. Until
+  -- build step 6 adds the others it is always the default one.
+  describe "the stated report" do
+    it "is \"default\" on a successful evaluation and on one that stopped" do
+      withServiceFromSources "report" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        decided <- evalFunction baseUrl mgr "report" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= False
+                , "unused flag" Aeson..= Aeson.object []
+                ]
+            ])
+        statusCode' decided `shouldBe` 200
+        reportOf decided `shouldBe` Just "default"
+        waiting <- evalFunction baseUrl mgr "report" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "unused flag" Aeson..= Aeson.object []
+                ]
+            ])
+        statusCode' waiting `shouldBe` 422
+        reportOf waiting `shouldBe` Just "default"
+
+    -- Decided by Claude 2026-10-07, pending Meng's review. @p AND TRUE@ is @p@:
+    -- a bare unknown inside the wrapper's JUST must be undetermined and name
+    -- the input, as on the direct path, and not "#EVAL produced ASSUME".
+    it "names the input when a wrapper-path answer is the bare missing input" do
+      withServiceFromSources "bare-input" [("gate.l4", bareInputJL4)] \baseUrl mgr -> do
+        let ask q = evalFunction baseUrl mgr "bare-input" "gate"
+              (Aeson.object
+                [ "arguments" Aeson..= Aeson.object [ "p" Aeson..= Aeson.object [], "q" Aeson..= q ] ])
+            textOf = Text.Encoding.decodeUtf8 . LBS.toStrict . responseBody
+        -- positive control: the same request, decided by q, answers
+        decided <- ask False
+        statusCode' decided `shouldBe` 200
+        -- the answer is p itself
+        waiting <- ask True
+        statusCode' waiting `shouldBe` 422
+        textOf waiting `shouldSatisfy` Text.isInfixOf "I could not continue evaluating"
+        textOf waiting `shouldSatisfy` Text.isInfixOf "`p (not supplied)`"
+        textOf waiting `shouldSatisfy` (not . Text.isInfixOf "produced ASSUME")
+        reportOf waiting `shouldBe` Just "default"
+
+    it "is \"default\" in an MCP tool's answer, and in its undetermined error" do
+      withServiceFromSources "report-mcp" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        let call args = do
+              req <- buildJsonPost (baseUrl <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("eligible" :: Text)
+                    , "arguments" Aeson..= args
+                    ]
+                ]
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 200
+              pure (mcpToolText (responseBody resp))
+        decided <- call $ Aeson.object
+          [ "is resident" Aeson..= False, "unused flag" Aeson..= Aeson.object [] ]
+        fmap fst decided `shouldBe` Just False
+        (reportOfText . snd =<< decided) `shouldBe` Just "default"
+        waiting <- call $ Aeson.object
+          [ "is resident" Aeson..= True, "unused flag" Aeson..= Aeson.object [] ]
+        fmap fst waiting `shouldBe` Just True
+        (reportOfText . snd =<< waiting) `shouldBe` Just "default"
+        (snd <$> waiting) `shouldSatisfy` maybe False ("I needed to know the value" `Text.isInfixOf`)
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -1504,15 +1814,16 @@ spec = describe "integration" do
       -- Was a characterisation test pinning the disagreement, with a note to
       -- invert it when the two surfaces were reconciled. This is that inversion.
       --
-      -- The gap: L4.Viz.Ladder.generateAtomId hashes each input ref as its
-      -- numeric rootUnique over the atom's DIRECT ref set, while
-      -- L4.Decision.QueryPlan.atomIdByUnique hashes it as the ref's LABEL over
+      -- The gap, then: the ladder hashed each input ref as its numeric
+      -- rootUnique over the atom's DIRECT ref set, while
+      -- L4.Decision.QueryPlan.atomIdByUnique hashed it as the ref's LABEL over
       -- the TRANSITIVE closure. The ids therefore disagreed for every atom with
       -- a non-empty ref set — which is every ordinary leaf — so a client could
       -- not join `ladder` leaves to `impactByAtomId`, and a binding keyed by a
       -- ladder atomId was accepted with a 200 and quietly did nothing.
-      -- jl4-lsp had always reconciled the two with annotateLadderWithAtomIds;
-      -- jl4-service now does the same, in buildDecisionQueryCacheFromCompiled.
+      -- Both now hash the leaf's C1 term key, which the ladder records once and
+      -- the plan reads (R3, smucclaw/l4-ide#1013), so they agree by construction;
+      -- this test is what says so.
       withServiceFromSources "ladder-atomids" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         qpResp <- queryPlan' baseUrl mgr "ladder-atomids" "compute_qualifies"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
@@ -1562,10 +1873,17 @@ spec = describe "integration" do
       withServiceFromSources "ladder-atomid-binds" [("twins.l4", twinLeavesJL4)] \baseUrl mgr -> do
         ladResp <- getLadder baseUrl mgr "ladder-atomid-binds" "twins"
         statusCode' ladResp `shouldBe` 200
-        let ids = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
-              Just (Aeson.Object fd) -> ladderAtomIds fd
+        -- A twin is one atomId held by two different uniques; a bare input
+        -- drawn twice keeps its one unique and is not one (and under
+        -- simplification the inputs are drawn twice too).
+        let atoms = case lookupKey "funDecl" (decodeObject (responseBody ladResp)) of
+              Just (Aeson.Object fd) -> ladderLeafAtoms fd
               _ -> []
-            twins = [a | (a : _ : _) <- List.group (List.sort ids)]
+            twins =
+              [ a
+              | (a, us) <- Map.toList (Map.fromListWith (<>) [(a, [u]) | (a, u) <- atoms])
+              , length (List.nub us) >= 2
+              ]
         -- Guard: without a genuine twin the binding assertion would pass for the
         -- wrong reason.
         twinId <- case twins of
@@ -2679,12 +2997,67 @@ spec = describe "integration" do
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
 
+    -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
+    -- inputs that only the compiler named, and that nothing gives a type. It
+    -- used to be published as the inputs `input 1` and `input 2`, typed
+    -- "object", and every call to it failed; now the deploy is refused.
+    it "refuses a module that @exports a clause group with no GIVEN" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "size.l4" (exportedSizeGroup []))
+      case result of
+        Left err ->
+          err `shouldSatisfy` Text.isInfixOf "`size` is published with @export, but its inputs have no names"
+        Right (_fns, meta, _bundles) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    -- Overloads written one after another are gathered by the parser and
+    -- separated by the checker; the @export above the second one must stay
+    -- with it (refutation of legalese/l4-ide#545's review, round 3).
+    it "publishes the overload whose @export is written above it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "twice.l4" $ Text.unlines
+        [ "DECIDE twice n IS n * 2"
+        , "@export the boolean version"
+        , "DECIDE twice b IS b AND b"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta, _bundles) ->
+          [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions] `shouldBe` [("twice", ["b"])]
+
+    it "publishes the same clause group with a GIVEN, under the names it gives" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "size.l4" $ exportedSizeGroup
+        [ "GIVEN c IS A Colour"
+        , "      n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta, _bundles) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions] `shouldBe` [["c", "n"]]
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
+
+-- | A clause group published with @export, under the given signature lines
+-- (none: no GIVEN at all).
+exportedSizeGroup :: [Text] -> Text
+exportedSizeGroup signature = Text.unlines $
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+  , ""
+  , "@export"
+  ] <> signature <>
+  [ "DECIDE size Red   n IS n"
+  , "DECIDE size Green n IS n + 1"
+  , "DECIDE size Blue  n IS 0"
+  ]
 
 -- | What a client is meant to get back from an evaluation request.
 data WireOutcome
@@ -2800,6 +3173,12 @@ spinFast = 150_000
 spinFifth :: Int
 spinFifth = 500_000
 
+-- | The exponent at which 'powerJL4' takes 12 s to answer, nearly all of it
+-- after the evaluator has returned (an M-series Mac, 2026-10-07: 3.1 s at
+-- 20,000, with the number forced only by the JSON encoder).
+powerSlow :: Int
+powerSlow = 40_000
+
 -- | Steps that would take some twenty minutes.
 spinSlow :: Int
 spinSlow = 1_000_000_000
@@ -2811,13 +3190,18 @@ spinOptions = testOptions { evalTimeout = 3, maxEvalMemoryMb = 100_000 }
 
 -- | Post one batch of 'spinJL4' cases, the i-th spinning for the i-th count.
 postSpinBatch :: String -> Manager -> String -> [Int] -> IO (Response LBS.ByteString)
-postSpinBatch baseUrl mgr deployId steps = do
+postSpinBatch baseUrl mgr deployId = postBatchTo baseUrl mgr deployId "spin"
+
+-- | Post one batch of cases to a function that takes @n@, the i-th with the
+-- i-th value.
+postBatchTo :: String -> Manager -> String -> String -> [Int] -> IO (Response LBS.ByteString)
+postBatchTo baseUrl mgr deployId fnName steps = do
   let body = Aeson.object
         [ "outcomes" Aeson..= ([] :: [Text])
         , "cases" Aeson..=
             [ Aeson.object ["@id" Aeson..= i, "n" Aeson..= n] | (i, n) <- zip [1 :: Int ..] steps ]
         ]
-  req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/spin/evaluation/batch") body
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> deployId <> "/functions/" <> fnName <> "/evaluation/batch") body
   httpLbs req mgr
 
 -- | The case objects of a batch response, as the service wrote them.
@@ -2855,9 +3239,7 @@ withPendingService deployId sources act = do
     Right result -> pure result
 
 withPendingService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withPendingService' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -2884,7 +3266,6 @@ withPendingService' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
-    cleanDir tmpPath
     pure result
 
 -- | Save sources to disk and register as DeploymentFailed,
@@ -2902,9 +3283,7 @@ withFailedService deployId sources act = do
     Right result -> pure result
 
 withFailedService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withFailedService' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withFailedService' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -2930,7 +3309,6 @@ withFailedService' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
-    cleanDir tmpPath
     pure result
 
 -- | Compile sources and register them directly in the TVar,
@@ -2948,9 +3326,7 @@ withServiceFromSources deployId sources act = do
     Right result -> pure result
 
 withServiceFromSources' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceFromSources' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withServiceFromSources' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -2972,7 +3348,6 @@ withServiceFromSources' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | 'withServiceFromSources' under caller-chosen 'Options'.
@@ -2995,9 +3370,7 @@ withServiceFromSourcesOpts opts deployId sources act = do
 
 withServiceFromSourcesOpts'
   :: Options -> Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceFromSourcesOpts' opts deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withServiceFromSourcesOpts' opts deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3017,7 +3390,6 @@ withServiceFromSourcesOpts' opts deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | 'withServiceFromSources', with the deployment registry itself handed to the
@@ -3049,9 +3421,7 @@ withServiceFromSourcesTVar'
   -> [(FilePath, Text)]
   -> (TVar (Map DeploymentId DeploymentState) -> String -> Manager -> IO a)
   -> IO a
-withServiceFromSourcesTVar' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-  cleanDir tmpPath
+withServiceFromSourcesTVar' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3071,7 +3441,6 @@ withServiceFromSourcesTVar' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act registry baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | Whether a deployed function currently holds a built 'CachedDecisionQuery'.
@@ -3092,8 +3461,9 @@ hasDecisionQueryCache registry deployId fnName = do
 -- Every other helper in this file registers freshly-compiled
 -- 'ValidatedFunction's straight into the TVar, which makes the whole suite
 -- blind to anything that differs only after a restart. The CBOR round-trip is
--- exactly such a thing: 'L4.Instances.Serialise' encodes every annotation as
--- @()@, so a rehydrated AST carries no type information. That is what made
+-- exactly such a thing: a bundle keeps no part of an annotation but the
+-- multi-clause mark (@Serialise Anno@ in "L4.Syntax"), so a rehydrated AST
+-- carries no type information. That is what made
 -- @\/query-plan@ and @\/ladder@ answer 400 ("Can only visualize, as a ladder
 -- diagram, a DECIDE that returns a boolean") on any process restarted since the
 -- deploy, while @\/evaluation@ — which needs no annotations — kept working.
@@ -3114,10 +3484,8 @@ withServiceRestartedFromCbor deployId sources act = do
     Right result -> pure result
 
 withServiceRestartedFromCbor' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceRestartedFromCbor' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
-      cborPath = tmpPath </> Text.unpack deployId </> "bundle.cbor"
-  cleanDir tmpPath
+withServiceRestartedFromCbor' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
+  let cborPath = tmpPath </> Text.unpack deployId </> "bundle.cbor"
   store <- initStore tmpPath
   logger <- newLogger False
 
@@ -3158,7 +3526,6 @@ withServiceRestartedFromCbor' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
-    cleanDir tmpPath
     pure result'
 
 -- | Start a service with an empty deployment registry.
@@ -3175,9 +3542,7 @@ withEmptyService act = do
     Right result -> pure result
 
 withEmptyService' :: (String -> Manager -> IO a) -> IO a
-withEmptyService' act = do
-  let tmpPath = "/tmp/jl4-service-test-empty"
-  cleanDir tmpPath
+withEmptyService' act = withStoreDir "empty" \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
   registry <- newTVarIO Map.empty
@@ -3190,7 +3555,6 @@ withEmptyService' act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
-    cleanDir tmpPath
     pure result
 
 -- | Evaluate a function via the API.
@@ -3198,6 +3562,32 @@ evalFunction :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response
 evalFunction baseUrl mgr deployId fnName body = do
   req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fnName <> "/evaluation") body
   httpLbs req mgr
+
+-- | The report a response states it carries, if it states one.
+reportOf :: Response LBS.ByteString -> Maybe Text
+reportOf resp = case Aeson.decode (responseBody resp) of
+  Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
+  _ -> Nothing
+
+-- | The report an MCP tool result's text states, the text being an encoded
+-- evaluation response.
+reportOfText :: Text -> Maybe Text
+reportOfText t = case Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t)) of
+  Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
+  _ -> Nothing
+
+-- | Whether an MCP @tools/call@ result is an error, and its first text.
+mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
+mcpToolText body = do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  Aeson.Object c : _ <- pure (toList cs)
+  Aeson.String t <- Aeson.KeyMap.lookup "text" c
+  let isErr = case Aeson.KeyMap.lookup "isError" r of
+        Just (Aeson.Bool b) -> b
+        _                   -> False
+  pure (isErr, t)
 
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
@@ -3276,12 +3666,6 @@ buildJsonPost url body = do
     , requestHeaders = [("Content-Type", "application/json")]
     }
 
--- | Clean/remove a directory if it exists.
-cleanDir :: FilePath -> IO ()
-cleanDir path = do
-  exists <- doesDirectoryExist path
-  if exists then removeDirectoryRecursive path else pure ()
-
 -- | Query a function's query-plan via the API.
 queryPlan' :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response LBS.ByteString)
 queryPlan' baseUrl mgr deployId fnName body = do
@@ -3336,6 +3720,20 @@ ladderAtomLabels = List.sort . ladderLeafField "name"
 -- | The @atomId@s embedded in the ladder's leaves.
 ladderAtomIds :: Aeson.Object -> [Text]
 ladderAtomIds = ladderLeafField "atomId"
+
+-- | Each leaf's @atomId@ with its @unique@ (@name.unique@).
+ladderLeafAtoms :: Aeson.Object -> [(Text, Int)]
+ladderLeafAtoms fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [(Text, Int)]
+  go (Aeson.Object o) =
+    let here = case (Aeson.KeyMap.lookup "atomId" o, Aeson.KeyMap.lookup "name" o) of
+          (Just (Aeson.String a), Just (Aeson.Object nm))
+            | Just (Aeson.Number n) <- Aeson.KeyMap.lookup "unique" nm -> [(a, round n)]
+          _ -> []
+     in here <> concatMap go (Aeson.KeyMap.elems o)
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []
 
 -- | Decode a JSON response body as an Aeson Object.
 decodeObject :: LBS.ByteString -> Maybe Aeson.Object

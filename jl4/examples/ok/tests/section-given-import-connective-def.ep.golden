@@ -1,0 +1,19 @@
+-- The definition half of a cross-IMPORT pair for the built-in connectives.
+-- See ok/section-given-import-connective-call.l4, which imports this file.
+--
+-- A section GIVEN with a default, and a BOOLEAN rule that reads it. Once this
+-- module is discharged, the rule takes `the rate` as a trailing input, so an
+-- importer that names it reaches a closure that still has to be applied to
+-- this module's own cell before it is a BOOLEAN.
+
+§ `Flags`
+    GIVEN `the rate` IS A NUMBER TYPICALLY 5
+
+GIVETH A BOOLEAN
+`rate is high` MEANS `the rate` GREATER THAN 3
+
+GIVETH A BOOLEAN
+`rate is low` MEANS `the rate` LESS THAN 3
+
+#EVAL `rate is high`
+#EVAL `rate is low`

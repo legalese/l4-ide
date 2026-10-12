@@ -24,7 +24,18 @@
 #                    trailers. Default origin/unstable.
 #
 #   Exits 0 only if every check that ran passed. Any failure is fatal and named
-#   in the summary table.
+#   in the summary table. A test suite that fails keeps its full log, and the
+#   run prints the log's path and the failing examples; passing suites' logs go.
+#
+# CONDITIONAL PROBES — each runs only when the diff against --base touches what
+# it guards, and each came from a review the test suites had passed
+# (specs/todo/MAIN-PRE-REVIEW.md):
+#   (a) jl4-core/src/L4/Parser*: `l4 check` CPU time at 1,000 and 4,000 lines
+#       (etc/probe-parse-scaling.mjs). FAIL above a ratio of 8.
+#   (b) jl4-service/: the same calls before and after a restart that loads
+#       bundle.cbor (etc/probe-service-restart.mjs). FAIL on any difference.
+#   (c) jl4/tests-cli/: new assertions comparing output without dropping '\r'
+#       (etc/probe-cli-crlf.mjs). WARN only: it reads text, not behaviour.
 #
 # WHAT IT DOES NOT CHECK — stated because a green run must not be mistaken for
 # CI. See the memory note "local gate is not CI".
@@ -46,7 +57,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --quick) QUICK=1; shift ;;
     --base)  BASE="${2:-}"; [ -n "$BASE" ] || { echo "--base needs a ref" >&2; exit 2; }; shift 2 ;;
-    -h|--help) sed -n '3,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '3,48p' "$0"; exit 0 ;;
     -*) echo "unknown flag: $1" >&2; exit 2 ;;
     *)  [ -z "$WT" ] || { echo "give exactly one worktree path" >&2; exit 2; }; WT="$1"; shift ;;
   esac
@@ -122,22 +133,102 @@ if [ -n "$STRAY" ]; then
   exit 3
 fi
 
+# ---------------------------------------------------------------- logs
+# Each test suite's output goes to a log in a directory made for this run. A
+# suite that passes deletes its log. A suite that fails keeps it, prints its
+# path and the failing examples, and the summary names it again.
+#
+# The log's path is chosen HERE and handed to the step. Until 2026-10-08 each
+# step's `bash -c "..."` named its own file, /tmp/vb-<suite>.$$, where $$ was
+# the inner bash's pid, while the cleanup at the end removed /tmp/vb-<suite>.$$
+# with this script's pid. The two never matched, so every run left its logs
+# behind (about 300 files and 30 MB in /tmp when it was noticed), and nothing
+# pointed at a failing suite's log, the one file worth reading.
+LOGDIR=$(mktemp -d "${TMPDIR:-/tmp}/verify-branch.XXXXXX") \
+  || { echo "FATAL: cannot create a log directory" >&2; exit 2; }
+KEPT=()
+# The probes below run copies of the built binaries, kept here and always removed.
+PROBEDIR=$(mktemp -d "${TMPDIR:-/tmp}/verify-branch-probe.XXXXXX") \
+  || { echo "FATAL: cannot create a probe directory" >&2; exit 2; }
+# On any exit, Ctrl-C included, the log directory goes unless a failed suite's log is in it.
+cleanup() { rm -rf "$PROBEDIR"; [ "${#KEPT[@]}" -gt 0 ] || rm -rf "$LOGDIR"; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+suite() { # suite <label> <cabal test target> <summary lines to show>
+  local label="$1" target="$2" lines="$3" log="$LOGDIR/$2.log"
+  if step "$label" bash -c "cd '$WT' && cabal test $target 2>&1 | tee '$log' | grep -E 'examples,|PASS|FAIL' | tail -$lines; grep -q '$target: PASS' '$log'"; then
+    rm -f "$log"
+    return 0
+  fi
+  KEPT+=("$log")
+  echo "  full log: $log"
+  # hspec numbers each failure "  1) <the example's path>". A suite that did not
+  # build, or crashed, has none, so show the end of its log instead.
+  if grep -qE '^  [0-9]+\) ' "$log"; then
+    grep -E '^  [0-9]+\) ' "$log" | head -20 | sed 's/^ */  failed: /'
+  else
+    tail -15 "$log" | sed 's/^/  | /'
+  fi
+  return 1
+}
+
 # ---------------------------------------------------------------- the gate
 step "cabal build all" bash -c "cd '$WT' && cabal build all 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"
 
 if [ "$QUICK" = 1 ]; then
   note "jl4-test SKIPPED (--quick)"
 else
-  step "jl4-test (corpus goldens + round-trip)" \
-    bash -c "cd '$WT' && cabal test jl4-test 2>&1 | tee /tmp/vb-jl4-test.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -3; grep -q 'jl4-test: PASS' /tmp/vb-jl4-test.\$\$"
+  suite "jl4-test (corpus goldens + round-trip)" jl4-test 3
 fi
 
-step "l4-cli-test"    bash -c "cd '$WT' && cabal test l4-cli-test 2>&1 | tee /tmp/vb-cli.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'l4-cli-test: PASS' /tmp/vb-cli.\$\$"
-step "jl4-core-test"  bash -c "cd '$WT' && cabal test jl4-core-test 2>&1 | tee /tmp/vb-core.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'jl4-core-test: PASS' /tmp/vb-core.\$\$"
+suite "l4-cli-test"   l4-cli-test 2
+suite "jl4-core-test" jl4-core-test 2
 # jl4-service-test renders a state graph over the HTTP surface and asserts its captions
 # (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
 # lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
-step "jl4-service-test" bash -c "cd '$WT' && cabal test jl4-service-test 2>&1 | tee /tmp/vb-svc.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'jl4-service-test: PASS' /tmp/vb-svc.\$\$"
+suite "jl4-service-test" jl4-service-test 2
+
+# ---------------------------------------------------------------- probes
+# Each probe guards a defect that a review of a main-bound PR found after every
+# suite above had passed, and runs only when the diff touches what it guards
+# (header; specs/todo/MAIN-PRE-REVIEW.md). They run copies of the binaries: a
+# build in this worktree relinks the originals, and a half-written binary fails
+# both sides of a before/after comparison alike (CLAUDE.md §3.2.1).
+DIFF_FILES=$(git -C "$WT" diff --name-only "$BASE"...HEAD 2>/dev/null)
+NOT_PROBED=()
+snapshot() { # snapshot <exe> prints the path of a copy of the built exe
+  local bin
+  bin=$(cd "$WT" && cabal list-bin "exe:$1" 2>/dev/null) && [ -x "$bin" ] && cp "$bin" "$PROBEDIR/$1" && echo "$PROBEDIR/$1"
+}
+
+if echo "$DIFF_FILES" | grep -q '^jl4-core/src/L4/Parser'; then
+  if L4_COPY=$(snapshot l4); then
+    step "probe (a): l4 check time is linear in file length" \
+      bash -c "cd '$WT' && node etc/probe-parse-scaling.mjs --selftest && node etc/probe-parse-scaling.mjs '$L4_COPY'"
+  else RESULTS+=("FAIL  probe (a): no built l4 to time"); FAILED=1; fi
+else NOT_PROBED+=("(a) parse time"); fi
+
+if echo "$DIFF_FILES" | grep -q '^jl4-service/'; then
+  if SVC_COPY=$(snapshot jl4-service); then
+    step "probe (b): jl4-service answers the same after a restart from bundle.cbor" \
+      bash -c "cd '$WT' && node etc/probe-service-restart.mjs '$SVC_COPY'"
+  else RESULTS+=("FAIL  probe (b): no built jl4-service to start"); FAILED=1; fi
+else NOT_PROBED+=("(b) service restart"); fi
+
+if echo "$DIFF_FILES" | grep -q '^jl4/tests-cli/'; then
+  printf '\n=== probe (c): CLI tests that compare output without dropping \\r ===\n'
+  if CRLF=$(cd "$WT" && node etc/probe-cli-crlf.mjs --selftest >/dev/null && node etc/probe-cli-crlf.mjs --base "$BASE" "$WT"); then
+    echo "$CRLF"
+    case "$CRLF" in
+      *WARN:*) RESULTS+=("WARN  probe (c): $(echo "$CRLF" | grep -c '^  ') CLI-test line(s) may need '\\r' dropped; read them above") ;;
+      *) RESULTS+=("PASS  probe (c): no new CLI-test comparison of raw output") ;;
+    esac
+  else echo "$CRLF"; RESULTS+=("FAIL  probe (c) could not run"); FAILED=1; fi
+else NOT_PROBED+=("(c) CLI \\r"); fi
+[ "${#NOT_PROBED[@]}" -eq 0 ] ||
+  note "probes not run, the diff does not touch what they guard: $(printf '%s, ' "${NOT_PROBED[@]}" | sed 's/, $//')"
 
 step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
 
@@ -169,7 +260,7 @@ case $? in
   *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
 esac
 
-step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6"
+step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
 # worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
@@ -210,6 +301,11 @@ echo
 banner
 echo "  RESULTS"
 for r in "${RESULTS[@]}"; do echo "    $r"; done
+if [ "${#KEPT[@]}" -gt 0 ]; then
+  echo
+  echo "  LOGS of the failed suites, kept:"
+  for k in "${KEPT[@]}"; do echo "    $k"; done
+fi
 echo
 echo "  NOT CHECKED — suites CI runs and this does not: jl4-lsp-test,"
 echo "               jl4-mlir-test, jl4-websessions-test, jl4-proleg-burden,"
@@ -217,5 +313,4 @@ echo "               jl4-proleg-roundtrip."
 echo "  NOT CHECKED — also: DMN engine harnesses, go selftest, WASM, Nix,"
 echo "               TypeScript. A green run here is not a green CI."
 echo "────────────────────────────────────────────────────────────────────"
-rm -f /tmp/vb-jl4-test.$$ /tmp/vb-cli.$$ /tmp/vb-core.$$ /tmp/vb-svc.$$
 exit "$FAILED"

@@ -182,8 +182,9 @@ DECIDE `the amount is not less than 21 (wrong)` n IF n GREATER THAN 21
 assertion failed
 ```
 
-_(Probe `q02-boundary-wrong.l4`; the file still exits 0 — a failing assertion is reported at
-`DiagnosticSeverity_Error` but does not change the exit code, so read the diagnostics.)_
+_(Probe `q02-boundary-wrong.l4`; `l4 run` exits 1 on it, but an `l4` built before
+legalese/l4-ide#518 exits 0, and only the `DiagnosticSeverity_Error` line says which assertion
+failed, so read the diagnostics.)_
 
 **See** entry 4.5 for the same distinction on dates, where "on or before" and "beginning with the
 day" hide an extra off-by-one, and [drafting-patterns.md](../drafting-patterns.md), "Constitutive

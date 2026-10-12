@@ -56,7 +56,7 @@ main = do
     , test "traceMeta pretty-print baked"      testTraceMetaBaked
     , test "<fn>$trace symbol emitted"         testTraceSymbolEmitted
     , test "traceMeta nodes populated"         testTraceMetaNodes
-    , test "AND/OR/NOT marked special"         testTraceSpecialMarkers
+    , test "AND/OR/IMPLIES marked special"     testTraceSpecialMarkers
     , test "fnValue node + enter_fn/exit_fn"   testTraceFnValueAndContext
     , test "NOT-range disambiguation"          testTraceNotRangeDisambiguation
     , test "returnType enriched from EntityInfo" testReturnTypeEnrichedFromEntityInfo
@@ -563,10 +563,10 @@ testTraceSymbolEmitted = do
           && T.isInfixOf "@__l4_trace_enter" mlir
           && T.isInfixOf "@__l4_trace_exit"  mlir
 
--- | M5 slice 4A: AND/OR (and direct App "__AND__"/"__OR__") nodes get
--- a @"special"@ marker in the schema so the runtime knows to append a
--- synthetic IF sub-tree and apply short-circuit filtering. This is the
--- mechanism that flips `is-eligible` to byte-identical.
+-- | M5 slice 4A: AND/OR/IMPLIES (and direct App "__AND__" and so on)
+-- nodes get a @"special"@ marker in the schema so the runtime knows to
+-- apply short-circuit filtering. This is the mechanism that keeps
+-- `is-eligible` byte-identical.
 testTraceSpecialMarkers :: IO Bool
 testTraceSpecialMarkers = do
   let src = T.unlines
@@ -574,6 +574,16 @@ testTraceSpecialMarkers = do
         , "GIVEN `age` IS A NUMBER"
         , "GIVETH A BOOLEAN"
         , "DECIDE `ok` IS `age` >= 18 AND `age` <= 65"
+        , ""
+        , "@export Either"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `young or old` IS `age` < 18 OR `age` > 65"
+        , ""
+        , "@export Implication"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `adult if over 18` IS `age` > 18 IMPLIES `age` >= 18"
         ]
   case schemaWithDiagnostics src of
     Left errs -> do
@@ -581,6 +591,8 @@ testTraceSpecialMarkers = do
       pure False
     Right json ->
       pure $ T.isInfixOf "\"special\":\"AND\"" json
+          && T.isInfixOf "\"special\":\"OR\"" json
+          && T.isInfixOf "\"special\":\"IMPLIES\"" json
 
 -- | An @MEANS@ / @DECIDE … IS@ binding without an explicit @GIVETH@
 -- must still surface a concrete 'returnType' in the schema; otherwise
@@ -609,8 +621,8 @@ testReturnTypeEnrichedFromEntityInfo = do
 -- into the same 'SrcRange' at parse time. The rangeMap is now keyed by
 -- '(SrcRange, exprDisambiguator)', so both get distinct trace nodes
 -- and the wrapper can look up each by its own AST shape. Verify the
--- schema has BOTH a NOT-tagged node AND a separate PROJ-tagged node
--- for an expression like @NOT req's flag@.
+-- schema has BOTH a NOT node AND a separate PROJ-tagged node for an
+-- expression like @NOT req's flag@.
 testTraceNotRangeDisambiguation :: IO Bool
 testTraceNotRangeDisambiguation = do
   let src = T.unlines
@@ -630,7 +642,10 @@ testTraceNotRangeDisambiguation = do
       -- The NOT subtree must exist as one node; the inner PROJ subtree
       -- as another. If the rangeMap collapsed them, the PROJ node would
       -- be missing from the schema (its 'tnSpecial' would be absent).
-      pure $ T.isInfixOf "\"special\":\"NOT\"" json
+      -- The NOT node is identified by its source text: it carries no
+      -- @special@ marker since the connectives stopped needing a
+      -- synthetic IF sub-tree (UNKNOWN-EVALUATION-SPEC §8 step 2).
+      pure $ T.isInfixOf "\"exampleCode\":\"NOT req's flag\"" json
           && T.isInfixOf "\"special\":\"PROJ\"" json
 
 -- | M5 slice 4A: every `<fn>$trace` clone calls @__l4_trace_enter_fn@

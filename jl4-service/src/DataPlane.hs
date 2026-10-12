@@ -36,6 +36,7 @@ import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.DeepSeq (NFData)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (bracket_, evaluate)
 import Control.Monad.IO.Class (liftIO)
@@ -331,7 +332,7 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     bracket_ (waitQSem local) (signalQSem local) $
     bracket_ (waitQSem env.batchSlots.shared) (signalQSem env.batchSlots.shared) do
       let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-      r <- runAppM env (runEvaluatorForDirectLimited vf Nothing args outputFilter traceLevel includeGraphViz
+      r <- runAppM env (runEvaluatorForDirectLimited False vf Nothing args outputFilter traceLevel includeGraphViz
                           (Maybe.fromMaybe PresumeSoft batchArgs.presumption))
       pure (inputCase.id, either limitHitCase id <$> r)
 
@@ -442,18 +443,19 @@ queryPlanHandler' deployId fnName fnArgs = do
 -- the containment and the exception, over seven shapes including record
 -- projections, WHERE-expansion and the IMPLIES seam.
 --
--- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were UUID5
--- over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ rendered each
--- ref as its numeric @rootUnique@ over the atom's /direct/ ref set while
+-- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were once
+-- UUID5 over @"fn|label|refs=..."@, but the ladder rendered each ref as its
+-- numeric @rootUnique@ over the atom's /direct/ ref set while
 -- @L4.Decision.QueryPlan.atomIdByUnique@ rendered it as the ref's /label/ over
 -- the /transitive closure/, so they disagreed for every atom with a non-empty
 -- ref set — which is every ordinary leaf — and a binding keyed by a ladder
--- atomId was accepted with a 200 and did nothing at all. @jl4-lsp@ had always
--- reconciled them by calling @LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds@
--- before serving the ladder (see @LSP.L4.Actions@); jl4-service now does the
--- same in 'buildDecisionQueryCacheFromCompiled', so both surfaces and both
--- products agree. 'IntegrationSpec' pins it, including the end-to-end claim that
--- such a binding moves @determined@.
+-- atomId was accepted with a 200 and did nothing at all. Since R3
+-- (WHERE-INLINING-SPEC §10.1, smucclaw/l4-ide#1013) both are the hash of the
+-- leaf's C1 term key, which the ladder records once while drawing and the plan
+-- reads ("L4.Viz.AtomKey"), so they agree by construction; what is left of the
+-- reconciliation in 'buildDecisionQueryCacheFromCompiled' only names them under
+-- the function name this deployment serves. 'IntegrationSpec' pins it, including
+-- the end-to-end claim that such a binding moves @determined@.
 ladderHandler :: DeploymentId -> Text -> AppM VizExpr.RenderAsLadderInfo
 ladderHandler deployId fnName = do
   logger <- asks (.logger)
@@ -647,14 +649,20 @@ runEvaluatorForDirect
   -> Presumption
   -> AppM (SimpleResponse, Int64)
 runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption =
-  runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption
+  runEvaluatorForDirectLimited True vf engine args outputFilter traceLevel includeGraphViz presumption
     >>= either (const resourceLimitExceeded) pure
 
 -- | 'runEvaluatorForDirect', returning a limit hit (and the bytes allocated up
 -- to it) instead of failing the request, so that the batch endpoint can report
 -- it on the one case that hit it.
+--
+-- The first argument says whether the caller writes the reasoning tree. A
+-- batch does not (it reads the result, the GraphViz text and what the answer
+-- presumed), so it drops the tree before the limits force the response:
+-- otherwise a traced batch would pay for a tree it never sends.
 runEvaluatorForDirectLimited
-  :: ValidatedFunction
+  :: Bool
+  -> ValidatedFunction
   -> Maybe EvalBackend
   -> [(Text, Maybe FnLiteral)]
   -> Maybe (Set.Set Text)
@@ -662,21 +670,22 @@ runEvaluatorForDirectLimited
   -> Bool
   -> Presumption
   -> AppM (Either (LimitHit, Int64) (SimpleResponse, Int64))
-runEvaluatorForDirectLimited vf engine args outputFilter traceLevel includeGraphViz presumption = do
+runEvaluatorForDirectLimited keepReasoning vf engine args outputFilter traceLevel includeGraphViz presumption = do
   let evalBackend = Maybe.fromMaybe JL4 engine
   case Map.lookup evalBackend vf.fnEvaluator of
     Nothing -> throwError err500 { errBody = jsonError "No evaluator available for backend" }
     Just runFn -> do
       limited <-
         withEvalLimits $
-          runExceptT
-            ( runFn.runFunction
-                args
-                outputFilter
-                traceLevel
-                includeGraphViz
-                presumption
-            )
+          fmap (fmap (\r -> if keepReasoning then r else r { reasoning = emptyReasoning })) $
+            runExceptT
+              ( runFn.runFunction
+                  args
+                  outputFilter
+                  traceLevel
+                  includeGraphViz
+                  presumption
+              )
       pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
         Left err -> (SimpleError err, allocBytes)
         Right r -> (SimpleResponse r, allocBytes)
@@ -737,14 +746,14 @@ runAppM env action = runHandler $ runReaderT action env
 -- Uses configurable eval timeout and per-evaluation allocation limits.
 -- Returns the result and the number of GHC allocation bytes consumed.
 -- Hitting either limit fails the request with a 500.
-timeoutAction :: IO b -> AppM (b, Int64)
+timeoutAction :: NFData b => IO b -> AppM (b, Int64)
 timeoutAction act = withEvalLimits act >>= either (const resourceLimitExceeded) pure
 
 resourceLimitExceeded :: AppM a
 resourceLimitExceeded = throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
 
 -- | 'EvalLimits.withEvalLimits' under the service's configured limits.
-withEvalLimits :: IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
+withEvalLimits :: NFData b => IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits act = do
   cfg <- asks (.options)
   liftIO (EvalLimits.withEvalLimits cfg act)

@@ -1,0 +1,53 @@
+-- The built-in connectives called through a function parameter.
+--
+-- `AND`, `OR`, `IMPLIES` and `NOT` are evaluated in frames of their own
+-- (UNKNOWN-EVALUATION-SPEC §4.4, U2, U2b), and a variable that holds one --
+-- here a parameter of `combine` or `apply` -- gets the same frames: the left
+-- operand first, and the right one only if the left does not decide. The
+-- short circuits below would otherwise divide by zero. No trace shows a
+-- parameter named `a` or `b`, because the connectives have none.
+--
+-- The connectives are named here by their internal spelling, `__AND__` and
+-- so on, which is the only way to pass one as a value.
+
+GIVEN f IS A FUNCTION FROM BOOLEAN AND BOOLEAN TO BOOLEAN
+      p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+combine f p q MEANS f p q
+
+GIVEN g IS A FUNCTION FROM BOOLEAN TO BOOLEAN
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+apply g p MEANS g p
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`has a positive reciprocal` n MEANS 1 DIVIDED BY n GREATER THAN 0
+
+-- The truth tables, through the parameter.
+#EVAL combine `__AND__` TRUE TRUE
+#EVAL combine `__AND__` TRUE FALSE
+#EVAL combine `__OR__` FALSE FALSE
+#EVAL combine `__OR__` FALSE TRUE
+#EVAL combine `__IMPLIES__` TRUE FALSE
+#EVAL combine `__IMPLIES__` TRUE TRUE
+#EVAL apply `__NOT__` TRUE
+#EVAL apply `__NOT__` FALSE
+
+-- The right operand is not evaluated when the left decides ...
+#EVAL combine `__AND__` FALSE (`has a positive reciprocal` 0)
+#EVAL combine `__OR__` TRUE (`has a positive reciprocal` 0)
+#EVAL combine `__IMPLIES__` FALSE (`has a positive reciprocal` 0)
+-- ... and is when it does not: this one divides by zero.
+#EVAL combine `__AND__` TRUE (`has a positive reciprocal` 0)
+
+-- The same calls written out, for comparison.
+#EVAL FALSE AND `has a positive reciprocal` 0
+#EVAL TRUE OR `has a positive reciprocal` 0
+
+-- What a trace shows: the call, then the operands it evaluated.
+#EVALTRACE combine `__AND__` TRUE FALSE
+#EVALTRACE combine `__OR__` TRUE (`has a positive reciprocal` 0)
+#EVALTRACE apply `__NOT__` TRUE
+#EVALTRACE TRUE AND (FALSE OR `has a positive reciprocal` 2)

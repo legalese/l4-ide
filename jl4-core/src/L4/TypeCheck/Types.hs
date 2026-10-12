@@ -8,7 +8,7 @@ import Base
 import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
-import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
+import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
@@ -112,6 +112,16 @@ data CheckError =
   | TypeMismatch ExpectationContext (Type' Resolved) (Type' Resolved) -- expected, given
   | InconsistentNameInSignature Name (Maybe Name)
   | InconsistentNameInAppForm Name (Maybe Name)
+  | ClausePatternCountMismatch (Maybe SrcRange) Name Int Int
+    -- ^ The clauses of a multi-clause group have a different number of
+    -- patterns than its GIVEN names inputs ('L4.TypeCheck.clauseInputsAgainstGiven').
+    -- Carries the first clause's head range, the group's name, the number of
+    -- patterns in each clause, and the number of inputs the GIVEN names.
+  | ExportedClausesWithoutGiven (Maybe SrcRange) Name
+    -- ^ An @\@export@ed definition written as clauses with patterns, one
+    -- clause or several, with no GIVEN to name its inputs
+    -- ('L4.TypeCheck.refuseExportedClausesWithoutGiven'). Carries the range of
+    -- the @\@export@ and the definition's name.
   | NonDistinctError NonDistinctContext [[Name]]
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
@@ -310,6 +320,14 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | NonassertableOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@nonassertable@ annotation sits above something that is not a
+    -- definition: the first text says what (a declaration, an input, a section
+    -- heading or its inputs, a directive, an import, a timezone), the second
+    -- names it when it has a name. Only a named step can be closed to assertion.
+    -- ^ An @\@nonassertable@ carried text after it that is not a comment.
+    -- The mark takes no words: @\@nonassertable \`alpha\` MEANS TRUE@ would
+    -- otherwise swallow the definition into the annotation and mark the next.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -325,6 +343,12 @@ data CheckError =
     -- same level. Carries the chain's range and both operators with their
     -- fixities.
   | SuspiciousBinderPattern Resolved Resolved
+  | SuspiciousClausePattern Name Bool Resolved Resolved
+    -- ^ 'SuspiciousBinderPattern' for a pattern of a multi-clause group
+    -- ('L4.TypeCheck.checkClauseMatrix'): a pattern that is a new name, close
+    -- to a value of its input's type that no clause of the group matches.
+    -- Arguments: the group's name, whether a GIVEN names its inputs, the new
+    -- name, the value it resembles.
     -- ^ A CONSIDER branch pattern is a fresh binder (matching everything)
     -- whose name closely resembles a constructor of the scrutinee's type
     -- that no other branch covers — very likely a misspelled constructor.
@@ -359,6 +383,11 @@ data UnreachableClause
     -- clauses after this one are unreachable for the same reason
   | CoveredByClausesAbove
     -- ^ every input it matches is matched by a clause above it
+  | AfterClauseBindingNewName [Name] Int
+    -- ^ a clause above it matches every input because its patterns are
+    -- new names (the first argument, as written), such as a misspelled
+    -- value; carries how many further clauses are unreachable for the same
+    -- reason
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -376,6 +405,14 @@ data CheckWarning
     -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
     -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
     -- range, the group's head name for display, and why.
+  | ClauseAnnotationUnused SrcRange Name Int Text Bool
+    -- ^ An @\@desc@, @\@export@ or @\@nlg@ written between two clauses of a
+    -- multi-clause group, which takes its annotations from above its first
+    -- clause only ('L4.TypeCheck.checkClauseMatrix'). Carries the
+    -- annotation's range, the group's head name, the later clause's number
+    -- (counting from 1), the annotation as written (@\@export@, say), and
+    -- whether the group has a GIVEN, which is where its @\@desc@ and
+    -- @\@export@ go.
   | FixityIgnoredNonBinary RawName (Maybe SrcRange)
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
@@ -694,6 +731,7 @@ severity (MkCheckErrorWithContext e _) =
     CheckInfo {}               -> SInfo
     CheckWarning {}            -> SWarn
     SuspiciousBinderPattern {} -> SInfo
+    SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
     _                          -> SError
 
@@ -770,6 +808,8 @@ instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
+  rangeOf (ClausePatternCountMismatch r _ _ _) = r
+  rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
@@ -788,16 +828,19 @@ instance HasSrcRange CheckError where
   rangeOf (EmptyWindow d _ _)               = rangeOf d
   rangeOf (BeforeOnJoinLine d)              = rangeOf d
   rangeOf (FixityAnnotationMalformed mr _)  = mr
+  rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
+  rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
+  rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
   rangeOf (AmbiguousImplicitSupply _ r)     = rangeOf r
@@ -935,10 +978,23 @@ emptyMixfixRegistry :: MixfixRegistry
 emptyMixfixRegistry = MkMixfixRegistry Map.empty Map.empty Set.empty
 
 -- | Merge two registries (used when combining scopes).
+--
+-- Entries are merged with 'List.union', which keeps the first copy of an entry
+-- and drops later copies equal to it. A module's registry already holds every
+-- entry of its imports' registries, so merging with @++@ kept one copy per
+-- import PATH: when each module imports prelude and every earlier module, the
+-- k-th held 2^k copies of each of the prelude's mixfix functions, all
+-- deep-forced with the rest of its 'TypeCheckResult', and
+-- 'lookupByFirstKeyword' returned the product of two such lists
+-- (smucclaw\/l4-ide#1008). Dropping an equal later copy changes no reader:
+-- the @tryMatch...@ functions in "L4.TypeCheck" stop at the first candidate
+-- that matches (and 'L4.TypeCheck.tryMatchAnyPattern' keeps the first error),
+-- and the rest test for any candidate, 'List.nub' the declared fixities, or
+-- build a 'Map.fromList' keyed by 'Unique'.
 unionMixfixRegistry :: MixfixRegistry -> MixfixRegistry -> MixfixRegistry
 unionMixfixRegistry r1 r2 = MkMixfixRegistry
-  { byCanonicalName = Map.unionWith (++) r1.byCanonicalName r2.byCanonicalName
-  , byFirstKeyword  = Map.unionWith (++) r1.byFirstKeyword r2.byFirstKeyword
+  { byCanonicalName = Map.unionWith List.union r1.byCanonicalName r2.byCanonicalName
+  , byFirstKeyword  = Map.unionWith List.union r1.byFirstKeyword r2.byFirstKeyword
   , keywordUniverse = Set.union r1.keywordUniverse r2.keywordUniverse
   }
 
@@ -2135,14 +2191,76 @@ instance ApplySubst (Type' Resolved) where
 instance ApplySubst (OptionallyNamedType Resolved) where
   applySubst (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn <$> applySubst t
 
+-- | The type 'applySubst' makes of a type, read off a snapshot of the
+-- substitution. Only the path compression 'applySubst' writes back is left
+-- out, and that changes no answer: it saves later lookups, and every reader
+-- of the substitution chases it to the end.
+--
+-- For a structure that is only read, this is the cheap way to resolve the
+-- types in it. 'applySubst' through 'gplate' rebuilds every node of the
+-- structure inside 'Check', annotations and tokens included, and holds the
+-- rebuilt nodes as closures until they are read; @'Optics.over' ('gplate'
+-- \@('Type'' 'Resolved')) ('substituteInfVars' s)@ rebuilds a node when it
+-- is read.
+substituteInfVars :: Substitution -> Type' Resolved -> Type' Resolved
+substituteInfVars s = go
+  where
+    go = \ case
+      Type ann       -> Type ann
+      TyApp ann n ts -> TyApp ann n (map go ts)
+      Fun ann onts t -> Fun ann (map goNamed onts) (go t)
+      Forall ann ns t -> Forall ann ns (go t)
+      InfVar ann rn i -> maybe (InfVar ann rn i) go (Map.lookup i s)
+    goNamed (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn (go t)
+
 instance ApplySubst CheckError where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckError) applySubst
 
 instance ApplySubst CheckErrorContext where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorContext) applySubst
 
+-- | The context is resolved lazily ('substituteInfVars'), and only when it
+-- holds a type the substitution changes ('contextChanges'); otherwise it is
+-- kept as it is. It is the syntax that was being checked when the
+-- diagnostic was raised, as written, so it can be a whole definition, such
+-- as a CONSIDER of thousands of arms for a warning about that CONSIDER, and
+-- each level of it holds the levels inside it. 'applySubst' rebuilt all of
+-- it, for each diagnostic raised inside it, whether anything read it or
+-- not; rebuilt lazily, it is still rebuilt in full where the diagnostics
+-- are forced, as the language server's rules force them, and a copy per
+-- level made a CONSIDER nested 600 deep, warned about at the innermost
+-- level, peak at 390 MB. Kept, it is shared.
 instance ApplySubst CheckErrorWithContext where
-  applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorWithContext) applySubst
+  applySubst (MkCheckErrorWithContext e ctx) = do
+    e' <- applySubst e
+    s <- use #substitution
+    let ctx'
+          | contextChanges s ctx = Optics.over (gplate @(Type' Resolved)) (substituteInfVars s) ctx
+          | otherwise = ctx
+    pure (MkCheckErrorWithContext e' ctx')
+
+-- | Whether 'substituteInfVars' changes a type in this context. A context is
+-- syntax as written, over 'Name's, so a 'Type'' 'Resolved' can only sit in
+-- an annotation's extras (its 'resolvedInfo', or the names of a resolved
+-- annotation); each annotation's extras are searched, and the syntax around
+-- them is walked only as far as its annotations, never into their tokens,
+-- which are most of it.
+contextChanges :: Substitution -> CheckErrorContext -> Bool
+contextChanges s =
+  Optics.anyOf (gplate @Anno) \ (a :: Anno) ->
+    Optics.anyOf (gplate @(Type' Resolved) @Extension) (substitutionChanges s) (Optics.view annoExtra a)
+
+-- | Whether 'substituteInfVars' changes this type: whether it mentions an
+-- inference variable the substitution binds.
+substitutionChanges :: Substitution -> Type' Resolved -> Bool
+substitutionChanges s = go
+  where
+    go = \ case
+      Type _         -> False
+      TyApp _ _ ts   -> any go ts
+      Fun _ onts t   -> any (go . optionallyNamedTypeType) onts || go t
+      Forall _ _ t   -> go t
+      InfVar _ _ i   -> Map.member i s
 
 instance ApplySubst EntityInfo where
   applySubst = traverse (\(n, entity) -> (n, ) <$> applySubst entity)

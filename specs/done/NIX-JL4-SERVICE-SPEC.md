@@ -77,7 +77,8 @@ The decision service / jl4-service resolves `IMPORT prelude` by looking for `pre
 
 ## How @export Works
 
-- `@export [default] <description>` annotation goes before `GIVEN` (or before `DECIDE` if no GIVEN)
+- `@export [default] <description>` annotation goes before `GIVEN` (or before `DECIDE` if no GIVEN), except that a definition written as clauses with patterns, one clause or several, needs a `GIVEN` to be exported: `l4 check` refuses an `@export` of one with no GIVEN, because its inputs then have only names L4 made up and no declared types (ruling M2, below)
+- Ruling M2: option A, "Refuse at check"; conditions: on unstable first, then carried to #545, plus one issue for inputs with no declared type published with the wrong schema type, filed as smucclaw/l4-ide#1024; Meng gave no note beyond choosing the option; 2026-10-08; bench https://claude.ai/artifact/152eFCmvtT18nVKr9KyTdn
 - Both `DECIDE name ...` and `name params MEANS ...` forms produce the same `MkDecide` AST node, so `@export` works with either
 - `default` marks the primary exported function
 - The decision service discovers exports via `L4.Export.getExportedFunctions`

@@ -855,7 +855,7 @@ jl4Rules evalConfig rootDirectory recorder = do
           Left errs -> do
             -- Each error keeps its 'PError' as the diagnostic's typed source
             -- (as 'checkErrorToDiagnostic' does for 'CheckErrorWithContext'
-            -- below), so 'outOfScopeAssumeQuickFix''s sibling in
+            -- below), so 'outOfScopeDeclarationQuickFix''s sibling in
             -- "LSP.L4.Handlers" can find a confusable-character error's
             -- structured 'Lexer.fixes' again via @messageOfL \@PError@.
             let mk pErr = mkFileDiagnosticWithSource uri (mkParseErrorDiagnostic pErr) pErr
@@ -1306,7 +1306,13 @@ jl4Rules evalConfig rootDirectory recorder = do
               EvaluateLazy.Assertion (EvaluateLazy.FailsBecause _)   -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Assertion (EvaluateLazy.Errored _)        -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Reduction (EvaluateLazy.ReducedErrored _) -> Just LSP.DiagnosticSeverity_Error
-              _                                    -> Just LSP.DiagnosticSeverity_Information
+              -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+              EvaluateLazy.Assertion (EvaluateLazy.Undetermined _)        -> Just LSP.DiagnosticSeverity_Error
+              EvaluateLazy.Reduction (EvaluateLazy.ReducedUndetermined _) -> Just LSP.DiagnosticSeverity_Error
+              -- one arm each, no wildcard, so a new outcome must choose
+              -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b)
+              EvaluateLazy.Assertion EvaluateLazy.Holds              -> Just LSP.DiagnosticSeverity_Information
+              EvaluateLazy.Reduction (EvaluateLazy.Reduced _)        -> Just LSP.DiagnosticSeverity_Information
         , _code = Nothing
         , _codeDescription = Nothing
         , _source = Just "eval"
@@ -1406,6 +1412,14 @@ prettyNlgResolveWarning = \ case
     "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
   Resolve.FixityAnnotationNoLocation _ ->
     "A fixity annotation has no source location. This might be an internal compiler error."
+  Resolve.NonassertableAnnotationMisplaced _ ->
+    "This @nonassertable sits inside a definition's body, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE. A definition inside a WHERE or LET block cannot carry it yet."
+  Resolve.NonassertableAnnotationSuperseded _ ->
+    "Two or more @nonassertable marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
+  Resolve.NonassertableAnnotationSameLine _ ->
+    "This @nonassertable shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
+  Resolve.NonassertableAnnotationNoLocation _ ->
+    "A @nonassertable annotation has no source location. This might be an internal compiler error."
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1433,6 +1447,14 @@ rangeOfResolveWarning = \ case
   Resolve.FixityAnnotationMisplaced fx ->
     srcSpanToLspRange $ Just fx.range
   Resolve.FixityAnnotationNoLocation _ ->
+    srcSpanToLspRange Nothing
+  Resolve.NonassertableAnnotationMisplaced na ->
+    srcSpanToLspRange $ Just na.range
+  Resolve.NonassertableAnnotationSameLine na ->
+    srcSpanToLspRange $ Just na.range
+  Resolve.NonassertableAnnotationSuperseded na ->
+    srcSpanToLspRange $ Just na.range
+  Resolve.NonassertableAnnotationNoLocation _ ->
     srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------

@@ -1,0 +1,13 @@
+-- A string that spans lines in a clause body (probe q/str). Printed, its
+-- second line gains the printer's indentation, as it does in a rule
+-- that is not written as clauses.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default lbl
+GIVEN c IS A Colour
+GIVETH A STRING
+    DECIDE lbl Red   IS "a
+      b"
+    DECIDE lbl c     IS "z"
+

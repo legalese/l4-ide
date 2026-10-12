@@ -82,6 +82,10 @@ runEvalTraceFixture = fixtureDir </> "run-evaltrace.l4"
 earlyActFixture :: FilePath
 earlyActFixture = fixtureDir </> "early-act.l4"
 
+-- | Two multi-clause groups, for how @l4 render@ and a trace name their parts.
+multiClauseRenderFixture :: FilePath
+multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -101,6 +105,24 @@ refuseBatchJson    = fixtureDir </> "refuse-batch.json"
 assertAssumedFixture :: FilePath
 assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
 
+-- | Typechecks cleanly; one @#EVAL@ whose result is a bare assumed BOOLEAN.
+evalAssumedFixture :: FilePath
+evalAssumedFixture = fixtureDir </> "eval-assumed.l4"
+
+-- | Typechecks cleanly; one @#EVAL@ decided whatever its input is, and one
+-- that waits on two.
+evalUndeterminedFixture :: FilePath
+evalUndeterminedFixture = fixtureDir </> "eval-undetermined.l4"
+
+evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture :: FilePath
+evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
+evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
+evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
+
+-- | Typechecks cleanly; one @#ASSERT@ holds and one evaluates to FALSE.
+assertFailsFixture :: FilePath
+assertFailsFixture = fixtureDir </> "assert-fails.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -114,6 +136,25 @@ batchMixedJson   = fixtureDir </> "batch-mixed.json"
 batchMixfixSharedHead, batchMixfixSharedHeadJson :: FilePath
 batchMixfixSharedHead     = fixtureDir </> "batch-mixfix-shared-head.l4"
 batchMixfixSharedHeadJson = fixtureDir </> "batch-mixfix-shared-head.json"
+
+-- | Multi-clause groups whose compiled form, printed, met a drafter's name
+-- (review of legalese/l4-ide#545); see the fixtures.
+batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans :: FilePath
+batchClauses         = fixtureDir </> "batch-multi-clause.l4"
+batchClausesCapture  = fixtureDir </> "batch-multi-clause-capture.l4"
+batchClausesColours  = fixtureDir </> "batch-multi-clause-colours.json"
+batchClausesBooleans = fixtureDir </> "batch-multi-clause-booleans.json"
+
+-- | Groups whose clauses, printed from the source text, meant something
+-- else in the printed module (review of legalese/l4-ide#545, round 2).
+batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs, batchClausesString, batchClausesB, batchClausesCatchAll :: FilePath
+batchClausesCatchAll  = fixtureDir </> "batch-multi-clause-catch-all.l4"
+batchClausesDitto     = fixtureDir </> "batch-multi-clause-ditto.l4"
+batchClausesDittoHead = fixtureDir </> "batch-multi-clause-ditto-head.l4"
+batchClausesFixity    = fixtureDir </> "batch-multi-clause-fixity.l4"
+batchClausesTabs      = fixtureDir </> "batch-multi-clause-tabs.l4"
+batchClausesString    = fixtureDir </> "batch-multi-clause-string.l4"
+batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
 
 batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
 batchCodeFixture  = fixtureDir </> "batch-code.l4"
@@ -133,6 +174,11 @@ batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 batchSectionEnumFixture, batchSectionEnumJson :: FilePath
 batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
 batchSectionEnumJson    = fixtureDir </> "batch-section-enum.json"
+
+-- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
+batchLineBreakFixture, batchLineBreakJson :: FilePath
+batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
+batchLineBreakJson    = fixtureDir </> "batch-string-line-break.json"
 
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
@@ -215,6 +261,12 @@ decodeArray sout =
       expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
       error "unreachable"
 
+-- | A JSON array field's elements, if the field is an array.
+arrayField :: Value -> String -> Maybe [Value]
+arrayField v k = case objField v k of
+  Just (Array a) -> Just (toList a)
+  _              -> Nothing
+
 -- | Count non-blank lines (each NDJSON row is one line).
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
@@ -280,6 +332,15 @@ verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
 verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
+
+-- Two read-through copies of a recursive WHERE local, one per call, with
+-- different arguments: two atoms, not one (smucclaw/l4-ide#1013).
+verifyRecursiveLocalCopiesFixture :: FilePath
+verifyRecursiveLocalCopiesFixture = fixtureDir </> "verify-recursive-local-copies.l4"
+
+-- A ledger read before and after a RECORD: two atoms, not one.
+verifyLedgerReadsFixture :: FilePath
+verifyLedgerReadsFixture = fixtureDir </> "verify-ledger-reads.l4"
 
 -- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
 -- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
@@ -383,11 +444,18 @@ coreFixtures =
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
   , verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
-  , assertRaisesFixture, assertAssumedFixture
+  , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
+  , multiClauseRenderFixture
+  , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
+  , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
+  , batchClausesString, batchClausesB, batchClausesCatchAll
+  , evalUndeterminedFixture
+  , evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture
   ]
 
 spec :: FilePath -> Spec
@@ -525,15 +593,23 @@ spec bin = do
       env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
       case objField env "results" of
-        Just (Array v) -> do
-          length v `shouldBe` 2
-          mapM_ (\r -> do
-                   objField r "kind"  `shouldBe` Just (String "assertion")
-                   objField r "value" `shouldBe` Just Null
-                   case objField r "error" of
-                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
-                     other -> expectationFailure ("Expected an error string, got " ++ show other))
-                (toList v)
+        Just (Array v) -> case toList v of
+          [raised, waiting] -> do
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+              other -> expectationFailure ("Expected an error string, got " ++ show other)
+            -- One stuck on an input nobody supplied did not raise an error: it
+            -- is undetermined, still an assertion, and says what it waits on
+            -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3).
+            objField waiting "kind"  `shouldBe` Just (String "assertion")
+            objField waiting "value" `shouldBe` Just Null
+            objField waiting "error" `shouldBe` Nothing
+            case objField waiting "undetermined" of
+              Just und -> arrayField und "needs" `shouldBe` Just [String "x"]
+              other    -> expectationFailure ("Expected an undetermined field, got " ++ show other)
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "still typechecks the raising fixture — l4 check succeeds on it" $
@@ -599,6 +675,81 @@ spec bin = do
 
     it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
       expectFail bin ["run", assertAssumedFixture]
+
+    -- The same bare term as an #EVAL's result is no value either. It used to
+    -- print as one, with exit 0, while #ASSERT on it was stuck
+    -- (UNKNOWN-EVALUATION-SPEC row 52).
+    it "fails the run when an #EVAL's result is a bare assumed term" $
+      expectFail bin ["run", evalAssumedFixture]
+
+    it "reports a bare assumed #EVAL result as undetermined, never as a value" $ do
+      env <- jsonEnvelope bin ["run", evalAssumedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [r] -> do
+            -- its own kind, from build step 3 (UNKNOWN-EVALUATION-SPEC row 52)
+            objField r "kind"  `shouldBe` Just (String "undetermined")
+            objField r "value" `shouldBe` Just Null
+            arrayField r "needs" `shouldBe` Just [String "x"]
+            case objField r "message" of
+              Just (String e) -> e `shouldSatisfy` ("assumed term" `T.isInfixOf`)
+              other -> expectationFailure ("Expected the default report's text, got " ++ show other)
+          other -> expectationFailure ("Expected 1 result, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Found in review of the step-3 rebase: reading the term an unknown
+    -- stands for followed a name bound to itself (or to a cycle of names)
+    -- without spending any of its budget, so these never answered. The run is
+    -- killed after 20 s, which fails the test where an in-process test would
+    -- hang the suite.
+    describe "a name that is bound to itself, under an unknown" $
+      mapM_
+        (\(label, fixture, needed) ->
+          it ("answers, naming the unknown it is stuck on: " ++ label) $ do
+            r <- runL4Within 20 bin ["run", fixture, "--json"]
+            case r of
+              Nothing -> expectationFailure "l4 run did not answer within 20 s"
+              Just out -> do
+                out.outExit `shouldBe` ExitFailure 1
+                out.outStdout `shouldSatisfy` (("\"" ++ needed ++ "\"") `isInfixOf`))
+        [ ("a rule that is its own value", evalAliasLoopFixture, "f")
+        , ("the same inside a list", evalAliasLoopListFixture, "x")
+        , ("two names bound to each other", evalAliasCycleFixture, "f")
+        ]
+
+    -- A residual: two inputs, both named, in the order evaluation reached
+    -- them, and the run fails (§4.12 row 23).
+    it "names every input an undetermined #EVAL waits on, and fails the run" $ do
+      env <- jsonEnvelope bin ["run", evalUndeterminedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [decided, waiting] -> do
+            objField decided "kind"  `shouldBe` Just (String "value")
+            objField waiting "kind"  `shouldBe` Just (String "undetermined")
+            arrayField waiting "needs" `shouldBe` Just [String "x", String "y"]
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Ruled by Meng 2026-09-29: an #ASSERT that evaluates cleanly to FALSE is a
+    -- failed test, and fails the run. Without this, no script or CI job could
+    -- catch a failing assertion by exit status.
+    it "fails the run when an #ASSERT evaluates to false" $ do
+      Output code sout _ <- runL4 bin ["run", assertFailsFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "returns ok=false in JSON when an #ASSERT evaluates to false" $ do
+      env <- jsonEnvelope bin ["run", assertFailsFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> map (`objField` "value") (toList v) `shouldBe` [Just (Bool True), Just (Bool False)]
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the failing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertFailsFixture] "Check succeeded."
 
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
@@ -678,6 +829,34 @@ spec bin = do
           diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
           diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
         other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+  -- The names a multi-clause group is compiled to are spelled so that no
+  -- source can write them ('L4.Parser.generatedName'), and say what they are.
+  describe "multi-clause groups: the names they are compiled to" $ do
+    let generatedSpellings = ["_pm_", "__pm_", "pm arg", "pm_fallthrough"]
+        mentionsOldName out = any (`isInfixOf` out) generatedSpellings
+
+    it "reads the clauses as one list of cases in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      -- the third clause, which an earlier build left out altogether
+      sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
+      sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
+      sout `shouldSatisfy` ("- otherwise: the result of clause 2" `isInfixOf`)
+      sout `shouldSatisfy` ("The result of clause 2 is determined by:" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names no generated input in the HTML rendering either" $ do
+      Output code sout _ <- runL4 bin ["render", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input 1" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names the later clauses by the clauses they hold in a trace" $ do
+      Output code sout _ <- runL4 bin ["run", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $
@@ -1224,6 +1403,62 @@ spec bin = do
       sout `shouldSatisfy` ("\"result\":true" `isInfixOf`)
       sout `shouldNotSatisfy` ("multiple definitions" `isInfixOf`)
 
+    -- A multi-clause group prints as the clauses the drafter wrote. Printed
+    -- from what they compile to, a name the compiler made up was written out
+    -- as source, and a drafter's definition of the same text captured it:
+    -- each of the first three answered differently with status "success".
+    describe "re-prints a multi-clause group as its clauses" $ do
+      let results args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args)
+            code `shouldBe` ExitSuccess
+            pure [ (objField row "status", outResult row)
+                 | l <- lines sout
+                 , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value]
+                 ]
+          outResult row = case objField row "output" of
+            Just (Array os) | [o] <- toList os -> objField o "result"
+            _ -> Nothing
+          ok v = (Just (String "success"), Just v)
+      it "reads a drafter's definition named like the binding of the later clauses" $
+        results [batchClauses, "-e", "later", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 7, Number 2, Number 3])
+      it "reads a drafter's definition named like the binding of the last clause" $
+        results [batchClauses, "-e", "fee", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 101, Number 3])
+      it "reads a drafter's definition named like an input of a group with no GIVEN" $
+        results [batchClauses, "-e", "through", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Red", String "Green"])
+      it "reads a drafter's `input 1` in a group whose only clause left matches anything" $ do
+        results [batchClausesCatchAll, "-e", "one", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+        results [batchClausesCatchAll, "-e", "two", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+      it "tests the input a pattern variable is named after, not the variable" $
+        results [batchClausesCapture, "-e", "capture", "--inputs", batchClausesBooleans]
+          >>= (`shouldBe` map ok [Number 1, Number 2, Number 1, Number 2])
+      -- Printed from the source text instead, the next four answered
+      -- differently or did not parse: a ditto resolved against the printer's
+      -- line, operators lost their precedence, tabs did not re-parse.
+      it "keeps what a ditto in a clause body copies" $
+        results [batchClausesDitto, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 0, Number 0])
+      it "keeps what a ditto in a clause head copies" $
+        results [batchClausesDittoHead, "--inputs", batchClausesB]
+          >>= (`shouldBe` map ok [Number 1, Number 2])
+      it "keeps the precedence of declared infix operators in a clause body" $
+        results [batchClausesFixity, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 7, Number 7, Number 0])
+      it "reads clauses indented with tabs" $
+        results [batchClausesTabs, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 3, Number 3])
+      -- The printer adds its indentation to the second line of any string
+      -- that spans lines, in a rule written as clauses or not; routed
+      -- separately. `l4 run` gives "a\n      b".
+      it "keeps a string that spans lines in a clause body" $ do
+        pendingWith "the printer indents the later lines of a multi-line string, in every rule"
+        results [batchClausesString, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
+
     it "serializes a #TRACE breach with correctly-labeled fields" $ do
       -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
       -- re-prints the module and re-parses it once per input row.
@@ -1373,6 +1608,17 @@ spec bin = do
         [red, blue] -> do
           red  `shouldSatisfy` ("\"result\":true" `isInfixOf`)
           blue `shouldSatisfy` ("\"result\":false" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
+
+    it "keeps a line break inside a string literal as it is written" $ do
+      -- batch runs the re-printed module; before #1028 the newline came back
+      -- followed by the body's indentation ("line\\n  next"), status success.
+      Output code sout _ <- runL4 bin ["batch", batchLineBreakFixture, "--inputs", batchLineBreakJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [broken, tabbed] -> do
+          broken `shouldSatisfy` ("\"result\":\"line\\nnext\"" `isInfixOf`)
+          tabbed `shouldSatisfy` ("\"result\":\"tab\\there\"" `isInfixOf`)
         rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
@@ -2428,6 +2674,22 @@ spec bin = do
     it "terminates on recursive and mutually recursive local bindings" $ do
       Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
+
+    -- An atomId is the hash of a leaf's term (R3). Unfolding `f a` and `f b` makes
+    -- two copies of a recursive WHERE local that keep its one name; keyed by the
+    -- name alone they were one atom, and a satisfiable rule was reported
+    -- unsatisfiable. `same` is the control: its two copies are one proposition.
+    it "keeps two read-through copies of a recursive local apart, and joins two that are one" $ do
+      env <- jsonEnvelope bin ["verify", verifyRecursiveLocalCopiesFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "top" found `shouldBe` Just []
+      lookup "same" found `shouldBe` Just ["unsat"]
+
+    -- A RECALL is not a function of its operands, so two occurrences of one RECALL
+    -- term on either side of a RECORD are two atoms (C1's `fresh`).
+    it "does not join two ledger reads that a RECORD between them can tell apart" $ do
+      env <- jsonEnvelope bin ["verify", verifyLedgerReadsFixture, "--format", "json"]
+      lookup "top" (findingsByDecision env) `shouldBe` Just []
 
     -- Reading through calls. `the arrow is broken` asks for an exception and the
     -- offence it defeats at once; with calls as opaque leaves that was two

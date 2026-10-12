@@ -472,14 +472,15 @@ eq("aeson: -Infinity", formatAesonDouble(-Infinity), "-Infinity");
 // ---- M5 slice 1: envelope + synthetic Reasoning ----
 {
   // SimpleResponse path: no reasoning, no tag flip — must produce the exact
-  // bytes the M4 parity harness was already byte-identical on.
+  // bytes the M4 parity harness was already byte-identical on, plus the
+  // report every jl4-service response states (UNKNOWN-EVALUATION-SPEC U7b).
   const noTrace = aesonStringify(
     wrapEvaluationEnvelope({ value: ratToAesonValue(makeRat(199n, 12000n)) }),
   );
   eq(
     "envelope: SimpleResponse byte-identical to M4 baseline",
     noTrace,
-    '{"contents":{"result":{"value":1.6583333333333332e-2}},"tag":"SimpleResponse"}',
+    '{"contents":{"result":{"value":1.6583333333333332e-2}},"report":"default","tag":"SimpleResponse"}',
   );
   // TraceResponse path: non-empty reasoning flips the tag and inserts the
   // reasoning key (alphabetically before "result", per Aeson's key order).
@@ -494,7 +495,7 @@ eq("aeson: -Infinity", formatAesonDouble(-Infinity), "-Infinity");
   eq(
     "envelope: TraceResponse shape matches Aeson key order",
     traced,
-    '{"contents":{"reasoning":{"children":[],"exampleCode":["is-eligible"],"explanation":["Result: TRUE"]},"result":{"value":true}},"tag":"TraceResponse"}',
+    '{"contents":{"reasoning":{"children":[],"exampleCode":["is-eligible"],"explanation":["Result: TRUE"]},"result":{"value":true}},"report":"default","tag":"TraceResponse"}',
   );
   // Empty reasoning collapses back to SimpleResponse — same rule as
   // `responseTag` in jl4-service's Backend/Api.hs.

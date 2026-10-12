@@ -24,6 +24,10 @@ module TestData (
   missingBooleanJL4,
   sectionBooleanJL4,
   deonticBooleanJL4,
+  considerBooleanJL4,
+  decidedAnywayJL4,
+  bareInputJL4,
+  deonticConsiderJL4,
   maybeInputsJL4,
   timeInputsJL4,
   wireProbeJL4,
@@ -44,6 +48,12 @@ module TestData (
   deonticDefaultJL4,
   spinJL4,
   spinOrRefuseJL4,
+  spinWrapperJL4,
+  powerJL4,
+  heavyLibJL4,
+  heavyMainJL4,
+  deepJL4,
+  partialClausesJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -207,9 +217,8 @@ DECIDE compute_qualifies IF walks AND eats AND drinks
 --
 -- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes
 -- through 'L4.Viz.Ladder.leafFromExpr', which mints a fresh @unique@ per
--- occurrence. The two occurrences share a label and an input-ref closure, so
--- 'L4.Viz.Ladder.generateAtomId' gives them one atomId between them: one
--- question, two BDD variables.
+-- occurrence. The two occurrences are one term, so they share one C1 key and
+-- one atomId between them ("L4.Viz.AtomKey"): one question, two BDD variables.
 --
 -- Answering that question FALSE refutes both disjuncts and settles the whole
 -- decision — but only if the binding reaches both variables. That makes "did
@@ -508,6 +517,63 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A BOOLEAN input read by a CONSIDER with an OTHERWISE. Until
+-- UNKNOWN-EVALUATION-SPEC §8 step 1, a missing one on the wrapper path failed
+-- the WHEN TRUE pattern and the OTHERWISE took it, so the answer was the
+-- OTHERWISE's value, with a 200.
+considerBooleanJL4 :: Text
+considerBooleanJL4 =
+  [i|
+@export default fee
+GIVEN `is member`   IS A BOOLEAN
+      amount        IS A NUMBER
+      `unused flag` IS A BOOLEAN
+GIVETH A NUMBER
+fee MEANS
+    CONSIDER `is member`
+    WHEN TRUE THEN 0
+    OTHERWISE amount
+|]
+
+-- | A rule that reads a BOOLEAN input whose value cannot change its answer:
+-- from UNKNOWN-EVALUATION-SPEC §8 step 3, a missing one is no reason to stop.
+decidedAnywayJL4 :: Text
+decidedAnywayJL4 =
+  [i|
+@export default eligible
+GIVEN `has criminal record` IS A BOOLEAN
+      `unused flag`         IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible MEANS `has criminal record` OR TRUE
+|]
+
+-- | 'deonticBooleanJL4' with the branch written as a CONSIDER and an
+-- OTHERWISE, which a missing input used to take.
+deonticConsiderJL4 :: Text
+deonticConsiderJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver        IS A Driver
+      `is motorway` IS A BOOLEAN
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    CONSIDER `is motorway`
+    WHEN TRUE THEN
+        PARTY driver
+        MUST `wear seatbelt`
+        WITHIN 1
+    OTHERWISE
+        PARTY driver
+        MAY `drive`
 |]
 
 -- | A MAYBE DATE and a MAYBE NUMBER input, each followed by another input. On
@@ -951,4 +1017,113 @@ GIVETH A BOOLEAN
 DECIDE spin IF
   IF n < 0 THEN REFUSE "n is negative"
   ELSE `count down` n EQUALS 0
+|]
+
+-- | 'spinJL4' with an input that makes it take the generated-wrapper path: a
+-- MAYBE input sent as @{}@ (uncertain) is one the direct path cannot take
+-- (smucclaw/l4-ide#1018). The input is not read.
+spinWrapperJL4 :: Text
+spinWrapperJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count down` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE `count down` (n - 1)
+
+@export default spins for n steps and then answers TRUE
+GIVEN
+  n IS A NUMBER
+  u IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE spin IF `count down` n EQUALS 0
+|]
+
+-- | A number the evaluator leaves unfinished: @(10 TO THE POWER 40) TO THE
+-- POWER n@, built by repeated multiplication. The evaluation returns while
+-- the multiplications are still thunks, and they are done when the answer is
+-- forced (smucclaw/l4-ide#1019).
+powerJL4 :: Text
+powerJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`power of a big base` n MEANS
+  IF n AT MOST 0 THEN 1 ELSE 10000000000000000000000000000000000000000 * `power of a big base` (n - 1)
+
+@export default (10 to the power 40) to the power n
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE power IS `power of a big base` n
+|]
+
+-- | An imported value that costs about 33 MB to compute: more than a case has
+-- left after 'heavyMainJL4' has spent 47 MB of a 64 MB limit on its own
+-- steps, and less than the whole limit (smucclaw/l4-ide#1020).
+heavyLibJL4 :: Text
+heavyLibJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count down` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE `count down` (n - 1)
+
+heavy MEANS `count down` 5000
+|]
+
+heavyMainJL4 :: Text
+heavyMainJL4 =
+  [i|
+IMPORT heavy_lib
+
+@export default spends n steps of its own, then reads the imported value
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `use heavy` IF `count down` n EQUALS 0 AND heavy EQUALS 0
+|]
+
+-- | A recursion that is not a tail call: each level waits for the next, so the
+-- frame stack grows with n and a limit hit has frames to unwind. A tail
+-- call such as 'spinJL4' has almost none, and hides what the unwinding does
+-- after an allocation limit.
+deepJL4 :: Text
+deepJL4 =
+  [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`sum to` n MEANS
+  IF n AT MOST 0 THEN 0 ELSE n + `sum to` (n - 1)
+
+@export default sums 1 to n by non-tail recursion
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE deep IS `sum to` n
+|]
+
+-- | A rule written as clauses, with no clause for Blue. The error for Blue is
+-- worded from the clauses ("No clause of `price` matches these inputs"), and
+-- the evaluator reads that from a mark on the CONSIDERs the clauses compile
+-- to, which the bundle has to keep (review of legalese/l4-ide#545).
+partialClausesJL4 :: Text
+partialClausesJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default The price of a colour
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+|]
+
+-- | A rule whose answer, when its second input is TRUE, is its first input
+-- itself: @p AND TRUE@ is @p@. On the wrapper path (a @{}@ in the request) that
+-- answer sits inside the wrapper's JUST.
+bareInputJL4 :: Text
+bareInputJL4 =
+  [i|
+@export default gate
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+gate MEANS p AND q
 |]

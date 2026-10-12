@@ -306,12 +306,13 @@ Put `#EVAL` on the question and run the file with no case at all, and the answer
 
 ```
 Result:
-  I could not continue evaluating, because I needed to know the value of
+  I could not continue evaluating, because I needed to know the values of
     `annual income`
-  but it is an assumed term.
+    `net worth`
+  but they are assumed terms.
 ```
 
-That is easy to mistake for a complaint about your rule. It is not; the rule is fine. "An assumed term" is a fact the file names but does not settle — exactly what you wrote the `GIVEN` to say. The tool says _assumed_ of any fact left open, whichever keyword named it: a section `GIVEN` and an older `ASSUME` report in exactly these words, so meeting the word here is not a sign that your `GIVEN` was quietly treated as something else. L4 names the first blank it reached and stops, rather than guessing a value and handing you a number that looks like an answer. (That is why the `#EVAL` line is shown here and is not in the companion file: a run ending this way counts as a run that did not succeed, and every file in this documentation must succeed.)
+That is easy to mistake for a complaint about your rule. It is not; the rule is fine. "An assumed term" is a fact the file names but does not settle — exactly what you wrote the `GIVEN` to say. The tool says _assumed_ of any fact left open, whichever keyword named it: a section `GIVEN` and an older `ASSUME` report in exactly these words, so meeting the word here is not a sign that your `GIVEN` was quietly treated as something else. L4 names every blank the answer is waiting for and stops, rather than guessing a value and handing you a number that looks like an answer. (That is why the `#EVAL` line is shown here and is not in the companion file: a run ending this way counts as a run that did not succeed, and every file in this documentation must succeed.)
 
 What you _can_ do with no facts at all is ask what kind of answer a rule gives:
 
@@ -336,9 +337,15 @@ Trace:
 
 One block, because the file holds one `#EVAL`: the recap from Step 1. The two `#CHECK` lines answer `NUMBER` and `BOOLEAN`, and they report as information among the file's other messages rather than as blocks of their own; in an editor they appear against the line you wrote them on. The run ends successfully, which is the point of putting `#CHECK` in a file and keeping `#EVAL` out of one whose facts nobody has supplied.
 
-What you cannot do today is keep worked cases against a section's facts — three or four applicants you re-run after every edit, as a standing check on your encoding — inside the `.l4` file. That is what the proposed spelling below is for. Until it is built, those cases live in a `.json` file next to the `.l4` file and run with `l4 batch`: the same discipline, kept in two files instead of one.
+You can also keep worked cases against a section's facts — three or four applicants you re-run after every edit, as a standing check on your encoding — inside the `.l4` file. Write `WITH` after the rule's name, then each fact's name, `IS`, and the value:
 
-_Proposed, not landed (2026-09-04) — designed and written down, but not yet built: supplying a fact inside the file itself, by writing `WITH` after the rule's name and then the fact's name, `IS`, and the value — for example ``#EVAL `the investor's 12-month limit` WITH `annual income` IS 40000``, and the same spelling where one rule uses another. Write that line today and the file is rejected: L4 answers `You are giving named inputs to … but it is not a function, so it takes none.`, meaning the rule takes no inputs of its own. It is not quietly ignored. Until it is built, facts come from outside the file: a web form, `l4 batch`, or the published service — the same rules put behind a web address, where other people and other programs can ask them._
+```l4
+#EVAL `the investor's 12-month limit` WITH `annual income` IS 40000, `net worth` IS 80000
+```
+
+That answers `4000`. Name every fact the question reaches: leave out `net worth` and the run stops on it, with the same "assumed term" screen as above. The same spelling works where one rule uses another.
+
+Facts for a real case, from whoever is asking, still come from outside the file: a web form, `l4 batch`, or the published service — the same rules put behind a web address, where other people and other programs can ask them.
 
 ### Two questions, two forms
 
@@ -487,13 +494,23 @@ The options are:
 
 That message asks a question about the source text, and answering it is a drafting decision. Each answer says something different about what the provision means:
 
-| If                                                           | Then                                                                                                                     |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| it is really one fee across the whole Part                   | **hoist** _(available today)_: move the `GIVEN` up to the `§ Fees` heading and delete both copies                        |
-| they are really two fees                                     | **rename** _(available today)_: call them `the application fee` and `the renewal fee`, as a careful drafter would have   |
-| section 7's fee is section 2's fee, for this one calculation | **bridge** _(proposed, not landed — see below)_: say at the point where section 7 borrows the fee which fee it is taking |
+| If                                                           | Then                                                                                                                        |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| it is really one fee across the whole Part                   | **hoist** _(available today)_: move the `GIVEN` up to the `§ Fees` heading and delete both copies                           |
+| they are really two fees                                     | **rename** _(available today)_: call them `the application fee` and `the renewal fee`, as a careful drafter would have      |
+| section 7's fee is section 2's fee, for this one calculation | **bridge** _(available today)_: give section 7 a fee of its own, and hand it to section 2's rule where section 7 borrows it |
 
-_Proposed, not landed (2026-09-04): the bridge spelling, `WITH` followed by the fact's name, `IS`, and the value to give it. It is the same proposed `WITH` as in Step 5, and today it is rejected in the same way. Until it is built, the two ways out are to hoist or to rename._
+The bridge is the `WITH` from Step 5: the fact's name, `IS`, and the value to give it. Section 7 declares the fee it hands over, because a `the fee` written in section 7 with none of its own would be the same two-way question:
+
+```l4
+§§ `7. Refunds`
+    GIVEN `the fee` IS A NUMBER
+
+GIVETH A NUMBER
+`the refund` MEANS (`the application fee payable` WITH `the fee` IS `the fee`) TIMES 0.5
+```
+
+``#EVAL `the refund` WITH `the fee` IS 100`` then answers `50`.
 
 ### When no heading sits above both
 

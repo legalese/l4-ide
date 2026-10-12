@@ -21,6 +21,8 @@ module LSP.L4.Viz.Ladder (
   InputRef (..),
   getAtomInputRefs,
   getLeafExpr,
+  getLeafKeys,
+  getFreshLeaves,
   getVizConfig,
 
   -- * Conversion
@@ -32,6 +34,7 @@ module LSP.L4.Viz.Ladder (
   ) where
 
 import Base
+import qualified Base.Text as Text
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Data.IntSet (IntSet)
@@ -45,7 +48,8 @@ import Control.Monad.Extra (unlessM)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified L4.TypeCheck as TC
-import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, seamLabel)
+import L4.Viz.Ladder (InputRef(..), collectTypicallyDefaults, seamLabel)
+import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
@@ -122,15 +126,16 @@ withCallExpansions cfg = cfg { expandCalls = True }
 {- | Stamp every mixfix call in a module with its canonical pattern, so that the
 ladder's labels print the call's full surface form.
 
-A call leaf's label is 'prettyLayout' of the call, and its atomId is computed
-from that label ('generateAtomId', then the plan's @atomIdByUnique@). Without
-the stamp the printer can emit only a mixfix name's HEAD keyword, so two
-operators sharing one print alike: in
-@jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4@ both
+A call leaf's label is 'prettyLayout' of the call. Without the stamp the
+printer can emit only a mixfix name's HEAD keyword, so two operators sharing one
+print alike: in @jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4@ both
 @`the will` w `is duly executed without` 3@ and @`the will` w `is revoked counting` 3@
-arrived as @`the will` OF w, 3@ with ONE atomId (measured 2026-10-06), and a
-client that links copies by atomId answered both with one click, so
-@X AND NOT Y@ could never come out TRUE.
+arrived as @`the will` OF w, 3@ (measured 2026-10-06). The atomId was then a hash
+of that label, so the two shared ONE atomId, and a client that links copies by
+atomId answered both with one click: @X AND NOT Y@ could never come out TRUE.
+The atomId is now the hash of the call's TERM ("L4.Viz.AtomKey", R3), which names
+each operator by its own definition whatever it prints as; the stamp is what
+keeps the two LABELS apart for the reader.
 
 'L4.Print.restoreMixfixPatterns' does the same for printed MODULES, and stamps
 only operators defined in the module, because an imported operator's surface
@@ -191,6 +196,17 @@ data VizState = MkVizState
   , atomInputRefs  :: IntMap (Set InputRef)
   , typicallyDefaults :: IntMap Bool
   -- ^ Unique.unique -> the binder's BOOLEAN TYPICALLY default (see 'collectTypicallyDefaults').
+  , keyEnv :: KeyEnv
+  -- ^ What names a leaf's term (R3, "L4.Viz.AtomKey"). Lazy: a pass that never
+  -- forces an atomId never walks the module.
+  , leafKeys :: IntMap Text
+  -- ^ Leaf id -> the C1 key of its term. The query plan names its atoms from
+  -- these ('LSP.L4.Viz.QueryPlan.buildQueryPlanCache'), so the diagram and the
+  -- plan cannot disagree (smucclaw/l4-ide#935).
+  , freshLeaves :: !Int
+  -- ^ How many leaves keyed apart per occurrence ('keyLeaf') so far.
+  , freshLeafIds :: IntSet
+  -- ^ The ids of those leaves ('getFreshLeaves').
   , expansionNodes :: !Int
   -- ^ IR nodes the expansions so far have added (see 'expansionNodeBudget').
   , expansionOverBudget :: !Bool
@@ -225,6 +241,10 @@ mkInitialVizState cfg =
     , atomDeps = Map.empty
     , atomInputRefs = Map.empty
     , typicallyDefaults = Map.empty
+    , keyEnv = withTypeExpander (TC.applyFinalSubstitution cfg.substitution cfg.moduleUri) (mkKeyEnv cfg.module')
+    , leafKeys = Map.empty
+    , freshLeaves = 0
+    , freshLeafIds = IntSet.empty
     , expansionNodes = 0
     , expansionOverBudget = False
     , expansionCutByDepth = False
@@ -319,6 +339,18 @@ freeInputRefsExpanded visited expr = do
 -- | The source expression a leaf variable stands for, if it is a leaf.
 getLeafExpr :: VizState -> Int -> Maybe (Expr Resolved)
 getLeafExpr vs leaf = Map.lookup leaf vs.leafExprs
+
+-- | The C1 key of every leaf's term, by leaf id ('L4.Viz.AtomKey'). Inside an
+-- expansion that is the term AFTER the call's arguments were put in (R3).
+getLeafKeys :: VizState -> IntMap Text
+getLeafKeys vs = vs.leafKeys
+
+-- | The leaves keyed apart per occurrence, because their value depends on when
+-- they are evaluated ('L4.Viz.AtomKey.isEffectful'). Their keys are numbered in
+-- drawing order within ONE diagram, so a consumer that joins the atoms of two
+-- separately drawn diagrams by atomId must not join these.
+getFreshLeaves :: VizState -> IntSet
+getFreshLeaves vs = vs.freshLeafIds
 
 defsForInliningOf :: Module Resolved -> IntMap (Unique, Transform.Unfoldable)
 defsForInliningOf module' =
@@ -617,8 +649,7 @@ translateGo = go
                   vname = V.MkName uniq label
               refs <- freeInputRefsExpanded Set.empty e
               recordAtomInputRefs uniq refs
-              functionName <- use #functionName
-              let atomId = generateAtomId functionName label refs
+              atomId <- keyLeaf uniq e
               args' <- traverse (go CtxNone) args
               expansion <- case fnResolved of
                 Ref _ callee _ -> expandCall callee e
@@ -675,8 +706,7 @@ varLeaf vid vname resolved = do
       Nothing -> pure (Set.singleton (MkInputRef vname.unique []))
       Just body -> freeInputRefsExpanded (Set.singleton vname.unique) body
   recordAtomInputRefs vname.unique refs
-  functionName <- use #functionName
-  let atomId = generateAtomId functionName vname.label refs
+  atomId <- keyLeaf vname.unique (App emptyAnno resolved [])
   defaults <- use #typicallyDefaults
   let mTypically = Map.lookup (getUnique resolved).unique defaults
   -- A bare reference to a same-module rule of no parameters is a call too.
@@ -694,7 +724,6 @@ leafFromExpr expr = do
   refs <- freeInputRefsExpanded Set.empty expr
   recordAtomInputRefs uniq refs
   #leafExprs %= Map.insert uniq expr
-  functionName <- use #functionName
   -- A call with arguments to a rule defined in this module can be expanded in
   -- place: 'inlineExprs' substitutes the arguments for the parameters. The leaf
   -- keeps its fresh id, so remember which rule it calls.
@@ -710,8 +739,8 @@ leafFromExpr expr = do
         App _ (Ref _ callee _) _ -> expandCall callee expr
         _ -> pure Nothing
       else pure Nothing
+  atomId <- keyLeaf uniq expr
   let label = prettyLayout expr
-      atomId = generateAtomId functionName label refs
   pure $
     V.UBoolVar
       vid
@@ -835,6 +864,35 @@ mkVizNameWith printer (getUniqueName -> (MkUnique {unique}, name)) =
 -- AtomId generation
 ------------------------------------------------------
 
+-- | Key a leaf's term (R3, "L4.Viz.AtomKey"), remember the key under the leaf's
+-- id for the query plan, and name its atom in this decision's diagram.
+--
+-- Inside an expansion the term is the callee's body with the call's arguments
+-- already put in ('expandCall'), so a leaf is keyed in the CALLER's context: the
+-- @a@ inlined from @limb a b@ is the caller's own @a@, and @limb a b@ and
+-- @limb c d@ share no atom.
+keyLeaf :: Int -> Expr Resolved -> Viz Text
+keyLeaf uniq expr = do
+  env <- use #keyEnv
+  locals <- getLocalDecls
+  let term = withLocalsInScope locals expr
+      bareReference = case expr of
+        App _ _ [] -> True
+        _ -> False
+  -- A leaf whose value depends on when it is evaluated (a ledger read, or a call
+  -- to a rule that makes one) is C1's @fresh@: each occurrence is its own atom,
+  -- numbered in drawing order so the number survives an edit elsewhere.
+  key <-
+    if not bareReference && isEffectful env term
+      then do
+        n <- #freshLeaves <%= (+ 1)
+        #freshLeafIds %= IntSet.insert uniq
+        pure (termKey env term <> "|occurrence " <> Text.pack (show n))
+      else pure (termKey env term)
+  #leafKeys %= Map.insert uniq key
+  functionName <- use #functionName
+  pure (atomIdOfKey functionName key)
+
 ------------------------------------------------------
 -- Crude dependency tracking
 ------------------------------------------------------
@@ -928,7 +986,14 @@ inlineExprs vs = foldr (inlineExpr vs)
 inlineExpr :: VizState -> Int -> Decide Resolved -> Decide Resolved
 inlineExpr vs target =
   case Map.lookup definition vs.defsForInlining of
-    Just (u, unfoldable) -> over decideBody (Transform.unfoldOnce (DataMap.singleton u unfoldable))
+    Just (u, unfoldable) -> over decideBody (Transform.unfoldOnce (DataMap.singleton u (withLocalsInlined unfoldable)))
     Nothing -> id
   where
     definition = Map.findWithDefault target target vs.callLeafTargets
+    -- The definition's own WHERE definitions are inlined first, as 'expandCall'
+    -- does and for the same reason: a local keeps ONE unique in every copy the
+    -- unfolding makes, though each copy has that call's arguments in it, so two
+    -- calls' copies of one local would be drawn as one proposition (found by
+    -- adversarial review of smucclaw/l4-ide#1013). A local that cannot be
+    -- inlined (a recursive one) still comes along as it is.
+    withLocalsInlined (Transform.MkUnfoldable ps rhs) = Transform.MkUnfoldable ps (Transform.inlineLocalBindings rhs)

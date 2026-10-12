@@ -266,8 +266,9 @@ GIVETH A BOOLEAN
 - Each combinator carries an `@nlg` annotation, so `in breach` above renders as
   "In breach if filed on time has not been proven true" without any extra work.
 - See the [negation-as-failure reference](../libraries/negation-as-failure.md) for
-  the full truth table, and the runnable example (with a Kleene three-valued lift)
-  [negation-as-failure-examples.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure-examples.l4).
+  the full truth table, and the runnable example (with `kand` / `kor` / `knot`,
+  truth-functional strong Kleene, #526 §4.1(a))
+  [negation-as-failure-examples.l4](../../../jl4/examples/ok/negation-as-failure-examples.l4).
 
 ---
 

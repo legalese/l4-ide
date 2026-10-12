@@ -11,6 +11,7 @@ module L4.Parser.MixfixRegistry
 import Base
 import qualified Base.Map as Map
 import qualified Base.Set as Set
+import qualified Data.List as List
 import L4.Mixfix
 import L4.Syntax
 
@@ -21,10 +22,16 @@ data MixfixHintRegistry = MkMixfixHintRegistry
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData)
 
+-- | Entries are merged with 'List.union', which drops a later copy equal to an
+-- earlier one. A module's registry includes its imports' registries, so
+-- merging with '<>' kept one copy of each hint per import PATH: 2^k copies of
+-- each prelude hint in the k-th of n modules that each import prelude and
+-- every earlier module (smucclaw\/l4-ide#1008). The parser reads only
+-- 'keywordUniverse', so no parse changes.
 instance Semigroup MixfixHintRegistry where
   MkMixfixHintRegistry m1 s1 <> MkMixfixHintRegistry m2 s2 =
     MkMixfixHintRegistry
-      (Map.unionWith (<>) m1 m2)
+      (Map.unionWith List.union m1 m2)
       (Set.union s1 s2)
 
 instance Monoid MixfixHintRegistry where

@@ -208,6 +208,7 @@ library
     L4.Utils.Ratio
     L4.Crypto.SHA1
     L4.Crypto.UUID5
+    L4.Viz.AtomKey
     L4.Viz.GuardedRows
     L4.Viz.Ladder
     L4.Viz.VizExpr
@@ -230,8 +231,11 @@ test-suite jl4-core-test
     TemporalContextSpec
     UnifySpec
     DeprecatedAssumeSpec
+    AtomKeySpec
     LadderFreshIdSpec
     MixfixParserSpec
+    NestedParenParserSpec
+    MixfixRegistryMergeSpec
     EventExactPrintSpec
     FormatFidelitySpec
     PatternMatchParserSpec
@@ -239,6 +243,7 @@ test-suite jl4-core-test
     UUID5Spec
     ExportReadSetSpec
     ExportValidationSpec
+    NonassertableSpec
     CatalaLowerSpec
     NumberLiteralSpec
     NlgLangTagSpec
@@ -251,14 +256,18 @@ test-suite jl4-core-test
     NlgPercentSpec
     NlgRenderSpec
     TracePostprocessSpec
+    UnknownInputsSpec
+    GraphVizStubSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    MultiClausePrintSpec
     PrettyLayoutNlgSpec
     NlgMultiplicitySpec
     NlgAttachmentSpec
     SectionGivenTdnrSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
+    InterruptedForceSpec
     RecordLedgerSpec
     LedgerRenderingSpec
     M4PartyLedgerSpec
@@ -281,6 +290,8 @@ test-suite jl4-core-test
     BlawxParseSpec
     ApiStateGraphLensSpec
     SmartPunctuationSpec
+    TimezoneTimeoutSpec
+    ConsiderScaleSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

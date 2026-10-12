@@ -157,8 +157,8 @@ nobody disputes into a question your web form asks the public:
     GIVEN `the parties wish to record the terms of their engagement` IS A BOOLEAN
 ```
 
-The rule that reads it stops dead the moment anything forces it (probe `i2-recital-as-input.l4`,
-exit 1):
+The rule that reads it stops dead the moment its answer depends on it (probe
+`i2-recital-as-input.l4`, exit 1):
 
 ```
 I could not continue evaluating, because I needed to know the value of

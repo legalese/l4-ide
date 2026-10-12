@@ -109,6 +109,30 @@ Human-readable descriptions.
 
 **Example:** [annotation-example.l4](annotation-example.l4)
 
+### @nonassertable
+
+Marks a named step as closed to assertion: once node assertion ships, a request to a published rule will not be allowed to supply a value for this definition, so its truth will have to come from what it is defined as.
+Today the mark is recorded and kept, and nothing reads it: a request that names the definition is treated as it is for an unmarked one.
+Write it on a line of its own above a `MEANS` or `DECIDE` definition, at the top level of a file or inside a section: above the definition's `GIVEN`, or directly above the line that names it.
+
+```l4
+§ `The offence`
+    GIVEN `did the act`    IS A BOOLEAN
+          `had the intent` IS A BOOLEAN
+          `has a defence`  IS A BOOLEAN
+
+@nonassertable
+`offence made out` MEANS `did the act` AND `had the intent` AND NOT `has a defence`
+```
+
+The mark changes nothing a rule works out, and it survives a re-print: `l4 batch` and the REPL, which re-print a module before running it, keep it.
+On anything that is not a definition, above it or among its lines, it is an error that names what it sits on: a `DECLARE`, an `ASSUME`, a section heading or the `GIVEN` under it, a directive, an `IMPORT`.
+On one of a definition's own `GIVEN` lines it is an error too, one per mark, naming the input on that line (or the next one, for a mark on a line of its own among them): an input is supplied, never asserted, so there is nothing there to close; a mark above the same definition still counts.
+The mark takes no words: what follows it on the line is read as source and never swallowed, so prose after it is an error, often reported on the next line or inside the definition before; a definition written on the mark's line usually fails to parse, since it no longer starts at the margin, and where it does parse the mark is its.
+A mark at the end of the line that names a definition, or inside its body, is a warning and carries nothing; one at the end of the `GIVETH` line is above the name line and counts; two marks above one definition are one mark and a warning.
+A `@desc` whose text begins with the word `nonassertable` is a description, not the mark.
+Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the request-side assertion the mark closes; both are designed in `specs/todo/presumption-assertion/CONTRACT.md` and not built.
+
 ### @nlg
 
 Natural language generation hints.
@@ -561,6 +585,23 @@ Evaluate an expression and display the result. Used for testing functions and in
 ### #EVALTRACE
 
 Evaluate an expression and display the full execution trace, showing each step of the evaluation.
+`AND`, `OR`, `IMPLIES` and `NOT` each appear under their own text, with the first operand and its value beneath them.
+The second operand, when it was needed, is the next step, at the connective's own level, and one that was not needed does not appear.
+For `both p q MEANS p AND q`, `#EVALTRACE both TRUE FALSE` shows:
+
+```
+┌ both OF TRUE, FALSE
+│┌ both
+│└ <function>
+├ p AND q
+│┌ p
+│└ TRUE
+├ q
+└ FALSE
+```
+
+A first operand written as plain `TRUE` or `FALSE` is not shown, since its value is already in the source: `#EVALTRACE TRUE AND FALSE` is `┌ TRUE AND FALSE`, `├ FALSE`, `└ FALSE`.
+`UNLESS` appears as what it means, so `p UNLESS q` shows as `p AND (NOT q)`.
 
 **Syntax:**
 
@@ -599,18 +640,15 @@ Trace:
   ├ age AT LEAST 18 AND `is a resident`
   │┌ age AT LEAST 18
   │└ TRUE
-  ├ IF a THEN b ELSE FALSE
-  │┌ a
-  │└ TRUE
-  ├ b
+  ├ `is a resident`
   └ TRUE
 ```
 
 Read it from the top: the first line is what was asked, each line starting `├` is one step in working it out, and the last line, `└ TRUE`, is the answer.
 The indented lines beside a step are the smaller questions that step had to answer first.
 
-Two lines in it are ones you did not write.
-`IF a THEN b ELSE FALSE` is how L4 itself works out an `AND`: `a` is the left side and `b` is the right, and if `a` is not true the answer is `FALSE`.
+The `AND` line is the rule's own text, then comes its left side with the answer it gave, `age AT LEAST 18`, and then its right side, `` `is a resident` ``, which was needed because the left side was `TRUE`.
+One line in it is one you did not write.
 `<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
 
 **Seeing the trace from the command line.**

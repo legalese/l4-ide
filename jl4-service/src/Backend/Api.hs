@@ -12,6 +12,7 @@ module Backend.Api (
 ) where
 
 import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData)
 import Control.Monad.Trans.Except (ExceptT)
 import Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
@@ -43,6 +44,7 @@ data FnLiteral
   | FnUncertain
   | FnUnknown
   deriving (Show, Read, Ord, Eq, Generic)
+  deriving anyclass (NFData)
 
 instance ToJSON FnLiteral where
   toJSON = \ case
@@ -215,7 +217,7 @@ newtype GraphVizResponse = GraphVizResponse
     -- ^ Raw DOT text for callers who want to render or post-process traces themselves.
   }
   deriving (Show, Read, Ord, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON, ToSchema)
+  deriving anyclass (FromJSON, ToJSON, ToSchema, NFData)
 
 -- | Evaluation result with symmetric JSON serialization.
 -- The output uses 'result' (a JSON object) to mirror the input 'arguments'.
@@ -232,6 +234,7 @@ data ResponseWithReason = ResponseWithReason
   -- empty when the answer rests on no default.
   }
   deriving (Show, Read, Ord, Eq, Generic)
+  deriving anyclass (NFData)
 
 -- | Derive the response tag based on content present.
 responseTag :: ResponseWithReason -> Text
@@ -264,7 +267,7 @@ data Reasoning = Reasoning
   , children    :: [Reasoning]
   }
   deriving (Show, Read, Ord, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, ToJSON, NFData)
 
 emptyReasoning :: Reasoning
 emptyReasoning = Reasoning
@@ -306,11 +309,13 @@ data EvaluatorError
   | CannotHandleParameterType !FnLiteral
   | CannotHandleUnknownVars
   deriving stock (Show, Read, Ord, Eq, Generic)
+  deriving anyclass (NFData)
 
 -- | Which of an evaluation's two limits stopped it: @--eval-timeout@ or
 -- @--max-eval-memory-mb@. On the wire, @"time"@ or @"memory"@.
 data LimitHit = TimeLimitHit | AllocationLimitHit
   deriving stock (Show, Read, Ord, Eq, Enum, Bounded, Generic)
+  deriving anyclass (NFData)
 
 instance ToJSON LimitHit where
   toJSON = \case
@@ -372,7 +377,7 @@ data ParameterMismatch = ParameterMismatch
   , actual :: !Int
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, ToJSON, NFData)
 
 instance FromHttpApiData FnLiteral where
   parseQueryParam t = Right $ parseTextAsFnLiteral t

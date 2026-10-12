@@ -155,10 +155,10 @@ GIVETH A DEONTIC Actor Action
 #TRACE `must order nothing` AT 0 WITH
   PARTY alice DOES Order ks AT 1
 
--- 12. Not yet fixed: the unknown is read by a rule that uses CONSIDER, here
---     `pick`, before the act is matched. That rule still treats `k` as "not
---     Retail", so the event is passed over and the obligation stays pending.
---     This is being worked on, and this answer will change to Stuck on `k`.
+-- 12. The unknown is read by a rule that uses CONSIDER, here `pick`, before
+--     the act is matched. A CONSIDER on an unknown is Stuck too, so this is
+--     Stuck on `k` (UNKNOWN-EVALUATION-SPEC §8 step 1); it used to treat `k`
+--     as "not Retail", pass the event over and leave the obligation pending.
 #TRACE `must deliver` AT 0 WITH
   PARTY alice DOES Deliver (pick k) AT 1
 

@@ -1,0 +1,9 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-run-parse-error.l4
+  Hidden: no
+  Range: 10:1-10:2
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message: | 10 | g y MEANS 5 | ^ expecting % or space token

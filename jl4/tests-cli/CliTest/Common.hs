@@ -8,7 +8,7 @@ module CliTest.Common where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Monad (unless, when)
+import Control.Monad (unless, void, when)
 import Data.List (findIndex, isInfixOf, isPrefixOf)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
@@ -34,8 +34,10 @@ import System.Process
   , createProcess
   , proc
   , readCreateProcessWithExitCode
+  , terminateProcess
   , waitForProcess
   )
+import System.Timeout (timeout)
 import Test.Hspec
 
 ----------------------------------------------------------------------------
@@ -165,6 +167,34 @@ runL4In mCwd mEnv bin args = do
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Like 'runL4', but give up after the given number of seconds: the child is
+-- killed and the result is 'Nothing'. For a test of something that, when it
+-- regresses, never answers at all; an in-process test of that would hang the
+-- suite instead of failing it.
+runL4Within :: Int -> FilePath -> [String] -> IO (Maybe Output)
+runL4Within seconds bin args = do
+  let cp = (proc bin args)
+        { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
+  (Just hin, Just hout, Just herr, ph) <- createProcess cp
+  hClose hin
+  hSetBinaryMode hout True
+  hSetBinaryMode herr True
+  soutVar <- newEmptyMVar
+  serrVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar serrVar)
+  _ <- forkIO (BS.hGetContents hout >>= putMVar soutVar)
+  finished <- timeout (seconds * 1000000) (waitForProcess ph)
+  case finished of
+    Nothing -> terminateProcess ph >> void (waitForProcess ph) >> pure Nothing
+    Just code -> do
+      soutBytes <- takeMVar soutVar
+      serrBytes <- takeMVar serrVar
+      pure (Just Output
+        { outExit   = code
+        , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
+        , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
+        })
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
 -- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports

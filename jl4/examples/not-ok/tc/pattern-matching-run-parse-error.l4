@@ -1,0 +1,10 @@
+-- A run of same-headed definitions that is not a clause group, with a
+-- bracketed input in the third: the parser reports the error where it reports
+-- it when it reads the run again from every definition, whether or not it
+-- remembers the run (refutation of legalese/l4-ide#545's review, round 3;
+-- jl4-test's "parser memo changes nothing" check covers this file).
+f x MEANS 1
+f x MEANS 2
+f (x) MEANS 3
+f x MEANS 4
+g y MEANS 5

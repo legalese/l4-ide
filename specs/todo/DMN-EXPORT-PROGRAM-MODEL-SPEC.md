@@ -5119,8 +5119,14 @@ separate list from the CONSIDER-matched `siMissingRanges` so neither silently mi
 double-reports), so the probe below now reports `D-PARTIAL` **Blocking** and fails
 `--fail-on blocking` while still emitting its two-rule table. Only n ≥ 2 groups are analysed at
 matrix level (n = 1 already warns via the ordinary CONSIDER path); `@nonexhaustive` on the group
-silences it (R4); literal/expression patterns, column-count mismatches, un-resolvable patterns and
+silences it (R4); column-count mismatches, un-resolvable patterns and
 cap overflows all bail **fail-open to no-warning**, the same contract as `analyzePatternMatch`.
+Literal patterns no longer bail (2026-10-09, review of legalese/l4-ide#545 round 2 item 4): a number or a piece of text is one value of a column with no end of values, so a literal group with no catch-all is always incomplete and warns with the GIVEN-name clause.
+Past the 64-row cap the warning lists instead what the literal-free clauses leave open (one all-wildcard row when every clause has a literal), so such a group falls silent only when that shorter list is over the cap too; a clause found never used is reported past the cap as well.
+Only an `EXACTLY` that is neither a literal, a value of the column's type, nor the column's own name still bails, and only in a column that is not a number, a text or a date (an enumeration, a record; a synonym of NUMBER, STRING or DATE is expanded first); in a column of numbers, texts or dates, nested or not, that clause is left out of the analysis, and the group's warning is then the coarse list alone, since the exact one could name a keyed gap the left-out clause covers (`f 2 "b"` / `f (EXACTLY two) s` / `f 1 s` would list `2 s`; refutation of `99b1936cf`, 2026-10-09).
+An `EXACTLY` whose expression mentions its own column's input bails in any column: what it matches depends on that input, so leaving it out would report a gap that is not there.
+One that mentions only other inputs matches one value of its column per value of theirs, and is left out like a constant (the rule main adopted in `46a26e355`; unstable's first fix bailed on any input, and was narrowed to it).
+The DMN exporter's `D-PARTIAL` for a literal group with no catch-all is **not** new: before this change `Dmn/Analysis.hs` raised it for a suppressed analysis with no OTHERWISE arm, and after it for the checker's missing clauses, with the same XML and exit code and only the reason text changed (fit verification of 2026-10-09 on the two-group probe `dm1-literal-group.l4`: the two `.dmn` files compare identical byte for byte, both runs exit 1 with "1 blocking … D-PARTIAL"; no `DmnExport.hs` case pins the reason text).
 
 **The probe is now a committed regression pair** — `jl4/examples/ok/pattern-matching-partial-matrix.l4`
 (+ goldens) for the `l4 check` half, and two `DmnExport.hs` cases (`D-PARTIAL` Blocking with `L1`,
@@ -5157,7 +5163,8 @@ of the first build:
   "already warns via the ordinary CONSIDER path"; measured 2026-10-06 that warning had no location
   (`1:1`) and named a `WHEN` branch the drafter never wrote. A one-clause group now gets
   `PatternClausesMissing` at its head, worded "This clause does not cover all cases". Where the
-  matrix gives up (a literal pattern, or more than 64 missing clauses), a one-clause group keeps the
+  matrix gives up (an `EXACTLY` it cannot read, or more than 64 missing clauses even after the
+  coarse tier; until 2026-10-09 any literal pattern too), a one-clause group keeps the
   `CONSIDER` warning it had, now at its head (`settleOneClause`): the first build dropped it, and
   the review found one-clause groups that checked silently. A group of two clauses or more is
   silent there, as it was.
@@ -5173,9 +5180,10 @@ of the first build:
   binding and failed at run time. The parser records the first such clause in
   `PmMatrix.catchAll`, and the checker warns `PatternClauseUnreachable` at the first clause after
   it. The matrix analysis's redundant rows, computed and discarded until now, are reported the same
-  way (a clause after a fresh-name pattern, a repeated clause), when the analysis runs: not when a
-  pattern is a literal. A program whose unreachable clause is ill-typed used to run and now fails
-  `l4 check`; that is the point of checking it.
+  way (a clause after a fresh-name pattern, a repeated clause, and since 2026-10-09 a repeated
+  number or text), when the analysis runs: not when an `EXACTLY` it cannot read stands the group
+  down (until 2026-10-09, not when any pattern was a literal). A program whose unreachable clause
+  is ill-typed used to run and now fails `l4 check`; that is the point of checking it.
 - **Clause order, locations and names.** `checkClausesLet` checks the `LET` a group is compiled to
   in source order (each clause before the binding of the clauses after it) and gives the binding the
   group's result type, so the first clause settles what the signature left open and a wrong type is
@@ -5190,6 +5198,44 @@ of the first build:
   `PmConsider`, and says "No clause of `k` matches these inputs" instead of naming a `CONSIDER`.
   Hand-written `CONSIDER`s keep the old wording. `l4 batch` and the REPL re-run a _printed_ module,
   and printing does not carry the marks, so there a group still reports in the `CONSIDER` wording.
+  (No longer so since 2026-10-07: a group prints as its clauses, and `l4 batch` reports "No clause
+  of `lbl` matches these inputs" too. See below.)
+
+**What changed 2026-10-07** (the same review: generated names still leaked, and one could capture or be captured; fixed on `unstable` first).
+The marks above say which _nodes_ are generated, but the generated _names_ were still ordinary names, and the generated test of a GIVEN input read it by the drafter's own name.
+Each change below was measured on probes in the review's shape, before and after:
+
+- **Names no source can write.** The desugarer spells every name it makes up with `PreDef` (`L4.Parser.generatedName`), which the parser never produces, so a backticked name with the same text is a different name and neither can capture the other.
+  The inputs of a group whose GIVEN does not name them are `input 1`, `input 2`, …; the binding of the later clauses is `the result of clauses 2 to 3`, or `the result of clause 3`.
+  A clause body naming a definition `__pm_fallthrough_0` used to read the binding of the later clauses instead: with clauses `Red`, `Green` and a catch-all answering 3, `u Red` answered 3 where the definition says 7, with no diagnostic.
+  It now answers 7.
+- **The generated test of a GIVEN input reads it by a spelling no pattern can bind.** It names the input respelled with `PreDef`, which the checker makes another name of the same input (`clauseInputSpellings`).
+  A pattern variable that an earlier column binds, with that input's name, used to capture the test: `DECIDE paint (Circle c) Red` beside `DECIDE paint s c` was reported ambiguous at `1:1`, as was `DECIDE f b TRUE` under `GIVEN a, b`.
+  Both now check, and answer as the clauses say.
+  A name the drafter writes in a clause body where both are in scope stays ambiguous, as in a hand-written `CONSIDER`; the message now gives the GIVEN input's location where it said "predefined", because the definition now binds the inputs at the GIVEN's location (`givenInputBinding`).
+- **A GIVEN that does not name one input per pattern** is one error at the first clause (`ClausePatternCountMismatch`): "Each clause of `g` has 2 patterns, but its GIVEN names 1 input."
+  A GIVEN that declares only a type names no inputs, and draws the same error ("its GIVEN names no inputs").
+  The group is then checked as if its GIVEN named the made-up inputs; the inputs it does name stay in scope at the type it declares, so a clause body that reads one as that type draws no second error; and no warning about missing or unused clauses is given until the counts agree.
+  It used to report `_pm_arg_2` as an unknown name at `1:1`, and `_pm_arg_1` "at <no location>".
+  A first attempt kept them at a type nothing constrained: `c + 1` with `c IS A Colour` then passed, and a later misuse was reported against NUMBER, a type `c` took from another clause.
+- **Printed modules.** `l4 batch`, the REPL and the corpus's re-print check run a module printed back as source, and a group used to print as the tree it compiles to, which wrote the made-up names out as text where a drafter's definition of the same text captured them: `l4 batch` answered 3 for 7, 4 for 101 and Red for Blue, each with status "success".
+  A group now prints as its signature and its clauses, each printed from the AST (`L4.Print.writtenClauses`): its patterns from the clause matrix the parser keeps (`PmMatrix`), where dittos are already resolved, and its body from under the generated `CONSIDER`s that test it (`clauseBodies`).
+  No generated name reaches printed source.
+  A group left with one clause that matches anything has nothing to tell it from a plain definition and prints as one; for a group with no GIVEN, its inputs are printed with names its body does not use (`unusedInputNames`), since the desugarer's `input 1` printed as source would be read as the drafter's.
+  Printed with the desugarer's names, `` DECIDE h `_` IS `input 1` `` beside `` `input 1` MEANS Blue `` answered Red, Green and Blue under `l4 batch` where `l4 run` answers Blue (round-3 review, probe `fb1`).
+  A first attempt copied the clauses out of the source text; a ditto then copied from the printer's line above instead of the drafter's (`charge Red` answered 2 for 1), operators of declared precedence lost the brackets the printer would have written, tab-indented clauses did not re-parse, and (the round-2 review found) the copied text could run on into the next declaration's annotations.
+  Accepted loss: a clause after one whose every pattern matches anything is never tried, and the checker drops it from the tree it returns, so a printed group omits it; no answer can change, and the source module still warns about it.
+  A string that spans lines gains the printer's indentation on its later lines, in any rule; that is not specific to groups and is not fixed here.
+  The evaluation differential over all 435 files the round-trip covers gives the same results printed as from source, except one file with no group whose error message cites a different file and line.
+- **The binding of the later clauses keeps a source range**, because the checker keys each definition's signature by range, but only its first clause's body (`L4.Parser.clausesSrcAnno`).
+  The hull of all the bodies it had covered the heads and patterns between them, and hover on a pattern there answered with the binding's type.
+  A pattern that is its input's own name compiles to no node; the checker records the input's type at it, so hover answers with that, but go-to-definition there finds nothing.
+- **The editor** no longer offers generated names in completion, or a GIVEN input twice, and the outline leaves out made-up inputs and the bindings a group compiles to.
+- **`l4 render`** puts a binding of the later clauses that is read once in place of the reading, and merges a generated `CONSIDER` into its parent when both test the same input, so a group over one input reads as one list of cases.
+  A binding read from several places, which happens when the clauses test several inputs, is a "where" entry named for the clauses it holds.
+  It used to show `__pm_fallthrough_0`, call an input "pm arg 1", and drop every binding nested in another, so a three-clause group lost its third clause.
+  A trace prints the generated names, which now say what they are.
+  The wording is assumed, not ruled.
 
 The remainder of this section is the original measurement, kept because it documents why the fix
 had to happen before desugaring.

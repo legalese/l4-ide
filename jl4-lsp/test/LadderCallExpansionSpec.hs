@@ -62,11 +62,15 @@ data Rendered = MkRendered
   , vizState :: Ladder.VizState
   }
 
-renderAll :: String -> T.Text -> IO [Rendered]
-renderAll stem source = do
+-- | Every decision of the module, optionally with 'Transform.simplify' on, as
+-- the IDE's own lens asks for. A leaf must be keyed alike either way: an expansion is
+-- simplified on its own, and R3's "two copies of limb a b share every atom" has
+-- to hold for whatever shape that leaves.
+renderAllWith :: Bool -> String -> T.Text -> IO [Rendered]
+renderAllWith simplify stem source = do
   path <- scratch stem
   (verId, tc) <- checkSource path source
-  let cfg = Ladder.withCallExpansions (Ladder.mkVizConfig verId tc.module' tc.substitution False)
+  let cfg = Ladder.withCallExpansions (Ladder.mkVizConfig verId tc.module' tc.substitution simplify)
   pure
     [ MkRendered (VizQueryPlan.annotateLadderWithAtomIds info st).funDecl d st
     | d <- foldTopLevelDecides (\d -> [d]) tc.module'
@@ -74,8 +78,11 @@ renderAll stem source = do
     ]
 
 render :: String -> T.Text -> T.Text -> IO Rendered
-render stem source target = do
-  rs <- renderAll stem source
+render = renderWith False
+
+renderWith :: Bool -> String -> T.Text -> T.Text -> IO Rendered
+renderWith simplify stem source target = do
+  rs <- renderAllWith simplify stem source
   case [r | r <- rs, r.funDecl.fnName.label == target] of
     [r] -> pure r
     other -> fail ("expected one rule named " <> T.unpack target <> ", found " <> show (length other))
@@ -184,20 +191,25 @@ creditworthy = T.unlines
 
 spec :: Spec
 spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPEC §10)" $ do
-  let numberings = [("as written", []), ("shifted by one unused input", ["z"])]
+  let numberings =
+        [ (name <> simplified, leading, simplify)
+        | (name, leading) <- [("as written", []), ("shifted by one unused input", ["z"])]
+        , (simplified, simplify) <- [("", False), (", simplified", True)]
+        ]
 
-  mapM_ (\(numbering, leading) -> describe numbering $ do
-    let n = show (length leading)
+  mapM_ (\(numbering, leading, simplify) -> describe numbering $ do
+    let n = show (length leading) <> (if simplify then "s" else "")
+        renderS = renderWith simplify
 
     it "(i) an argument inlined from `limb a b AND a` is the caller's own `a`" $ do
-      r <- render ("pass-" <> n) (caller leading "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
+      r <- renderS ("pass-" <> n) (caller leading "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
       x <- expansionOf "limb OF a, b" r.funDecl
       let direct = [a | (V.UBoolVar _ nm _ _ a _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
       direct `shouldSatisfy` ((== 1) . length)
       atomIdsOf "a" (allLeaves x) `shouldBe` direct
 
     it "(ii) `limb a b AND limb c d`: the two expansions share no atomId" $ do
-      r <- render ("diff-" <> n) (caller leading "different actuals" ["a", "b", "c", "d"] ["      `limb` a b", "  AND `limb` c d"]) "`different actuals`"
+      r <- renderS ("diff-" <> n) (caller leading "different actuals" ["a", "b", "c", "d"] ["      `limb` a b", "  AND `limb` c d"]) "`different actuals`"
       x1 <- expansionOf "limb OF a, b" r.funDecl
       x2 <- expansionOf "limb OF c, d" r.funDecl
       let ids1 = map snd (allLeaves x1)
@@ -207,7 +219,7 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       map fst (allLeaves x2) `shouldBe` ["c", "d"]
 
     it "(iii) `limb a b AND limb a b`: the two expansions are pairwise the same atoms" $ do
-      r <- render ("same-" <> n) (caller leading "same actuals" ["a", "b"] ["      `limb` a b", "  AND `limb` a b"]) "`same actuals`"
+      r <- renderS ("same-" <> n) (caller leading "same actuals" ["a", "b"] ["      `limb` a b", "  AND `limb` a b"]) "`same actuals`"
       case [x | (l, Just x) <- calls r.funDecl.body, l == "limb OF a, b"] of
         [x1, x2] -> do
           allLeaves x1 `shouldBe` allLeaves x2
@@ -263,6 +275,32 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
         mapM_ (\l -> atomIdsOf l drawn `shouldSatisfy` ((== 1) . length)) untouched
         -- and what the expand drew directly is what the expansion drew inline
         atomIdsOf "a's `has stable income`" unfolded `shouldBe` atomIdsOf "a's `has stable income`" drawn
+
+  it "(vii-b) l4/inlineExprs: two calls' copies of a callee's WHERE local are two propositions" $ do
+    -- Unfolding copied the callee's body WITH its WHERE block, once per call, and
+    -- each copy kept the local's one unique, so `big` from `ok x` and `big` from
+    -- `ok y` were one atom though one means x > 3 and the other y > 3 (found by
+    -- adversarial review of smucclaw/l4-ide#1013). The locals are inlined first now.
+    let src = T.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `ok` n IF `big`"
+          , "  WHERE `big` MEANS n GREATER THAN 3"
+          , ""
+          , "GIVEN x IS A NUMBER"
+          , "      y IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `x qualifies and y does not` x y IF `ok` x AND NOT `ok` y"
+          ]
+    r <- render "inline-where" src "`x qualifies and y does not`"
+    let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+    callUniques `shouldSatisfy` (not . null)
+    case renderAfterInlining r.vizState r.decide callUniques of
+      Left e -> expectationFailure (show e)
+      Right (_, info, _, _) -> do
+        let ls = directLeaves info.funDecl.body
+        length ls `shouldBe` 2
+        length (nub (map snd ls)) `shouldBe` 2
 
   describe "(viii) a callee's WHERE definitions are inlined, not drawn as names (A1)" $ do
     -- A local name has ONE unique in every call of its rule and means something
@@ -395,10 +433,10 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       [isJust x | (l, x) <- calls r'.funDecl.body, l == "loops OF a"] `shouldBe` [True]
 
   describe "atomIds of rules a callee reads (S5)" $ do
-    -- Not pinned here: that the rule's atomId survives a line added above it. It
-    -- does not, because a ref to a module rule that is not a plan variable
-    -- renders by its unique ('QP.atomIdsOfLabels'), as it already did in the
-    -- atomId of every plan variable that reads one.
+    -- That the rule's atomId survives a line added above it is pinned below. It
+    -- used not to: a ref to a module rule that was not a plan variable rendered
+    -- by its unique. An atomId is now the hash of the leaf's term, which names a
+    -- module rule by its path (R3, "L4.Viz.AtomKey").
     let shadowSrc = T.unlines
           [ "DECIDE ready IF TRUE"
           , ""
@@ -420,6 +458,15 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       direct `shouldSatisfy` ((== 1) . length)
       inlined `shouldSatisfy` ((== 1) . length)
       inlined `shouldSatisfy` all (`notElem` direct)
+
+    it "the module rule's atomId survives a line added above it" $ do
+      r <- render "global-shadow" shadowSrc "`shadow caller`"
+      r' <- render "global-shadow-shifted" (T.unlines ["GIVEN z IS A BOOLEAN", "DECIDE unrelated z IF z", ""] <> shadowSrc) "`shadow caller`"
+      inlined <- inlinedReady r
+      inlined' <- inlinedReady r'
+      inlined `shouldSatisfy` ((== 1) . length)
+      inlined' `shouldBe` inlined
+      allLeaves r'.funDecl.body `shouldBe` allLeaves r.funDecl.body
 
     it "a call with a module rule as its argument has one atomId drawn directly and inside another call's expansion" $ do
       let src = T.unlines

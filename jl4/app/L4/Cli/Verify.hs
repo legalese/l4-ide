@@ -64,6 +64,7 @@ import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
 import Options.Applicative
 import System.Exit (ExitCode (..), exitSuccess, exitWith)
@@ -473,7 +474,7 @@ vizConfig opts tc = LadderViz.mkVizConfig verDocId tc.module' tc.substitution
 -- and the only identity that is the same for one proposition in two rules.
 atomIdsOf :: Text -> VizExpr.RenderAsLadderInfo -> LadderViz.VizState -> Map Int Text
 atomIdsOf fnName ladderInfo vizState =
-  QP.atomIdByUnique fnName (VizQP.buildParamsByUnique ladderInfo) (VizQP.buildQueryPlanCache ladderInfo vizState)
+  QP.atomIdByUnique fnName (VizQP.buildQueryPlanCache ladderInfo vizState)
 
 -- | What the call atoms of one decision mean, in that decision's atom space.
 data CallMeanings = CallMeanings
@@ -529,7 +530,7 @@ callMeanings opts tc callees (MkDecide ann sig appForm _) fnName atomIds labels 
 
     attempts :: [(Int, Either Text (BDQ.BoolExpr Text))]
     attempts =
-      [ (v, meaningOf x)
+      [ (v, meaningOf v x)
       | v <- order
       , Just e <- [LadderViz.getLeafExpr vizState v]
       , Just x <- [unfolded e]
@@ -542,8 +543,8 @@ callMeanings opts tc callees (MkDecide ann sig appForm _) fnName atomIds labels 
       Left size ->
         Just (Left ("unfolding it grew past " <> Text.pack (show unfoldBudget) <> " expression nodes (it reached " <> Text.pack (show size) <> ")"))
 
-    meaningOf :: Either Text (Expr Resolved) -> Either Text (BDQ.BoolExpr Text)
-    meaningOf = \case
+    meaningOf :: Int -> Either Text (Expr Resolved) -> Either Text (BDQ.BoolExpr Text)
+    meaningOf v = \case
       Left why -> Left why
       Right x ->
         case LadderViz.doVisualize (MkDecide ann sig appForm (Transform.inlineLocalBindings x)) (vizConfig opts tc False) of
@@ -554,11 +555,20 @@ callMeanings opts tc callees (MkDecide ann sig appForm _) fnName atomIds labels 
             | otherwise ->
                 let (bx, _, _) = VizQP.vizExprToBoolExpr li.funDecl.body
                     aids = atomIdsOf fnName li vs
-                 in Right (mapVarsTo (\u -> Map.findWithDefault (localKey u) u aids) bx)
+                    fresh = LadderViz.getFreshLeaves vs
+                    key u
+                      | IntSet.member u fresh = localKey "fresh" v u
+                      | otherwise = Map.findWithDefault (localKey "local" v u) u aids
+                 in Right (mapVarsTo key bx)
 
     -- An atom with no atomId is its own proposition; key it so it cannot meet
-    -- anything else. (Uniques from different ladders must not be compared.)
-    localKey u = "\0local:" <> Text.pack (show u)
+    -- anything else. So is an atom whose value depends on when it is evaluated
+    -- (a ledger read): its atomId is numbered within its own diagram, and two
+    -- meanings drawn apart would otherwise share it. Uniques from different
+    -- ladders must not be compared, so the key carries the call atom @v@ whose
+    -- meaning drew it.
+    localKey :: Text -> Int -> Int -> Text
+    localKey kind v u = "\0" <> kind <> ":" <> Text.pack (show v) <> ":" <> Text.pack (show u)
 
     -- The caller's atoms, by atomId.
     callerIndex :: Map Text Int
@@ -704,8 +714,14 @@ ladderNodeCount budget root = go 0 [root]
 -- independent variables and is satisfiable. That is not a soundness bug —
 -- independence only ever makes a formula more satisfiable, so findings stay true
 -- — but it is a large hole in coverage, and closing it does not require
--- inventing a notion of sameness: @generateAtomId@ already defines one, and it
--- is the one a wizard user answers once.
+-- inventing a notion of sameness: the atomId already defines one, and it is the
+-- one a wizard user answers once.
+--
+-- Coalescing IS sound only if two different propositions never share an atomId.
+-- That held only approximately while the atomId was a hash of the PRINTED label
+-- (two mixfix calls sharing a head keyword printed alike: smucclaw/l4-ide#1004);
+-- it is the hash of the leaf's term now ("L4.Viz.AtomKey", R3), which names
+-- every name by its own binder.
 --
 -- The representative of an atomId class is its first unique in variable order,
 -- so the coalesced order is a subsequence of the original and the planner's
