@@ -185,14 +185,14 @@ DECIDE g 0 IS "zero"
 DECIDE g 0 IS "zero again"
 DECIDE g n IS "other"
 
--- Test 30: a number with more digits than a double holds is matched exactly.
+-- Test 30: more digits than a double holds, matched exactly under l4 run only.
 GIVEN n IS A NUMBER
 GIVETH A STRING
 DECIDE `long decimal` 0.1234567890123456789 IS "long"
 DECIDE `long decimal` n IS "other"
 
-#EVAL `long decimal` 0.1234567890123456789   -- "long"
-#EVAL `long decimal` 0.12345678901234568     -- "other"
+#EVAL `long decimal` 0.1234567890123456789   -- "long"; l4 batch and the REPL say "other"
+#EVAL `long decimal` 0.12345678901234568     -- "other"; l4 batch and the REPL say "long"
 
 -- Test 31: EXACTLY of the input's own name compares the input with itself,
 -- so it matches every input, like the bare name; a clause after it is never
