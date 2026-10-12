@@ -553,9 +553,9 @@ spec = describe "Unification" $ do
   describe "cost of unifying nested types" $ do
     -- Unifying a type with its instance used to substitute the whole
     -- remaining subtree at every step of the descent, so the cost grew with
-    -- the SQUARE of the nesting: `idf v` fifty times at depth 400 took
-    -- 15.3 s to check, and 1.9 s once only the head is walked (16.8 s in
-    -- the review of legalese/l4-ide#545, finding F5). Timed by the
+    -- the SQUARE of the nesting: `l4 check` of a generic function used
+    -- fifty times at a type nested 400 deep took 15.3 s, and takes 1.9 s
+    -- once only the head is walked (measured on one machine). Timed by the
     -- ratio of two sizes, not by a bound in seconds, so that a slow machine
     -- does not fail it; and in CPU time, so that time spent waiting for a busy
     -- machine is not counted. Four times the depth takes about four times as
