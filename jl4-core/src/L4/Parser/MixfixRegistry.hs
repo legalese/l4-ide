@@ -5,12 +5,15 @@ module L4.Parser.MixfixRegistry
   , buildMixfixHintRegistry
   , hasMixfixHints
   , isKnownMixfixKeyword
+  , mixfixRulesWrittenAs
+  , showMixfixPattern
   , showKeywords
   ) where
 
 import Base
 import qualified Base.Map as Map
 import qualified Base.Set as Set
+import qualified Base.Text as Text
 import L4.Mixfix
 import L4.Syntax
 
@@ -49,6 +52,36 @@ hasMixfixHints hints = not (Set.null hints.keywordUniverse)
 isKnownMixfixKeyword :: RawName -> MixfixHintRegistry -> Bool
 isKnownMixfixKeyword kw hints =
   kw `Set.member` hints.keywordUniverse
+
+-- | The mixfix rules in scope that a run of tokens is written in the form of.
+--
+-- Each token is its name when it is a bare name and 'Nothing' when it is
+-- anything else (a literal, a bracket, a constructor applied to something). A
+-- rule's form is its pattern: the run must be as long as the pattern, and
+-- where the pattern has a keyword the run must hold that very name; where it
+-- has an input the run may hold anything. So @Red `costs` 0@ is written in the
+-- form of @c `costs` n@, and @Red `costs`@ and @Red `cost` 0@ are not.
+mixfixRulesWrittenAs :: [Maybe RawName] -> MixfixHintRegistry -> [MixfixInfo]
+mixfixRulesWrittenAs toks hints =
+  [ info
+  | infos <- Map.elems hints.byFirstKeyword
+  , info <- infos
+  , length info.pattern == length toks
+  , and (zipWith slotHolds info.pattern toks)
+  ]
+  where
+    slotHolds = \ case
+      MixfixKeyword kw -> (== Just kw)
+      MixfixParam _    -> const True
+
+-- | A rule's pattern as a drafter writes it, its inputs by the names its
+-- definition gave them and its keywords in backticks: @c `costs` n@.
+showMixfixPattern :: MixfixInfo -> Text
+showMixfixPattern info = Text.unwords (map word info.pattern)
+  where
+    word = \ case
+      MixfixKeyword kw -> "`" <> rawNameToText kw <> "`"
+      MixfixParam n    -> rawNameToText n
 
 showKeywords :: MixfixHintRegistry -> [Text]
 showKeywords hints = map rawNameToText $ Set.toList hints.keywordUniverse
