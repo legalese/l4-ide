@@ -1019,10 +1019,18 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     AppNamed   _ n namedExpr _ ->
       case filter (not . isDefaultFill) namedExpr of
         []      -> printWithLayout n <+> "WITHAL"
+        [one]   -> printWithLayout n <+> "WITH" <+> printWithLayout one
+        -- Several arguments print on ONE line, comma-separated. They used to
+        -- print one to a line, aligned under the first, which parses only where
+        -- the text starts a line of its own: inside brackets, or after a prefix
+        -- on a line (a directive such as @#ASSERT (f WITH a IS 1, b IS 2) EQUALS 3@),
+        -- the second argument's column no longer lines up and the parse fails at
+        -- it. A value that has an open tail of its own, such as a comma list, is
+        -- bracketed so that the comma after it is this list's.
         written ->
               printWithLayout n
           <+> "WITH"
-          <+> align (vcatHard (fmap printWithLayout written))
+          <+> hsep (punctuate comma (fmap printNamedArgument written))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
@@ -1478,6 +1486,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (NamedExpr a) where
   printWithLayout = \ case
     MkNamedExpr _ name e ->
       printWithLayout name <+> "IS" <+> printWithLayout e
+
+-- | One argument of a @WITH@ list that shares a line with the others
+-- ('printWithLayout' of an 'AppNamed'): the value is bracketed when its own
+-- rendering is open-tailed ('parensIfOpenTailed').
+printNamedArgument :: LayoutPrinterWithName a => NamedExpr a -> Doc ann
+printNamedArgument = \ case
+  MkNamedExpr _ name e ->
+    printWithLayout name <+> "IS" <+> parensIfOpenTailed e
 
 -- | Print a LocalDecl in LET context (without DECIDE keyword and without type signature)
 -- Uses "BE" as the binding keyword in honour of The Beatles' "Let It Be"

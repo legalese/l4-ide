@@ -1,0 +1,3 @@
+`scaled` where `base` is 10 and `rate` is 2 is equal to 20
+`scaled` where `base` is 10 and `rate` is 3 by default is equal to 30
+`total` with 4 is equal to 33

@@ -1,0 +1,28 @@
+-- Several WITH arguments on one call, in the places a printed module must re-parse
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, the print defect of section 3.2.1's differential).
+-- Every default here is a literal (HAIRCUT, 2026-10-12): the call sites, not the
+-- defaults, are what has several arguments.
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+combine MEANS a PLUS b
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+pair MEANS x TIMES y
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+-- several arguments inside brackets, one nested in another, and spliced after other text
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+total MEANS (combine WITH a IS n, b IS 1) PLUS (pair WITH x IS (combine WITH a IS 2, b IS 3), y IS n) PLUS (scaled WITH base IS n, rate IS 2)
+
+#ASSERT (scaled WITH base IS 10, rate IS 2) EQUALS 20
+#ASSERT (scaled WITH base IS 10) EQUALS 30
+#ASSERT (total 4) EQUALS 33

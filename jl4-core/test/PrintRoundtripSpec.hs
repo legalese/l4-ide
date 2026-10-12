@@ -25,6 +25,14 @@ spec =
     roundtrips "GIVEN-parametrised DECLARE" [] declareSrc
     roundtrips "GIVEN-parametrised ASSUME" [] assumeSrc
     roundtrips "a string literal with a line break and a tab" ["\"line\\nnext\\tend\""] lineBreakSrc
+    -- Several WITH arguments print on ONE line, comma-separated. They used to
+    -- print one to a line, aligned under the first, which parses only where the
+    -- text starts a line of its own: inside brackets or after a prefix the second
+    -- argument's column no longer lines up ("unexpected EQUALS" in a directive,
+    -- the five files the section 3.2.1 differential flagged).
+    roundtrips "several WITH arguments in a directive" ["scaled WITH base IS 10, rate IS 2"] multiArgDirectiveSrc
+    roundtrips "several WITH arguments in a rule body, one nested in another"
+      ["pair WITH x IS (combine WITH a IS 2, b IS 3), y IS n"] multiArgBodySrc
 
 -- | Assert that @src@ parses, its 'prettyLayout' contains every @mustContain@
 -- fragment, and that printed output parses again. A pure re-parse check catches
@@ -96,4 +104,31 @@ lineBreakSrc = T.unlines
   , "    IF x > 0"
   , "    THEN \"line\\nnext\\tend\""
   , "    ELSE \"no\""
+  ]
+
+multiArgDirectiveSrc :: T.Text
+multiArgDirectiveSrc = T.unlines
+  [ "GIVEN rate IS A NUMBER TYPICALLY 3"
+  , "      base IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "scaled MEANS rate TIMES base"
+  , ""
+  , "#ASSERT (scaled WITH base IS 10, rate IS 2) EQUALS 20"
+  ]
+
+multiArgBodySrc :: T.Text
+multiArgBodySrc = T.unlines
+  [ "GIVEN a IS A NUMBER"
+  , "      b IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "combine MEANS a PLUS b"
+  , ""
+  , "GIVEN x IS A NUMBER"
+  , "      y IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "pair MEANS x TIMES y"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "total MEANS (combine WITH a IS n, b IS 1) PLUS (pair WITH x IS (combine WITH a IS 2, b IS 3), y IS n)"
   ]
