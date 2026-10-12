@@ -57,6 +57,7 @@ module LSP.Core.Shake(
     actionLogger,
     getVirtualFile, addVirtualFile, addVirtualFileUri, addVirtualFileFromFS, getVirtualFileText,
     embeddedLibraryUri,
+    embeddedLibraryText,
     FileVersion(..),
     updatePositionMapping,
     updatePositionMappingHelper,
@@ -389,6 +390,13 @@ embeddedLibraryVfs =
     [ (embeddedLibraryUri name, VirtualFile 0 0 (Rope.fromText content))
     | (name, content) <- Map.toList EmbeddedLibraries.embeddedLibraries
     ]
+
+-- | The source of the embedded library at an 'embeddedLibraryUri', if there is
+-- one: the very text 'getVirtualFile' hands the build graph, so the ranges the
+-- server reports for that module are ranges into this text. The @l4/embeddedLibrary@
+-- request serves it to editors, which cannot open a @jl4-embedded:@ URI themselves.
+embeddedLibraryText :: NormalizedUri -> Maybe Text
+embeddedLibraryText nuri = Rope.toText . _file_text <$> Map.lookup nuri embeddedLibraryVfs
 
 -- | Read a virtual file from the current snapshot
 getVirtualFile :: NormalizedUri -> Action (Maybe VirtualFile)
