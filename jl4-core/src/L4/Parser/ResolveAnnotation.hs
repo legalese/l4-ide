@@ -789,7 +789,8 @@ data RefWarning
 
 data RefS = RefS
   { refs :: ![RefWithSpan]
-    -- ^ Refs that have not yet been attached to an AST node.
+    -- ^ Refs that have not yet been attached to an AST node, sorted by the
+    -- position where they END. See 'takeMatchingRefs'.
   , refWarnings :: ![RefWarning]
   }
   deriving stock (Generic, Eq, Show)
@@ -823,12 +824,12 @@ addRefCommentsToAst refs0 ast =
     (withSpan, missing) = preprocessRefs refs0
     initialS =
       RefS
-        { refs = List.sortOn (.range.start) withSpan
+        { refs = List.sortOn (.range.end) withSpan
         , refWarnings = fmap RefMissingLocation missing
         }
     (ast', s') = runState (addRef ast) initialS
-    -- Any refs that were never claimed become warnings.
-    leftovers = fmap RefNotAttached s'.refs
+    -- Any refs that were never claimed become warnings, in source order.
+    leftovers = fmap RefNotAttached (List.sortOn (.range.start) s'.refs)
   in
     (ast', s'{refs = [], refWarnings = s'.refWarnings <> leftovers})
 
@@ -840,10 +841,25 @@ preprocessRefs = foldl' go ([], [])
       Nothing -> (located, ref : missing)
       Just r -> (WithSpan (fromSrcRange r) ref : located, missing)
 
-takeMatchingRefs :: (RefWithSpan -> Bool) -> State RefS [RefWithSpan]
-takeMatchingRefs predicate = do
+-- | Remove and return every pending ref that precedes the node
+-- ('refPrecedesNode'), still in the order they are kept.
+--
+-- A ref precedes a node exactly when it ENDS at or before the node's start,
+-- and the pending refs are sorted by where they end. So for any node the refs
+-- that precede it are a prefix of the list, and 'List.span' finds them by
+-- looking at that prefix and one ref more. 'List.partition' looked at every
+-- pending ref for every node, so a file with n refs cost n times its number
+-- of nodes: 16,000 refs took 38 seconds to check, where the same 16,000
+-- definitions without them took 4.
+--
+-- The list is sorted by end, not by start, so that this holds of any refs and
+-- not only of the ones the lexer produces today. Sorted by start, a ref that
+-- encloses another would end after it, fail the test, and hide the ref behind
+-- it. No ref encloses another now, since each is one lexer token.
+takeMatchingRefs :: SrcSpan -> State RefS [RefWithSpan]
+takeMatchingRefs nodeRange = do
   s <- get
-  let (matches, rest) = List.partition predicate s.refs
+  let (matches, rest) = List.span (refPrecedesNode nodeRange) s.refs
   put s{refs = rest}
   pure matches
 
@@ -870,7 +886,7 @@ attachRef node ann =
   case nodeSpan node of
     Nothing -> pure ann
     Just nodeRange -> do
-      matches <- takeMatchingRefs (refPrecedesNode nodeRange)
+      matches <- takeMatchingRefs nodeRange
       case reverse (List.sortOn (.range.start) matches) of
         [] -> pure ann
         (nearest : extras) -> do
