@@ -442,55 +442,83 @@ exprFieldRefs fieldNames expr =
 -- Returns the members of each cyclic strongly-connected component.
 --
 -- A recursive synonym has no finite expansion, so it would otherwise send
--- the type checker's synonym-expanding loops into infinite regress (those
--- loops carry fuel as a backstop, since a cycle can also arrive via
--- imports — see 'L4.TypeCheck.Unify').
+-- the type checker's synonym-expanding loops into infinite regress. The
+-- fuel in 'L4.TypeCheck.Unify' bounds the depth of that regress but not
+-- its work, so this check is what keeps a cycle from being expanded at
+-- all: every member of a cycle is given no body ('cyclicSynonyms'). Imports
+-- need no such care of their own. Modules are acyclic, and an imported
+-- module's cyclic synonyms were quarantined when that module was checked.
+-- A cycle that hides behind a spelling this pass does not follow, such as
+-- an alias that a same-arity sibling in another section also answers to, is
+-- found by 'L4.TypeCheck.quarantineResolvedSynonymCycles' once the bodies
+-- are resolved.
 --
 -- Like 'detectComputedFieldCycles' this matches names textually, which
--- over-approximates references (it is blind to arity and to whether a
--- name would actually resolve to the sibling synonym); a synonym's own
--- type parameters are excluded from its dependencies so that a parameter
--- shadowing a sibling synonym's name cannot manufacture a spurious cycle.
--- A synonym is referenceable through its AKA aliases as well as its
--- primary name, so aliases participate on both sides of the graph.
+-- over-approximates references (it does not know which section a name is
+-- resolved in); a synonym's own type parameters are excluded from its
+-- dependencies so that a parameter shadowing a sibling synonym's name
+-- cannot manufacture a spurious cycle. A synonym is referenceable through
+-- its AKA aliases as well as its primary name, so aliases participate on
+-- both sides of the graph.
+--
+-- It does know how many arguments a use is written with, because the
+-- checker does: a name is resolved among the types of the kind the use
+-- gives it, so @B@ with no arguments is not the sibling @B a@ that takes
+-- one, and in @DECLARE W AKA B IS A B@ it is @W@ itself. Reading it as
+-- the sibling found no cycle where the checker saw @W = W@; with two
+-- such synonyms unifying them branched twice per expansion, a thousand
+-- deep. A use whose argument count matches no synonym of that spelling
+-- is a kind error the checker reports, but it still resolves the name
+-- to one of them, so it is taken to refer to all of them.
 detectTypeSynonymCycles :: Module Name -> [[Name]]
 detectTypeSynonymCycles (MkModule _ _ section) =
   let
     synonyms = synonymsInSection section
-    -- alias or primary raw name -> primary raw name. Primary names must
-    -- win over aliases (left-biased union): an alias that collides with a
-    -- sibling synonym's primary name would otherwise capture that
-    -- sibling's references and manufacture a false, declaration-order-
-    -- dependent cycle. Name resolution disambiguates such collisions by
-    -- arity/kind, which this textual pass cannot see; when it cannot,
-    -- the program is ambiguous and rejected anyway, and the expansion
-    -- fuel in L4.TypeCheck.Unify remains the termination guarantee.
-    primaryName =
-      Map.fromList
-        [ (rawName n, rawName n) | (n, _, _, _) <- synonyms ]
-      `Map.union`
-      Map.fromList
-        [ (alias, rawName n) | (n, aliases, _, _) <- synonyms, alias <- aliases ]
+    -- spelling (primary name or alias) -> the synonyms answering to it,
+    -- by primary name, with the number of parameters each takes
+    bySpelling :: Map.Map RawName [(RawName, Int)]
+    bySpelling =
+      Map.fromListWith (flip (<>))
+        [ (spelling, [(rawName n, length params)])
+        | (n, aliases, params, _) <- synonyms
+        , spelling <- rawName n : aliases
+        ]
+    -- The synonyms a use of a name with this many arguments can refer to.
+    -- Several of the same arity are an ambiguity the checker reports;
+    -- all of them are kept, since which one it would pick can depend on
+    -- sections this pass does not see.
+    referents :: (RawName, Int) -> [RawName]
+    referents (spelling, argc) =
+      case Map.findWithDefault [] spelling bySpelling of
+        []         -> []
+        candidates -> case [ p | (p, arity) <- candidates, arity == argc ] of
+          []    -> fst <$> candidates
+          exact -> exact
     graphData =
       [ (n, rawName n, Set.toList deps)
       | (n, _aliases, params, ty) <- synonyms
-      , let deps = Set.fromList
-              [ primary
-              | r <- toList ty
-              , not (rawName r `Set.member` params)
-              , Just primary <- [Map.lookup (rawName r) primaryName]
-              ]
+      , let deps = Set.fromList (concatMap referents (typeUses (Set.fromList params) ty))
       ]
   in
     [ cyc | CyclicSCC cyc <- stronglyConnComp graphData ]
 
+-- | The type constructors a type applies, each with the number of
+-- arguments it is applied to, other than the type variables in scope.
+typeUses :: Set RawName -> Type' Name -> [(RawName, Int)]
+typeUses bound = \ case
+  Type _          -> []
+  TyApp _ n ts    -> [ (rawName n, length ts) | not (rawName n `Set.member` bound) ] <> concatMap (typeUses bound) ts
+  Fun _ onts t    -> concatMap (\ (MkOptionallyNamedType _ _ ty) -> typeUses bound ty) onts <> typeUses bound t
+  Forall _ ns t   -> typeUses (bound <> Set.fromList (rawName <$> ns)) t
+  InfVar {}       -> []
+
 -- | All type synonym declarations in a section (recursively):
 -- name, AKA aliases, type parameters, body.
-synonymsInSection :: Section Name -> [(Name, [RawName], Set RawName, Type' Name)]
+synonymsInSection :: Section Name -> [(Name, [RawName], [RawName], Type' Name)]
 synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
   where
     go (Declare _ (MkDeclare _ _ (MkAppForm _ n args mAka) (SynonymDecl _ ty))) =
-      [(n, akaNames mAka, Set.fromList (rawName <$> args), ty)]
+      [(n, akaNames mAka, rawName <$> args, ty)]
     go (Section _ s) = synonymsInSection s
     go _ = []
 

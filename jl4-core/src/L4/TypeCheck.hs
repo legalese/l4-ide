@@ -100,6 +100,7 @@ import Data.Monoid
 import Control.Monad.Extra (mapMaybeM)
 import qualified Control.Monad.Extra as Extra
 import Data.Either (partitionEithers)
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
@@ -202,12 +203,20 @@ doCheckProgramWithDependencies checkState checkEnv program =
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
 checkProgram module' = do
-  withScanTypeAndSigEnvironment scanTyDeclModule inferTyDeclModule scanFunSigModule module' \rdecides -> do
-    (rprog, topEnv) <- inferProgram module'
-    -- Build the mixfix registry from THIS module's function signatures
-    -- so it can be propagated to importing modules
-    let localMixfixRegistry = buildMixfixRegistry rdecides
-    pure (rprog, topEnv, localMixfixRegistry)
+  -- 'withScanTypeAndSigEnvironment', with one step between scanning the
+  -- types and scanning the definitions: once every synonym body is
+  -- resolved, a cycle the spelling-based check missed is found and its
+  -- members are given no body ('quarantineResolvedSynonymCycles').
+  rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule module'
+    >>= quarantineResolvedSynonymCycles
+  withDeclares rdeclares do
+    rdecides <- scanFunSigModule module'
+    withDecides rdecides do
+      (rprog, topEnv) <- inferProgram module'
+      -- Build the mixfix registry from THIS module's function signatures
+      -- so it can be propagated to importing modules
+      let localMixfixRegistry = buildMixfixRegistry rdecides
+      pure (rprog, topEnv, localMixfixRegistry)
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
@@ -2113,6 +2122,80 @@ matchPatFunTy  r t args =
 -- Forward References high level helpers
 -- ----------------------------------------------------------------------------
 
+-- | The second line of defence against a type synonym that refers to itself.
+--
+-- 'detectTypeSynonymCycles' reads spellings, before anything is resolved,
+-- and a spelling can hide a reference: an alias that a same-arity sibling
+-- in another section also answers to, which the checker settles by section
+-- and this pass does not see. A cycle it misses keeps its bodies, and the fuel in
+-- "L4.TypeCheck.Unify" bounds the
+-- depth of their expansion, not its work: two such synonyms that each name
+-- themselves twice, unified with each other, ran past 4 GiB.
+--
+-- So once every body is resolved, this reads the references themselves. A
+-- body names the 'Unique' of the synonym each type application in it
+-- resolved to, whatever it was spelled, and a name that did not resolve (an
+-- ambiguity, an unknown name) names none. A cycle among those is a cycle of
+-- expansions, and its members are given no body and reported as
+-- 'CyclicTypeSynonyms', as the spelling-based check does. A cycle that check
+-- already caught has no body left to follow, so this finds only what it
+-- missed. It cannot reject a program the other accepts correctly: a
+-- reference cycle among synonyms has no finite expansion.
+quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
+quarantineResolvedSynonymCycles decls = do
+  for_ cycles \ cyc -> case cyc of
+    []                       -> pure ()
+    (_, firstName, _) : _ ->
+      errorContext (WhileCheckingDeclare firstName) $
+        addError (CyclicTypeSynonyms [ n | (_, n, _) <- cyc ])
+  pure (map quarantine decls)
+  where
+    -- Every synonym that still has a body, in declaration order: the unique
+    -- all its spellings share, its declared name, and the uniques its body
+    -- applies.
+    synonyms :: [(Unique, Name, [Unique])]
+    synonyms =
+      [ (getUnique r, getOriginal r, map getUnique (bodyHeads body))
+      | MkDeclChecked _ cis <- decls
+      , MkCheckInfo (r : _) (KnownType _ _ (Just body)) <- cis
+      ]
+
+    -- Every 'Resolved' in head (type constructor \/ type variable) position
+    -- within a type, outermost first: exactly the names the type is built
+    -- from, not whatever 'Resolved's an 'Anno' payload holds.
+    bodyHeads :: Type' Resolved -> [Resolved]
+    bodyHeads = \ case
+      Type _        -> []
+      TyApp _ n ts  -> n : concatMap bodyHeads ts
+      Fun _ onts t  -> concatMap (bodyHeads . optionallyNamedTypeType) onts ++ bodyHeads t
+      Forall _ _ t  -> bodyHeads t
+      InfVar {}     -> []
+
+    -- Each cycle's members in declaration order, the cycles in the order of
+    -- their first members.
+    cycles :: [[(Unique, Name, [Unique])]]
+    cycles =
+      map (map snd)
+        . List.sortOn (map fst)
+        $ [ List.sortOn fst members
+          | CyclicSCC members <- stronglyConnComp [ (ix, u, deps) | ix@(_, (u, _, deps)) <- indexed ]
+          ]
+
+    indexed :: [(Int, (Unique, Name, [Unique]))]
+    indexed = zip [0 ..] synonyms
+
+    quarantine :: DeclChecked DeclareOrAssume -> DeclChecked DeclareOrAssume
+    quarantine d = d { publicNames = map unbody d.publicNames }
+
+    unbody :: CheckInfo -> CheckInfo
+    unbody ci = case ci of
+      MkCheckInfo (r : _) (KnownType k ps (Just _))
+        | getUnique r `Set.member` cyclic -> ci { checkEntity = KnownType k ps Nothing }
+      _ -> ci
+
+    cyclic :: Set Unique
+    cyclic = Set.fromList [ u | cyc <- cycles, (u, _, _) <- cyc ]
+
 scanDeclares ::
   (a -> Check [DeclTypeSig]) ->
   (a -> Check [DeclChecked DeclareOrAssume]) ->
@@ -3306,6 +3389,16 @@ prettyCheckError (CyclicTypeSynonyms cycleSyns) =
   [ ""
   , "A type synonym must not refer to itself, directly or via other"
   , "synonyms, because it could then never be fully expanded."
+  ]
+prettyCheckError (SynonymExpansionLimit limit syn) =
+  [ "I stopped following type synonyms at " <> quotedName (getName syn) <> "."
+  , ""
+  , "To compare two types I replace a type synonym by the type it stands for,"
+  , "and I give up after " <> Text.pack (show limit) <> " replacements in a row. Here a chain of synonyms,"
+  , "each defined as the next, is longer than that."
+  , ""
+  , "The types were not found to differ. Declare the first synonym in the chain"
+  , "as the type it finally stands for, to shorten the chain."
   ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
