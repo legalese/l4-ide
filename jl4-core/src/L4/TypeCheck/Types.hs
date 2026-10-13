@@ -92,6 +92,13 @@ data CheckError =
     -- ^ Error in mixfix pattern matching (function name, error details)
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
+  | CyclicTypeSynonyms [Name]
+    -- ^ Circular dependency between type synonym declarations (cycle members)
+  | SynonymExpansionLimit Int Resolved
+    -- ^ Comparing two types followed this many type synonyms in a row and
+    -- stopped at the one given, which still stands for another type. The
+    -- types are not known to differ, so this is not a 'TypeMismatch'. See
+    -- 'L4.TypeCheck.Unify.synonymExpansionFuel'.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved

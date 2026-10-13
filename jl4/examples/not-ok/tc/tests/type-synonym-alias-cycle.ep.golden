@@ -1,0 +1,23 @@
+-- Type synonym cycles that a name can hide (SHOULD FAIL).
+-- Each of these synonyms refers to itself, but not by the spelling a reader
+-- would look for. They used to be accepted, and unifying two of them (as
+-- oops does below) used all the memory there was.
+DECLARE Duo OF a, b
+  HAS fst IS AN a
+      snd IS A  b
+
+-- `B1` here has no arguments, so it is W1's own alias, not the synonym
+-- `B1 a` below, which takes one: W1 is `Duo OF W1, W1`.
+DECLARE W1 AKA B1 IS A Duo OF B1, B1
+DECLARE B1 a IS A LIST OF a
+
+DECLARE W2 AKA B2 IS A Duo OF B2, B2
+DECLARE B2 a IS A LIST OF a
+
+-- The same with a synonym that is its own alias and nothing else.
+DECLARE W3 AKA B3 IS A B3
+DECLARE B3 a IS A LIST OF a
+
+GIVEN x IS A W1
+GIVETH A W2
+oops x MEANS x

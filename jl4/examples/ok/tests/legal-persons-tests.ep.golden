@@ -4,7 +4,7 @@ IMPORT timezone
 IMPORT jurisdiction
 IMPORT `legal-persons`
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 § `Legal Persons Library Tests`
 
