@@ -33,16 +33,14 @@ tryExpandTypeSynonym r args = do
 -- That bounds the DEPTH of a path, not the WORK. A synonym whose body
 -- mentions itself twice branches twice per expansion, and a cycle of
 -- such synonyms costs 2^fuel before the fuel stops it. What keeps a
--- cycle from ever being expanded is the declaration-time checks, which
--- give every synonym in a cycle no body at all:
--- 'L4.Desugar.detectTypeSynonymCycles' over the spellings in the
--- source, and 'L4.TypeCheck.quarantineResolvedSynonymCycles' over the
--- resolved bodies, for what a spelling hides. Imports do not change
--- that: modules are acyclic, and an imported module's cyclic synonyms
--- were quarantined when that module was checked. The fuel's own job is
--- the acyclic case, a chain of synonyms so long that it is not worth
--- following; it is also the last line of defence for a cycle both
--- checks miss, which stops a linear one but not a branching one.
+-- cycle from ever being expanded is the declaration-time check
+-- 'L4.TypeCheck.quarantineResolvedSynonymCycles', which gives every
+-- synonym in a cycle no body at all. Imports do not change that:
+-- modules are acyclic, and an imported module's cyclic synonyms were
+-- quarantined when that module was checked. The fuel's own job is the
+-- acyclic case, a chain of synonyms so long that it is not worth
+-- following; it is also the last line of defence for a cycle that check
+-- misses, which stops a linear one but not a branching one.
 --
 -- Legitimate programs spend one unit per nested synonym expansion along
 -- one path, so the bound is generous. Running out is reported as

@@ -187,9 +187,9 @@ spec = describe "Unification" $ do
     it "rejects a synonym that reaches itself through an alias it shares with a one-parameter sibling" $ do
       -- `B1` in W1's body has no arguments, so it can only be W1's own alias:
       -- the sibling `B1` takes one parameter. W1 is then `Duo OF W1, W1`, and
-      -- so is W2. The detector used to give the name to the sibling, found no
-      -- cycle, and left both bodies live: unifying W1 with W2 branched twice
-      -- per expansion, 500 deep (4 GiB and still going).
+      -- so is W2. A pass over the spellings once gave the name to the
+      -- sibling, found no cycle, and left both bodies live: unifying W1 with
+      -- W2 branched twice per expansion, 500 deep (4 GiB and still going).
       (ok, cycles) <- cycleReport $ Text.unlines
         [ "DECLARE Duo OF a, b"
         , "  HAS fst IS AN a"
@@ -231,8 +231,8 @@ spec = describe "Unification" $ do
       cycles `shouldMatchList` [["W1"], ["W2"]]
 
     it "rejects a cycle that names itself by its section-qualified name" $ do
-      -- The detector reads spellings, and `One`.L1 is not the spelling L1.
-      -- The cycle is found among the resolved bodies instead.
+      -- `One`.L1 is not the spelling L1, which a pass over spellings could
+      -- not see through; the references are found among the resolved bodies.
       (ok, cycles) <- cycleReport $ Text.unlines
         [ "IMPORT prelude"
         , ""
@@ -272,10 +272,9 @@ spec = describe "Unification" $ do
 
     it "still quarantines a cyclic synonym that names itself with the wrong number of arguments" $ do
       -- `B` takes one parameter and its body says `B` bare, which is a kind
-      -- error; the checker still resolves the name to B. The spelling-based
-      -- pass, which reads only uses with the right number of arguments,
-      -- does not see that; the pass over the resolved bodies does, and
-      -- without it two doubling bodies would stay live.
+      -- error; the checker still resolves the name to B, so the body refers
+      -- to B and the resolved bodies show the cycle. Without it two doubling
+      -- bodies would stay live.
       (ok, cycles) <- cycleReport $ Text.unlines
         [ "IMPORT prelude"
         , ""
@@ -360,6 +359,50 @@ spec = describe "Unification" $ do
         ]
       (ok, cycles) `shouldBe` (True, [])
 
+    it "accepts two synonyms of one name and different arities, whichever is declared first" $ do
+      -- `Box OF NUMBER` is the one-parameter synonym and the bare `Box` is the
+      -- other, so the narrow one uses the wide one and nothing refers to
+      -- itself. A pass that keyed synonyms by name could not tell them
+      -- apart, and rejected one declaration order of this.
+      let wide = "DECLARE Box a IS A LIST OF a"
+          narrow = "DECLARE Box IS A Box OF NUMBER"
+          prog decls = Text.unlines $ decls <> [ "", "GIVETH A Box", "b MEANS LIST 1, 2" ]
+      wideFirst <- cycleReport (prog [wide, narrow])
+      narrowFirst <- cycleReport (prog [narrow, wide])
+      (wideFirst, narrowFirst) `shouldBe` ((True, []), (True, []))
+
+    it "accepts two synonyms of one name and different arities with another between them" $ do
+      (ok, cycles) <- cycleReport $ Text.unlines
+        [ "DECLARE Box a IS A LIST OF a"
+        , "DECLARE Mid IS A Box"
+        , "DECLARE Box IS A Box OF NUMBER"
+        , ""
+        , "GIVETH A Mid"
+        , "b MEANS LIST 1, 2"
+        ]
+      (ok, cycles) `shouldBe` (True, [])
+
+    it "accepts a one-parameter synonym that names the other synonym of its name, whichever is declared first" $ do
+      -- The bare `Box` in the wide synonym's body is the narrow synonym.
+      let wide = "DECLARE Box a IS A PAIR OF a, Box"
+          narrow = "DECLARE Box IS A NUMBER"
+          prog decls = Text.unlines $
+            [ "IMPORT prelude" ] <> decls <> [ "", "GIVETH A Box OF STRING", "b MEANS PAIR OF \"x\", 41" ]
+      wideFirst <- cycleReport (prog [wide, narrow])
+      narrowFirst <- cycleReport (prog [narrow, wide])
+      (wideFirst, narrowFirst) `shouldBe` ((True, []), (True, []))
+
+    it "reports no cycle for a synonym that shares its name with an imported record of the same arity" $ do
+      -- Both are the name `Money` with no arguments, so the use is ambiguous
+      -- and is reported as that; it resolves to nothing, and so refers to no
+      -- synonym.
+      let vfs = vfsFromList [ ( "lib1", "DECLARE Money HAS amount IS A NUMBER\n" ) ]
+      (_, plain) <- cycleReportWith vfs $ Text.unlines
+        [ "IMPORT lib1", "", "DECLARE Money IS A Money" ]
+      (_, aliased) <- cycleReportWith vfs $ Text.unlines
+        [ "IMPORT lib1", "", "DECLARE Cash AKA Money IS A Money" ]
+      (plain, aliased) `shouldBe` ([], [])
+
     it "terminates when the cyclic synonyms come from an imported module" $ do
       -- Imports are acyclic, and the imported module's own check quarantines
       -- its cyclic synonyms, so the importer meets them with no body.
@@ -386,9 +429,8 @@ spec = describe "Unification" $ do
       mb `shouldBe` Just False
 
     it "terminates when a cycle only the resolved bodies show comes from an imported module" $ do
-      -- The same, for the cycle that is found among the resolved bodies
-      -- rather than by spelling: the module that declares it has them
-      -- quarantined before anyone imports it.
+      -- The same, for a cycle that a spelling hides: the module that
+      -- declares it has them quarantined before anyone imports it.
       let vfs = vfsFromList
             [ ( "qloops"
               , Text.unlines
@@ -511,9 +553,9 @@ spec = describe "Unification" $ do
   describe "cost of unifying nested types" $ do
     -- Unifying a type with its instance used to substitute the whole
     -- remaining subtree at every step of the descent, so the cost grew with
-    -- the SQUARE of the nesting: `idf v` fifty times at depth 400 took
-    -- 15.3 s to check, and 1.9 s once only the head is walked (16.8 s in
-    -- the review of legalese/l4-ide#545, finding F5). Timed by the
+    -- the SQUARE of the nesting: `l4 check` of a generic function used
+    -- fifty times at a type nested 400 deep took 15.3 s, and takes 1.9 s
+    -- once only the head is walked (measured on one machine). Timed by the
     -- ratio of two sizes, not by a bound in seconds, so that a slow machine
     -- does not fail it; and in CPU time, so that time spent waiting for a busy
     -- machine is not counted. Four times the depth takes about four times as
