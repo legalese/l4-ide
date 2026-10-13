@@ -596,6 +596,77 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       traced(valued("pay 100"), []),
       "Result: PARTY Alice\nMUST pay 100\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
     );
+    // L4's printer backticks a name unless it starts with a letter and holds
+    // only letters, digits and underscores. A hyphen, a percent sign, a dot, an
+    // apostrophe and a leading digit all need the backticks, with or without a
+    // space, or the source text does not parse. The same rule spells an event's
+    // party and action in the trace.
+    const named = (name) => ({
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: name,
+      partyKind: "name",
+      action: name,
+      actionKind: "name",
+      deadline: 14,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    });
+    const tracedCode = (contract, events) =>
+      rtT.invokeFunctionWithReasoning(
+        { exports: {} },
+        {
+          name: "the-sale-contract",
+          isDeontic: true,
+          parameters: { properties: {} },
+          paramOrder: [],
+          deonticContract: contract,
+          traceMeta: { fnName: "`the sale contract`" },
+        },
+        { startTime: 0, events },
+      ).reasoning.exampleCode[0];
+    [
+      ["ship-it", true],
+      ["50%", true],
+      ["x.y", true],
+      ["it's", true],
+      ["2nd", true],
+      ["A", true],
+      ["IS", true],
+      ["LESS", true],
+      ["LIST", false],
+      ["a", false],
+      ["2nd buyer", true],
+      ["the seller", true],
+      ["Alice", false],
+      ["seller_1", false],
+      ["x2", false],
+      ["Zoë", false],
+    ].forEach(([name, quoted]) => {
+      const shown = quoted ? "`" + name + "`" : name;
+      eq(
+        "deontic trace: the name " +
+          name +
+          (quoted ? " is" : " is not") +
+          " backticked",
+        traced(named(name), []),
+        "Result: PARTY " +
+          shown +
+          "\nMUST " +
+          shown +
+          "\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+      );
+      eq(
+        "deontic trace: an event named " +
+          name +
+          (quoted ? " is" : " is not") +
+          " backticked",
+        tracedCode(named("Alice"), [
+          { party: name, action: name, at: 5 },
+        ]).includes("EVENT OF " + shown + ", " + shown + ", 5"),
+        true,
+      );
+    });
     // A bundle compiled before the kind keys existed carries no partyKind or
     // actionKind. Its literals are printed as given, never backticked again and
     // never a crash.
