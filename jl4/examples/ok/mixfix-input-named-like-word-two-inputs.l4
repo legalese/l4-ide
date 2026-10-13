@@ -1,0 +1,16 @@
+-- Two inputs: `total plus y` is a rule called `total` that takes the inputs
+-- `plus` and `y`, beside the mixfix rule ``a `plus` b``. Its GIVEN names
+-- `plus`, so the line is not written like the mixfix rule (see also
+-- mixfix-input-named-like-word.l4).
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+GIVEN plus IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+total plus y MEANS plus * y
+
+#EVAL 3 `plus` 4    -- 7
+#EVAL total 3 4     -- 12
