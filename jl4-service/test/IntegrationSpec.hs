@@ -47,7 +47,7 @@ import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -2594,6 +2594,58 @@ spec = describe "integration" do
               stringAt "eventParty" br `shouldBe` stringAt "party" obl
               stringAt "eventAction" br `shouldBe` stringAt "action" obl
             other -> expectationFailure ("Expected an OBLIGATION and a BREACH, got: " <> show other)
+
+    -- the operands of a ROR or a RAND are OBLIGATIONs of their own
+    it "names the party and the action of each operand of a ROR and of a RAND" do
+      withServiceFromSources "deontic-names-rops" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        let operands tag fn = do
+              resp <- evalFunction baseUrl mgr "deontic-names-rops" fn (sale [])
+              assertSuccess resp \r ->
+                case Map.lookup "value" r.fnResult of
+                  Just (FnObject [(t, FnArray [FnObject [("OBLIGATION", FnObject first)], FnObject [("OBLIGATION", FnObject second)]])])
+                    | t == tag -> do
+                        obligationNames first `shouldBe` (Just seller, Just delivery)
+                        obligationNames second `shouldBe` (Just buyer, Just payment)
+                  other -> expectationFailure ("Expected two OBLIGATIONs under " <> show tag <> ", got: " <> show other)
+        operands "OR" "the alternative"
+        operands "AND" "the conjunction"
+
+    -- an action the rule does not declare is a binder, and a space in it changes nothing
+    it "names an action that is a binder without backticks" do
+      withServiceFromSources "deontic-names-binder" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        initial <- evalFunction baseUrl mgr "deontic-names-binder" "the binder" (sale [])
+        late <- evalFunction baseUrl mgr "deontic-names-binder" "the binder"
+          (sale [event seller "inspect the goods" 50])
+        assertSuccess initial \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just seller, Just "some act")
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+        assertSuccess late \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("BREACH", FnObject fields)]) -> do
+              stringAt "obligationAction" fields `shouldBe` Just "some act"
+              case lookup "failures" fields of
+                Just (FnArray [FnObject failure]) ->
+                  stringAt "action" failure `shouldBe` Just "some act"
+                other -> expectationFailure ("Expected one failure, got: " <> show other)
+            other -> expectationFailure ("Expected BREACH, got: " <> show other)
+
+    -- a party read from a GIVEN: the answer is the input's name, not the party
+    -- it was given, until an event has been compared with it
+    it "names a party that is a GIVEN input by its name, without backticks" do
+      withServiceFromSources "deontic-names-given" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-given" "the given party"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object ["the payer" Aeson..= seller]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just "the payer", Just delivery)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
 
     -- R2: an action that carries a string is rule source, and stays escaped
     it "keeps an action that carries a string as rule source, escaped" do

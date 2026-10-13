@@ -1799,13 +1799,16 @@ serializeRAction (MkAction _ deonticModal pat _) =
 -- A bare action name is spelled as 'constructorText' spells it, without
 -- backticks. That is how the @eventAction@ of the event that answers the
 -- obligation is spelled, and how the README's "Answers" says an enum answer is
--- spelled, so a client can compare them. An action that carries a value, a
--- string say, is rule source, and stays 'Print.prettyLayout' (R2, 2026-10-12:
--- rule source printed anywhere is escaped); so does a pattern that is not a
--- name at all.
+-- spelled, so a client can compare them. A name the rule does not declare is a
+-- binder, a 'PatVar', which matches any event; it is a bare name all the same,
+-- and a space in it must not change how it is spelled. An action that carries a
+-- value, a string say, is rule source, and stays 'Print.prettyLayout' (R2,
+-- 2026-10-12: rule source printed anywhere is escaped); so does a pattern that
+-- is not a name at all, and a reference to a @GIVEN@ (a 'PatExpr').
 actionText :: Pattern Resolved -> Text
 actionText = \ case
   PatApp _ name [] -> constructorText name
+  PatVar _ name    -> constructorText name
   pat              -> Print.prettyLayout pat
 
 -- | An obligation's party, as a JSON payload should carry it. A bare name is
@@ -1814,6 +1817,11 @@ actionText = \ case
 -- includes a bare name that is not a constructor, a @GIVEN@ the party is read
 -- from say. A party expression that is more than a name, a record built
 -- @WITH@ fields, is rule source.
+--
+-- The name is the identifier, not the party it stands for: @PARTY seller@ with
+-- @seller MEANS ...@, or with @seller@ a @GIVEN@, answers @seller@ until an
+-- event has been compared with it, so comparing that with an @eventParty@ is
+-- still false there.
 partyText :: Expr Resolved -> Text
 partyText = \ case
   App _ name [] -> constructorText name

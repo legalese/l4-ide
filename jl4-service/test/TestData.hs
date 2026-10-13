@@ -13,6 +13,7 @@ module TestData (
   saleContractJL4,
   deonticExportJL4,
   deonticDeadlineJL4,
+  deonticShapesJL4,
   deonticLineBreakJL4,
   deonticRecordPartyJL4,
   spacedFieldsJL4,
@@ -449,6 +450,47 @@ GIVETH A DEONTIC Party `Contract Action`
     PARTY `the seller`
     MUST `deliver the goods`
     WITHIN 14
+|]
+
+-- | Four shapes of party and action, each with a space in a name: the operands
+-- of a @ROR@ and of a @RAND@, an action the rule does not declare (a binder),
+-- and a party that is a @GIVEN@ input.
+deonticShapesJL4 :: Text
+deonticShapesJL4 =
+  [i|
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`, `inspect the goods`
+
+@export default alternative
+GIVETH A DEONTIC Party `Contract Action`
+`the alternative` MEANS
+    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
+    ROR
+    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
+
+@export default conjunction
+GIVETH A DEONTIC Party `Contract Action`
+`the conjunction` MEANS
+    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
+    RAND
+    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
+
+@export default binder
+GIVETH A DEONTIC Party `Contract Action`
+`the binder` MEANS
+    PARTY `the seller`
+    MUST `some act`
+    WITHIN 10
+
+@export default given party
+GIVEN `the payer` IS A Party
+GIVETH A DEONTIC Party `Contract Action`
+`the given party` MEANS
+    PARTY `the payer`
+    MUST `deliver the goods`
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH
 |]
 
 -- | A contract whose one action carries a string with a line break in it. The
