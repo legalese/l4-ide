@@ -2221,7 +2221,7 @@ function renderResidualForParamCtx(
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
 function renderActiveDeonticExpr(expr, args, meta, _givenParams) {
   if (expr == null) return "";
-  if (typeof expr === "string") return expr;
+  if (typeof expr === "string") return deonticNameAsSource(expr);
   if (expr.param != null) {
     const props = (meta && meta.parameters && meta.parameters.properties) || {};
     const schema = props[expr.param];
@@ -2255,9 +2255,24 @@ function renderContractAsSource(c, deadlineOverride) {
   return "";
 }
 
+// A literal party or action as L4 source. The schema carries a bare name PLAIN
+// (`Schema.hs` 'exprToDeonticParty' / 'patternToDeonticExpr'), as jl4-service
+// answers it, so a name with a space has to be backticked again here for the
+// trace's source text to be L4, as 'formatEventComponent' does for an event's.
+// A literal that is already source (an action that carries a value, @say "pay"@,
+// or a record built @WITH@ fields) carries its own backticks or quotes and is
+// left alone. That test is a heuristic: the schema does not say which a literal
+// is, and a value-carrying action without a quote in it (@pay 100@) is backticked
+// as if it were a name. This runtime does not match such an action
+// structurally either: it compares the literal with the event's action string.
+function deonticNameAsSource(s) {
+  if (typeof s !== "string") return s;
+  return /\s/.test(s) && !/[`"]/.test(s) ? "`" + s + "`" : s;
+}
+
 function renderDeonticExprForSource(e) {
   if (e == null) return "";
-  if (typeof e === "string") return e; // already a literal text
+  if (typeof e === "string") return deonticNameAsSource(e);
   if (e.param != null) return e.param; // bare param name
   return String(e);
 }

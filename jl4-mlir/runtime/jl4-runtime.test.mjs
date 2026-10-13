@@ -544,6 +544,50 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     },
   );
 
+  // The trace's source text is L4. The schema carries a bare name plain, so a
+  // name with a space is backticked again there, as an event's is; a literal
+  // that is already source (an action that carries a value) is left alone.
+  {
+    const rtT = createRuntime();
+    rtT.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+    const traced = (contract, events) =>
+      rtT.invokeFunctionWithReasoning(
+        { exports: {} },
+        {
+          name: "the-sale-contract",
+          isDeontic: true,
+          parameters: { properties: {} },
+          paramOrder: [],
+          deonticContract: contract,
+          traceMeta: { fnName: "`the sale contract`" },
+        },
+        { startTime: 0, events },
+      ).reasoning.explanation[0];
+    eq(
+      "deontic trace: a name with a space is backticked in the source text",
+      traced(sale, [
+        { party: "the seller", action: "deliver the goods", at: 5 },
+      ]),
+      "Result: PARTY `the buyer`\nMUST `pay the invoice`\nWITHIN 30\nHENCE FULFILLED\nLEST BREACH",
+    );
+    eq(
+      "deontic trace: an action that carries a value stays as the source it is",
+      traced(
+        {
+          kind: "OBLIGATION",
+          modal: "MUST",
+          party: "Alice",
+          action: 'say "pay now"',
+          deadline: 14,
+          hence: { kind: "FULFILLED" },
+          lest: { kind: "BREACH", by: null, because: null },
+        },
+        [],
+      ),
+      'Result: PARTY Alice\nMUST say "pay now"\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH',
+    );
+  }
+
   // Blocker 1 — out-of-order events must NOT be sorted. deliver@20 precedes
   // deliver@5; the first event (20) is already past the WITHIN-14 deadline, so
   // the seller obligation lapses to its explicit LEST BREACH.

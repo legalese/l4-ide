@@ -27,6 +27,17 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 | `refused-unsupported` |     5 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
+> **Stale as of 2026-10-13.** The board below was measured before the service's
+> response envelope gained `contents.presumed` (`jl4-service/src/Backend/Api.hs`,
+> `ToJSON ResponseWithReason`). `wrapEvaluationEnvelope` in the runtime does not
+> write it, so no successful evaluation is byte-identical any more: on 2026-10-13
+> every comparable cell classified `value-equal`, before and after the
+> party/action change in ledger #13. The 227 row, "227 of 227 … byte-identical"
+> and "byte-identical natively" below describe the board as it was, and have
+> **not** been re-measured. The 2026-10-13 re-measure covered the 9 files CI's
+> `jl4-mlir-parity-full` runs (120 comparisons, all `value-equal`, 0 `differs`),
+> not the 38 files of this corpus.
+
 **227 of 227 real comparisons (100%) are byte-identical — the extended sweep
 passes (`PARITY OK`).** Re-measured after merging ~6 weeks of `unstable` into the
 lane, where it first came back **213/14** and had to be earned again: `a9caf2f6`

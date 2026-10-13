@@ -76,6 +76,36 @@ testDeonticNamesPlain = do
           putStrLn $ "    json: " <> T.unpack (T.take 600 json)
           pure False
 
+-- | An action that carries a value is not a name: it is baked as the rule
+-- source it is, as @Backend.Jl4.actionText@ prints it, and only a bare name is
+-- baked plain.
+testDeonticValueActionIsSource :: IO Bool
+testDeonticValueActionIsSource = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF Alice"
+        , "DECLARE Action IS ONE OF say HAS text IS A STRING"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY Alice"
+        , "    MUST say \"pay\""
+        , "    WITHIN 10"
+        , "    HENCE FULFILLED"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let want = "\"action\":\"say \\\"pay\\\"\""
+      if T.isInfixOf want json
+        then pure True
+        else do
+          putStrLn $ "\n    expected " <> T.unpack want
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
 main :: IO ()
 main = do
   results <- sequence
@@ -90,6 +120,7 @@ main = do
     , test "schema picks up imported DECLAREs" testSchemaUsesImportedDeclares
     , test "deontic contract baked into schema" testDeonticSchemaBaked
     , test "deontic party/action names are plain" testDeonticNamesPlain
+    , test "deontic value-carrying action stays source" testDeonticValueActionIsSource
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn

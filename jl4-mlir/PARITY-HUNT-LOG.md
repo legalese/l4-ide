@@ -533,8 +533,9 @@ source, so a name with a space came back in backticks), beside `eventParty`,
 that asked whether the party who acted was the party who was obliged, by comparing
 `eventParty` with `party`, got a false no for `the seller`. The service now spells a
 bare party or action name plain in all of them (`Backend.Jl4.partyText`,
-`actionText`; an action that carries a value, or a party that is more than a name,
-is still rule source). The warning above is best read as not to harmonise this
+`actionText`; an action name the rule does not declare, a binder, is a bare name too;
+an action that carries a value, an action given by a `GIVEN`, or a party that is
+more than a name, is still rule source). The warning above is best read as not to harmonise this
 backend alone.
 
 | field                                                                      | reference before          | reference now       |
@@ -547,12 +548,14 @@ name, and `deonticObligationToWire` no longer re-adds backticks to an unobserved
 literal party (`deonticSourceSpelling` is gone). Measured on the CI Tier-2 corpus
 (`pr-checks.yml`, `jl4-mlir-parity-full`, 9 files): unstable service and unstable
 backend, **120 comparisons, 0 differs**; fixed service and unstable backend, **109
-and 11 differs**, exactly the four fields in the table above (7 distinct value
-pairs, all in `deontic-sale` and `deontic-seatbelt`); fixed service and this
-backend, **120 comparisons, 0 differs, `PARITY OK`**. Every one of the 120 is
-classified `value-equal`, not `byte-identical`, before and after: the result values
-match and the response bytes already differed on unstable (the cause was not looked
-into). CI runs this sweep only when `jl4-mlir/**` changes, and with
+and 11 differs**, exactly the four fields in the table above (11 cells, 10
+distinct (service, WASM) pairs: 8 cells in `deontic-sale`, 3 in `deontic-seatbelt`);
+fixed service and this backend, **120 comparisons, 0 differs, `PARITY OK`**. Every
+one of the 120 is classified `value-equal`, not `byte-identical`, before and after:
+the service's envelope carries `contents.presumed` and `wrapEvaluationEnvelope`
+does not write it, so the bytes differ whatever the answer. The 227 board of
+`coverage-report/PARITY-COVERAGE.md` is stale for that reason, and this re-measure
+covered 9 of its 38 files. CI runs this sweep only when `jl4-mlir/**` changes, and with
 `continue-on-error: true`, so a red one would not have blocked the service change.
 
 ### Out-of-lane asymmetries — noted, triaged, not chased
