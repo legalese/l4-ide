@@ -22,14 +22,13 @@ DECIDE demo_multiline_postfix radius IS
   `squared`
 
 DECIDE demo_multiline_mixfix base exponent IS
-  `raised to`
   base
+  `raised to`
   exponent
 
 DECIDE demo_multiline_chain payer payee ledger IS
-  `remits`
-  `to settle`
   payer
+  `remits`
   payee
   `to settle`
   ledger
