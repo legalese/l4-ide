@@ -37,6 +37,7 @@ import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRe
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
+import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
@@ -1064,6 +1065,137 @@ spec = describe "integration" do
                 reqList `shouldSatisfy` maybe False (elem "events")
               _ -> expectationFailure "Missing required array in parameters"
           _ -> expectationFailure "Missing parameters in response"
+
+  -- One party and one action were spelled two ways in the same answer. A
+  -- BREACH's `eventParty` and `eventAction` are a constructor's name, plain,
+  -- but an OBLIGATION's `party` and `action`, and a BREACH's `obligationAction`,
+  -- were L4 source, so a name with a space in it came back in backticks. A
+  -- client asking "is the party who acted the party who was obliged?" by
+  -- comparing the two strings got a false no. The README's rule for an enum
+  -- answer is the plain name, and a party or an action NAME is an enum answer.
+  describe "deontic answers spell a party and an action one way" do
+    let seller = "the seller" :: Text
+        buyer = "the buyer" :: Text
+        delivery = "deliver the goods" :: Text
+        payment = "pay the invoice" :: Text
+        sale events = Aeson.object
+          [ "arguments" Aeson..= Aeson.object []
+          , "startTime" Aeson..= (0 :: Int)
+          , "events" Aeson..= (events :: [Aeson.Value])
+          ]
+        event who what time = Aeson.object
+          ["party" Aeson..= (who :: Text), "action" Aeson..= (what :: Text), "at" Aeson..= (time :: Int)]
+        stringAt key fields = case lookup key fields of
+          Just (FnLitString t) -> Just t
+          _ -> Nothing
+        -- the party and the action an OBLIGATION names
+        obligationNames fields = (stringAt "party" fields, stringAt "action" fields)
+
+    it "names the obliged party and its action without backticks, before any event" do
+      withServiceFromSources "deontic-names-init" [("contract.l4", deonticExportJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-init" "the sale contract" (sale [])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just seller, Just delivery)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    it "names the obliged party and its action without backticks, after an event" do
+      withServiceFromSources "deontic-names-resid" [("contract.l4", deonticExportJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-resid" "the sale contract"
+          (sale [event seller delivery 5])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just buyer, Just payment)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    it "spells the party and the action of a BREACH the same in every field" do
+      withServiceFromSources "deontic-names-breach" [("contract.l4", deonticDeadlineJL4)] \baseUrl mgr -> do
+        -- the seller delivers at 20, after its deadline of 14
+        resp <- evalFunction baseUrl mgr "deontic-names-breach" "the sale contract"
+          (sale [event seller delivery 20])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("BREACH", FnObject fields)]) -> do
+              -- the event that revealed the miss
+              stringAt "eventParty" fields `shouldBe` Just seller
+              stringAt "eventAction" fields `shouldBe` Just delivery
+              -- the obligation that was missed
+              stringAt "obligationAction" fields `shouldBe` Just delivery
+            other -> expectationFailure ("Expected BREACH, got: " <> show other)
+
+    -- the client's question, asked across two answers
+    it "lets a client compare the party who acted with the party who was obliged" do
+      withServiceFromSources "deontic-names-compare" [("contract.l4", deonticDeadlineJL4)] \baseUrl mgr -> do
+        punctual <- evalFunction baseUrl mgr "deontic-names-compare" "the sale contract" (sale [])
+        tardy <- evalFunction baseUrl mgr "deontic-names-compare" "the sale contract"
+          (sale [event seller delivery 20])
+        assertSuccess punctual \b -> assertSuccess tardy \l ->
+          case (Map.lookup "value" b.fnResult, Map.lookup "value" l.fnResult) of
+            (Just (FnObject [("OBLIGATION", FnObject obl)]), Just (FnObject [("BREACH", FnObject br)])) -> do
+              stringAt "eventParty" br `shouldBe` stringAt "party" obl
+              stringAt "eventAction" br `shouldBe` stringAt "action" obl
+            other -> expectationFailure ("Expected an OBLIGATION and a BREACH, got: " <> show other)
+
+    -- the operands of a ROR or a RAND are OBLIGATIONs of their own
+    it "names the party and the action of each operand of a ROR and of a RAND" do
+      withServiceFromSources "deontic-names-rops" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        let operands tag fn = do
+              resp <- evalFunction baseUrl mgr "deontic-names-rops" fn (sale [])
+              assertSuccess resp \r ->
+                case Map.lookup "value" r.fnResult of
+                  Just (FnObject [(t, FnArray [FnObject [("OBLIGATION", FnObject first)], FnObject [("OBLIGATION", FnObject second)]])])
+                    | t == tag -> do
+                        obligationNames first `shouldBe` (Just seller, Just delivery)
+                        obligationNames second `shouldBe` (Just buyer, Just payment)
+                  other -> expectationFailure ("Expected two OBLIGATIONs under " <> show tag <> ", got: " <> show other)
+        operands "OR" "the alternative"
+        operands "AND" "the conjunction"
+
+    -- an action the rule does not declare is a binder, and a space in it changes nothing
+    it "names an action that is a binder without backticks" do
+      withServiceFromSources "deontic-names-binder" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        initial <- evalFunction baseUrl mgr "deontic-names-binder" "the binder" (sale [])
+        late <- evalFunction baseUrl mgr "deontic-names-binder" "the binder"
+          (sale [event seller "inspect the goods" 50])
+        assertSuccess initial \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just seller, Just "some act")
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+        assertSuccess late \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("BREACH", FnObject fields)]) -> do
+              stringAt "obligationAction" fields `shouldBe` Just "some act"
+            other -> expectationFailure ("Expected BREACH, got: " <> show other)
+
+    -- a party read from a GIVEN: the answer is the input's name, not the party
+    -- it was given, until an event has been compared with it
+    it "names a party that is a GIVEN input by its name, without backticks" do
+      withServiceFromSources "deontic-names-given" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-given" "the given party"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object ["the payer" Aeson..= seller]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just "the payer", Just delivery)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    -- an action that carries a value is not a name: it is rule source
+    it "keeps an action that carries a value as rule source" do
+      withServiceFromSources "deontic-names-value" [("contract.l4", deonticValueActionJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-value" "the contract" (sale [])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) -> do
+              stringAt "party" fields `shouldBe` Just "Alice"
+              stringAt "action" fields `shouldBe` Just "say \"pay now\""
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
 
   describe "deontic evaluation with record-typed parties" do
     it "evaluates to FULFILLED when record-typed party wears seatbelt then drives" do

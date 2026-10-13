@@ -12,6 +12,9 @@ module TestData (
   maybeParamJL4,
   saleContractJL4,
   deonticExportJL4,
+  deonticDeadlineJL4,
+  deonticShapesJL4,
+  deonticValueActionJL4,
   deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
@@ -277,6 +280,83 @@ GIVETH A DEONTIC Party `Contract Action`
         HENCE FULFILLED
         LEST BREACH
     LEST BREACH
+|]
+
+-- | As 'deonticExportJL4', but the seller's obligation has no @LEST@: missing
+-- its deadline is a breach the evaluator reports as @deadline_missed@, naming
+-- the event that revealed it and the obligation that was missed.
+deonticDeadlineJL4 :: Text
+deonticDeadlineJL4 =
+  [i|
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
+
+@export default sale contract
+GIVETH A DEONTIC Party `Contract Action`
+`the sale contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+|]
+
+-- | Shapes of party and action, each with a space in a name: the operands of a
+-- @ROR@ and of a @RAND@, an action the rule does not declare (a binder), and a
+-- party that is a @GIVEN@ input.
+deonticShapesJL4 :: Text
+deonticShapesJL4 =
+  [i|
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`, `inspect the goods`
+
+@export default alternative
+GIVETH A DEONTIC Party `Contract Action`
+`the alternative` MEANS
+    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
+    ROR
+    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
+
+@export default conjunction
+GIVETH A DEONTIC Party `Contract Action`
+`the conjunction` MEANS
+    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
+    RAND
+    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
+
+@export default binder
+GIVETH A DEONTIC Party `Contract Action`
+`the binder` MEANS
+    PARTY `the seller`
+    MUST `some act`
+    WITHIN 10
+
+@export default given party
+GIVEN `the payer` IS A Party
+GIVETH A DEONTIC Party `Contract Action`
+`the given party` MEANS
+    PARTY `the payer`
+    MUST `deliver the goods`
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH
+|]
+
+-- | A contract whose one action carries a value: it is not a name, so the
+-- answer prints it as the rule source it is.
+deonticValueActionJL4 :: Text
+deonticValueActionJL4 =
+  [i|
+DECLARE Party IS ONE OF Alice
+DECLARE Act IS ONE OF
+  say HAS text IS A STRING
+
+@export default the contract
+GIVETH A DEONTIC Party Act
+`the contract` MEANS
+  PARTY Alice
+  MUST say "pay now"
+  WITHIN 10
+  HENCE FULFILLED
+  LEST BREACH
 |]
 
 -- | L4 source with a deontic function that uses record-typed parties.
