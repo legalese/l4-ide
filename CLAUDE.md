@@ -44,8 +44,8 @@ This repo is upstream: `.github/workflows/release-l4-skill.yml` packages `skills
 `l4-plugin.zip`. There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and
 `/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
 
-**So a correction to a skill lands here first**, per the user-level `CLAUDE.md` rule "when you
-correct a document, find its other copies first". The bundle names this repo as its source, so the
+**So a correction to a skill lands here first**, and its other copies are found and corrected in
+the same session. The bundle names this repo as its source, so the
 pointer home exists, and the path back down is the generator below.
 
 **The bundle is generated, and its generator is in this repo: `etc/build-plugin-bundle.mjs`.**
@@ -123,12 +123,15 @@ dependency.
 
 ## 2. Worktrees: never edit the main checkout
 
-- `~/src/legalese/l4-ide` is the **reference checkout**. Do not develop in it.
-- All work happens in a branch + worktree under `~/src/legalese/l4wt/<short-name>`:
+- Keep one clone of this repository as the **reference checkout**, on `unstable`. Do not develop in it.
+- All work happens in a branch + its own worktree, one per branch:
 
 ```
-git -C ~/src/legalese/l4-ide worktree add -b <branch> ~/src/legalese/l4wt/<name> origin/unstable
+git -C <reference checkout> worktree add -b <branch> <worktree root>/<short-name> origin/unstable
 ```
+
+Where the reference checkout and the worktree root live is a fact about your machine, not about this repository, so this file does not record it.
+Keep notes like that in your own `~/.claude/` files: Claude Code loads `~/.claude/CLAUDE.md` and `~/.claude/rules/*.md` in every project, and nothing there is committed.
 
 ### 2.1 The build lock
 
@@ -160,11 +163,10 @@ there.
 > with it. Same family as §3.2.1's snapshot rule — a probe that reads a name rather than a fact
 > reports confidently about a world it is not observing.
 
-### 2.2 Cloud sessions (claude.ai/code): the paths above do not exist, and neither does the toolchain on PATH
+### 2.2 Cloud sessions (claude.ai/code): one shallow clone, and the toolchain is not on PATH
 
 A cloud session gets one fresh clone at `/home/user/l4-ide`, checked out on whatever branch the
-session was pointed at; there is no `~/src/legalese`. The rule survives the move, only the paths
-change: treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, e.g.
+session was pointed at. Treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, e.g.
 `git -C /home/user/l4-ide worktree add -b <branch> /home/user/l4wt/<name> origin/unstable`. The
 clone is **shallow**, so `git log -S` and `git blame` answer from a truncated history — a pickaxe
 that finds only a merge commit is reporting the depth limit, not the origin of the change.
@@ -312,7 +314,7 @@ involves a branch moving subjects into canon, run `node etc/sync-canon.mjs --che
 right) and make the intended edit in canon instead.
 
 > **Why.** 2026-09-24: #490 respelled two comments in `legal/miles-card/uob-ladys-solitaire.l4`,
-> and SUITCASE (#489) moved that file to `canon/contracts/payments/sg-miles-card/`. Merging the
+> and #489 moved that file to `canon/contracts/payments/sg-miles-card/`. Merging the
 > first into the second put the respelled text into the mirror. The full local gate passed on the
 > merged tree, and only CI's `Canon Mirror` job caught it.
 
@@ -382,8 +384,8 @@ broken example, not a stale binary. **The direction of safety is not symmetric a
 invert**: a binary NEWER than the tree is fine; it is older-than-what-it-reads that breaks. So the
 question is never "is my binary current" but "is it at least as new as everything it will parse" —
 prelude, corpus and docs alike. `doc/test-docs.sh` is the usual route in, because it prefers any
-`l4` on `PATH` over the one you built (`:323`), and `~/.local/bin/l4` was a 27 Aug build when this
-was written (2026-09-05); put your worktree's binary first on `PATH`, or run with no `l4` on it at
+`l4` on `PATH` over the one you built (`:323`), and an `l4` installed there weeks ago is the one it
+will find; put your worktree's binary first on `PATH`, or run with no `l4` on it at
 all. How many errors a stale binary invents is a function of BOTH the binary and the corpus, so
 it is a symptom to read, never a constant to memorise — a count quoted from a previous session
 is the first thing to distrust here.
@@ -555,8 +557,8 @@ note so a later editor does not silently un-change a repair.
 ### 4.1 Spec status headers
 
 A spec that is not implemented says so in its header, in the present tense, with a date. Do not
-describe planned behaviour as though it ships — see the anti-drift rules in the user-level
-`CLAUDE.md`. When a spec is discharged, say so and say **why the file is retained** (usually
+describe planned behaviour as though it ships: write "proposed, not landed", and name what would
+make it true. When a spec is discharged, say so and say **why the file is retained** (usually
 because code cites its section numbers, which makes them load-bearing and renumbering a breaking
 change).
 
