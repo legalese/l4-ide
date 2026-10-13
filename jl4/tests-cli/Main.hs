@@ -10,6 +10,7 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Exception (finally)
 import Control.Monad (forM_, unless, when)
 import Data.Char (isSpace)
 import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
@@ -24,13 +25,17 @@ import qualified Data.Aeson.Key as Key
 import System.Directory
   ( canonicalizePath
   , createDirectoryIfMissing
-  , createFileLink
   , doesFileExist
+  , emptyPermissions
   , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
   , removeFile
   , removePathForcibly
+  , setOwnerReadable
+  , setOwnerSearchable
+  , setOwnerWritable
+  , setPermissions
   )
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>), isAbsolute, normalise)
@@ -2434,12 +2439,30 @@ spec bin = do
       serr `shouldSatisfy` ("embedded stdlib" `isInfixOf`)
       serr `shouldSatisfy` ("XDG data dir" `isInfixOf`)
 
+    -- The example below makes a symbolic link, and is marked pending where the
+    -- account may not make one (Windows without the symlink privilege). This
+    -- pins that path: a link made in a folder the account may not write to is
+    -- reported, not thrown.
+    it "reports a link it may not create, instead of throwing" $ do
+      tmp <- getTemporaryDirectory
+      let locked = tmp </> "l4-shadow-locked"
+          target = tmp </> "l4-shadow-locked-target.l4"
+          open' = setOwnerWritable True (setOwnerSearchable True (setOwnerReadable True emptyPermissions))
+      removePathForcibly locked
+      createDirectoryIfMissing True locked
+      writeFile target poison
+      setPermissions locked emptyPermissions
+      r <- tryLink target (locked </> "prelude.l4") `finally` setPermissions locked open'
+      case r of
+        Left why -> why `shouldSatisfy` ("cannot create a symbolic link" `isInfixOf`)
+        Right () -> pendingWith "this account can make a link in a read-only folder (root, or a platform that ignores the mode)"
+
     it "dereferences symlinks when naming the shadowed copy" $ do
       tmp <- getTemporaryDirectory
       let target = tmp </> "l4-shadow-poison-target.l4"
       writeFile target poison
       realTarget <- canonicalizePath target
-      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> createFileLink target p
+      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> linkOrPending target p
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
       code `shouldBe` ExitSuccess
       -- The warning must print the symlink's real target, so a reader can see
