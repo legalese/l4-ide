@@ -356,6 +356,15 @@ $ l4 batch echo-date.l4 --inputs dates.json --continue-on-error
 
 So `valid` means a case has the right shape, not that the rules will accept every value in it.
 
+#### What the rules and the file have to be
+
+`l4 batch` does not run your rules file as it stands. It checks the file, prints the checked module back as source with its directives taken out, and for each case adds a small wrapper that reads the case and applies the exported function; then it checks and runs that text. Four things follow.
+
+- **The printed module has to be valid source.** If it is not, every case is an `error` line with the parser's message, and the cause is the rules file and not the cases. One shape that does this is a bare quoted string used as a condition inside a boolean expression, such as `a AND "and also" AND TRUE`.
+- **An exported function whose `MAYBE` input is followed by another input cannot be run.** The wrapper it needs is not valid, and every case is an `error` line. Put the `MAYBE` input last.
+- **Every case checks the whole module again,** and the modules it imports, so a large rules file with many cases takes time.
+- **A CSV file has to be UTF-8** (in Excel, save as "CSV UTF-8"). A file in another encoding stops the command with an error message from the Haskell runtime and a backtrace, and no `Error:` line.
+
 #### When the command cannot start
 
 If `l4 batch` cannot read the cases or the rules, it prints no line for any case and exits with status 1. It says why in one plain line that starts `Error:`, on standard output, which is where the case lines go, so a script that reads the output as JSON should look at the exit status before it parses:
