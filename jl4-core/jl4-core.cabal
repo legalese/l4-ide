@@ -162,6 +162,7 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
     PatternMatchParserSpec
     PatternClausesMissingSpec
@@ -173,6 +174,7 @@ test-suite jl4-core-test
     ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
+    DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
