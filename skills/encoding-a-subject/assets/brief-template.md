@@ -51,11 +51,13 @@ Name anything deliberately left out, and why.⟩
 
 ## Rules that matter
 
-- **Encode isomorphically.** A reader holding the source beside your module checks it line by line. Cite the section or regulation on every rule (`@ref` or a comment).
+- **Encode isomorphically.** A reader holding the source beside your module checks it line by line.
+  Cite the section or regulation on every rule with an `@ref` line.
+  ⟨If the source is kept as a plain-text file, add: "Quote it on `-- src:N | text` lines and put source locators on the `@ref`, as `references/source-locators.md` in the `encoding-a-subject` skill describes; `assets/srcrefs.py` checks them."⟩
 - **Each vintage is its own answer, not one merged answer.** Where the law has vintages, the vintage is an input. Where a vintage is silent, the answer is that it is silent — never a number borrowed from another vintage.
 - **Where the sources do not answer, `REFUSE "…"`** — never `FALSE`, never `0`, never a plausible default. A gap is a finding, not a bug.
 - **An assertion that fails is a finding.** Never edit an expected value to match what the code computed. Report it.
-- **Read the diagnostics, not the exit code.** `l4 run` exits 0 when an `#ASSERT` fails and when it refuses. A failure says `assertion failed` (at Error severity, on the `Message:` line or the line after it); a refusal says `assertion refused` (at Warning, on the line after `Message:`). Never report green for a run whose output you did not read.
+- **Read the diagnostics, not the exit code.** `l4 run` exits 0 when an `#ASSERT` refuses, an `l4` built before legalese/l4-ide#518 exits 0 when one fails too, and no exit code says which one. A failure says `assertion failed` (at Error severity, on the `Message:` line or the line after it); a refusal says `assertion refused` (at Warning, on the line after `Message:`). Never report green for a run whose output you did not read.
 - ⟨Anything subject-specific: date arithmetic needs `IMPORT daydate`; money is in ⟨currency⟩; "day" means ⟨calendar/business⟩ day per s. ⟨n⟩ …⟩
 
 ## Toolchain

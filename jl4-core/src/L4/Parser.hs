@@ -62,6 +62,7 @@ import qualified L4.Syntax
 import L4.Parser.SrcSpan
 import qualified Generics.SOP as SOP
 import L4.Parser.Anno
+import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..), givenParamNames)
 import L4.Parser.MixfixRegistry
 
 -- | The memo of bracketed groups ('GroupMemo') sits BELOW megaparsec, where
@@ -102,6 +103,7 @@ data PState = PState
   , refs :: [Ref]
   , descs :: [Desc]
   , fixities :: [Fixity]
+  , nonassertables :: [Nonassertable]
   , langs :: [LangTag]
     -- ^ @\@lang@ declarations seen, most recent first. A list rather than a
     -- 'Maybe' so that a second declaration is a fact we could report on later
@@ -125,6 +127,9 @@ addDesc desc s = over #descs (desc:) s
 addFixity :: Fixity -> PState -> PState
 addFixity fx s = over #fixities (fx:) s
 
+addNonassertable :: Nonassertable -> PState -> PState
+addNonassertable n s = over #nonassertables (n:) s
+
 spaces :: Parser [PosToken]
 spaces =
   takeWhileP (Just "space token") isSpaceToken
@@ -132,7 +137,7 @@ spaces =
 spaceOrAnnotations :: Parser (Lexeme ())
 spaceOrAnnotations = do
   ws <- spaces
-  nlgs :: [NS Epa [Ref, Nlg, Desc, Fixity, (), LangTag]] <- many (fmap (S . S . S . S . S . Z) langP <|> fmap (S . S . S . S . Z) refAdditionalP <|> fmap (S . S . S . Z) fixityP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
+  nlgs :: [NS Epa [Ref, Nlg, Desc, Fixity, (), LangTag, Nonassertable]] <- many (fmap (S . S . S . S . S . S . Z) nonassertableP <|> fmap (S . S . S . S . S . Z) langP <|> fmap (S . S . S . S . Z) refAdditionalP <|> fmap (S . S . S . Z) fixityP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
   traverse_ addAnnotation nlgs
   let
     epaNlgs = fmap (collapse_NS . map_NS (K . epaToHiddenCluster)) nlgs
@@ -196,6 +201,15 @@ descP = do
     )
     "Description annotation"
   pure $ fmap (MkDesc (mkSimpleEpaAnno e)) e
+
+nonassertableP :: Parser (Epa Nonassertable)
+nonassertableP = do
+  e <- hidden $ spacedTokenWs (\ case
+    TAnnotations TNonassertable -> Just ()
+    _ -> Nothing
+    )
+    "Nonassertable annotation"
+  pure $ MkNonassertable (mkSimpleEpaAnno e) <$ e
 
 fixityP :: Parser (Epa Fixity)
 fixityP = do
@@ -358,8 +372,9 @@ lexeme p = do
     , hiddenClusters = wsOrAnnotation.hiddenClusters
     }
 
-addAnnotation :: NS Epa (Ref : Nlg : Desc : Fixity : () : LangTag : xs) -> Parser ()
+addAnnotation :: NS Epa (Ref : Nlg : Desc : Fixity : () : LangTag : Nonassertable : xs) -> Parser ()
 addAnnotation = \ case
+  S (S (S (S (S (S (Z na)))))) -> modify' (addNonassertable na.payload)
   S (S (S (Z fx))) -> modify' (addFixity fx.payload)
   S (S (Z desc)) -> modify' (addDesc desc.payload)
   S (Z nlg) -> modify' (addNlg nlg.payload)
@@ -667,7 +682,7 @@ topdecl =
       try timezone'
   <|> withTypeSig (\ sig -> attachAnno $
         Declare   emptyAnno <$> annoHole (declare sig)
-    <|> Decide    emptyAnno <$> annoHole (try (decidePatternMatch sig) <|> decide sig)
+    <|> Decide    emptyAnno <$> annoHole (try (decidePatternMatch sig) <|> decideNotInMixfixForm sig)
     <|> Assume    emptyAnno <$> annoHole (assume sig)
   ) <|> attachAnno
         (Directive emptyAnno <$> annoHole directive)
@@ -1041,6 +1056,15 @@ decidePatternMatch sig = do
     let isGroup = any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses
     unless isGroup $ turnDownRun (start : restStarts)
     guard isGroup
+    -- A group is made of clauses written with the rule's name first. A clause
+    -- written in the form of a mixfix rule is none, and is told so here,
+    -- where the run is read once and in full ('mixfixFormClause'). The error
+    -- is registered rather than raised, so that the group still parses and
+    -- the one error is the file's only error: a failure here would be caught
+    -- by the 'try' in 'topdecl', and the run read again as definitions.
+    hints <- asks (.mixfixHints)
+    for_ (mixfixFormClause hints (givenTermNames sig) (zip (start : restStarts) clauses)) \ (off, msg) ->
+      registerParseError (FancyError off (Set.singleton (ErrorFail (Text.unpack msg))))
     pure (desugarPatternClauses sig rawToks firstClause rest)
   where
     sameHeadClause clauseCol h ar = do
@@ -1059,6 +1083,112 @@ decidePatternMatch sig = do
     isBareNullaryPat _               = False
     columnDiffers col =
       length (List.nub [ rawName n | PatApp _ n [] <- col ]) > 1
+
+-- | A clause is @head patterns MEANS body@ (or @DECIDE head patterns IS body@),
+-- with the rule's name as its head. A mixfix rule is written the other way
+-- about, with a word between its inputs: @c `costs` n MEANS n@. It is one
+-- definition, found by its words wherever it is called (@Red `costs` 0@), and
+-- has no clauses. A line written in its form for one case of it,
+-- @Red `costs` 0 MEANS 1@, was read as a rule named @Red@ with the patterns
+-- @costs@ and @0@: the file checked, and @Red `costs` 0@ went on giving the
+-- one definition's answer, 0, where the line meant 1. Two lines
+-- @c `costs` 0@ and @c `costs` n@ were read as a group defining a rule named
+-- like its own input, and refused in twelve messages, three of them with no
+-- location (both found by the pre-review of legalese\/l4-ide#545,
+-- 2026-10-13). What the drafter meant is plain from the line, so it is
+-- refused here, once, at its first token.
+--
+-- Two things show the form, and the parser can see both:
+--
+--  * the line is written as a mixfix rule in scope, imports included
+--    ('mixfixRulesWrittenAs'): as long as the rule's pattern, with the rule's
+--    words where the pattern has them. That is the exact test. It needs the
+--    rule to be a definition that the first parse (which has no hints) could
+--    read as one, so it does not see a rule that is itself written as
+--    clauses.
+--
+--  * the head is one of the group's own GIVEN inputs, followed by a word that
+--    is none. A definition whose head is also one of its inputs is already
+--    refused, written any way ("the defined term and all its inputs must have
+--    distinct names"), so this refuses nothing that was accepted. It shows
+--    the form of a rule that has no definition, only the clauses.
+--
+-- Returns the first such clause, with the offset it starts at.
+mixfixFormClause :: MixfixHintRegistry -> [Name] -> [(Int, PMClause)] -> Maybe (Int, Text)
+mixfixFormClause hints inputs = listToMaybe . mapMaybe check
+  where
+    inputNames = map rawName inputs
+    check (off, c) = (,) off <$> (writtenAsRule c <|> afterInput c)
+
+    writtenAsRule c = do
+      rule <- listToMaybe (mixfixRulesWrittenAs (Just (rawName (pmHead c)) : map barePattern (pmPats c)) hints)
+      pure $ mixfixFormMessage
+        "This clause is written the way a rule with a word between its inputs is written, like this one:"
+        (showMixfixPattern rule)
+
+    afterInput c = case pmPats c of
+      PatApp _ kw [] : _
+        | rawName (pmHead c) `elem` inputNames
+        , rawName kw `notElem` inputNames ->
+            let word = "`" <> rawNameToText (rawName kw) <> "`"
+            in Just $ mixfixFormMessage
+                 (Text.unwords
+                    [ "This clause begins with", rawNameToText (rawName (pmHead c)) <> ", an input of the GIVEN, and then the word"
+                    , word <> ". That is how a rule with a word between its inputs is written:" ])
+                 (Text.unwords [rawNameToText (rawName (pmHead c)), word, "..."])
+      _ -> Nothing
+
+    barePattern = \ case
+      PatApp _ n [] -> Just (rawName n)
+      _             -> Nothing
+
+-- | What 'mixfixFormClause' tells the drafter: how the line is written, the
+-- rule it is written like, and the two ways to write what the line was for.
+mixfixFormMessage :: Text -> Text -> Text
+mixfixFormMessage lead shape = Text.unlines
+  [ lead
+  , ""
+  , "  " <> shape
+  , ""
+  , "A rule written that way is one definition, so it cannot be split into clauses."
+  , "Write it once and tell the cases apart inside it with CONSIDER, or write the clauses with a name of their own first, one pattern for each input, as in DECIDE price Red 0 IS ..."
+  ]
+
+-- | A definition that is parsed as a definition ('decide'), unless it is
+-- written in the form of a mixfix rule but not with that rule's inputs: then
+-- the parse is as it was and the one error is registered.
+--
+-- A line like @Red `costs` n MEANS 1@, with no literal in it, is no clause
+-- ('decidePatternMatch' turned it down), so it is read as a definition of a
+-- rule named @Red@ with the inputs @costs@ and @n@. It checked, and
+-- @Red `costs` 0@ went on giving the one definition's answer, 0, where the
+-- line meant 1. Every token of a real definition of a mixfix rule that is not
+-- one of its words is an input its GIVEN names, so a line in a rule's form
+-- that holds a name which is none is no definition of that rule, whatever the
+-- drafter meant it as.
+-- A second definition of the same words with a GIVEN of its own, for other
+-- types, names its own inputs and is not touched. (The example line has no
+-- GIVEN of its own, so every input of the form it holds counts as a stray.)
+decideNotInMixfixForm :: TypeSig Name -> Parser (Decide Name)
+decideNotInMixfixForm sig = do
+  off <- getOffset
+  d@(MkDecide _ _ (MkAppForm _ hd args _) _) <- decide sig
+  hints <- asks (.mixfixHints)
+  let toks = hd : args
+      inputNames = givenParamNames sig
+      strays rule = [ t | (MixfixParam _, t) <- zip rule.pattern toks, rawName t `notElem` inputNames ]
+      rules = mixfixRulesWrittenAs (map (Just . rawName) toks) hints
+  for_ (traverse (\ rule -> (,) rule <$> listToMaybe (strays rule)) rules >>= listToMaybe) \ (rule, stray) ->
+    registerParseError $ FancyError off $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
+      [ "This definition is written the way the rule"
+      , ""
+      , "  " <> showMixfixPattern rule
+      , ""
+      , "is written, but " <> rawNameToText (rawName stray) <> " is not an input its GIVEN names, so it is read as a rule of its own."
+      , "A rule written that way is one definition, with no cases of its own."
+      , "To treat some input differently, write the rule once and tell the cases apart inside it with CONSIDER."
+      ]
+  pure d
 
 -- | Record that the clauses starting at these positions start no clause group.
 --
@@ -1378,7 +1508,10 @@ clausesSrcAnno (c : _) = fixAnnoSrcRange (mkHoleAnnoFor (pmBody c))
 -- source range (see 'clausesSrcAnno').
 bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
 bindFallthrough mark ftName ftAnno ftExpr body =
-  LetIn emptyAnno
+  -- The LET carries the binding's mark too, so that the checker, which cannot
+  -- give a node with no range a type (and this one has none, see
+  -- 'clausesSrcAnno'), still records the group's result type on it.
+  LetIn (setPmSynthetic mark emptyAnno)
     [ LocalDecide emptyAnno
         (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
     ]
@@ -3745,6 +3878,7 @@ execNlgParserForTokens p uri input ts =
       , refs = []
       , descs = []
       , fixities = []
+      , nonassertables = []
       , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
@@ -3753,24 +3887,24 @@ execNlgParserForTokens p uri input ts =
 -- JL4 parsers
 -- ----------------------------------------------------------------------------
 
-execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParser = execParserWithHints mempty
 
-execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserWithHints hints p uri input =
   case execLexer uri input of
     Left errs -> Left errs
     Right ts -> execParserForTokensWithHints hints p uri input ts
 
-execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokens = execParserForTokensWithHints mempty
 
-execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints = execParserForTokensWith True
 
 -- | 'execParserForTokensWithHints', with 'memoGroup' on ('True') or off; see
 -- 'memoiseGroups'.
-execParserForTokensWith :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Bool -> MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWith :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Bool -> MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWith memoise hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
@@ -3790,11 +3924,13 @@ execParserForTokensWith memoise hints p file input ts =
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang localisedNlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
         (withFixity, fixityS) = Resolve.addFixityCommentsToAst pstate.fixities withDesc
-        (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withFixity
+        (withNonassertable, naS) = Resolve.addNonassertableCommentsToAst pstate.nonassertables withFixity
+        (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withNonassertable
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
         fixityWarnings = fmap Resolve.renderFixityWarning fixityS.fixityWarnings
+        naWarnings = fmap Resolve.renderNonassertableWarning naS.nonassertableWarnings
       in
-        Right (annotatedA, nlgS.warnings ++ refWarnings ++ fixityWarnings, pstate)
+        Right (annotatedA, nlgS.warnings ++ refWarnings ++ fixityWarnings ++ naWarnings, pstate)
   where
     env = Env
       { moduleUri = file
@@ -3808,6 +3944,7 @@ execParserForTokensWith memoise hints p file input ts =
       , refs = []
       , descs = []
       , fixities = []
+      , nonassertables = []
       , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
@@ -3884,7 +4021,7 @@ programParserWithHintPass memoise uri input = do
 -- ----------------------------------------------------------------------------
 
 -- | Parse a source file and pretty-print the resulting syntax tree.
-parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Parser a -> NormalizedUri -> Text -> IO ()
+parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Parser a -> NormalizedUri -> Text -> IO ()
 parseFile p uri input =
   case execParser p uri input of
     Left errs -> Text.putStr $ Text.unlines $ fmap (.message) (toList errs)

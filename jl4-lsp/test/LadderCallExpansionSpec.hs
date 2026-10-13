@@ -12,6 +12,7 @@ module LadderCallExpansionSpec (spec) where
 import Control.Exception (evaluate)
 import Data.List (nub, (\\))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Maybe (isJust)
 import qualified Data.Text as T
@@ -757,6 +758,134 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
         Left e -> expectationFailure (show e)
         Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
 
+  -- A BOOLEAN rule written as DECIDE clauses is read through to the CONSIDER it
+  -- stands for before it is drawn, so a call in one of its clauses is the call
+  -- box of the hand-written CONSIDER: the same label, the same atomId and the
+  -- same panel. Each form is its own module with the same names, as two
+  -- deployments of one rule are, so that their atomIds can be compared.
+  describe "a rule written as DECIDE clauses" $ do
+    let header =
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+          , ""
+          , "GIVEN x IS A BOOLEAN"
+          , "      y IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `both hold` x y IS x AND y"
+          , ""
+          , "GIVEN c IS A Colour"
+          , "      a IS A BOOLEAN"
+          , "      b IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          ]
+        clauses =
+          [ "DECIDE rule Red a b IS `both hold` a b"
+          , "DECIDE rule c a b IS a OR b"
+          ]
+        hand =
+          [ "DECIDE rule c a b IS"
+          , "  CONSIDER c"
+          , "    WHEN Red THEN `both hold` a b"
+          , "    OTHERWISE a OR b"
+          ]
+    it "draws a call in a clause as the hand-written CONSIDER draws it: box, atomIds and panel" $ do
+      rC <- render "clauses-call" (T.unlines (header <> clauses)) "rule"
+      rH <- render "hand-call" (T.unlines (header <> hand)) "rule"
+      -- the call is a box that opens, so the comparison below covers a panel
+      [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+      withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- A called rule written as clauses opens onto the CONSIDER it stands for, as
+    -- it is drawn on its own, not onto the nested CONSIDERs it compiles to.
+    it "opens a call to a clause group onto the panel of a call to its hand-written CONSIDER" $ do
+      let calling callee = T.unlines $
+            [ "DECLARE Colour IS ONE OF Red, Green, Blue", "", "GIVEN c IS A Colour", "GIVETH A BOOLEAN" ]
+            <> callee
+            <> [ "", "GIVEN c IS A Colour", "      a IS A BOOLEAN", "GIVETH A BOOLEAN", "DECIDE rule c a IS warm c AND a" ]
+      rC <- render "calls-clauses" (calling ["DECIDE warm Red IS TRUE", "DECIDE warm Green IS FALSE", "DECIDE warm Blue IS FALSE"]) "rule"
+      rH <- render "calls-hand" (calling ["DECIDE warm c IS", "  CONSIDER c", "    WHEN Red THEN TRUE", "    WHEN Green THEN FALSE", "    WHEN Blue THEN FALSE"]) "rule"
+      [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+      withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- A called rule written as a table of clauses is read as its CONSIDER before
+    -- anything else is put in. In the other order the clauses' shared
+    -- fall-through was walked once for every branch that reached it: a rule
+    -- written by hand calling a four-by-four table took 44 s to draw, and a
+    -- five-by-five one did not finish in two minutes.
+    it "draws a call to a 25-row table of two enums in moments, opening onto its CONSIDER" $ do
+      let values prefix = [prefix <> T.pack (show i) | i <- [0 .. 4 :: Int]]
+          table = [(a, b, if (i * 3 + j) `mod` 4 == 0 then "FALSE" else "TRUE") | (i, a) <- zip [0 :: Int ..] (values "A"), (j, b) <- zip [0 :: Int ..] (values "B")]
+          calling callee = T.unlines $
+            [ "DECLARE C1 IS ONE OF " <> T.intercalate ", " (values "A")
+            , "DECLARE C2 IS ONE OF " <> T.intercalate ", " (values "B")
+            , ""
+            , "GIVEN x IS A C1"
+            , "      y IS A C2"
+            , "GIVETH A BOOLEAN" ]
+            <> callee
+            <> [ "", "GIVEN p IS A C1", "      q IS A C2", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE rule p q f IS callee p q OR f" ]
+          clauseTable = ["DECIDE callee " <> a <> " " <> b <> " IS " <> v | (a, b, v) <- table]
+          handTable =
+            ["DECIDE callee x y IS", "  CONSIDER x"]
+              <> concat
+                   [ ["    WHEN " <> a <> " THEN", "      CONSIDER y"] <> ["        WHEN " <> b <> " THEN " <> v | (a', b, v) <- table, a' == a]
+                   | a <- values "A" ]
+      drawn <- timeout 60000000 $ do
+        rC <- render "calls-table" (calling clauseTable) "rule"
+        rH <- render "calls-table-hand" (calling handTable) "rule"
+        _ <- evaluate (BL.length (Aeson.encode rC.funDecl.body) + BL.length (Aeson.encode rH.funDecl.body))
+        pure (rC, rH)
+      case drawn of
+        Nothing -> expectationFailure "drawing a call to a 25-row clause table did not finish within 60 s"
+        Just (rC, rH) -> do
+          [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+          withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- A call to a rule written as clauses too long to read through is not
+    -- offered for expansion, and the expand gesture leaves it as it is. The
+    -- gesture used to unfold it raw, its clauses' LETs drawn as one leaf, and
+    -- with long clause bodies gave no answer in 100 s (review).
+    it "does not offer to expand a call to clauses too long to read through, and leaves it as it is" $ do
+      -- Eleven clauses over two MAYBE inputs, whose binding patterns the pruning
+      -- learns nothing from, pass the 20,000-part bound (as in l4-cli-test).
+      let src = T.unlines $
+            [ "GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN" ]
+            <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> T.pack (show i) <> " AND y GREATER THAN " <> T.pack (show i) | i <- [0 .. 10 :: Int] ]
+            <> [ "DECIDE bigrule m k IS FALSE", ""
+               , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE caller p q f IS bigrule p q OR f" ]
+      done <- timeout 60000000 $ do
+        r <- render "too-long-callee" src "caller"
+        let callLeaves = [(nm.unique, offered) | V.UBoolVar _ nm _ offered _ _ _ <- universeIR r.funDecl.body, "bigrule" `T.isInfixOf` nm.label]
+        _ <- evaluate (length callLeaves)
+        let unfolded = case renderAfterInlining r.vizState r.decide (map fst callLeaves) of
+              Left _ -> Nothing
+              Right (_, info, _, _) -> Just (withoutIds (Aeson.toJSON info.funDecl.body))
+        _ <- evaluate (BL.length (Aeson.encode unfolded))
+        pure (withoutIds (Aeson.toJSON r.funDecl.body), callLeaves, unfolded)
+      case done of
+        Nothing -> expectationFailure "drawing, or expanding, a call to clauses too long to read through did not finish within 60 s"
+        Just (drawnBody, callLeaves, unfolded) -> do
+          map snd callLeaves `shouldBe` [False]
+          unfolded `shouldBe` Just drawnBody
+
+    -- The limit on a ladder drawn from clauses is about the rule as written. A
+    -- rule written by hand that has a large clause group unfolded into it by the
+    -- expand gesture is still a rule written by hand, and is drawn.
+    it "l4/inlineExprs on a hand-written caller of a large clause group is drawn, not refused" $ do
+      let src = T.unlines $
+            [ "GIVEN n IS A NUMBER", "GIVETH A BOOLEAN" ]
+            <> [ "DECIDE callee " <> T.pack (show i) <> " IS " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. 599 :: Int] ]
+            <> [ "DECIDE callee n IS FALSE", ""
+               , "GIVEN q IS A NUMBER", "      flag IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE caller q flag IS callee q OR flag" ]
+      r <- render "inline-large-group" src "caller"
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure ("the unfolded caller was refused: " <> show e)
+        Right (_, info, _, _) -> length (directLeaves info.funDecl.body) `shouldSatisfy` (> 300)
+
   it "the wire omits `expansion` when a leaf has none" $ do
     r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
     let direct = [e | e@(V.UBoolVar _ nm _ _ _ _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
@@ -770,6 +899,13 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
     topDisjuncts = \case
       V.Or _ xs -> xs
       e -> [e]
+
+-- | A drawing as it goes on the wire, less the numbering of its nodes.
+withoutIds :: Aeson.Value -> Aeson.Value
+withoutIds = \case
+  Aeson.Object o -> Aeson.Object (KeyMap.map withoutIds (KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutIds xs)
+  v -> v
 
 -- | Every node drawn directly: through App arguments, not into expansions.
 directUniverse :: V.IRExpr -> [V.IRExpr]

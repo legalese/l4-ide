@@ -33,6 +33,25 @@ module TestData (
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
+  clauseGroupEnumJL4,
+  handEnumJL4,
+  letEnumJL4,
+  clauseGroupMixedJL4,
+  handMixedJL4,
+  clauseGroupSingleJL4,
+  handSingleJL4,
+  clauseGroupCallJL4,
+  handCallJL4,
+  clauseTableJL4,
+  handTableJL4,
+  clauseTable2JL4,
+  handTable2JL4,
+  clauseNewNameJL4,
+  handNewNameJL4,
+  clauseGroupNoGivethJL4,
+  clauseGroupLetResultJL4,
+  rowsClauseGroupJL4,
+  letChainJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -54,6 +73,7 @@ module TestData (
   heavyMainJL4,
   deepJL4,
   partialClausesJL4,
+  lineBreakJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -200,6 +220,25 @@ constantJL4 =
 GIVETH A NUMBER
 DECIDE the_answer IS 42
 |]
+
+-- | A function whose answer is a string holding a line break or a tab.
+--
+-- The reasoning tree prints each step as source code, so the literal reaches
+-- @exampleCode@ spelled the way the source spells it (@"line\nnext"@, a
+-- backslash and an n), while @explanation@ prints the VALUE and keeps the
+-- break. Written as plain lines, not through the interpolating quasi-quoter,
+-- which would turn the backslash pairs into the characters they spell.
+lineBreakJL4 :: Text
+lineBreakJL4 =
+  Text.unlines
+    [ "@export default the text"
+    , "GIVEN x IS A NUMBER"
+    , "GIVETH A STRING"
+    , "DECIDE s x IS"
+    , "    IF x > 0"
+    , "    THEN \"line\\nnext\""
+    , "    ELSE \"tab\\there\""
+    ]
 
 -- | L4 source for the "compute_qualifies" function used in integration tests.
 qualifiesJL4 :: Text
@@ -1127,3 +1166,302 @@ GIVEN p IS A BOOLEAN
 GIVETH A BOOLEAN
 gate MEANS p AND q
 |]
+
+-- | BOOLEAN rules written as multi-clause DECIDE groups, each beside the
+-- CONSIDER a drafter would write by hand for the same rule. All are called
+-- @rule@, so that the two forms of a pair get the same atom ids and their
+-- query plans can be compared whole.
+--
+-- The desugarer compiles clauses to a CONSIDER (and a LET for the clauses not
+-- yet tried) that carry no source range. The checker used to record a result
+-- type only on a node that has one, so the ladder refused the rule as "not a
+-- boolean"; then the ladder drew the generated LET as one leaf, and the plan
+-- asked nothing.
+clauseGroupEnumJL4 :: Text
+clauseGroupEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
+|]
+
+handEnumJL4 :: Text
+handEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  CONSIDER c
+    WHEN Red THEN TRUE
+    WHEN Green THEN FALSE
+    WHEN Blue THEN FALSE
+|]
+
+-- | The same rule with the later clauses named in a LET the drafter wrote (not
+-- clauses, so read as written).
+letEnumJL4 :: Text
+letEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  LET rest BE CONSIDER c
+                WHEN Green THEN FALSE
+                WHEN Blue THEN TRUE
+  IN CONSIDER c
+       WHEN Red THEN TRUE
+       OTHERWISE rest
+|]
+
+-- | Two inputs, a literal pattern in the first clause, a bare name in the second.
+clauseGroupMixedJL4 :: Text
+clauseGroupMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule 0 b IS FALSE
+DECIDE rule n b IS b AND n GREATER THAN 5
+|]
+
+handMixedJL4 :: Text
+handMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule n b IS
+  CONSIDER n
+    WHEN 0 THEN FALSE
+    OTHERWISE b AND n GREATER THAN 5
+|]
+
+-- | A group of ONE clause: no LET, just the generated CONSIDER.
+clauseGroupSingleJL4 :: Text
+clauseGroupSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule (JUST b) IS b
+|]
+
+handSingleJL4 :: Text
+handSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule m IS
+  CONSIDER m
+    WHEN JUST b THEN b
+|]
+
+-- | A clause that calls another rule. The call is a box over its two BOOLEAN
+-- arguments, and its atomId is the hash of the call's term (R3), so the group
+-- and its hand-written CONSIDER must name it alike.
+clauseGroupCallJL4 :: Text
+clauseGroupCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS `both hold` a b
+DECIDE rule c a b IS a OR b
+|]
+
+handCallJL4 :: Text
+handCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN `both hold` a b
+    OTHERWISE a OR b
+|]
+
+-- | A table of two columns whose rows share the first column and differ in the
+-- second. The desugarer tests the colour again in every later clause; the
+-- ladder reads each test with what the branches around it already decided.
+clauseTableJL4 :: Text
+clauseTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red TRUE IS TRUE
+DECIDE rule Red FALSE IS FALSE
+DECIDE rule Green b IS b
+DECIDE rule Blue b IS NOT b
+|]
+
+handTableJL4 :: Text
+handTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c b IS
+  CONSIDER c
+    WHEN Red THEN
+      CONSIDER b
+        WHEN TRUE THEN TRUE
+        WHEN FALSE THEN FALSE
+    WHEN Green THEN b
+    WHEN Blue THEN NOT b
+|]
+
+-- | Two BOOLEAN columns, the input's own name standing for "any value".
+clauseTable2JL4 :: Text
+clauseTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule TRUE TRUE IS TRUE
+DECIDE rule TRUE q IS q
+DECIDE rule p TRUE IS p
+DECIDE rule p q IS FALSE
+|]
+
+handTable2JL4 :: Text
+handTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule p q IS
+  CONSIDER p
+    WHEN TRUE THEN
+      CONSIDER q
+        WHEN TRUE THEN TRUE
+        OTHERWISE q
+    OTHERWISE
+      CONSIDER q
+        WHEN TRUE THEN p
+        OTHERWISE FALSE
+|]
+
+-- | A last clause whose pattern is a new name, not the input's own: it always
+-- matches, so it is the OTHERWISE.
+clauseNewNameJL4 :: Text
+clauseNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS a
+DECIDE rule Green a b IS b
+DECIDE rule other a b IS a AND b
+|]
+
+handNewNameJL4 :: Text
+handNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN a
+    WHEN Green THEN b
+    OTHERWISE a AND b
+|]
+
+-- | A BOOLEAN group with no GIVETH: the type is inferred, not declared.
+clauseGroupNoGivethJL4 :: Text
+clauseGroupNoGivethJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
+|]
+
+-- | A BOOLEAN group whose first clause's result is a LET the drafter wrote.
+clauseGroupLetResultJL4 :: Text
+clauseGroupLetResultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm and the flag is set
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red b IS LET both BE b AND b IN both
+DECIDE rule c b IS FALSE
+|]
+
+-- | A numeric rule of @k@ clauses, each TRUE or FALSE by turns, then a
+-- fall-through. It draws one ladder node per TRUE row, plus one: 598 rows draw
+-- 300 nodes, the most a rule written as clauses may draw, and 600 draw 301.
+rowsClauseGroupJL4 :: Int -> Text
+rowsClauseGroupJL4 k =
+  "@export Rows\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS " <> (if even row then "TRUE" else "FALSE") | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS FALSE\n"
+
+-- | A drafter's chain of @n@ LETs that each use the one before twice. Written
+-- out it doubles for each LET, and its conjunctive normal form, which is what
+-- the ladder draws, grows faster than that.
+letChainJL4 :: Int -> Text
+letChainJL4 n =
+  "@export doubling let chain\nGIVEN x IS A BOOLEAN\n      y IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE rule IS\n"
+    <> "  LET a0 BE x\n  IN\n"
+    <> Text.concat
+         [ Text.replicate (3 + level) " " <> "LET a" <> Text.pack (show level) <> " BE a" <> Text.pack (show (level - 1)) <> " AND y OR a" <> Text.pack (show (level - 1)) <> "\n"
+             <> Text.replicate (3 + level) " " <> "IN\n"
+         | level <- [1 .. n - 1] ]
+    <> Text.replicate (3 + n) " " <> "a" <> Text.pack (show (n - 1)) <> "\n"

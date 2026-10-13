@@ -142,6 +142,11 @@ data CheckError =
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
   | CyclicTypeSynonyms [Name]
     -- ^ Circular dependency between type synonym declarations (cycle members)
+  | SynonymExpansionLimit Int Resolved
+    -- ^ Comparing two types followed this many type synonyms in a row and
+    -- stopped at the one given, which still stands for another type. The
+    -- types are not known to differ, so this is not a 'TypeMismatch'. See
+    -- 'L4.TypeCheck.Unify.synonymExpansionFuel'.
   | MisattachedSectionGiven Name (Maybe Name)
     -- ^ A column-1 @GIVEN@ that opens a section and declares a name the
     -- declaration it attaches to never uses. Carries the unused parameter name
@@ -320,6 +325,14 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | NonassertableOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@nonassertable@ annotation sits above something that is not a
+    -- definition: the first text says what (a declaration, an input, a section
+    -- heading or its inputs, a directive, an import, a timezone), the second
+    -- names it when it has a name. Only a named step can be closed to assertion.
+    -- ^ An @\@nonassertable@ carried text after it that is not a comment.
+    -- The mark takes no words: @\@nonassertable \`alpha\` MEANS TRUE@ would
+    -- otherwise swallow the definition into the annotation and mark the next.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -405,6 +418,13 @@ data CheckWarning
     -- (counting from 1), the annotation as written (@\@export@, say), and
     -- whether the group has a GIVEN, which is where its @\@desc@ and
     -- @\@export@ go.
+  | ClauseArityChanged SrcRange Name Int [Name]
+    -- ^ A definition with no GIVEN of its own, right after a multi-clause
+    -- group of the same name, that has another number of inputs than the
+    -- group has patterns ('L4.TypeCheck.warnClauseArityChange'). It is not a
+    -- clause of the group: it is a rule of its own, and the names after its
+    -- head are its inputs. Carries the head's range, the name, the number of
+    -- patterns each clause above has, and the definition's input names.
   | FixityIgnoredNonBinary RawName (Maybe SrcRange)
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
@@ -820,6 +840,7 @@ instance HasSrcRange CheckError where
   rangeOf (EmptyWindow d _ _)               = rangeOf d
   rangeOf (BeforeOnJoinLine d)              = rangeOf d
   rangeOf (FixityAnnotationMalformed mr _)  = mr
+  rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
@@ -827,6 +848,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
   rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
+  rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
@@ -1020,12 +1042,6 @@ data CheckEnv =
     -- ^ Map from record type RawName to set of computed field RawNames.
     -- Used to produce better error messages when a user tries to supply
     -- a computed field in a record constructor.
-    , cyclicSynonyms       :: !(Set RawName)
-    -- ^ Primary names of type synonyms found to be cyclic at declaration
-    -- time. Their bodies are quarantined (installed as bodyless
-    -- 'KnownType's) so that synonym expansion never touches them — a
-    -- cyclic synonym has no finite expansion, and expanding one can
-    -- blow up exponentially before the expansion fuel runs out.
     , sectionBinderNames   :: !(Set RawName)
     -- ^ The names this module's section-level @GIVEN@s bind (R4), read off the
     -- parsed module before desugaring. They are the names a @WITH@ site may
@@ -1156,7 +1172,6 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , assumeDeclarations = Map.empty
     , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
     , computedFields = Map.empty
-    , cyclicSynonyms = mempty
     , sectionBinderNames = mempty
     , sectionBinderDecls = mempty
     , importedImplicitReaders =
@@ -2064,10 +2079,24 @@ setAnnNlg nlg a = withRange a $ \r -> do
 setAnnResolvedType ::
      (HasAnno a, AnnoToken a ~ PosToken, AnnoExtra a ~ Extension)
   => Type' Resolved -> Maybe TermKind -> a -> Check a
-setAnnResolvedType t k a = withRange a $ \r -> do
-  let info = TypeInfo t k
-  addInfoForSrcRange r info
-  pure $ a & annoOf % annInfo ?~ info
+setAnnResolvedType t k a = case rangeOf (getAnno a) of
+  Just r -> do
+    let info = TypeInfo t k
+    addInfoForSrcRange r info
+    pure $ a & annoOf % annInfo ?~ info
+  -- A node the clause desugarer generated has no range, on purpose: it has no
+  -- source to point at, and a range would put it in the position index that
+  -- hover and go-to-definition search. Its type is still a fact about the
+  -- node, and the ladder reads a DECIDE body's type off the node
+  -- ('L4.Viz.Ladder.hasBooleanType'), so it is recorded ON the node and
+  -- nowhere else: the position index and every diagnostic are as they were.
+  Nothing
+    | isJust (Optics.view annPmSynthetic (getAnno a)) -> do
+        -- With the substitution so far applied: a group with no GIVETH is
+        -- checked against a fresh type that its clauses have already fixed.
+        t' <- applySubst t
+        pure $ a & annoOf % annInfo ?~ TypeInfo t' k
+    | otherwise -> pure a
 
 setAnnResolvedKind ::
      (HasAnno a, AnnoToken a ~ PosToken, AnnoExtra a ~ Extension)
@@ -2469,7 +2498,6 @@ extendEnv cis env =
     , assumeDeclarations = e.assumeDeclarations
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
-    , cyclicSynonyms = e.cyclicSynonyms
     , sectionBinderNames = e.sectionBinderNames
     , sectionBinderDecls = e.sectionBinderDecls
     , importedImplicitReaders = e.importedImplicitReaders

@@ -109,6 +109,30 @@ Human-readable descriptions.
 
 **Example:** [annotation-example.l4](annotation-example.l4)
 
+### @nonassertable
+
+Marks a named step as closed to assertion: once node assertion ships, a request to a published rule will not be allowed to supply a value for this definition, so its truth will have to come from what it is defined as.
+Today the mark is recorded and kept, and nothing reads it: a request that names the definition is treated as it is for an unmarked one.
+Write it on a line of its own above a `MEANS` or `DECIDE` definition, at the top level of a file or inside a section: above the definition's `GIVEN`, or directly above the line that names it.
+
+```l4
+§ `The offence`
+    GIVEN `did the act`    IS A BOOLEAN
+          `had the intent` IS A BOOLEAN
+          `has a defence`  IS A BOOLEAN
+
+@nonassertable
+`offence made out` MEANS `did the act` AND `had the intent` AND NOT `has a defence`
+```
+
+The mark changes nothing a rule works out, and it survives a re-print: `l4 batch` and the REPL, which re-print a module before running it, keep it.
+On anything that is not a definition, above it or among its lines, it is an error that names what it sits on: a `DECLARE`, an `ASSUME`, a section heading or the `GIVEN` under it, a directive, an `IMPORT`.
+On one of a definition's own `GIVEN` lines it is an error too, one per mark, naming the input on that line (or the next one, for a mark on a line of its own among them): an input is supplied, never asserted, so there is nothing there to close; a mark above the same definition still counts.
+The mark takes no words: what follows it on the line is read as source and never swallowed, so prose after it is an error, often reported on the next line or inside the definition before; a definition written on the mark's line usually fails to parse, since it no longer starts at the margin, and where it does parse the mark is its.
+A mark at the end of the line that names a definition, or inside its body, is a warning and carries nothing; one at the end of the `GIVETH` line is above the name line and counts; two marks above one definition are one mark and a warning.
+A `@desc` whose text begins with the word `nonassertable` is a description, not the mark.
+Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the request-side assertion the mark closes; both are designed in `specs/todo/presumption-assertion/CONTRACT.md` and not built.
+
 ### @nlg
 
 Natural language generation hints.
@@ -424,11 +448,61 @@ wrote before tags existed still means what it meant.
 
 ### @ref
 
-Cross-references to legal sources.
+Cross-references to legal sources: the provision a rule, a type or an input comes from.
 
-**Inline form:** `The applicant <<must be at least 18 years old>>.`
+**Line form:** `@ref` and the citation, on a line of its own.
+
+**Inline form:** the citation between `<<` and `>>`, which can sit in the middle of a line.
 
 See [annotation-example.l4](annotation-example.l4)
+
+#### What a `@ref` cites
+
+A `@ref` cites what comes **after** it, so write it on the line above the thing it cites:
+
+```l4
+@ref Section 4(1)(a) of the Act
+GIVEN age IS A NUMBER
+      resident IS A BOOLEAN
+GIVETH A BOOLEAN
+`is eligible` MEANS
+  age AT LEAST 18
+  AND <<Section 4(1)(b)>> resident
+```
+
+The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the expression that follows it.
+A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
+Blank lines and comments between a `@ref` and that construct make no difference.
+
+**Several citations.** Write them one above the other, each on a line of its own.
+The construct below keeps all of them, in the order written.
+
+```l4
+@ref Dog Act 058 of 1976 (WA)
+@ref url https://www.legislation.wa.gov.au/legislation/statutes.nsf/law_a230.html
+§ `Dogs Act - 33D.1`
+```
+
+An export that carries one citation per rule uses the nearest, which is the one written last, just above the construct.
+
+#### Two warnings
+
+Both are warnings, so `l4 check` still succeeds, and the IDE marks the `@ref` itself.
+
+**A `@ref` that follows code on its line.**
+A `@ref` written at the end of a line, after the code it means to cite, cannot cite that code, because it cites what comes after it.
+It does not cite the next construct either: it is attached to nothing, so the next construct's citation, in the IDE and in every export, is not this one.
+The warning names the code it trails:
+
+> This @ref (`1981/61 sec. 2`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`.
+
+The fix is to move it to the line above that code.
+An inline `<<…>>` is warned about only when it ends the line, because in the middle of a line it cites the word after it, which is what it is for.
+
+**A `@ref` with nothing after it.**
+A `@ref` after the last construct of the file has nothing to attach to:
+
+> This @ref (`Section 4(1)(a) of the Act`) is at the end of the file, so there is nothing after it to attach to.
 
 #### Writing a literal `>>`
 
@@ -454,11 +528,18 @@ text in a citation, and `>` is ordinary text in an `@nlg` annotation. Each
 annotation escapes only what would otherwise be read as punctuation in that
 annotation.
 
-### @ref-src / @ref-map
+### @ref-map
 
-Source references and mappings.
+Gives a name a URL: `@ref-map NAME URL`.
+Everything before the last space is the name and the last word is the URL.
+A citation written with `@ref` (or `<<` `>>`) whose text equals the name, ignoring case, is shown in the IDE as a link to the URL.
+See [jl4/README.md](../../../jl4/README.md#how-to-use-annotations-for-citations) for an example.
 
-See [annotation-example.l4](annotation-example.l4)
+### @ref-src
+
+Accepted and ignored.
+The annotation used to load name-to-URL mappings from a CSV file; that was removed so that the language core needs no file access, and `@ref-map` replaces it.
+A `@ref-src` that names a file which does not exist passes `l4 check`.
 
 ### @export
 

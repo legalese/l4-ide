@@ -260,10 +260,9 @@ collectTopDecides (MkModule _ _ section) = goSection section
 -- node (@Decide ann d@), and one written above a @WHERE@ binding attaches to
 -- the @LocalDecide ann d@ node — not to the inner @MkDecide@ — so both annos
 -- are consulted, outer first, exactly as the DMN lowerer does. A node's anno
--- can hold at most one ref and the nearest preceding one wins, every other
--- becoming a @RefNotAttached@ warning (@attachRef@,
--- @ResolveAnnotation.hs:1162-1172@) — which is why each definition is read from
--- its /own/ node and never from a neighbour's.
+-- holds every ref written above it and 'annRef' reads the nearest, the last
+-- (@attachRef@), so a stack of refs shows its bottom one. Each definition is
+-- read from its /own/ node and never from a neighbour's.
 --
 -- The gloss is read from the inner @MkDecide@, where 'attachLeadingDesc' puts
 -- it.

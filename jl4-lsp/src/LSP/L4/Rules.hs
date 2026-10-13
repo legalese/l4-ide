@@ -366,17 +366,40 @@ instance Pretty Log where
             <+> pretty s.category
     LogImportResolution msg -> "[Import Resolution]" <+> pretty msg
 
+-- | Which tiers of the library ladder an import may fall through to once the
+-- in-memory (VFS) tier has missed. See 'resolveLibrary'.
+data LibraryScope
+  = AmbientLibraries
+    -- ^ The whole ladder: @$JL4_LIBRARY_PATH@, the project root, the importing
+    -- file's directory, the embedded stdlib, the per-user XDG store and the
+    -- editor extension's bundle. The CLI, the REPL and the language server run
+    -- on a person's own machine, where the project directory, the environment
+    -- and their own stores are theirs to use.
+  | EmbeddedStdlibOnly
+    -- ^ The stdlib built into this binary, and nothing else: no environment
+    -- variable, no working directory, no per-user store, no extension bundle.
+    -- For a host that serves bundles somebody else uploaded. The bundle's own
+    -- files sit in the VFS tier, which is consulted first, so what is left for
+    -- the ladder to find is the stdlib; and a file that happens to sit in the
+    -- host's working directory, or a library directory an operator exported,
+    -- must not be able to replace it for every deployment (jl4-service).
+    -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R5, option A), with
+    -- conditions; see specs\/todo\/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10.
+  deriving stock (Eq, Show)
+
 -- | One candidate source for a bare-module-name import.
 data LibraryCandidate
   = FileCandidate !Text !FilePath
     -- ^ label (for logs) and filesystem path to probe
   | EmbeddedCandidate
     -- ^ the stdlib copy compiled into this binary ('L4.API.EmbeddedLibraries').
-    -- NOTE: the embed is frozen at /build/ time from the Cabal datadir the TH
-    -- splice resolved then (often @~/.cabal/share@) — editing a checkout's
-    -- @jl4-core/libraries/*.l4@ does NOT refresh it on a plain @cabal build@.
-    -- When developing the stdlib itself, pin @JL4_LIBRARY_PATH@ at your
-    -- worktree's @jl4-core/libraries@ (see @jl4-core/libraries/README.md@).
+    -- NOTE: the embed is read when GHC compiles "L4.API.EmbeddedLibraries".
+    -- Editing a checkout's @jl4-core/libraries/*.l4@ alone does NOT refresh it
+    -- on a plain @cabal build@, which prints @Up to date@ and never calls GHC
+    -- (a real change to any jl4-core source file does; measured 2026-10-13, see
+    -- @L4.API.EmbeddedLibraries.TH@). When developing the stdlib itself, pin
+    -- @JL4_LIBRARY_PATH@ at your worktree's @jl4-core/libraries@ (see
+    -- @jl4-core/libraries/README.md@).
   deriving stock (Eq, Show)
 
 candidateDisplay :: LibraryCandidate -> Text
@@ -402,7 +425,9 @@ data LibraryResolution = LibraryResolution
     -- than the probe list, because it claims to print the locations in the order
     -- they were tried, and the embedded tier's rank is 4 of 6 -- it used to be
     -- appended last whatever its rank.
-  , hasExplicitPath :: !Bool                -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted)
+  , hasExplicitPath :: !Bool
+    -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted). Always
+    -- False under 'EmbeddedStdlibOnly', which does not read the variable.
   }
 
 -- | Resolve a library module across the filesystem and the embedded stdlib.
@@ -424,8 +449,23 @@ data LibraryResolution = LibraryResolution
 --
 -- When JL4_LIBRARY_PATH is set, the embedded copy is not consulted at all —
 -- the operator has taken explicit control of the library store.
-resolveLibrary :: FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
-resolveLibrary rootDirectory mImportingFile modName = do
+--
+-- Under 'EmbeddedStdlibOnly' the ladder is the embedded copy alone, whatever the
+-- environment and the working directory hold.
+resolveLibrary :: LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
+  pure LibraryResolution
+    { winner = Maybe.listToMaybe present
+    , existing = present
+    , candidates = [EmbeddedCandidate]
+    , searchedPaths = []
+    , tiersInOrder = [EmbeddedCandidate]
+    , hasExplicitPath = False
+    }
+  where
+    present = [ (1, EmbeddedCandidate)
+              | Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)) ]
+resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
   mEnvPath <- lookupEnv "JL4_LIBRARY_PATH"
   xdgDataDir <- getXdgDirectory XdgData "jl4"
   exePath <- getExecutablePath
@@ -486,6 +526,28 @@ candidateDisplayCanonical c = case c of
   FileCandidate _ p -> do
     real <- either (\(_ :: SomeException) -> p) id <$> tryAny (canonicalizePath p)
     pure $ candidateDisplay c <> if real == p then "" else " -> " <> Text.pack real
+
+-- | The existing candidates with each FILE kept once, at the rank of its first
+-- appearance.
+--
+-- Two tiers can name one file: the CLI sets the project root to the importing
+-- file's own directory, so the root tier and the importer-relative tier probe
+-- the same path, and an XDG symlink can point at a copy another tier also
+-- reaches. Left in, the shadow warning listed that file twice, once as
+-- [chosen] and once as [shadowed], which reads as a copy shadowing itself.
+-- Files are compared by canonical path, so a symlink and its target are one
+-- file; the embedded stdlib is not a file and is never merged with anything.
+distinctCopies :: [(Int, LibraryCandidate)] -> IO [(Int, LibraryCandidate)]
+distinctCopies existing = do
+  keyed <- traverse (\ic -> (,ic) <$> fileKey (snd ic)) existing
+  pure (map snd (List.nubBy sameFile keyed))
+  where
+    fileKey = \case
+      EmbeddedCandidate -> pure Nothing
+      FileCandidate _ p ->
+        Just . either (\ (_ :: SomeException) -> normalise p) id <$> tryAny (canonicalizePath p)
+    sameFile (Just a, _) (Just b, _) = a == b
+    sameFile _ _ = False
 
 -- | A @file:@ URI that reads back as the path it was built from.
 --
@@ -665,16 +727,50 @@ triedLocations outcome = do
 --
 -- VFS candidates (web/editor in-memory overlays) are checked first, then the
 -- filesystem + embedded tiers via 'resolveLibrary'. An embedded winner is
--- registered as a Shake virtual file, exactly as a VFS hit would be.
+-- /not/ registered anywhere: it is handed back as its 'Shake.embeddedLibraryUri',
+-- which 'Shake.getVirtualFile' serves from a pure map.
+--
+-- An import that resolves to nothing is announced at Warning, once per
+-- importing module and module name until it resolves. Both rules above ask
+-- about every IMPORT, so announcing on each ask printed one mistake twice, and
+-- both copies reached @--json@ diagnostics. The key is cleared when the import
+-- resolves, so breaking it again later warns again.
 resolveImportShared
   :: Recorder (WithPriority Log)
   -> IORef (Set.Set (String, [Text]))
      -- ^ shadow configurations already warned about this session (warn-once)
+  -> IORef (Set.Set (Text, String))
+     -- ^ (importing module, module name) pairs already announced as not found
+  -> LibraryScope
   -> FilePath          -- ^ root directory
   -> NormalizedUri     -- ^ importing module
   -> String            -- ^ bare module name
   -> Action ImportOutcome
-resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName = do
+resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
+  outcome <- resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName
+  let key = ((fromNormalizedUri importerUri).getUri, modName)
+  case outcome.importUri of
+    Just _ ->
+      UnliftIO.atomicModifyIORef' notFoundWarnedRef \s -> (Set.delete key s, ())
+    Nothing -> do
+      fresh <- UnliftIO.atomicModifyIORef' notFoundWarnedRef \s ->
+        if Set.member key s then (s, False) else (Set.insert key s, True)
+      when fresh $ logWith recorder Warning $ LogImportResolution $
+        case outcome.embedTried of
+          EmbedSkipped -> "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): " <> Text.pack modName
+          _            -> "Module not found: " <> Text.pack modName
+  pure outcome
+
+-- | 'resolveImportShared' without the not-found announcement.
+resolveImportQuietly
+  :: Recorder (WithPriority Log)
+  -> IORef (Set.Set (String, [Text]))
+  -> LibraryScope
+  -> FilePath
+  -> NormalizedUri
+  -> String
+  -> Action ImportOutcome
+resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName = do
   logWith recorder Info $ LogImportResolution $
     "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
 
@@ -731,7 +827,7 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
                          , embedTried = EmbedSkipped }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
-      res <- liftIO $ resolveLibrary rootDirectory mImportingNfp modName
+      res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
 
       -- Detailed candidate accounting + the shadow warning run only when
       -- JL4_LIBRARY_PATH is unset: with the env var set the operator has
@@ -792,33 +888,29 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
               -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
               -- as existing when the lookup succeeds. Fail soft regardless.
               pure $ outcome Nothing
-        Nothing
-          | res.hasExplicitPath -> do
-              logWith recorder Warning $ LogImportResolution $
-                "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): " <> Text.pack modName
-              pure $ outcome Nothing
-          | otherwise -> do
-              logWith recorder Warning $ LogImportResolution $
-                "Module not found: " <> Text.pack modName
-              pure $ outcome Nothing
+        -- Not announced here: 'resolveImportShared' does that, once.
+        Nothing -> pure $ outcome Nothing
   where
     -- Option E of LIBRARY-RESOLUTION-SHADOW-SPEC: when several copies of the
     -- same module are visible AND their contents differ, name them all (with
     -- symlinks dereferenced) and say which one wins. Identical copies (e.g. an
     -- XDG symlink pointing at the very sources the embed was built from) stay
     -- silent. Warned once per distinct configuration per session.
-    warnOnLibraryShadow res =
-      when (length res.existing >= 2) $ do
-        contents <- liftIO $ traverse (\(_, c) -> candidateContent modName c) res.existing
+    warnOnLibraryShadow res = do
+      -- Each file once: see 'distinctCopies'. Counting copies, and listing
+      -- them, both go by the deduplicated list.
+      copies <- liftIO $ distinctCopies res.existing
+      when (length copies >= 2) $ do
+        contents <- liftIO $ traverse (\(_, c) -> candidateContent modName c) copies
         let distinct = List.nub (catMaybes contents)
         when (length distinct >= 2) $ do
-          shownAll <- liftIO $ traverse (candidateDisplayCanonical . snd) res.existing
+          shownAll <- liftIO $ traverse (candidateDisplayCanonical . snd) copies
           let key = (modName, shownAll)
           fresh <- UnliftIO.atomicModifyIORef' shadowWarnedRef $ \s ->
             if Set.member key s then (s, False) else (Set.insert key s, True)
           when fresh $ do
             let mark i = if Just i == fmap fst res.winner then "[chosen]   " else "[shadowed] "
-                rows = zipWith (\(i, _) shown -> "  " <> mark i <> shown) res.existing shownAll
+                rows = zipWith (\(i, _) shown -> "  " <> mark i <> shown) copies shownAll
             logWith recorder Warning $ LogImportResolution $ Text.unlines $
               [ "Multiple differing copies of module `" <> Text.pack modName <> "` are visible:" ]
               <> rows
@@ -827,13 +919,53 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
                    <> ".l4 in the project root or beside the importing file."
                  ]
 
+-- | The modules a file imports that resolved to nothing, by bare name, in the
+-- order they are written, each once.
+--
+-- 'GetImports' reports an unresolvable IMPORT as a diagnostic and leaves it out
+-- of its result, so what it did not resolve is what the file declares minus
+-- what it returned. The names are computed the way 'GetImports' computes them,
+-- so the two cannot disagree about which module an IMPORT names. A file that
+-- does not parse has declared nothing and yields @[]@: its own error is the
+-- one to read.
+--
+-- For a host that must say so when an uploaded bundle imports something it
+-- does not carry (jl4-service), where the diagnostic itself is not in reach.
+unresolvedImports :: NormalizedUri -> Action [Text]
+unresolvedImports uri = do
+  mProg <- use GetParsedAst uri
+  mResolved <- use GetImports uri
+  pure $ case (mProg, mResolved) of
+    (Just prog, Just resolved) ->
+      let resolvedNames = Set.fromList (map (moduleBaseName . (.importName)) resolved)
+       in List.nub
+            [ n
+            | n <- foldTopDecls declaredImport prog
+            , not (Set.member n resolvedNames)
+            ]
+    _ -> []
+  where
+    declaredImport :: TopDecl Name -> [Text]
+    declaredImport = \ case
+      Import _ (MkImport _ n _) -> [moduleBaseName n]
+      _ -> []
+    moduleBaseName :: Name -> Text
+    moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+
+-- | The rules of a session that may use every tier of the library ladder: the
+-- CLI, the REPL and the language server. See 'LibraryScope'.
 jl4Rules :: EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
-jl4Rules evalConfig rootDirectory recorder = do
+jl4Rules = jl4RulesIn AmbientLibraries
+
+jl4RulesIn :: LibraryScope -> EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
+jl4RulesIn scope evalConfig rootDirectory recorder = do
   -- Session-scoped memory for 'resolveImportShared''s shadow warning, so a
   -- given shadow configuration is reported once, not on every re-resolution.
   shadowWarnedRef <- UnliftIO.newIORef Set.empty
+  -- ...and for its not-found warning, which two rules would otherwise each print.
+  notFoundWarnedRef <- UnliftIO.newIORef Set.empty
   let resolveImport :: NormalizedUri -> String -> Action ImportOutcome
-      resolveImport = resolveImportShared recorder shadowWarnedRef rootDirectory
+      resolveImport = resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory
 
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $
@@ -1405,13 +1537,23 @@ prettyNlgResolveWarning = \ case
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
   Resolve.RefUnattached r ->
-    "@ref `" <> getRef r.payload <> "` could not be attached to any following syntax node."
+    Resolve.refUnattachedMessage r.payload
+  Resolve.RefTrailing r code ->
+    Resolve.refTrailingMessage r.payload code
   Resolve.RefNoLocation ref ->
-    "@ref `" <> getRef ref <> "` has no source location. This might be an internal compiler error."
+    Resolve.refNoLocationMessage ref
   Resolve.FixityAnnotationMisplaced _ ->
     "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
   Resolve.FixityAnnotationNoLocation _ ->
     "A fixity annotation has no source location. This might be an internal compiler error."
+  Resolve.NonassertableAnnotationMisplaced _ ->
+    "This @nonassertable sits inside a definition's body, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE. A definition inside a WHERE or LET block cannot carry it yet."
+  Resolve.NonassertableAnnotationSuperseded _ ->
+    "Two or more @nonassertable marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
+  Resolve.NonassertableAnnotationSameLine _ ->
+    "This @nonassertable shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
+  Resolve.NonassertableAnnotationNoLocation _ ->
+    "A @nonassertable annotation has no source location. This might be an internal compiler error."
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1434,11 +1576,21 @@ rangeOfResolveWarning = \ case
     srcRangeToLspRange $ rangeOf name
   Resolve.RefUnattached r ->
     srcSpanToLspRange $ Just r.range
+  Resolve.RefTrailing r _ ->
+    srcSpanToLspRange $ Just r.range
   Resolve.RefNoLocation _ ->
     srcSpanToLspRange Nothing
   Resolve.FixityAnnotationMisplaced fx ->
     srcSpanToLspRange $ Just fx.range
   Resolve.FixityAnnotationNoLocation _ ->
+    srcSpanToLspRange Nothing
+  Resolve.NonassertableAnnotationMisplaced na ->
+    srcSpanToLspRange $ Just na.range
+  Resolve.NonassertableAnnotationSameLine na ->
+    srcSpanToLspRange $ Just na.range
+  Resolve.NonassertableAnnotationSuperseded na ->
+    srcSpanToLspRange $ Just na.range
+  Resolve.NonassertableAnnotationNoLocation _ ->
     srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------

@@ -59,9 +59,10 @@ rule readable — pays for it in analysis coverage, invisibly.
 ### 1.1 Why the cheap fix does not fix it
 
 The obvious reading of "descend into `WHERE`" is to swap `foldTopLevelDecides` for `foldDecides`
-in verify's `topLevelDecides` (`jl4/app/L4/Cli/Verify.hs:359-360`). Both folds already exist
-(`jl4-core/src/L4/Syntax.hs:800` and `:811`), and verify already calls the second one to
-_count_ what it skipped (`nestedNotVisited`, `Verify.hs:386-390`). One line.
+in verify's `topLevelDecides` (`jl4/app/L4/Cli/Verify.hs:360-361`). Both folds already exist
+(`foldTopLevelDecides` and `foldDecides`, `jl4-core/src/L4/Syntax.hs:835` and `:846`), and verify
+already calls the second one to _count_ what it skipped (`nestedNotVisited` in
+`jl4/app/L4/Cli/Verify.hs:394-399`). One line.
 
 It would not help. It yields a separate report on `enrolled`, and `enrolled MEANS \`is a member\``
 is faultless on its own. **The contradiction exists only in the combination**, so the unit of
@@ -420,6 +421,13 @@ A call box is the term `f a b`, so its key is the rule's path with its arguments
 
 Ruling, 2026-10-09, asked inline in session `ladder-ref-trans` (offered as a bench, SOMMELIER, not built): all four as recommended; no conditions; Meng's note: "i think we can skip SOMMELIER if i just say i accept your recommendations".
 
+**RULED 2026-10-12, not built.** Meng marked `accept`, option A on bench card R6 of "Main Wave Rulings" (<https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb>) at 23:55:38Z, with no note.
+The ruling, as printed on the card: the term key drops annotations instead of printing them blank, so adding an annotation field moves no `atomId`.
+Conditions: one restamp of the pinned ids, landing after #551, #558 and #633 (whichever of those lands later restamps instead); #633's `Refs` newtype is removed in that PR; a test checks that adding an annotation field moves no id; this section and the "stable UUIDv5" comment at `jl4-query-plan/src/L4/Decision/QueryPlan.hs:375` are corrected; the promise reads "ids move only by a ruling, with a restamp"; the change reaches `main` through the wave, so both release tracks give the same ids.
+Option B, keying imported and builtin names by name, is deferred until a client is shown storing ids across versions.
+A separate PR by Scalpel builds this, into unstable, after #545 and FLOTILLA; this record changes no code.
+Until it lands, what this section says of the key describes the code as built, which blanks each annotation but still prints its fields (`AtomKey.hs`, `over (gplate @Anno) (const emptyAnno)`).
+
 > **R3b** (**ANSWERED 2026-10-11**, ruled by Meng). A record field read written as its selector applied, `adult p`, is the same proposition as the projection `p's adult`, and the two carry one `atomId`.
 > The projection is sugar for the record accessor function applied to the record.
 
@@ -448,7 +456,7 @@ What adversarial review changed (one reviewer with probe binaries; no false merg
 What it knowingly leaves, by kind of failure:
 
 - **Silent, the safe direction:** a projection over an ordinary rule, `` p's `is adult` ``, and the rule applied, `` `is adult` p ``, are still two atoms (the fold reads only selectors), and a selector passed as a value does not merge with the lambda that reads the field.
-- **Pre-existing, outside the ladder:** the checker's over-broad `ComputedSelector` stamp is still read as it is by the DMN and document exporters, semantic tokens and shadowing; correcting it is a change of its own.
+- **Pre-existing, outside the ladder:** the checker's over-broad `ComputedSelector` stamp is still read as it is by the DMN exporter, semantic tokens, completion and shadowing (the document exporter tests the `_self` shape instead, `Export/Document.hs:652-656`); correcting it is a change of its own, smucclaw/l4-ide#1038.
 
 What it knowingly leaves, by kind of failure:
 
@@ -461,6 +469,26 @@ What it knowingly leaves, by kind of failure:
   Two occurrences of one term share an `atomId`, and a binding by `atomId` reaches both, but the BDD does not know they are equal, so `X AND NOT X` over a compound `X` is undetermined rather than `FALSE`.
   `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here (smucclaw/l4-ide#1032).
 - **Silent, and the unsafe direction, pre-existing: `carameliseExpr` resets an `INERT`'s AND/OR context under a comparison**, so two comparisons that evaluate differently are drawn as one term and share an `atomId` (smucclaw/l4-ide#1031).
+
+> **R3c** (**ASSUMED 2026-10-13, not ruled**; written by session Scalpel, to be confirmed or changed by Meng).
+> The key of a leaf larger than **2,048 expression nodes** (`L4.Viz.AtomKey.digestThreshold`), counted with its locals put in, is not the `show` of that tree but a **digest** of it: `~` followed by a SHA-1 of the same tree.
+> At or under the threshold the key is what it always was.
+
+Why: the key is the `show` of the leaf with its locals put in, and a local that names another twice (`LET a1 BE a0 AND y OR a0`, and so on down a chain) is linear in the source and exponential once put in, so the key's length, the time to build it and the time to hash it all doubled with each local.
+Measured on jl4-service's `/query-plan`, 2026-10-12, at `708c40f72`: a chain of 3 such `LET`s took 0.49 s, 5 took 2.18 s, 6 took 4.39 s and 7 took 8.93 s.
+With the cost of each byte of the key removed (`L4.Crypto.SHA1` recomputed its message schedule on every read), a chain of 13 still took 2.18 s, again doubling at each step.
+
+What it keeps: **R3 at every size.** The digest is a function of the tree the leaf means, not of how it was written, so a `LET` and its body written out where it is used are one atom above the threshold as below it.
+The digest of a node is a hash of the node with each child replaced by a stand-in, and of its children's digests, in order; a local is digested once per distinct set of digests of its arguments, and that is remembered, so the work is linear in the source.
+
+What it costs:
+
+- **A leaf above the threshold gets a different `atomId`, once.** None in the corpus does: the largest leaf, locals put in, is **313 nodes** (537 files / 8,085 leaves under `jl4/examples` that are not deliberate errors, plus 130 files / 687 leaves in `jl4-core/libraries` and `doc`), and 267 with a local in it. The threshold is the next power of two above four times 313.
+- **The digest declines some terms**, which are then keyed by `show` at any size: a local that cannot be put in (a recursive one, or one that applies a parameter as a function), a local passed as a value, one Unique declared twice, and a term with a binder of its own (a lambda, a quantifier, a pattern variable), because a bound variable is named by how many binders enclose it, so the digest of a shared subterm would depend on where it is put. A doubling chain that also has one of these is still exponential, as it was.
+- **The two kinds of key cannot be equal.** A `show` key begins with the name of a constructor, a capital letter. A digest key begins with `~`. `AtomKeySweepSpec` checks that no leaf key in the corpus is a digest and that every one begins with a capital letter, and `AtomKeyDigestSpec` that a digest begins with `~`.
+
+The estimate of the size is `L4.Viz.AtomKey.inlinedSize`, which does not build the inlined term; `AtomKeySpec` and `AtomKeySizeSpec` pin it against the real pass.
+What would settle it: Meng's ruling on the number, and on whether an id moving once for a leaf this size is acceptable.
 
 ### 10.2 What was measured before building (2026-10-05)
 

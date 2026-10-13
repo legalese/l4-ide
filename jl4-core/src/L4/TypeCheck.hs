@@ -90,7 +90,7 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.ResolveAnnotation (pickDesc)
-import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
+import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
@@ -112,6 +112,7 @@ import Data.Monoid
 import Control.Monad.Extra (mapMaybeM)
 import qualified Control.Monad.Extra as Extra
 import Data.Either (partitionEithers)
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
@@ -122,7 +123,7 @@ import Data.Function (on)
 import Control.Exception (assert)
 import Data.Char (isPrint)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -151,7 +152,6 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
-    , cyclicSynonyms = Set.empty
     , sectionBinderNames = Set.empty
     , sectionBinderDecls = Map.empty
     , importedImplicitReaders = Set.empty
@@ -187,10 +187,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
   let cycleErrors =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
-        ]
-        ++
-        [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
-        | cyc@(synName : _) <- synonymCycles
         ]
         ++
         -- The dedent hazard of R4: a section binder pushed back to column 1
@@ -245,7 +241,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
       fieldsOf c =
         nubBy (\ a b -> rawName a == rawName b)
           [ c'.fieldRead | c' <- fieldCollisions, c'.binders == c.binders ]
-      synonymCycles = detectTypeSynonymCycles program
       -- Section binders are elaborated LAST, so that the ASSUME each one becomes
       -- sits at the very head of its section's declaration list. Computed-field
       -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
@@ -261,7 +256,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
           (desugarSectionGivens (desugarComputedFields program))
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
-        , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
         , sectionBinderNames = collectSectionBinderNames program
         , sectionBinderDecls = collectSectionBinderDecls program
         }
@@ -405,8 +399,10 @@ checkProgram written = do
   -- known, a run of clauses that the parser grouped on bare names alone is
   -- told apart from a run of overloads ('separateOverloads').
   rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
+    >>= quarantineResolvedSynonymCycles
   withDeclares rdeclares do
     module' <- separateOverloads written
+    warnClauseArityChange module'
     rdecides <- scanFunSigModule module'
     withDecides rdecides do
       (rprog, topEnv) <- inferProgram module'
@@ -414,6 +410,36 @@ checkProgram written = do
       -- so it can be propagated to importing modules
       let localMixfixRegistry = buildMixfixRegistry rdecides
       pure (rprog, topEnv, localMixfixRegistry)
+
+-- | Warn about a definition that looks like one more clause of the group above
+-- it and is not: it has the group's name and no GIVEN of its own, and another
+-- number of inputs than the group has patterns.
+--
+-- @DECIDE f Red IS 1@, @DECIDE f c IS 2@ and @DECIDE f Red Blue IS 3@: the
+-- parser gathers the clauses that have the same name and the same number of
+-- patterns, so the third is read as a definition of its own, which takes two
+-- inputs and calls them @Red@ and @Blue@. It checks, and @f Green Red@ gives
+-- 3. A GIVEN of its own would have said that a rule of its own is meant, so a
+-- definition with one is not asked about. Only a definition that is not itself
+-- a group is: two or more clauses with a distinguishable pattern are a
+-- deliberate rule. Run on the module as 'separateOverloads' leaves it, so a
+-- run of overloads is not mistaken for a group.
+warnClauseArityChange :: Module Name -> Check ()
+warnClauseArityChange (MkModule _ _ sec) = goSection sec
+  where
+    goSection (MkSection _ _ _ _ decls) = do
+      for_ (zip decls (drop 1 decls)) \ case
+        (Decide _ (MkDecide gann _ (MkAppForm _ ghd _ _) _), Decide _ (MkDecide dann (MkTypeSig _ (MkGivenSig _ []) Nothing) (MkAppForm _ hd args _) _))
+          | Just matrix <- view annPmMatrix gann
+          , Nothing <- view annPmMatrix dann
+          , rawName hd == rawName ghd
+          , length args /= length matrix.scrutinees
+          , Just r <- rangeOf hd ->
+              addWarning (ClauseArityChanged r hd (length matrix.scrutinees) args)
+        _ -> pure ()
+      for_ decls \ case
+        Section _ sub -> goSection sub
+        _ -> pure ()
 
 -- | Turn each run of clauses that the parser grouped only because their bare
 -- names differ ('L4.Parser.decidePatternMatch') back into the separate
@@ -511,8 +537,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne eo h i lb apos) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne eo h i lb apos
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo h i lb apos) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo h i lb apos
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -884,7 +910,7 @@ warnDeprecatedAssume origin ann n role mReplacement aliases =
         _                  -> AtTopLevel
     , replacement = mReplacement
     , aliases
-    , annotated = isJust ann.extra.desc || isJust ann.extra.ref
+    , annotated = isJust ann.extra.desc || isJust (view annRef ann)
     }
 
 -- | R3: the deprecation warning for an @EXACTLY@ written in a regulative
@@ -1171,32 +1197,68 @@ asValue = local \ env -> env { enclosingObligation = (\ enc -> enc { direct = Fa
 -- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
 -- computes it per declaration.
 inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
-inferTopDecl _ (Declare ann declare) = do
+inferTopDecl _ (Declare ann declare@(MkDeclare _ _ (MkAppForm _ dn _ _) _)) = do
+  rejectNonassertable "a declaration" (Just (rawNameToText (rawName dn))) ann
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
 inferTopDecl _ (Decide ann decide) = do
+  rejectNonassertableOnInput decide
   refuseExportedClausesWithoutGiven decide
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
-inferTopDecl origin (Assume ann assume) = do
+inferTopDecl origin (Assume ann assume@(MkAssume _ _ (MkAppForm _ an _ _) _ _)) = do
+  rejectNonassertable "an input" (Just (rawNameToText (rawName an))) ann
   (rassume, extends) <- prune $ inferAssume origin assume
   pure (Assume ann rassume, extends)
 inferTopDecl _ (Directive ann directive) = do
+  rejectNonassertable "a directive" Nothing ann
   rdirective <- inferDirective directive
   pure (Directive ann rdirective, [])
 inferTopDecl _ (Import ann import_) = do
+  rejectNonassertable "an import" Nothing ann
   rimport_ <- inferImport import_
   pure (Import ann rimport_, [])
 inferTopDecl _ (Section ann sec) = do
+  rejectNonassertable "a section heading or its inputs" Nothing (getAnno sec)
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
 inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+  rejectNonassertable "a timezone" Nothing ann
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
   -- source range for that diagnostic. See T4.
   (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
+
+-- | @\@nonassertable@ marks a named step; on anything else, above it or
+-- among its lines, it is an error named for what it sits on, at the
+-- annotation's own range ('L4.Parser.ResolveAnnotation' gives every mark on
+-- such a construct to it).
+rejectNonassertable :: Text -> Maybe Text -> Anno -> Check ()
+rejectNonassertable what mname ann =
+  for_ (ann ^. annNonassertable) \ na ->
+    addError (NonassertableOnNonDefinition what mname (rangeOf na))
+
+-- | The marks the resolver found on a definition's GIVEN lines
+-- ('annNonassertableOnInputs'): one error each, naming the input on the
+-- mark's line, or the next one when the mark has a line of its own among
+-- them; on every surface, since 'L4.Export.isNonassertableDecide' never
+-- reads these.
+rejectNonassertableOnInput :: Decide Name -> Check ()
+rejectNonassertableOnInput decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ inputs) _) _ _) =
+  for_ (getAnno decide ^. annNonassertableOnInputs) \ na -> do
+    let lineOf :: Maybe SrcRange -> Maybe Int
+        lineOf = fmap (\ r -> r.start.line)
+        markLine = lineOf (rangeOf na)
+        inputName (MkOptionallyTypedName _ n _ _) = rawNameToText (rawName n)
+        atOrAfter :: OptionallyTypedName Name -> Bool
+        atOrAfter (MkOptionallyTypedName _ n _ _) = lineOf (rangeOf n) >= markLine
+        mname = case (filter atOrAfter inputs, reverse inputs) of
+          (next : _, _) -> Just (inputName next)
+          ([], lastInput : _) -> Just (inputName lastInput)
+          ([], []) -> Nothing
+    addError (NonassertableOnNonDefinition "an input" mname (rangeOf na))
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
 -- there is a potential problem. If we use type-directed name resolution but
@@ -2180,20 +2242,12 @@ inferTypeNameAndSynonym rappForm Nothing = do
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 inferTypeNameAndSynonym rappForm (Just t) = do
-  cyclic <- asks (.cyclicSynonyms)
   let
     rs = appFormHeads rappForm
-    -- A synonym that is a member of a declaration-time cycle gets NO
-    -- body: it has no finite expansion, and letting the expansion
-    -- machinery at it can blow up exponentially even under fuel. The
-    -- cycle itself is reported as CyclicTypeSynonyms; the body is still
-    -- checked below so its other errors surface.
-    quarantined = case rs of
-      (r : _) -> rawName (getOriginal r) `Set.member` cyclic
-      []      -> False
-    kt body = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) body
   rt <- inferType t
-  pure $ makeKnownMany rs (kt (if quarantined then Nothing else Just rt))
+  -- A synonym in a cycle is stripped of this body afterwards, once every
+  -- body is resolved: 'quarantineResolvedSynonymCycles'.
+  pure $ makeKnownMany rs (KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) (Just rt))
 
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
 inferConDecl rappForm (MkConDecl ann n tns) = do
@@ -3590,7 +3644,8 @@ constructorArity ei r = case Map.lookup (getUnique r) ei of
 -- ones are silenced, by the mark on the node: a CONSIDER the drafter wrote
 -- inside any clause's body is checked like any other. (A one-clause group's
 -- warnings are only withdrawn once the matrix has answered; see
--- 'settleOneClause'.)
+-- 'settleOneClause'.) Their redundant branches are never reported either:
+-- the only branch of theirs that can be redundant is the OTHERWISE they were given.
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
@@ -3650,7 +3705,11 @@ checkConsider ec ann e branches t = do
   -- is silenced; redundancy is a bug regardless of intended partiality.
   unless (inNonexhaustive || leftToClauseMatrix || null missing) do
     addWarning $ PatternMatchesMissing missing
-  unless (null redundant) do
+  -- A CONSIDER the clauses compiled to is @WHEN p@ and an OTHERWISE for the
+  -- clauses after it, which nobody wrote, and which nothing reaches when @p@
+  -- is a new name. That finding is about the clauses, and
+  -- 'warnUnreachableClauses' makes it in their terms.
+  unless (null redundant || isJust generated) do
     addWarning $ PatternMatchRedundant redundant
 
   -- A CONSIDER a multi-clause group compiles to sees only its own clause, so
@@ -5538,10 +5597,15 @@ maxMissingSuggestions = 64
 --     ('Nabla's) describing every value not matched by the branches seen so
 --     far; it starts as the unconstrained set (everything).
 --   * A branch whose guard conjunction is inconsistent with EVERY current
---     'Nabla' covers nothing new: redundant. (Guard-less arms — OTHERWISE
---     and bare binders — are deliberately exempt, preserving the
---     long-standing behaviour that a defensive trailing catch-all is not
---     flagged; they still consume the remaining value space.)
+--     'Nabla' covers nothing new: redundant. That holds of a branch with no
+--     guards (an OTHERWISE, a bare binder, an @EXACTLY@ of the scrutinee
+--     itself) too: it is consistent with every 'Nabla', so it is redundant
+--     when there is none, which is when an earlier branch with no guards has
+--     taken the whole value space (its residue is empty). After branches
+--     that merely name every constructor the 'Nabla's stay, each with every
+--     constructor excluded, so a defensive trailing catch-all there is not
+--     flagged. That is deliberate: the refinement-tree analysis this
+--     replaced did not flag it either.
 --   * Splitting a 'Nabla' against a branch with guards @g1..gk@ yields the
 --     standard residue: @nabla ∧ ¬g1@, @nabla ∧ g1 ∧ ¬g2@, …; inconsistent
 --     conjunctions die immediately.
@@ -5572,7 +5636,7 @@ analyzeGuardRows branches = do
       let coversSomething =
             any (\nab -> isJust (foldM (flip addConstraint) nab (map guardEq guards))) uncovered
           redundant'
-            | not coversSomething, not (null guards) = b : redundant
+            | not coversSomething = b : redundant
             | otherwise = redundant
           uncovered' =
             nubNablas (concatMap (splitByGuards guards) uncovered)
@@ -5843,6 +5907,72 @@ matchPatFunTy  r t args =
 -- ----------------------------------------------------------------------------
 -- Forward References high level helpers
 -- ----------------------------------------------------------------------------
+
+-- | The guard against a type synonym that refers to itself.
+--
+-- A recursive synonym has no finite expansion, so it would send the
+-- synonym-expanding loops of "L4.TypeCheck.Unify" into infinite regress. The
+-- fuel there bounds the depth of that regress, not its work: two synonyms that
+-- each name themselves twice, unified with each other, ran past 4 GiB. So a
+-- synonym in a cycle is given no body at all, and reported as
+-- 'CyclicTypeSynonyms'.
+--
+-- This reads the references themselves, once every body is resolved. A body
+-- names the 'Unique' of the synonym each type application in it resolved to,
+-- whatever it was spelled (an alias, a section-qualified name, a name two
+-- sections both declare), and a name that did not resolve (an ambiguity, an
+-- unknown name) names none. A cycle among those is a cycle of expansions.
+-- It cannot reject a program the checker accepts correctly: a reference
+-- cycle among synonyms has no finite expansion.
+--
+-- It replaced a pass over spellings, run before anything was resolved,
+-- which was both too narrow (it could not see through a qualified name) and
+-- too wide: it keyed synonyms by name, so a record, an import, or a synonym
+-- of the same name and another arity was taken for the synonym itself and
+-- valid programs were rejected.
+quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
+quarantineResolvedSynonymCycles decls = do
+  for_ cycles \ cyc -> case cyc of
+    []                       -> pure ()
+    (_, firstName, _) : _ ->
+      errorContext (WhileCheckingDeclare firstName) $
+        addError (CyclicTypeSynonyms [ n | (_, n, _) <- cyc ])
+  pure (map quarantine decls)
+  where
+    -- Every synonym that still has a body, in declaration order: the unique
+    -- all its spellings share, its declared name, and the uniques its body
+    -- applies.
+    synonyms :: [(Unique, Name, [Unique])]
+    synonyms =
+      [ (getUnique r, getOriginal r, map getUnique (typeHeads body))
+      | MkDeclChecked _ cis <- decls
+      , MkCheckInfo (r : _) (KnownType _ _ (Just body)) <- cis
+      ]
+
+    -- Each cycle's members in declaration order, the cycles in the order of
+    -- their first members.
+    cycles :: [[(Unique, Name, [Unique])]]
+    cycles =
+      map (map snd)
+        . List.sortOn (map fst)
+        $ [ List.sortOn fst members
+          | CyclicSCC members <- stronglyConnComp [ (ix, u, deps) | ix@(_, (u, _, deps)) <- indexed ]
+          ]
+
+    indexed :: [(Int, (Unique, Name, [Unique]))]
+    indexed = zip [0 ..] synonyms
+
+    quarantine :: DeclChecked DeclareOrAssume -> DeclChecked DeclareOrAssume
+    quarantine d = d { publicNames = map unbody d.publicNames }
+
+    unbody :: CheckInfo -> CheckInfo
+    unbody ci = case ci of
+      MkCheckInfo (r : _) (KnownType k ps (Just _))
+        | getUnique r `Set.member` cyclic -> ci { checkEntity = KnownType k ps Nothing }
+      _ -> ci
+
+    cyclic :: Set Unique
+    cyclic = Set.fromList [ u | cyc <- cycles, (u, _, _) <- cyc ]
 
 scanDeclares ::
   (a -> Check [DeclTypeSig]) ->
@@ -7670,6 +7800,17 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (NonassertableOnNonDefinition what mname _) =
+  [ "@nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert."
+  , "Here it is on " <> maybe what (\ n -> "`" <> n <> "`, " <> what) mname <> ", " <> why
+  ]
+ where
+  -- An input is what a request supplies, so "cannot be asserted" would read
+  -- as though it were already closed; say what the request does with it,
+  -- and where the mark would have to go to close the definition instead.
+  why
+    | what == "an input" = "which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
+    | otherwise = "which cannot be asserted in any case; move it above the definition it is meant for, or remove it."
 prettyCheckError (FixityAnnotationMalformed _ raw) =
   [ "I could not parse this fixity annotation:"
   , ""
@@ -7704,6 +7845,16 @@ prettyCheckError (CyclicTypeSynonyms cycleSyns) =
   [ ""
   , "A type synonym must not refer to itself, directly or via other"
   , "synonyms, because it could then never be fully expanded."
+  ]
+prettyCheckError (SynonymExpansionLimit limit syn) =
+  [ "I stopped following type synonyms at " <> quotedName (getName syn) <> "."
+  , ""
+  , "To compare two types I replace a type synonym by the type it stands for,"
+  , "and I give up after " <> Text.pack (show limit) <> " replacements in a row. Here a chain of synonyms,"
+  , "each defined as the next, is longer than that."
+  , ""
+  , "The types were not found to differ. Declare the first synonym in the chain"
+  , "as the type it finally stands for, to shorten the chain."
   ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
@@ -8053,6 +8204,14 @@ prettyCheckWarning = \ case
     [ "This clause of " <> quotedName headName <> " is never used."
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
+    ]
+  ClauseArityChanged _ headName patterns inputs ->
+    [ "This definition of " <> quotedName headName <> " is not another clause of the clauses above it."
+    , "Each of those has " <> Text.textShow patterns <> " pattern" <> (if patterns == 1 then "" else "s")
+        <> ", and this one has " <> Text.textShow (length inputs) <> " input" <> (if length inputs == 1 then "" else "s")
+        <> (if null inputs then "" else ", " <> Text.intercalate " and " (map quotedName inputs))
+        <> ", so it is a separate rule, and what follows its name is the names it gives its inputs, not patterns."
+    , "If it is meant as another clause, give it as many patterns as the others have; if it is a rule of its own, give it a GIVEN of its own."
     ]
   ClauseAnnotationUnused _ headName k annotation hasGiven ->
     [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."

@@ -21,7 +21,6 @@ import L4.Annotation
 import L4.FindDefinition
 import qualified L4.StateGraph.Lens as SGLens
 import LSP.L4.SemanticTokens (srcPosToPosition)
-import Data.Either (isRight)
 import GHC.Generics (Generically (..))
 import L4.Lexer (LexFix (..), PError (..), annotations, directives, keywords)
 import qualified L4.Lexer as Lexer
@@ -187,15 +186,20 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
 -- many @DECIDE@/@MEANS@ shapes the visualiser does not handle yet, and a lens
 -- that fails when clicked is worse than none. If this is ever too slow the
 -- fix is to cache, or better, to make the visualiser accept more.
+--
+-- One refusal keeps its lens: a rule written as DECIDE clauses that is too
+-- large to draw. Its drafter has done nothing wrong, and a lens that silently
+-- went missing would not say why, so the lens's title says it, and clicking it
+-- answers with the whole message.
 decisionGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [CodeLens]
 decisionGraphCodeLenses verTextDocId typeCheck =
   foldTopLevelDecides decideToCodeLens typeCheck.module'
   where
     -- Three arguments: the IDE's displayers do not draw call expansions, so
     -- the lens does not ask for them ('VisualiseOptions' has the fourth).
-    mkDecisionGraphCodeLens srcPos = CodeLens
+    mkDecisionGraphCodeLens title srcPos = CodeLens
       { _command = Just Command
-        { _title = "Show decision graph"
+        { _title = title
         , _command = "l4.visualize"
         , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
         }
@@ -204,14 +208,19 @@ decisionGraphCodeLenses verTextDocId typeCheck =
       }
 
     -- Without simplification — simplification is a toggle inside the panel.
-    canVisualize decide =
+    lensTitle decide =
       let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
-      in isRight (Ladder.doVisualize decide cfg)
+      in case Ladder.doVisualize decide cfg of
+           Right _ -> Just "Show decision graph"
+           Left (Ladder.ClauseGroupTooLarge budget) ->
+             Just ("No decision graph: these clauses would draw more than " <> Text.pack (show budget) <> " boxes")
+           Left (Ladder.ClauseGroupTooLong _) ->
+             Just "No decision graph: these clauses are too long to draw"
+           Left _ -> Nothing
 
     decideToCodeLens decide =
-      case rangeOfNode decide of
-        Just node
-          | canVisualize decide -> [mkDecisionGraphCodeLens node.start]
+      case (rangeOfNode decide, lensTitle decide) of
+        (Just node, Just title) -> [mkDecisionGraphCodeLens title node.start]
         _ -> []
 
 -- | The state graph's lens: "Show state graph" above every top-level
@@ -444,11 +453,8 @@ newly-added DECIDE would not surface its inline affordance until a manual re-vis
 See smucclaw/l4-ide#557. -}
 updateVizConfig :: VersionedTextDocumentIdentifier -> TypeCheckResult -> RecentlyVisualised -> Ladder.VizConfig
 updateVizConfig verTxtDocId tcRes recentlyVisualised =
-  Ladder.getVizConfig recentlyVisualised.vizState
-    & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
-    & set #moduleUri (toNormalizedUri verTxtDocId._uri)
-    & set #substitution tcRes.substitution
-    & set #module' (ladderModule tcRes)
+  Ladder.retargetVizConfig verTxtDocId (ladderModule tcRes) tcRes.substitution
+    (Ladder.getVizConfig recentlyVisualised.vizState)
 
 {- | The module a ladder is drawn from: the checked module with every mixfix
 call stamped with its pattern ('Ladder.stampMixfixCalls'), so two operators
@@ -487,6 +493,24 @@ decideNodeStartsAtPos pos d = Just pos == do
 -- ----------------------------------------------------------------------------
 -- LSP Code Actions
 -- ----------------------------------------------------------------------------
+
+-- | The inputs of a definition that the outline lists: the ones the drafter
+-- wrote. The desugarer of a multi-clause definition names the inputs a GIVEN
+-- does not ('L4.Parser.generatedName'), and the outline leaves those out.
+-- Here rather than in the document-symbol handler, which the tests cannot
+-- reach (@jl4-lsp\/app@).
+outlineGivenParams :: [OptionallyTypedName Resolved] -> [OptionallyTypedName Resolved]
+outlineGivenParams = filter \ (MkOptionallyTypedName _ pn _ _) ->
+  not (isGeneratedName (rawName (getOriginal pn)))
+
+-- | The local definitions of a body that the outline lists. The bindings a
+-- multi-clause definition is compiled to ('PmSynthetic') are not things the
+-- drafter wrote, so they are left out.
+outlineLocals :: Expr Resolved -> [LocalDecl Resolved]
+outlineLocals = \ case
+  Where _ _ locals -> filter (not . isClausesBinding) locals
+  LetIn _ locals _ -> filter (not . isClausesBinding) locals
+  _                -> []
 
 completions :: Rope -> NormalizedUri -> TypeCheckResult -> Position -> [CompletionItem]
 completions rope nuri typeCheck pos@(Position ln col) = do

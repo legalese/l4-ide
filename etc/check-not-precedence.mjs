@@ -101,9 +101,12 @@
 // linter teaches people to ignore it.
 //
 // THE TWO FALSE POSITIVES, named so the next person does not rediscover them as
-// bugs: `x AND NOT y <<SG-c-2025-sghcf-12>>` in `ok/ref.l4` and
-// `lsp/semantic-tokens/annotations.l4`, where the `<` opens a `<<citation>>`
-// annotation and is not a comparison at all.
+// bugs: `x AND NOT y <<SG-c-2025-sghcf-12>>`, as `ok/ref.l4` and
+// `lsp/semantic-tokens/annotations.l4` once had it, where the `<` opens a
+// `<<citation>>` annotation and is not a comparison at all. Both files now put
+// the citation before `x`, because a citation refers to what FOLLOWS it; the
+// shape is still worth knowing, since a citation after an operand is how it
+// used to be written.
 //
 // Both of those, and the backtick-identifier repair in `stripNoise` below, are
 // the same lesson in different clothes: STRIP EVERY CONSTRUCT THAT CAN CONTAIN

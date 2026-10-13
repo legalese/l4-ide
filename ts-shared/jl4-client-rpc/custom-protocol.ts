@@ -265,6 +265,32 @@ export const GetExportedFunctionsRequestType = makeL4RpcRequestType<
 >('l4/getExportedFunctions')
 
 // ---------------------------------------------------------------------------
+// l4/embeddedLibrary — the source of a stdlib module compiled into the server
+// ---------------------------------------------------------------------------
+
+export interface EmbeddedLibraryParams {
+  /** A `jl4-embedded:/<module>.l4` URI, spelled as the server returned it in a
+   *  definition, a diagnostic or an import list. */
+  uri: string
+}
+
+export interface EmbeddedLibraryResponse {
+  /** The module's source: byte-for-byte what the server type-checks when
+   *  another file imports it. */
+  text: string
+}
+
+/**
+ * The standard library that `jl4-lsp` carries inside its binary has no file on
+ * disk, so the server names those modules with `jl4-embedded:` URIs. This is
+ * how a client reads one (to show it read-only, for go-to-definition).
+ */
+export const EmbeddedLibraryRequestType = makeL4RpcRequestType<
+  EmbeddedLibraryParams,
+  EmbeddedLibraryResponse
+>('l4/embeddedLibrary')
+
+// ---------------------------------------------------------------------------
 // l4/exportDocument — deterministic L4 → formatted document
 // ---------------------------------------------------------------------------
 

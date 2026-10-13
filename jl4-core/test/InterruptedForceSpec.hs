@@ -15,6 +15,7 @@ module InterruptedForceSpec (spec) where
 import Control.Exception (try)
 import Control.Monad (forM)
 import Data.IORef (newIORef, readIORef)
+import GHC.Conc (getAllocationCounter, setAllocationCounter)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import qualified Data.Text as Text
 import Test.Hspec
@@ -68,6 +69,16 @@ chainLibSrc = Text.unlines $
 chainMainSrc :: Text.Text
 chainMainSrc = Text.unlines [ "IMPORT chain_lib", "", "#EVAL t200" ]
 
+-- | The same chain, but its bottom raises a user error, so that every one of
+-- the two hundred forces is unwound by 'raiseException' rather than by
+-- 'runEval'.
+failingChainLibSrc :: Text.Text
+failingChainLibSrc = Text.unlines $
+  "t0 MEANS 1 / 0" : [ "t" <> n <> " MEANS t" <> prev <> " + 1" | i <- [1 .. 200 :: Int], let n = Text.pack (show i), let prev = Text.pack (show (i - 1)) ]
+
+failingChainMainSrc :: Text.Text
+failingChainMainSrc = Text.unlines [ "IMPORT failing_chain_lib", "", "#EVAL t200" ]
+
 spec :: Spec
 spec = describe "an interrupted force of an imported thunk" do
   -- The allocation limit lands at a heap check, so sweeping it across a run
@@ -93,6 +104,41 @@ spec = describe "an interrupted force of an imported thunk" do
           pure hit
         -- the sweep must have interrupted the run at least once, or it proves nothing
         length (filter id interruptedAt) `shouldSatisfy` (> 20)
+
+  -- A user error unwinds the stack frame by frame in 'raiseException'. A limit
+  -- that landed between a frame's pop and its unwind lost the frame, and with
+  -- it the restoring of its thunk. The sweep covers the last 60 KB of the run
+  -- in steps of 40 bytes (the RTS checks the limit at nursery-block boundaries, about 4 KB apart, so the landing points are only that fine on average), which holds the unwind of all 200 frames; the first
+  -- run's baseline, taken with no limit, is the answer every later run must
+  -- reproduce.
+  it "leaves no stale mark when an allocation limit lands during a user error's unwind" do
+    cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+    case checkWithImports (vfsFromList [("failing_chain_lib.l4", failingChainLibSrc)]) failingChainMainSrc of
+      Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+      Right r -> do
+        baselineEnv <- evaluateImports' cfg r.tcdResolvedImports
+        (_, baseline) <- execEvalModuleWithEnv cfg r.tcdEntityInfo baselineEnv r.tcdModule
+        let expected = map render baseline
+        expected `shouldSatisfy` any (Text.isInfixOf "DivisionByZero")
+        -- how much a whole run allocates, to aim the sweep at its end
+        total <- do
+          importEnv <- evaluateImports' cfg r.tcdResolvedImports
+          setAllocationCounter maxBound
+          _ <- execEvalModuleWithEnv cfg r.tcdEntityInfo importEnv r.tcdModule
+          (maxBound -) <$> getAllocationCounter
+        interruptedAt <- forM [1 .. 1500 :: Int] \i -> do
+          importEnv <- evaluateImports' cfg r.tcdResolvedImports
+          hitFlag <- newIORef False
+          let limited = cfg { allocationLimit = Just (MkAllocationLimit (max 1 (total - 60000 + fromIntegral i * 40)) hitFlag) }
+              run c = execEvalModuleWithEnv c r.tcdEntityInfo importEnv r.tcdModule
+          _ <- try (run limited) :: IO (Either AllocationLimitExceeded (Environment, [EvalDirectiveResult]))
+          hit <- readIORef hitFlag
+          (_, results) <- run cfg
+          map render results `shouldBe` expected
+          pure hit
+        -- most of the sweep lands inside the run, and the tail of it past the end
+        length (filter id interruptedAt) `shouldSatisfy` (> 1000)
+        length (filter not interruptedAt) `shouldSatisfy` (>= 1)
 
   it "can be forced again, on the same thread, by the next evaluation" do
     cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy

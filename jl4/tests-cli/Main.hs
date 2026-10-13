@@ -10,9 +10,9 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
 import Data.Char (isSpace)
-import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, nub, sort)
+import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
@@ -119,6 +119,10 @@ evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
 evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
 evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
 
+-- | Typechecks cleanly; one @#ASSERT@ holds and one evaluates to FALSE.
+assertFailsFixture :: FilePath
+assertFailsFixture = fixtureDir </> "assert-fails.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -152,11 +156,79 @@ batchClausesTabs      = fixtureDir </> "batch-multi-clause-tabs.l4"
 batchClausesString    = fixtureDir </> "batch-multi-clause-string.l4"
 batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
 
-batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson :: FilePath
 batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
+
+-- | A CSV with columns no input declares, run against 'batchEligFixture'.
+batchUndeclaredColumnCsv :: FilePath
+batchUndeclaredColumnCsv = fixtureDir </> "batch-undeclared-column.csv"
+
+-- | Payloads the wrapper has to carry to the rule and back unchanged, echoed
+-- through 'batchCodeFixture'.
+batchEscapeRoundtripJson :: FilePath
+batchEscapeRoundtripJson = fixtureDir </> "batch-escape-roundtrip.json"
+
+-- | Cases that send text for a NUMBER or BOOLEAN input (@"25"@, @"false"@) or a
+-- CSV cell for a STRING input, run against 'batchEligFixture' and
+-- 'batchCodeFixture'.
+batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv, batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson :: FilePath
+batchDeclaredStringsJson           = fixtureDir </> "batch-declared-strings.json"
+batchDeclaredStringsYaml           = fixtureDir </> "batch-declared-strings.yaml"
+batchDeclaredStringCellsCsv        = fixtureDir </> "batch-declared-string-cells.csv"
+batchDeclaredBadNumberJson         = fixtureDir </> "batch-declared-bad-number.json"
+batchDeclaredNumberForStringJson   = fixtureDir </> "batch-declared-number-for-string.json"
+
+-- | CSV cells for inputs that are neither a NUMBER nor a BOOLEAN: a choice
+-- (@DECLARE Answer IS ONE OF True, False, Unknown@), a @MAYBE@ choice, a DATE,
+-- and synonyms of a NUMBER and a BOOLEAN, which are still read as those.
+batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional, batchDeclaredTextDates, batchDeclaredTextSynonyms :: FilePath
+batchDeclaredText         = fixtureDir </> "batch-declared-text.l4"
+batchDeclaredTextAnswers  = fixtureDir </> "batch-declared-text-answers.csv"
+batchDeclaredTextOptional = fixtureDir </> "batch-declared-text-optional.csv"
+batchDeclaredTextDates    = fixtureDir </> "batch-declared-text-dates.csv"
+batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
+
+-- | Inputs declared through a type synonym (@DECLARE Year IS A NUMBER@, a
+-- BOOLEAN, a MAYBE), with the plain types beside them as the control, and the
+-- cases for each; and two CSV files that cannot be read.
+batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof :: FilePath
+batchSynonym         = fixtureDir </> "batch-synonym.l4"
+batchSynonymYearJson = fixtureDir </> "batch-synonym-year.json"
+batchSynonymFlagJson = fixtureDir </> "batch-synonym-flag.json"
+batchSynonymYearCsv  = fixtureDir </> "batch-synonym-year.csv"
+batchSynonymFlagCsv  = fixtureDir </> "batch-synonym-flag.csv"
+batchCsvBadQuote     = fixtureDir </> "batch-csv-bad-quote.csv"
+batchCsvEmpty        = fixtureDir </> "batch-csv-empty.csv"
+batchCsvOpenQuoteEof     = fixtureDir </> "batch-csv-open-quote-eof.csv"
+batchCsvOpenQuoteMid     = fixtureDir </> "batch-csv-open-quote-mid.csv"
+batchCsvOpenQuoteCrlf    = fixtureDir </> "batch-csv-open-quote-crlf.csv"
+batchCsvOpenQuoteDoubled = fixtureDir </> "batch-csv-open-quote-doubled.csv"
+batchCsvOpenQuoteHeader  = fixtureDir </> "batch-csv-open-quote-header.csv"
+batchCsvQuoteClosesAtEof = fixtureDir </> "batch-csv-quote-closes-at-eof.csv"
+
+-- | A choice type with one constructor that has a field and one that has
+-- none. Only the second can be given as JSON input; every other value is
+-- refused by name rather than passed on as NOTHING or as itself
+-- (smucclaw/l4-ide#1012).
+batchChoiceFixture, batchChoiceJson :: FilePath
+batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
+batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
+
+-- | A choice type declared under a § section (smucclaw/l4-ide#947).
+batchSectionEnumFixture, batchSectionEnumJson :: FilePath
+batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
+batchSectionEnumJson    = fixtureDir </> "batch-section-enum.json"
+
+-- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
+batchLineBreakFixture, batchLineBreakJson :: FilePath
+batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
+batchLineBreakJson    = fixtureDir </> "batch-string-line-break.json"
 
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
@@ -249,10 +321,11 @@ arrayField v k = case objField v k of
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
-batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
 
 -- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
 descAttachmentFixture :: FilePath
@@ -295,7 +368,9 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- five files prove the checker is capable of going red — and going red for the
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
-verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture :: FilePath
+verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
+verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture :: FilePath
+verifyClauseTableLargeFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -303,6 +378,12 @@ verifyDeadBranchFixture   = fixtureDir </> "verify-dead-branch.l4"
 verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
+verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
+verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
+verifyClauseGroupWhereFixture = fixtureDir </> "verify-clause-group-where.l4"
+verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
+verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
+verifyClauseTableLargeFixture = fixtureDir </> "verify-clause-table-large.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -409,8 +490,16 @@ coreFixtures =
   , evalCrashFixture, runEvalTraceFixture
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
-  , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
-  , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+  , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson
+  , batchUndeclaredColumnCsv, batchEscapeRoundtripJson
+  , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
+  , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
+  , batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof
+  , batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional
+  , batchDeclaredTextDates, batchDeclaredTextSynonyms
+  , batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture
   , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
   , batchTyImported, batchTyImportedTypes, batchTyImportedJson
   , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
@@ -423,7 +512,9 @@ coreFixtures =
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
-  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
+  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
+  , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
+  , verifyClauseTableLargeFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture, verifyFieldReadsFixture
@@ -714,6 +805,25 @@ spec bin = do
           other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
+    -- Ruled by Meng 2026-09-29: an #ASSERT that evaluates cleanly to FALSE is a
+    -- failed test, and fails the run. Without this, no script or CI job could
+    -- catch a failing assertion by exit status.
+    it "fails the run when an #ASSERT evaluates to false" $ do
+      Output code sout _ <- runL4 bin ["run", assertFailsFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "returns ok=false in JSON when an #ASSERT evaluates to false" $ do
+      env <- jsonEnvelope bin ["run", assertFailsFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> map (`objField` "value") (toList v) `shouldBe` [Just (Bool True), Just (Bool False)]
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the failing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertFailsFixture] "Check succeeded."
+
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
 
@@ -792,6 +902,37 @@ spec bin = do
           diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
           diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
         other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+  -- A step of a trace is printed as source, and a string literal in source is
+  -- spelled with escapes: a line break as \n, a tab as \t. #595 made the printer
+  -- do that so that `l4 batch` keeps a string that holds a line break; it also
+  -- changed every other surface that prints a step: the Trace: block of
+  -- `l4 run`, the trace `l4 trace` reports, and the `exampleCode` of the
+  -- jl4-service reasoning tree (pinned in jl4-service-test). Before it, a step
+  -- broke across lines inside the literal. A string VALUE, such as the one a
+  -- trace ends in or the Result: block shows, is not source and keeps its
+  -- line break.
+  -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R2, option A): the escaped
+  -- form stays on every surface; recorded in specs/done/BATCH-PROCESSING-SPEC.md.
+  describe "a string literal in a trace step" $ do
+    let escapedStep = "IF (x GREATER THAN 0) THEN \"line\\nnext\" ELSE \"tab\\there\""
+
+    it "is spelled as source in `l4 run`'s Trace: block, and the value keeps its line break" $ do
+      Output code sout _ <- runL4 bin ["run", evalTraceLineBreakFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any (escapedStep `isInfixOf`)
+      -- no step ends inside a literal
+      out `shouldNotSatisfy` any ("THEN \"line" `isSuffixOf`)
+      -- the value does: the Result: block holds it on two lines
+      out `shouldSatisfy` ([ "Result:", "  \"line", "  next\"" ] `isInfixOf`)
+
+    it "is spelled as source in the trace `l4 trace` reports" $ do
+      Output code _ serr <- runL4 bin ["trace", evalTraceLineBreakFixture]
+      code `shouldBe` ExitSuccess
+      let err = map (filter (/= '\r')) (lines serr)
+      err `shouldSatisfy` any (escapedStep `isInfixOf`)
+      err `shouldNotSatisfy` any ("THEN \"line" `isSuffixOf`)
 
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
@@ -1466,9 +1607,11 @@ spec bin = do
       nonBlankLines sout `shouldBe` 2
       sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
 
-    it "infers CSV cell types so numeric params typecheck" $ do
+    it "reads a CSV cell for a NUMBER or BOOLEAN input as the number or boolean it spells" $ do
       -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
-      -- the rows would come back status=error; success proves inference works.
+      -- the rows would come back status=error; success proves the declared
+      -- types were applied. (Every column here is declared, so this does not
+      -- reach 'inferCsvCell'; the undeclared-column test below does.)
       Output code sout _ <-
         runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
       code `shouldBe` ExitSuccess
@@ -1528,15 +1671,275 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
 
-    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+    it "keeps an exponent-form CSV cell (1E5) for a STRING input as written, not a number" $ do
       -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
       -- but must survive as the string "1E5" against a STRING param rather
-      -- than being coerced to 100000.
+      -- than being coerced to 100000. (A STRING input is read by its declared
+      -- type, so this does not reach 'inferCsvCell' either.)
       Output code sout _ <-
         runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    -- The one place a CSV cell is still typed by how it looks ('inferCsvCell'):
+    -- a column that no input declares, which the case echoes under `input`.
+    -- The columns are `lot`, `flag` and `serial`; batchEligFixture declares
+    -- none of them. The exponent form must stay text here too, because JSON's
+    -- number grammar would otherwise turn the lot code 1E5 into 100000.
+    it "types a CSV cell by how it looks when no input declares its column, and keeps 1E5 text" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchUndeclaredColumnCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      let cell k r = objField r "input" >>= (`objField` k)
+      map (cell "lot")    rows `shouldBe` [Just (String "1E5"), Just (Number 123456)]
+      map (cell "flag")   rows `shouldBe` [Just (Bool True), Just (Bool False)]
+      -- 007 is not a JSON number, and a date is text
+      map (cell "serial") rows `shouldBe` [Just (String "007"), Just (String "2026-10-13")]
+
+    -- A value is read by the type its input declares. The merge of main into
+    -- unstable (d543d8531) dropped main's `coerceInputTypes` as "superseded by
+    -- inferCsvCell", which types a CSV cell by how it looks and knows nothing of
+    -- JSON or YAML, so each of these answered with status "error".
+    describe "reads a value by the type its input declares" $ do
+      let rowsOf args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , sout
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          statusAndResult row = (objField row "status", fst (resultAndPresumed row))
+          succeeded r = (Just (String "success"), Just r)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in JSON" $ do
+        (code, sout, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsJson]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+        -- the line shows the case as the inputs declare it
+        sout `shouldSatisfy` ("\"age\":25" `isInfixOf`)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in YAML" $ do
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsYaml]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+
+      it "validates a case that sends text for a NUMBER or BOOLEAN input" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchDeclaredStringsJson, "--validate-only"]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+      it "keeps a CSV cell for a STRING input as the text written" $ do
+        -- 123456 and 1.50 used to arrive as numbers and be refused; 018956 and
+        -- 1e3 already stayed text
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredStringCellsCsv]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows
+          `shouldBe` map (succeeded . String) ["123456", "018956", "1.50", "1e3"]
+
+      -- Assumed, not ruled: JSON and YAML carry their own types, so a number
+      -- sent for a STRING input is an error, as it is on main.
+      it "still refuses a JSON number for a STRING input" $ do
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredNumberForStringJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` [Just (String "error")]
+
+      it "leaves text that is not a number alone, so the error names the value" $ do
+        -- `age` is readable and `income` is not. The error is about `lots`;
+        -- before, it was about the `25` that came first.
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredBadNumberJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [row] -> do
+            objField row "status" `shouldBe` Just (String "error")
+            let diagnostics = show (objField row "diagnostics")
+            diagnostics `shouldSatisfy` ("lots" `isInfixOf`)
+            diagnostics `shouldNotSatisfy` ("25" `isInfixOf`)
+          other -> expectationFailure ("expected 1 row, got " ++ show (length other))
+
+      -- Only a NUMBER or a BOOLEAN reads a CSV cell as anything but its text.
+      -- A choice named `True`, or a DATE written without dashes, was typed by
+      -- how it looks and then refused: `True` became JSON true ("Could not
+      -- decode true as Answer"), and 20261013 a number.
+      let csvRows entry csv = rowsOf [batchDeclaredText, "-e", entry, "--inputs", csv]
+      it "reads a CSV cell for a choice input as the name written" $ do
+        (code, _, rows) <- csvRows "echo answer" batchDeclaredTextAnswers
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` map (succeeded . String) ["yes", "no", "dunno"]
+
+      it "reads a CSV cell for a MAYBE choice input as the name written, and a blank one as left out" $ do
+        -- the second row is a quoted "", a cell that is blank (T3c)
+        (code, _, rows) <- csvRows "echo optional answer" batchDeclaredTextOptional
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` map (succeeded . String) ["yes", "none", "dunno"]
+
+      it "reads a CSV cell for a DATE input as text, so a bad date is reported as one" $ do
+        (code, _, rows) <- csvRows "echo date" batchDeclaredTextDates
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [good, bad] -> do
+            statusAndResult good `shouldBe` succeeded (String "2026-10-13")
+            objField bad "status" `shouldBe` Just (String "error")
+            show (objField bad "diagnostics") `shouldSatisfy` ("Could not parse date string '20261013'" `isInfixOf`)
+          other -> expectationFailure ("expected 2 rows, got " ++ show (length other))
+
+      -- Not a regression test: it passes on a build that types every cell by
+      -- its look. It pins the way a synonym is still read as what it stands for.
+      it "still reads a CSV cell for a synonym of NUMBER or BOOLEAN as one" $ do
+        (code, _, rows) <- csvRows "echo year" batchDeclaredTextSynonyms
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Number 2026)]
+
+      -- A MAYBE input is read by the type it wraps, so "25" is 25 for a MAYBE
+      -- NUMBER. Nothing tested that, and a build that stopped looking through
+      -- MAYBE would have passed every other test here.
+      it "reads text for a MAYBE NUMBER input as the number it spells, and refuses text that is not one" $ do
+        (code, _, rows) <- rowsOf [batchMaybeFixture, "--inputs", batchMaybeTextJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "error", "success"]
+        case rows of
+          [text, notANumber, number] -> do
+            fst (resultAndPresumed text)   `shouldBe` Just (Number 25)
+            fst (resultAndPresumed number) `shouldBe` Just (Number 25)
+            show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
+          other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
+
+      -- An input declared through a synonym is the type the synonym stands for
+      -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:
+      -- it used to look at the name `Year` and judge nothing, so text that is
+      -- no number, or a number for a flag, was `valid` and then refused when
+      -- the case was run. The plain exports in the fixture are the control.
+      describe "an input declared through a synonym" $ do
+        let run extra entry file = rowsOf ([batchSynonym, "-e", entry, "--inputs", file] <> extra)
+            -- one word for how a case went, run or validated
+            outcome row = case objField row "status" of
+              Just (String st) | st `elem` ["success", "valid"] -> "accepted"
+              _                                                  -> "refused" :: String
+            shape row = (outcome row, objField row "diagnostics", objField row "errors")
+
+        it "refuses text that is no number, as for a NUMBER, in JSON and in CSV" $ do
+          forM_ [batchSynonymYearJson, batchSynonymYearCsv] \file -> do
+            (_, _, plain)   <- run [] "plain number" file
+            (_, _, through) <- run [] "next year" file
+            map shape through `shouldBe` map shape plain
+            -- and the first row, the text `abc`, is the one refused
+            take 1 (map outcome through) `shouldBe` ["refused"]
+            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("field 'y'" `isInfixOf`)
+
+        it "refuses text that is no boolean, and a number, as for a BOOLEAN, in JSON and in CSV" $ do
+          forM_ [batchSynonymFlagJson, batchSynonymFlagCsv] \file -> do
+            (_, _, plain)   <- run [] "plain flag" file
+            (_, _, through) <- run [] "flip flag" file
+            map shape through `shouldBe` map shape plain
+            take 1 (map outcome through) `shouldBe` ["refused"]
+
+        it "judges a synonym's value under --validate-only as it judges the plain type's" $ do
+          forM_ [ ("next year", "plain number", batchSynonymYearJson)
+                , ("flip flag", "plain flag", batchSynonymFlagJson) ] \(entry, control, file) -> do
+            (_, _, plain)   <- run ["--validate-only"] control file
+            (_, _, through) <- run ["--validate-only"] entry file
+            map shape through `shouldBe` map shape plain
+            -- the mismatch is named, as for the plain type
+            show (map (`objField` "errors") through) `shouldSatisfy` ("Type mismatch for field" `isInfixOf`)
+
+        it "validates what it would run: a case is valid exactly when it is accepted" $ do
+          forM_ [ ("next year", batchSynonymYearJson), ("flip flag", batchSynonymFlagJson)
+                , ("maybe year", batchSynonymYearJson), ("year maybe", batchSynonymYearJson) ]
+            \(entry, file) -> do
+              (_, _, validated) <- run ["--validate-only"] entry file
+              (_, _, ran)       <- run [] entry file
+              (entry, map outcome validated) `shouldBe` (entry, map outcome ran)
+
+    -- A CSV file that cannot be read stops the command before any case runs.
+    -- It used to say only what the parser was called (`endOfInput`, `13: not
+    -- enough input`); cassava's own reader, before `csvRows`, named the input
+    -- it stopped at.
+    it "names the line of a CSV file it cannot read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvBadQuote]
+      code `shouldSatisfy` (/= ExitSuccess)
+      -- the stray quote is on line 2, after `ab`
+      sout `shouldSatisfy` ("line 2 of the CSV file is not valid CSV, near `\"c`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("endOfInput" `isInfixOf`)
+
+    it "says that an empty CSV file is empty" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvEmpty]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("the CSV file is empty" `isInfixOf`)
+      sout `shouldNotSatisfy` ("not enough input" `isInfixOf`)
+
+    -- A quote that opens a cell and is never closed. cassava's reader of a
+    -- quoted cell takes everything to the end of the file and drops the last
+    -- byte, taking it for the closing quote: `"abc` was the text `ab` with
+    -- status success, and in the middle of a file the cell swallowed every row
+    -- after it. Each is refused, at the line where the quote opens.
+    describe "a quote that opens a CSV cell and is never closed" $ do
+      let refusedAt n file = do
+            Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", file]
+            code `shouldSatisfy` (/= ExitSuccess)
+            sout `shouldSatisfy` (("line " <> show (n :: Int) <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed") `isInfixOf`)
+            -- and no row is run
+            sout `shouldNotSatisfy` ("\"status\"" `isInfixOf`)
+
+      it "is refused at the end of the file, naming the line" $ refusedAt 2 batchCsvOpenQuoteEof
+      it "is refused in the middle of a file, rather than taking the rows after it" $ refusedAt 2 batchCsvOpenQuoteMid
+      it "is refused in a file with Windows line ends" $ refusedAt 2 batchCsvOpenQuoteCrlf
+      it "is refused when the last quote is half of a doubled one" $ refusedAt 2 batchCsvOpenQuoteDoubled
+      it "is refused in the header" $ refusedAt 1 batchCsvOpenQuoteHeader
+
+      -- The control: a cell that closes at the very end of the file, with no
+      -- line end after it, is a cell, so the check cannot be refusing every
+      -- file that ends in a quote.
+      it "does not refuse a cell that closes at the end of the file" $ do
+        Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvQuoteClosesAtEof]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"result\":\"abc\"" `isInfixOf`)
+
+    it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
+      -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
+      -- and 42. Before #1012 the last four decoded to NOTHING or to
+      -- themselves, reached the fixture's OTHERWISE, and came back
+      -- "status":"success" with the answer "other".
+      Output code sout _ <-
+        runL4 bin ["batch", batchChoiceFixture, "--inputs", batchChoiceJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let rows = filter (not . all isSpace) (lines sout)
+      length rows `shouldBe` 5
+      case rows of
+        (sq : refused) -> do
+          sq `shouldSatisfy` ("\"result\":\"square\"" `isInfixOf`)
+          sq `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          flip mapM_ refused $ \r -> do
+            r `shouldSatisfy` ("Could not decode" `isInfixOf`)
+            r `shouldSatisfy` ("as Shape for field 's'" `isInfixOf`)
+            r `shouldSatisfy` ("one of: Square." `isInfixOf`)
+            r `shouldSatisfy` (not . ("\"other\"" `isInfixOf`))
+        [] -> expectationFailure "l4 batch printed no rows"
+      sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
+      sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "decodes a constructor of a choice type declared under a section by its bare name" $ do
+      -- "Red" is what JSONENCODE writes for Red, and what a request sends;
+      -- the constructor is stored as `Part A.Red`. Before #947's fix every
+      -- row answered FALSE, success; after #1012 alone, every row was refused.
+      Output code sout _ <- runL4 bin ["batch", batchSectionEnumFixture, "--inputs", batchSectionEnumJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [red, blue] -> do
+          red  `shouldSatisfy` ("\"result\":true" `isInfixOf`)
+          blue `shouldSatisfy` ("\"result\":false" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
+
+    it "keeps a line break inside a string literal as it is written" $ do
+      -- batch runs the re-printed module; before #1028 the newline came back
+      -- followed by the body's indentation ("line\\n  next"), status success.
+      Output code sout _ <- runL4 bin ["batch", batchLineBreakFixture, "--inputs", batchLineBreakJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [broken, tabbed] -> do
+          broken `shouldSatisfy` ("\"result\":\"line\\nnext\"" `isInfixOf`)
+          tabbed `shouldSatisfy` ("\"result\":\"tab\\there\"" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
       -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
@@ -1579,12 +1982,35 @@ spec bin = do
 
     -- Regression tests for target T11 (CLI injection / corruption).
     it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
-      -- The input row's payload contains backslashes (Windows path), embedded
-      -- quotes, newline/tab, and shell metacharacters. A naive quote-only
-      -- escaper produced an unparseable generated wrapper; a correct one
-      -- round-trips every byte as an L4 string literal.
+      -- The payload holds a Windows path, embedded quotes, a newline, a tab,
+      -- an apostrophe, braces and a percent sign. This pins the LOUD half of
+      -- the escaping only: `echoFixed` ignores its payload, so a quote-only
+      -- escaper fails here just because an unescaped `"` ends the wrapper's
+      -- string literal early and the wrapper no longer lexes. A backslash, a
+      -- tab or a line break does not break the lexing, and is pinned by the
+      -- next test.
       env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
       objField env "status" `shouldBe` Just (String "success")
+
+    -- The silent half. With a quote-only escaper a backslash reaches the lexer
+    -- unescaped, which reads it as the start of an escape of its own, so the
+    -- rule is handed JSON that is not the JSON that was sent, and the row is
+    -- still a success. Measured on the old escaper: `\u0041` (a backslash, then
+    -- u0041) comes back as `A`, `\\n` (two backslashes and an n) as a backslash
+    -- and an n, and a Windows path, a tab and a line break as null.
+    -- `echoCode` returns its input, so a payload the wrapper changed shows as a
+    -- result that is not the one sent.
+    it "hands every payload to the rule and back unchanged: backslashes, tabs, line breaks, escape-looking text" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchEscapeRoundtripJson, "--continue-on-error"]
+      let rows = [ row | l <- map (filter (/= '\r')) (lines sout)
+                       , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ]
+          sent = [ objField r "input" >>= (`objField` "code") | r <- rows ]
+      code `shouldBe` ExitSuccess
+      map (`objField` "status") rows `shouldBe` replicate 6 (Just (String "success"))
+      sent `shouldBe` map (Just . String . T.pack)
+        [ "C:\\Users\\x", "back\\slash", "tab\there", "line\nbreak", "\\u0041", "\\\\n" ]
+      map (fst . resultAndPresumed) rows `shouldBe` sent
 
   describe "l4 batch: TYPICALLY defaults (W3)" $ do
     -- Before W3 every one of these rows came back "Missing required field",
@@ -2131,6 +2557,24 @@ spec bin = do
       "...and also when the entry file is named bare"
       (checkFrom shadowImporterDir)
 
+    -- With the entry file named bare, the project root and the importing
+    -- file's directory are the same directory, so the root tier and the
+    -- importer-relative tier probe ONE file. The warning listed it twice, once
+    -- as [chosen] and once as [shadowed], which reads as a copy shadowing itself.
+    it "the shadow warning lists a copy once when two tiers name the same file" $ do
+      Output code sout serr <- checkFrom shadowSiblingDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr
+      serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
+      -- Two copies are visible, the project's prelude.l4 and the embedded
+      -- stdlib: two rows, the first chosen and the second shadowed.
+      let rows = [ l | l <- lines serr, "  [chosen]" `isPrefixOf` l || "  [shadowed]" `isPrefixOf` l ]
+      map (takeWhile (/= ']')) rows `shouldBe` ["  [chosen", "  [shadowed"]
+      length (filter ("prelude.l4" `isInfixOf`) rows) `shouldBe` 1
+
   -- smucclaw/l4-ide#971: an IMPORT that resolves to nothing has to say so, and a
   -- candidate URI has to read back as the path it was built from.
   --
@@ -2265,6 +2709,30 @@ spec bin = do
           filter ("file:" `isPrefixOf`) paths `shouldBe` []
           -- ...and no location is listed twice.
           nub (map asFile paths) `shouldBe` map asFile paths
+
+    -- Two rules resolve every IMPORT: the one that collects parser hints
+    -- (GetMixfixRegistry) and the one that collects typecheck dependencies
+    -- (GetImports). Each used to log "Module not found" at Warning, so one
+    -- mistake printed two warnings, and both landed in `--json` diagnostics.
+    it "warns once about an unresolved import, not once per rule that resolves it" $
+      sandbox "l4-import-missing-warns-once"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          let warning = "Module not found: zz no such module 971"
+              occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          Output _code _sout serr <- runIn dir ["check", "importer.l4"]
+          occurrences warning serr `shouldBe` 1
+          -- `l4 check --json` and `l4 run --json` carry the Warning lines in
+          -- `diagnostics`; each must carry this one once.
+          Output _ checkJson _ <- runIn dir ["check", "--json", "importer.l4"]
+          occurrences warning checkJson `shouldBe` 1
+          Output _ runJson _ <- runIn dir ["run", "--json", "importer.l4"]
+          occurrences warning runJson `shouldBe` 1
+          -- Positive control: `l4 ast` never typechecks, so the rule that
+          -- collects dependencies never runs, and the parser-hint rule is the
+          -- only one that tells you. One warning must not become none.
+          Output _ _ astErr <- runIn dir ["ast", "importer.l4"]
+          occurrences warning astErr `shouldBe` 1
 
   -- `l4 export` and the DMN engine checks. Called here rather than with the
   -- other backends below because this is where those describes have always
@@ -2531,6 +2999,119 @@ spec bin = do
       Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
       code `shouldBe` ExitFailure 1
 
+    -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
+    -- Before, it was skipped as not boolean; then its generated nesting made
+    -- the analysis report a dead limb that is only the clause that returns
+    -- FALSE, which the hand-written CONSIDER next to it does not.
+    it "analyses a clause group, and finds in it what it finds in the CONSIDER written by hand" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyClauseGroupFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"analysed\":2" `isInfixOf`)
+      sout `shouldSatisfy` ("\"skipped\":0" `isInfixOf`)
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
+
+    -- The two forms are one rule, so `l4 verify` counts them alike: the same
+    -- leaves, the same questions among them (one atomId each), the same ladder,
+    -- and a call in a clause is read through as it is in the CONSIDER.
+    it "counts a clause group's atoms, and reads its calls, as it does the CONSIDER written by hand" $ do
+      for_ [ (verifyClauseGroupFixture, "covered", "`covered by hand`", 0)
+           , (verifyClauseGroupCallFixture, "paid", "`paid by hand`", 1)
+           , (verifyClauseTableFixture, "`colour rule`", "`colour rule by hand`", 0)
+           , (verifyClauseTableFixture, "`either rule`", "`either rule by hand`", 0) ] \ (fixture, clauses, hand, calls) -> do
+        env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+        let stats nm =
+              [ (k, v)
+              | Just (Array ds) <- [objField env "decisions"]
+              , d <- toList ds
+              , objField d "name" == Just (String nm)
+              , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "callsReadThrough", "callsLeftOpaque", "findings"]
+              , Just v <- [objField d k]
+              ]
+        length (stats clauses) `shouldBe` 7
+        lookup "analysed" (stats clauses) `shouldBe` Just (Bool True)
+        lookup "callsReadThrough" (stats clauses) `shouldBe` Just (Number calls)
+        stats clauses `shouldBe` stats hand
+
+    -- Reading a table's clauses as their CONSIDER comes before putting any other
+    -- binding in. In the other order the clauses' shared fall-through was walked
+    -- once for every branch that reached it: this 25-row table of two enums did
+    -- not finish in 4 GiB (killed after 27 s on 9d7f5829e), and its CONSIDER takes
+    -- a moment. The bound is generous; the failure it guards against is not slow
+    -- but unbounded.
+    it "analyses a 25-row table of two enums in moments, as the CONSIDER written by hand" $ do
+      mOut <- runL4Within 60 bin ["verify", verifyClauseTableLargeFixture, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish a 25-row clause table within 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+            Left err -> expectationFailure ("JSON parse failed: " ++ err)
+            Right env -> do
+              let stats nm =
+                    [ (k, v)
+                    | Just (Array ds) <- [objField env "decisions"]
+                    , d <- toList ds
+                    , objField d "name" == Just (String nm)
+                    , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "findings"]
+                    , Just v <- [objField d k]
+                    ]
+              lookup "analysed" (stats "`table rule`") `shouldBe` Just (Bool True)
+              stats "`table rule`" `shouldBe` stats "`table rule by hand`"
+
+    -- A rule that CALLS a rule written as clauses too long to read through. The
+    -- callee is refused on its own line; the call is left as a box with the
+    -- reason, as any other call whose meaning cannot be drawn. It used to be
+    -- unfolded raw and its clauses' LETs drawn as one leaf: here a meaningless
+    -- "read through", and with long clause bodies no answer at all (killed at
+    -- 100 s and 2.7 GB in review).
+    it "leaves a call to clauses too long to read through as a box, and says why" $ do
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-cli-test-too-long-callee"
+          file = dir </> "too-long-callee.l4"
+      createDirectoryIfMissing True dir
+      writeFile file tooLongCalleeSource
+      mOut <- runL4Within 60 bin ["verify", file, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish within 60 s on a caller of clauses too long to read through"
+        Just (Output _ sout _) -> case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+          Left err -> expectationFailure ("JSON parse failed: " ++ err)
+          Right env -> do
+            let decisionNamed nm =
+                  [ d
+                  | Just (Array ds) <- [objField env "decisions"]
+                  , d <- toList ds
+                  , objField d "name" == Just (String nm)
+                  ]
+            map (`objField` "analysed") (decisionNamed "bigrule") `shouldBe` [Just (Bool False)]
+            case decisionNamed "caller" of
+              [d] -> case objField d "callsLeftOpaque" of
+                Just (Array opaque) ->
+                  [why | String why <- toList opaque] `shouldSatisfy` any ("too long to draw" `T.isInfixOf`)
+                other -> expectationFailure ("expected callsLeftOpaque on caller, got " ++ show other)
+              other -> expectationFailure ("expected one decision named caller, got " ++ show other)
+
+    -- A clause group whose ladder is one box (a column matches JUST x, a list
+    -- and the like, which the ladder does not break down) is not reported as
+    -- clean: there was nothing to check.
+    it "says it did not analyse a clause group the ladder could not break down" $ do
+      env <- jsonEnvelope bin ["verify", verifyClauseGroupMaybeFixture, "--format", "json"]
+      let reasons =
+            [ (nm, analysed, reason)
+            | Just (Array ds) <- [objField env "decisions"]
+            , d <- toList ds
+            , Just (String nm) <- [objField d "name"]
+            , Just (Bool analysed) <- [objField d "analysed"]
+            , let reason = case objField d "reason" of
+                    Just (String r) -> r
+                    _ -> ""
+            ]
+      case reasons of
+        [(nm, analysed, reason)] -> do
+          nm `shouldBe` "`flag is set`"
+          analysed `shouldBe` False
+          reason `shouldSatisfy` T.isInfixOf "not broken down"
+        other -> expectationFailure ("expected one decision, got " ++ show other)
+
     it "records a non-boolean DECIDE as skipped, never as clean" $ do
       env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]
       case objField env "summary" >>= (`objField` "skipped") of
@@ -2548,6 +3129,27 @@ spec bin = do
       case objField env "summary" >>= (`objField` "nestedNotVisited") of
         Just (Number n) -> n `shouldBe` 1
         other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
+
+    -- A rule written as DECIDE clauses is compiled to a CONSIDER and a LET for
+    -- the clauses after the first. No drafter wrote that LET, and verify reads
+    -- the group as the CONSIDER with the LET read through, so it is not a
+    -- decision left unvisited; a WHERE the drafter wrote inside a clause is.
+    it "does not count what a clause group is compiled to as WHERE-nested decisions" $ do
+      let nestedLine = "nested in a WHERE clause were NOT visited" :: String
+          nestedCount fixture = do
+            env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+            pure (objField env "summary" >>= (`objField` "nestedNotVisited"))
+      -- three clauses, nothing the drafter nested
+      Output _ groupText _ <- runL4 bin ["verify", verifyClauseGroupFixture]
+      groupText `shouldSatisfy` (not . (nestedLine `isInfixOf`))
+      nestedCount verifyClauseGroupFixture `shouldReturn` Just (Number 0)
+      -- three clauses, one WHERE the drafter wrote inside the second
+      Output _ whereText _ <- runL4 bin ["verify", verifyClauseGroupWhereFixture]
+      whereText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
+      nestedCount verifyClauseGroupWhereFixture `shouldReturn` Just (Number 1)
+      -- a hand-written WHERE-nested DECIDE outside any clause group
+      Output _ handText _ <- runL4 bin ["verify", verifyNestedFixture]
+      handText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
 
     -- This test used to assert the OPPOSITE, as a tripwire: "a future change
     -- which starts descending announces itself here rather than by silently
@@ -2710,6 +3312,18 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | A rule written as clauses that, read through, passes the 20,000-part bound,
+-- and a rule that calls it. Each clause tests two MAYBE inputs with patterns that
+-- bind a name, which tell the pruning nothing, so every clause draws the ones
+-- after it twice: eleven clauses are the fewest that pass the bound.
+tooLongCalleeSource :: String
+tooLongCalleeSource = unlines $
+  ["GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN"]
+    <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> show i <> " AND y GREATER THAN " <> show i | i <- [0 .. 10 :: Int] ]
+    <> [ "DECIDE bigrule m k IS FALSE", ""
+       , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+       , "DECIDE caller p q f IS bigrule p q OR f" ]
 
 -- | Each decision in an @l4 verify@ JSON envelope, with the kinds of its
 -- findings, in report order. A decision that was not analysed has none.

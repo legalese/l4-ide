@@ -339,8 +339,8 @@ If you would rather see the machinery than talk to it, the driver is usable dire
 ```bash
 # $L4 is already set, from whichever of the two routes above you took;
 # go.sh refuses outright if it does not point at something executable
-etc/go/go.sh plan --subject regcf --encoding primary
-etc/go/go.sh run  --subject regcf --encoding primary
+etc/go/go.sh plan --subject regcf --encoding legalese
+etc/go/go.sh run  --subject regcf --encoding legalese
 ```
 
 ### If your machine is not set up for Haskell — four routes
@@ -367,7 +367,7 @@ The run does not stop at **HG1**. With no review on record it proceeds on a prov
 If you want the record to say why a run went ahead unsigned, waive the gate instead — on the record, never silently:
 
 ```bash
-etc/go/go.sh run --subject regcf --encoding primary \
+etc/go/go.sh run --subject regcf --encoding legalese \
   --waive HG1="learning the pipeline; not a review of the encoding"
 ```
 

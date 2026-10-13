@@ -27,12 +27,12 @@ import qualified LSP.Core.Shake as Shake
 import Control.Exception (throwIO)
 import EvalLimits (currentAllocationLimit)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
+import LSP.L4.Oneshot (oneshotL4ActionAndErrorsIn)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
-import System.FilePath ((<.>), takeFileName)
+import System.FilePath ((<.>), takeExtension, takeFileName)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -138,13 +138,33 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
 
+-- | Where the 'IMPORT's of a deployed bundle may be resolved: the bundle's own
+-- files (the VFS tier, consulted first), then the standard library built into
+-- this binary, and nothing from the host. The service serves bundles that
+-- somebody else uploaded, to callers who cannot see the machine it runs on, so
+-- a `prelude.l4` in the working directory or a `JL4_LIBRARY_PATH` in the
+-- environment must not be able to replace the stdlib for every deployment —
+-- it did, silently (a deploy "applied", every call answered 422 `sum is not
+-- in scope`, nothing was logged). Every session the service opens uses this.
+--
+-- Ruled 2026-10-12 (bench "Main Wave Rulings", card R5, option A); one of its
+-- conditions is that an IMPORT that resolves to nothing is logged when a bundle
+-- is compiled or rebuilt after a restart ('typecheckAndEvalBundle' returns
+-- them). See specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10.
+bundleScope :: Rules.LibraryScope
+bundleScope = Rules.EmbeddedStdlibOnly
+
 -- | Typecheck and evaluate all files in a bundle in a SINGLE Shake session.
 -- This avoids creating N independent IDE sessions that redundantly re-parse
 -- and re-typecheck overlapping imports. Shake caches intermediate results
 -- (parse, import resolution, typecheck) and shares them across all files.
 --
 -- Returns per-file typecheck results and per-file evaluator environments
--- (for files that have exports and need import environments).
+-- (for files that have exports and need import environments), and the IMPORTs
+-- of the bundle's @.l4@ files that resolved to nothing, as (importing file,
+-- module name). The caller says so in its log: the diagnostic for one is in the
+-- session's store, which this function does not hand back, and a bundle with an
+-- unresolvable IMPORT still compiles.
 typecheckAndEvalBundle
   :: ModuleContext
   -- ^ All source files in the bundle (filepath -> content)
@@ -157,29 +177,32 @@ typecheckAndEvalBundle
         -- ^ Typecheck results per file (Nothing if typecheck failed)
         , Map FilePath EvalEnv.Environment
         -- ^ Evaluator import environments for requested files
+        , [(FilePath, Text)]
+        -- ^ IMPORTs that resolved to nothing: (importing file, module name)
         )
 typecheckAndEvalBundle moduleContext evalFiles = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  -- Core libraries (prelude, …) to register as stable virtual files, unless the
-  -- deployment ships its own copy of the same name (which then shadows the
-  -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand embedded fallback
-  -- (LSP.L4.Rules). That fallback used to mutate the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yielded an
-  -- unstable/duplicate prelude module and spurious overload ambiguity (e.g.
-  -- `count xs >= n` → "ambiguous __GEQ__"). Verified: the same source is
-  -- rejected via the embedded fallback and accepted when the library is a real
-  -- virtual file. The libraries stay *dependencies* (NOT added to `allUris`),
-  -- so they are never serialized or surfaced as deployment files — only
-  -- resolved when imported.
+  -- Core libraries (prelude, …) to register as virtual files, unless the
+  -- deployment ships a file of the same basename. They are registered at
+  -- `Shake.embeddedLibraryUri`, the one URI the resolver hands back for an
+  -- embedded winner, so every importer that falls through to the embedded tier
+  -- names the same module: a bundle must not hold two `prelude` modules (the
+  -- duplicate-module ambiguity, e.g. "ambiguous __GEQ__" on `count xs >= n`).
+  -- This service used to register them at `./<name>.l4`; see
+  -- `Shake.embeddedLibraryUriScheme` for why that key is forgeable.
   --
-  -- They are registered at `Shake.embeddedLibraryUri`, the one URI the resolver
-  -- hands back for an embedded winner. Registering them anywhere else would
-  -- give a bundle two `prelude` modules whenever some importer resolves via the
-  -- VFS tier and another falls through to the embedded tier — which is how the
-  -- duplicate-module ambiguity above arises.
+  -- This registration does NOT make `IMPORT prelude` resolve to the stdlib.
+  -- The VFS tier probes `project:/` and `./<module>.l4` keys, which a
+  -- `jl4-embedded:/` URI can never match, so what makes the stdlib the answer
+  -- is the resolver's embedded tier, and what keeps anything else from
+  -- standing in for it is that every session below runs under
+  -- `Rules.EmbeddedStdlibOnly` ('bundleScope'). Since 'Shake.getVirtualFile'
+  -- serves the same libraries from a pure map, these writes are redundant for
+  -- lookup; they stay *dependencies* (NOT added to `allUris`), so they are
+  -- never serialized or surfaced as deployment files — only resolved when
+  -- imported.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
         [ (name, content)
@@ -190,9 +213,9 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   -- Use the first file's directory as the session root (arbitrary but required)
   let allFiles = StrictMap.toList moduleContext
   case allFiles of
-    [] -> pure ([], StrictMap.empty, StrictMap.empty)
+    [] -> pure ([], StrictMap.empty, StrictMap.empty, [])
     ((firstPath, _) : _) -> do
-      (errs, (tcMap, evalMap)) <- oneshotL4ActionAndErrors evalConfig firstPath $ \_nfp -> do
+      (errs, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndErrorsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -213,6 +236,12 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         let tcMap = StrictMap.fromList
               [(path, mTc) | ((path, _, _), mTc) <- zip fileNfps (toList tcResults)]
 
+        -- The IMPORTs that found nothing. The typecheck above has already
+        -- resolved every import, so this reads memoised results.
+        unresolved <- fmap concat $
+          forM [(path, uri) | (path, _, uri) <- fileNfps, takeExtension path == ".l4"] $
+            \(path, uri) -> map (path,) <$> Rules.unresolvedImports uri
+
         -- Build evaluator import environments for files that need them.
         -- Uses GetLazyEvaluationDependencies which recursively evaluates imports.
         -- Within the same session, Shake reuses already-evaluated imports: the
@@ -231,9 +260,9 @@ typecheckAndEvalBundle moduleContext evalFiles = do
               | (path, Just (env, _dirResults)) <- evalPairs
               ]
 
-        pure (tcMap, evalMap)
+        pure (tcMap, evalMap, unresolved)
 
-      pure (errs, tcMap, evalMap)
+      pure (errs, tcMap, evalMap, unresolved)
 
 buildFunDecide :: Text -> FunctionDeclaration -> ExceptT EvaluatorError IO (Decide Resolved)
 buildFunDecide fnImpl fnDecl = do
@@ -1543,11 +1572,12 @@ buildImportEnvironment filepath source moduleContext _entityInfo = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  result <- oneshotL4ActionAndErrors evalConfig filepath $ \nfp -> do
+  result <- oneshotL4ActionAndErrorsIn bundleScope evalConfig filepath $ \nfp -> do
     let uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1888,12 +1918,13 @@ typecheckModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text]
 typecheckModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1906,12 +1937,13 @@ typecheckModule file input moduleContext = do
 evaluateModule :: (MonadIO m) => Presumption -> FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
 evaluateModule presumption file input moduleContext = do
   evalConfig <- liftIO $ requestEvalConfig apiDefaultPolicy presumption True
-  result <- liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  result <- liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)

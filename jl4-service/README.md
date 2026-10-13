@@ -257,6 +257,12 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+Each node of the response's `reasoning` tree has `exampleCode`, `explanation` and `children`.
+`exampleCode` is the step as L4 source, and `explanation` is its result.
+Wherever the answer prints rule source, a string literal in it is escaped the way the source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`.
+So `"line\nnext"` in `exampleCode` stays on one line, and so does the literal in the `explanation` of a `DEONTIC` contract (`MUST say "pay\nnow"`), which prints the contract's rule.
+A string that is itself the result, such as the answer of an ordinary function, keeps its line breaks in `explanation`.
+
 #### Deontic (Contract) Evaluation
 
 Functions returning `DEONTIC` model contract obligations and require additional parameters for simulation:
@@ -427,6 +433,13 @@ diagram calls its leaves.
 > leaves that merely **print** alike — two mixfix operators sharing a head keyword,
 > or an input and a rule of the same name — get two. A name counts by what it
 > refers to, never by its spelling or its position in the file.
+>
+> **A `label` is the leaf printed as rule source**, in `asks[].atoms[]`, in
+> `ranked` and on a ladder leaf, so a string literal in it is escaped the way the
+> source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`
+> (`note EQUALS "a\nb"`). The `atomId` does not depend on how a label prints: it
+> is a hash of the term, read from the syntax tree and never from the printed
+> text, so the escaping moves no `atomId`.
 >
 > **How long an `atomId` lasts.** It survives a redeploy of the same source, and
 > an edit elsewhere in the module: adding or moving other rules, and renaming or

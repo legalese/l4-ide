@@ -311,11 +311,9 @@ runOneshotWithDiagnostics evalConfig fp act = do
 --
 -- That exclusion is NOT the whole exit-code contract for @l4 run@. Ruled by
 -- Meng 2026-08-01: a @#EVAL@ that CRASHES during evaluation must be loud — it
--- exits non-zero. @l4 run@ therefore applies its own crash check on the
--- directive results ('L4.Cli.Run.evalDirectiveCrashed') in addition to calling
--- this predicate. An earlier version of this comment claimed an
--- evaluation-time exception never changes the exit code; that was the
--- pre-ruling behaviour and is no longer true.
+-- exits non-zero; ruled 2026-09-29: so must an @#ASSERT@ that evaluates to
+-- false. @l4 run@ therefore applies its own check on the directive results
+-- ('L4.Cli.Run.evalDirectiveFailsRun') in addition to calling this predicate.
 --
 -- If silencing is ever wanted, add a @-q@ \/ @--quiet-eval@ option to @l4 run@
 -- that restores exit 0 for a crashed directive — rather than flipping the

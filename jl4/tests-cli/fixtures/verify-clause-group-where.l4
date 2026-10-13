@@ -1,0 +1,14 @@
+-- A BOOLEAN rule written as DECIDE clauses, the second of which has a WHERE
+-- the drafter wrote. `l4 verify` reads the group as the CONSIDER it stands for,
+-- so the definitions the clauses are compiled to (one binds the clauses after
+-- the first, and `wet` sits inside it) are not decisions it skipped; `wet`,
+-- which the drafter wrote, is.
+DECLARE Peril IS ONE OF Water, Fire, Cosmetic
+
+GIVEN p IS A Peril
+      flooded IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE covered Water    flooded IS TRUE
+DECIDE covered Fire     flooded IS wet
+  WHERE wet MEANS flooded
+DECIDE covered Cosmetic flooded IS FALSE

@@ -1,4 +1,5 @@
 > Status: DONE — @ref annotations are attached to AST nodes as of PR #48 (merged 2026-07-06). The parallel Citations.hs interval-map hyperlink mechanism is intentionally left separate.
+> Amended 2026-10-13, ruled 2026-10-12 (card R1, option A): a node keeps EVERY ref that precedes it, a ref after code on its line is attached to nothing, and two new warnings replace the old one. See "Amendment 2026-10-13" at the end; the code listings below are as PR #48 built them.
 
 # Specification: @ref Annotation Attachment
 
@@ -116,8 +117,10 @@ The lexer recognizes the following `@ref` variants:
 
 ```l4
 -- Ctrl+click opens the file if found in IMPORT search paths
-DECIDE foo IS TRUE @ref legal-opinion.pdf
-DECIDE bar IS FALSE @ref ../docs/regulation-summary.md
+@ref legal-opinion.pdf
+DECIDE foo IS TRUE
+@ref ../docs/regulation-summary.md
+DECIDE bar IS FALSE
 ```
 
 The IDE will search for the file in:
@@ -226,3 +229,28 @@ Add test files:
 - `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` — `@desc` attachment specification
 - `doc/dev/specs/todo/WASM-LSP-SPEC.md` — WASM compatibility (reason for `@ref-src` removal: No file-io)
 - Issue #635 — decision service improvements (related)
+
+## Amendment 2026-10-13: a node keeps every ref before it; a ref after code is attached to nothing
+
+**Ruling:** card R1 (Main Wave Rulings bench), option A, with its conditions (in a stack the exporters show the NEAREST ref; the end-of-file ref keeps its own message; the `Refs` newtype stays, a later ruled PR removes it), no note, 2026-10-12, https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb.
+
+The attachment rule itself is unchanged: a `@ref` on a line of its own attaches to the first node that starts after it.
+
+What changed:
+
+1. `Extension.ref` holds a list of refs, not a `Maybe Ref` (`jl4-core/src/L4/Syntax.hs`): `annRefs` reads them all, in source order, and `annRef` reads the nearest, the last, which is what every exporter that shows one citation reads.
+   Before, a node kept the nearest and reported each of the others as "could not be attached to any following syntax node", which was untrue of a ref that had only been outranked.
+   The list is the newtype `Refs`, whose `show` is `Nothing` when empty, because an atomId is the hash of `show` of a term with its annotations emptied (`L4.Viz.AtomKey`), and a plain `ref = []` would have moved every atomId.
+2. A ref with nothing after it draws its own warning: "This @ref (`…`) is at the end of the file, so there is nothing after it to attach to."
+3. A ref that follows code on its line, with nothing after it on that line, is attached to NOTHING and draws a warning: "This @ref (`…`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `…`."
+   Before, such a ref bound to the next construct and became that construct's citation, in the IDE and in every export, with no one the wiser.
+   The flag is computed from the token stream (`trailingRefsOf`), because a `Ref` has no memory of its neighbours.
+   An inline `<<…>>` in the middle of a line is not flagged: it cites the word after it, which is what it is for.
+   That is outside R1's scope, which asks about a ref written at the end of a code line (its census counts the inline refs that end one), and it keeps attaching to what follows it.
+4. The warning text is built from the citation without its herald, delimiters, trailing spaces or carriage return (`refCitation`).
+   The stored text (`getRef`) is unchanged, because the readers do not all strip the same things: the DMN lowerer reads it raw, and the relational and Catala lowerers strip `@ref` but not `<<…>>`.
+
+Measured on this repo's tracked `.l4` files outside `jl4/examples/canon`, 2026-10-13: 190 refs, 179 on a line of their own and 11 at the end of a code line.
+The refs in `ok/ref.l4`, `lsp/semantic-tokens/annotations.l4`, `ok/nlg_ref_parse.l4`, `doc/reference/syntax/annotation-example.l4`, the two `ny-environmental` copies and the `britishcitizen` experiments were moved to the line above what they cite.
+
+Not chosen: a same-line rule, under which a ref at the end of a line binds to that line's code and a ref under a `§` heading binds to the section; and a rule under which a ref attaches to the node BEFORE it, which moves every own-line ref in the corpus to the wrong node.

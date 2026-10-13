@@ -95,6 +95,19 @@ click tc verId pos = do
     Left (e :: TResponseError 'Method_WorkspaceExecuteCommand) -> Left e._message
     Right v -> Right v
 
+-- | A rule of 600 clauses, which would draw 301 boxes, and then a small rule.
+tooLarge :: T.Text
+tooLarge =
+  T.unlines $
+    ["GIVEN n IS A NUMBER", "GIVETH A BOOLEAN"]
+      <> [ "DECIDE `too many rows` " <> T.pack (show i) <> " IS " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. 599 :: Int] ]
+      <> [ "DECIDE `too many rows` n IS FALSE"
+         , ""
+         , "GIVEN a IS A BOOLEAN"
+         , "GIVETH A BOOLEAN"
+         , "DECIDE `small` a IS a"
+         ]
+
 lensTitle :: CodeLens -> Maybe T.Text
 lensTitle l = (._title) <$> l._command
 
@@ -167,6 +180,19 @@ spec = do
           -- the boolean rule's own anchor
           r <- click tc verId (MkSrcPos 4 1)
           fmap (const ()) r `shouldBe` Left "No regulative rule starts at that position (the program may have changed between pressing the code lens and rendering it)"
+
+  -- A rule written as clauses that is too large to draw keeps its lens, titled
+  -- with why: a lens that silently went missing would not tell its drafter
+  -- anything. Clicking it answers with the whole message.
+  describe "the decision-graph lens on clauses too large to draw" $ do
+    it "keeps the lens, titled with the refusal, beside an ordinary one" $ do
+      path <- scratch "too-large"
+      mRes <- checkSource path tooLarge
+      case mRes of
+        Nothing -> expectationFailure "fixture did not type-check"
+        Just (verId, tc) ->
+          map snd (titlesByLine (decisionGraphCodeLenses verId tc))
+            `shouldBe` ["No decision graph: these clauses would draw more than 300 boxes", "Show decision graph"]
 
   describe "R13 on the corpus" $ do
     -- cabal runs the suite from the package directory; the corpus is one up.

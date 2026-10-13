@@ -80,6 +80,40 @@ DECLARE Age IS NUMBER
 DECLARE PersonName IS STRING
 ```
 
+**A synonym may not refer to itself**, either directly or through other synonyms, because a type like that could never be written out in full.
+L4 reports it as a circular dependency between the synonyms, and sets aside what they stand for rather than following them round and round.
+
+```l4
+-- Not allowed: each is defined as the other
+DECLARE Ping IS A Pong
+DECLARE Pong IS A Ping
+```
+
+The names a synonym is known by after `AKA` count as names for that synonym.
+In `DECLARE W AKA B IS A B` the `B` has no arguments after it, so it is `W` itself and not some other synonym called `B` that takes one (`DECLARE B a IS A LIST OF a`); that declaration is circular too.
+`B OF NUMBER` would be the one that takes an argument.
+Two synonyms, or a synonym and a record, may share a name when they take different numbers of arguments, and a use is read as the one that takes as many as it is given.
+A synonym that names itself by its section-qualified name (`` `One`.L1 `` inside `§ One`) is circular in the same way.
+
+**There is a limit to how long a chain can be.**
+To compare two types, L4 replaces a synonym by the type it stands for, and then does the same to that type if it is a synonym, and so on.
+It stops after 1000 replacements in a row.
+A chain of 1200 synonyms, each defined as the one before, is longer than that, and the error names the synonym where L4 stopped:
+
+```text
+I stopped following type synonyms at `S200`.
+
+To compare two types I replace a type synonym by the type it stands for,
+and I give up after 1000 replacements in a row. Here a chain of synonyms,
+each defined as the next, is longer than that.
+
+The types were not found to differ. Declare the first synonym in the chain
+as the type it finally stands for, to shorten the chain.
+```
+
+The message does not say the two types differ, because L4 has not found out whether they do.
+Chains anywhere near that long are rare; the usual remedy is to declare the first synonym in the chain as the type the chain ends in.
+
 ### Opaque Types
 
 Leave the body off entirely and you get an **opaque type**: a type that has a

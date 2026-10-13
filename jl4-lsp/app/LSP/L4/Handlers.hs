@@ -60,6 +60,7 @@ import Language.LSP.Server hiding (notificationHandler, requestHandler)
 import qualified Language.LSP.Server as LSP
 import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
+import LSP.L4.EmbeddedLibrary
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
@@ -530,8 +531,8 @@ handlers evalConfig recorder =
                             Just t  -> "DEONTIC" `Text.isPrefixOf` t
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) (filter writtenParam givenParams)
-                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals body)
+                        paramChildren = map (givenParamToSymbol lspRange) (outlineGivenParams givenParams)
+                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (outlineLocals body)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
                   Nothing -> []
 
@@ -632,17 +633,6 @@ handlers evalConfig recorder =
               | "FUNCTION" `Text.isPrefixOf` tyText        = SymbolKind_Field
               | otherwise                                 = SymbolKind_TypeParameter
 
-            -- The bindings a multi-clause definition is compiled to
-            -- ('PmSynthetic'), and the inputs its desugarer named, are not
-            -- things the drafter wrote, so the outline leaves them out.
-            collectLocals :: Expr Resolved -> [LocalDecl Resolved]
-            collectLocals (Where _ _ locals)  = filter (not . isClausesBinding) locals
-            collectLocals (LetIn _ locals _)  = filter (not . isClausesBinding) locals
-            collectLocals _                   = []
-
-            writtenParam :: OptionallyTypedName Resolved -> Bool
-            writtenParam (MkOptionallyTypedName _ pn _ _) = not (isGeneratedName (rawName (getOriginal pn)))
-
             localDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> LSP.Range -> LocalDecl Resolved -> [DocumentSymbol]
             localDeclToSymbol moduleNuri subst entInfo parentRange = \case
               LocalDecide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) localBody) ->
@@ -658,7 +648,7 @@ handlers evalConfig recorder =
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
                         paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals localBody)
+                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (outlineLocals localBody)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind parentRange selRange (paramChildren <> nestedLocals) ]
                   Nothing -> []
               LocalAssume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy _) ->
@@ -819,6 +809,20 @@ handlers evalConfig recorder =
                     , _xdata = Nothing
                     }
 
+    , requestHandler (SMethod_CustomMethod (Proxy @EmbeddedLibraryMethodName)) $ \_ide params ->
+        pure case Aeson.fromJSON params of
+          Aeson.Error err -> Left $ TResponseError
+            { _code = InR ErrorCodes_InvalidParams
+            , _message = "Failed to parse l4/embeddedLibrary params: " <> Text.pack err
+            , _xdata = Nothing
+            }
+          Aeson.Success reqParams -> case embeddedLibraryResponse reqParams of
+            Nothing -> Left $ TResponseError
+              { _code = InR ErrorCodes_InvalidParams
+              , _message = "Not an embedded library: " <> reqParams.uri
+              , _xdata = Nothing
+              }
+            Just response -> Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.GetExportedFunctionsMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.GetExportedFunctionsParams
             parseParams v = case Aeson.fromJSON v of

@@ -1,0 +1,20 @@
+-- A choice type with one constructor that has a field and one that has none.
+-- Only the one without can be given as JSON input (smucclaw/l4-ide#1012):
+-- every other value is refused by name. Before, it was decoded to NOTHING or
+-- passed through as itself, and reached the OTHERWISE below with
+-- "status":"success".
+
+DECLARE Shape IS ONE OF
+  Circle HAS size IS A NUMBER
+  Square
+
+@export default What kind of shape
+GIVEN s IS A Shape
+GIVETH A STRING
+DECIDE kind s IS
+  CONSIDER s
+    WHEN Square THEN "square"
+    OTHERWISE "other"
+
+#EVAL kind Square
+#EVAL kind (Circle 3)
