@@ -165,10 +165,13 @@ Similarly to the NLG annotations, there are annotations to allow for citing (and
 ```
 @ref-src citations.csv
 @ref-map foo bar baz https://example.com
-GIVEN x IS A BOOLEAN, y IS A BOOLEAN @ref foo bar baz
-GIVETH A BOOLEAN @ref 1981/61 sec. 2
-DECIDE xor x y IS  @ref SG-c-2025-sghcf-14
-     x AND NOT y <<SG-c-2025-sghcf-12>>
+@ref foo bar baz
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+@ref 1981/61 sec. 2
+GIVETH A BOOLEAN
+@ref SG-c-2025-sghcf-14
+DECIDE xor x y IS
+     <<SG-c-2025-sghcf-12>> x AND NOT y
   OR NOT x AND y @nlg Locally overwrite the annotation for %y%
 ```
 
@@ -189,5 +192,10 @@ This can be used to programatically generate reference mapping links.
 The `@ref-map` annotations can be used to amend the existing mapping in the same vein.
 
 Now the annotations can be initiated using either `@ref` or `<<` and `>>` as shown in the example above.
+
+A citation refers to what comes AFTER it, so write it on the line above the thing it cites, as in the example.
+A citation written at the end of a line, after the code it means to cite, is attached to nothing, and `l4 check` warns about it.
+Several citations above one construct are all kept, in order, and a tool that shows one citation per construct shows the nearest, the one written last.
+The rule, and the two warnings, are in [the syntax reference](../doc/reference/syntax/README.md#ref).
 
 When using this feature in the IDE, it will show the generated or verbatim links in the reference mapping as a hover link that can be clicked on.

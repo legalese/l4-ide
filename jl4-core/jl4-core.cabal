@@ -178,5 +178,6 @@ test-suite jl4-core-test
     containers,
     hspec,
     jl4-core,
+    optics,
     text,
     time

@@ -2143,7 +2143,7 @@ execParserForTokensWithHints hints p file input ts =
       let
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
-        (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withDesc
+        (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
         Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)

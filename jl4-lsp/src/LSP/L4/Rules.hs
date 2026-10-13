@@ -841,9 +841,11 @@ prettyNlgResolveWarning = \ case
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
   Resolve.RefUnattached r ->
-    "@ref `" <> getRef r.payload <> "` could not be attached to any following syntax node."
+    Resolve.refUnattachedMessage r.payload
+  Resolve.RefTrailing r code ->
+    Resolve.refTrailingMessage r.payload code
   Resolve.RefNoLocation ref ->
-    "@ref `" <> getRef ref <> "` has no source location. This might be an internal compiler error."
+    Resolve.refNoLocationMessage ref
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -860,6 +862,8 @@ rangeOfResolveWarning = \ case
   Resolve.Ambiguous name _ ->
     srcRangeToLspRange $ rangeOf name
   Resolve.RefUnattached r ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefTrailing r _ ->
     srcSpanToLspRange $ Just r.range
   Resolve.RefNoLocation _ ->
     srcSpanToLspRange Nothing
