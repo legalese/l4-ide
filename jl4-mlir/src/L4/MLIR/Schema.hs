@@ -795,7 +795,7 @@ exprToContract :: Expr Resolved -> Maybe DeonticContract
 exprToContract = \case
   Regulative _ deonton -> Just (deontonToContract deonton)
   Breach _ mBy mBec ->
-    Just (DCBreach (Print.prettyLayout <$> mBy) (Print.prettyLayout <$> mBec))
+    Just (DCBreach (partyLiteralText <$> mBy) (Print.prettyLayout <$> mBec))
   App _ headRes []
     | rawNameToText (rawName (getActual headRes)) `elem` ["Fulfilled", "FULFILLED"] ->
         Just DCFulfilled
@@ -836,6 +836,16 @@ exprToDeonticExpr e = case e of
     let nm = rawNameToText (rawName (getActual headRes))
     in if isLikelyParam nm then DEParam nm else DEName nm
   _ -> DELiteral (Print.prettyLayout e)
+
+-- | The plain-name rendering of a party expression, for the party of an
+-- explicit @BREACH BY@: jl4-service answers that party as the constructor name
+-- (@Backend.Jl4.constructorText@), without backticks, not as the rule source
+-- 'Print.prettyLayout' emits. An expression that is more than a name stays rule
+-- source.
+partyLiteralText :: Expr Resolved -> Text
+partyLiteralText e = case e of
+  App _ headRes [] -> rawNameToText (rawName (getActual headRes))
+  _                -> Print.prettyLayout e
 
 -- | Pattern variant: 'PatVar' is the param-ref shape; a bare action name is
 -- its PLAIN name, as @Backend.Jl4.actionText@ spells it; everything else (an

@@ -78,6 +78,42 @@ testDeonticNamesPlain = do
           putStrLn $ "    json: " <> T.unpack (T.take 600 json)
           pure False
 
+-- | The party of an explicit @BREACH BY@ is baked as its PLAIN name, as
+-- jl4-service answers it, not as rule source with backticks: @lest.by@ is
+-- @the borrower@, and the BECAUSE text stays the rule source it is.
+testDeonticBreachByPlain :: IO Bool
+testDeonticBreachByPlain = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the borrower`"
+        , "DECLARE Action IS ONE OF `repay loan`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the borrower`"
+        , "    MUST `repay loan`"
+        , "    WITHIN 30"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY `the borrower` BECAUSE \"not repaid\""
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("by is a plain name",    T.isInfixOf "\"by\":\"the borrower\"" json)
+            , ("because is rule source", T.isInfixOf "\"because\":\"\\\"not repaid\\\"\"" json)
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
 -- | An action that carries a value is not a name: it is baked as the rule
 -- source it is, as @Backend.Jl4.actionText@ prints it, with no @actionKind@;
 -- only a bare name is baked plain and tagged.
@@ -122,6 +158,7 @@ main = do
     , test "deontic contract baked into schema" testDeonticSchemaBaked
     , test "deontic party/action names are plain, tagged" testDeonticNamesPlain
     , test "deontic value-carrying action stays source" testDeonticValueActionIsSource
+    , test "deontic BREACH BY party is plain" testDeonticBreachByPlain
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn
