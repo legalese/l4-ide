@@ -38,6 +38,7 @@ import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
 import System.IO.Error (isPermissionError)
+import TestData (synonymKindsJL4, synonymParamJL4)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
@@ -222,6 +223,43 @@ spec = describe "integration" do
               Map.lookup "extra_provided" fieldMap `shouldBe` Just (FnLitBool False)
             other ->
               expectationFailure ("Expected FnObject with named fields, got: " <> show other)
+
+    -- A synonym for a MAYBE is a MAYBE: the service read only a type written
+    -- as MAYBE itself, so a value given for `MaybeYear` reached the rule as a
+    -- bare number ("reached a CONSIDER that has no branch for it") and a null
+    -- or an omitted one was "missing required parameter", both a 422.
+    it "reads a synonym for a MAYBE as a MAYBE: a value, a null and an omitted one" do
+      withServiceFromSources "maybe-synonym" [("synonym.l4", synonymParamJL4)] \baseUrl mgr ->
+        forM_ ["year maybe", "optional number" :: Text] \fn -> do
+          let answer args = do
+                resp <- evalFunction baseUrl mgr "maybe-synonym" fn
+                  (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+                pure ( statusCode' resp
+                     , case Aeson.decode (responseBody resp) of
+                         Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                         _ -> Nothing )
+          answer [ "y" Aeson..= (2020 :: Int) ] >>= (`shouldBe` (200, Just (FnLitInt 2021)))
+          answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
+          answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
+
+    -- The same fault showed on a synonym for a record, an enum and a list: the
+    -- service looked for each by the synonym's own name, and answered
+    -- "FnObject but expected type is not a known record", "check equality on
+    -- types that do not support it" and "FnArray but expected type is not LIST".
+    it "reads a synonym for a record, an enum and a list as the type it stands for" do
+      withServiceFromSources "kinds-synonym" [("kinds.l4", synonymKindsJL4)] \baseUrl mgr -> do
+        let answer fn args = do
+              resp <- evalFunction baseUrl mgr "kinds-synonym" fn
+                (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+              pure ( statusCode' resp
+                   , case Aeson.decode (responseBody resp) of
+                       Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                       _ -> Nothing )
+        answer "point x" [ "p" Aeson..= Aeson.object [ "x" Aeson..= (5 :: Int) ] ]
+          >>= (`shouldBe` (200, Just (FnLitInt 5)))
+        answer "hue code" [ "h" Aeson..= ("Red" :: Text) ] >>= (`shouldBe` (200, Just (FnLitInt 1)))
+        answer "hue code" [ "h" Aeson..= ("Green" :: Text) ] >>= (`shouldBe` (200, Just (FnLitInt 2)))
+        answer "first year" [ "ys" Aeson..= [2020, 2021 :: Int] ] >>= (`shouldBe` (200, Just (FnLitInt 2020)))
 
     it "MAYBE parameter is not in the required list of the schema" do
       withServiceFromSources "maybe-schema" [("maybe.l4", maybeParamJL4)] \baseUrl mgr -> do

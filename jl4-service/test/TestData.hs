@@ -10,6 +10,8 @@ module TestData (
   qualifiesJL4,
   recordJL4,
   maybeParamJL4,
+  synonymParamJL4,
+  synonymKindsJL4,
   saleContractJL4,
   deonticExportJL4,
   deonticRecordPartyJL4,
@@ -227,6 +229,71 @@ DECIDE with_maybe IS Result WITH
         CONSIDER extra
             WHEN JUST x THEN TRUE
             WHEN NOTHING THEN FALSE
+|]
+
+-- | Inputs declared through a type synonym for a MAYBE: one without a type
+-- parameter, and one that takes a type (@Optional OF NUMBER@). Each must be a
+-- MAYBE to the service, so a value is a JUST and a null or a missing one is a
+-- NOTHING, as for @MAYBE NUMBER@ itself.
+synonymParamJL4 :: Text
+synonymParamJL4 =
+  [i|
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+DECLARE Optional OF a IS A MAYBE a
+
+@export a year that may be left out, through a synonym
+GIVEN y IS A MaybeYear
+GIVETH A NUMBER
+`year maybe` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export a number that may be left out, through a synonym that takes a type
+GIVEN y IS AN Optional OF NUMBER
+GIVETH A NUMBER
+`optional number` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+|]
+
+-- | Inputs declared through a synonym for a record, an enum and a list. The
+-- service looked for a record, an enum or a LIST by the synonym's own name, so
+-- each was refused, and each now reads as the type the synonym stands for.
+synonymKindsJL4 :: Text
+synonymKindsJL4 =
+  [i|
+DECLARE Year IS A NUMBER
+
+DECLARE Pt HAS x IS A NUMBER
+
+DECLARE Point IS A Pt
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Hue IS A Colour
+
+DECLARE Years IS A LIST OF Year
+
+@export the x of a record, through a synonym
+GIVEN p IS A Point
+GIVETH A NUMBER
+`point x` p MEANS p's x
+
+@export a code for an enum, through a synonym
+GIVEN h IS A Hue
+GIVETH A NUMBER
+`hue code` h MEANS IF h EQUALS Red THEN 1 ELSE 2
+
+@export the first of a list, through a synonym
+GIVEN ys IS A Years
+GIVETH A NUMBER
+`first year` ys MEANS
+  CONSIDER ys
+    WHEN EMPTY THEN 0
+    WHEN y FOLLOWED BY rest THEN y
 |]
 
 -- | L4 source with an exported boolean function and a regulative (sale contract) rule.
