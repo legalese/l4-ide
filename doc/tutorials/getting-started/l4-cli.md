@@ -297,6 +297,7 @@ Natural-language names work too: exported functions and parameters written with 
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
 Text that does not spell one is left as it is, and the line is an error that names the text.
+A parameter declared through a synonym, such as `DECLARE Year IS A NUMBER`, is read as a number when the text spells one, but text that does not is not reported: it reaches the rules as text, and `--validate-only` calls the case valid.
 Every other kind of parameter keeps a non-blank CSV cell exactly as written, however much it looks like a number or a boolean.
 A `STRING` receives `123456`, `018956` and `1.50` as the codes they are, a choice such as `DECLARE Answer IS ONE OF True, False, Unknown` receives the name `True` and not a boolean, and a `DATE` receives `2026-10-13` as text, so a cell that is not a date, such as `20261013`, is an error that names it.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
@@ -332,7 +333,7 @@ The command exits with status 0 when every case was `success`, and 1 when any ca
 
 It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does.
 
-**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+**It judges those three types only.** For any other type, such as a `DATE`, a list, a record, a list of choices or a synonym such as `DECLARE Year IS A NUMBER`, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
 
 ```l4
 @export Echo a date

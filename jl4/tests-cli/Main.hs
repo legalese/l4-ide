@@ -546,11 +546,11 @@ spec bin = do
         code `shouldSatisfy` (/= ExitSuccess)
         length (filter ("Missing required field: 'income'" `isInfixOf`) (lines sout)) `shouldBe` 2
 
-    -- R4 (ruled, bench "Main Wave Rulings", 2026-10-12): `l4 batch` reads a CSV
-    -- file with the reader that unstable has, not cassava's `decodeByName`,
-    -- which drops every record that parses to one empty field. These are the
-    -- shapes where the two readers differ. Each of the first four fails on the
-    -- `decodeByName` reader.
+    -- Ruled 2026-10-12: a blank CSV cell (empty, spaces only, or a quoted "")
+    -- is absent, and `l4 batch` reads a CSV file with the reader that unstable
+    -- has, not cassava's `decodeByName`, which drops every record that parses
+    -- to one empty field. These are the shapes where the two readers differ.
+    -- Each of the first four fails on the `decodeByName` reader.
     describe "the CSV reader" $ do
       let csvRowsOf args = do
             Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
@@ -765,8 +765,8 @@ spec bin = do
   -- jl4-service-test). Before it, a step broke across lines inside the literal.
   -- The VALUE a trace ends in is not source and keeps its line break. `l4 run`
   -- prints no trace steps on main ("no trace captured"), so it is not pinned.
-  -- Ruled (R2, bench "Main Wave Rulings", accept A, 2026-10-12): the escaped
-  -- form is kept, and every surface it reaches is listed in the PR body.
+  -- Ruled 2026-10-12: printed string literals stay escaped on every surface,
+  -- and every surface it reaches is listed in the PR body.
   describe "a string literal in a trace step" $ do
     it "is spelled as source in the trace `l4 trace` reports" $ do
       Output code _ serr <- runL4 bin ["trace", evalTraceLineBreakFixture]

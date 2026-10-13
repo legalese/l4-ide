@@ -691,8 +691,8 @@ spec = describe "integration" do
     -- `exampleCode` is source: it prints a string literal as the source
     -- spells it, a line break as \n and a tab as \t. #595 changed that from a
     -- raw line break, and with it `l4 trace`. `explanation` prints a VALUE, and
-    -- keeps the line break. Ruled (R2, bench "Main Wave Rulings", accept A,
-    -- 2026-10-12): the escaped form is kept, as the valid spelling of the source.
+    -- keeps the line break. Ruled 2026-10-12: printed string literals stay
+    -- escaped on every surface, as the valid spelling of the source.
     it "spells a string literal in exampleCode as source, and keeps the line break in explanation" do
       withServiceFromSources "trace-line-break" [("line-break.l4", lineBreakJL4)] \baseUrl mgr -> do
         req <- buildJsonPost

@@ -623,8 +623,10 @@ data CsvRow
 -- with fewer or more cells than the header is refused, naming its line: a
 -- short one used to be run with its missing inputs left out, and a long one
 -- lost its extra cells and ran as a success. Not ruled: decided by Claude
--- overnight 2026-10-02, pending Meng's review (@TYPICALLY-ONE-BEHAVIOUR-SPEC.md@
--- on unstable, "Decided by Claude overnight").
+-- overnight 2026-10-02, pending Meng's review (unstable's
+-- @TYPICALLY-ONE-BEHAVIOUR-SPEC.md@, "Decided by Claude overnight"; the
+-- alternative named there is that an unquoted line of spaces in a one-column
+-- file is a row whose cell is absent).
 csvRows :: BSL.ByteString -> Either String [CsvRow]
 csvRows = AL.eitherResult . AL.parse file
   where
@@ -632,8 +634,7 @@ csvRows = AL.eitherResult . AL.parse file
     file = do
       -- A UTF-8 byte-order mark is not part of the first column's name. Excel's
       -- "CSV UTF-8" export writes one, and left in place it renamed the first
-      -- input, so every row took that input's default instead of its value
-      -- (review B1).
+      -- input, so that input was missing from every row.
       _ <- optional (A.string "\xEF\xBB\xBF")
       (hdrRaw, hdr) <- A.match (CsvParser.header comma)
       rows hdr (1 + lineEnds hdrRaw)
