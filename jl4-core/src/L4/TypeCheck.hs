@@ -2168,10 +2168,10 @@ checkConsider ec ann e branches t = do
   rbranches <- traverse (checkBranch ec patternEc te t) branches
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
   let withLiteral = any armHasLiteral rbranches
-      byHighlander = not withLiteral && isNothing generated && not (armsNameUnlisted (constructorFamilies resolvedDecls) rbranches)
+      engineWithFallback = not withLiteral && isNothing generated && not (armsNameUnlisted (constructorFamilies resolvedDecls) rbranches)
       ownAnalysis = considerWithoutLiterals generated leftToClauseMatrix re te rbranches
-  if withLiteral || byHighlander
-    then considerWithLiterals (if byHighlander then Just ownAnalysis else Nothing) generated leftToClauseMatrix re te rbranches
+  if withLiteral || engineWithFallback
+    then considerWithLiterals (if engineWithFallback then Just ownAnalysis else Nothing) generated leftToClauseMatrix re te rbranches
     else ownAnalysis
   pure (Consider ann re rbranches)
   where
