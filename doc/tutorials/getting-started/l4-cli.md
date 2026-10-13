@@ -297,7 +297,8 @@ Natural-language names work too: exported functions and parameters written with 
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
 Text that does not spell one is left as it is, and the line is an error that names the text.
-A parameter declared as `STRING` keeps a non-blank CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
+Every other kind of parameter keeps a non-blank CSV cell exactly as written, however much it looks like a number or a boolean.
+A `STRING` receives `123456`, `018956` and `1.50` as the codes they are, a choice such as `DECLARE Answer IS ONE OF True, False, Unknown` receives the name `True` and not a boolean, and a `DATE` receives `2026-10-13` as text, so a cell that is not a date, such as `20261013`, is an error that names it.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
 A blank CSV cell is not text, for a `STRING` parameter as for any other: an empty cell, a cell holding only spaces and a quoted `""` all leave the fact out, exactly as a column missing from the file does. A fact that has to be given is then missing, which makes the line an error that says `Missing required field` and names it; a `MAYBE` fact is `NOTHING`.
 So a line of nothing but empty cells, such as `,,`, is an error when the rules need any fact, and the run stops there unless you pass `--continue-on-error`.
