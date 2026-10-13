@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+lang-annotation-foot.l4:8:1-20:
+  TRUE
+lang-annotation-foot.l4:9:1-20:
+  FALSE

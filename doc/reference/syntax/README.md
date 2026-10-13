@@ -113,6 +113,24 @@ DECIDE `calculate premium` IS ...
 
 Only functions carrying `@export` are exported; everything else stays internal.
 
+### @lang
+
+Says which language the file's prose is written in, so that tools that read the file know before they read the rule. Put it on a line of its own, the first line by convention:
+
+```l4
+@lang en
+```
+
+The language is a short code of letters, digits and hyphens, such as `en`, `he` or `pt-BR`, separated from `@lang` by spaces. The code is the leading run of those characters; the rest of the line is kept as you wrote it and is not checked, so a comment may follow it, and `@lang en_US` records `en`. See [lang-example.l4](lang-example.l4).
+
+This version of L4 reads the declaration and prints it back exactly as you wrote it, but does nothing else with it: it changes how no rule is checked, evaluated or described. A file with no declaration is read as before, and a file with one is checked the same way as it would be without it.
+
+**Limits.**
+
+- The code is required. `@lang` on its own, a tab where the spaces go, and a code that does not start with an ASCII letter, digit or hyphen are all syntax errors.
+- Write `@lang` on a line of its own. In the middle of a line it takes the rest of the line, as `@desc` does, so in `DECIDE ok IF age GREATER THAN 17 @lang en AND age LESS THAN 5` the condition stops after `17` and the answer changes.
+- It may stand anywhere between top-level items, the foot of the file included. Two declarations in one file are both read, and neither is acted on.
+
 ---
 
 ## Directives

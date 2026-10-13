@@ -1,0 +1,5 @@
+@lang en
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is adult` IF age GREATER THAN 17

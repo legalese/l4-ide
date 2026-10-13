@@ -1,0 +1,7 @@
+@lang en   -- the language of this file's prose
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is adult` IF age GREATER THAN 17
+
+#EVAL `is adult` 18

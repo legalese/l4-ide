@@ -72,6 +72,12 @@ data PState = PState
   , nlgs :: [Nlg]
   , refs :: [Ref]
   , descs :: [Desc]
+  , langs :: [Text]
+    -- ^ The subtags of the @\@lang@ declarations seen, most recent first. A
+    -- list rather than a 'Maybe', so that a second declaration is a fact we
+    -- could report on later rather than one silently overwriting the other.
+    -- Nothing reads it yet: this version of the language has no
+    -- language-dependent rendering for a declaration to change.
   }
   deriving stock (Show, Eq, Generic)
   deriving (Semigroup, Monoid) via Generically PState
@@ -85,6 +91,9 @@ addRef ref s = over #refs (ref:) s
 addDesc :: Desc -> PState -> PState
 addDesc desc s = over #descs (desc:) s
 
+addLang :: Text -> PState -> PState
+addLang l s = over #langs (l:) s
+
 spaces :: Parser [PosToken]
 spaces =
   takeWhileP (Just "space token") isSpaceToken
@@ -92,7 +101,7 @@ spaces =
 spaceOrAnnotations :: Parser (Lexeme ())
 spaceOrAnnotations = do
   ws <- spaces
-  nlgs :: [NS Epa [Ref, Nlg, Desc, ()]] <- many (fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
+  nlgs :: [NS Epa [Ref, Nlg, Desc, (), Text]] <- many (fmap (S . S . S . S . Z) langP <|> fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
   traverse_ addAnnotation nlgs
   let
     epaNlgs = fmap (collapse_NS . map_NS (K . epaToHiddenCluster)) nlgs
@@ -101,6 +110,14 @@ spaceOrAnnotations = do
     , payload = ()
     , hiddenClusters = epaNlgs
     }
+
+-- | @\@lang en@. Collected like any other annotation, so its tokens ride in
+-- the same hidden cluster and exactprint re-emits the line unchanged.
+langP :: Parser (Epa Text)
+langP = hidden $ spacedTokenWs (\ case
+  TAnnotations (TLang tag _) -> Just tag
+  _ -> Nothing)
+  "Language declaration"
 
 refP :: Parser (Epa Ref)
 refP = do
@@ -246,8 +263,9 @@ lexeme p = do
     , hiddenClusters = wsOrAnnotation.hiddenClusters
     }
 
-addAnnotation :: NS Epa (Ref : Nlg : Desc : xs) -> Parser ()
+addAnnotation :: NS Epa (Ref : Nlg : Desc : () : Text : xs) -> Parser ()
 addAnnotation = \ case
+  S (S (S (S (Z lang)))) -> modify' (addLang lang.payload)
   S (S (Z desc)) -> modify' (addDesc desc.payload)
   S (Z nlg) -> modify' (addNlg nlg.payload)
   Z ref -> modify' (addRef ref.payload)
@@ -2121,6 +2139,7 @@ execNlgParserForTokens p uri input ts =
       , comments = []
       , refs = []
       , descs = []
+      , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 
@@ -2160,6 +2179,7 @@ execParserForTokensWithHints hints p file input ts =
       , comments = []
       , refs = []
       , descs = []
+      , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 

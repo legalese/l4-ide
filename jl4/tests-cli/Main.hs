@@ -260,6 +260,11 @@ spec bin = do
       env <- jsonEnvelope bin ["check", cleanFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool True)
 
+    -- The L4 skills open every encoding with `@lang en`. It used to stop the
+    -- lexer, and a lexer failure leaves an editor with no tokens at all.
+    it "succeeds on a module whose first line is @lang en" $
+      expectOk bin ["check", fixtureDir </> "lang-annotation.l4"] "Check succeeded."
+
     it "fails on a typecheck error" $
       expectFail bin ["check", errorFixture]
 

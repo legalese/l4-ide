@@ -1,0 +1,11 @@
+-- The declaration may stand anywhere, at the foot of the file included, and a
+-- comment after it is ordinary.
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is adult` IF age GREATER THAN 17
+
+#EVAL `is adult` 18
+#EVAL `is adult` 12
+
+@lang he   -- עברית

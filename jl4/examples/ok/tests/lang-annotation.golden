@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+lang-annotation.l4:11:1-20:
+  TRUE
+lang-annotation.l4:12:1-20:
+  FALSE
