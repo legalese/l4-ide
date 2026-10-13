@@ -841,6 +841,34 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
           [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
           withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
 
+    -- A call to a rule written as clauses too long to read through is not
+    -- offered for expansion, and the expand gesture leaves it as it is. The
+    -- gesture used to unfold it raw, its clauses' LETs drawn as one leaf, and
+    -- with long clause bodies gave no answer in 100 s (review).
+    it "does not offer to expand a call to clauses too long to read through, and leaves it as it is" $ do
+      -- Eleven clauses over two MAYBE inputs, whose binding patterns the pruning
+      -- learns nothing from, pass the 20,000-part bound (as in l4-cli-test).
+      let src = T.unlines $
+            [ "GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN" ]
+            <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> T.pack (show i) <> " AND y GREATER THAN " <> T.pack (show i) | i <- [0 .. 10 :: Int] ]
+            <> [ "DECIDE bigrule m k IS FALSE", ""
+               , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE caller p q f IS bigrule p q OR f" ]
+      done <- timeout 60000000 $ do
+        r <- render "too-long-callee" src "caller"
+        let callLeaves = [(nm.unique, offered) | V.UBoolVar _ nm _ offered _ _ _ <- universeIR r.funDecl.body, "bigrule" `T.isInfixOf` nm.label]
+        _ <- evaluate (length callLeaves)
+        let unfolded = case renderAfterInlining r.vizState r.decide (map fst callLeaves) of
+              Left _ -> Nothing
+              Right (_, info, _, _) -> Just (withoutIds (Aeson.toJSON info.funDecl.body))
+        _ <- evaluate (BL.length (Aeson.encode unfolded))
+        pure (withoutIds (Aeson.toJSON r.funDecl.body), callLeaves, unfolded)
+      case done of
+        Nothing -> expectationFailure "drawing, or expanding, a call to clauses too long to read through did not finish within 60 s"
+        Just (drawnBody, callLeaves, unfolded) -> do
+          map snd callLeaves `shouldBe` [False]
+          unfolded `shouldBe` Just drawnBody
+
     -- The limit on a ladder drawn from clauses is about the rule as written. A
     -- rule written by hand that has a large clause group unfolded into it by the
     -- expand gesture is still a rule written by hand, and is drawn.

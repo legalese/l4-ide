@@ -485,8 +485,10 @@ analyseDecide opts callees cfg decide0 =
                     }
   where
     -- Local bindings put in before analysis, a rule written as clauses read as
-    -- its CONSIDER first ('Transform.inlineLocalBindingsForDrawing'). Clauses
-    -- too long to read through are left as written, for the ladder to refuse.
+    -- its CONSIDER first ('Transform.inlineLocalBindingsForDrawing'). A rule
+    -- written as clauses too long to read through is left as written, and the
+    -- ladder refuses it ('LadderViz.ClauseGroupTooLong'); a call to one is
+    -- left as a box ('callMeanings').
     decide = case decide0 of
       MkDecide ann sig af body -> MkDecide ann sig af (fromMaybe body (Transform.inlineLocalBindingsForDrawing body))
     notBrokenDown =
@@ -580,8 +582,13 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
     meaningOf :: Int -> Either Text (Expr Resolved) -> Either Text (BDQ.BoolExpr Text)
     meaningOf v = \case
       Left why -> Left why
-      Right x ->
-        case LadderViz.doVisualize (MkDecide ann sig appForm (fromMaybe x (Transform.inlineLocalBindingsForDrawing x))) (LadderViz.withSimplification False cfg) of
+      Right x -> case Transform.inlineLocalBindingsForDrawing x of
+        -- It calls a rule written as clauses too long to read through. Drawn
+        -- as it is, the clauses' LETs would be one leaf whose key reads them
+        -- through, which does not finish; the call stays a box instead.
+        Nothing ->
+          Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError (LadderViz.ClauseGroupTooLong Transform.letInliningNodeBudget))
+        Just x' -> case LadderViz.doVisualize (MkDecide ann sig appForm x') (LadderViz.withSimplification False cfg) of
           Left err -> Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError err)
           Right (li, vs)
             | ladderNodeCount opts.verifyMaxNodes li.funDecl.body > opts.verifyMaxNodes ->

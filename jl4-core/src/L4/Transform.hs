@@ -107,15 +107,30 @@ inlineLocalBindings = inlineLocalBindingsWhere (const True) . inlineGeneratedLet
 -- @l4 verify@, and twenty-five rows did not finish in 4 GiB, where its CONSIDER
 -- written by hand takes a tenth of a second.
 --
--- 'Nothing' when the clauses are too long to read through
--- ('letInliningNodeBudget'). An expression with no clauses in it is read
--- exactly as 'inlineLocalBindings' reads it.
+-- 'Nothing' when the expression holds clauses too long to read through
+-- ('letInliningNodeBudget'), and what then is the caller's to say: the ladder
+-- refuses a rule written as clauses, @l4 verify@ leaves a call to one as a box
+-- it does not open, and the IDE does not offer to expand it. The raw expression
+-- is no fallback: drawn as it is, it puts the clauses' LETs in a leaf whose key
+-- reads them through, which does not finish. An expression with no clauses in
+-- it is read exactly as 'inlineLocalBindings' reads it.
 inlineLocalBindingsForDrawing :: Expr Resolved -> Maybe (Expr Resolved)
 inlineLocalBindingsForDrawing e
-  | not (anyOf (cosmosOf (gplate @(Expr Resolved))) isGeneratedLet e) = Just (inlineLocalBindingsWhere (const True) e)
+  | not (hasGeneratedLets e) = Just (inlineLocalBindingsWhere (const True) e)
   | otherwise = case inlineLetsForViz e of
       Right asConsider -> Just (inlineLocalBindingsWhere (const True) asConsider)
       Left _      -> Nothing
+
+-- | Do the clauses in this expression, if any, read through
+-- ('inlineLocalBindingsForDrawing' would answer)? Only the clauses are read,
+-- under the same bound, and nothing else is put in, so this costs no more than
+-- 'letInliningNodeBudget' nodes.
+clausesReadThrough :: Expr Resolved -> Bool
+clausesReadThrough e = not (hasGeneratedLets e) || either (const False) (const True) (inlineLetsForViz e)
+
+-- | Does this expression hold a LET the clause desugarer generated?
+hasGeneratedLets :: Expr Resolved -> Bool
+hasGeneratedLets = anyOf (cosmosOf (gplate @(Expr Resolved))) isGeneratedLet
   where
     isGeneratedLet = \ case
       LetIn _ ds@(_ : _) _ -> all generatedBinding ds

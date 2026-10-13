@@ -57,7 +57,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, positionalCall)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, clausesReadThrough, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -222,6 +222,11 @@ data VizState = MkVizState
   -- own WHERE definitions inlined into it; 'Nothing' for a definition whose
   -- body keeps a local binding after that (see 'expandCall'). Each entry is
   -- computed at most once per decision, and only for a rule that is called.
+  , calleeReadsThrough :: IntMap Bool
+  -- ^ Unique.unique -> whether that definition, if written as clauses, reads
+  -- through within 'Transform.letInliningNodeBudget' ('Transform.clausesReadThrough').
+  -- A call to one that does not is not offered for expansion. Lazy per entry,
+  -- so only a callee that is called is read.
   , typeVariables :: IntMap (Set Unique)
   -- ^ Unique.unique -> the type variables (@GIVEN a IS A TYPE@) of each
   -- definition of 'defsForInlining' that has any; absent for every other one.
@@ -280,6 +285,7 @@ mkInitialVizState cfg =
     , appExprMakers = Map.empty
     , defsForInlining = Map.empty
     , expansionBodies = Map.empty
+    , calleeReadsThrough = Map.empty
     , typeVariables = Map.empty
     , leafExprs = Map.empty
     , callLeafTargets = Map.empty
@@ -426,6 +432,16 @@ hasDefForInlining (MkUnique _ uniq uniqUri) = do
   -- We don't want, e.g., to pick up on builtin Uniques, which can have the same Int unique as a user-defined Unique
   pure $ uniqUri == cfg.moduleUri && Map.member uniq defsForInlining
 
+-- | May a call to this definition be offered for expansion (@canInline@)? Only
+-- when it is a definition of this module ('hasDefForInlining') that, if
+-- written as clauses, reads through ('calleeReadsThrough'): the expand gesture
+-- leaves a call to one that does not as it is ('inlineExpr').
+canInlineCallee :: Unique -> Viz Bool
+canInlineCallee callee = do
+  known <- hasDefForInlining callee
+  readsThrough <- use #calleeReadsThrough
+  pure (known && Map.findWithDefault True callee.unique readsThrough)
+
 ------------------------------------------------------
 -- Viz state helpers
 ------------------------------------------------------
@@ -526,6 +542,7 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     { functionName = (mkPrettyVizName funResolved).label
     , defsForInlining = defs
     , expansionBodies = Map.map expansionBodyOf defs
+    , calleeReadsThrough = Map.map (\ (_, Transform.MkUnfoldable _ rhs) -> Transform.clausesReadThrough rhs) defs
     , typeVariables = Map.restrictKeys (typeVariablesOf cfg.module') (Map.keysSet defs)
     -- A leaf's variable is keyed by an Int. A bare reference to one of this
     -- module's names uses the name's unique; every other leaf gets a fresh id
@@ -818,8 +835,8 @@ defaultUBoolVarCanInline = False
 varLeaf :: V.ID -> V.Name -> Resolved -> Viz IRExpr
 varLeaf vid vname resolved = do
   canInline <- case resolved of
-    Ref _ uniq _ -> hasDefForInlining uniq
-    Def uniq _ -> hasDefForInlining uniq
+    Ref _ uniq _ -> canInlineCallee uniq
+    Def uniq _ -> canInlineCallee uniq
     _ -> pure False
   -- TODO: Prob need to do this `canInline` thing for things that aren't App of no args too?
   let target = (getUnique resolved).unique
@@ -857,7 +874,7 @@ leafFromExpr expr = do
     Just callee -> do
       known <- hasDefForInlining callee
       when known $ #callLeafTargets %= Map.insert uniq callee.unique
-      pure known
+      canInlineCallee callee
     Nothing -> pure defaultUBoolVarCanInline
   expansion <-
     case calleeOf of
@@ -1192,17 +1209,22 @@ inlineExprs vs = foldr (inlineExpr vs)
 inlineExpr :: VizState -> Int -> Decide Resolved -> Decide Resolved
 inlineExpr vs target =
   case Map.lookup definition vs.defsForInlining of
-    Just (u, Transform.MkUnfoldable ps rhs) -> over decideBody (transformOf (gplate @(Expr Resolved)) (unfold u ps (withLocalsInlined rhs)))
-    Nothing -> id
-  where
-    definition = Map.findWithDefault target target vs.callLeafTargets
     -- The definition's own WHERE definitions are inlined first, as 'expandCall'
     -- does and for the same reason: a local keeps ONE unique in every copy the
     -- unfolding makes, though each copy has that call's arguments in it, so two
     -- calls' copies of one local would be drawn as one proposition (found by
     -- adversarial review of smucclaw/l4-ide#1013). A local that cannot be
     -- inlined (a recursive one) still comes along as it is.
-    withLocalsInlined rhs = fromMaybe rhs (Transform.inlineLocalBindingsForDrawing rhs)
+    Just (u, Transform.MkUnfoldable ps rhs)
+      | Just flat <- Transform.inlineLocalBindingsForDrawing rhs ->
+          over decideBody (transformOf (gplate @(Expr Resolved)) (unfold u ps flat))
+    -- No definition, or one written as clauses too long to read through: the
+    -- call stays as it is. Unfolded raw, the clauses' LETs would be drawn as a
+    -- leaf whose key reads them through, which does not finish; the leaf of
+    -- such a call is not offered for expansion ('calleeReadsThrough').
+    _ -> id
+  where
+    definition = Map.findWithDefault target target vs.callLeafTargets
     -- 'Transform.unfoldOnce' with one definition, except that a polymorphic
     -- one's types are instantiated at each call, as 'expandCall' does: unfolded
     -- without, a polymorphic callee's IF was one box after the expand gesture

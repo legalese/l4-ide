@@ -2881,7 +2881,7 @@ spec bin = do
         Nothing -> expectationFailure "l4 verify did not finish a 25-row clause table within 60 s"
         Just (Output code sout _) -> do
           code `shouldBe` ExitSuccess
-          case eitherDecode (BSL8.pack sout) of
+          case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
             Left err -> expectationFailure ("JSON parse failed: " ++ err)
             Right env -> do
               let stats nm =
@@ -2894,6 +2894,38 @@ spec bin = do
                     ]
               lookup "analysed" (stats "`table rule`") `shouldBe` Just (Bool True)
               stats "`table rule`" `shouldBe` stats "`table rule by hand`"
+
+    -- A rule that CALLS a rule written as clauses too long to read through. The
+    -- callee is refused on its own line; the call is left as a box with the
+    -- reason, as any other call whose meaning cannot be drawn. It used to be
+    -- unfolded raw and its clauses' LETs drawn as one leaf: here a meaningless
+    -- "read through", and with long clause bodies no answer at all (killed at
+    -- 100 s and 2.7 GB in review).
+    it "leaves a call to clauses too long to read through as a box, and says why" $ do
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-cli-test-too-long-callee"
+          file = dir </> "too-long-callee.l4"
+      createDirectoryIfMissing True dir
+      writeFile file tooLongCalleeSource
+      mOut <- runL4Within 60 bin ["verify", file, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish within 60 s on a caller of clauses too long to read through"
+        Just (Output _ sout _) -> case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+          Left err -> expectationFailure ("JSON parse failed: " ++ err)
+          Right env -> do
+            let decisionNamed nm =
+                  [ d
+                  | Just (Array ds) <- [objField env "decisions"]
+                  , d <- toList ds
+                  , objField d "name" == Just (String nm)
+                  ]
+            map (`objField` "analysed") (decisionNamed "bigrule") `shouldBe` [Just (Bool False)]
+            case decisionNamed "caller" of
+              [d] -> case objField d "callsLeftOpaque" of
+                Just (Array opaque) ->
+                  [why | String why <- toList opaque] `shouldSatisfy` any ("too long to draw" `T.isInfixOf`)
+                other -> expectationFailure ("expected callsLeftOpaque on caller, got " ++ show other)
+              other -> expectationFailure ("expected one decision named caller, got " ++ show other)
 
     -- A clause group whose ladder is one box (a column matches JUST x, a list
     -- and the like, which the ladder does not break down) is not reported as
@@ -3107,6 +3139,18 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | A rule written as clauses that, read through, passes the 20,000-part bound,
+-- and a rule that calls it. Each clause tests two MAYBE inputs with patterns that
+-- bind a name, which tell the pruning nothing, so every clause draws the ones
+-- after it twice: eleven clauses are the fewest that pass the bound.
+tooLongCalleeSource :: String
+tooLongCalleeSource = unlines $
+  ["GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN"]
+    <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> show i <> " AND y GREATER THAN " <> show i | i <- [0 .. 10 :: Int] ]
+    <> [ "DECIDE bigrule m k IS FALSE", ""
+       , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+       , "DECIDE caller p q f IS bigrule p q OR f" ]
 
 -- | Each decision in an @l4 verify@ JSON envelope, with the kinds of its
 -- findings, in report order. A decision that was not analysed has none.

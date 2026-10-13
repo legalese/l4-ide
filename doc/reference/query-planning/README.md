@@ -211,6 +211,8 @@ These clauses are too long to draw: written out as the CONSIDER they stand for, 
 In the editor, a rule refused for either reason keeps the lens above it, which then reads `No decision graph: these clauses would draw more than 300 boxes`, or `No decision graph: these clauses are too long to draw`.
 Clicking it shows the whole message.
 
+A rule that uses clauses too long to draw is still drawn, with the use as one box that does not open: the editor does not offer to expand it, and `l4 verify` checks the rule without looking inside that box, and says why under "call left as a leaf".
+
 Only the picture and the plan are refused.
 The rule still runs: `#EVAL`, `l4 run` and the service's evaluation answer it as usual.
 
