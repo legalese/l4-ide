@@ -418,8 +418,13 @@ The writer-first order here reads the future, because `RECORD` carries the wall-
 The same review measured that extending such a trace can turn `BREACHED` into `FULFILLED`: the verdict is not monotone in the trace.
 SEESAW, ruled 2026-10-09 and landed 2026-10-13 (#640), makes a compound's breach report independent of operand order only for operands that make and miss deadlines, and its "what it does not promise" list names this case, an `ROR`'s unrun right operand, and the black-ink gap, which needs `RECORD` to carry the contract clock beside `at=` (`EVERY-EACH-QUANTIFIER-SPEC.md` §6.1.2; its card A9 keeps transaction time today).
 
+Two further symptoms of the same cause, measured 2026-10-14 by session IL-hvac on an `l4` built from `unstable` after #640 and re-run here (`l4 lts --steps`):
+In a loop `(PARTY I MAY a k … HENCE COMMIT seen IS k, loop) ROR (PARTY P MAY b k … HENCE COMMIT seen IS k, loop) ROR (PARTY T MAY done …)` with acts I 1, P 2, I 3, P 4, T 5, **P's act at 2 is lost**: the left operand passes over it, accepts I's act at 3 and recurses, and the `ROR` at that level never runs its right operand, so `seen` records 1, 3, 4 and nothing reports the missing 2.
+In `I loop RAND P loop` with the same alternation, the official record is written 1, 3, 2, 4: operand-major, not time order.
+Rule N10's run-time check B does not catch either, since neither is a history read; both are evidence for its goal A, lockstep operands.
+
 **N12 — black ink picks the last write by position, and a named reader is cached.**
-Measured 2026-10-09 on the installed `l4` (pre-SEESAW), from the N12 skeptic's probes.
+Measured 2026-10-09 on the installed `l4` (pre-SEESAW), from the N12 skeptic's probes; the last-write probe below re-run 2026-10-14 on an `l4` built after #640 gives the same two answers (commit order 1, 2 and R refused in `a RAND b RAND c`; 2, 1 and R fulfilled in `b RAND a RAND c`).
 P commits `v` = 1 at 20, Q commits `v` = 2 at 3, and R's guard reads `v` at 25: `a RAND b RAND c` reads 2 and `b RAND a RAND c` reads 1, because the winner is the last visible entry by log position (`Ledger.hs` ~183) and under `RAND` the log is in operand order; both writes precede the reader, so an as-of filter alone would change nothing.
 A named helper `gate` = `IF RECALL P's waived THEN FULFILLED ELSE Q MUST y WITHIN 3`, used at 0 and again after a `RECORD` at 4, re-serves the read from 0 at its second use and arms Q twice (due 3 and 7); written inline, the second read sees the record and only one Q is armed.
 That second result happens today, independent of this spec, and follows a deliberate cache rule — a ledger read is re-served "per temporal scope" (`Machine.hs` ~1435 on `origin/unstable`, smucclaw#914 §2B), and the contract clock is not a scope — while `STATE-AS-LEDGER-SPEC.md` §4 defines a bare read as "the value as of this point in the deontic sequence".
