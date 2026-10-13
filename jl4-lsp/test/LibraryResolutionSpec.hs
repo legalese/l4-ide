@@ -13,18 +13,24 @@
 -- hspec runs items sequentially so this does not race.
 module LibraryResolutionSpec (spec) where
 
-import Control.Exception (bracket)
+import Control.Exception (IOException, bracket, finally, throwIO, try)
 import Control.Monad (forM_)
 import Data.Maybe (isNothing)
 import System.Directory
   ( canonicalizePath
   , createDirectoryIfMissing
   , createFileLink
+  , emptyPermissions
   , getTemporaryDirectory
   , removePathForcibly
+  , setOwnerReadable
+  , setOwnerSearchable
+  , setOwnerWritable
+  , setPermissions
   )
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>), (<.>))
+import System.IO.Error (isPermissionError)
 
 import Language.LSP.Protocol.Types (toNormalizedFilePath)
 import LSP.L4.Rules
@@ -86,6 +92,24 @@ resolveIn = resolveInScope AmbientLibraries
 resolveInScope :: LibraryScope -> Sandbox -> String -> IO LibraryResolution
 resolveInScope scope sb modName =
   resolveLibrary scope sb.rootDir (Just (toNormalizedFilePath (sb.siblingDir </> "importer.l4"))) modName
+
+-- | Try to create a symbolic link; 'Left' says why it could not be made. On
+-- Windows an account without the symlink privilege gets "permission denied".
+-- Any other failure is a real one and is rethrown.
+tryLink :: FilePath -> FilePath -> IO (Either String ())
+tryLink target link = do
+  r <- try (createFileLink target link) :: IO (Either IOException ())
+  case r of
+    Right () -> pure (Right ())
+    Left e
+      | isPermissionError e -> pure (Left ("cannot create a symbolic link here (" <> show e <> ")"))
+      | otherwise -> throwIO e
+
+-- | Create a symbolic link, or mark the example pending where this account may
+-- not: the example is about what the resolver does with a link, not about
+-- whether the platform lets a test make one.
+linkOrPending :: FilePath -> FilePath -> IO ()
+linkOrPending target link = tryLink target link >>= either pendingWith pure
 
 plant :: FilePath -> String -> IO FilePath
 plant dir modName = do
@@ -168,12 +192,27 @@ spec = around withSandbox $
     it "symlinked XDG entries canonicalize to their real target" $ \sb -> do
       target <- plant sb.elsewhere strayMod
       let link = sb.xdgLibs </> strayMod <.> "l4"
-      createFileLink target link
+      linkOrPending target link
       res <- resolveIn sb strayMod
       winnerFile res `shouldBe` Just link
       realWinner <- traverse canonicalizePath (winnerFile res)
       realTarget <- canonicalizePath target
       realWinner `shouldBe` Just realTarget
+
+    -- The examples that need a symbolic link are marked pending where the account
+    -- may not make one (Windows without the symlink privilege), instead of
+    -- failing. This pins the path they take: a link made in a folder the account
+    -- may not write to is reported, not thrown.
+    it "reports a link it may not create, instead of throwing" $ \sb -> do
+      target <- plant sb.elsewhere strayMod
+      let locked = sb.elsewhere </> "locked"
+          open' = setOwnerWritable True (setOwnerSearchable True (setOwnerReadable True emptyPermissions))
+      createDirectoryIfMissing True locked
+      setPermissions locked emptyPermissions
+      r <- tryLink target (locked </> strayMod <.> "l4") `finally` setPermissions locked open'
+      case r of
+        Left why -> why `shouldContain` "cannot create a symbolic link"
+        Right () -> pendingWith "this account can make a link in a read-only folder (root, or a platform that ignores the mode)"
 
     -- A host that serves uploaded bundles must not let its own files or
     -- environment replace the stdlib (jl4-service). Every tier but the embedded
@@ -210,7 +249,7 @@ spec = around withSandbox $
       it "merges a symlink with its target" $ \sb -> do
         target <- plant sb.elsewhere strayMod
         let link = sb.xdgLibs </> strayMod <.> "l4"
-        createFileLink target link
+        linkOrPending target link
         let existing = [(1, FileCandidate "project root" target), (2, FileCandidate "XDG data dir" link)]
         distinctCopies existing `shouldReturn` [(1, FileCandidate "project root" target)]
 

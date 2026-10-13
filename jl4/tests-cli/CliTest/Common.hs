@@ -8,6 +8,7 @@ module CliTest.Common where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
+import Control.Exception (IOException, throwIO, try)
 import Control.Monad (unless, void, when)
 import Data.List (findIndex, isInfixOf, isPrefixOf)
 import Data.Maybe (fromMaybe)
@@ -20,6 +21,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( createDirectoryIfMissing
+  , createFileLink
   , doesFileExist
   , getTemporaryDirectory
   , makeAbsolute
@@ -28,6 +30,7 @@ import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
 import System.IO (hClose, hSetBinaryMode)
+import System.IO.Error (isPermissionError)
 import System.Process
   ( CreateProcess(..)
   , StdStream(..)
@@ -39,6 +42,28 @@ import System.Process
   )
 import System.Timeout (timeout)
 import Test.Hspec
+
+----------------------------------------------------------------------------
+-- Symbolic links
+----------------------------------------------------------------------------
+
+-- | Try to create a symbolic link; 'Left' says why it could not be made. On
+-- Windows an account without the symlink privilege gets "permission denied".
+-- Any other failure is a real one and is rethrown.
+tryLink :: FilePath -> FilePath -> IO (Either String ())
+tryLink target link = do
+  r <- try (createFileLink target link) :: IO (Either IOException ())
+  case r of
+    Right () -> pure (Right ())
+    Left e
+      | isPermissionError e -> pure (Left ("cannot create a symbolic link here (" <> show e <> ")"))
+      | otherwise -> throwIO e
+
+-- | Create a symbolic link, or mark the example pending where this account may
+-- not: the example is about what @l4@ does with a link, not about whether the
+-- platform lets a test make one.
+linkOrPending :: FilePath -> FilePath -> IO ()
+linkOrPending target link = tryLink target link >>= either pendingWith pure
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
