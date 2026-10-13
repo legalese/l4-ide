@@ -57,7 +57,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindings, readClausesAsConsider, positionalCall)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -547,11 +547,12 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     -- gives what inlining them after would: the parameters are free in the body
     -- and substitution is by unique, so nothing is captured. A called rule
     -- written as clauses opens onto the CONSIDER it stands for, as it is drawn
-    -- on its own ('translateDecide').
-    expansionBodyOf (_, Transform.MkUnfoldable ps rhs)
-      | bindsLocally flat = Nothing
-      | otherwise = Just (ps, flat)
-      where flat = Transform.readClausesAsConsider (Transform.inlineLocalBindings rhs)
+    -- on its own ('translateDecide'), and is read as that before anything else
+    -- is put in ('Transform.inlineLocalBindingsForDrawing'); clauses too long
+    -- to read through have no expansion.
+    expansionBodyOf (_, Transform.MkUnfoldable ps rhs) = do
+      flat <- Transform.inlineLocalBindingsForDrawing rhs
+      if bindsLocally flat then Nothing else Just (ps, flat)
     seedFrom
       | cfg.expandCalls = toListOf (gplate @Unique) cfg.module'
       | otherwise = toListOf (gplate @Unique) body
@@ -890,8 +891,8 @@ So an argument inlined from the call IS the caller's leaf for that argument:
 @a@ inlined from @limb a b@ has the caller's @a@'s unique, and so its atomId.
 
 The callee's own WHERE definitions are inlined into the substituted body
-('Transform.inlineLocalBindings', as @l4 verify@ does before it reads a call
-through) before anything is drawn. They have to be. A local name has ONE unique
+('Transform.inlineLocalBindingsForDrawing', as @l4 verify@ does before it reads
+a call through) before anything is drawn. They have to be. A local name has ONE unique
 in every call of its rule, and stands for a different proposition in each, since
 its definition has that call's arguments in it; drawn as a leaf it would be keyed
 by its name, and then @ok WHERE ok MEANS p@ called with @a@ and with @b@ was one
@@ -899,7 +900,7 @@ atom, a local named @a@ meaning @NOT p@ was the caller's input @a@, and a callee
 @both@ was the caller's own @both@ (all measured 2026-10-05). Inlined, each such
 leaf is drawn as what it says after substitution, keyed like any other.
 
-A local that 'Transform.inlineLocalBindings' leaves in place — recursive, an
+A local that 'Transform.inlineLocalBindingsForDrawing' leaves in place — recursive, an
 @ASSUME@, applied to one of its own parameters as a function, or referenced at
 another arity — would bring back exactly that problem, so a call whose reduced
 body still binds anything locally is not expanded at all.
@@ -1201,7 +1202,7 @@ inlineExpr vs target =
     -- calls' copies of one local would be drawn as one proposition (found by
     -- adversarial review of smucclaw/l4-ide#1013). A local that cannot be
     -- inlined (a recursive one) still comes along as it is.
-    withLocalsInlined = Transform.inlineLocalBindings
+    withLocalsInlined rhs = fromMaybe rhs (Transform.inlineLocalBindingsForDrawing rhs)
     -- 'Transform.unfoldOnce' with one definition, except that a polymorphic
     -- one's types are instantiated at each call, as 'expandCall' does: unfolded
     -- without, a polymorphic callee's IF was one box after the expand gesture

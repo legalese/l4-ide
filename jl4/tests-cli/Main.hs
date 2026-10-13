@@ -340,6 +340,7 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- the exit code.
 verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
 verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture :: FilePath
+verifyClauseTableLargeFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -352,6 +353,7 @@ verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
 verifyClauseGroupWhereFixture = fixtureDir </> "verify-clause-group-where.l4"
 verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
 verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
+verifyClauseTableLargeFixture = fixtureDir </> "verify-clause-table-large.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -474,6 +476,7 @@ coreFixtures =
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
+  , verifyClauseTableLargeFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
@@ -2865,6 +2868,32 @@ spec bin = do
         lookup "analysed" (stats clauses) `shouldBe` Just (Bool True)
         lookup "callsReadThrough" (stats clauses) `shouldBe` Just (Number calls)
         stats clauses `shouldBe` stats hand
+
+    -- Reading a table's clauses as their CONSIDER comes before putting any other
+    -- binding in. In the other order the clauses' shared fall-through was walked
+    -- once for every branch that reached it: this 25-row table of two enums did
+    -- not finish in 4 GiB (killed after 27 s on 9d7f5829e), and its CONSIDER takes
+    -- a moment. The bound is generous; the failure it guards against is not slow
+    -- but unbounded.
+    it "analyses a 25-row table of two enums in moments, as the CONSIDER written by hand" $ do
+      mOut <- runL4Within 60 bin ["verify", verifyClauseTableLargeFixture, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish a 25-row clause table within 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          case eitherDecode (BSL8.pack sout) of
+            Left err -> expectationFailure ("JSON parse failed: " ++ err)
+            Right env -> do
+              let stats nm =
+                    [ (k, v)
+                    | Just (Array ds) <- [objField env "decisions"]
+                    , d <- toList ds
+                    , objField d "name" == Just (String nm)
+                    , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "findings"]
+                    , Just v <- [objField d k]
+                    ]
+              lookup "analysed" (stats "`table rule`") `shouldBe` Just (Bool True)
+              stats "`table rule`" `shouldBe` stats "`table rule by hand`"
 
     -- A clause group whose ladder is one box (a column matches JUST x, a list
     -- and the like, which the ladder does not break down) is not reported as

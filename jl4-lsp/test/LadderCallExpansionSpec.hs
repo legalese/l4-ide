@@ -806,6 +806,41 @@ spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPE
       [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
       withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
 
+    -- A called rule written as a table of clauses is read as its CONSIDER before
+    -- anything else is put in. In the other order the clauses' shared
+    -- fall-through was walked once for every branch that reached it: a rule
+    -- written by hand calling a four-by-four table took 44 s to draw, and a
+    -- five-by-five one did not finish in two minutes.
+    it "draws a call to a 25-row table of two enums in moments, opening onto its CONSIDER" $ do
+      let values prefix = [prefix <> T.pack (show i) | i <- [0 .. 4 :: Int]]
+          table = [(a, b, if (i * 3 + j) `mod` 4 == 0 then "FALSE" else "TRUE") | (i, a) <- zip [0 :: Int ..] (values "A"), (j, b) <- zip [0 :: Int ..] (values "B")]
+          calling callee = T.unlines $
+            [ "DECLARE C1 IS ONE OF " <> T.intercalate ", " (values "A")
+            , "DECLARE C2 IS ONE OF " <> T.intercalate ", " (values "B")
+            , ""
+            , "GIVEN x IS A C1"
+            , "      y IS A C2"
+            , "GIVETH A BOOLEAN" ]
+            <> callee
+            <> [ "", "GIVEN p IS A C1", "      q IS A C2", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE rule p q f IS callee p q OR f" ]
+          clauseTable = ["DECIDE callee " <> a <> " " <> b <> " IS " <> v | (a, b, v) <- table]
+          handTable =
+            ["DECIDE callee x y IS", "  CONSIDER x"]
+              <> concat
+                   [ ["    WHEN " <> a <> " THEN", "      CONSIDER y"] <> ["        WHEN " <> b <> " THEN " <> v | (a', b, v) <- table, a' == a]
+                   | a <- values "A" ]
+      drawn <- timeout 60000000 $ do
+        rC <- render "calls-table" (calling clauseTable) "rule"
+        rH <- render "calls-table-hand" (calling handTable) "rule"
+        _ <- evaluate (BL.length (Aeson.encode rC.funDecl.body) + BL.length (Aeson.encode rH.funDecl.body))
+        pure (rC, rH)
+      case drawn of
+        Nothing -> expectationFailure "drawing a call to a 25-row clause table did not finish within 60 s"
+        Just (rC, rH) -> do
+          [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+          withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
     -- The limit on a ladder drawn from clauses is about the rule as written. A
     -- rule written by hand that has a large clause group unfolded into it by the
     -- expand gesture is still a rule written by hand, and is drawn.

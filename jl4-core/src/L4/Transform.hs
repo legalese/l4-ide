@@ -96,6 +96,37 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 inlineLocalBindings :: Expr Resolved -> Expr Resolved
 inlineLocalBindings = inlineLocalBindingsWhere (const True) . inlineGeneratedLets
 
+-- | 'inlineLocalBindings' for a consumer that draws or analyses what comes out
+-- (@l4 verify@, a call's panel, the expand gesture).
+--
+-- The LETs a rule written as clauses generates are read first, as the
+-- CONSIDER the clauses stand for ('inlineLetsForViz'), and only then is every
+-- other local binding put in. The other order walks the clauses' shared
+-- fall-through as a tree, once for every branch that reaches it, before
+-- anything prunes it: a sixteen-row table of two enums took 18 s and 2.9 GB in
+-- @l4 verify@, and twenty-five rows did not finish in 4 GiB, where its CONSIDER
+-- written by hand takes a tenth of a second.
+--
+-- 'Nothing' when the clauses are too long to read through
+-- ('letInliningNodeBudget'). An expression with no clauses in it is read
+-- exactly as 'inlineLocalBindings' reads it.
+inlineLocalBindingsForDrawing :: Expr Resolved -> Maybe (Expr Resolved)
+inlineLocalBindingsForDrawing e
+  | not (anyOf (cosmosOf (gplate @(Expr Resolved))) isGeneratedLet e) = Just (inlineLocalBindingsWhere (const True) e)
+  | otherwise = case inlineLetsForViz e of
+      Right asConsider -> Just (inlineLocalBindingsWhere (const True) asConsider)
+      Left _      -> Nothing
+  where
+    isGeneratedLet = \ case
+      LetIn _ ds@(_ : _) _ -> all generatedBinding ds
+      _                    -> False
+    generatedBinding = \ case
+      LocalDecide _ (MkDecide a _ _ _) -> case view annPmSynthetic a of
+        Just (PmFallthrough _) -> True
+        Just (PmUnreachable _) -> True
+        _                      -> False
+      _ -> False
+
 -- | Substitute the @LET@s the clause desugarer generates (the clauses not yet
 -- tried, 'PmFallthrough') into the CONSIDERs that refer to them.
 --
@@ -266,13 +297,6 @@ joinGeneratedConsiders = transformOf (gplate @(Expr Resolved)) \ case
     unsnoc' xs = case xs of
       [] -> Nothing
       _  -> Just (init xs, last xs)
-
--- | Read a rule written as DECIDE clauses as the CONSIDER a drafter would write
--- for it: the generated CONSIDERs pruned by what their enclosing branches
--- already decided ('pruneGeneratedConsiders'), then joined
--- ('joinGeneratedConsiders').
-readClausesAsConsider :: Expr Resolved -> Expr Resolved
-readClausesAsConsider = joinGeneratedConsiders . pruneGeneratedConsiders
 
 -- | Drop what the enclosing generated branches make impossible.
 --

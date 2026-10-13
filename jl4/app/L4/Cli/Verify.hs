@@ -484,7 +484,11 @@ analyseDecide opts callees cfg decide0 =
                     , drUnfolding = Unfolding (Map.size meanings.cmDefs) meanings.cmOpaque
                     }
   where
-    decide = Transform.inlineLocalBindingsInDecide decide0
+    -- Local bindings put in before analysis, a rule written as clauses read as
+    -- its CONSIDER first ('Transform.inlineLocalBindingsForDrawing'). Clauses
+    -- too long to read through are left as written, for the ladder to refuse.
+    decide = case decide0 of
+      MkDecide ann sig af body -> MkDecide ann sig af (fromMaybe body (Transform.inlineLocalBindingsForDrawing body))
     notBrokenDown =
       "these clauses were not broken down into questions: a column matches a pattern other than an enum value or a literal (JUST x, a list, and the like), so the whole rule is one box and there is nothing in it to check"
 
@@ -577,7 +581,7 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
     meaningOf v = \case
       Left why -> Left why
       Right x ->
-        case LadderViz.doVisualize (MkDecide ann sig appForm (Transform.inlineLocalBindings x)) (LadderViz.withSimplification False cfg) of
+        case LadderViz.doVisualize (MkDecide ann sig appForm (fromMaybe x (Transform.inlineLocalBindingsForDrawing x))) (LadderViz.withSimplification False cfg) of
           Left err -> Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError err)
           Right (li, vs)
             | ladderNodeCount opts.verifyMaxNodes li.funDecl.body > opts.verifyMaxNodes ->
