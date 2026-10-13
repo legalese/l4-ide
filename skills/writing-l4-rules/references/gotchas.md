@@ -563,6 +563,11 @@ DECIDE `כפול` n IS n TIMES 2
 rather than linearized prose. `@lang he` at module level declares what an **untagged** `@nlg` in
 that module means, so an existing monolingual file gets labelled without touching every herald.
 
+**Declare `@lang` only for a module that is not written in English, and never write `@lang en`.**
+A module that declares nothing is English, so `@lang en` changes nothing on a current binary.
+On a binary built before `@lang` existed it is a lexer error at line 1 (`unexpected '@'`), which rejects the whole file; an editor whose language server is such a binary then has no tokens to colour it with, because L4's highlighting comes only from the server.
+A module that uses `@nlg:xx` tags does not need `@lang` either: its untagged heralds are English unless it says otherwise.
+
 **One thing a tag does not buy, and it surprises people.**
 A tag names the _rendering_; **it does not localise the words L4 puts around it**, and `@lang` does not either.
 Those words — `with`, "is equal to" — follow `l4 nlg --lang` instead: the module above prints `עם` with `--lang he`, and `שורה משלה with 21` with no `--lang` at all.

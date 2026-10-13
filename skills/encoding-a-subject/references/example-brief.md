@@ -54,9 +54,9 @@ example beneath it), transcribed and run.
 
 ## Deliverables, all under your `DEPOSIT` directory (given in your task)
 
-1. `.l4` modules with ASCII filenames. Decompose as you see fit. Every module starts with
-   `@lang en`. Source language is English; identifiers are English backtick names that read
-   like the statute. `@nlg:he` Hebrew heralds are welcome but optional.
+1. `.l4` modules with ASCII filenames. Decompose as you see fit. The encoding is in English,
+   so no module carries a `@lang` line: a module that declares nothing is English. Identifiers
+   are English backtick names that read like the statute. `@nlg:he` Hebrew heralds are welcome but optional.
 2. A tests module that (a) transcribes the SimpLEX table's rows as `#ASSERT`s against the
    DRAFT, in the table's own outcome words, and (b) runs the same scenarios against the
    other two vintages, asserting what each vintage actually answers.

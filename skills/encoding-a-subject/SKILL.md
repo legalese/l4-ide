@@ -30,7 +30,7 @@ Most of the quality comes from the brief.
 - **Get a current `l4`.** Install it with this plugin's `scripts/install-l4.sh`, which fetches the release it was built against and checks its digest, or download an archive from [`legalese/prereleases`](https://github.com/legalese/prereleases/releases) — each carries a `BUILD-INFO.txt` naming the commit it was built from.
   `l4` has no `--version` flag, so that file is how you know what you are running.
   The authoring skill documents the language as it is on `unstable`; **a binary older than the skill rejects constructs the skill tells you exist**, and the symptom is a parse error that reads like your mistake.
-  Measured: `@lang en`, which the authoring skill documents, is a parse error at line 1 on the 7 September 2026 prerelease.
+  Measured: `@lang en`, a spelling of the `@lang` declaration the authoring skill documents, is a parse error at line 1 on the 7 September 2026 prerelease.
   Note that `install-l4.sh` links `~/.local/bin/l4`, replacing whatever was there.
 - **Leave `JL4_LIBRARY_PATH` unset.** The standard library is compiled into the binary and always matches it; pointing the variable at a newer library produces a cascade of `could not find a definition` errors.
 - **Use the strongest model available, at high effort.** The comparison above ran every arm on Opus at high effort.

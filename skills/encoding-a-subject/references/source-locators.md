@@ -86,7 +86,6 @@ Nothing in L4 checks that the node it landed on is the one you meant.
 The module is saved as `dieu-35.l4`, and its two rules are deliberately small: they show the placement and are not the whole of Điều 35.
 
 ```l4
-@lang en
 IMPORT prelude
 
 §§ `Dieu 35: the period for thinking it over`
