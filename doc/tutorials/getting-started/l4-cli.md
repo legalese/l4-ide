@@ -484,7 +484,7 @@ The command exits with status 0 when every case was `success` or `refused`, and 
 
 `--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not five: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The problems are the ones a run reports under `diagnostics`, so `errors` is how a validation line says what `diagnostics` says in a run. A case that could not be read at all, such as a CSV line with the wrong number of cells, is `invalid` here and `error` in a run. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
 
-It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does.
+It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`.
 
 **It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
 
