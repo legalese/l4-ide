@@ -21,6 +21,12 @@ module L4.Parser.ResolveAnnotation (
   NonassertableWithSpan,
   HasRef(..),
   addRefCommentsToAst,
+  TrailingRefs,
+  trailingRefsOf,
+  refWarningMessage,
+  refUnattachedMessage,
+  refTrailingMessage,
+  refNoLocationMessage,
   -- * Annotate Syntax Nodes with definite 'SrcSpan's.
   WithSpan (..),
   NlgWithSpan,
@@ -56,10 +62,11 @@ import Base
 
 import Data.Char (isSpace)
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import L4.Annotation
-import L4.Lexer (LangTag)
+import L4.Lexer (AnnoType (..), LangTag, PosToken (..), TAnnotations (..), TokenType (..), displayTokenType)
 import L4.Syntax
 import L4.Parser.SrcSpan
 
@@ -81,7 +88,14 @@ data Warning
     -- 'Nothing' for untagged). Must be at least two. Annotations in other
     -- languages on the same name are unaffected and still attach.
   | RefUnattached RefWithSpan
-    -- ^ A @ref could not be attached to any following AST node.
+    -- ^ A @ref has no AST node after it to attach to: it comes after the last
+    -- one, at the end of the file.
+  | RefTrailing RefWithSpan (Maybe Text)
+    -- ^ A @ref follows code on its line, with nothing after it there. A @ref
+    -- refers to what FOLLOWS it, so it cannot cite the code it trails, and it
+    -- is attached to nothing rather than to the next construct (ruled
+    -- 2026-10-12, bench "Main Wave Rulings" card R1). The text is that code,
+    -- when there is some on the line to quote.
   | RefNoLocation Ref
     -- ^ A @ref had no source location. That's a bug.
   | FixityAnnotationMisplaced FixityWithSpan
@@ -1741,7 +1755,10 @@ data RefWarning
   = RefMissingLocation Ref
     -- ^ A 'Ref' had no 'SrcRange', so we could not place it. That's a bug.
   | RefNotAttached RefWithSpan
-    -- ^ A 'Ref' could not be attached to any following AST node.
+    -- ^ A 'Ref' has no AST node after it. See 'RefUnattached'.
+  | RefAfterCode RefWithSpan (Maybe Text)
+    -- ^ A 'Ref' follows code on its line, and is attached to nothing. See
+    -- 'RefTrailing'.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -1760,13 +1777,49 @@ data RefS = RefS
 renderRefWarning :: RefWarning -> Warning
 renderRefWarning = \ case
   RefNotAttached r     -> RefUnattached r
+  RefAfterCode r code  -> RefTrailing r code
   RefMissingLocation r -> RefNoLocation r
+
+-- | The words for a warning about where a @ref sits; 'Nothing' for any other
+-- warning. What @l4 check@, @l4 run@ and the IDE print, and what
+-- @doc\/reference\/syntax\/README.md@ quotes: change the one, change the other.
+refWarningMessage :: Warning -> Maybe Text
+refWarningMessage = \ case
+  RefUnattached r   -> Just (refUnattachedMessage r.payload)
+  RefTrailing r code -> Just (refTrailingMessage r.payload code)
+  RefNoLocation r   -> Just (refNoLocationMessage r)
+  _                 -> Nothing
+
+refUnattachedMessage :: Ref -> Text
+refUnattachedMessage r =
+  "This @ref" <> quotedCitation r <> " is at the end of the file, so there is nothing after it to attach to."
+
+refTrailingMessage :: Ref -> Maybe Text -> Text
+refTrailingMessage r code =
+  "This @ref" <> quotedCitation r
+    <> " follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above "
+    <> maybe "the code it cites" (\c -> "`" <> c <> "`") code
+    <> "."
+
+refNoLocationMessage :: Ref -> Text
+refNoLocationMessage r =
+  "This @ref" <> quotedCitation r <> " has no source location. This might be an internal compiler error."
+
+-- | @ (`the citation`)@, ready to follow \"This @ref\"; nothing for a @ref with no text.
+quotedCitation :: Ref -> Text
+quotedCitation r = case refCitation r of
+  "" -> ""
+  c  -> " (`" <> c <> "`)"
 
 -- | Attach @ref annotations to the AST nodes that immediately follow them.
 --
 -- Unlike @nlg (which targets 'Name' nodes) or @desc (which targets top-level
 -- declarations), a @ref can attach to /any/ AST node. The attachment rule is
--- \"the immediately following AST node, regardless of type\".
+-- \"the immediately following AST node, regardless of type\", and a node keeps
+-- EVERY ref that precedes it, in source order. It used to keep one, the
+-- nearest, and report each of the others as unattached, which they were not:
+-- they had been outranked, and a stack of refs above a definition is how the
+-- corpus writes several citations for it.
 --
 -- We rely on the fact that a pre-order traversal of a well-formed AST visits
 -- nodes in non-decreasing start position. Therefore, the first node whose
@@ -1774,22 +1827,114 @@ renderRefWarning = \ case
 -- following node, and it claims the ref. Refs are removed from the state as
 -- soon as they are claimed, so each ref is used at most once.
 --
+-- Two warnings come out of this pass, both about a ref that cannot do what
+-- its author meant, and a ref that draws one is attached to nothing. A ref
+-- with nothing after it ('RefNotAttached') has no node to attach to. A ref
+-- that follows code on its line ('RefAfterCode'; the 'TrailingRefs' say
+-- which, because only the tokens know) is not offered to any node, and not to
+-- the next construct either, which would make it that construct's citation;
+-- the warning says to put it on the line above (ruled 2026-10-12, bench
+-- "Main Wave Rulings" card R1, option A).
+--
 -- Like 'addNlgCommentsToAst', we merely add structured data to the ast node's
 -- respective 'Anno'; the exact-print annotations are left untouched.
-addRefCommentsToAst :: HasRef a => [Ref] -> a -> (a, RefS)
-addRefCommentsToAst refs0 ast =
+addRefCommentsToAst :: HasRef a => TrailingRefs -> [Ref] -> a -> (a, RefS)
+addRefCommentsToAst trailing refs0 ast =
   let
     (withSpan, missing) = preprocessRefs refs0
+    isTrailing r = Map.member r.range.start trailing
+    -- A ref that trails code is offered to no node, so it cannot be claimed.
     initialS =
       RefS
-        { refs = List.sortOn (.range.end) withSpan
-        , refWarnings = fmap RefMissingLocation missing
+        { refs = List.sortOn (.range.end) (filter (not . isTrailing) withSpan)
+        , refWarnings = []
         }
     (ast', s') = runState (addRef ast) initialS
-    -- Any refs that were never claimed become warnings, in source order.
-    leftovers = fmap RefNotAttached (List.sortOn (.range.start) s'.refs)
+    afterCode =
+      [ (r.range.start, RefAfterCode r code)
+      | r <- withSpan
+      , Just code <- [Map.lookup r.range.start trailing]
+      ]
+    -- Any refs that were never claimed become warnings.
+    leftovers = [ (r.range.start, RefNotAttached r) | r <- s'.refs ]
+    -- In source order.
+    placed = fmap snd (List.sortOn fst (afterCode <> leftovers))
   in
-    (ast', s'{refs = [], refWarnings = s'.refWarnings <> leftovers})
+    (ast', s'{refs = [], refWarnings = fmap RefMissingLocation missing <> placed})
+
+-- | The @ref tokens that follow code on their line and have nothing after
+-- them there, each by where it starts, with the code before it (when there is
+-- some to quote).
+--
+-- Only the token stream can say this: by the time a ref is a 'Ref' it has an
+-- 'Anno' and a range and no memory of its neighbours. The line form, @\@ref
+-- ...@, runs to the end of the line, so code before it is enough. The inline
+-- form, @\<\<...\>\>@, can sit in the middle of an expression, where it binds to
+-- the word after it and is right to; it is flagged only when no code follows
+-- it on its line. (Card R1 asks about a ref \"written at the end of a code
+-- line\", and its census counts the inline ones that end one; a mid-line
+-- @\<\<...\>\>@ is outside the ruling and keeps attaching to what follows it.)
+type TrailingRefs = Map SrcPos (Maybe Text)
+
+-- | Where the scan for 'TrailingRefs' has got to.
+data TrailScan = TrailScan
+  { lastCodeLine :: !Int
+    -- ^ The line the latest code token ENDED on; 0 before there is one. A
+    -- multi-line token ends where code on that line begins to follow it.
+  , lineStart    :: !Int
+    -- ^ The line 'linePrefix' belongs to.
+  , linePrefix   :: [Text]
+    -- ^ What the tokens that START on 'lineStart' say, latest first.
+  , awaiting     :: [(SrcPos, Maybe Text, Int)]
+    -- ^ Inline refs that follow code, with the line they END on, until the
+    -- next code token shows whether anything follows them there.
+  , found        :: !TrailingRefs
+  }
+
+trailingRefsOf :: [PosToken] -> TrailingRefs
+trailingRefsOf toks = finish (List.foldl' step start toks)
+ where
+  start = TrailScan 0 0 [] [] Map.empty
+
+  finish st = List.foldl' (\m (pos, quoted, _) -> Map.insert pos quoted m) st.found st.awaiting
+
+  -- Neither whitespace and comments nor annotations are code. A ref that
+  -- follows another ref, or a comment, on a line of its own is on a line of
+  -- its own.
+  isCode tok = case tok.payload of
+    TSpaces _      -> False
+    TAnnotations _ -> False
+    _              -> True
+
+  step st tok =
+    let
+      begins = tok.range.start
+      ends = tok.range.end
+      -- A code token shows what follows each inline ref waiting on one: more
+      -- code on the ref's own line, and it is mid-line; or none.
+      resolved
+        | isCode tok =
+            st { awaiting = []
+               , found = List.foldl' (\m (pos, quoted, endLine) ->
+                           if begins.line == endLine then m else Map.insert pos quoted m)
+                           st.found st.awaiting }
+        | otherwise = st
+      sameLine
+        | begins.line == resolved.lineStart = resolved
+        | otherwise = resolved { lineStart = begins.line, linePrefix = [] }
+      beforeRef = Text.strip (Text.concat (reverse sameLine.linePrefix))
+      codeBefore = if Text.null beforeRef then Nothing else Just beforeRef
+      scanned = case tok.payload of
+        TAnnotations (TRef _ ty) | sameLine.lastCodeLine == begins.line ->
+          case ty of
+            LineAnno   -> sameLine { found = Map.insert begins codeBefore sameLine.found }
+            InlineAnno -> sameLine { awaiting = (begins, codeBefore, ends.line) : sameLine.awaiting }
+        _ -> sameLine
+    in
+      scanned
+        { linePrefix = displayTokenType tok.payload : scanned.linePrefix
+        , lastCodeLine = if isCode tok then ends.line else scanned.lastCodeLine
+        }
 
 preprocessRefs :: [Ref] -> ([RefWithSpan], [Ref])
 preprocessRefs = foldl' go ([], [])
@@ -1821,9 +1966,6 @@ takeMatchingRefs nodeRange = do
   put s{refs = rest}
   pure matches
 
-addRefWarning :: RefWarning -> State RefS ()
-addRefWarning w = modify' $ \s -> s{refWarnings = w : s.refWarnings}
-
 -- | True if a ref sits (entirely) before the given node's start position, i.e.
 -- the node is a candidate for being the ref's \"immediately following node\".
 refPrecedesNode :: SrcSpan -> RefWithSpan -> Bool
@@ -1835,21 +1977,17 @@ refPrecedesNode nodeRange ref =
     refEnd.line < nodeStart.line
       || (refEnd.line == nodeStart.line && refEnd.column <= nodeStart.column)
 
--- | Attach at most one pending ref (the one closest to the node) to the node's
--- 'Anno'. When multiple refs precede the same node, the nearest one wins and
--- the others are reported as 'RefNotAttached' warnings (a node's 'Anno' can
--- only carry a single 'Ref').
+-- | Hold on the node's 'Anno' every pending ref that precedes the node, in
+-- source order.
 attachRef :: HasSrcRange a => a -> Anno -> State RefS Anno
 attachRef node ann =
   case nodeSpan node of
     Nothing -> pure ann
     Just nodeRange -> do
       matches <- takeMatchingRefs nodeRange
-      case reverse (List.sortOn (.range.start) matches) of
-        [] -> pure ann
-        (nearest : extras) -> do
-          traverse_ (addRefWarning . RefNotAttached) extras
-          pure $ setRef nearest.payload ann
+      pure $ case List.sortOn (.range.start) matches of
+        [] -> ann
+        rs -> addRefs (fmap (.payload) rs) ann
 
 -- ----------------------------------------------------------------------------
 -- HasRef Class and Instances

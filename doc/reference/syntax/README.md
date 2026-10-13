@@ -448,11 +448,61 @@ wrote before tags existed still means what it meant.
 
 ### @ref
 
-Cross-references to legal sources.
+Cross-references to legal sources: the provision a rule, a type or an input comes from.
 
-**Inline form:** `The applicant <<must be at least 18 years old>>.`
+**Line form:** `@ref` and the citation, on a line of its own.
+
+**Inline form:** the citation between `<<` and `>>`, which can sit in the middle of a line.
 
 See [annotation-example.l4](annotation-example.l4)
+
+#### What a `@ref` cites
+
+A `@ref` cites what comes **after** it, so write it on the line above the thing it cites:
+
+```l4
+@ref Section 4(1)(a) of the Act
+GIVEN age IS A NUMBER
+      resident IS A BOOLEAN
+GIVETH A BOOLEAN
+`is eligible` MEANS
+  age AT LEAST 18
+  AND <<Section 4(1)(b)>> resident
+```
+
+The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the expression that follows it.
+A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
+Blank lines and comments between a `@ref` and that construct make no difference.
+
+**Several citations.** Write them one above the other, each on a line of its own.
+The construct below keeps all of them, in the order written.
+
+```l4
+@ref Dog Act 058 of 1976 (WA)
+@ref url https://www.legislation.wa.gov.au/legislation/statutes.nsf/law_a230.html
+§ `Dogs Act - 33D.1`
+```
+
+An export that carries one citation per rule uses the nearest, which is the one written last, just above the construct.
+
+#### Two warnings
+
+Both are warnings, so `l4 check` still succeeds, and the IDE marks the `@ref` itself.
+
+**A `@ref` that follows code on its line.**
+A `@ref` written at the end of a line, after the code it means to cite, cannot cite that code, because it cites what comes after it.
+It does not cite the next construct either: it is attached to nothing, so the next construct's citation, in the IDE and in every export, is not this one.
+The warning names the code it trails:
+
+> This @ref (`1981/61 sec. 2`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`.
+
+The fix is to move it to the line above that code.
+An inline `<<…>>` is warned about only when it ends the line, because in the middle of a line it cites the word after it, which is what it is for.
+
+**A `@ref` with nothing after it.**
+A `@ref` after the last construct of the file has nothing to attach to:
+
+> This @ref (`Section 4(1)(a) of the Act`) is at the end of the file, so there is nothing after it to attach to.
 
 #### Writing a literal `>>`
 

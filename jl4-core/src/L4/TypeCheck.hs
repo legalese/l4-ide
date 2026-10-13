@@ -910,7 +910,7 @@ warnDeprecatedAssume origin ann n role mReplacement aliases =
         _                  -> AtTopLevel
     , replacement = mReplacement
     , aliases
-    , annotated = isJust ann.extra.desc || isJust ann.extra.ref
+    , annotated = isJust ann.extra.desc || isJust (view annRef ann)
     }
 
 -- | R3: the deprecation warning for an @EXACTLY@ written in a regulative

@@ -389,7 +389,10 @@ Read it before writing one:
 `@ref` and `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
 An `@ref` on its own line binds to the next syntax node, whatever it is, so it goes above the rule it cites.
 Measured with `l4 check` and `l4 ast`: one written under its rule attached to the next rule, with no message; one above a `§` heading attached to the heading.
-Two above one rule leave the nearer attached and report the other as unattached, and so does one at the end of a file; both are warnings, and `l4 check` still exits 0.
+Two above one rule are both kept, in the order written, and an export that shows one citation shows the nearest, the lower.
+One written at the end of a line of code attaches to nothing, and draws a warning that says to put it on the line above.
+One at the end of a file, with nothing after it, draws a warning that there is nothing to attach it to.
+Both warnings leave `l4 check` exiting 0.
 `@ref-src` is accepted and ignored.
 The lexer still reads it and the parser stores nothing from it (`refAdditionalP` in `jl4-core/src/L4/Parser.hs`); the CSV loading it did was removed, as `specs/done/REF-ANNOTATION-SPEC.md` records.
 Measured: `@ref-src this-file-does-not-exist.csv` passes `l4 check` with `Check succeeded` and no diagnostic.

@@ -672,6 +672,46 @@ spec = do
       m <- lowerOk statute
       concat [ ls | SegProse ls <- m.modSegments ] `shouldSatisfy` elem "*Source: s1(1).*"
 
+    -- A stack of @refs shows its nearest, the one written closest above the
+    -- rule (ruled 2026-10-12, bench "Main Wave Rulings" card R1).
+    it "cites the nearest of several @refs written above a rule" $ do
+      m <- lowerOk $ Text.unlines
+        [ "§ `Winter allowance`"
+        , ""
+        , "@ref s1(1)"
+        , "@ref s1(2)"
+        , "@export Whether the household qualifies."
+        , "GIVEN h IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `qualifies` IF"
+        , "    h"
+        ]
+      let prose = concat [ ls | SegProse ls <- m.modSegments ]
+      prose `shouldSatisfy` elem "*Source: s1(2).*"
+      prose `shouldNotSatisfy` elem "*Source: s1(1).*"
+
+    -- A @ref refers to what FOLLOWS it. One written after code on its line is
+    -- attached to nothing, not to the next rule, whose citation it would
+    -- otherwise become with no one the wiser (card R1, option A).
+    it "cites nothing for a @ref written after code on its line" $ do
+      m <- lowerOk $ Text.unlines
+        [ "§ `Winter allowance`"
+        , ""
+        , "@export Whether the household qualifies."
+        , "GIVEN h IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `qualifies` IF"
+        , "    h @ref s1(1)"
+        , ""
+        , "@export Whether the household is large."
+        , "GIVEN h IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `is large` IF"
+        , "    h"
+        ]
+      let prose = concat [ ls | SegProse ls <- m.modSegments ]
+      filter ("*Source:" `Text.isPrefixOf`) prose `shouldBe` []
+
     it "puts an @export description on the scope as #[description]" $ do
       m <- lowerOk statute
       (scopeDecl "Qualifies" m).sdDesc `shouldBe` Just "Whether the household qualifies."

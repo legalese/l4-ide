@@ -228,18 +228,18 @@ A **silent** failure exits 0 and leaves a wrong answer standing, so these are th
 | An `@ref-map` name that does not repeat the `@ref` text, locator included                                            | L4 matches the whole text, and the link is simply missing. Nothing reports it.                                                                                                                                                                                                                                                     |
 | An `@ref` above the wrong declaration, including one declaration too late                                            | L4 binds an `@ref` to the next syntax node. Measured: an `@ref` written under its rule attached to the rule below it, with no message.                                                                                                                                                                                             |
 | An `@ref` before a `§` or `§§` heading, or before a `#ASSERT`                                                        | It attaches to the heading or the directive. Measured: `l4 check` printed `Check succeeded`.                                                                                                                                                                                                                                       |
-| Two `@ref` lines above one declaration                                                                               | L4 keeps the nearer one and reports the other as unattached. It prints a warning, but `l4 check` still exits 0.                                                                                                                                                                                                                    |
-| An `@ref` at the end of a file                                                                                       | L4 prints "could not be attached to any following syntax node", but `l4 check` still exits 0.                                                                                                                                                                                                                                      |
+| An `@ref` at the end of a line of code, after the code it cites                                                      | L4 attaches it to nothing. It prints "follows code on its line", but `l4 check` still exits 0.                                                                                                                                                                                                                                     |
+| An `@ref` at the end of a file                                                                                       | L4 prints "is at the end of the file, so there is nothing after it to attach to", but `l4 check` still exits 0.                                                                                                                                                                                                                    |
 | An encoding that does not mean what the quoted text says                                                             | The gate compares text with text.                                                                                                                                                                                                                                                                                                  |
 
 The last two L4 rows are printed, not hidden, but `check.sh` does not show them: it counts errors and assertion outcomes only.
 List them with `l4`, run on each module:
 
 ```
-for f in *.l4; do l4 check "$f"; done 2>&1 | grep 'could not be attached'
+for f in *.l4; do l4 check "$f"; done 2>&1 | grep -E 'is at the end of the file|follows code on its line'
 ```
 
-Measured: on a file that ended in an `@ref`, and on one with two `@ref` lines above a rule, `check.sh` printed a table of zeros and exited 0, and the command above printed one line for each.
+Measured: on a file that ended in an `@ref`, and on one with an `@ref` at the end of a line of code, `check.sh` printed a table of zeros and exited 0, and the command above printed one line for each.
 
 ## What the gate does not check
 
