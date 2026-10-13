@@ -38,12 +38,13 @@ substitutedEntityInfo r =
   applyFinalSubstitution r.tcdSubstitution r.tcdUri r.tcdEntityInfo
 
 -- | A party and an action whose names need backticks in L4 source are baked
--- into the schema as their PLAIN names, tagged as names (@{"name": ...}@) so
--- the runtime can backtick them again in the trace's source text. jl4-service
--- spells them plain in an answer (@Backend.Jl4.partyText@ \/ @actionText@).
--- Until 2026-10-13 the action was baked as source, backticks included, because
--- the reference printed it that way. An action that carries a value stays rule
--- source, an untagged string.
+-- into the schema as their PLAIN names, as bare strings a runtime that predates
+-- the tag reads correctly, with @partyKind@ \/ @actionKind@ = @"name"@ beside
+-- them so the new runtime can backtick them again in the trace's source text.
+-- jl4-service spells them plain in an answer (@Backend.Jl4.partyText@ \/
+-- @actionText@). Until 2026-10-13 the action was baked as source, backticks
+-- included, because the reference printed it that way. An action that carries
+-- a value stays rule source, with no kind key.
 testDeonticNamesPlain :: IO Bool
 testDeonticNamesPlain = do
   let src = T.unlines
@@ -65,8 +66,10 @@ testDeonticNamesPlain = do
     Right json -> do
       let checks :: [(String, Bool)]
           checks =
-            [ ("party is a plain name",  T.isInfixOf "\"party\":{\"name\":\"the seller\"}" json)
-            , ("action is a plain name", T.isInfixOf "\"action\":{\"name\":\"deliver the goods\"}" json)
+            [ ("party is a plain string",  T.isInfixOf "\"party\":\"the seller\"" json)
+            , ("action is a plain string", T.isInfixOf "\"action\":\"deliver the goods\"" json)
+            , ("party is tagged a name",   T.isInfixOf "\"partyKind\":\"name\"" json)
+            , ("action is tagged a name",  T.isInfixOf "\"actionKind\":\"name\"" json)
             ]
       let failures = [name | (name, ok) <- checks, not ok]
       case failures of
@@ -77,8 +80,8 @@ testDeonticNamesPlain = do
           pure False
 
 -- | An action that carries a value is not a name: it is baked as the rule
--- source it is, as @Backend.Jl4.actionText@ prints it, and only a bare name is
--- baked plain.
+-- source it is, as @Backend.Jl4.actionText@ prints it, with no @actionKind@;
+-- only a bare name is baked plain and tagged.
 testDeonticValueActionIsSource :: IO Bool
 testDeonticValueActionIsSource = do
   let src = T.unlines
@@ -99,7 +102,7 @@ testDeonticValueActionIsSource = do
       pure False
     Right json -> do
       let want = "\"action\":\"say \\\"pay\\\"\""
-      if T.isInfixOf want json
+      if T.isInfixOf want json && not (T.isInfixOf "\"actionKind\"" json)
         then pure True
         else do
           putStrLn $ "\n    expected " <> T.unpack want

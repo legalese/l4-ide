@@ -495,14 +495,18 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   const sale = {
     kind: "OBLIGATION",
     modal: "MUST",
-    party: { name: "the seller" },
-    action: { name: "deliver the goods" },
+    party: "the seller",
+    action: "deliver the goods",
+    partyKind: "name",
+    actionKind: "name",
     deadline: 14,
     hence: {
       kind: "OBLIGATION",
       modal: "MUST",
-      party: { name: "the buyer" },
-      action: { name: "pay the invoice" },
+      party: "the buyer",
+      action: "pay the invoice",
+      partyKind: "name",
+      actionKind: "name",
       deadline: 30,
       hence: { kind: "FULFILLED" },
       lest: { kind: "BREACH", by: null, because: null },
@@ -575,7 +579,8 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     const valued = (action) => ({
       kind: "OBLIGATION",
       modal: "MUST",
-      party: { name: "Alice" },
+      party: "Alice",
+      partyKind: "name",
       action,
       deadline: 14,
       hence: { kind: "FULFILLED" },
@@ -591,8 +596,9 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       traced(valued("pay 100"), []),
       "Result: PARTY Alice\nMUST pay 100\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
     );
-    // A bundle compiled before names were tagged carries only bare strings.
-    // They are printed as given, never backticked again and never a crash.
+    // A bundle compiled before the kind keys existed carries no partyKind or
+    // actionKind. Its literals are printed as given, never backticked again and
+    // never a crash.
     const untagged = {
       kind: "OBLIGATION",
       modal: "MUST",
@@ -603,12 +609,12 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       lest: { kind: "BREACH", by: null, because: null },
     };
     eq(
-      "deontic trace: an untagged literal from an older bundle is printed as given",
+      "deontic trace: a literal with no kind key (older bundle) is printed as given",
       traced(untagged, []),
       "Result: PARTY the seller\nMUST `deliver the goods`\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
     );
     eq(
-      "deontic: an untagged literal from an older bundle is answered as given",
+      "deontic: a literal with no kind key (older bundle) is answered as given",
       JSON.stringify(
         rtT.invokeFunction(
           { exports: {} },
@@ -630,6 +636,36 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
           party: "the seller",
         },
       }),
+    );
+    // The kind keys are siblings of the plain strings, so a runtime that
+    // predates them reads a new bundle as it reads an old one. Stripping them
+    // models that reader: no answer may depend on them, only the trace text.
+    const withoutKinds = JSON.parse(
+      JSON.stringify(sale, (k, v) =>
+        k === "partyKind" || k === "actionKind" ? undefined : v,
+      ),
+    );
+    eq(
+      "deontic: the kind keys are absent from the model of an older runtime",
+      JSON.stringify(withoutKinds).includes("Kind"),
+      false,
+    );
+    const streams = [
+      [],
+      [{ party: "the seller", action: "deliver the goods", at: 5 }],
+      [{ party: "the seller", action: "deliver the goods", at: 20 }],
+      [
+        { party: "the seller", action: "deliver the goods", at: 5 },
+        { party: "the buyer", action: "pay the invoice", at: 20 },
+      ],
+    ];
+    streams.forEach((events, i) =>
+      eq(
+        "deontic: an older runtime reading a new bundle answers the same, stream " +
+          i,
+        JSON.stringify(runDeontic(withoutKinds, 0, events, {}, null)),
+        JSON.stringify(runDeontic(sale, 0, events, {}, null)),
+      ),
     );
   }
 

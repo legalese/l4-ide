@@ -165,9 +165,12 @@ data DeonticContract
 --
 -- The name and the source are told apart so that the runtime can print the
 -- trace's source text as L4: a name with a space is backticked there, source
--- text is printed as given. Both are the same text on the answer's wire. A
--- bundle compiled before 'DEName' existed has only the literal, and the
--- runtime prints it as given.
+-- text is printed as given. On the wire both are the same bare string, so a
+-- runtime that does not know the difference reads a bundle correctly; the
+-- difference travels in a sibling key of the obligation, @partyKind@ \/
+-- @actionKind@ = @"name"@, which such a runtime ignores. A bundle compiled
+-- before the key existed has none, and the runtime prints its literals as
+-- given.
 data DeonticExpr
   = DEName    !Text
   | DELiteral !Text
@@ -2135,7 +2138,7 @@ instance Aeson.ToJSON DeonticContract where
     , "by"      .= mBy
     , "because" .= mBec
     ]
-  toJSON o@DCObligation{} = Aeson.object
+  toJSON o@DCObligation{} = Aeson.object $
     [ "kind"     .= ("OBLIGATION" :: Text)
     , "party"    .= o.dcParty
     , "action"   .= o.dcAction
@@ -2144,6 +2147,8 @@ instance Aeson.ToJSON DeonticContract where
     , "hence"    .= o.dcHence
     , "lest"     .= o.dcLest
     ]
+    <> [ "partyKind"  .= ("name" :: Text) | DEName{} <- [o.dcParty] ]
+    <> [ "actionKind" .= ("name" :: Text) | DEName{} <- [o.dcAction] ]
   toJSON o@DCIfThenElse{} = Aeson.object
     [ "kind" .= ("IF" :: Text)
     , "cond" .= o.dcCond
@@ -2158,8 +2163,8 @@ instance Aeson.FromJSON DeonticContract where
       "FULFILLED" -> pure DCFulfilled
       "BREACH"    -> DCBreach <$> o .:? "by" <*> o .:? "because"
       "OBLIGATION" -> DCObligation
-        <$> o .: "party"
-        <*> o .: "action"
+        <$> (tagName <$> o .:? "partyKind" <*> o .: "party")
+        <*> (tagName <$> o .:? "actionKind" <*> o .: "action")
         <*> o .: "modal"
         <*> o .:? "deadline"
         <*> o .:? "hence"
@@ -2170,23 +2175,25 @@ instance Aeson.FromJSON DeonticContract where
         <*> o .: "else"
       _ -> fail ("unknown DeonticContract kind: " ++ Text.unpack kind)
 
--- | DeonticExpr ⇄ JSON: source as a bare string, a name as
--- '{"name": "<name>"}', a param ref as '{"param": "<name>"}'. The runtime
--- branches on @typeof@ and the key.
+-- | DeonticExpr ⇄ JSON: a name or source as a bare string, a param ref as
+-- '{"param": "<name>"}'. The runtime branches on @typeof@. A name is the same
+-- string as source; 'DeonticContract' says which in a sibling key.
 instance Aeson.ToJSON DeonticExpr where
+  toJSON (DEName    t) = Aeson.toJSON t
   toJSON (DELiteral t) = Aeson.toJSON t
-  toJSON (DEName    t) = Aeson.object ["name" .= t]
   toJSON (DEParam   t) = Aeson.object ["param" .= t]
 
 instance Aeson.FromJSON DeonticExpr where
   parseJSON v = case v of
     Aeson.String t -> pure (DELiteral t)
-    Aeson.Object o -> do
-      mName <- o .:? "name"
-      case mName of
-        Just n  -> pure (DEName n)
-        Nothing -> DEParam <$> o .: "param"
-    _ -> fail "DeonticExpr: expected string (source), {name: name} or {param: name}"
+    Aeson.Object o -> DEParam <$> o .: "param"
+    _ -> fail "DeonticExpr: expected string (literal) or {param: name}"
+
+-- | Apply a sibling @partyKind@ \/ @actionKind@ key to the expression it
+-- describes: @"name"@ makes a literal a bare name.
+tagName :: Maybe Text -> DeonticExpr -> DeonticExpr
+tagName (Just "name") (DELiteral t) = DEName t
+tagName _             e             = e
 
 -- | DeonticGuard ⇄ JSON: tagged-record form, mirroring DeonticContract.
 instance Aeson.ToJSON DeonticGuard where
