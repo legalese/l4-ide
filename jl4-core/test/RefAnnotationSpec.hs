@@ -4,6 +4,7 @@ module RefAnnotationSpec (spec) where
 
 import Control.Exception (evaluate)
 import qualified Data.Text as Text
+import GHC.Clock (getMonotonicTime)
 import System.CPUTime (getCPUTime)
 
 import Base
@@ -150,41 +151,123 @@ refHoldersAndBody src = do
           expectationFailure "Expected a DECIDE"
           error "unreachable"
 
--- | @attachesInLinearTime small large limit line@: parsing @large@ lines made
--- by @line@ (one definition each) takes less than @limit@ times the CPU time
--- of parsing @small@ lines. A ratio short of twice the limit is measured
--- again, up to twice, so that one pause does not fail it. The warnings are
--- forced as well as the definitions, because they depend on the last state of
--- every pass that attaches annotations to the tree: so each of them has run
--- to the end when the clock stops.
-attachesInLinearTime :: Int -> Int -> Double -> (Int -> Text) -> Expectation
-attachesInLinearTime smallSize largeSize limit line = do
+-- | A CPU clock, in picoseconds, as 'getCPUTime' reads it.
+type Clock = IO Integer
+
+-- | One step of the CPU clock on Windows, 15.625 ms in picoseconds: every
+-- reading there is a multiple of it, so a parse that takes less than a step
+-- reads as 0 or as a whole step.
+windowsClockStep :: Integer
+windowsClockStep = 15625000000
+
+-- | A clock that reads in whole steps, rounding down, as Windows' does.
+steppedClock :: Integer -> Clock -> Clock
+steppedClock step clock = (\ t -> t `div` step * step) <$> clock
+
+-- | How long, in seconds of wall-clock time, 'linearTimeRatioOn' looks for a
+-- stretch of parses that its clock can measure.
+measurableSearchSeconds :: Double
+measurableSearchSeconds = 2.0
+
+-- | Parse @src@ and count its definitions. The warnings are forced as well as
+-- the definitions, because they depend on the last state of every pass that
+-- attaches annotations to the tree: so each of them has run to the end when
+-- the clock stops.
+parseCountingDecides :: Text -> IO Int
+parseCountingDecides src =
+  case execProgramParser (toNormalizedUri (Uri "file:///ref-annotation-spec-timing")) src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (MkModule _ _ (MkSection _ _ _ decls), warnings) -> do
+      _ <- evaluate (length warnings)
+      pure (length [ () | Decide _ _ <- decls ])
+
+-- | A parse of no real file: it takes time quadratic in the number of lines
+-- and finds one "definition" for each. It is the control for the guard, which
+-- must still fail a parse like this on a clock as coarse as Windows' (the
+-- work is made up, so that the test does not depend on the parser).
+quadraticParse :: Text -> IO Int
+quadraticParse src = do
+  let k = length (Text.lines src)
+  _ <- evaluate (foldl' (+) 0 [1 .. k * k * 20])
+  pure k
+
+-- | The time to parse @largeSize@ lines made by @line@ over the time to parse
+-- @smallSize@ of them, both in the CPU time that the clock reads; or 'Nothing'
+-- if the clock could not measure the small file.
+--
+-- The small file is parsed over and over in one timed stretch, until the
+-- stretch spans ten steps of the Windows clock, and its time is the stretch's
+-- divided by the number of parses. One parse of 1,000 lines is about four
+-- steps there, so a single reading is off by a quarter either way: on Windows,
+-- two of 56 runs of the guard that read it once gave 16.5 and 17.0 against a
+-- limit of 16 (review of legalese/l4-ide#648). The large file is parsed once,
+-- since it is eight times longer. If no stretch spans ten steps within
+-- 'measurableSearchSeconds' (a clock that never ticks, say) or 4,096 parses,
+-- there is no ratio. A ratio short of twice the limit is measured again, up to
+-- twice, so that one pause does not fail it; each measurement reads the small
+-- file again as well as the large one, and the smallest ratio counts.
+linearTimeRatioOn :: Clock -> (Text -> IO Int) -> Int -> Int -> Double -> (Int -> Text) -> IO (Maybe Double)
+linearTimeRatioOn clock parse smallSize largeSize limit line = do
   let file k = Text.unlines (map line [1 .. k])
-      uri = toNormalizedUri (Uri "file:///ref-annotation-spec-timing")
-      parse src =
-        case execProgramParser uri src of
-          Left errs -> do
-            expectationFailure $ "Parser failed: " <> show errs
-            error "unreachable"
-          Right (MkModule _ _ (MkSection _ _ _ decls), warnings) -> do
-            _ <- evaluate (length warnings)
-            pure (length [ () | Decide _ _ <- decls ])
-      timeParse k = do
+      -- The CPU time of @reps@ parses of a file of @k@ lines, in picoseconds.
+      timeParses k reps = do
         src <- evaluate (file k)
         _ <- evaluate (Text.length src)
-        t0 <- getCPUTime
-        n <- parse src
-        t1 <- getCPUTime
-        n `shouldBe` k
+        t0 <- clock
+        replicateM_ reps do
+          n <- parse src
+          n `shouldBe` k
+        t1 <- clock
         pure (fromIntegral (t1 - t0) :: Double)
-      fastest k tries = minimum <$> traverse (const (timeParse k)) [1 .. tries :: Int]
-  small <- fastest smallSize 3
-  let ratio large = large / max small 1.0e9
-      settle tries = do
-        r <- ratio <$> timeParse largeSize
-        if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-  r <- settle 3
-  r `shouldSatisfy` (< limit)
+      measurable = fromIntegral (10 * windowsClockStep) :: Double
+      maxReps = 4096 :: Int
+  start <- getMonotonicTime
+  let -- The number of parses of the small file that fills a measurable stretch.
+      repsFor reps = do
+        t <- timeParses smallSize reps
+        now <- getMonotonicTime
+        if t >= measurable
+          then pure (Just reps)
+          else if reps >= maxReps || now - start >= measurableSearchSeconds
+            then pure Nothing
+            else repsFor (reps * 2)
+  found <- repsFor 1
+  case found of
+    Nothing -> pure Nothing
+    Just reps -> do
+      let -- One ratio: the fastest of three stretches of the small file, per
+          -- parse, against one parse of the large file.
+          measure = do
+            stretches <- traverse (const (timeParses smallSize reps)) [1 .. 3 :: Int]
+            large <- timeParses largeSize 1
+            let small = minimum stretches / fromIntegral reps
+            pure (if small <= 0 then Nothing else Just (large / small))
+          settle tries = do
+            measured <- measure
+            case measured of
+              Nothing -> pure Nothing
+              Just r
+                | r < limit || r >= 2 * limit || tries <= (1 :: Int) -> pure (Just r)
+                | otherwise -> fmap (min r) <$> settle (tries - 1)
+      settle 3
+
+-- | @attachesInLinearTimeOn clock small large limit line@: parsing @large@
+-- lines made by @line@ (one definition each) takes less than @limit@ times the
+-- CPU time of parsing @small@ lines, as 'linearTimeRatioOn' measures it. If the
+-- clock gave no ratio, the test is pending, not failed.
+attachesInLinearTimeOn :: Clock -> Int -> Int -> Double -> (Int -> Text) -> Expectation
+attachesInLinearTimeOn clock smallSize largeSize limit line = do
+  ratio <- linearTimeRatioOn clock parseCountingDecides smallSize largeSize limit line
+  case ratio of
+    Nothing -> pendingWith "the CPU clock did not tick enough while the small file was parsed, so there is no ratio to judge"
+    Just r -> r `shouldSatisfy` (< limit)
+
+-- | A file of @i@ definitions, each with a citation above it.
+citedDefinition :: Int -> Text
+citedDefinition i =
+  "@ref https://example.com/s" <> Text.pack (show i) <> "\nf" <> Text.pack (show i) <> " x MEANS " <> Text.pack (show i)
 
 spec :: Spec
 spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
@@ -414,10 +497,36 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
   -- them took 30 s to check, where the same definitions without citations
   -- took 2 s. With that scan, parsing 8,000 definitions took 44 to 45 times as
   -- long as 1,000 (four runs). Linear is 8 times, so this times 1,000 and
-  -- 8,000 lines and fails above twice that.
+  -- 8,000 lines and fails above 30, which leaves the noise of a busy machine
+  -- room on one side and the quadratic scan on the other.
   it "attaches @ref citations in time linear in their number" $
-    attachesInLinearTime 1000 8000 16 \ i ->
-      "@ref https://example.com/s" <> Text.pack (show i) <> "\nf" <> Text.pack (show i) <> " x MEANS " <> Text.pack (show i)
+    attachesInLinearTimeOn getCPUTime 1000 8000 30 citedDefinition
+
+  -- The guard above reads the CPU clock. On Windows it ticks every 15.625 ms,
+  -- and 1,000 lines parse in about four of those: the small sample was read
+  -- once, to within a quarter either way (review of legalese/l4-ide#648). This
+  -- runs the guard on a clock that reads as Windows' does; the guard times
+  -- enough parses of the small file to span ten steps.
+  it "judges a linear parse linear on a clock that ticks every 15.625 ms" $
+    attachesInLinearTimeOn (steppedClock windowsClockStep getCPUTime) 1000 8000 30 citedDefinition
+
+  -- The control for the one above: on the same clock, a parse that takes time
+  -- quadratic in the lines is still failed.
+  it "still fails a quadratic parse on that clock" $ do
+    ratio <- linearTimeRatioOn (steppedClock windowsClockStep getCPUTime) quadraticParse 1000 8000 30 (const "x")
+    case ratio of
+      Nothing -> pendingWith "the clock did not tick, so there is no ratio to judge"
+      Just r -> r `shouldSatisfy` (>= 30)
+
+  -- A clock that never ticks gives no ratio, and the search for a measurable
+  -- stretch is bounded, so the guard goes pending within seconds and not
+  -- minutes.
+  it "gives no ratio within seconds on a clock that never ticks" $ do
+    t0 <- getMonotonicTime
+    ratio <- linearTimeRatioOn (pure 0) parseCountingDecides 1000 8000 30 citedDefinition
+    t1 <- getMonotonicTime
+    ratio `shouldBe` Nothing
+    (t1 - t0) `shouldSatisfy` (< 30)
 
 -- | The message for a @\@ref@ with nothing after it. Quoted in
 -- @doc/reference/syntax/README.md@, which is the page to change with it.
