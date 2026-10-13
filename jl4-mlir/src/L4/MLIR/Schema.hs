@@ -156,13 +156,24 @@ data DeonticContract
       }
   deriving stock (Eq, Show)
 
--- | Either a pre-rendered literal expression ('DELiteral' \"`the seller`\")
--- or a reference to a GIVEN parameter ('DEParam' \"driver\"). The JS
--- runtime resolves DEParam against the request's @arguments@ bag at
--- evaluation time, giving record-typed parties their actual value
--- (which the wire envelope then tags with the record type name).
+-- | A party or an action in the contract tree: a bare name ('DEName' \"the
+-- seller\"), pre-rendered rule source ('DELiteral' \"say \\\"pay\\\"\"), or a
+-- reference to a GIVEN parameter ('DEParam' \"driver\"). The JS runtime
+-- resolves DEParam against the request's @arguments@ bag at evaluation time,
+-- giving record-typed parties their actual value (which the wire envelope then
+-- tags with the record type name).
+--
+-- The name and the source are told apart so that the runtime can print the
+-- trace's source text as L4: a name with a space is backticked there, source
+-- text is printed as given. On the wire both are the same bare string, so a
+-- runtime that does not know the difference reads a bundle correctly; the
+-- difference travels in a sibling key of the obligation, @partyKind@ \/
+-- @actionKind@ = @"name"@, which such a runtime ignores. A bundle compiled
+-- before the key existed has none, and the runtime prints its literals as
+-- given.
 data DeonticExpr
-  = DELiteral !Text
+  = DEName    !Text
+  | DELiteral !Text
   | DEParam   !Text
   deriving stock (Eq, Show)
 
@@ -954,26 +965,28 @@ deontonToContract deonton = do
 -- runtime can resolve it against the request's @arguments@ bag) or a literal
 -- name.
 --
--- A literal party is rendered with its PLAIN name, not 'Print.prettyLayout'.
+-- A bare party name ('DEName') is rendered with its PLAIN name, not 'Print.prettyLayout'.
 -- prettyLayout emits L4 /source/, so a multi-word party comes back
--- backtick-quoted; jl4-service evaluates the party to a constructor VALUE and
--- renders it through @Backend.Jl4.constructorText@
--- (@rawNameToText . rawName . getActual@), which carries no backticks. Emitting
--- @\`the seller\`@ where the reference says @the seller@ is a wrong answer at
--- @supported: true@, and it is the shape a caller compares against the
--- @enum@ the service declares in its own @returnSchema@.
+-- backtick-quoted; jl4-service renders a party as a constructor name through
+-- @Backend.Jl4.constructorText@ (@rawNameToText . rawName . getActual@), which
+-- carries no backticks, whether the party is an evaluated value
+-- (@eventParty@, @obligatedParty@) or the unevaluated expression of an
+-- OBLIGATION (@Backend.Jl4.partyText@). Emitting @\`the seller\`@ where the
+-- reference says @the seller@ is a wrong answer at @supported: true@, and it
+-- is the shape a caller compares against the @enum@ the service declares in
+-- its own @returnSchema@.
 --
--- The ACTION is deliberately NOT treated this way: the reference prints it
--- with 'Print.prettyLayout' of an unevaluated Name (@ValueLazyJSON@'s
--- @obligationAction .= prettyLayout action@), backticks included. Party and
--- action genuinely disagree on the wire, and this asymmetry is measured:
--- deontic-sale's residual OBLIGATION is @{"party":"the seller",
--- "action":"\`deliver the goods\`"}@ on both sides.
+-- The ACTION is spelled the same way ('patternToDeonticExpr'). Until
+-- 2026-10-13 it was not: jl4-service printed the action with prettyLayout,
+-- backticks included, beside a plain party, and this backend copied that
+-- asymmetry because the parity harness measured it. A client comparing
+-- @eventParty@ with @party@ got a false mismatch for a name with a space in
+-- it, so jl4-service now spells both plain and this backend follows it.
 exprToDeonticParty :: Expr Resolved -> DeonticExpr
 exprToDeonticParty e = case e of
   App _ headRes [] ->
     let nm = rawNameToText (rawName (getActual headRes))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
+    in if isLikelyParam nm then DEParam nm else DEName nm
   _ -> DELiteral (Print.prettyLayout e)
 
 -- | The plain-name rendering of a party expression. See 'exprToDeonticParty'
@@ -983,13 +996,16 @@ partyLiteralText e = case e of
   App _ headRes [] -> rawNameToText (rawName (getActual headRes))
   _                -> Print.prettyLayout e
 
--- | Pattern variant: 'PatVar' is the param-ref shape; everything
--- else collapses to its pretty-printed form.
+-- | Pattern variant: 'PatVar' is the param-ref shape; a bare action name is
+-- its PLAIN name, as @Backend.Jl4.actionText@ spells it; everything else (an
+-- action that carries a value, @say "pay"@) collapses to its pretty-printed
+-- rule source.
 patternToDeonticExpr :: Pattern Resolved -> DeonticExpr
 patternToDeonticExpr p = case p of
   PatVar _ n ->
     let nm = rawNameToText (rawName (getActual n))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
+    in if isLikelyParam nm then DEParam nm else DEName nm
+  PatApp _ n [] -> DEName (rawNameToText (rawName (getActual n)))
   _ -> DELiteral (Print.prettyLayout p)
 
 -- | Heuristic: a bare lowercase identifier without surrounding
@@ -2122,7 +2138,7 @@ instance Aeson.ToJSON DeonticContract where
     , "by"      .= mBy
     , "because" .= mBec
     ]
-  toJSON o@DCObligation{} = Aeson.object
+  toJSON o@DCObligation{} = Aeson.object $
     [ "kind"     .= ("OBLIGATION" :: Text)
     , "party"    .= o.dcParty
     , "action"   .= o.dcAction
@@ -2131,6 +2147,8 @@ instance Aeson.ToJSON DeonticContract where
     , "hence"    .= o.dcHence
     , "lest"     .= o.dcLest
     ]
+    <> [ "partyKind"  .= ("name" :: Text) | DEName{} <- [o.dcParty] ]
+    <> [ "actionKind" .= ("name" :: Text) | DEName{} <- [o.dcAction] ]
   toJSON o@DCIfThenElse{} = Aeson.object
     [ "kind" .= ("IF" :: Text)
     , "cond" .= o.dcCond
@@ -2145,8 +2163,8 @@ instance Aeson.FromJSON DeonticContract where
       "FULFILLED" -> pure DCFulfilled
       "BREACH"    -> DCBreach <$> o .:? "by" <*> o .:? "because"
       "OBLIGATION" -> DCObligation
-        <$> o .: "party"
-        <*> o .: "action"
+        <$> (tagName <$> o .:? "partyKind" <*> o .: "party")
+        <*> (tagName <$> o .:? "actionKind" <*> o .: "action")
         <*> o .: "modal"
         <*> o .:? "deadline"
         <*> o .:? "hence"
@@ -2157,9 +2175,11 @@ instance Aeson.FromJSON DeonticContract where
         <*> o .: "else"
       _ -> fail ("unknown DeonticContract kind: " ++ Text.unpack kind)
 
--- | DeonticExpr ⇄ JSON: literal as a bare string, param ref as
--- '{"param": "<name>"}'. The runtime branches on @typeof@.
+-- | DeonticExpr ⇄ JSON: a name or source as a bare string, a param ref as
+-- '{"param": "<name>"}'. The runtime branches on @typeof@. A name is the same
+-- string as source; 'DeonticContract' says which in a sibling key.
 instance Aeson.ToJSON DeonticExpr where
+  toJSON (DEName    t) = Aeson.toJSON t
   toJSON (DELiteral t) = Aeson.toJSON t
   toJSON (DEParam   t) = Aeson.object ["param" .= t]
 
@@ -2168,6 +2188,12 @@ instance Aeson.FromJSON DeonticExpr where
     Aeson.String t -> pure (DELiteral t)
     Aeson.Object o -> DEParam <$> o .: "param"
     _ -> fail "DeonticExpr: expected string (literal) or {param: name}"
+
+-- | Apply a sibling @partyKind@ \/ @actionKind@ key to the expression it
+-- describes: @"name"@ makes a literal a bare name.
+tagName :: Maybe Text -> DeonticExpr -> DeonticExpr
+tagName (Just "name") (DELiteral t) = DEName t
+tagName _             e             = e
 
 -- | DeonticGuard ⇄ JSON: tagged-record form, mirroring DeonticContract.
 instance Aeson.ToJSON DeonticGuard where

@@ -495,20 +495,179 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   const sale = {
     kind: "OBLIGATION",
     modal: "MUST",
-    party: "`the seller`",
-    action: "`deliver the goods`",
+    party: "the seller",
+    action: "deliver the goods",
+    partyKind: "name",
+    actionKind: "name",
     deadline: 14,
     hence: {
       kind: "OBLIGATION",
       modal: "MUST",
-      party: "`the buyer`",
-      action: "`pay the invoice`",
+      party: "the buyer",
+      action: "pay the invoice",
+      partyKind: "name",
+      actionKind: "name",
       deadline: 30,
       hence: { kind: "FULFILLED" },
       lest: { kind: "BREACH", by: null, because: null },
     },
     lest: { kind: "BREACH", by: null, because: null },
   };
+
+  // A residual obligation names its party and its action with the plain names
+  // the schema carries, observed or not (jl4-service: Backend.Jl4.partyText and
+  // actionText; until 2026-10-13 it printed both as source, backticks and all).
+  jeq(
+    "deontic: unobserved obligation → plain party and action",
+    runDeontic(sale, 0, [], {}, null),
+    {
+      OBLIGATION: {
+        action: "deliver the goods",
+        deadline: "14",
+        modal: "MUST",
+        party: "the seller",
+      },
+    },
+  );
+  jeq(
+    "deontic: residual obligation after an event → plain party and action",
+    runDeontic(
+      sale,
+      0,
+      [{ party: "the seller", action: "deliver the goods", at: 5 }],
+      {},
+      null,
+    ),
+    {
+      OBLIGATION: {
+        action: "pay the invoice",
+        deadline: "30",
+        modal: "MUST",
+        party: "the buyer",
+      },
+    },
+  );
+
+  // The trace's source text is L4. The schema carries a bare name plain, so a
+  // name with a space is backticked again there, as an event's is; a literal
+  // that is already source (an action that carries a value) is left alone.
+  {
+    const rtT = createRuntime();
+    rtT.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+    const traced = (contract, events) =>
+      rtT.invokeFunctionWithReasoning(
+        { exports: {} },
+        {
+          name: "the-sale-contract",
+          isDeontic: true,
+          parameters: { properties: {} },
+          paramOrder: [],
+          deonticContract: contract,
+          traceMeta: { fnName: "`the sale contract`" },
+        },
+        { startTime: 0, events },
+      ).reasoning.explanation[0];
+    eq(
+      "deontic trace: a name with a space is backticked in the source text",
+      traced(sale, [
+        { party: "the seller", action: "deliver the goods", at: 5 },
+      ]),
+      "Result: PARTY `the buyer`\nMUST `pay the invoice`\nWITHIN 30\nHENCE FULFILLED\nLEST BREACH",
+    );
+    // Rule source is a bare string and is printed as given: an action that
+    // carries a value, with or without a quote in it.
+    const valued = (action) => ({
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "Alice",
+      partyKind: "name",
+      action,
+      deadline: 14,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    });
+    eq(
+      "deontic trace: an action that carries a value stays as the source it is",
+      traced(valued('say "pay now"'), []),
+      'Result: PARTY Alice\nMUST say "pay now"\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH',
+    );
+    eq(
+      "deontic trace: `pay 100` is an application, not a name, and is untouched",
+      traced(valued("pay 100"), []),
+      "Result: PARTY Alice\nMUST pay 100\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+    );
+    // A bundle compiled before the kind keys existed carries no partyKind or
+    // actionKind. Its literals are printed as given, never backticked again and
+    // never a crash.
+    const untagged = {
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "the seller",
+      action: "`deliver the goods`",
+      deadline: 14,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    };
+    eq(
+      "deontic trace: a literal with no kind key (older bundle) is printed as given",
+      traced(untagged, []),
+      "Result: PARTY the seller\nMUST `deliver the goods`\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+    );
+    eq(
+      "deontic: a literal with no kind key (older bundle) is answered as given",
+      JSON.stringify(
+        rtT.invokeFunction(
+          { exports: {} },
+          {
+            name: "the-sale-contract",
+            isDeontic: true,
+            parameters: { properties: {} },
+            paramOrder: [],
+            deonticContract: untagged,
+          },
+          { startTime: 0, events: [] },
+        ),
+      ),
+      JSON.stringify({
+        OBLIGATION: {
+          action: "`deliver the goods`",
+          deadline: "14",
+          modal: "MUST",
+          party: "the seller",
+        },
+      }),
+    );
+    // The kind keys are siblings of the plain strings, so a runtime that
+    // predates them reads a new bundle as it reads an old one. Stripping them
+    // models that reader: no answer may depend on them, only the trace text.
+    const withoutKinds = JSON.parse(
+      JSON.stringify(sale, (k, v) =>
+        k === "partyKind" || k === "actionKind" ? undefined : v,
+      ),
+    );
+    eq(
+      "deontic: the kind keys are absent from the model of an older runtime",
+      JSON.stringify(withoutKinds).includes("Kind"),
+      false,
+    );
+    const streams = [
+      [],
+      [{ party: "the seller", action: "deliver the goods", at: 5 }],
+      [{ party: "the seller", action: "deliver the goods", at: 20 }],
+      [
+        { party: "the seller", action: "deliver the goods", at: 5 },
+        { party: "the buyer", action: "pay the invoice", at: 20 },
+      ],
+    ];
+    streams.forEach((events, i) =>
+      eq(
+        "deontic: an older runtime reading a new bundle answers the same, stream " +
+          i,
+        JSON.stringify(runDeontic(withoutKinds, 0, events, {}, null)),
+        JSON.stringify(runDeontic(sale, 0, events, {}, null)),
+      ),
+    );
+  }
 
   // Blocker 1 — out-of-order events must NOT be sorted. deliver@20 precedes
   // deliver@5; the first event (20) is already past the WITHIN-14 deadline, so
@@ -580,13 +739,13 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   const repay = {
     kind: "OBLIGATION",
     modal: "MUST",
-    party: "`the borrower`",
-    action: "`repay loan`",
+    party: "the borrower",
+    action: "repay loan",
     deadline: 30,
     hence: { kind: "FULFILLED" },
     lest: {
       kind: "BREACH",
-      by: "`the borrower`",
+      by: "the borrower",
       because: '"loan not repaid"',
     },
   };
@@ -606,12 +765,12 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         failures: [
           {
             detail: "loan not repaid",
-            party: "`the borrower`",
+            party: "the borrower",
             reason: "explicit",
           },
         ],
-        parties: ["`the borrower`"],
-        party: "`the borrower`",
+        parties: ["the borrower"],
+        party: "the borrower",
         reason: "explicit",
       },
     },
@@ -623,7 +782,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     kind: "OBLIGATION",
     modal: "MUST",
     party: { param: "driver" },
-    action: "`wear seatbelt`",
+    action: "wear seatbelt",
     deadline: 1,
     hence: {
       kind: "OBLIGATION",
@@ -651,18 +810,18 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         deadline: 1,
         // eventAction is the event's own action name, which the reference
         // renders PLAIN (a9caf2f6 replaced prettyLayout with constructorText
-        // in Backend.Jl4). obligationAction on the very same object keeps its
-        // backticks, because that one is still prettyLayout of an unevaluated
-        // Name in ValueLazyJSON. The asymmetry is the reference's, not ours,
-        // and the live differential run agrees: deontic-seatbelt is
-        // byte-identical against jl4-service with exactly these two spellings.
+        // in Backend.Jl4). Until 2026-10-13 obligationAction on the very same
+        // object kept its backticks, because the reference printed it with
+        // prettyLayout of an unevaluated Name; it now prints the plain name
+        // too, so the two agree and a client can compare them. The schema
+        // literal below is what the compiler emits (`patternToDeonticExpr`).
         eventAction: "wear seatbelt",
         eventParty: { Driver: { name: "Alice" } },
         // The blame list (R-T3): one failure, the anchor, carrying the same
         // party/action/deadline as the scalars.
         failures: [
           {
-            action: "`wear seatbelt`",
+            action: "wear seatbelt",
             deadline: 1,
             party: { Driver: { name: "Alice" } },
             reason: "deadline_missed",
@@ -674,7 +833,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         // modelling one obligation at a time.
         obligatedParties: [{ Driver: { name: "Alice" } }],
         obligatedParty: { Driver: { name: "Alice" } },
-        obligationAction: "`wear seatbelt`",
+        obligationAction: "wear seatbelt",
         reason: "deadline_missed",
         timestamp: 2,
       },
@@ -711,7 +870,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     runDeontic(seatbeltMust, 0, [], { driver: { name: "Alice" } }, driverMeta),
     {
       OBLIGATION: {
-        action: "`wear seatbelt`",
+        action: "wear seatbelt",
         deadline: "1",
         modal: "MUST",
         party: "driver",

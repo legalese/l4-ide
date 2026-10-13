@@ -870,16 +870,6 @@ function deonticStripBackticks(s) {
   return s;
 }
 
-// The L4 SOURCE spelling of a name: backticked unless it is a bare identifier.
-// This is what `Print.prettyLayout` emits, and it is what the reference falls
-// back to when it prints an UNEVALUATED party expression. The evaluated value
-// of the same party is the plain name (`Backend.Jl4.constructorText`) — see
-// 'deonticObligationToWire' for which case gets which.
-function deonticSourceSpelling(s) {
-  if (typeof s !== "string") return s;
-  return /^[A-Za-z][A-Za-z0-9_]*$/.test(s) ? s : "`" + s + "`";
-}
-
 function deonticObligationToWire(o, ctx, remainingNum, observed) {
   const resolvedParty = resolveDeonticExpr(o.party, ctx);
   const resolvedAction = resolveDeonticExpr(o.action, ctx);
@@ -888,24 +878,23 @@ function deonticObligationToWire(o, ctx, remainingNum, observed) {
   // is only *resolved* once an event has been scrutinized against it: if the
   // relevant event stream was empty ('observed' false), jl4-service prints the
   // un-evaluated parameter NAME ("driver"), not the record value
-  // (Jl4.hs:1085 serializeEitherValue Left → prettyLayout of the party expr).
+  // (Backend.Jl4.serializeParty, Left → partyText of the party expression).
   // Once an event has been compared, the party is a resolved value that
   // records tag as @{<TypeName>: …}@ from the bundle's @x-l4-type@ stamp.
   //
-  // A LITERAL party (@PARTY `the seller`@) splits the same way, and an earlier
-  // version of this comment claimed it "prints identically either way". That
-  // stopped being true at a9caf2f6: unobserved, the reference still prints the
-  // unevaluated expression via `prettyLayout` and the backticks survive;
-  // observed, it prints the constructor VALUE via `constructorText` and they do
-  // not. The schema carries the plain name, so the source spelling is
-  // reconstructed here rather than stored twice.
+  // A LITERAL party (@PARTY `the seller`@) is the plain name either way. Until
+  // 2026-10-13 it was not: unobserved, the reference printed the unevaluated
+  // expression via `prettyLayout` and the backticks survived, and this
+  // function re-added them. The reference now prints a bare name through
+  // `constructorText` whether or not an event has been compared, so the schema's
+  // plain name is the answer.
   let party;
   if (o.party && typeof o.party === "object" && o.party.param != null) {
     party = observed
       ? deonticTagRecord(resolvedParty, ctx, o.party.param)
       : o.party.param;
   } else {
-    party = observed ? resolvedParty : deonticSourceSpelling(resolvedParty);
+    party = resolvedParty;
   }
   // 'deadline' on the wire: number = "remaining time after observed
   // events", string = "original WITHIN literal, untouched". The
@@ -957,9 +946,8 @@ function deonticDeadlineMissedNode(
 // The obligation's OWN party, rendered as jl4-service renders the obligated
 // party of a DeadlineMissed breach: the breach is normalised before it is
 // serialized, so the party is always the EVALUATED value — a record tagged
-// with its L4 type name, a constructor by its plain name — never the source
-// spelling (compare the residual-obligation case in
-// 'deonticObligationToWire', where an unobserved party keeps its backticks).
+// with its L4 type name, a constructor by its plain name. A residual
+// obligation's party ('deonticObligationToWire') is spelled the same way.
 function deonticEvaluatedParty(obligation, ctx) {
   const resolvedParty = resolveDeonticExpr(obligation.party, ctx);
   if (
@@ -975,7 +963,7 @@ function deonticEvaluatedParty(obligation, ctx) {
 // Render an event's party the way jl4-service serializes 'ev'party':
 // record-typed parties tag with the obligation party's L4 type name
 // (@{Driver: {...}}@); scalar/enum parties render as their L4 constructor
-// name (backtick-quoted when not a plain identifier).
+// name, plain.
 function deonticRenderEventParty(evParty, obligation, ctx) {
   if (
     evParty != null &&
@@ -991,10 +979,6 @@ function deonticRenderEventParty(evParty, obligation, ctx) {
   return deonticRenderEnumName(evParty);
 }
 
-// Approximate L4's 'Print.prettyLayout' of an enum-constructor name: a name
-// that is a plain identifier prints bare; anything with spaces / punctuation
-// is backtick-quoted. Enum constructors in the deontic corpus follow this
-// rule (@drive@ vs @`wear seatbelt`@).
 // A party / event-action name as the JSON payload should carry it: PLAIN.
 //
 // This used to backtick anything that wasn't a bare identifier, mirroring
@@ -1002,9 +986,10 @@ function deonticRenderEventParty(evParty, obligation, ctx) {
 // constructor through `Backend.Jl4.constructorText`, which carries no
 // backticks, because the service declares the un-backticked spelling in its own
 // `returnSchema` enum and was otherwise handing out a schema its responses
-// fail. `eventAction` and every party field follow the plain spelling;
-// `obligationAction` does NOT — that one is still `prettyLayout` of an
-// unevaluated Name on the reference side, so it keeps its backticks.
+// fail. `eventAction`, `obligationAction` and every party field follow the
+// plain spelling. `obligationAction` and the OBLIGATION's `action` joined them
+// on 2026-10-13: until then the reference printed those with `prettyLayout`
+// of an unevaluated Name, so they kept their backticks.
 function deonticRenderEnumName(name) {
   return name;
 }
@@ -2215,8 +2200,12 @@ function renderResidualForParamCtx(
       args,
       meta,
       givenParams,
+      contract.partyKind,
     );
-    const actionText = renderDeonticExprForSource(contract.action);
+    const actionText = renderDeonticExprForSource(
+      contract.action,
+      contract.actionKind,
+    );
     const lines = ["PARTY " + partyText, contract.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : contract.deadline;
@@ -2234,9 +2223,9 @@ function renderResidualForParamCtx(
 
 // Render the primary obligation's party with its type tag —
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
-function renderActiveDeonticExpr(expr, args, meta, _givenParams) {
+function renderActiveDeonticExpr(expr, args, meta, _givenParams, kind) {
   if (expr == null) return "";
-  if (typeof expr === "string") return expr;
+  if (typeof expr === "string") return deonticLiteralAsSource(expr, kind);
   if (expr.param != null) {
     const props = (meta && meta.parameters && meta.parameters.properties) || {};
     const schema = props[expr.param];
@@ -2257,8 +2246,8 @@ function renderContractAsSource(c, deadlineOverride) {
   if (c.kind === "FULFILLED") return "FULFILLED";
   if (c.kind === "BREACH") return "BREACH";
   if (c.kind === "OBLIGATION") {
-    const partyText = renderDeonticExprForSource(c.party);
-    const actionText = renderDeonticExprForSource(c.action);
+    const partyText = renderDeonticExprForSource(c.party, c.partyKind);
+    const actionText = renderDeonticExprForSource(c.action, c.actionKind);
     const lines = ["PARTY " + partyText, c.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : c.deadline;
@@ -2270,9 +2259,24 @@ function renderContractAsSource(c, deadlineOverride) {
   return "";
 }
 
-function renderDeonticExprForSource(e) {
+// A literal party or action as L4 source. The schema carries a bare name and
+// rule source alike as a string, and says which in the obligation's sibling
+// key @partyKind@ / @actionKind@ (`Schema.hs`, 'DeonticExpr'). The answer's wire
+// prints a name plain, as jl4-service does, so a name with a space has to be
+// backticked again here for the trace's source text to be L4, as
+// 'formatEventComponent' does for an event's. Only a literal tagged "name" is
+// touched. Anything else is rule source (an action that carries a value,
+// @pay 100@ or @say "pay"@, or a record built @WITH@ fields), or a literal from
+// a bundle compiled before the key existed, and is printed as given. The key is
+// a sibling, so a runtime that predates it reads the same bundle correctly and
+// only its trace text lacks the backticks.
+function deonticLiteralAsSource(text, kind) {
+  return kind === "name" && /\s/.test(text) ? "`" + text + "`" : text;
+}
+
+function renderDeonticExprForSource(e, kind) {
   if (e == null) return "";
-  if (typeof e === "string") return e; // already a literal text
+  if (typeof e === "string") return deonticLiteralAsSource(e, kind);
   if (e.param != null) return e.param; // bare param name
   return String(e);
 }

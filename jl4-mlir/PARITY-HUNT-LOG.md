@@ -487,26 +487,33 @@ caller validating our response against our own schema would reject it. `"NOTHING
 is the same bug as ledger #12 in a different coat: a value indistinguishable from
 a genuine string answer, which is precisely what `MAYBE STRING` exists to prevent.
 
-**The party/action asymmetry is deliberate — do not "clean it up".** On the same
-wire object the reference spells the party plain and the action backticked:
+**The party/action asymmetry is deliberate — do not "clean it up".**
+_(Retired 2026-10-13: the reference now spells the action plain too; see the dated
+note at the end of this ledger entry. The text below is what was true, and what
+the sweep measured, until then.)_ On the same
+wire object the reference spelled the party plain and the action backticked:
 
 ```json
 { "OBLIGATION": { "party": "the seller", "action": "`deliver the goods`" } }
 ```
 
-They come from different places. The party is evaluated to a constructor VALUE
+They came from different places. The party is evaluated to a constructor VALUE
 and printed by `Backend.Jl4.constructorText`; the action is an unevaluated `Name`
-printed by `ValueLazyJSON`'s `obligationAction .= prettyLayout action`. Both
-spellings are measured byte-identical against a live service. Harmonising them —
-in either direction — re-breaks half the cells.
+printed by `prettyLayout` (`jl4-service`'s `serializeRAction`, as `ValueLazyJSON`'s
+`obligationAction .= prettyLayout action` still does). Both
+spellings were measured byte-identical against a live service. Harmonising them
+in this backend alone — in either direction — re-breaks half the cells: that is
+what the warning meant, and it is a statement about copying the reference, not a
+ruling that the reference should spell one name two ways.
 
-**And a literal party splits the same way a parameter party already did.** The
+**And a literal party splits the same way a parameter party already did.**
+_(Also retired 2026-10-13, below.)_ The
 sweep only revealed this on the second pass, by _reversing_ the two remaining
-failures: unobserved (empty event stream), the reference prints the unevaluated
-expression and the backticks survive; observed, it prints the constructor value
-and they do not. The comment at that site used to assert literal parties "print
+failures: unobserved (empty event stream), the reference printed the unevaluated
+expression and the backticks survived; observed, it printed the constructor value
+and they did not. The comment at that site used to assert literal parties "print
 identically either way" — true before `a9caf2f6`, false after, and believed until
-the harness contradicted it. `deonticSourceSpelling` reconstructs the source form
+the harness contradicted it. `deonticSourceSpelling` reconstructed the source form
 rather than storing both spellings in the schema.
 
 Restored: **227 byte-identical, 0 differs, 5 honest refusals, `PARITY OK`**, with
@@ -517,6 +524,45 @@ differentially has no such thing as a quiet merge.** `cabal build` and every
 golden in the repo were green while three wire surfaces were wrong, because
 nothing in the Haskell test suite compares us to the reference — only the sweep
 does. Re-run the sweep after every resync, not after every `jl4-mlir` change.
+
+**2026-10-13 — the reference stopped spelling one name two ways, and this backend
+followed.** `jl4-service` printed `OBLIGATION.party`, `OBLIGATION.action`,
+`BREACH.obligationAction` and `BREACH.failures[].action` with `prettyLayout` (L4
+source, so a name with a space came back in backticks), beside `eventParty`,
+`eventAction` and `obligatedParty` from `constructorText` (the plain name). A client
+that asked whether the party who acted was the party who was obliged, by comparing
+`eventParty` with `party`, got a false no for `the seller`. The service now spells a
+bare party or action name plain in all of them (`Backend.Jl4.partyText`,
+`actionText`; an action name the rule does not declare, a binder, is a bare name too;
+an action that carries a value, an action given by a `GIVEN`, or a party that is
+more than a name, is still rule source). The warning above is best read as not to harmonise this
+backend alone.
+
+| field                                                                      | reference before          | reference now       |
+| -------------------------------------------------------------------------- | ------------------------- | ------------------- |
+| `OBLIGATION.party`                                                         | `` `the seller` ``        | `the seller`        |
+| `OBLIGATION.action`, `BREACH.obligationAction`, `BREACH.failures[].action` | `` `deliver the goods` `` | `deliver the goods` |
+
+This backend changed with it: `patternToDeonticExpr` bakes a bare action as its plain
+name, and `deonticObligationToWire` no longer re-adds backticks to an unobserved
+literal party (`deonticSourceSpelling` is gone). The schema now tags a bare name
+apart from rule source with a sibling key of the obligation (`partyKind` /
+`actionKind` = `"name"`, `DEName`); `party` and `action` stay plain strings, so a
+runtime that predates the key reads the bundle correctly. The trace's source text
+backticks a tagged spaced name and leaves `pay 100` alone; a bundle compiled
+before the key holds none, and the runtime prints its literals as given.
+Measured on the CI Tier-2 corpus
+(`pr-checks.yml`, `jl4-mlir-parity-full`, 9 files): unstable service and unstable
+backend, **120 comparisons, 0 differs**; fixed service and unstable backend, **109
+and 11 differs**, exactly the four fields in the table above (11 cells, 10
+distinct (service, WASM) pairs: 8 cells in `deontic-sale`, 3 in `deontic-seatbelt`);
+fixed service and this backend, **120 comparisons, 0 differs, `PARITY OK`**. Every
+one of the 120 is classified `value-equal`, not `byte-identical`, before and after:
+the service's envelope carries `contents.presumed` and `wrapEvaluationEnvelope`
+does not write it, so the bytes differ whatever the answer. The 227 board of
+`coverage-report/PARITY-COVERAGE.md` is stale for that reason, and this re-measure
+covered 9 of its 38 files. CI runs this sweep only when `jl4-mlir/**` changes, and with
+`continue-on-error: true`, so a red one would not have blocked the service change.
 
 ### Out-of-lane asymmetries — noted, triaged, not chased
 
