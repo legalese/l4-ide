@@ -591,3 +591,78 @@ Hand-ported to main, where it differs from unstable:
 - `PatternMatchParserSpec.hs` on this branch has two timing guards, where unstable's has three (unstable's third times `@ref` citations, which main does not have); the new helper and the two cases were written into this file's version.
 - The five `ok/` fixtures write their mixfix calls head first (``#EVAL `plus` 3 4``), where unstable's write them as the drafter would (``#EVAL 3 `plus` 4``): main exact-prints an infix mixfix call head first (smucclaw/l4-ide#918, fixed on unstable in legalese/l4-ide#124), and for ``#EVAL Alice `is eligible` `` it also dropped the `Alice`, which the `.ep.golden` would then have recorded. Each file says so in a comment. With the calls written head first the `.ep.golden` equals the source, and the results are the same as on unstable (7 and 12; `TRUE`, `"yes"` and `"no"`; 5, 0 and 7).
 - The control's `.golden` and `.ep.golden` are re-recorded for main's parse errors, which are points (`13:1-13:1`) where unstable's span the first token (`13:1-13:4`).
+
+## The ladder and /query-plan read a BOOLEAN clause group as its CONSIDER (from #651)
+
+`/query-plan` (jl4-service) and the ladder answered "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." for a BOOLEAN rule written as clauses, a group of one clause included.
+They now read it as the `CONSIDER` it stands for, as `unstable` does since legalese/l4-ide#651.
+Two causes, and fixing the first alone turned the refusal into a misleading answer.
+
+The type.
+The generated CONSIDERs and the LET that binds the later clauses have no source range, and `setAnnResolvedType` (`jl4-core/src/L4/TypeCheck/Types.hs:772`) recorded a type only on a node with one.
+A node with a `PmSynthetic` mark now has its type recorded on the node itself, with the substitution so far applied, and not in the position index, so hover, go-to-definition and every diagnostic are as they were.
+`bindFallthrough` (`jl4-core/src/L4/Parser.hs:1306`) marks the LET with its binding's mark for this.
+
+The shape.
+With the type recorded, the ladder drew the generated LET as one leaf, and the plan asked nothing.
+`translateDecide` in both ladders (`jl4-core/src/L4/Viz/Ladder.hs:300`, `jl4-lsp/src/LSP/L4/Viz/Ladder.hs:317`) now runs `L4.Transform.inlineLetsForViz` (`jl4-core/src/L4/Transform.hs:131`) first.
+It substitutes the generated LETs into the CONSIDERs that use them, in linear time (`inlineGeneratedLets`, `:68`); prunes each generated CONSIDER by what the branches around it settled, so a later clause does not ask again about an input an earlier one decided (`pruneGeneratedConsiders`, `:219`, which knows nullary constructors, literals and `EXACTLY` of a constructor the checker stamped, and reads a clause whose pattern is a new name as the `OTHERWISE`); and joins the generated CONSIDERs on one input (`joinGeneratedConsiders`, `:168`).
+A LET the drafter wrote is never read through.
+
+Pruning is what keeps the read-through small.
+Measured on two tables of two enumerations, every pair of values a row, with `rule` the name of each: 16 rows of 4 values by 4, a checkerboard (`rule Ai Bj IS TRUE` where i + j is even and `FALSE` where it is odd, so 8 of each), and 25 rows of 5 by 5, whose results are those of `jl4/tests-cli/fixtures/verify-clause-table-large.l4` on `unstable` (that file is not on this branch):
+
+| `rule`, read as                     | 16 rows                            | 25 rows                              |
+| ----------------------------------- | ---------------------------------- | ------------------------------------ |
+| written (the generated LETs)        | 125 nodes, 2,882 characters        | 197 nodes, 4,567 characters          |
+| LETs substituted, not pruned        | 327,675 nodes                      | more than 5,000,000 nodes            |
+| substituted and pruned              | 56 nodes, 2,054 characters         | 85 nodes, 3,808 characters           |
+| pruned and joined: the box's label  | 26 nodes, 950 characters           | 37 nodes, 1,488 characters           |
+| the nested CONSIDER written by hand | 26 nodes, 950 characters, the same | 37 nodes, 1,488 characters, the same |
+
+With the type fixed and nothing read through, the box's label was the first row, the generated LETs, and the plan asked nothing.
+
+Whether a rule was written as clauses is read off its `PmMatrix` mark (`writtenAsClauses`, `:163`), and a rule that was not is drawn as it always was.
+
+On this branch a CONSIDER is drawn as one box, labelled with the CONSIDER printed whole, and its atomId hashes that label (`generateAtomId`, `jl4-core/src/L4/Viz/Ladder.hs:504`).
+So a clause group and its hand-written CONSIDER agree, in the ladder, the plan and their atomIds, when the read-through prints as the hand form: a table reads through to the nested CONSIDER a drafter writes for it, and a flatter CONSIDER that means the same (`WHEN Red THEN b` for a nested `CONSIDER b WHEN TRUE THEN TRUE ...`) is a different box.
+The plan's atomIds and the ladder's differ here for every rule with inputs, a clause group or not: the plan renders an atom's inputs by their labels (`atomIdByUnique`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:187`) and the ladder by their numbers.
+That is older than this work and is not changed here.
+
+### Bounds
+
+`letInliningNodeBudget` (`jl4-core/src/L4/Transform.hs:147`) is 20,000 nodes, counted on the pruned CONSIDERs before joining, as on `unstable`.
+It bounds the work of reading the clauses through, since pruning cannot settle every copy (behind a pattern that binds a name, say).
+Past it the ladder refuses a rule written as clauses with `ClauseGroupTooLong`: "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules."
+Sixty rows on one NUMBER input, each comparing a sum of two hundred ones with zero, come to 24,301 nodes.
+
+`ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `:157`).
+A CONSIDER is one box here, so it is reached only by a group that reads through to something else (one whose first clause matches every input, with a long disjunction for its result), or when the ladder is simplified, as jl4-service simplifies it: a group that reads through to a disjunction of 6 two-input conjunctions is 449 boxes in conjunctive normal form, and refused, where the same rule written by hand is drawn.
+The boolean check runs first, so a long group that returns a number is told it is not boolean.
+
+These are `unstable`'s bounds, and the only ones here.
+They were checked on 111 generated tables, each run through `/query-plan` here and `/ladder` on `unstable` at `01557e40a`, on 2026-10-13: one NUMBER input of 50 to 1,200 rows; an enumeration by one BOOLEAN (24 to 200 values) and by as many BOOLEANs as values (10 to 150); two enumerations with every pair of values a row (5 by 5 to 30 by 30); rows over an enumeration whose results AND 3 or 6 number comparisons, or 10 or 20 BOOLEAN inputs; and random tables of 2 to 6 inputs, BOOLEAN or NUMBER, with results TRUE, FALSE or an input, some with a name in an earlier column before a test of a later one.
+A review re-ran them against `unstable` at `0cfcf6960`, and the two agree, in verdict and box count, on all 109 tables on which both give a verdict.
+`unstable` draws 81 of the 111 and refuses 28; for 2 (900 rows of two enumerations, 1,200 rows of one NUMBER) its deploy does not finish, and neither does it here.
+This branch refuses none of the 81, and draws all 28: `unstable` refuses them because, drawn as rows, each would have more than 300 boxes, and here a CONSIDER is one box.
+When drawing a CONSIDER as rows (legalese/l4-ide#137) reaches this branch, that limit will apply to them here too.
+
+Their cost here is small since the SHA-1 that names each box from its label (`L4.Crypto.SHA1`, carried from `unstable`'s legalese/l4-ide#626) builds each block's message schedule once: the hash of a 38,617-character label took 2.2 s before and takes 1 ms now.
+With it, the slowest of the 111 plans in 0.39 s (a label of 881,237 characters), and of the larger tables a review chose to find the limit (two enumerations of up to 27 values, enumerations of 330 values by a BOOLEAN, 400-value enumerations by as many BOOLEANs, and 120 rows each ANDing 30 BOOLEANs), the slowest planned in 1.02 s cold and 0.01 s warm, and the editor drew it in 0.8 s.
+Without it, the same 881,237-character label planned in 102 s.
+
+The editor's decision-graph lens moved into `LSP.L4.Actions.decisionGraphCodeLenses` (`jl4-lsp/src/LSP/L4/Actions.hs:463`), so that it can be tested, and keeps its lens for a refused group, titled "No decision graph: these clauses are too long to draw" (or "... would draw more than 300 boxes"); clicking it shows the whole message.
+The lens never simplifies the ladder.
+
+### Not carried, because it is not on this branch
+
+- `l4 verify`, its reading of clause groups and its NOT ANALYSED and WHERE counts: there is no `l4 verify` here.
+- Call panels and reading a called group through (`expansionBodyOf`, and the bound on callers of a too-long group): a call here is one box, and the expand gesture (`l4/inlineExprs`) unfolds only a rule with no inputs, which cannot be written as clauses.
+- Term-keyed atomIds (R3): atomIds here hash the printed label.
+- Drawing a CONSIDER as rows of boxes (`L4.Viz.GuardedRows`, legalese/l4-ide#137, `unstable` only), and with it the plan cost of twin atoms that `unstable` records. On this branch a CONSIDER written by hand is one box too, so a clause group drawn as the same one box is drawn alike.
+
+After a `jl4-service` restart that rehydrates from `bundle.cbor`, `/query-plan` answers "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." for every boolean rule, a clause group or one written by hand, and `/evaluation` still answers.
+`Serialise Anno` (`jl4-core/src/L4/Syntax.hs:1052`) writes only the desugarer's mark, so the rehydrated DECIDE has no resolved type.
+That is older than this work, and it is not fixed here.
+
+Pinned by `jl4-service/test/IntegrationSpec.hs` ("a BOOLEAN rule written as DECIDE clauses": eight pairs compared with their hand-written CONSIDER, whole plan and atomIds; the 20,000-part refusal; the 193 and 449-box simplified ladders; the boolean check first; a drafter's LET kept as written) and `jl4-lsp/test/ClauseGroupLadderSpec.hs` (four pairs in both ladders, `EXACTLY` among them; the refusal in both; the lens).
