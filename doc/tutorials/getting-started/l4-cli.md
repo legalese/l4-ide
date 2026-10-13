@@ -300,6 +300,11 @@ Text that does not spell one is left as it is, and the line is an error that nam
 A parameter declared as `STRING` keeps a non-blank CSV cell exactly as written, so `123456`, `018956` and `1.50` reach the rules as the codes they are.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
 A blank CSV cell is not text, for a `STRING` parameter as for any other: an empty cell, a cell holding only spaces and a quoted `""` all leave the fact out, exactly as a column missing from the file does. A fact that has to be given is then missing, which makes the line an error that says `Missing required field` and names it; a `MAYBE` fact is `NOTHING`.
+So a line of nothing but empty cells, such as `,,`, is an error when the rules need any fact, and the run stops there unless you pass `--continue-on-error`.
+A CSV file cannot carry empty text, or text of only spaces, as a value: to give a fact that value, use a JSON or YAML file (`"note": ""`).
+A line with nothing on it, or only spaces or tabs, is not a case at all, while a quoted `""` or `"   "` is a case whose cell is blank.
+A byte-order mark at the start of the file, which Excel's CSV UTF-8 export writes, is ignored.
+A line with more or fewer cells than the header is refused and counted as an error, and the message gives its line number.
 A CSV cell for any other kind of parameter is typed by its content: `true` or `false` (any case) is a boolean, a plain number such as `3.5` is a number (a cell containing `e` or `E` stays text), and anything else is a string.
 
 `--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
@@ -316,7 +321,7 @@ Every case that is run produces one line, or one item with `--format json` or `y
 `status` is one of two words:
 
 - `success`: the rules gave an answer.
-- `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+- `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
 
 The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
 

@@ -37,14 +37,19 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.Attoparsec.ByteString as A
+import qualified Data.Attoparsec.ByteString.Lazy as AL
 import qualified Data.Csv as Csv
+import qualified Data.Csv.Parser as CsvParser
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
+import Control.Monad (void)
 import Data.Char (isAlpha, isAlphaNum)
 import Data.Maybe (fromMaybe)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Word (Word8)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 import System.IO
@@ -295,6 +300,23 @@ processRow
   -> Int
   -> BatchRow
   -> IO (Aeson.Value, Bool)
+processRow opts _ _ _ _ _ _ (RefusedRow input reason)
+  -- refused while reading the file: an error in either mode
+  | opts.batchValidateOnly = pure
+      ( Aeson.object
+          [ Key.fromString "input"  Aeson..= input
+          , Key.fromString "status" Aeson..= ("invalid" :: Text)
+          , Key.fromString "errors" Aeson..= [reason]
+          ]
+      , True )
+  | otherwise = pure
+      ( Aeson.object
+          [ Key.fromString "input"       Aeson..= input
+          , Key.fromString "output"      Aeson..= Aeson.Null
+          , Key.fromString "status"      Aeson..= ("error" :: Text)
+          , Key.fromString "diagnostics" Aeson..= [reason]
+          ]
+      , True )
 processRow opts evalConfig filteredSource exportFn params schema idx (BatchRow source cells)
   | opts.batchValidateOnly =
       let errs = validateRow schema input
@@ -420,8 +442,11 @@ jsonKindName = \case
 -- Input parsing
 ----------------------------------------------------------------------------
 
--- | One case read from the input, with where it came from.
-data BatchRow = BatchRow RowSource Aeson.Value
+-- | One case read from the input, or a CSV record refused while reading it,
+-- with the cells it had (named against the header as far as they go) and why.
+data BatchRow
+  = BatchRow RowSource Aeson.Value
+  | RefusedRow Aeson.Value Text
 
 -- | Where a case came from, which decides how much its values already say.
 data RowSource
@@ -443,9 +468,13 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
     Right val -> case val of
       Aeson.Array arr -> Right (map (BatchRow FromStructured) (Vector.toList arr))
       single          -> Right [BatchRow FromStructured single]
-  "csv" -> case Csv.decodeByName bytes of
+  "csv" -> case csvRows bytes of
     Left err -> Left err
-    Right (_, rows) -> Right (map (BatchRow FromCsv . rowToJson) (Vector.toList rows))
+    Right rows -> Right
+      [ case r of
+          CsvRecord record         -> BatchRow FromCsv (rowToJson Aeson.String record)
+          CsvRagged record reason  -> RefusedRow (rowToJson inferCsvCell record) reason
+      | r <- rows ]
       where
         -- A BLANK cell (empty, spaces only, or a quoted @""@) is left out of
         -- the case, exactly as if its column were missing from the file. CSV has
@@ -454,12 +483,14 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
         -- that has to be given is then reported as missing, and a @MAYBE@ input
         -- is @NOTHING@, as a missing JSON key is.
         --
-        -- A case that will be evaluated keeps each other cell as the text
+        -- A case that will be evaluated keeps each non-blank cell as the text
         -- written: only the export's declared input types can say whether
-        -- @123456@ is a number or a code ('declareInputs').
-        rowToJson :: Csv.NamedRecord -> Aeson.Value
-        rowToJson record = Aeson.Object $ KeyMap.fromList
-          [ (Key.fromText (decodeUtf8 k), Aeson.String (decodeUtf8 v))
+        -- @123456@ is a number or a code ('declareInputs'). A refused record
+        -- is not evaluated, and is shown with the cells typed by what they
+        -- look like.
+        rowToJson :: (Text -> Aeson.Value) -> Csv.NamedRecord -> Aeson.Value
+        rowToJson cell record = Aeson.Object $ KeyMap.fromList
+          [ (Key.fromText (decodeUtf8 k), cell (decodeUtf8 v))
           | (k, v) <- HashMap.toList record
           , not (Text.null (Text.strip (decodeUtf8 v)))
           ]
@@ -506,6 +537,76 @@ jsonBool s = case Text.toLower (Text.strip s) of
   "true"  -> Just (Aeson.Bool True)
   "false" -> Just (Aeson.Bool False)
   _       -> Nothing
+
+-- | One record of a CSV file, named against the header the way cassava names
+-- it, or refused because its cell count is not the header's.
+data CsvRow
+  = CsvRecord Csv.NamedRecord
+  | CsvRagged Csv.NamedRecord Text
+
+-- | The records of a CSV file with a header, in file order.
+--
+-- Not 'Csv.decodeByName': cassava drops every record that parses to a single
+-- empty field (@removeBlankLines@), and a blank line and a line holding only
+-- @""@ both parse to that. Under T3c the second is a row whose one cell is
+-- empty, so absent, and it must be evaluated like any other row: dropping it
+-- turned two rows in into one row out, with exit 0.
+--
+-- A blank line is not a row, and neither is an unquoted line holding only
+-- spaces or tabs; a quoted @"   "@ is a row whose cell is absent. A record
+-- with fewer or more cells than the header is refused, naming its line: a
+-- short one used to take the defaults of its missing cells, and a long one
+-- lost its extra cells, both with status success (review M4; decided
+-- overnight 2026-10-02, pending Meng's review, spec §4.1).
+csvRows :: BSL.ByteString -> Either String [CsvRow]
+csvRows = AL.eitherResult . AL.parse file
+  where
+    comma = 44
+    file = do
+      -- A UTF-8 byte-order mark is not part of the first column's name. Excel's
+      -- "CSV UTF-8" export writes one, and left in place it renamed the first
+      -- input, so every row took that input's default instead of its value
+      -- (review B1).
+      _ <- optional (A.string "\xEF\xBB\xBF")
+      (hdrRaw, hdr) <- A.match (CsvParser.header comma)
+      rows hdr (1 + lineEnds hdrRaw)
+    rows hdr line = do
+      done <- A.atEnd
+      if done
+        then pure []
+        else do
+          blank <- (True <$ (A.skipWhile isBlankByte *> endOfLine)) <|> pure False
+          trailing <- if blank then pure False
+                      else (True <$ (A.takeWhile1 isBlankByte *> A.endOfInput)) <|> pure False
+          if blank || trailing
+            then rows hdr (line + 1)
+            else do
+              (raw, r) <- A.match (CsvParser.record comma <* (endOfLine <|> A.endOfInput))
+              let named = HashMap.fromList (zip (Vector.toList hdr) (Vector.toList r))
+                  width = Vector.length hdr
+                  cells = Vector.length r
+                  this
+                    | cells == width = CsvRecord named
+                    | otherwise = CsvRagged named $
+                        "Line " <> Text.pack (show line) <> " has " <> Text.pack (show cells)
+                        <> " cell" <> (if cells == 1 then "" else "s") <> ", but the header has "
+                        <> Text.pack (show width) <> ", so the row is refused: a cell missing from a"
+                        <> " short row would otherwise take its default, and a long row's extra cells"
+                        <> " would be dropped"
+              (this :) <$> rows hdr (line + max 1 (lineEnds raw))
+    endOfLine = void (A.string "\r\n") <|> void (A.word8 10) <|> void (A.word8 13)
+    isBlankByte w = w == 32 || w == 9
+    -- the line ends in some consumed input, since a quoted cell may hold one:
+    -- CRLF, LF and a lone CR count one each
+    lineEnds :: BS.ByteString -> Int
+    lineEnds = go 0 . BS.unpack
+      where
+        go :: Int -> [Word8] -> Int
+        go n (13 : 10 : rest) = go (n + 1) rest
+        go n (13 : rest)      = go (n + 1) rest
+        go n (10 : rest)      = go (n + 1) rest
+        go n (_ : rest)       = go n rest
+        go n []               = n
 
 -- | Infer a JSON value for the text of a non-empty CSV cell, when no declared
 -- input type says what it is ('declareInputs'):

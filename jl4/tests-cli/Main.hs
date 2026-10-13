@@ -215,6 +215,18 @@ batchBlankIncomeCsv = fixtureDir </> "batch-blank-income.csv"
 -- | A cases file that holds one object, not an array.
 batchSingleObjectJson = fixtureDir </> "batch-single-object.json"
 
+-- | CSV files whose shape the reader has to get right: a file with one column
+-- (where a row of one empty cell and a blank line look alike), a UTF-8
+-- byte-order mark before the header, records with too few or too many cells,
+-- and CRLF line ends with a quoted cell that holds a line break.
+batchOneColFixture, batchOneColCsv, batchOneColSpacesCsv, batchBomCsv, batchRaggedCsv, batchCrlfCsv :: FilePath
+batchOneColFixture   = fixtureDir </> "batch-onecol.l4"
+batchOneColCsv       = fixtureDir </> "batch-onecol.csv"
+batchOneColSpacesCsv = fixtureDir </> "batch-onecol-spaces.csv"
+batchBomCsv          = fixtureDir </> "batch-bom.csv"
+batchRaggedCsv       = fixtureDir </> "batch-ragged.csv"
+batchCrlfCsv         = fixtureDir </> "batch-crlf.csv"
+
 -- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
 batchLineBreakFixture, batchLineBreakJson :: FilePath
 batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
@@ -523,6 +535,80 @@ spec bin = do
           runL4 bin ["batch", batchEligFixture, "--inputs", batchBlankIncomeCsv, "--validate-only", "--continue-on-error"]
         code `shouldSatisfy` (/= ExitSuccess)
         length (filter ("Missing required field: 'income'" `isInfixOf`) (lines sout)) `shouldBe` 2
+
+    -- R4 (ruled, bench "Main Wave Rulings", 2026-10-12): `l4 batch` reads a CSV
+    -- file with the reader that unstable has, not cassava's `decodeByName`,
+    -- which drops every record that parses to one empty field. These are the
+    -- shapes where the two readers differ. Each of the first four fails on the
+    -- `decodeByName` reader.
+    describe "the CSV reader" $ do
+      let csvRowsOf args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , sout
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          statusesOf = map (`objField` "status")
+          diagnosticsOf row = show (objField row "diagnostics")
+          inputOf row k = objField row "input" >>= (`objField` k)
+
+      -- A line holding only `""` and a blank line both parse to one empty
+      -- field, and `decodeByName` drops both: three rows in, two rows out, exit
+      -- 0. The `""` row is a row whose one cell is empty, so absent (T3c), and
+      -- the required input is missing.
+      it "reads a one-column row whose only cell is \"\" as a row, with its input missing" $ do
+        (code, _, rows) <- csvRowsOf [batchOneColFixture, "--inputs", batchOneColCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        statusesOf rows `shouldBe` map (Just . String) ["success", "error", "success"]
+        map (`inputOf` "name") rows `shouldBe` [Just (String "alice"), Nothing, Just (String "bob")]
+        diagnosticsOf (rows !! 1) `shouldSatisfy` ("Missing required field 'name'" `isInfixOf`)
+
+      -- An unquoted line of spaces is not a row, any more than a blank line is;
+      -- `decodeByName` made it a row of one blank cell, so an error. Decided by
+      -- Claude overnight 2026-10-02, pending Meng's review (not ruled); the
+      -- alternative named in the spec is that such a line is a row whose cell
+      -- is absent.
+      it "does not read a line of spaces, or a blank line, as a row" $ do
+        (code, _, rows) <- csvRowsOf [batchOneColFixture, "--inputs", batchOneColSpacesCsv]
+        code `shouldBe` ExitSuccess
+        statusesOf rows `shouldBe` map (Just . String) ["success", "success"]
+        map (`inputOf` "name") rows `shouldBe` [Just (String "alice"), Just (String "bob")]
+
+      -- Excel's "CSV UTF-8" export starts with a byte-order mark, which
+      -- `decodeByName` left in the first column's name: the input `age` was then
+      -- missing from every row.
+      it "reads a CSV that starts with a UTF-8 byte-order mark" $ do
+        (code, _, rows) <- csvRowsOf [batchEligFixture, "--inputs", batchBomCsv]
+        code `shouldBe` ExitSuccess
+        statusesOf rows `shouldBe` [Just (String "success")]
+        map (`inputOf` "age") rows `shouldBe` [Just (Number 25)]
+
+      -- Decided by Claude overnight 2026-10-02, pending Meng's review
+      -- (specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md on unstable, "Decided by
+      -- Claude overnight"): a record with fewer or more cells than the header is
+      -- refused, naming its line. A short record used to leave its last input
+      -- missing, and a long one lost its extra cells and was a success. The
+      -- line of a tab and a space is blank, so it is skipped and still counted.
+      it "refuses a record whose cell count is not the header's, naming its line" $ do
+        (code, sout, rows) <- csvRowsOf [batchEligFixture, "--inputs", batchRaggedCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        statusesOf rows `shouldBe` map (Just . String) ["success", "error", "error"]
+        sout `shouldSatisfy` ("Line 3 has 2 cells, but the header has 3" `isInfixOf`)
+        sout `shouldSatisfy` ("Line 5 has 4 cells, but the header has 3" `isInfixOf`)
+        Output vcode vout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchRaggedCsv, "--validate-only", "--continue-on-error"]
+        vcode `shouldSatisfy` (/= ExitSuccess)
+        vout `shouldSatisfy` ("Line 3 has 2 cells" `isInfixOf`)
+
+      -- Not a change: the new reader has to keep reading what cassava read. CRLF
+      -- line ends are not part of a cell, and a quoted cell may hold a line break.
+      -- The result is not asserted here: until the generated wrapper quotes a
+      -- line break exactly, a rule is handed the echo of that cell as null.
+      it "reads CRLF line ends, and a quoted cell holding a line break, as one row each" $ do
+        (code, _, rows) <- csvRowsOf [batchCodeFixture, "--inputs", batchCrlfCsv]
+        code `shouldBe` ExitSuccess
+        map (`inputOf` "code") rows
+          `shouldBe` [Just (String "plain"), Just (String "line one\nline two")]
 
     it "keeps a line break inside a string literal as it is written" $ do
       -- batch runs the re-printed module; before smucclaw/l4-ide#1028 the newline came back
