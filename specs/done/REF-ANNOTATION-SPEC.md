@@ -246,7 +246,7 @@ What changed:
    Before, such a ref bound to the next construct and became that construct's citation, in the IDE and in every export, with no one the wiser.
    The flag is computed from the token stream (`trailingRefsOf`), because a `Ref` has no memory of its neighbours.
    An inline `<<…>>` in the middle of a line is not flagged: it cites the word after it, which is what it is for.
-   That reading of "written after code on the same line" is an assumption, not part of the ruling.
+   That is outside R1's scope, which asks about a ref written at the end of a code line (its census counts the inline refs that end one), and it keeps attaching to what follows it.
 4. The warning text is built from the citation without its herald, delimiters, trailing spaces or carriage return (`refCitation`).
    The stored text (`getRef`) is unchanged, because the readers do not all strip the same things: the DMN lowerer reads it raw, and the relational and Catala lowerers strip `@ref` but not `<<…>>`.
 

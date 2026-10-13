@@ -1871,8 +1871,9 @@ addRefCommentsToAst trailing refs0 ast =
 -- ...@, runs to the end of the line, so code before it is enough. The inline
 -- form, @\<\<...\>\>@, can sit in the middle of an expression, where it binds to
 -- the word after it and is right to; it is flagged only when no code follows
--- it on its line. (Card R1 says \"written after code on the same line\"; that a
--- mid-line @\<\<...\>\>@ is not trailing is an assumption, not a ruling.)
+-- it on its line. (Card R1 asks about a ref \"written at the end of a code
+-- line\", and its census counts the inline ones that end one; a mid-line
+-- @\<\<...\>\>@ is outside the ruling and keeps attaching to what follows it.)
 type TrailingRefs = Map SrcPos (Maybe Text)
 
 -- | Where the scan for 'TrailingRefs' has got to.
