@@ -65,6 +65,7 @@ If your description matches more than one place in the contract, L4 warns you; a
 
 | you want to know                                               | ask (placeholder spellings)                                   |
 | -------------------------------------------------------------- | ------------------------------------------------------------- |
+| is it outstanding (armed, neither done nor failed)?            | ``OUTSTANDING (PARTY patron MUST `return` _)``                |
 | has it ever failed?                                            | ``EVER FAILED (PARTY patron MUST `return` _)``                |
 | is a failure still outstanding?                                | ``FAILED AND NOT CURED (PARTY patron MUST `return` _)``       |
 | was a failure put right by its reparation, not by performance? | ``CURED BY REPARATION (PARTY patron MUST `return` _)``        |
@@ -72,6 +73,7 @@ If your description matches more than one place in the contract, L4 warns you; a
 | when did it fail?                                              | `THE INSTANT OF THE LAST FAILURE OF (…)`                      |
 
 "Failed" means the deadline passed without performance; "cured by reparation" means everything its `LEST` required was then done by the same party (ruling N8).
+"Outstanding" means armed and neither performed nor failed, which includes not yet due (ruling N13); "any reparation obligation not satisfied on this date" is `OUTSTANDING … UNDER LEST` read at that date.
 
 `THE INSTANT` is the **contract clock**: the moment in the trace at which your rule is being checked.
 It is **not** `NOW`, which is the computer's wall clock, and using `NOW` in a `PROVIDED` gets a warning (ruling N4).
