@@ -1237,15 +1237,20 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ Lam ann' sig' body'
     App ann n ns -> do
       -- The range of an infix (mixfix) call is its keyword and no more, so an
-      -- operand to the LEFT of the keyword starts before the call does. Those
-      -- operands come first in the walk, before the call itself, so that a ref
-      -- inside one is claimed by the node it precedes and not by the whole call.
+      -- operand to the LEFT of the keyword starts before the call does. The
+      -- call is where its first left operand begins, so it claims the refs
+      -- that precede that operand first. The operands then come before the
+      -- call in the walk, so that a ref inside one is claimed by the node it
+      -- precedes and not by the whole call.
       let startsBefore a = case (nodeSpan a, nodeSpan expr) of
             (Just sa, Just se) -> sa.start < se.start
             _                  -> False
           (leftOperands, rest) = span startsBefore ns
+      annAbove <- case leftOperands of
+        []      -> pure ann
+        l : _   -> attachRef l ann
       leftOperands' <- traverse addRef leftOperands
-      ann' <- attachRef expr ann
+      ann' <- attachRef expr annAbove
       n' <- addRef n
       rest' <- traverse addRef rest
       pure $ App ann' n' (leftOperands' <> rest')

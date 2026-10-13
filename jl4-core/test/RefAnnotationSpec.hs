@@ -129,6 +129,27 @@ refPlacements src = do
         , Just r <- [rangeOf a]
         ]
 
+-- | The source range of every node that holds a ref, and the source range of
+-- the body of the last top-level @DECIDE@: whether a ref is held by that
+-- body's own node.
+refHoldersAndBody :: Text -> IO ([Maybe SrcRange], Maybe SrcRange)
+refHoldersAndBody src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-holders")
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m@(MkModule _ _ (MkSection _ _ _ decls)), _, _) ->
+      case reverse [ body | Decide _ (MkDecide _ _ _ body) <- decls ] of
+        (body : _) ->
+          pure
+            ( [ rangeOf a | a <- toListOf (gplate @Anno) m, not (null (view annRefs a)) ]
+            , rangeOf (getAnno body)
+            )
+        [] -> do
+          expectationFailure "Expected a DECIDE"
+          error "unreachable"
+
 -- | @attachesInLinearTime small large limit line@: parsing @large@ lines made
 -- by @line@ (one definition each) takes less than @limit@ times the CPU time
 -- of parsing @small@ lines. A ratio short of twice the limit is measured
@@ -348,6 +369,23 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
           , "  2) `plus` 3"
           ])
         `shouldReturn` [((7, 3), "two")]
+
+    it "is the whole infix call, when the ref sits above the call" $ do
+      -- The call's own range is its keyword, but the call starts where its
+      -- left operand does, so a ref above the whole call is the call's, and
+      -- not its left operand's.
+      (holders, bodyRange) <-
+        refHoldersAndBody
+          (Text.unlines
+            [ "GIVEN a IS A NUMBER, b IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "a `plus` b MEANS a + b"
+            , ""
+            , "DECIDE s IS"
+            , "  @ref https://example.com/whole"
+            , "  (1 + 2) `plus` 3"
+            ])
+      holders `shouldBe` [bodyRange]
 
     it "is the type after it" $ do
       refPlacements "GIVEN x IS A\n  @ref https://example.com/type\n  NUMBER\nDECIDE r IS x\n"
