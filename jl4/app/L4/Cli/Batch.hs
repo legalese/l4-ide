@@ -61,7 +61,8 @@ import Control.Monad (void)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word8)
 import Data.Char (isAlpha, isAlphaNum)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, decodeUtf8With, encodeUtf8)
+import Data.Text.Encoding.Error (lenientDecode)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 import System.IO
@@ -878,8 +879,26 @@ data CsvRow
 -- lost its extra cells, both with status success (review M4; decided
 -- overnight 2026-10-02, pending Meng's review, spec §4.1).
 csvRows :: BSL.ByteString -> Either String [CsvRow]
-csvRows = AL.eitherResult . AL.parse file
+csvRows bytes = case AL.parse file bytes of
+  AL.Done _ parsed -> Right parsed
+  -- Attoparsec's own message is the name of the parser that gave up
+  -- (@endOfInput@, @13: not enough input@), which says neither where nor why.
+  -- What it does know is the input left at the point it stopped, and with the
+  -- input before that we can name the line.
+  AL.Fail unconsumed _ _
+    | BSL.null (dropByteOrderMark bytes) ->
+        Left "the CSV file is empty: its first line has to name the inputs"
+    | otherwise ->
+        let consumed = BSL.take (BSL.length bytes - BSL.length unconsumed) bytes
+            line     = 1 + lineEnds (BSL.toStrict consumed)
+            near     = BSL.takeWhile (\w -> w /= 10 && w /= 13) (BSL.take 30 unconsumed)
+            excerpt  = Text.unpack (decodeUtf8With lenientDecode (BSL.toStrict near))
+        in Left $ "line " <> show line <> " of the CSV file is not valid CSV"
+             <> (if null excerpt then ", where it ends" else ", near `" <> excerpt <> "`")
   where
+    dropByteOrderMark b
+      | BSL.take 3 b == BSL.pack [0xEF, 0xBB, 0xBF] = BSL.drop 3 b
+      | otherwise = b
     comma = 44
     file = do
       -- A UTF-8 byte-order mark is not part of the first column's name. Excel's

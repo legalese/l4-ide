@@ -194,13 +194,16 @@ batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
 
 -- | Inputs declared through a type synonym (@DECLARE Year IS A NUMBER@, a
 -- BOOLEAN, a MAYBE), with the plain types beside them as the control, and the
--- cases for each.
-batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv :: FilePath
+-- cases for each; and two CSV files that cannot be read.
+batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty :: FilePath
 batchSynonym         = fixtureDir </> "batch-synonym.l4"
 batchSynonymYearJson = fixtureDir </> "batch-synonym-year.json"
 batchSynonymFlagJson = fixtureDir </> "batch-synonym-flag.json"
 batchSynonymYearCsv  = fixtureDir </> "batch-synonym-year.csv"
 batchSynonymFlagCsv  = fixtureDir </> "batch-synonym-flag.csv"
+batchCsvBadQuote     = fixtureDir </> "batch-csv-bad-quote.csv"
+batchCsvEmpty        = fixtureDir </> "batch-csv-empty.csv"
 
 -- | A choice type with one constructor that has a field and one that has
 -- none. Only the second can be given as JSON input; every other value is
@@ -474,6 +477,7 @@ coreFixtures =
   , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
   , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
   , batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty
   , batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional
   , batchDeclaredTextDates, batchDeclaredTextSynonyms
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture
@@ -1823,6 +1827,23 @@ spec bin = do
               (_, _, validated) <- run ["--validate-only"] entry file
               (_, _, ran)       <- run [] entry file
               (entry, map outcome validated) `shouldBe` (entry, map outcome ran)
+
+    -- A CSV file that cannot be read stops the command before any case runs.
+    -- It used to say only what the parser was called (`endOfInput`, `13: not
+    -- enough input`); cassava's own reader, before `csvRows`, named the input
+    -- it stopped at.
+    it "names the line of a CSV file it cannot read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvBadQuote]
+      code `shouldSatisfy` (/= ExitSuccess)
+      -- the stray quote is on line 2, after `ab`
+      sout `shouldSatisfy` ("line 2 of the CSV file is not valid CSV, near `\"c`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("endOfInput" `isInfixOf`)
+
+    it "says that an empty CSV file is empty" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvEmpty]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("the CSV file is empty" `isInfixOf`)
+      sout `shouldNotSatisfy` ("not enough input" `isInfixOf`)
 
     it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
       -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
