@@ -277,16 +277,24 @@ fi
 
 # ---------------------------------------------------------------- hygiene
 printf '\n=== commit trailers ===\n'
+# `Claude-Session:` names the Claude Code session behind a commit Claude co-authored, so only
+# those commits are held to it. A commit with no Claude `Co-Authored-By:` line was written by
+# hand and passes without either trailer.
 MISSING=0
+BYHAND=0
 while IFS= read -r c; do
   [ -n "$c" ] || continue
-  if ! git -C "$WT" log -1 --format='%B' "$c" | grep -q '^Claude-Session:'; then
+  body=$(git -C "$WT" log -1 --format='%B' "$c")
+  if ! printf '%s\n' "$body" | grep -qi '^Co-Authored-By: Claude'; then
+    BYHAND=$((BYHAND + 1))
+  elif ! printf '%s\n' "$body" | grep -q '^Claude-Session:'; then
     echo "  MISSING Claude-Session: $(git -C "$WT" log -1 --format='%h %s' "$c")"
     MISSING=1
   fi
 done < <(git -C "$WT" rev-list --no-merges "$BASE".."$HEAD_SHA" 2>/dev/null)
+[ "$BYHAND" -gt 0 ] && note "$BYHAND commit(s) without a Claude co-author: not held to Claude-Session"
 if [ "$MISSING" = 1 ]; then RESULTS+=("FAIL  commit trailers"); FAILED=1
-else echo "  all commits carry Claude-Session"; RESULTS+=("PASS  commit trailers"); fi
+else echo "  every Claude-co-authored commit carries Claude-Session"; RESULTS+=("PASS  commit trailers"); fi
 
 # `L4.Print` has TWO printers with different guards, and the round-trip property
 # is weaker than it looks: a printer that drops a bracket emits source that
