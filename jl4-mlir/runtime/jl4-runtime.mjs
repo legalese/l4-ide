@@ -812,6 +812,7 @@ function evalDeonticGuard(g, ctx) {
 function resolveDeonticExpr(expr, ctx) {
   if (expr == null) return null;
   if (typeof expr === "string") return expr;
+  if (expr.name != null) return expr.name;
   if (expr.param != null) {
     return ctx.args ? ctx.args[expr.param] : undefined;
   }
@@ -2221,7 +2222,8 @@ function renderResidualForParamCtx(
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
 function renderActiveDeonticExpr(expr, args, meta, _givenParams) {
   if (expr == null) return "";
-  if (typeof expr === "string") return deonticNameAsSource(expr);
+  if (typeof expr === "string") return expr;
+  if (expr.name != null) return deonticNameAsSource(expr.name);
   if (expr.param != null) {
     const props = (meta && meta.parameters && meta.parameters.properties) || {};
     const schema = props[expr.param];
@@ -2255,24 +2257,22 @@ function renderContractAsSource(c, deadlineOverride) {
   return "";
 }
 
-// A literal party or action as L4 source. The schema carries a bare name PLAIN
-// (`Schema.hs` 'exprToDeonticParty' / 'patternToDeonticExpr'), as jl4-service
-// answers it, so a name with a space has to be backticked again here for the
-// trace's source text to be L4, as 'formatEventComponent' does for an event's.
-// A literal that is already source (an action that carries a value, @say "pay"@,
-// or a record built @WITH@ fields) carries its own backticks or quotes and is
-// left alone. That test is a heuristic: the schema does not say which a literal
-// is, and a value-carrying action without a quote in it (@pay 100@) is backticked
-// as if it were a name. This runtime does not match such an action
-// structurally either: it compares the literal with the event's action string.
-function deonticNameAsSource(s) {
-  if (typeof s !== "string") return s;
-  return /\s/.test(s) && !/[`"]/.test(s) ? "`" + s + "`" : s;
+// A bare party or action name as L4 source. The schema carries it as
+// @{name: "..."}@ and the answer's wire prints it plain, as jl4-service does,
+// so a name with a space has to be backticked again here for the trace's source
+// text to be L4, as 'formatEventComponent' does for an event's. Only a tagged
+// name is touched. A bare string is rule source (an action that carries a
+// value, @pay 100@ or @say "pay"@, or a record built @WITH@ fields), or a
+// literal from a bundle compiled before names were tagged, and is printed as
+// given.
+function deonticNameAsSource(name) {
+  return /\s/.test(name) ? "`" + name + "`" : name;
 }
 
 function renderDeonticExprForSource(e) {
   if (e == null) return "";
-  if (typeof e === "string") return deonticNameAsSource(e);
+  if (typeof e === "string") return e; // already source, or an untagged literal
+  if (e.name != null) return deonticNameAsSource(e.name);
   if (e.param != null) return e.param; // bare param name
   return String(e);
 }

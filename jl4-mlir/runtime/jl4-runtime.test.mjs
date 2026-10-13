@@ -495,14 +495,14 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   const sale = {
     kind: "OBLIGATION",
     modal: "MUST",
-    party: "the seller",
-    action: "deliver the goods",
+    party: { name: "the seller" },
+    action: { name: "deliver the goods" },
     deadline: 14,
     hence: {
       kind: "OBLIGATION",
       modal: "MUST",
-      party: "the buyer",
-      action: "pay the invoice",
+      party: { name: "the buyer" },
+      action: { name: "pay the invoice" },
       deadline: 30,
       hence: { kind: "FULFILLED" },
       lest: { kind: "BREACH", by: null, because: null },
@@ -570,21 +570,66 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       ]),
       "Result: PARTY `the buyer`\nMUST `pay the invoice`\nWITHIN 30\nHENCE FULFILLED\nLEST BREACH",
     );
+    // Rule source is a bare string and is printed as given: an action that
+    // carries a value, with or without a quote in it.
+    const valued = (action) => ({
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: { name: "Alice" },
+      action,
+      deadline: 14,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    });
     eq(
       "deontic trace: an action that carries a value stays as the source it is",
-      traced(
-        {
-          kind: "OBLIGATION",
-          modal: "MUST",
-          party: "Alice",
-          action: 'say "pay now"',
-          deadline: 14,
-          hence: { kind: "FULFILLED" },
-          lest: { kind: "BREACH", by: null, because: null },
-        },
-        [],
-      ),
+      traced(valued('say "pay now"'), []),
       'Result: PARTY Alice\nMUST say "pay now"\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH',
+    );
+    eq(
+      "deontic trace: `pay 100` is an application, not a name, and is untouched",
+      traced(valued("pay 100"), []),
+      "Result: PARTY Alice\nMUST pay 100\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+    );
+    // A bundle compiled before names were tagged carries only bare strings.
+    // They are printed as given, never backticked again and never a crash.
+    const untagged = {
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "the seller",
+      action: "`deliver the goods`",
+      deadline: 14,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    };
+    eq(
+      "deontic trace: an untagged literal from an older bundle is printed as given",
+      traced(untagged, []),
+      "Result: PARTY the seller\nMUST `deliver the goods`\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+    );
+    eq(
+      "deontic: an untagged literal from an older bundle is answered as given",
+      JSON.stringify(
+        rtT.invokeFunction(
+          { exports: {} },
+          {
+            name: "the-sale-contract",
+            isDeontic: true,
+            parameters: { properties: {} },
+            paramOrder: [],
+            deonticContract: untagged,
+          },
+          { startTime: 0, events: [] },
+        ),
+      ),
+      JSON.stringify({
+        OBLIGATION: {
+          action: "`deliver the goods`",
+          deadline: "14",
+          modal: "MUST",
+          party: "the seller",
+        },
+      }),
     );
   }
 

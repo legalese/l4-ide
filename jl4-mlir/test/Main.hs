@@ -38,10 +38,12 @@ substitutedEntityInfo r =
   applyFinalSubstitution r.tcdSubstitution r.tcdUri r.tcdEntityInfo
 
 -- | A party and an action whose names need backticks in L4 source are baked
--- into the schema as their PLAIN names, as jl4-service spells them in an
--- answer (@Backend.Jl4.partyText@ \/ @actionText@). Until 2026-10-13 the
--- action was baked as source, backticks included, because the reference
--- printed it that way. An action that carries a value stays rule source.
+-- into the schema as their PLAIN names, tagged as names (@{"name": ...}@) so
+-- the runtime can backtick them again in the trace's source text. jl4-service
+-- spells them plain in an answer (@Backend.Jl4.partyText@ \/ @actionText@).
+-- Until 2026-10-13 the action was baked as source, backticks included, because
+-- the reference printed it that way. An action that carries a value stays rule
+-- source, an untagged string.
 testDeonticNamesPlain :: IO Bool
 testDeonticNamesPlain = do
   let src = T.unlines
@@ -63,10 +65,8 @@ testDeonticNamesPlain = do
     Right json -> do
       let checks :: [(String, Bool)]
           checks =
-            [ ("party is plain",   T.isInfixOf "\"party\":\"the seller\"" json)
-            , ("action is plain",  T.isInfixOf "\"action\":\"deliver the goods\"" json)
-            , ("action not source", not (T.isInfixOf "\"action\":\"`" json))
-            , ("party not source",  not (T.isInfixOf "\"party\":\"`" json))
+            [ ("party is a plain name",  T.isInfixOf "\"party\":{\"name\":\"the seller\"}" json)
+            , ("action is a plain name", T.isInfixOf "\"action\":{\"name\":\"deliver the goods\"}" json)
             ]
       let failures = [name | (name, ok) <- checks, not ok]
       case failures of
@@ -119,7 +119,7 @@ main = do
     , test "helper-read ASSUME threads through" testHelperReadAssumeThreaded
     , test "schema picks up imported DECLAREs" testSchemaUsesImportedDeclares
     , test "deontic contract baked into schema" testDeonticSchemaBaked
-    , test "deontic party/action names are plain" testDeonticNamesPlain
+    , test "deontic party/action names are plain, tagged" testDeonticNamesPlain
     , test "deontic value-carrying action stays source" testDeonticValueActionIsSource
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked

@@ -545,7 +545,11 @@ backend alone.
 
 This backend changed with it: `patternToDeonticExpr` bakes a bare action as its plain
 name, and `deonticObligationToWire` no longer re-adds backticks to an unobserved
-literal party (`deonticSourceSpelling` is gone). Measured on the CI Tier-2 corpus
+literal party (`deonticSourceSpelling` is gone). The schema now tags a bare name
+(`{"name": ...}`, `DEName`) apart from rule source (a bare string), so the trace's
+source text can backtick a spaced name and leave `pay 100` alone; a bundle
+compiled before the tag holds only strings, which the runtime prints as given.
+Measured on the CI Tier-2 corpus
 (`pr-checks.yml`, `jl4-mlir-parity-full`, 9 files): unstable service and unstable
 backend, **120 comparisons, 0 differs**; fixed service and unstable backend, **109
 and 11 differs**, exactly the four fields in the table above (11 cells, 10

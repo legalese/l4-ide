@@ -156,13 +156,21 @@ data DeonticContract
       }
   deriving stock (Eq, Show)
 
--- | Either a pre-rendered literal expression ('DELiteral' \"the seller\")
--- or a reference to a GIVEN parameter ('DEParam' \"driver\"). The JS
--- runtime resolves DEParam against the request's @arguments@ bag at
--- evaluation time, giving record-typed parties their actual value
--- (which the wire envelope then tags with the record type name).
+-- | A party or an action in the contract tree: a bare name ('DEName' \"the
+-- seller\"), pre-rendered rule source ('DELiteral' \"say \\\"pay\\\"\"), or a
+-- reference to a GIVEN parameter ('DEParam' \"driver\"). The JS runtime
+-- resolves DEParam against the request's @arguments@ bag at evaluation time,
+-- giving record-typed parties their actual value (which the wire envelope then
+-- tags with the record type name).
+--
+-- The name and the source are told apart so that the runtime can print the
+-- trace's source text as L4: a name with a space is backticked there, source
+-- text is printed as given. Both are the same text on the answer's wire. A
+-- bundle compiled before 'DEName' existed has only the literal, and the
+-- runtime prints it as given.
 data DeonticExpr
-  = DELiteral !Text
+  = DEName    !Text
+  | DELiteral !Text
   | DEParam   !Text
   deriving stock (Eq, Show)
 
@@ -954,7 +962,7 @@ deontonToContract deonton = do
 -- runtime can resolve it against the request's @arguments@ bag) or a literal
 -- name.
 --
--- A literal party is rendered with its PLAIN name, not 'Print.prettyLayout'.
+-- A bare party name ('DEName') is rendered with its PLAIN name, not 'Print.prettyLayout'.
 -- prettyLayout emits L4 /source/, so a multi-word party comes back
 -- backtick-quoted; jl4-service renders a party as a constructor name through
 -- @Backend.Jl4.constructorText@ (@rawNameToText . rawName . getActual@), which
@@ -975,7 +983,7 @@ exprToDeonticParty :: Expr Resolved -> DeonticExpr
 exprToDeonticParty e = case e of
   App _ headRes [] ->
     let nm = rawNameToText (rawName (getActual headRes))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
+    in if isLikelyParam nm then DEParam nm else DEName nm
   _ -> DELiteral (Print.prettyLayout e)
 
 -- | The plain-name rendering of a party expression. See 'exprToDeonticParty'
@@ -993,8 +1001,8 @@ patternToDeonticExpr :: Pattern Resolved -> DeonticExpr
 patternToDeonticExpr p = case p of
   PatVar _ n ->
     let nm = rawNameToText (rawName (getActual n))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
-  PatApp _ n [] -> DELiteral (rawNameToText (rawName (getActual n)))
+    in if isLikelyParam nm then DEParam nm else DEName nm
+  PatApp _ n [] -> DEName (rawNameToText (rawName (getActual n)))
   _ -> DELiteral (Print.prettyLayout p)
 
 -- | Heuristic: a bare lowercase identifier without surrounding
@@ -2162,17 +2170,23 @@ instance Aeson.FromJSON DeonticContract where
         <*> o .: "else"
       _ -> fail ("unknown DeonticContract kind: " ++ Text.unpack kind)
 
--- | DeonticExpr ⇄ JSON: literal as a bare string, param ref as
--- '{"param": "<name>"}'. The runtime branches on @typeof@.
+-- | DeonticExpr ⇄ JSON: source as a bare string, a name as
+-- '{"name": "<name>"}', a param ref as '{"param": "<name>"}'. The runtime
+-- branches on @typeof@ and the key.
 instance Aeson.ToJSON DeonticExpr where
   toJSON (DELiteral t) = Aeson.toJSON t
+  toJSON (DEName    t) = Aeson.object ["name" .= t]
   toJSON (DEParam   t) = Aeson.object ["param" .= t]
 
 instance Aeson.FromJSON DeonticExpr where
   parseJSON v = case v of
     Aeson.String t -> pure (DELiteral t)
-    Aeson.Object o -> DEParam <$> o .: "param"
-    _ -> fail "DeonticExpr: expected string (literal) or {param: name}"
+    Aeson.Object o -> do
+      mName <- o .:? "name"
+      case mName of
+        Just n  -> pure (DEName n)
+        Nothing -> DEParam <$> o .: "param"
+    _ -> fail "DeonticExpr: expected string (source), {name: name} or {param: name}"
 
 -- | DeonticGuard ⇄ JSON: tagged-record form, mirroring DeonticContract.
 instance Aeson.ToJSON DeonticGuard where
