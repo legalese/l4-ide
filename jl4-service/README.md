@@ -434,6 +434,13 @@ diagram calls its leaves.
 > or an input and a rule of the same name — get two. A name counts by what it
 > refers to, never by its spelling or its position in the file.
 >
+> **A `label` is the leaf printed as rule source**, in `asks[].atoms[]`, in
+> `ranked` and on a ladder leaf, so a string literal in it is escaped the way the
+> source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`
+> (`note EQUALS "a\nb"`). The `atomId` does not depend on how a label prints: it
+> is a hash of the term, read from the syntax tree and never from the printed
+> text, so the escaping moves no `atomId`.
+>
 > **How long an `atomId` lasts.** It survives a redeploy of the same source, and
 > an edit elsewhere in the module: adding or moving other rules, and renaming or
 > inserting section headings, do not change it. It changes when what the leaf

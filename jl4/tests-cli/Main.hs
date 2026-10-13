@@ -10,7 +10,7 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
 import Data.Char (isSpace)
 import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
 import qualified Data.ByteString as BS
@@ -191,6 +191,26 @@ batchDeclaredTextAnswers  = fixtureDir </> "batch-declared-text-answers.csv"
 batchDeclaredTextOptional = fixtureDir </> "batch-declared-text-optional.csv"
 batchDeclaredTextDates    = fixtureDir </> "batch-declared-text-dates.csv"
 batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
+
+-- | Inputs declared through a type synonym (@DECLARE Year IS A NUMBER@, a
+-- BOOLEAN, a MAYBE), with the plain types beside them as the control, and the
+-- cases for each; and two CSV files that cannot be read.
+batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof :: FilePath
+batchSynonym         = fixtureDir </> "batch-synonym.l4"
+batchSynonymYearJson = fixtureDir </> "batch-synonym-year.json"
+batchSynonymFlagJson = fixtureDir </> "batch-synonym-flag.json"
+batchSynonymYearCsv  = fixtureDir </> "batch-synonym-year.csv"
+batchSynonymFlagCsv  = fixtureDir </> "batch-synonym-flag.csv"
+batchCsvBadQuote     = fixtureDir </> "batch-csv-bad-quote.csv"
+batchCsvEmpty        = fixtureDir </> "batch-csv-empty.csv"
+batchCsvOpenQuoteEof     = fixtureDir </> "batch-csv-open-quote-eof.csv"
+batchCsvOpenQuoteMid     = fixtureDir </> "batch-csv-open-quote-mid.csv"
+batchCsvOpenQuoteCrlf    = fixtureDir </> "batch-csv-open-quote-crlf.csv"
+batchCsvOpenQuoteDoubled = fixtureDir </> "batch-csv-open-quote-doubled.csv"
+batchCsvOpenQuoteHeader  = fixtureDir </> "batch-csv-open-quote-header.csv"
+batchCsvQuoteClosesAtEof = fixtureDir </> "batch-csv-quote-closes-at-eof.csv"
 
 -- | A choice type with one constructor that has a field and one that has
 -- none. Only the second can be given as JSON input; every other value is
@@ -463,6 +483,9 @@ coreFixtures =
   , batchUndeclaredColumnCsv, batchEscapeRoundtripJson
   , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
   , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
+  , batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof
   , batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional
   , batchDeclaredTextDates, batchDeclaredTextSynonyms
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture
@@ -1768,6 +1791,96 @@ spec bin = do
             fst (resultAndPresumed number) `shouldBe` Just (Number 25)
             show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
           other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
+
+      -- An input declared through a synonym is the type the synonym stands for
+      -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:
+      -- it used to look at the name `Year` and judge nothing, so text that is
+      -- no number, or a number for a flag, was `valid` and then refused when
+      -- the case was run. The plain exports in the fixture are the control.
+      describe "an input declared through a synonym" $ do
+        let run extra entry file = rowsOf ([batchSynonym, "-e", entry, "--inputs", file] <> extra)
+            -- one word for how a case went, run or validated
+            outcome row = case objField row "status" of
+              Just (String st) | st `elem` ["success", "valid"] -> "accepted"
+              _                                                  -> "refused" :: String
+            shape row = (outcome row, objField row "diagnostics", objField row "errors")
+
+        it "refuses text that is no number, as for a NUMBER, in JSON and in CSV" $ do
+          forM_ [batchSynonymYearJson, batchSynonymYearCsv] \file -> do
+            (_, _, plain)   <- run [] "plain number" file
+            (_, _, through) <- run [] "next year" file
+            map shape through `shouldBe` map shape plain
+            -- and the first row, the text `abc`, is the one refused
+            take 1 (map outcome through) `shouldBe` ["refused"]
+            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("field 'y'" `isInfixOf`)
+
+        it "refuses text that is no boolean, and a number, as for a BOOLEAN, in JSON and in CSV" $ do
+          forM_ [batchSynonymFlagJson, batchSynonymFlagCsv] \file -> do
+            (_, _, plain)   <- run [] "plain flag" file
+            (_, _, through) <- run [] "flip flag" file
+            map shape through `shouldBe` map shape plain
+            take 1 (map outcome through) `shouldBe` ["refused"]
+
+        it "judges a synonym's value under --validate-only as it judges the plain type's" $ do
+          forM_ [ ("next year", "plain number", batchSynonymYearJson)
+                , ("flip flag", "plain flag", batchSynonymFlagJson) ] \(entry, control, file) -> do
+            (_, _, plain)   <- run ["--validate-only"] control file
+            (_, _, through) <- run ["--validate-only"] entry file
+            map shape through `shouldBe` map shape plain
+            -- the mismatch is named, as for the plain type
+            show (map (`objField` "errors") through) `shouldSatisfy` ("Type mismatch for field" `isInfixOf`)
+
+        it "validates what it would run: a case is valid exactly when it is accepted" $ do
+          forM_ [ ("next year", batchSynonymYearJson), ("flip flag", batchSynonymFlagJson)
+                , ("maybe year", batchSynonymYearJson), ("year maybe", batchSynonymYearJson) ]
+            \(entry, file) -> do
+              (_, _, validated) <- run ["--validate-only"] entry file
+              (_, _, ran)       <- run [] entry file
+              (entry, map outcome validated) `shouldBe` (entry, map outcome ran)
+
+    -- A CSV file that cannot be read stops the command before any case runs.
+    -- It used to say only what the parser was called (`endOfInput`, `13: not
+    -- enough input`); cassava's own reader, before `csvRows`, named the input
+    -- it stopped at.
+    it "names the line of a CSV file it cannot read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvBadQuote]
+      code `shouldSatisfy` (/= ExitSuccess)
+      -- the stray quote is on line 2, after `ab`
+      sout `shouldSatisfy` ("line 2 of the CSV file is not valid CSV, near `\"c`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("endOfInput" `isInfixOf`)
+
+    it "says that an empty CSV file is empty" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvEmpty]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("the CSV file is empty" `isInfixOf`)
+      sout `shouldNotSatisfy` ("not enough input" `isInfixOf`)
+
+    -- A quote that opens a cell and is never closed. cassava's reader of a
+    -- quoted cell takes everything to the end of the file and drops the last
+    -- byte, taking it for the closing quote: `"abc` was the text `ab` with
+    -- status success, and in the middle of a file the cell swallowed every row
+    -- after it. Each is refused, at the line where the quote opens.
+    describe "a quote that opens a CSV cell and is never closed" $ do
+      let refusedAt n file = do
+            Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", file]
+            code `shouldSatisfy` (/= ExitSuccess)
+            sout `shouldSatisfy` (("line " <> show (n :: Int) <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed") `isInfixOf`)
+            -- and no row is run
+            sout `shouldNotSatisfy` ("\"status\"" `isInfixOf`)
+
+      it "is refused at the end of the file, naming the line" $ refusedAt 2 batchCsvOpenQuoteEof
+      it "is refused in the middle of a file, rather than taking the rows after it" $ refusedAt 2 batchCsvOpenQuoteMid
+      it "is refused in a file with Windows line ends" $ refusedAt 2 batchCsvOpenQuoteCrlf
+      it "is refused when the last quote is half of a doubled one" $ refusedAt 2 batchCsvOpenQuoteDoubled
+      it "is refused in the header" $ refusedAt 1 batchCsvOpenQuoteHeader
+
+      -- The control: a cell that closes at the very end of the file, with no
+      -- line end after it, is a cell, so the check cannot be refusing every
+      -- file that ends in a quote.
+      it "does not refuse a cell that closes at the end of the file" $ do
+        Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvQuoteClosesAtEof]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"result\":\"abc\"" `isInfixOf`)
 
     it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
       -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),

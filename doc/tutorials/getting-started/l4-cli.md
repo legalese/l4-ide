@@ -484,7 +484,7 @@ The command exits with status 0 when every case was `success` or `refused`, and 
 
 `--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not five: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The problems are the ones a run reports under `diagnostics`, so `errors` is how a validation line says what `diagnostics` says in a run. A case that could not be read at all, such as a CSV line with the wrong number of cells, is `invalid` here and `error` in a run. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
 
-It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does.
+It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`.
 
 **It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
 
@@ -513,7 +513,7 @@ So `valid` means a case has the right shape, not that the rules will accept ever
 
 If `l4 batch` cannot read the cases or the rules, it prints no line for any case and exits with status 1. It says why in one plain line that starts `Error:`, on standard output, which is where the case lines go, so a script that reads the output as JSON should look at the exit status before it parses:
 
-- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV;
+- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV; for a CSV file it names the line, as in `` line 2 of the CSV file is not valid CSV, near `"c` ``, an empty CSV file is said to be empty, and a quote that opens a cell and is never closed is refused at the line where it opens;
 - `Error: --input-format is required when the extension can't be inferred (e.g. reading from stdin)`;
 - `Error: type checking failed` for rules that do not type-check, with the type errors themselves on standard error;
 - `Error: no @export functions found in module`, or `Error: no @export function named 'name' found` when `--entrypoint` names one that is not there.
