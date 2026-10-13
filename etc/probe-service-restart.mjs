@@ -5,18 +5,20 @@
 // WHY
 //   Everything jl4-service-test does runs in one process, and most of it
 //   registers freshly compiled functions straight into memory. A restarted
-//   service reads each deployment back from <store>/<id>/bundle.cbor instead,
-//   and that encoding has twice lost something the first process had: the
-//   types query-plan needs, and the multi-clause mark that words a no-match
-//   error in the drafter's terms (review of legalese/l4-ide#545, round 2).
-//   Both were silent: 200 or a plausible error, no diagnostic.
+//   service brings each deployment back from <store>/<id>/ instead. It used to
+//   read a cache there, bundle.cbor, and that encoding twice lost something
+//   the first process had: the types query-plan needs, and the multi-clause
+//   mark that words a no-match error in the drafter's terms (review of
+//   legalese/l4-ide#545, round 2). Both were silent: 200 or a plausible error,
+//   no diagnostic. A restart now compiles the stored sources as a deploy does;
+//   this probe is what says so from outside the process.
 //
 // WHAT
 //   Starts the given jl4-service on a fresh store and a free port, deploys an
 //   ordinary rule and a rule written as clauses, and calls both, including an
-//   input no clause matches. Stops it, checks bundle.cbor was written, restarts
-//   it on the same store, and makes the same calls. Any answer that differs is
-//   a FAIL. The service is stopped by PID.
+//   input no clause matches. Stops it, restarts it on the same store, and makes
+//   the same calls. Any answer that differs is a FAIL. The service is stopped
+//   by PID.
 //
 //   A build without multi-clause rules (main before #545) rejects the clause
 //   module; that half is then reported as not probed, and the rest still runs.
@@ -248,14 +250,6 @@ const list = calls(!clauseErr, false);
 const before = await ask(port, list);
 await stop();
 
-const cached = ["probe-plain", ...(clauseErr ? [] : ["probe-clauses"])].filter(
-  (id) => !existsSync(join(store, id, "bundle.cbor")),
-);
-if (cached.length)
-  die(
-    `no bundle.cbor for ${cached.join(", ")}: a restart would not read the cache, so it cannot be probed`,
-  );
-
 await start(port);
 await ready(port, "probe-plain");
 if (!clauseErr) await ready(port, "probe-clauses");
@@ -274,7 +268,7 @@ for (let i = 0; i < list.length; i++) {
 rmSync(dir, { recursive: true, force: true });
 console.log(
   differs
-    ? `FAIL: ${differs} of ${list.length} answers differ after a restart from bundle.cbor${perturb ? " (--perturb: expected)" : ""}`
-    : `PASS: ${list.length} answers identical before and after a restart from bundle.cbor`,
+    ? `FAIL: ${differs} of ${list.length} answers differ after a restart${perturb ? " (--perturb: expected)" : ""}`
+    : `PASS: ${list.length} answers identical before and after a restart`,
 );
 process.exit(differs ? 1 : 0);

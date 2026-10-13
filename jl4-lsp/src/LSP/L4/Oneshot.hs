@@ -56,9 +56,20 @@ oneshotL4ActionAndDiagnostics
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
-oneshotL4ActionAndDiagnostics evalConfig fp act = do
+oneshotL4ActionAndDiagnostics = oneshotL4ActionAndDiagnosticsIn Rules.AmbientLibraries
+
+-- | 'oneshotL4ActionAndDiagnostics' under a chosen 'Rules.LibraryScope', for a
+-- host that serves bundles somebody else uploaded and wants to say why a file
+-- of one did not parse (see 'oneshotL4ActionAndErrorsIn').
+oneshotL4ActionAndDiagnosticsIn
+  :: Rules.LibraryScope
+  -> EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+oneshotL4ActionAndDiagnosticsIn scope evalConfig fp act = do
   (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
-  (diags, res) <- oneshotL4ActionWithDiags recorder evalConfig fp act
+  (diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
   errs <- getLog
   pure (errs, diags, res)
 

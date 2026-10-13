@@ -8,8 +8,7 @@
 -- module that is in neither is not there for any caller, yet the bundle still
 -- compiles: the file typechecks, the deploy reports "applied", and only a call
 -- that reaches something the missing module should have defined fails. Nothing
--- in the service said so, on a compile or on a restart that rebuilds the
--- deployment from @bundle.cbor@. Ruled 2026-10-12 (bench "Main Wave Rulings",
+-- in the service said so, on a compile or on a restart. Ruled 2026-10-12 (bench "Main Wave Rulings",
 -- card R5): a @WARN@ naming the deployment and the module, on both paths. A
 -- refusal at deploy time is not part of it.
 --
@@ -18,11 +17,15 @@ module UnresolvedImportSpec (spec) where
 
 import Test.Hspec
 
-import BundleStore (SerializedBundle, StoredMetadata (..))
-import Compiler (buildFromCborBundle, compileBundle, computeVersion)
+import BundleStore (StoredMetadata (..), initStore, saveBundle)
+import Compiler (compileBundle, computeVersion)
+import DeploymentLoader (loadAndRegister)
+import IntegrationSpec (testOptions)
 import Logging (Logger, newLoggerTo)
+import TestStoreDir (withStoreDir)
+import Types (DeploymentId (..), DeploymentState (..))
 
-import Codec.Serialise (deserialiseOrFail, serialise)
+import Control.Concurrent.STM (newTVarIO, readTVarIO)
 import Control.Exception (finally)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Map.Strict (Map)
@@ -67,8 +70,8 @@ unresolvedLines = filter (BS8.isInfixOf "resolves to nothing")
 hasField :: BS8.ByteString -> BS8.ByteString -> BS8.ByteString -> Bool
 hasField key value = BS8.isInfixOf ("\"" <> key <> "\":\"" <> value <> "\"")
 
--- | Compile, then rebuild the same deployment the way a restart does: from the
--- CBOR bundles, which are encoded and decoded on the way. Each half gets its own
+-- | Compile, then bring the same deployment back the way a restart does: from
+-- the sources in a store, through 'loadAndRegister'. Each half gets its own
 -- log, so a line is attributed to the path that wrote it.
 compileThenRestart
   :: Map FilePath Text
@@ -77,15 +80,19 @@ compileThenRestart sources = do
   (compiled, compileLog) <- withLog \logger -> compileBundle logger "spec" sources
   case compiled of
     Left err -> pure (Left err, compileLog, Left "not attempted", [])
-    Right (_fns, _meta, bundles) -> do
-      decoded <- either (fail . show) pure $ traverse roundTrip bundles
-      (rebuilt, restartLog) <- withLog \logger ->
-        buildFromCborBundle logger "spec" decoded sources
+    Right _ -> do
+      (restarted, restartLog) <- withLog \logger -> withStoreDir "unresolved-import" \storeDir -> do
+        store <- initStore storeDir
+        saveBundle store "spec" sources
           (StoredMetadata (computeVersion sources) "2025-01-01T00:00:00Z" Nothing Nothing Nothing)
-      pure (Right (), compileLog, () <$ rebuilt, restartLog)
- where
-  roundTrip :: SerializedBundle -> Either String SerializedBundle
-  roundTrip = either (Left . show) Right . deserialiseOrFail . serialise
+        registry <- newTVarIO Map.empty
+        loadAndRegister logger testOptions registry store "spec"
+        state <- Map.lookup (DeploymentId "spec") <$> readTVarIO registry
+        pure $ case state of
+          Just (DeploymentReady _ _) -> Right ()
+          Just (DeploymentFailed err) -> Left err
+          _ -> Left "the deployment was not registered"
+      pure (Right (), compileLog, restarted, restartLog)
 
 spec :: Spec
 spec = describe "a bundle IMPORT that resolves to nothing is logged at WARN" do
@@ -112,7 +119,7 @@ spec = describe "a bundle IMPORT that resolves to nothing is logged at WARN" do
                       , any (\l -> hasField "module" (BS8.pack m) l) (unresolvedLines logLines) ]
       named `shouldBe` ["zzone", "zztwo"]
 
-  describe "when the deployment is rebuilt after a restart" do
+  describe "when the deployment is loaded after a restart" do
     it "says it again, on the restart path's own log" do
       (compiled, compileLog, rebuilt, restartLog) <-
         compileThenRestart (Map.singleton "main.l4" (importing ["zznope"]))

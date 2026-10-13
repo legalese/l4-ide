@@ -450,7 +450,7 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
       reject "Update rejected: compilation timed out or exceeded the memory limit"
     Just (Left err) ->
       reject ("Update rejected: compilation failed: " <> err)
-    Just (Right (fns, meta0, bundles)) -> do
+    Just (Right (fns, meta0)) -> do
       let newIfaces = map (ifaceFromFunction . (.fnImpl)) (Map.elems fns)
           breaking = maybe [] (`detectBreakingChanges` newIfaces) mGate
       case breaking of
@@ -496,7 +496,6 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
                 , BundleStore.smDeploymentVersion = Just depVersion
                 }
           BundleStore.saveBundle env.bundleStore deployId.unDeploymentId sourceMap storedMeta'
-          BundleStore.saveBundleCbor env.bundleStore deployId.unDeploymentId bundles
           BundleStore.saveMetadataCache env.bundleStore deployId.unDeploymentId (encodeMetadataCache meta)
             `catch` \(e :: SomeException) ->
               logWarn env.logger "Failed to save metadata cache (non-fatal)"

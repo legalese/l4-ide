@@ -10,7 +10,7 @@ module DeploymentLoader (
 
 import qualified BundleStore
 import BundleStore (BundleStore)
-import Compiler (compileBundle, buildFromCborBundle)
+import Compiler (compileBundle)
 import Logging (Logger, logInfo, logWarn, logError, logDebug)
 import Options (Options (..))
 import qualified Shared
@@ -34,7 +34,13 @@ import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
 -- | Load a deployment from the store and register it.
--- Tries the fast CBOR cache path first; falls back to full recompilation.
+--
+-- The stored sources are compiled afresh, as a deploy compiles them, under the
+-- same @--compile-timeout@ and @--max-compile-memory-mb@. Nothing is kept of an
+-- earlier compile: a deployment is exactly what its sources compile to now, so
+-- one that no longer parses or type-checks is registered as failed, with the
+-- errors a deploy of those sources would get. A @bundle.cbor@ that an older
+-- build left beside the sources is not read, and not touched.
 loadAndRegister :: Logger -> Options -> TVar (Map.Map DeploymentId DeploymentState) -> BundleStore -> Text -> IO ()
 loadAndRegister logger options registry store deployId = do
   -- Load sources and metadata (always needed)
@@ -43,37 +49,14 @@ loadAndRegister logger options registry store deployId = do
   let compileTimeoutMicros = options.compileTimeout * 1_000_000
       compileMemLimitMb = options.maxCompileMemoryMb
 
-  -- Try fast path: load from CBOR cache
-  mCbor <- BundleStore.loadBundleCbor logger store deployId
-  result <- case mCbor of
-    Just bundles -> do
-      logDebug logger "Loading deployment from CBOR cache"
-        [("deploymentId", toJSON deployId)]
-      cborResult <- buildFromCborBundle logger deployId bundles sources storedMeta
-      case cborResult of
-        Right ok@(fns, _meta)
-          | Map.null fns -> do
-              logWarn logger "CBOR rebuild produced no functions, deleting cache and recompiling"
-                [("deploymentId", toJSON deployId)]
-              BundleStore.deleteBundleCbor store deployId
-              compileFreshAndCache logger compileTimeoutMicros compileMemLimitMb store deployId sources
-          | otherwise -> pure (Right ok)
-        Left err -> do
-          logWarn logger "CBOR rebuild failed, deleting cache and recompiling from source"
-            [ ("deploymentId", toJSON deployId)
-            , ("error", toJSON err)
-            ]
-          BundleStore.deleteBundleCbor store deployId
-          compileFreshAndCache logger compileTimeoutMicros compileMemLimitMb store deployId sources
-    Nothing -> do
-      logDebug logger "Compiling deployment"
-        [("deploymentId", toJSON deployId)]
-      compileFreshAndCache logger compileTimeoutMicros compileMemLimitMb store deployId sources
+  logDebug logger "Compiling deployment"
+    [("deploymentId", toJSON deployId)]
+  result <- compileFromSource logger compileTimeoutMicros compileMemLimitMb deployId sources
 
   case result of
     Right (fns, meta0) -> do
       -- The operator-supplied description and the deploy-time version strings
-      -- are not derived from sources, so the compiler/CBOR rebuild can't
+      -- are not derived from sources, so the compiler can't
       -- reproduce them — restore them from the persisted StoredMetadata so the
       -- version (and the counters encoded in it) survives restarts.
       --
@@ -229,16 +212,15 @@ waitForResult registryTVar deployId timeoutMicros = do
     Nothing -> CompilationInProgress
     Just r  -> r
 
--- | Compile from source with timeout and memory limit, and save CBOR cache for next restart.
-compileFreshAndCache
+-- | Compile from source with timeout and memory limit.
+compileFromSource
   :: Logger
   -> Int  -- ^ timeout in microseconds
   -> Int  -- ^ memory limit in MB
-  -> BundleStore
   -> Text
   -> Map.Map FilePath Text
   -> IO (Either Text (Map.Map Text ValidatedFunction, DeploymentMetadata))
-compileFreshAndCache logger timeoutMicros memLimitMb store deployId sources = do
+compileFromSource logger timeoutMicros memLimitMb deployId sources = do
   let memLimitBytes = fromIntegral memLimitMb * 1024 * 1024 :: Int64
       compileLimited = do
         setAllocationCounter memLimitBytes
@@ -256,9 +238,4 @@ compileFreshAndCache logger timeoutMicros memLimitMb store deployId sources = do
       logError logger "Compilation timed out or exceeded memory limit"
         [("deploymentId", toJSON deployId)]
       pure $ Left "Compilation timed out or exceeded memory limit"
-    Just (Right (fns, meta, bundles)) -> do
-      -- Save CBOR caches for fast restart
-      BundleStore.saveBundleCbor store deployId bundles
-      pure $ Right (fns, meta)
-    Just (Left err) ->
-      pure $ Left err
+    Just result -> pure result

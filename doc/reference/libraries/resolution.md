@@ -79,8 +79,8 @@ library — does not stop the deploy, which still reports "applied": the file
 typechecks, and only a call that reaches something the missing module should have
 defined fails. The service logs a `WARN` for each one, naming the deployment, the
 importing file and the module (`Bundle IMPORT resolves to nothing`), when the
-bundle is compiled and again whenever it is rebuilt after a restart. A refusal at
-deploy time is not made; it would need a ruling of its own.
+bundle is compiled and again when the deployment is compiled afresh after a
+restart. A refusal at deploy time is not made; it would need a ruling of its own.
 
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
 (unit, table-driven), the `l4 library resolution shadow (B′)` group in
