@@ -161,6 +161,7 @@ With `batch-declared-text.l4`: the cells `True` and `False` for a choice input a
 9. **A string literal in printed source is spelled as source**, with `\n`, `\t` and `\r` for a line break, tab and carriage return, wherever the system prints an expression or pattern.
    Ruled 2026-10-12: printed string literals stay escaped on every surface, on condition that every such surface is listed in the PR body; the list is the one below, checked against this tree.
    Where a client sees both forms in one answer, the steps are escaped and the values are raw.
+   `jl4-service/README.md` says so for the service, under "Trace Output" and "Query Planning".
    "Probed" means run with the `l4`, `jl4-service` or `jl4-repl` built from `main` and from this PR on a rule that holds `"line\nnext"`; "read in code" means the printer call was read and not run.
    - Escaped, as source:
      - `l4 trace`: the step text on standard error, which is the same text the editor shows for `#EVALTRACE` (probed: `IF (x GREATER THAN 0) THEN "line\nnext" ELSE "tab\there"`; `main` broke the line inside the literal).
