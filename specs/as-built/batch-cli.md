@@ -126,7 +126,7 @@ That reading still typed a CSV cell for a choice or a `DATE` by how it looked, w
 With `batch-declared-text.l4`: the cells `True` and `False` for a choice input answer `"yes"` and `"no"` on `main`, were errors in this PR before #635 (the cell had become the boolean), and answer `"yes"` and `"no"` now.
 `batch-elig.l4` with the row `{"age":"25","income":"50000","hasViolations":"false"}` answers `true` with status `success` in both, and `batch-code.l4` with the CSV cells `123456` and `018956` returns them unchanged in both.
 
-**What differs from `main`, all of it deliberate:**
+**What differs from `main`, all of it deliberate except item 11:**
 
 1. **The run stops at the first failing row** unless `--continue-on-error` is given; `main` processed every row and has no such option.
    On `batch-mixed.json` (three rows, the second with `"income":"NOT_A_NUMBER"`) `main` writes three lines; this PR writes two and exits 1, and with `--continue-on-error` writes three and exits 1.
@@ -181,7 +181,7 @@ With `batch-declared-text.l4`: the cells `True` and `False` for a choice input a
    - Not escaped on this branch: an inert string (`"..."` in a boolean expression), because this PR leaves out #595's change to the `Inert` arm (`Print.hs:440`).
    - Not applicable here: `l4 run` prints no trace steps on `main` ("no trace captured"), and the deontic forms for an opening and for `EVERY` are not on `main`.
 10. **The `batch` summary in `l4 --help`** says `(json|yaml|csv in, NDJSON streaming out)`, where `main` said `(NDJSON streaming)`.
-11. **A malformed CSV file has lost the location in its message.** A stray quote (`"30"x,1,false`) is still a fatal `Error: failed to parse inputs: …`, but the text is `endOfInput`, where `main` said `parse error (Failed reading: satisfy) at "x,1,false\n"`. Unstable has the same message, and a fix for it is planned there.
+11. **A malformed CSV file has lost the location in its message.** This one is not deliberate: it came with unstable's CSV reader, and unstable has it too. A stray quote (`"30"x,1,false`) is still a fatal `Error: failed to parse inputs: …`, but the text is `endOfInput`, where `main` said `parse error (Failed reading: satisfy) at "x,1,false\n"`. Unstable has the same message, and a fix for it is planned there.
 
 The command, the options it had, the output keys and `main`'s backtick-quoting of natural-language export and parameter names (`quoteIdent`, also from `f6ebc282e`) are otherwise as on `main`.
 `doc/tutorials/getting-started/l4-cli.md` (under `l4 batch`) is rewritten to describe reading by declared type, blank cells, `--format` and `--output`, what each line says, stop-at-first-failure with `--continue-on-error`, `--validate-only` and its limits, and where fatal errors go.
