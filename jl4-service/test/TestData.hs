@@ -12,6 +12,8 @@ module TestData (
   maybeParamJL4,
   saleContractJL4,
   deonticExportJL4,
+  deonticDeadlineJL4,
+  deonticLineBreakJL4,
   deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
@@ -431,6 +433,43 @@ GIVETH A DEONTIC Party `Contract Action`
         LEST BREACH
     LEST BREACH
 |]
+
+-- | As 'deonticExportJL4', but the seller's obligation has no @LEST@: missing
+-- its deadline is a breach the evaluator reports as @deadline_missed@, naming
+-- the event that revealed it, the obligation that was missed, and the failure.
+deonticDeadlineJL4 :: Text
+deonticDeadlineJL4 =
+  [i|
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
+
+@export default sale contract
+GIVETH A DEONTIC Party `Contract Action`
+`the sale contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+|]
+
+-- | A contract whose one action carries a string with a line break in it. The
+-- action is rule source, not a name, so the answer prints it escaped (R2,
+-- 2026-10-12). Written as plain lines, like 'lineBreakJL4', for the same reason.
+deonticLineBreakJL4 :: Text
+deonticLineBreakJL4 =
+  Text.unlines
+    [ "DECLARE Party IS ONE OF Alice"
+    , "DECLARE Act IS ONE OF"
+    , "  say HAS text IS A STRING"
+    , ""
+    , "@export default the contract"
+    , "GIVETH A DEONTIC Party Act"
+    , "`the contract` MEANS"
+    , "  PARTY Alice"
+    , "  MUST say \"pay\\nnow\""
+    , "  WITHIN 10"
+    , "  HENCE FULFILLED"
+    , "  LEST BREACH"
+    ]
 
 -- | L4 source with a deontic function that uses record-typed parties.
 -- Tests that events with JSON object parties (e.g. {"name": "Alice"})

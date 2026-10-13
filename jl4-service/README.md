@@ -283,6 +283,12 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `startTime` — start time for contract simulation (required for DEONTIC)
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
+The answer spells a party and an action as an enum answer does (above): its name, without backticks, in every field that names one.
+An `OBLIGATION` names them in `party` and `action`.
+A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligatedParty` and `obligationAction` (the obligation that was missed), and in the `party` and `action` of each entry of `failures`.
+So a client can ask whether the party who acted is the party who was obliged by comparing two strings: for a party the rule writes as `` `the seller` ``, both are `the seller`.
+An action that carries a value, such as `say "pay\nnow"`, is not a name but rule source, and is printed as such, escaped the way the Trace Output section describes.
+
 ### Batch Evaluation
 
 Evaluate a function across many input cases:
