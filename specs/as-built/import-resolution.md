@@ -74,6 +74,9 @@ Measured on 2026-10-13 with the `l4`, `jl4-lsp` and `jl4-service` built from pla
 - `jl4-lsp/src/LSP/L4/Actions.hs:385-397`: hover renders a type through `prettyTypeForDisplay` (`jl4-core/src/L4/Print.hs:119`).
 - `jl4-lsp/jl4-lsp.cabal:156-176`: the `jl4-lsp-test` suite, created by #93.
 - User docs: `doc/reference/libraries/resolution.md` (the ladder table at l.26-34) and `jl4-core/libraries/README.md`, both from #134, and `doc/reference/libraries/IMPORT.md`, whose resolution rule this PR corrects.
+  `doc/reference/libraries/README.md`, `doc/reference/README.md` and `prelude-example.l4` no longer say the prelude is imported automatically, which `main` measured as false (a file that calls `sum` without `IMPORT prelude` gets "could not find a definition"); the wording is unstable's (`ec899dc95`).
+  `doc/reference/libraries/resolution.md` names the XDG store on Windows, `%APPDATA%\jl4\libraries\` unless `XDG_DATA_HOME` is set, taken from the `directory` package's source (`getXdgDirectory XdgData`) and not run on Windows.
+  `jl4-service/README.md` has a "Libraries and `IMPORT`" section with the three `WARN` lines.
 
 ## Behaviour and rules
 

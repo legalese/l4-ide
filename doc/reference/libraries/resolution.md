@@ -33,6 +33,11 @@ For a bare module name `<mod>`, resolution tries, **first match wins**:
 | 5   | XDG store             | `~/.local/share/jl4/libraries/<mod>.l4`                        | machine-global _extra_ libraries the embed doesn't carry |
 | 6   | VSCode bundle         | `<exeDir>/../../libraries/<mod>.l4`                            | the packaged extension, for non-embedded extras          |
 
+The XDG store is the `jl4/libraries` folder of the user's data directory.
+It is `$XDG_DATA_HOME/jl4/libraries/` when that variable is set to an absolute path.
+Otherwise it is `~/.local/share/jl4/libraries/` on macOS and Linux, and `%APPDATA%\jl4\libraries\` on Windows, which is usually `C:\Users\<you>\AppData\Roaming\jl4\libraries\`.
+Every other mention of `~/.local/share/jl4/libraries/` on this page means this folder.
+
 Three rules of thumb fall out of the table:
 
 - **Project-scoped beats embedded.** If you put a `prelude.l4` in your project
