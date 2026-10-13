@@ -27,7 +27,7 @@ Nothing else on `main` reads the stored ref: `l4 ast` prints it, the type checke
 - Collection, older than the change: `PState.refs` (`jl4-core/src/L4/Parser.hs:73`), `addRef` (`:82-83`), `refP` (`:105-108`).
 - Attachment, all in `jl4-core/src/L4/Parser/ResolveAnnotation.hs`: `RefWarning` and `RefS` (`:797-815`), `renderRefWarning` (`:817-824`), the message functions `refWarningMessage`, `refUnattachedMessage`, `refTrailingMessage`, `refNoLocationMessage` and `quotedCitation` (`:826-855`), `addRefCommentsToAst` (`:857-904`), `TrailingRefs` and `trailingRefsOf` (`:906-978`), `preprocessRefs` (`:980-986`), `takeMatchingRefs` (`:988-1008`), `refPrecedesNode` (`:1010-1019`), `attachRef` (`:1021-1031`), `class HasRef` (`:1037-1042`) and its 28 instances (`:1044-1366`).
 - Warning constructors on the shared parser `Warning` type: `RefUnattached`, `RefTrailing`, `RefNoLocation` (`ResolveAnnotation.hs:70-79`).
-- Wiring: `execParserForTokensWithHints` passes the token stream to `trailingRefsOf` (`Parser.hs:2146`).
+- Wiring: `execParserForTokensWithHints` passes the token stream to `trailingRefsOf` (`Parser.hs:2151`).
 - LSP rendering: messages at `jl4-lsp/src/LSP/L4/Rules.hs:843-848`, ranges at `:864-869`.
 - The user reference is `doc/reference/syntax/README.md`, section `@ref`; `jl4/GRAMMAR.md` and `jl4/README.md` say the same in short.
 
@@ -44,7 +44,10 @@ The node holds all of them, in source order (`attachRef`).
 So a ref is held by the outermost node that starts after it: a ref above a declaration lands on its `TopDecl` wrapper rather than the inner `Decide`, and a ref above a body expression lands on that expression's outermost node.
 `Module` and `Section` never claim a ref; they only recurse, so a leading `@ref` reaches the first declaration rather than the module, whose start it shares (the `MkSection` container).
 All seven `TopDecl` forms, `Declare`, `Decide`, `Assume`, the directives, `Event`, `Import`, type declarations, fields, signatures, types, names and every expression constructor call `attachRef`.
-`Deonton` and `RAction` only pass the ref to their children: the `Regulative` expression that holds a `Deonton` (`Syntax.hs`) starts where it does and has already taken the refs before it.
+`Deonton` only passes the ref to its children: the `Regulative` expression that holds a `Deonton` (`Syntax.hs`) starts where it does and has already taken the refs before it.
+`RAction` passes them to its children as well, but that reason does not cover it: a ref between the party and `MUST`, `MAY` or `SHANT` is not taken by anything before the action, so the action's expression holds it and the action does not (measured with `l4 ast`: `PARTY S`, then a `@ref`, then `MUST delivery` puts the ref on `delivery`).
+In the same way a ref just inside a parenthesis before `PARTY` is held by the party expression and not by the nested obligation, while a ref directly above `PARTY` is held by the `Regulative`.
+Whether those two should land on the action and on the obligation is not decided here; `unstable` has the same instances.
 An infix (mixfix) call has a source range that is its keyword and no more, so an operand to the LEFT of the keyword starts before the call does.
 The `App` arm first lets the call claim the refs that end before its first left operand starts, because the call starts where that operand does: a ref above `(1 + 2) `plus` 3` is held by the call.
 It then visits the operands (`ResolveAnnotation.hs:1238-1256`), so a ref inside `(1 + <<cite>> 2) `plus` 3` is held by `2` and not by the whole call.
@@ -73,17 +76,21 @@ Where they appear (measured with this build on a file with a stack, a trailing r
 - in the diagnostics of `l4 check --json` and `l4 run --json`;
 - under the name of an imported file when the ref is in that file;
 - as warnings in the editor (`jl4-lsp/src/LSP/L4/Rules.hs:843-869`), including on files that already had a ref after code or at the end of the file.
+  The browser-based editor built from the WebAssembly target shows neither new warning: its check (`l4Check`) discards the parser's warnings, the `@nlg` ones included (`jl4-core/src/L4/Import/Resolution.hs:202` and `:287`).
 
 They do not appear in `l4 format`, in `l4 batch` (its output is identical with and without the change) or in the jl4-service responses, and the exit status is unchanged.
 
 ## Tests and fixtures that pin it
 
-- `jl4-core/test/RefAnnotationSpec.hs` (22 cases in `jl4-core-test`):
+- `jl4-core/test/RefAnnotationSpec.hs` (26 cases in `jl4-core-test`):
   - the four cases of #48: a ref above a body expression attaches to it; two DECIDEs get their own refs; no ref leaves the body's ref empty; a leading ref attaches to the first declaration and not the module;
   - a node holds every ref before it, in source order, and the nearest is the last;
   - the end-of-file and after-code messages, with a carriage return and an inline citation; a mid-line `<<…>>`; own-line refs across a blank line and a comment; a section heading holding a stack;
   - where a ref lands for an operand, for the left operand of an infix call, a type, a field and a branch;
-  - a timing guard that parses 1,000 and 8,000 definitions, each with a ref, and fails if the larger takes more than 16 times as long.
+  - a timing guard that parses 1,000 and 8,000 definitions, each with a ref, and fails if the larger takes more than 30 times as long (linear is 8; the quadratic scan took 44 to 45). It does not depend on the clock's resolution: it parses the small file over and over until the stretch spans ten steps of a 15.625 ms clock such as Windows', and measures the small file again with each retry.
+    Three more cases pin that: a linear parse is judged linear on a clock that reads in 15.625 ms steps, a made-up quadratic parse is still failed on that clock, and a clock that never ticks gives no ratio within seconds, so the guard goes pending.
+- `jl4/tests-cli/Main.hs` (one case under `l4 check`) with `jl4/tests-cli/fixtures/ref-trailing.l4`: a ref after code and a ref at the end of the file give the two warnings, with their text and ranges as the editor renders them, and the check still exits 0.
+  `unstable` has no such case; it is added here because the text and ranges in `jl4-lsp/src/LSP/L4/Rules.hs:843-869` were otherwise covered by no test.
 - `jl4/examples/ok/ref-annotation.l4` with its four goldens: refs on two declarations and their body expressions.
   The goldens pin only that the file parses, checks and evaluates (42, TRUE); they do not show where the refs landed.
 - `jl4/examples/ok/ref.l4` and `jl4/examples/lsp/semantic-tokens/annotations.l4`, with their goldens, have each ref on the line above what it cites.

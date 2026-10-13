@@ -186,6 +186,11 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalTraceFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 
+-- | A @\@ref@ that trails its code (line 4) and one with nothing after it
+-- (line 8): two warnings, no error.
+refTrailingFixture :: FilePath
+refTrailingFixture = fixtureDir </> "ref-trailing.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -196,7 +201,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , evalTraceFixture ] \fp -> do
+       , evalTraceFixture, refTrailingFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -270,6 +275,22 @@ spec bin = do
     it "fails on unparseable garbage input" $ do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    -- The two warnings of the @ref pass, as the LSP renders them (their text is
+    -- quoted in doc/reference/syntax/README.md, which is the page to change
+    -- with it). They are warnings, so the check still succeeds.
+    it "warns about a @ref after code and a @ref with nothing after it, and still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", refTrailingFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      let err = filter (/= '\r') serr
+      err `shouldSatisfy` isInfixOf "Range:    4:18-4:49"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 4(1)(a) of the Act`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`."
+      err `shouldSatisfy` isInfixOf "Range:    8:1-8:15"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 9`) is at the end of the file, so there is nothing after it to attach to."
+      length (filter (isInfixOf "Severity: DiagnosticSeverity_Warning") (lines err)) `shouldBe` 2
 
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do

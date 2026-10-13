@@ -102,6 +102,7 @@ GIVETH A BOOLEAN
 The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the expression that follows it.
 A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
 Blank lines and comments between a `@ref` and that construct make no difference.
+A citation before the first operand of a chain of `AND`, `OR` or arithmetic is held by the whole chain, because the chain is the outermost expression that starts after it; to cite one operand, put the citation just before that operand inside the chain, as with `resident` above.
 
 **Several citations.** Write them one above the other, each on a line of its own.
 The construct below keeps all of them, in the order written.
@@ -116,7 +117,8 @@ Where only one citation per construct is wanted, the nearest is used: the one wr
 
 #### Two warnings
 
-Both are warnings, so `l4 check` still succeeds, and the IDE marks the `@ref` itself.
+Both are warnings, so `l4 check` still succeeds, and the VS Code extension marks the `@ref` itself.
+The browser-based editor (the WebAssembly build) does not show them: its check drops every warning the parser raises, those for `@nlg` too.
 
 **A `@ref` that follows code on its line.**
 A `@ref` written at the end of a line, after the code it means to cite, cannot cite that code, because it cites what comes after it.

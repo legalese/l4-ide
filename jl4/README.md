@@ -194,6 +194,7 @@ The `@ref-map` annotations can be used to amend the existing mapping in the same
 Now the annotations can be initiated using either `@ref` or `<<` and `>>` as shown in the example above.
 
 A citation refers to what comes AFTER it, so write it on the line above the thing it cites, as in the example.
+In the example, `<<SG-c-2025-sghcf-12>>` comes before the first operand of the `OR` chain, so it cites the whole body of `xor`; a citation before a later operand cites that operand.
 A citation written at the end of a line, after the code it means to cite, is attached to nothing, and `l4 check` warns about it.
 Several citations above one construct are all kept, in order, and a tool that shows one citation per construct shows the nearest, the one written last.
 The rule, and the two warnings, are in [the syntax reference](../doc/reference/syntax/README.md#ref).
