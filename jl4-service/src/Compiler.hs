@@ -62,6 +62,26 @@ logStdlibStandIns logger deployId l4Files =
           ]
       _ -> pure ()
 
+-- | Say, at WARN, which IMPORTs of a bundle resolved to nothing: the importing
+-- file and the module name, under the deployment's ID.
+--
+-- A deployment resolves its IMPORTs against its own files and the stdlib built
+-- into the service, and nothing from the host, so a module that is in neither
+-- is not there for any caller. The deploy still goes through: the file
+-- typechecks, and only a call that reaches something the missing module should
+-- have defined fails, with a message about the identifier rather than the
+-- module. Until this was logged nothing in the service said so, on a compile or
+-- on a restart (ruled 2026-10-12, bench "Main Wave Rulings", card R5: a WARN
+-- now, a refusal only by a later ruling).
+logUnresolvedImports :: Logger -> Text -> [(FilePath, Text)] -> IO ()
+logUnresolvedImports logger deployId unresolved =
+  forM_ unresolved $ \(path, modName) ->
+    logWarn logger "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name"
+      [ ("deploymentId", toJSON deployId)
+      , ("file", toJSON path)
+      , ("module", toJSON modName)
+      ]
+
 -- | Compile an in-memory source map into a deployment-ready function registry.
 --
 -- Uses a SINGLE Shake session for the entire bundle: all files are typechecked
@@ -90,7 +110,8 @@ compileBundle logger deployId sources = do
       -- Pass all paths as needing eval environments — we'll discover which have
       -- exports from the typecheck results, then only the eval envs for those
       -- files will actually be used.
-      (_errs, tcMap, evalMap) <- typecheckAndEvalBundle moduleContext allPaths
+      (_errs, tcMap, evalMap, unresolved) <- typecheckAndEvalBundle moduleContext allPaths
+      logUnresolvedImports logger deployId unresolved
 
       -- Phase 2: Process typecheck results per file
       results <- forM l4Files $ \(filepath, content) ->
@@ -339,7 +360,8 @@ buildFromCborBundle logger deployId bundles sources storedMeta = do
       bundleFiles = [bundle.sbFilePath | bundle <- bundles, Map.member bundle.sbFilePath sources]
 
   -- Build all import environments in a single Shake session
-  (_errs, tcMap, evalMap) <- typecheckAndEvalBundle moduleContext bundleFiles
+  (_errs, tcMap, evalMap, unresolved) <- typecheckAndEvalBundle moduleContext bundleFiles
+  logUnresolvedImports logger deployId unresolved
 
   -- Process each bundle using the shared eval environments
   allFnsWithFile <- fmap concat $ forM bundles $ \bundle -> do

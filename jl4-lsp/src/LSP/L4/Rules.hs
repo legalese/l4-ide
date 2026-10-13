@@ -383,6 +383,8 @@ data LibraryScope
     -- the ladder to find is the stdlib; and a file that happens to sit in the
     -- host's working directory, or a library directory an operator exported,
     -- must not be able to replace it for every deployment (jl4-service).
+    -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R5, option A), with
+    -- conditions; see specs\/todo\/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10.
   deriving stock (Eq, Show)
 
 -- | One candidate source for a bare-module-name import.
@@ -916,6 +918,39 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
                  , "different copy, set JL4_LIBRARY_PATH or place " <> Text.pack modName
                    <> ".l4 in the project root or beside the importing file."
                  ]
+
+-- | The modules a file imports that resolved to nothing, by bare name, in the
+-- order they are written, each once.
+--
+-- 'GetImports' reports an unresolvable IMPORT as a diagnostic and leaves it out
+-- of its result, so what it did not resolve is what the file declares minus
+-- what it returned. The names are computed the way 'GetImports' computes them,
+-- so the two cannot disagree about which module an IMPORT names. A file that
+-- does not parse has declared nothing and yields @[]@: its own error is the
+-- one to read.
+--
+-- For a host that must say so when an uploaded bundle imports something it
+-- does not carry (jl4-service), where the diagnostic itself is not in reach.
+unresolvedImports :: NormalizedUri -> Action [Text]
+unresolvedImports uri = do
+  mProg <- use GetParsedAst uri
+  mResolved <- use GetImports uri
+  pure $ case (mProg, mResolved) of
+    (Just prog, Just resolved) ->
+      let resolvedNames = Set.fromList (map (moduleBaseName . (.importName)) resolved)
+       in List.nub
+            [ n
+            | n <- foldTopDecls declaredImport prog
+            , not (Set.member n resolvedNames)
+            ]
+    _ -> []
+  where
+    declaredImport :: TopDecl Name -> [Text]
+    declaredImport = \ case
+      Import _ (MkImport _ n _) -> [moduleBaseName n]
+      _ -> []
+    moduleBaseName :: Name -> Text
+    moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
 
 -- | The rules of a session that may use every tier of the library ladder: the
 -- CLI, the REPL and the language server. See 'LibraryScope'.

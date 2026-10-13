@@ -434,3 +434,21 @@ ambient tier is one path or two.
 - **Two-resolver parity:** a fixture using cross-module **mixfix** _and_ a normal
   typecheck dependency on the same imported module; assert both resolvers log the
   same real path (guards §3.3).
+
+---
+
+## 10. Rulings recorded from a bench
+
+The service's shorter ladder (`LibraryScope` / `EmbeddedStdlibOnly`, `jl4-service`'s
+`bundleScope`; `doc/reference/libraries/resolution.md`, "the resolution order") was
+built before it was ruled, and is now ruled.
+
+- **R5 = A**, bench "Main Wave Rulings", no note, 2026-10-12,
+  https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb. A deployment resolves its own files and
+  the built-in stdlib, nothing from the host. Conditions: (1) a `WARN` naming the
+  deployment and the module whenever a compile or a restart meets an unresolved `IMPORT`
+  (a warning now, a refusal only by a later ruling; the deploy API is unchanged);
+  (2) `resolution.md` says the service reads neither `JL4_LIBRARY_PATH`, the working
+  directory nor the XDG store; (3) an operator note in the main PR's Operators section,
+  no code: before a host is upgraded, its operator checks `/var/lib/jl4-service/.env` and
+  the XDG store for libraries a deployment needs.
