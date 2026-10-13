@@ -20,6 +20,13 @@ import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle)
 
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text.Encoding as TE
+import qualified Control.Exception as E
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text.IO as TIO
+
+import qualified L4.Lexer as Lexer
+import qualified L4.Print as Print
 
 import L4.API.VirtualFS (checkWithImports, checkWithImportsAndUri, emptyVFS, vfsFromList)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..), ResolvedImport(..))
@@ -109,6 +116,40 @@ testDeonticValueActionIsSource = do
           putStrLn $ "    json: " <> T.unpack (T.take 600 json)
           pure False
 
+-- | The WASM runtime backticks a name in its trace's source text the way
+-- L4's printer does ('Print.quoteIfNeeded'), and for that it carries its own copy
+-- of the reserved words: the lexer's keywords, except those the grammar also
+-- accepts as a name ('Print.keywordsUsableAsNames'). Read the copy out of the
+-- runtime and compare it with the lexer's set, so a keyword added to the lexer
+-- fails here until it is added to the runtime.
+testReservedWordsInSync :: IO Bool
+testReservedWordsInSync = do
+  let paths = ["runtime/jl4-runtime.mjs", "jl4-mlir/runtime/jl4-runtime.mjs"]
+      firstReadable [] = pure Nothing
+      firstReadable (p : ps) = do
+        r <- E.try (TIO.readFile p) :: IO (Either E.IOException T.Text)
+        either (const (firstReadable ps)) (pure . Just) r
+  mJs <- firstReadable paths
+  case mJs of
+    Nothing -> do
+      putStrLn $ "\n    cannot read the runtime from " <> show paths
+      pure False
+    Just js -> do
+      let between a b t = fst (T.breakOn b (snd (T.breakOn a t)))
+          section = between "BEGIN L4_RESERVED_WORDS" "END L4_RESERVED_WORDS" js
+          -- the words are the odd-numbered pieces between double quotes
+          quoted t = [w | (i, w) <- zip [0 :: Int ..] (T.splitOn "\"" t), odd i]
+          inRuntime = Set.fromList (quoted section)
+          inLexer =
+            Set.fromList (Map.keys Lexer.keywords)
+              `Set.difference` Set.fromList Print.keywordsUsableAsNames
+      if not (Set.null inRuntime) && inRuntime == inLexer
+        then pure True
+        else do
+          putStrLn $ "\n    in the lexer, not the runtime: " <> show (Set.toList (inLexer `Set.difference` inRuntime))
+          putStrLn $ "    in the runtime, not the lexer: " <> show (Set.toList (inRuntime `Set.difference` inLexer))
+          pure False
+
 main :: IO ()
 main = do
   results <- sequence
@@ -124,6 +165,7 @@ main = do
     , test "deontic contract baked into schema" testDeonticSchemaBaked
     , test "deontic party/action names are plain, tagged" testDeonticNamesPlain
     , test "deontic value-carrying action stays source" testDeonticValueActionIsSource
+    , test "WASM trace reserved words match the lexer" testReservedWordsInSync
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn
