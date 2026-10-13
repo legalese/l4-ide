@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedRecordDot, PatternSynonyms, TupleSections #-}
--- | Type-check a source text the way the language server does, for the specs that
--- draw ladders from it.
+-- | Type-check a source text the way the language server does, and return the
+-- checked module with the identifier of its document.
 module CheckSource (checkSource) where
 
 import qualified Data.Text as T
