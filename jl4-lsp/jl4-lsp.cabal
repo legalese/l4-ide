@@ -160,6 +160,7 @@ test-suite jl4-lsp-test
   other-modules:
     CheckSource
     ClauseGeneratedNamesSpec
+    ClauseGroupLadderSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

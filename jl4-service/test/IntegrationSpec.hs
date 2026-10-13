@@ -21,7 +21,8 @@ import Control.Monad (forM_, guard)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Exception (try)
-import Data.Foldable (toList)
+import Data.Foldable (for_, toList)
+import qualified Data.List as List
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
@@ -40,7 +41,7 @@ import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, dnfClauseJL4, handDnfJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -670,6 +671,143 @@ spec = describe "integration" do
         resp <- queryPlan' baseUrl mgr "qp-404" "no_such_fn"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 404
+
+    -- A rule written as DECIDE clauses is the same rule as the CONSIDER it
+    -- stands for, so its plan, with the ladder the plan carries, must be the
+    -- same: the same inputs, the same questions, the same atoms. Compared
+    -- whole, modulo the numbering of nodes ('withoutNodeIds'), so that a clause
+    -- group drawn as one leaf that asks nothing (or one that names a generated
+    -- binding) fails. This ladder draws a CONSIDER as one box, whose atomId
+    -- hashes its printed text, so the hand-written forms below are written as
+    -- the CONSIDER the clauses read through to, nested where a table's rows are.
+    describe "a BOOLEAN rule written as DECIDE clauses" do
+      let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+          sameAsHandWritten :: Text -> Text -> Text -> SpecWith ()
+          sameAsHandWritten name clauses hand =
+            it (Text.unpack ("has the plan and the ladder of its hand-written CONSIDER: " <> name)) do
+              withServiceFromSources ("cg-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hw-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cg-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hw-" <> name) "rule" noArguments
+                  statusCode' qpC `shouldBe` 200
+                  statusCode' qpH `shouldBe` 200
+                  let planC = withoutNodeIds <$> (Aeson.decode (responseBody qpC) :: Maybe Aeson.Value)
+                      planH = withoutNodeIds <$> (Aeson.decode (responseBody qpH) :: Maybe Aeson.Value)
+                  planC `shouldBe` planH
+                  -- the plan asks something
+                  lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+                  -- and no name the desugarer made up reaches a label, an ask or an input
+                  let text = Text.pack (show (responseBody qpC))
+                  for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
+                    (g, g `Text.isInfixOf` text) `shouldBe` (g, False)
+
+          -- The plans above are compared whole, atomIds included. This compares
+          -- the atomIds alone, so that a failure names them: the ladder's, and the
+          -- plan's. The two are not compared with each other: here the plan names
+          -- an atom's inputs by their labels and the ladder by their numbers, so
+          -- they differ for every rule with inputs, however it is written.
+          sameAtomIds :: Text -> Text -> Text -> SpecWith ()
+          sameAtomIds name clauses hand =
+            it (Text.unpack ("names every atom as its hand-written CONSIDER does: " <> name)) do
+              withServiceFromSources ("cga-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hwa-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cga-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hwa-" <> name) "rule" noArguments
+                  for_ [qpC, qpH] \r -> statusCode' r `shouldBe` 200
+                  let ladderIds r = case lookupKey "ladder" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object l) | Just (Aeson.Object fd) <- Aeson.KeyMap.lookup "funDecl" l ->
+                          List.sort (List.nub (ladderLeafField "atomId" fd))
+                        _ -> []
+                      planIds r = case lookupKey "impactByAtomId" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object m) -> List.sort (map Aeson.Key.toText (Aeson.KeyMap.keys m))
+                        _ -> []
+                  -- both are non-empty, so the equalities below mean something
+                  ladderIds qpC `shouldSatisfy` (not . null)
+                  planIds qpC `shouldSatisfy` (not . null)
+                  ladderIds qpC `shouldBe` ladderIds qpH
+                  planIds qpC `shouldBe` planIds qpH
+
+      sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAsHandWritten "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAsHandWritten "single" clauseGroupSingleJL4 handSingleJL4
+      -- The hand-written CONSIDER without a GIVETH is itself refused (its type is an
+      -- inference variable the service never resolves), so the group without one is
+      -- compared with the hand-written rule that has one.
+      sameAsHandWritten "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAsHandWritten "call" clauseGroupCallJL4 handCallJL4
+      -- Rows that share an earlier column: the desugarer tests it again in every
+      -- later clause, and the ladder reads each test with what the branches
+      -- around it already decided.
+      sameAsHandWritten "table" clauseTableJL4 handTableJL4
+      sameAsHandWritten "table2" clauseTable2JL4 handTable2JL4
+      -- A last clause whose pattern is a new name is the OTHERWISE.
+      sameAsHandWritten "newname" clauseNewNameJL4 handNewNameJL4
+
+      sameAtomIds "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAtomIds "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAtomIds "single" clauseGroupSingleJL4 handSingleJL4
+      sameAtomIds "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAtomIds "call" clauseGroupCallJL4 handCallJL4
+      sameAtomIds "table" clauseTableJL4 handTableJL4
+      sameAtomIds "table2" clauseTable2JL4 handTable2JL4
+      sameAtomIds "newname" clauseNewNameJL4 handNewNameJL4
+
+      -- A clause whose result is a LET the drafter wrote: the group around it is
+      -- read through, and the LET inside the clause stays as written.
+      it "answers a clause group whose clause result is a LET" do
+        withServiceFromSources "cg-let-result" [("rule.l4", clauseGroupLetResultJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "cg-let-result" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+          -- the colour is asked: the group's CONSIDER is read through
+          lookupArrayLength "inputs" (decodeObject (responseBody resp)) `shouldSatisfy` maybe False (> 0)
+
+      -- Only the LETs the desugarer generated are read through. A LET the
+      -- drafter wrote stays as written, so a chain of LETs that each use the one
+      -- before twice (which doubles for each LET when written out) is the one
+      -- atom it always was, however long.
+      it "answers a LET the drafter wrote as written" do
+        withServiceFromSources "let-enum" [("rule.l4", letEnumJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "let-enum" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "LET"
+      for_ [3 :: Int, 7] \n ->
+        it ("answers a chain of " <> show n <> " doubling LETs fast, as written") do
+          withServiceFromSources "chain" [("rule.l4", letChainJL4 n)] \baseUrl mgr -> do
+            resp <- queryPlan' baseUrl mgr "chain" "rule" noArguments
+            statusCode' resp `shouldBe` 200
+            LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "LET"
+
+      -- Clauses whose CONSIDER, written out, would be more than 20,000 parts are
+      -- not read through, and not drawn as the generated LETs either (one leaf
+      -- that asks nothing): the answer says why.
+      it "refuses clauses that come to more than 20000 parts, naming why" do
+        withServiceFromSources "long-rows" [("rule.l4", longClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-rows" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
+      it "says long clauses that return a number are not boolean, not that they are too long" do
+        withServiceFromSources "long-num" [("rule.l4", longNumberClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-num" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "returns a boolean"
+
+      -- A rule written as clauses may draw 300 boxes and no more. Here a CONSIDER
+      -- is one box, but the service simplifies the ladder, and a disjunction of
+      -- conjunctions rewritten into conjunctive normal form grows past 300.
+      it "answers clauses whose simplified ladder draws 193 boxes" do
+        withServiceFromSources "dnf-5" [("rule.l4", dnfClauseJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "refuses clauses whose simplified ladder would draw 449 boxes, naming why" do
+        withServiceFromSources "dnf-6" [("rule.l4", dnfClauseJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+      it "draws the same rule written without clauses, whatever its size" do
+        withServiceFromSources "hand-dnf-6" [("rule.l4", handDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "hand-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 200
 
   describe "evaluation with trace" do
     it "includes reasoning when trace=full" do
@@ -2156,3 +2294,32 @@ testOptions = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   }
+
+-- | A JSON answer without the numbers the visualizer gave its nodes: the
+-- @id@ and @unique@ fields, the per-node @impact@ table keyed by them, and the
+-- document version. What is left is the shape of the answer and its atom ids.
+withoutNodeIds :: Aeson.Value -> Aeson.Value
+withoutNodeIds = \case
+  Aeson.Object o ->
+    Aeson.Object (Aeson.KeyMap.map withoutNodeIds
+      (Aeson.KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique", "impact", "verDocId"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutNodeIds xs)
+  v -> v
+
+-- | A field of every node of a ladder's body: the text if it is a string, or
+-- the @label@ if it is a name.
+ladderLeafField :: Text -> Aeson.Object -> [Text]
+ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [Text]
+  go (Aeson.Object o) =
+    let here = case Aeson.KeyMap.lookup (Aeson.Key.fromText field) o of
+          Just (Aeson.String t) -> [t]
+          Just (Aeson.Object nm) -> case Aeson.KeyMap.lookup "label" nm of
+            Just (Aeson.String t) -> [t]
+            _ -> []
+          _ -> []
+        kids = concatMap go (Aeson.KeyMap.elems o)
+     in here <> kids
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []

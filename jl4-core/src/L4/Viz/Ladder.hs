@@ -46,7 +46,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, writtenAsClauses)
 import L4.Desugar
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
@@ -58,6 +58,12 @@ import qualified L4.Viz.VizExpr as VizExpr
 data VizError
   = InvalidProgramNoDecidesFound
   | InvalidDecideMustHaveBoolRetType
+  | ClauseGroupTooLarge Int
+    -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
+  | ClauseGroupTooLong Int
+    -- ^ a rule written as DECIDE clauses that, written out as the CONSIDER it
+    -- stands for, has more expression nodes than this
+    -- ('L4.Transform.letInliningNodeBudget')
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -67,6 +73,10 @@ prettyPrintVizError = \case
     "The program isn't the right sort for visualization: there are no DECIDE rules that can be visualized."
   InvalidDecideMustHaveBoolRetType ->
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+  ClauseGroupTooLarge budget ->
+    "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
+  ClauseGroupTooLong budget ->
+    "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than " <> Text.pack (show budget) <> " parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Monad
@@ -288,9 +298,22 @@ vizProgram :: VersionedDocId -> Decide Resolved -> Viz RenderAsLadderInfo
 vizProgram verDocId decide = MkRenderAsLadderInfo verDocId <$> translateDecide decide
 
 translateDecide :: Decide Resolved -> Viz FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body) = do
-  unlessM (hasBooleanType (getAnno body)) $
+translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) = do
+  -- Asked before anything is read through: a rule that returns a number is not
+  -- too large to draw, it is not a ladder at all.
+  unlessM (hasBooleanType (getAnno body0)) $
     throwError InvalidDecideMustHaveBoolRetType
+  -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
+  -- Whether it was is read off the rule as written (the parser records its
+  -- clauses on it), not off its body.
+  let isClauseGroup = Transform.writtenAsClauses asWritten
+  body <- case Transform.inlineLetsForViz body0 of
+    Right inlined -> pure inlined
+    -- Too big to read through. Clauses are refused: drawn as they stand they
+    -- would be one leaf that asks nothing. Anything else is drawn as written:
+    -- a LET the drafter wrote is never read through.
+    Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+           | otherwise     -> pure body0
 
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
@@ -298,6 +321,11 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
   shouldSimplify <- getShouldSimplify
   vid <- getFresh
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
+  -- The same limit on what is drawn as where a CONSIDER is drawn as rows (see
+  -- 'Transform.clauseGroupLadderBudget'). A rule that was not written as
+  -- clauses is drawn as it always was.
+  when (isClauseGroup && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+    throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
   pure $ MkFunDecl vid funName (paramNamesFromGivens givenSig appArgs) vizBody
   where
     paramNamesFromGivens :: GivenSig Resolved -> [Resolved] -> [VizExpr.Name]

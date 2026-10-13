@@ -21,6 +21,28 @@ module TestData (
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
+  clauseGroupEnumJL4,
+  handEnumJL4,
+  letEnumJL4,
+  clauseGroupMixedJL4,
+  handMixedJL4,
+  clauseGroupSingleJL4,
+  handSingleJL4,
+  clauseGroupCallJL4,
+  handCallJL4,
+  clauseTableJL4,
+  handTableJL4,
+  clauseTable2JL4,
+  handTable2JL4,
+  clauseNewNameJL4,
+  handNewNameJL4,
+  clauseGroupNoGivethJL4,
+  clauseGroupLetResultJL4,
+  letChainJL4,
+  longNumberClausesJL4,
+  longClausesJL4,
+  dnfClauseJL4,
+  handDnfJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -34,6 +56,7 @@ import Control.Monad.Trans.Except
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 rodentAndVerminFunctionSpec :: IO ValidatedFunction
 rodentAndVerminFunctionSpec = either (error . show) id <$> runExceptT rodentAndVerminFunction
@@ -504,3 +527,335 @@ GIVEN `d one` IS A DATE
 GIVETH A NUMBER
 DECIDE `later` IS 1
 |]
+
+-- | BOOLEAN rules written as multi-clause DECIDE groups, each beside the
+-- CONSIDER a drafter would write by hand for the same rule. All are called
+-- @rule@, so that the two forms of a pair get the same atom ids and their
+-- query plans can be compared whole.
+--
+-- The desugarer compiles clauses to a CONSIDER (and a LET for the clauses not
+-- yet tried) that carry no source range. The checker recorded a result type
+-- only on a node that has one, so the ladder refused the rule as "not a
+-- boolean"; with the type recorded, the ladder drew the generated LET as one
+-- leaf, and the plan asked nothing.
+clauseGroupEnumJL4 :: Text
+clauseGroupEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
+|]
+
+handEnumJL4 :: Text
+handEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  CONSIDER c
+    WHEN Red THEN TRUE
+    WHEN Green THEN FALSE
+    WHEN Blue THEN FALSE
+|]
+
+-- | The same rule with the later clauses named in a LET the drafter wrote (not
+-- clauses, so read as written).
+letEnumJL4 :: Text
+letEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  LET rest BE CONSIDER c
+                WHEN Green THEN FALSE
+                WHEN Blue THEN TRUE
+  IN CONSIDER c
+       WHEN Red THEN TRUE
+       OTHERWISE rest
+|]
+
+-- | Two inputs, a literal pattern in the first clause, a bare name in the second.
+clauseGroupMixedJL4 :: Text
+clauseGroupMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule 0 b IS FALSE
+DECIDE rule n b IS b AND n GREATER THAN 5
+|]
+
+handMixedJL4 :: Text
+handMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule n b IS
+  CONSIDER n
+    WHEN 0 THEN FALSE
+    OTHERWISE b AND n GREATER THAN 5
+|]
+
+-- | A group of ONE clause: no LET, just the generated CONSIDER.
+clauseGroupSingleJL4 :: Text
+clauseGroupSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule (JUST b) IS b
+|]
+
+handSingleJL4 :: Text
+handSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule m IS
+  CONSIDER m
+    WHEN JUST b THEN b
+|]
+
+-- | A clause that calls another rule. The call is part of the CONSIDER's one
+-- box, so the group and its hand-written CONSIDER must print it alike.
+clauseGroupCallJL4 :: Text
+clauseGroupCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS `both hold` a b
+DECIDE rule c a b IS a OR b
+|]
+
+handCallJL4 :: Text
+handCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN `both hold` a b
+    OTHERWISE a OR b
+|]
+
+-- | A table of two columns whose rows share the first column and differ in the
+-- second. The desugarer tests the colour again in every later clause; the
+-- ladder reads each test with what the branches around it already decided, so
+-- the table prints as the nested CONSIDER a drafter writes for it.
+clauseTableJL4 :: Text
+clauseTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red TRUE IS TRUE
+DECIDE rule Red FALSE IS FALSE
+DECIDE rule Green b IS b
+DECIDE rule Blue b IS NOT b
+|]
+
+handTableJL4 :: Text
+handTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c b IS
+  CONSIDER c
+    WHEN Red THEN
+      CONSIDER b
+        WHEN TRUE THEN TRUE
+        WHEN FALSE THEN FALSE
+    WHEN Green THEN b
+    WHEN Blue THEN NOT b
+|]
+
+-- | Two BOOLEAN columns, the input's own name standing for "any value".
+clauseTable2JL4 :: Text
+clauseTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule TRUE TRUE IS TRUE
+DECIDE rule TRUE q IS q
+DECIDE rule p TRUE IS p
+DECIDE rule p q IS FALSE
+|]
+
+handTable2JL4 :: Text
+handTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule p q IS
+  CONSIDER p
+    WHEN TRUE THEN
+      CONSIDER q
+        WHEN TRUE THEN TRUE
+        OTHERWISE q
+    OTHERWISE
+      CONSIDER q
+        WHEN TRUE THEN p
+        OTHERWISE FALSE
+|]
+
+-- | A last clause whose pattern is a new name, not the input's own: it always
+-- matches, so it is the OTHERWISE.
+clauseNewNameJL4 :: Text
+clauseNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS a
+DECIDE rule Green a b IS b
+DECIDE rule other a b IS a AND b
+|]
+
+handNewNameJL4 :: Text
+handNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN a
+    WHEN Green THEN b
+    OTHERWISE a AND b
+|]
+
+-- | A BOOLEAN group with no GIVETH: the type is inferred, not declared.
+clauseGroupNoGivethJL4 :: Text
+clauseGroupNoGivethJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
+|]
+
+-- | A BOOLEAN group whose first clause's result is a LET the drafter wrote.
+clauseGroupLetResultJL4 :: Text
+clauseGroupLetResultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm and the flag is set
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red b IS LET both BE b AND b IN both
+DECIDE rule c b IS FALSE
+|]
+
+-- | A drafter's chain of @n@ LETs that each use the one before twice. Written
+-- out it doubles for each LET, and its conjunctive normal form, which is what
+-- the ladder draws, grows faster than that.
+letChainJL4 :: Int -> Text
+letChainJL4 n =
+  "@export doubling let chain\nGIVEN x IS A BOOLEAN\n      y IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE rule IS\n"
+    <> "  LET a0 BE x\n  IN\n"
+    <> Text.concat
+         [ Text.replicate (3 + level) " " <> "LET a" <> Text.pack (show level) <> " BE a" <> Text.pack (show (level - 1)) <> " AND y OR a" <> Text.pack (show (level - 1)) <> "\n"
+             <> Text.replicate (3 + level) " " <> "IN\n"
+         | level <- [1 .. n - 1] ]
+    <> Text.replicate (3 + n) " " <> "a" <> Text.pack (show (n - 1)) <> "\n"
+
+-- | A BOOLEAN group of @k@ rows on one NUMBER input, each row's result a sum of
+-- @width@ ones compared with zero, then a fall-through. It is long, not
+-- branching: 60 rows of width 200 come to 24,301 parts written out.
+longClausesJL4 :: Int -> Int -> Text
+longClausesJL4 k width =
+  "@export Long rows\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") <> " GREATER THAN 0" | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS FALSE\n"
+
+-- | A group of @k@ rows on one NUMBER input, each row's result a sum of
+-- @width@ ones, then a fall-through. It returns a NUMBER, so it is not a
+-- ladder at all, which is what the answer must say, not that it is too long
+-- (60 rows of width 200 come to more than 20,000 parts written out).
+longNumberClausesJL4 :: Int -> Int -> Text
+longNumberClausesJL4 k width =
+  "@export Long numeric rows\nGIVEN n IS A NUMBER\nGIVETH A NUMBER\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS 0\n"
+
+-- | A group whose first clause names every input, so it matches every input
+-- and the group reads through to that clause's body: a disjunction of @k@
+-- conjunctions of two inputs. (The second clause is never used, and the
+-- checker says so.) The service simplifies the ladder into conjunctive normal
+-- form, which has @2^k@ disjunctions of @k@ inputs: 193 boxes for 5, and 449
+-- for 6.
+dnfClauseJL4 :: Int -> Text
+dnfClauseJL4 k = dnfRule k True
+
+-- | 'dnfClauseJL4' without clauses.
+handDnfJL4 :: Int -> Text
+handDnfJL4 k = dnfRule k False
+
+dnfRule :: Int -> Bool -> Text
+dnfRule k clauses =
+  "@export Dnf\nGIVEN n IS A NUMBER\n"
+    <> Text.concat [ "      a" <> Text.pack (show j) <> " IS A BOOLEAN\n      b" <> Text.pack (show j) <> " IS A BOOLEAN\n" | j <- [1 .. k] ]
+    <> "GIVETH A BOOLEAN\n"
+    <> "DECIDE rule n " <> inputs <> " IS " <> Text.intercalate " OR " [ "(a" <> Text.pack (show j) <> " AND b" <> Text.pack (show j) <> ")" | j <- [1 .. k] ] <> "\n"
+    <> (if clauses then "DECIDE rule 0 " <> inputs <> " IS FALSE\n" else "")
+  where
+    inputs = Text.unwords (concat [ ["a" <> Text.pack (show j), "b" <> Text.pack (show j)] | j <- [1 .. k] ])

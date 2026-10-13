@@ -23,10 +23,12 @@ module LSP.L4.Viz.Ladder (
   V.fromLspVerDocId,
 
   -- * Other helpers
+  VizError (..),
   prettyPrintVizError
   ) where
 
 import Base
+import qualified Base.Text as Text
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Data.IntSet (IntSet)
@@ -43,7 +45,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, writtenAsClauses)
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
     RenderAsLadderInfo (..),
@@ -254,6 +256,12 @@ getVizConfig vs = vs.cfg
 data VizError
   = InvalidProgramNoDecidesFound
   | InvalidDecideMustHaveBoolRetType
+  | ClauseGroupTooLarge Int
+    -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
+  | ClauseGroupTooLong Int
+    -- ^ a rule written as DECIDE clauses that, written out as the CONSIDER it
+    -- stands for, has more expression nodes than this
+    -- ('L4.Transform.letInliningNodeBudget')
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -264,6 +272,10 @@ prettyPrintVizError = \ case
     "The program isn't the right sort for visualization: there are no DECIDE rules that can be visualized."
   InvalidDecideMustHaveBoolRetType ->
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+  ClauseGroupTooLarge budget ->
+    "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
+  ClauseGroupTooLong budget ->
+    "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than " <> Text.pack (show budget) <> " parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Entrypoint: Visualise
@@ -303,10 +315,19 @@ vizProgram decide = MkRenderAsLadderInfo <$> getVerDocId <*> translateDecide dec
 --
 -- Simple implementation: Translate Decide iff <= 1 Given
 translateDecide :: Decide Resolved -> Viz V.FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body) =
+translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
   do
-    unlessM (hasBooleanType (getAnno body)) $
+    -- Asked before anything is read through: a rule that returns a number is
+    -- not too large to draw, it is not a ladder at all.
+    unlessM (hasBooleanType (getAnno body0)) $
       throwError InvalidDecideMustHaveBoolRetType
+    -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
+    -- Mirrors 'L4.Viz.Ladder.translateDecide'.
+    let isClauseGroup = Transform.writtenAsClauses asWritten
+    body <- case Transform.inlineLetsForViz body0 of
+      Right inlined -> pure inlined
+      Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+             | otherwise     -> pure body0
 
     let funName = mkPrettyVizName funResolved
     assign #functionName funName.label
@@ -314,6 +335,8 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
+    when (isClauseGroup && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+      throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl
       vid
       -- didn't want a backtick'd name in the header
