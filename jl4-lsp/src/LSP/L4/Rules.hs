@@ -252,6 +252,10 @@ data LibraryScope
     -- the ladder to find is the stdlib; and a file that happens to sit in the
     -- host's working directory, or a library directory an operator exported,
     -- must not be able to replace it for every deployment (jl4-service).
+    -- Ruled 2026-10-12: a deployment resolves its own files and the built-in
+    -- stdlib, nothing from the host; an IMPORT that resolves to nothing is logged
+    -- at WARN when a bundle is compiled or rebuilt after a restart, and refused
+    -- only if a later ruling says so.
   deriving stock (Eq, Show)
 
 -- | One candidate source for a bare-module-name import.
@@ -632,6 +636,34 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
                  , "different copy, set JL4_LIBRARY_PATH or place " <> Text.pack modName
                    <> ".l4 in the project root or beside the importing file."
                  ]
+
+-- | The modules a file imports that resolved to nothing, by bare name, in the
+-- order they are written, each once.
+--
+-- 'GetImports' reports an unresolvable IMPORT as a diagnostic and gives it the
+-- importing file's own URI as its module, a placeholder that stands for nothing
+-- (see @mkImportUri@ there), whereas an IMPORT that resolved names another
+-- file. So the unresolved ones are the results whose module is the importer.
+-- The names are the ones 'GetImports' computed, so the two cannot disagree
+-- about which module an IMPORT names. A file that does not parse has no
+-- imports and yields @[]@: its own error is the one to read.
+--
+-- For a host that must say so when an uploaded bundle imports something it
+-- does not carry (jl4-service), where the diagnostic itself is not in reach.
+unresolvedImports :: NormalizedUri -> Action [Text]
+unresolvedImports uri = do
+  mResolved <- use GetImports uri
+  pure $ case mResolved of
+    Just resolved ->
+      List.nub
+        [ moduleBaseName r.importName
+        | r <- resolved
+        , r.moduleUri == uri
+        ]
+    Nothing -> []
+  where
+    moduleBaseName :: Name -> Text
+    moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
 
 -- | The rules of a session that may use every tier of the library ladder: the
 -- CLI, the REPL and the language server. See 'LibraryScope'.

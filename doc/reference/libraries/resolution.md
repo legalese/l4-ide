@@ -49,12 +49,18 @@ Three rules of thumb fall out of the table:
 people uploaded cannot let its own machine stand in for the standard library.
 So a deployment's `IMPORT`s are resolved against the bundle's own files (tier 0)
 and then the standard library built into the service binary (tier 4), and
-nothing else: tiers 1, 2, 3, 5 and 6 are not consulted, and neither is
-`JL4_LIBRARY_PATH`. A `prelude.l4` in the service's working directory, or a
-library directory exported into its environment, has no effect on any
-deployment. (Without this rule it would: the deploy reports "applied" and every
-call then answers 422 `sum is not in scope`.) The service says at start-up, at
-`WARN`, when `JL4_LIBRARY_PATH` is set and therefore ignored.
+nothing else. **The service reads neither `JL4_LIBRARY_PATH`, nor its working
+directory, nor the XDG store (`~/.local/share/jl4/libraries/`)**, and not the
+extension bundle either: tiers 1, 2, 3, 5 and 6 are not consulted. A
+`prelude.l4` in the service's working directory, or a library directory exported
+into its environment, has no effect on any deployment. (Without this rule it
+would: the deploy reports "applied" and every call then answers 422 `sum is not
+in scope`.) The service says at start-up, at `WARN`, when `JL4_LIBRARY_PATH` is
+set and therefore ignored.
+
+A consequence for anyone moving a deployment onto the service: a library you
+used to supply from the host's filesystem has to be a file in the bundle, in the
+same directory as the file that imports it, or it is not there.
 
 A bundle that ships a file with the name of a standard library module, such as
 its own `prelude.l4`, is still honoured, as any project copy is: the importers
@@ -63,10 +69,19 @@ library's. The service says so, at `WARN`, each time it compiles such a bundle
 (`Bundle file stands in for a standard library module`, naming the file and the
 module), unless the file is exactly the library's own text.
 
+An `IMPORT` that finds nothing — no file in the bundle, no module in the built-in
+library — does not stop the deploy, which still reports "applied": the file
+typechecks, and only a call that reaches something the missing module should have
+defined fails. The service logs a `WARN` for each one, naming the deployment, the
+importing file and the module (`Bundle IMPORT resolves to nothing`), when the
+bundle is compiled and again whenever it is rebuilt after a restart. A refusal at
+deploy time is not made; it would need a ruling of its own.
+
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
 (unit, table-driven), the `l4 library resolution shadow (B′)` group in
 `jl4/tests-cli/Main.hs` (black-box CLI), and, for the service's shorter ladder,
-`jl4-service/test/StdlibResolutionSpec.hs`.
+`jl4-service/test/StdlibResolutionSpec.hs` and
+`jl4-service/test/UnresolvedImportSpec.hs`.
 
 ---
 

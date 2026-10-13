@@ -29,7 +29,7 @@ import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
-import System.FilePath ((<.>), takeFileName)
+import System.FilePath ((<.>), takeExtension, takeFileName)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -142,6 +142,12 @@ buildCompiledFromShared shared funName = runExceptT $ do
 -- silently — a deploy "applied" and every call answered 422 `sum is not in
 -- scope` — and this scope is what makes that impossible.) Every session the
 -- service opens uses this.
+--
+-- Ruled 2026-10-12: a deployment resolves its own files and the built-in
+-- stdlib, nothing from the host. One of the conditions is that an IMPORT that
+-- resolves to nothing is logged at WARN when a bundle is compiled or rebuilt
+-- after a restart ('typecheckAndEvalBundle' returns them); a refusal would need
+-- a later ruling.
 bundleScope :: Rules.LibraryScope
 bundleScope = Rules.EmbeddedStdlibOnly
 
@@ -151,7 +157,11 @@ bundleScope = Rules.EmbeddedStdlibOnly
 -- (parse, import resolution, typecheck) and shares them across all files.
 --
 -- Returns per-file typecheck results and per-file evaluator environments
--- (for files that have exports and need import environments).
+-- (for files that have exports and need import environments), and the IMPORTs
+-- of the bundle's @.l4@ files that resolved to nothing, as (importing file,
+-- module name). The caller says so in its log: the diagnostic for one is in the
+-- session's store, which this function does not hand back, and a bundle with an
+-- unresolvable IMPORT still compiles.
 typecheckAndEvalBundle
   :: ModuleContext
   -- ^ All source files in the bundle (filepath -> content)
@@ -164,6 +174,8 @@ typecheckAndEvalBundle
         -- ^ Typecheck results per file (Nothing if typecheck failed)
         , Map FilePath EvalEnv.Environment
         -- ^ Evaluator import environments for requested files
+        , [(FilePath, Text)]
+        -- ^ IMPORTs that resolved to nothing: (importing file, module name)
         )
 typecheckAndEvalBundle moduleContext evalFiles = do
   fixedNow <- Eval.readFixedNowEnv
@@ -198,9 +210,9 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   -- Use the first file's directory as the session root (arbitrary but required)
   let allFiles = StrictMap.toList moduleContext
   case allFiles of
-    [] -> pure ([], StrictMap.empty, StrictMap.empty)
+    [] -> pure ([], StrictMap.empty, StrictMap.empty, [])
     ((firstPath, _) : _) -> do
-      (errs, (tcMap, evalMap)) <- oneshotL4ActionAndErrorsIn bundleScope evalConfig firstPath $ \_nfp -> do
+      (errs, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndErrorsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -221,6 +233,12 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         let tcMap = StrictMap.fromList
               [(path, mTc) | ((path, _, _), mTc) <- zip fileNfps (toList tcResults)]
 
+        -- The IMPORTs that found nothing. The typecheck above has already
+        -- resolved every import, so this reads memoised results.
+        unresolved <- fmap concat $
+          forM [(path, uri) | (path, _, uri) <- fileNfps, takeExtension path == ".l4"] $
+            \(path, uri) -> map (path,) <$> Rules.unresolvedImports uri
+
         -- Build evaluator import environments for files that need them.
         -- Uses GetLazyEvaluationDependencies which recursively evaluates imports.
         -- Within the same session, Shake reuses already-evaluated imports.
@@ -237,9 +255,9 @@ typecheckAndEvalBundle moduleContext evalFiles = do
               | (path, Just (env, _dirResults)) <- evalPairs
               ]
 
-        pure (tcMap, evalMap)
+        pure (tcMap, evalMap, unresolved)
 
-      pure (errs, tcMap, evalMap)
+      pure (errs, tcMap, evalMap, unresolved)
 
 buildFunDecide :: Text -> FunctionDeclaration -> ExceptT EvaluatorError IO (Decide Resolved)
 buildFunDecide fnImpl fnDecl = do
