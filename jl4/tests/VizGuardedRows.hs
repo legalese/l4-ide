@@ -381,6 +381,24 @@ enumTableByHand k =
     <> Text.unlines [ "    WHEN V" <> Text.pack (show i) <> " THEN\n      CONSIDER b\n        WHEN TRUE THEN TRUE\n        OTHERWISE FALSE" | i <- [0 .. k - 1] ]
     <> "    OTHERWISE FALSE\n"
 
+-- | 'enumTable' with each enum value written @EXACTLY Vi@, two rows per value.
+exactlyTable :: Int -> Text
+exactlyTable k =
+  "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "V" <> Text.pack (show i) | i <- [0 .. k - 1] ] <> "\n"
+    <> "GIVEN c IS A Big\n      b IS A BOOLEAN\nGIVETH A BOOLEAN\n"
+    <> Text.unlines (concat [ [ "DECIDE compliant (EXACTLY V" <> Text.pack (show i) <> ") TRUE IS " <> (if even i then "TRUE" else "FALSE")
+                              , "DECIDE compliant (EXACTLY V" <> Text.pack (show i) <> ") FALSE IS " <> (if even i then "FALSE" else "TRUE") ]
+                            | i <- [0 .. k - 1] ])
+    <> "DECIDE compliant c b IS FALSE\n"
+
+exactlyTableByHand :: Int -> Text
+exactlyTableByHand k =
+  "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "V" <> Text.pack (show i) | i <- [0 .. k - 1] ] <> "\n"
+    <> "GIVEN c IS A Big\n      b IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE compliant c b IS\n  CONSIDER c\n"
+    <> Text.unlines [ "    WHEN EXACTLY V" <> Text.pack (show i) <> " THEN\n      CONSIDER b\n        WHEN TRUE THEN " <> (if even i then "TRUE" else "FALSE") <> "\n        WHEN FALSE THEN " <> (if even i then "FALSE" else "TRUE") <> "\n        OTHERWISE FALSE"
+                    | i <- [0 .. k - 1] ]
+    <> "    OTHERWISE FALSE\n"
+
 -- | A last clause whose pattern is a new name, not the input's own.
 clauseNewName :: Text
 clauseNewName =
@@ -602,6 +620,14 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
         let clauses = vizBody False (enumTable k)
         shapeOf clauses `shouldBe` shapeOf (vizBody False (enumTableByHand k))
         countLeaves clauses `shouldBe` 2 * k
+
+    -- EXACTLY an enum value names one value, as the value itself does. It was
+    -- not known as one, so nothing in a table written with it was pruned, and
+    -- eight values by a BOOLEAN were refused as too long to draw.
+    it "reads EXACTLY an enum value as that value, and draws the table as its hand-written CONSIDER" $
+      case vizResult False (exactlyTable 8) of
+        Left e -> expectationFailure ("an EXACTLY table was refused: " <> show e)
+        Right clauses -> shapeOf clauses `shouldBe` shapeOf (vizBody False (exactlyTableByHand 8))
 
     it "reads a clause whose pattern is a new name as the OTHERWISE" $
       shapeOf (vizBody False clauseNewName) `shouldBe` shapeOf (vizBody False clauseNewNameByHand)

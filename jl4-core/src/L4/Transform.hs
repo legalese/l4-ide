@@ -401,12 +401,22 @@ pruneGeneratedConsiders = total Map.empty
       PatApp _ ctor _                   -> Uncertain (Just (GroundCtor (getUnique ctor)))
       PatLit _ lit                      -> Ground (litKey lit)
       PatExpr _ (Lit _ lit)             -> Ground (litKey lit)
+      -- EXACTLY a constructor: known only when the checker stamped the name a
+      -- constructor, since a bare name here can as well be an input or a rule,
+      -- which names no one value (two inputs can be equal).
+      PatExpr _ (App _ r [])
+        | isConstructorRef r            -> Ground (GroundCtor (getUnique r))
       PatVar _ v                        -> Binds v
       _                                 -> Uncertain Nothing
 
     litKey = \ case
       NumericLit _ x -> GroundNum x
       StringLit _ t  -> GroundStr t
+
+    isConstructorRef r = case getActual r of
+      MkName nameAnn _ -> case view annInfo nameAnn of
+        Just (TypeInfo _ (Just Constructor)) -> True
+        _                                    -> False
 
 -- | What is known about an input inside a generated branch.
 data Known = Is GroundKey | IsNot [GroundKey]
