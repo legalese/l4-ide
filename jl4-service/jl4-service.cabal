@@ -149,6 +149,7 @@ test-suite jl4-service-test
     StdlibResolutionSpec
     TestData
     TestStoreDir
+    UnresolvedImportSpec
 
   hs-source-dirs:
     test
