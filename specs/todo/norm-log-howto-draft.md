@@ -67,7 +67,7 @@ If your description matches more than one place in the contract, L4 warns you; a
 | -------------------------------------------------------------- | ------------------------------------------------------------- |
 | is it outstanding (armed, neither done nor failed)?            | ``OUTSTANDING (PARTY patron MUST `return` _)``                |
 | has it ever failed?                                            | ``EVER FAILED (PARTY patron MUST `return` _)``                |
-| is a failure still outstanding?                                | ``FAILED AND NOT CURED (PARTY patron MUST `return` _)``       |
+| is a failure still uncured?                                    | ``FAILED AND NOT CURED (PARTY patron MUST `return` _)``       |
 | was a failure put right by its reparation, not by performance? | ``CURED BY REPARATION (PARTY patron MUST `return` _)``        |
 | how many failures in the last year?                            | `THE NUMBER OF FAILURES OF (…) WITHIN 365 BEFORE THE INSTANT` |
 | when did it fail?                                              | `THE INSTANT OF THE LAST FAILURE OF (…)`                      |
