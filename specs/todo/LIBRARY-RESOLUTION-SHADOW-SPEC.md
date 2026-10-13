@@ -452,3 +452,9 @@ built before it was ruled, and is now ruled.
   directory nor the XDG store; (3) an operator note in the main PR's Operators section,
   no code: before a host is upgraded, its operator checks `/var/lib/jl4-service/.env` and
   the XDG store for libraries a deployment needs.
+- **R3 = A**, bench "Main Wave Rulings", no note, 2026-10-12,
+  https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb. Deployments run on the service's
+  built-in stdlib; `ts-apps/vscode/src/sidebar-provider.ts` keeps skipping `jl4-embedded:`
+  imports when it zips a deployment. Condition: a later, non-blocking PR has the extension
+  warn at deploy time when its stdlib differs from the service's, the service reporting a
+  stdlib hash. Recorded only; that warning is not built.
