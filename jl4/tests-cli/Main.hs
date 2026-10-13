@@ -593,8 +593,13 @@ spec bin = do
         (code, sout, rows) <- csvRowsOf [batchEligFixture, "--inputs", batchRaggedCsv]
         code `shouldSatisfy` (/= ExitSuccess)
         statusesOf rows `shouldBe` map (Just . String) ["success", "error", "error"]
-        sout `shouldSatisfy` ("Line 3 has 2 cells, but the header has 3" `isInfixOf`)
-        sout `shouldSatisfy` ("Line 5 has 4 cells, but the header has 3" `isInfixOf`)
+        -- the message says what the reader would otherwise have done, which on
+        -- main is to leave the missing cell out (there are no defaults to take)
+        let reason = ", so the row is refused: a cell missing from a short row would otherwise"
+                     <> " be read as left out (NOTHING for a MAYBE input, a missing field for any"
+                     <> " other), and a long row's extra cells would be dropped"
+        sout `shouldSatisfy` (("Line 3 has 2 cells, but the header has 3" <> reason) `isInfixOf`)
+        sout `shouldSatisfy` (("Line 5 has 4 cells, but the header has 3" <> reason) `isInfixOf`)
         Output vcode vout _ <-
           runL4 bin ["batch", batchEligFixture, "--inputs", batchRaggedCsv, "--validate-only", "--continue-on-error"]
         vcode `shouldSatisfy` (/= ExitSuccess)

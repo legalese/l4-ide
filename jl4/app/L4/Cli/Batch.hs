@@ -555,9 +555,10 @@ data CsvRow
 -- A blank line is not a row, and neither is an unquoted line holding only
 -- spaces or tabs; a quoted @"   "@ is a row whose cell is absent. A record
 -- with fewer or more cells than the header is refused, naming its line: a
--- short one used to take the defaults of its missing cells, and a long one
--- lost its extra cells, both with status success (review M4; decided
--- overnight 2026-10-02, pending Meng's review, spec §4.1).
+-- short one used to be run with its missing inputs left out, and a long one
+-- lost its extra cells and ran as a success. Not ruled: decided by Claude
+-- overnight 2026-10-02, pending Meng's review (@TYPICALLY-ONE-BEHAVIOUR-SPEC.md@
+-- on unstable, "Decided by Claude overnight").
 csvRows :: BSL.ByteString -> Either String [CsvRow]
 csvRows = AL.eitherResult . AL.parse file
   where
@@ -591,8 +592,8 @@ csvRows = AL.eitherResult . AL.parse file
                         "Line " <> Text.pack (show line) <> " has " <> Text.pack (show cells)
                         <> " cell" <> (if cells == 1 then "" else "s") <> ", but the header has "
                         <> Text.pack (show width) <> ", so the row is refused: a cell missing from a"
-                        <> " short row would otherwise take its default, and a long row's extra cells"
-                        <> " would be dropped"
+                        <> " short row would otherwise be read as left out (NOTHING for a MAYBE input,"
+                        <> " a missing field for any other), and a long row's extra cells would be dropped"
               (this :) <$> rows hdr (line + max 1 (lineEnds raw))
     endOfLine = void (A.string "\r\n") <|> void (A.word8 10) <|> void (A.word8 13)
     isBlankByte w = w == 32 || w == 9
