@@ -100,6 +100,7 @@ import Data.Monoid
 import Control.Monad.Extra (mapMaybeM)
 import qualified Control.Monad.Extra as Extra
 import Data.Either (partitionEithers)
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
@@ -193,12 +194,20 @@ doCheckProgramWithDependencies checkState checkEnv program =
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
 checkProgram module' = do
-  withScanTypeAndSigEnvironment scanTyDeclModule inferTyDeclModule scanFunSigModule module' \rdecides -> do
-    (rprog, topEnv) <- inferProgram module'
-    -- Build the mixfix registry from THIS module's function signatures
-    -- so it can be propagated to importing modules
-    let localMixfixRegistry = buildMixfixRegistry rdecides
-    pure (rprog, topEnv, localMixfixRegistry)
+  -- 'withScanTypeAndSigEnvironment', with one step between scanning the
+  -- types and scanning the definitions: once every synonym body is
+  -- resolved, a cycle among them is found and its members are given no body
+  -- ('quarantineResolvedSynonymCycles').
+  rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule module'
+    >>= quarantineResolvedSynonymCycles
+  withDeclares rdeclares do
+    rdecides <- scanFunSigModule module'
+    withDecides rdecides do
+      (rprog, topEnv) <- inferProgram module'
+      -- Build the mixfix registry from THIS module's function signatures
+      -- so it can be propagated to importing modules
+      let localMixfixRegistry = buildMixfixRegistry rdecides
+      pure (rprog, topEnv, localMixfixRegistry)
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
@@ -330,7 +339,27 @@ applyFinalSubstitution subst moduleUri t =
         in
           r
 
--- | Helper function to run the check monad an expect a unique result.
+-- | Helper function to run the check monad and expect a unique result.
+--
+-- INVARIANT (callers must guarantee determinism): every alternative-producing
+-- path under 'checkProgram' must be collapsed by 'prune' (or 'softprune')
+-- before results merge into the module traversal. At the time of writing, the
+-- forking consumers are all pruned: the scan phases prune per declaration
+-- ('scanTyDeclDeclare', 'inferTyDeclDeclare', 'scanFunSigDecide'),
+-- 'inferTopDecl' prunes Declare/Decide/Assume/Timezone, and 'inferDirective'
+-- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert; Import/Section name
+-- handling is deterministic ('def'/'ref'). The other two callers of this
+-- function only run 'applySubst', which never forks.
+--
+-- If you add a directive or top-level declaration case that runs
+-- 'checkExpr'/'inferExpr', wrap it in 'prune', or the 'error' below becomes
+-- reachable from ordinary user input (this happened for #ASSERT and
+-- TIMEZONE IS; see specs/as-built/tc-soundness.md). We deliberately keep these arms as 'error'
+-- rather than auto-recovering: now that those are pruned, reaching them
+-- requires a compiler bug (a missing 'prune'), and failing loudly in
+-- CI/golden runs beats silently
+-- committing to an arbitrary typing. The CLI/LSP drivers have catch-alls
+-- that keep interactive sessions alive.
 runCheckUnique :: Check a -> CheckEnv -> CheckState  -> (With CheckErrorWithContext a, CheckState)
 runCheckUnique c e s =
   case runCheck c e s of
@@ -444,7 +473,11 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   pure (Contract ann re rt revs)
 inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
-  e' <- checkExpr ExpectAssertContext e boolean
+  -- The 'prune' is load-bearing: like the sibling directive cases above, we must
+  -- collapse candidate results here, so that an ambiguous-but-well-typed expression
+  -- surfaces as an 'AmbiguousTermError' diagnostic instead of leaking multiple
+  -- results into 'runCheckUnique' (which calls 'error'). See specs/as-built/tc-soundness.md.
+  e' <- prune $ checkExpr ExpectAssertContext e boolean
   pure (Assert ann e')
 
 -- We process imports prior to normal scope- and type-checking. Therefore, this is trivial.
@@ -495,8 +528,12 @@ inferTopDecl (Import ann import_) = do
 inferTopDecl (Section ann sec) = do
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
-inferTopDecl (Timezone ann tzExpr) = do
-  (rtzExpr, _ty) <- inferExpr tzExpr
+inferTopDecl (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+  -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
+  -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
+  -- (instead of crashing in 'runCheckUnique'), and the context supplies the
+  -- source range for that diagnostic. See specs/as-built/tc-soundness.md.
+  (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
@@ -840,9 +877,10 @@ inferTypeNameAndSynonym rappForm Nothing = do
 inferTypeNameAndSynonym rappForm (Just t) = do
   let
     rs = appFormHeads rappForm
-    kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) . Just
   rt <- inferType t
-  pure $ makeKnownMany rs (kt rt)
+  -- A synonym in a cycle is stripped of this body afterwards, once every
+  -- body is resolved: 'quarantineResolvedSynonymCycles'.
+  pure $ makeKnownMany rs (KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) (Just rt))
 
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
 inferConDecl rappForm (MkConDecl ann n tns) = do
@@ -1349,7 +1387,16 @@ inferExpr' g =
           re <-
             case res of
               [re'] -> pure re'
-              _ -> pure $ error "internal error in matchFunTy"
+              -- Unreachable invariant: we pass the singleton [projE] above, and
+              -- every 'matchFunTy' branch returns exactly one resolved expr per
+              -- argument (zip3 traversals; error branches 'traverse inferExpr args';
+              -- Check nondeterminism forks whole computations, never concatenates
+              -- result lists), so the singleton match always succeeds (see
+              -- specs/as-built/tc-soundness.md).
+              -- Fail strictly at the site rather than 'pure $ error ...', which
+              -- would plant a lazy bottom inside the returned 'Proj' node that
+              -- detonates arbitrarily far away (eval/nlg/serialization).
+              _ -> error "internal error in matchFunTy: projection expected exactly one resolved argument"
 
           pure (Proj projAnn re rl, rt)
     Var ann n -> do
@@ -1759,6 +1806,13 @@ desugarBranches scrut nebs = do
     PatVar _ _ -> pure []
     PatExpr _ _ -> pure []
     PatLit _ _ -> pure []
+    -- This wildcard fires only for a PatApp/PatCons whose anno lacks
+    -- 'resolvedInfo'. That requires a RANGELESS anno: 'setAnnResolvedType'
+    -- routes through 'withRange', which is a silent no-op when the anno has no
+    -- 'SrcRange'. The parser stamps ranges on pattern annos, so surface syntax
+    -- is not expected to reach this (no test pins that). Any future stage that
+    -- synthesizes CONSIDER branches with 'emptyAnno' would land here — the
+    -- root cause would be the missing range, not missing type information.
     _ -> error "fatal internal error: expected type information but didn't get any"
 
 type VarEnv = Map Unique [Resolved]
@@ -1940,48 +1994,60 @@ inferLit (StringLit _ _) =
 matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
 matchFunTy _isProjection _r t []   =
   pure ([], t)
-matchFunTy  isProjection r t args =
-  case t of
-    InfVar _ann _pre i -> do
-      subst <- use #substitution
-      case Map.lookup i subst of
-        Nothing -> do
-          -- We know nothing about the type of the thing we're applying.
-          -- So we construct a new function type of the right shape by
-          -- generating variables and bind the variable to that type.
-          --
-          -- Then we can proceed to checking the arguments.
-          argts <- traverse (const (fresh (NormalName "arg"))) args
-          rt <- fresh (NormalName "res")
-          let tf = fun_ argts rt
-          assign #substitution (Map.insert i tf subst)
-
-          rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
-          pure (rargs, rt)
-
-        Just t' -> matchFunTy isProjection r t' args
-    Fun _ann onts rt
-      -- We know already that the type of the thing we're applying
-      -- is a function, good. So we can check the number of arguments
-      -- and then check the arguments against their expected result
-      -- types.
-      | nonts == nargs -> do
-        rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
-        pure (rargs, rt)
-
-      | otherwise -> do
-        addError (IncorrectArgsNumberApp r nonts nargs)
-        rargs <- fst . unzip <$> traverse inferExpr args
-        pure (rargs, rt)
-      where
-        nonts = length onts
-        nargs = length args
-    TyApp _ann n ts -> do
-      mt' <- tryExpandTypeSynonym n ts
-      maybe illegalAppError (\ t' -> matchFunTy isProjection r t' args) mt'
-    _ -> illegalAppError
+matchFunTy  isProjection r t0 args =
+  -- The fuel bounds the synonym-expansion chain so that a cyclic type
+  -- synonym (which evades declaration-time detection when it arrives via
+  -- imports) cannot make us loop; when it runs out, we report the current
+  -- type as non-applicable. Substitution-chase steps do NOT consume fuel:
+  -- the substitution is acyclic (see 'bind' in L4.TypeCheck.Unify), so
+  -- chasing terminates on its own, and long chains arise from legitimate
+  -- alias definitions.
+  go synonymExpansionFuel t0
   where
-    illegalAppError = do
+    go :: Int -> Type' Resolved -> Check ([Expr Resolved], Type' Resolved)
+    go fuel t
+      | fuel <= 0 = illegalAppError t
+      | otherwise =
+        case t of
+          InfVar _ann _pre i -> do
+            subst <- use #substitution
+            case Map.lookup i subst of
+              Nothing -> do
+                -- We know nothing about the type of the thing we're applying.
+                -- So we construct a new function type of the right shape by
+                -- generating variables and bind the variable to that type.
+                --
+                -- Then we can proceed to checking the arguments.
+                argts <- traverse (const (fresh (NormalName "arg"))) args
+                rt <- fresh (NormalName "res")
+                let tf = fun_ argts rt
+                assign #substitution (Map.insert i tf subst)
+
+                rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
+                pure (rargs, rt)
+
+              Just t' -> go fuel t'
+          Fun _ann onts rt
+            -- We know already that the type of the thing we're applying
+            -- is a function, good. So we can check the number of arguments
+            -- and then check the arguments against their expected result
+            -- types.
+            | nonts == nargs -> do
+              rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
+              pure (rargs, rt)
+
+            | otherwise -> do
+              addError (IncorrectArgsNumberApp r nonts nargs)
+              rargs <- fst . unzip <$> traverse inferExpr args
+              pure (rargs, rt)
+            where
+              nonts = length onts
+              nargs = length args
+          TyApp _ann n ts -> do
+            mt' <- tryExpandTypeSynonym n ts
+            maybe (illegalAppError t) (go (fuel - 1)) mt'
+          _ -> illegalAppError t
+    illegalAppError t = do
       -- We are trying to apply a non-function.
       addError (IllegalApp r t (length args))
       rargs <- fst . unzip <$> traverse inferExpr args
@@ -2039,6 +2105,83 @@ matchPatFunTy  r t args =
 -- ----------------------------------------------------------------------------
 -- Forward References high level helpers
 -- ----------------------------------------------------------------------------
+
+-- | The guard against a type synonym that refers to itself.
+--
+-- A recursive synonym has no finite expansion, so it would send the
+-- synonym-expanding loops of "L4.TypeCheck.Unify" into infinite regress. The
+-- fuel there bounds the depth of that regress, not its work: two synonyms that
+-- each name themselves twice, unified with each other, ran past 4 GiB. So a
+-- synonym in a cycle is given no body at all, and reported as
+-- 'CyclicTypeSynonyms'.
+--
+-- This reads the references themselves, once every body is resolved. A body
+-- names the 'Unique' of the synonym each type application in it resolved to,
+-- whatever it was spelled (an alias, a name at the wrong number of
+-- arguments), and a name that did not resolve (an ambiguity, an unknown name)
+-- names none. A cycle among those is a cycle of expansions. It cannot reject a
+-- program the checker accepts correctly: a reference cycle among synonyms has
+-- no finite expansion.
+--
+-- An earlier version on unstable also compared spellings, before anything
+-- was resolved. That reads a name for what it looks like, so a record, an
+-- import, or a synonym of the same name and another arity was taken for the
+-- synonym itself and valid programs were rejected, while a use at the wrong
+-- number of arguments was not seen.
+quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
+quarantineResolvedSynonymCycles decls = do
+  for_ cycles \ cyc -> case cyc of
+    []                       -> pure ()
+    (_, firstName, _) : _ ->
+      errorContext (WhileCheckingDeclare firstName) $
+        addError (CyclicTypeSynonyms [ n | (_, n, _) <- cyc ])
+  pure (map quarantine decls)
+  where
+    -- Every synonym that still has a body, in declaration order: the unique
+    -- all its spellings share, its declared name, and the uniques its body
+    -- applies.
+    synonyms :: [(Unique, Name, [Unique])]
+    synonyms =
+      [ (getUnique r, getOriginal r, map getUnique (bodyHeads body))
+      | MkDeclChecked _ cis <- decls
+      , MkCheckInfo (r : _) (KnownType _ _ (Just body)) <- cis
+      ]
+
+    -- Every 'Resolved' in head (type constructor \/ type variable) position
+    -- within a type, outermost first: exactly the names the type is built
+    -- from, not whatever 'Resolved's an 'Anno' payload holds.
+    bodyHeads :: Type' Resolved -> [Resolved]
+    bodyHeads = \ case
+      Type _        -> []
+      TyApp _ n ts  -> n : concatMap bodyHeads ts
+      Fun _ onts t  -> concatMap (bodyHeads . optionallyNamedTypeType) onts ++ bodyHeads t
+      Forall _ _ t  -> bodyHeads t
+      InfVar {}     -> []
+
+    -- Each cycle's members in declaration order, the cycles in the order of
+    -- their first members.
+    cycles :: [[(Unique, Name, [Unique])]]
+    cycles =
+      map (map snd)
+        . List.sortOn (map fst)
+        $ [ List.sortOn fst members
+          | CyclicSCC members <- stronglyConnComp [ (ix, u, deps) | ix@(_, (u, _, deps)) <- indexed ]
+          ]
+
+    indexed :: [(Int, (Unique, Name, [Unique]))]
+    indexed = zip [0 ..] synonyms
+
+    quarantine :: DeclChecked DeclareOrAssume -> DeclChecked DeclareOrAssume
+    quarantine d = d { publicNames = map unbody d.publicNames }
+
+    unbody :: CheckInfo -> CheckInfo
+    unbody ci = case ci of
+      MkCheckInfo (r : _) (KnownType k ps (Just _))
+        | getUnique r `Set.member` cyclic -> ci { checkEntity = KnownType k ps Nothing }
+      _ -> ci
+
+    cyclic :: Set Unique
+    cyclic = Set.fromList [ u | cyc <- cycles, (u, _, _) <- cyc ]
 
 scanDeclares ::
   (a -> Check [DeclTypeSig]) ->
@@ -3226,6 +3369,24 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (CyclicTypeSynonyms cycleSyns) =
+  [ "Circular dependency detected between type synonyms:"
+  , ""
+  ] ++ map (\ n -> "  " <> quotedName n) cycleSyns ++
+  [ ""
+  , "A type synonym must not refer to itself, directly or via other"
+  , "synonyms, because it could then never be fully expanded."
+  ]
+prettyCheckError (SynonymExpansionLimit limit syn) =
+  [ "I stopped following type synonyms at " <> quotedName (getName syn) <> "."
+  , ""
+  , "To compare two types I replace a type synonym by the type it stands for,"
+  , "and I give up after " <> Text.pack (show limit) <> " replacements in a row. Here a chain of synonyms,"
+  , "each defined as the next, is longer than that."
+  , ""
+  , "The types were not found to differ. Declare the first synonym in the chain"
+  , "as the type it finally stands for, to shorten the chain."
+  ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
   , ""
