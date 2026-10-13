@@ -61,8 +61,14 @@ isKnownMixfixKeyword kw hints =
 -- where the pattern has a keyword the run must hold that very name; where it
 -- has an input the run may hold anything. So @Red `costs` 0@ is written in the
 -- form of @c `costs` n@, and @Red `costs`@ and @Red `cost` 0@ are not.
-mixfixRulesWrittenAs :: [Maybe RawName] -> MixfixHintRegistry -> [MixfixInfo]
-mixfixRulesWrittenAs toks hints =
+--
+-- The first argument holds the names that the definition being read has for its
+-- own inputs. A run that holds one of them where the pattern has a keyword
+-- holds an input there, not the rule's word, so it is no use of that rule:
+-- @total plus y@, whose GIVEN names @plus@ and @y@, is a rule called @total@
+-- with two inputs, and not a line written like @a `plus` b@.
+mixfixRulesWrittenAs :: [RawName] -> [Maybe RawName] -> MixfixHintRegistry -> [MixfixInfo]
+mixfixRulesWrittenAs inputs toks hints =
   [ info
   | infos <- Map.elems hints.byFirstKeyword
   , info <- infos
@@ -71,7 +77,7 @@ mixfixRulesWrittenAs toks hints =
   ]
   where
     slotHolds = \ case
-      MixfixKeyword kw -> (== Just kw)
+      MixfixKeyword kw -> \ tok -> tok == Just kw && kw `notElem` inputs
       MixfixParam _    -> const True
 
 -- | A rule's pattern as a drafter writes it, its inputs by the names its

@@ -851,7 +851,10 @@ decidePatternMatch sig = do
 --    words where the pattern has them. That is the exact test. It needs the
 --    rule to be a definition that the first parse (which has no hints) could
 --    read as one, so it does not see a rule that is itself written as
---    clauses.
+--    clauses. A token that sits where the rule has a word but is one of the
+--    group's own GIVEN inputs is an input, not the word: @DECIDE fee costs 0@
+--    under a GIVEN that names @costs@ is an ordinary rule called @fee@, and
+--    is left alone.
 --
 --  * the head is one of the group's own GIVEN inputs, followed by a word that
 --    is none. A definition whose head is also one of its inputs is already
@@ -867,7 +870,7 @@ mixfixFormClause hints inputs = listToMaybe . mapMaybe check
     check (off, c) = (,) off <$> (writtenAsRule c <|> afterInput c)
 
     writtenAsRule c = do
-      rule <- listToMaybe (mixfixRulesWrittenAs (Just (rawName (pmHead c)) : map barePattern (pmPats c)) hints)
+      rule <- listToMaybe (mixfixRulesWrittenAs inputNames (Just (rawName (pmHead c)) : map barePattern (pmPats c)) hints)
       pure $ mixfixFormMessage
         "This clause is written the way a rule with a word between its inputs is written, like this one:"
         (showMixfixPattern rule)
@@ -915,6 +918,9 @@ mixfixFormMessage lead shape = Text.unlines
 -- A second definition of the same words with a GIVEN of its own, for other
 -- types, names its own inputs and is not touched. (The example line has no
 -- GIVEN of its own, so every input of the form it holds counts as a stray.)
+-- Neither is a definition whose GIVEN names, where the rule has a word, an
+-- input of its own: @total plus y@ with a GIVEN of @plus@ and @y@ is a rule
+-- called @total@ that takes those two, beside a rule @a `plus` b@.
 decideNotInMixfixForm :: TypeSig Name -> Parser (Decide Name)
 decideNotInMixfixForm sig = do
   off <- getOffset
@@ -923,7 +929,7 @@ decideNotInMixfixForm sig = do
   let toks = hd : args
       inputNames = givenParamNames sig
       strays rule = [ t | (MixfixParam _, t) <- zip rule.pattern toks, rawName t `notElem` inputNames ]
-      rules = mixfixRulesWrittenAs (map (Just . rawName) toks) hints
+      rules = mixfixRulesWrittenAs inputNames (map (Just . rawName) toks) hints
   for_ (traverse (\ rule -> (,) rule <$> listToMaybe (strays rule)) rules >>= listToMaybe) \ (rule, stray) ->
     registerParseError $ FancyError off $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
       [ "This definition is written the way the rule"
