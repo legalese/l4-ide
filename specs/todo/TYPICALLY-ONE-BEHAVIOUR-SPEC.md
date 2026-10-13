@@ -181,7 +181,10 @@ The decoder now names the field in every primitive mismatch (`Expected JSON bool
 
 **T3c.** An empty CSV cell is dropped from the row (`Batch.hs` `parseBatchInput`), so it is absent exactly as a missing column is.
 Batch reads CSV with its own row loop over cassava's `header` and `record` parsers (`csvRows`), because `Csv.decodeByName` drops every record that parses to one empty field, and a line holding only `""` parses to that as a blank line does: a one-column file lost that row, two rows in and one out, exit 0.
-Assumed, not ruled: a cell of spaces is empty, so absent; a quoted `""` in a one-column file is a row whose cell is absent; an unquoted blank line is not a row.
+**RULED 2026-10-12.** Meng marked `accept`, option A on bench card R4 of "Main Wave Rulings" (<https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb>) at 23:54:41Z, with no note.
+The ruling, as printed on the card: in `l4 batch` CSV a blank cell is absent whether it is empty, spaces only or a quoted `""`.
+Conditions: FLOTILLA 14 takes unstable's CSV row reader (`csvRows`), so `main` and unstable agree on one-column files, with Scalpel saying whether the ragged-record refusal and BOM handling come with it; `doc/tutorials/getting-started/l4-cli.md` gains one sentence: to pass an empty or all-space text, use JSON or YAML.
+Still assumed, not ruled: an unquoted blank line is not a row.
 The two shapes after this paragraph, a short or long record and a line of spaces, are under "Decided by Claude overnight" below.
 A leading UTF-8 byte-order mark is not part of the header (review B1): Excel's "CSV UTF-8" export writes one, and it renamed the first column, so that input took its default on every row.
 Its `MAYBE` paragraph measured both ways: an empty cell for `GIVEN premium IS A MAYBE NUMBER` gives `NOTHING` under soft and "Missing required field 'premium'" under hard.

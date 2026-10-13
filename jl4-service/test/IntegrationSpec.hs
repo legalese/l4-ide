@@ -1923,8 +1923,11 @@ spec = describe "integration" do
     -- `exampleCode` is source: it prints a string literal as the source
     -- spells it, a line break as \n and a tab as \t. #595 changed that from a
     -- raw line break, and with it `l4 run`'s trace text and `l4 trace`.
-    -- `explanation` prints a VALUE, and keeps the line break. Assumed, not
-    -- ruled (2026-10-13): the escaped form is the valid spelling of the source.
+    -- `explanation` of a plain string result prints a VALUE, and keeps the line
+    -- break; one that prints rule source, such as a DEONTIC contract, is escaped.
+    -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R2, option A): the
+    -- escaped form stays on every surface; recorded in
+    -- specs/done/BATCH-PROCESSING-SPEC.md.
     it "spells a string literal in exampleCode as source, and keeps the line break in explanation" do
       withServiceFromSources "trace-line-break" [("line-break.l4", lineBreakJL4)] \baseUrl mgr -> do
         req <- buildJsonPost
