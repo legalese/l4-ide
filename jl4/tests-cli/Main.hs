@@ -717,7 +717,8 @@ spec bin = do
   -- jl4-service-test). Before it, a step broke across lines inside the literal.
   -- The VALUE a trace ends in is not source and keeps its line break. `l4 run`
   -- prints no trace steps on main ("no trace captured"), so it is not pinned.
-  -- Assumed, not ruled (2026-10-13): the escaped form is kept.
+  -- Ruled (R2, bench "Main Wave Rulings", accept A, 2026-10-12): the escaped
+  -- form is kept, and every surface it reaches is listed in the PR body.
   describe "a string literal in a trace step" $ do
     it "is spelled as source in the trace `l4 trace` reports" $ do
       Output code _ serr <- runL4 bin ["trace", evalTraceLineBreakFixture]
