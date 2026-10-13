@@ -1932,8 +1932,12 @@ function renderResidualForParamCtx(
       args,
       meta,
       givenParams,
+      contract.partyKind,
     );
-    const actionText = renderDeonticExprForSource(contract.action);
+    const actionText = renderDeonticExprForSource(
+      contract.action,
+      contract.actionKind,
+    );
     const lines = ["PARTY " + partyText, contract.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : contract.deadline;
@@ -1951,9 +1955,9 @@ function renderResidualForParamCtx(
 
 // Render the primary obligation's party with its type tag —
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
-function renderActiveDeonticExpr(expr, args, meta, givenParams) {
+function renderActiveDeonticExpr(expr, args, meta, givenParams, kind) {
   if (expr == null) return "";
-  if (typeof expr === "string") return expr;
+  if (typeof expr === "string") return deonticLiteralAsSource(expr, kind);
   if (expr.param != null) {
     const props = (meta && meta.parameters && meta.parameters.properties) || {};
     const schema = props[expr.param];
@@ -1974,8 +1978,8 @@ function renderContractAsSource(c, deadlineOverride) {
   if (c.kind === "FULFILLED") return "FULFILLED";
   if (c.kind === "BREACH") return "BREACH";
   if (c.kind === "OBLIGATION") {
-    const partyText = renderDeonticExprForSource(c.party);
-    const actionText = renderDeonticExprForSource(c.action);
+    const partyText = renderDeonticExprForSource(c.party, c.partyKind);
+    const actionText = renderDeonticExprForSource(c.action, c.actionKind);
     const lines = ["PARTY " + partyText, c.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : c.deadline;
@@ -1987,9 +1991,24 @@ function renderContractAsSource(c, deadlineOverride) {
   return "";
 }
 
-function renderDeonticExprForSource(e) {
+// A literal party or action as L4 source. The schema carries a bare name and
+// rule source alike as a string, and says which in the obligation's sibling
+// key @partyKind@ / @actionKind@ (`Schema.hs`, 'DeonticExpr'). The answer's wire
+// prints a name plain, as jl4-service does, so a name with a space has to be
+// backticked again here for the trace's source text to be L4, as
+// 'formatEventComponent' does for an event's. Only a literal tagged "name" is
+// touched. Anything else is rule source (an action that carries a value,
+// @pay 100@ or @say "pay"@, or a record built @WITH@ fields), or a literal from
+// a bundle compiled before the key existed, and is printed as given. The key is
+// a sibling, so a runtime that predates it reads the same bundle correctly and
+// only its trace text lacks the backticks.
+function deonticLiteralAsSource(text, kind) {
+  return kind === "name" && /\s/.test(text) ? "`" + text + "`" : text;
+}
+
+function renderDeonticExprForSource(e, kind) {
   if (e == null) return "";
-  if (typeof e === "string") return e; // already a literal text
+  if (typeof e === "string") return deonticLiteralAsSource(e, kind);
   if (e.param != null) return e.param; // bare param name
   return String(e);
 }

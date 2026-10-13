@@ -9,6 +9,7 @@
 
 import {
   createRuntime,
+  runDeontic,
   makeTracePool,
   MemoryLimitError,
   DEFAULT_MAX_HEAP_BYTES,
@@ -174,6 +175,143 @@ eq("concat then eq", env.__l4_str_eq(c, box("ab")), 1);
 // Default cap is 64 MiB — published as a public constant so the HTTP
 // wrapper and tests stay in sync without hard-coding the number.
 eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
+
+// --- Deontic: a bare party / action name is a plain string plus a kind key --
+// The schema carries a bare name and rule source alike as a string and says
+// which in the obligation's sibling key partyKind / actionKind ("name"). The
+// answer's wire prints the string as it is; the trace's source text backticks a
+// tagged name that has a space, so that it stays L4, and prints anything else
+// as given.
+{
+  const sale = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "the seller",
+    partyKind: "name",
+    action: "deliver the goods",
+    actionKind: "name",
+    deadline: 14,
+    hence: {
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "the buyer",
+      partyKind: "name",
+      action: "pay the invoice",
+      actionKind: "name",
+      deadline: 30,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    },
+    lest: { kind: "BREACH", by: null, because: null },
+  };
+  const rtD = createRuntime();
+  rtD.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+  const metaOf = (contract) => ({
+    name: "the-sale-contract",
+    isDeontic: true,
+    parameters: { properties: {} },
+    paramOrder: [],
+    deonticContract: contract,
+    traceMeta: { fnName: "`the sale contract`" },
+  });
+  const answer = (contract, events) =>
+    JSON.stringify(runDeontic(contract, 0, events, {}, null));
+  const traced = (contract, events) =>
+    rtD.invokeFunctionWithReasoning({ exports: {} }, metaOf(contract), {
+      startTime: 0,
+      events,
+    }).reasoning.explanation[0];
+  const delivered = [
+    { party: "the seller", action: "deliver the goods", at: 5 },
+  ];
+
+  eq(
+    "deontic: an obligation names its party and action plain",
+    answer(sale, []),
+    JSON.stringify({
+      OBLIGATION: {
+        action: "deliver the goods",
+        deadline: "14",
+        modal: "MUST",
+        party: "the seller",
+      },
+    }),
+  );
+  eq(
+    "deontic trace: a tagged name with a space is backticked in the source text",
+    traced(sale, delivered),
+    "Result: PARTY `the buyer`\nMUST `pay the invoice`\nWITHIN 30\nHENCE FULFILLED\nLEST BREACH",
+  );
+
+  // Rule source is a string with no kind key and is printed as given.
+  const valued = (action) => ({
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "Alice",
+    partyKind: "name",
+    action,
+    deadline: 14,
+    hence: { kind: "FULFILLED" },
+    lest: { kind: "BREACH", by: null, because: null },
+  });
+  eq(
+    "deontic trace: an action that carries a value stays as the source it is",
+    traced(valued('say "pay now"'), []),
+    'Result: PARTY Alice\nMUST say "pay now"\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH',
+  );
+  eq(
+    "deontic trace: `pay 100` is an application, not a name, and is untouched",
+    traced(valued("pay 100"), []),
+    "Result: PARTY Alice\nMUST pay 100\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+  );
+
+  // A bundle compiled before the kind keys existed has none. Its literals are
+  // printed as given: never backticked again, never an error.
+  const older = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "`the seller`",
+    action: "`deliver the goods`",
+    deadline: 14,
+    hence: { kind: "FULFILLED" },
+    lest: { kind: "BREACH", by: null, because: null },
+  };
+  eq(
+    "deontic trace: a literal with no kind key (older bundle) is printed as given",
+    traced(older, []),
+    "Result: PARTY `the seller`\nMUST `deliver the goods`\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+  );
+
+  // The kind keys are siblings of the plain strings, so a runtime that
+  // predates them reads a new bundle as it reads an old one. Stripping them
+  // models that reader: no answer may depend on them, only the trace text.
+  const withoutKinds = JSON.parse(
+    JSON.stringify(sale, (k, v) =>
+      k === "partyKind" || k === "actionKind" ? undefined : v,
+    ),
+  );
+  eq(
+    "deontic: the kind keys are gone from the model of an older runtime",
+    JSON.stringify(withoutKinds).includes("Kind"),
+    false,
+  );
+  [
+    [],
+    delivered,
+    [{ party: "the seller", action: "deliver the goods", at: 20 }],
+    [
+      { party: "the seller", action: "deliver the goods", at: 5 },
+      { party: "the buyer", action: "pay the invoice", at: 20 },
+    ],
+  ].forEach((events, i) =>
+    eq(
+      "deontic: an older runtime reading a new bundle answers the same, stream " +
+        i,
+      answer(withoutKinds, events),
+      answer(sale, events),
+    ),
+  );
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
