@@ -873,9 +873,11 @@ spec bin = do
   -- changed every other surface that prints a step: the Trace: block of
   -- `l4 run`, the trace `l4 trace` reports, and the `exampleCode` of the
   -- jl4-service reasoning tree (pinned in jl4-service-test). Before it, a step
-  -- broke across lines inside the literal. The VALUE a trace ends in, and the
-  -- Result: block, are not source and keep their line break.
-  -- Assumed, not ruled (2026-10-13): the escaped form is kept.
+  -- broke across lines inside the literal. A string VALUE, such as the one a
+  -- trace ends in or the Result: block shows, is not source and keeps its
+  -- line break.
+  -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R2, option A): the escaped
+  -- form stays on every surface; recorded in specs/done/BATCH-PROCESSING-SPEC.md.
   describe "a string literal in a trace step" $ do
     let escapedStep = "IF (x GREATER THAN 0) THEN \"line\\nnext\" ELSE \"tab\\there\""
 
