@@ -420,6 +420,13 @@ A call box is the term `f a b`, so its key is the rule's path with its arguments
 
 Ruling, 2026-10-09, asked inline in session `ladder-ref-trans` (offered as a bench, SOMMELIER, not built): all four as recommended; no conditions; Meng's note: "i think we can skip SOMMELIER if i just say i accept your recommendations".
 
+**RULED 2026-10-12, not built.** Meng marked `accept`, option A on bench card R6 of "Main Wave Rulings" (<https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb>) at 23:55:38Z, with no note.
+The ruling, as printed on the card: the term key drops annotations instead of printing them blank, so adding an annotation field moves no `atomId`.
+Conditions: one restamp of the pinned ids, landing after #551, #558 and #633 (whichever of those lands later restamps instead); #633's `Refs` newtype is removed in that PR; a test checks that adding an annotation field moves no id; this section and the "stable UUIDv5" comment at `jl4-query-plan/src/L4/Decision/QueryPlan.hs:375` are corrected; the promise reads "ids move only by a ruling, with a restamp"; the change reaches `main` through the wave, so both release tracks give the same ids.
+Option B, keying imported and builtin names by name, is deferred until a client is shown storing ids across versions.
+A separate PR by Scalpel builds this, into unstable, after #545 and FLOTILLA; this record changes no code.
+Until it lands, what this section says of the key describes the code as built, which blanks each annotation but still prints its fields (`AtomKey.hs`, `over (gplate @Anno) (const emptyAnno)`).
+
 What it knowingly leaves, by kind of failure:
 
 - **Silent, and the safe direction: equal propositions can get two keys** where they are different terms, such as `a AND b` and `b AND a` inside one leaf.
