@@ -66,6 +66,7 @@ import Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Options.Applicative
 import System.Exit (ExitCode (..), exitSuccess, exitWith)
 
@@ -389,11 +390,18 @@ topLevelDecides tc = foldTopLevelDecides (\d -> [d]) tc.module'
 -- What the ladder and the verifier must agree about is what a rule MEANS; how
 -- much of it either chooses to draw at once is a separate question, and the
 -- @l4\/inlineExprs@ gesture exists precisely so a reader can choose.
+--
+-- A definition the clause desugarer generated is not counted: the @LET@ that
+-- binds "the clauses not yet tried" of a rule written as DECIDE clauses
+-- ('PmSynthetic'). No drafter wrote it, and the rule around it is analysed as
+-- the CONSIDER it stands for, with that @LET@ read through
+-- ('L4.Transform.inlineLetsForViz'), so nothing in it went unvisited.
 nestedNotVisited :: Rules.TypeCheckResult -> Int
 nestedNotVisited tc =
-  sum [length (foldDecides (\_ -> [() :: ()]) d) | d <- tops] - length tops
+  sum [length (foldDecides drafted d) - length (drafted d) | d <- topLevelDecides tc]
   where
-    tops = topLevelDecides tc
+    drafted :: Decide Resolved -> [()]
+    drafted (MkDecide ann _ _ _) = [() | isNothing (view annPmSynthetic ann)]
 
 -- | A decision's name as the drafter wrote it.
 decideName :: Decide Resolved -> Text
@@ -414,7 +422,7 @@ decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = prettyLayout (getOriginal n)
 -- context, say — is not reported here. The callee has its own entry in the report,
 -- where its structure is its own text. See specs/todo/WHERE-INLINING-SPEC.md §9.
 analyseDecide
-  :: VerifyOptions -> Map Unique Transform.Unfoldable -> LadderViz.VizConfig -> Decide Resolved -> DecisionReport
+  :: VerifyOptions -> Callees -> LadderViz.VizConfig -> Decide Resolved -> DecisionReport
 analyseDecide opts callees cfg decide0 =
   case LadderViz.doVisualize decide cfg of
     Left err ->
@@ -423,6 +431,20 @@ analyseDecide opts callees cfg decide0 =
         , drResult = Left (LadderViz.prettyPrintVizError err)
         , drUnfolding = noUnfolding
         }
+    -- A rule written as clauses whose whole ladder is one box holding the
+    -- CONSIDER the clauses compile to: the ladder could not break it down (a
+    -- column matches JUST x, a list or the like), so there is nothing here to
+    -- check, and "no findings" would read as a clean bill.
+    Right (ladderInfo, vizState)
+      | Transform.writtenAsClauses decide
+      , VizExpr.UBoolVar _ leaf _ _ _ _ _ <- ladderInfo.funDecl.body
+      , Just (Consider leafAnn _ _) <- LadderViz.getLeafExpr vizState leaf.unique
+      , Just PmConsider{} <- view annPmSynthetic leafAnn ->
+          DecisionReport
+            { drName = ladderInfo.funDecl.fnName.label
+            , drResult = Left notBrokenDown
+            , drUnfolding = noUnfolding
+            }
     Right (ladderInfo, vizState) ->
       let fnName = ladderInfo.funDecl.fnName.label
           nodes = ladderNodeCount opts.verifyMaxNodes ladderInfo.funDecl.body
@@ -463,7 +485,15 @@ analyseDecide opts callees cfg decide0 =
                     , drUnfolding = Unfolding (Map.size meanings.cmDefs) meanings.cmOpaque
                     }
   where
-    decide = Transform.inlineLocalBindingsInDecide decide0
+    -- Local bindings put in before analysis, a rule written as clauses read as
+    -- its CONSIDER first ('Transform.inlineLocalBindingsForDrawing'). A rule
+    -- written as clauses too long to read through is left as written, and the
+    -- ladder refuses it ('LadderViz.ClauseGroupTooLong'); a call to one is
+    -- left as a box ('callMeanings').
+    decide = case decide0 of
+      MkDecide ann sig af body -> MkDecide ann sig af (fromMaybe body (Transform.inlineLocalBindingsForDrawing body))
+    notBrokenDown =
+      "these clauses were not broken down into questions: a column matches a pattern other than an enum value or a literal (JUST x, a list, and the like), so the whole rule is one box and there is nothing in it to check"
 
 -- | The config every decision of the file is drawn from, with simplification on
 -- (a call's meaning is drawn without it: 'LadderViz.withSimplification', which
@@ -517,7 +547,7 @@ noMeanings = CallMeanings Map.empty [] []
 -- normal form, stays opaque and is named in 'cmOpaque'.
 callMeanings
   :: VerifyOptions
-  -> Map Unique Transform.Unfoldable
+  -> Callees
   -> LadderViz.VizConfig
   -> Decide Resolved
   -> Text
@@ -534,6 +564,8 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
     }
   where
     label v = stripBackticks (Map.findWithDefault (Text.pack (show v)) v labels)
+    tooLongReason =
+      "its meaning could not be drawn: " <> LadderViz.prettyPrintVizError (LadderViz.ClauseGroupTooLong Transform.letInliningNodeBudget)
 
     attempts :: [(Int, Either Text (BDQ.BoolExpr Text))]
     attempts =
@@ -544,7 +576,13 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
       ]
 
     -- The call unfolded, or Nothing if the leaf is not a call to a known rule.
-    unfolded e = case Transform.unfoldCalls unfoldBudget callees e of
+    -- A call to a rule written as clauses too long to read through is left as a
+    -- box before anything is unfolded, so that refusing it costs only the
+    -- bounded reading of its clauses ('Callees'), not the callee's size.
+    unfolded e = case Transform.positionalCall e of
+      Just (r, _) | Set.member (getUnique r) callees.tooLong -> Just (Left tooLongReason)
+      _ -> unfoldedReadable e
+    unfoldedReadable e = case Transform.unfoldCalls unfoldBudget callees.readable e of
       Right (_, 0) -> Nothing
       Right (x, _) -> Just (Right x)
       Left size ->
@@ -553,8 +591,12 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
     meaningOf :: Int -> Either Text (Expr Resolved) -> Either Text (BDQ.BoolExpr Text)
     meaningOf v = \case
       Left why -> Left why
-      Right x ->
-        case LadderViz.doVisualize (MkDecide ann sig appForm (Transform.inlineLocalBindings x)) (LadderViz.withSimplification False cfg) of
+      Right x -> case Transform.inlineLocalBindingsForDrawing x of
+        -- It calls a rule written as clauses too long to read through. Drawn
+        -- as it is, the clauses' LETs would be one leaf whose key reads them
+        -- through, which does not finish; the call stays a box instead.
+        Nothing -> Left tooLongReason
+        Just x' -> case LadderViz.doVisualize (MkDecide ann sig appForm x') (LadderViz.withSimplification False cfg) of
           Left err -> Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError err)
           Right (li, vs)
             | ladderNodeCount opts.verifyMaxNodes li.funDecl.body > opts.verifyMaxNodes ->
@@ -628,6 +670,14 @@ mapVarsTo f = \case
 unfoldBudget :: Int
 unfoldBudget = 200000
 
+-- | The rules a call may be read through to, and the rules written as clauses
+-- too long to read through ('Transform.clausesReadThrough'), a call to which is
+-- left as a box.
+data Callees = Callees
+  { readable :: Map Unique Transform.Unfoldable
+  , tooLong :: Set Unique
+  }
+
 -- | The rules a call may be unfolded into: every top-level DECIDE that returns a
 -- BOOLEAN, in this module and in every module it imports (transitively), minus the
 -- recursive ones ('Transform.pruneRecursive').
@@ -643,7 +693,7 @@ unfoldBudget = 200000
 -- variable. Measured: without the zonk such an imported rule is never recognised
 -- as boolean, is never unfolded, and a contradiction through it is missed
 -- (tests-cli/fixtures/verify-unfold-rules.l4 is written that way on purpose).
-unfoldableRules :: Rules.TypeCheckResult -> Map Unique Transform.Unfoldable
+unfoldableRules :: Rules.TypeCheckResult -> Callees
 unfoldableRules tc0 =
   -- Recursion is a property of which calls a body makes, which zonking does not
   -- change, so prune on the bodies as checked. The zonk itself is left as a thunk
@@ -651,8 +701,17 @@ unfoldableRules tc0 =
   -- is only ever zonked if some call is actually read through to it. Zonking every
   -- rule of every imported module up front, the prelude included, cost seconds
   -- per file for rules nobody called.
-  Map.mapWithKey (\u (Transform.MkUnfoldable ps rhs) -> Transform.MkUnfoldable ps (zonkFor u rhs)) kept
+  Callees
+    { readable = Map.mapWithKey (\u (Transform.MkUnfoldable ps rhs) -> Transform.MkUnfoldable ps (zonkFor u rhs)) readsThrough
+    , tooLong = Map.keysSet tooLongToRead
+    }
   where
+    -- Which rules written as clauses read through is decided on the bodies as
+    -- checked too, before any is zonked or unfolded, and on each rule's own body,
+    -- as the IDE decides whether to offer a call for expansion. A rule that calls
+    -- one that does not read through is still read through itself, with that
+    -- call left inside it as a box.
+    (readsThrough, tooLongToRead) = Map.partition (\ (Transform.MkUnfoldable _ rhs) -> Transform.clausesReadThrough rhs) kept
     candidates :: [(Unique, (Transform.Unfoldable, Rules.TypeCheckResult))]
     candidates = concatMap fromModule (Map.elems modules)
     kept = Transform.pruneRecursive (Map.fromList [(u, unf) | (u, (unf, _)) <- candidates])

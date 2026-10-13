@@ -59,9 +59,10 @@ rule readable — pays for it in analysis coverage, invisibly.
 ### 1.1 Why the cheap fix does not fix it
 
 The obvious reading of "descend into `WHERE`" is to swap `foldTopLevelDecides` for `foldDecides`
-in verify's `topLevelDecides` (`jl4/app/L4/Cli/Verify.hs:359-360`). Both folds already exist
-(`jl4-core/src/L4/Syntax.hs:800` and `:811`), and verify already calls the second one to
-_count_ what it skipped (`nestedNotVisited`, `Verify.hs:386-390`). One line.
+in verify's `topLevelDecides` (`jl4/app/L4/Cli/Verify.hs:360-361`). Both folds already exist
+(`foldTopLevelDecides` and `foldDecides`, `jl4-core/src/L4/Syntax.hs:835` and `:846`), and verify
+already calls the second one to _count_ what it skipped (`nestedNotVisited` in
+`jl4/app/L4/Cli/Verify.hs:394-399`). One line.
 
 It would not help. It yields a separate report on `enrolled`, and `enrolled MEANS \`is a member\``
 is faultless on its own. **The contradiction exists only in the combination**, so the unit of

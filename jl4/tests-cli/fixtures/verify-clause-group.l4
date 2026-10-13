@@ -1,0 +1,16 @@
+-- A BOOLEAN rule written as DECIDE clauses. `l4 verify` reads it as the
+-- CONSIDER it stands for, so it finds nothing in it, as in `covered by hand`.
+DECLARE Peril IS ONE OF Water, Fire, Cosmetic
+
+GIVEN p IS A Peril
+GIVETH A BOOLEAN
+DECIDE covered Water    IS TRUE
+DECIDE covered Fire     IS TRUE
+DECIDE covered Cosmetic IS FALSE
+
+GIVEN p IS A Peril
+GIVETH A BOOLEAN
+DECIDE `covered by hand` p IS CONSIDER p
+  WHEN Water THEN TRUE
+  WHEN Fire THEN TRUE
+  WHEN Cosmetic THEN FALSE

@@ -368,7 +368,9 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- five files prove the checker is capable of going red — and going red for the
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
-verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture :: FilePath
+verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
+verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture :: FilePath
+verifyClauseTableLargeFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -376,6 +378,12 @@ verifyDeadBranchFixture   = fixtureDir </> "verify-dead-branch.l4"
 verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
+verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
+verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
+verifyClauseGroupWhereFixture = fixtureDir </> "verify-clause-group-where.l4"
+verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
+verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
+verifyClauseTableLargeFixture = fixtureDir </> "verify-clause-table-large.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -501,7 +509,9 @@ coreFixtures =
   , dupDiagDiamondEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
-  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
+  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
+  , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
+  , verifyClauseTableLargeFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
@@ -2986,6 +2996,119 @@ spec bin = do
       Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
       code `shouldBe` ExitFailure 1
 
+    -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
+    -- Before, it was skipped as not boolean; then its generated nesting made
+    -- the analysis report a dead limb that is only the clause that returns
+    -- FALSE, which the hand-written CONSIDER next to it does not.
+    it "analyses a clause group, and finds in it what it finds in the CONSIDER written by hand" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyClauseGroupFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"analysed\":2" `isInfixOf`)
+      sout `shouldSatisfy` ("\"skipped\":0" `isInfixOf`)
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
+
+    -- The two forms are one rule, so `l4 verify` counts them alike: the same
+    -- leaves, the same questions among them (one atomId each), the same ladder,
+    -- and a call in a clause is read through as it is in the CONSIDER.
+    it "counts a clause group's atoms, and reads its calls, as it does the CONSIDER written by hand" $ do
+      for_ [ (verifyClauseGroupFixture, "covered", "`covered by hand`", 0)
+           , (verifyClauseGroupCallFixture, "paid", "`paid by hand`", 1)
+           , (verifyClauseTableFixture, "`colour rule`", "`colour rule by hand`", 0)
+           , (verifyClauseTableFixture, "`either rule`", "`either rule by hand`", 0) ] \ (fixture, clauses, hand, calls) -> do
+        env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+        let stats nm =
+              [ (k, v)
+              | Just (Array ds) <- [objField env "decisions"]
+              , d <- toList ds
+              , objField d "name" == Just (String nm)
+              , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "callsReadThrough", "callsLeftOpaque", "findings"]
+              , Just v <- [objField d k]
+              ]
+        length (stats clauses) `shouldBe` 7
+        lookup "analysed" (stats clauses) `shouldBe` Just (Bool True)
+        lookup "callsReadThrough" (stats clauses) `shouldBe` Just (Number calls)
+        stats clauses `shouldBe` stats hand
+
+    -- Reading a table's clauses as their CONSIDER comes before putting any other
+    -- binding in. In the other order the clauses' shared fall-through was walked
+    -- once for every branch that reached it: this 25-row table of two enums did
+    -- not finish in 4 GiB (killed after 27 s on 9d7f5829e), and its CONSIDER takes
+    -- a moment. The bound is generous; the failure it guards against is not slow
+    -- but unbounded.
+    it "analyses a 25-row table of two enums in moments, as the CONSIDER written by hand" $ do
+      mOut <- runL4Within 60 bin ["verify", verifyClauseTableLargeFixture, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish a 25-row clause table within 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+            Left err -> expectationFailure ("JSON parse failed: " ++ err)
+            Right env -> do
+              let stats nm =
+                    [ (k, v)
+                    | Just (Array ds) <- [objField env "decisions"]
+                    , d <- toList ds
+                    , objField d "name" == Just (String nm)
+                    , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "findings"]
+                    , Just v <- [objField d k]
+                    ]
+              lookup "analysed" (stats "`table rule`") `shouldBe` Just (Bool True)
+              stats "`table rule`" `shouldBe` stats "`table rule by hand`"
+
+    -- A rule that CALLS a rule written as clauses too long to read through. The
+    -- callee is refused on its own line; the call is left as a box with the
+    -- reason, as any other call whose meaning cannot be drawn. It used to be
+    -- unfolded raw and its clauses' LETs drawn as one leaf: here a meaningless
+    -- "read through", and with long clause bodies no answer at all (killed at
+    -- 100 s and 2.7 GB in review).
+    it "leaves a call to clauses too long to read through as a box, and says why" $ do
+      tmp <- getTemporaryDirectory
+      let dir = tmp </> "l4-cli-test-too-long-callee"
+          file = dir </> "too-long-callee.l4"
+      createDirectoryIfMissing True dir
+      writeFile file tooLongCalleeSource
+      mOut <- runL4Within 60 bin ["verify", file, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish within 60 s on a caller of clauses too long to read through"
+        Just (Output _ sout _) -> case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+          Left err -> expectationFailure ("JSON parse failed: " ++ err)
+          Right env -> do
+            let decisionNamed nm =
+                  [ d
+                  | Just (Array ds) <- [objField env "decisions"]
+                  , d <- toList ds
+                  , objField d "name" == Just (String nm)
+                  ]
+            map (`objField` "analysed") (decisionNamed "bigrule") `shouldBe` [Just (Bool False)]
+            case decisionNamed "caller" of
+              [d] -> case objField d "callsLeftOpaque" of
+                Just (Array opaque) ->
+                  [why | String why <- toList opaque] `shouldSatisfy` any ("too long to draw" `T.isInfixOf`)
+                other -> expectationFailure ("expected callsLeftOpaque on caller, got " ++ show other)
+              other -> expectationFailure ("expected one decision named caller, got " ++ show other)
+
+    -- A clause group whose ladder is one box (a column matches JUST x, a list
+    -- and the like, which the ladder does not break down) is not reported as
+    -- clean: there was nothing to check.
+    it "says it did not analyse a clause group the ladder could not break down" $ do
+      env <- jsonEnvelope bin ["verify", verifyClauseGroupMaybeFixture, "--format", "json"]
+      let reasons =
+            [ (nm, analysed, reason)
+            | Just (Array ds) <- [objField env "decisions"]
+            , d <- toList ds
+            , Just (String nm) <- [objField d "name"]
+            , Just (Bool analysed) <- [objField d "analysed"]
+            , let reason = case objField d "reason" of
+                    Just (String r) -> r
+                    _ -> ""
+            ]
+      case reasons of
+        [(nm, analysed, reason)] -> do
+          nm `shouldBe` "`flag is set`"
+          analysed `shouldBe` False
+          reason `shouldSatisfy` T.isInfixOf "not broken down"
+        other -> expectationFailure ("expected one decision, got " ++ show other)
+
     it "records a non-boolean DECIDE as skipped, never as clean" $ do
       env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]
       case objField env "summary" >>= (`objField` "skipped") of
@@ -3003,6 +3126,27 @@ spec bin = do
       case objField env "summary" >>= (`objField` "nestedNotVisited") of
         Just (Number n) -> n `shouldBe` 1
         other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
+
+    -- A rule written as DECIDE clauses is compiled to a CONSIDER and a LET for
+    -- the clauses after the first. No drafter wrote that LET, and verify reads
+    -- the group as the CONSIDER with the LET read through, so it is not a
+    -- decision left unvisited; a WHERE the drafter wrote inside a clause is.
+    it "does not count what a clause group is compiled to as WHERE-nested decisions" $ do
+      let nestedLine = "nested in a WHERE clause were NOT visited" :: String
+          nestedCount fixture = do
+            env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+            pure (objField env "summary" >>= (`objField` "nestedNotVisited"))
+      -- three clauses, nothing the drafter nested
+      Output _ groupText _ <- runL4 bin ["verify", verifyClauseGroupFixture]
+      groupText `shouldSatisfy` (not . (nestedLine `isInfixOf`))
+      nestedCount verifyClauseGroupFixture `shouldReturn` Just (Number 0)
+      -- three clauses, one WHERE the drafter wrote inside the second
+      Output _ whereText _ <- runL4 bin ["verify", verifyClauseGroupWhereFixture]
+      whereText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
+      nestedCount verifyClauseGroupWhereFixture `shouldReturn` Just (Number 1)
+      -- a hand-written WHERE-nested DECIDE outside any clause group
+      Output _ handText _ <- runL4 bin ["verify", verifyNestedFixture]
+      handText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
 
     -- This test used to assert the OPPOSITE, as a tripwire: "a future change
     -- which starts descending announces itself here rather than by silently
@@ -3155,6 +3299,18 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | A rule written as clauses that, read through, passes the 20,000-part bound,
+-- and a rule that calls it. Each clause tests two MAYBE inputs with patterns that
+-- bind a name, which tell the pruning nothing, so every clause draws the ones
+-- after it twice: eleven clauses are the fewest that pass the bound.
+tooLongCalleeSource :: String
+tooLongCalleeSource = unlines $
+  ["GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN"]
+    <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> show i <> " AND y GREATER THAN " <> show i | i <- [0 .. 10 :: Int] ]
+    <> [ "DECIDE bigrule m k IS FALSE", ""
+       , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+       , "DECIDE caller p q f IS bigrule p q OR f" ]
 
 -- | Each decision in an @l4 verify@ JSON envelope, with the kinds of its
 -- findings, in report order. A decision that was not analysed has none.

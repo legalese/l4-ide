@@ -57,7 +57,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindings, positionalCall)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, clausesReadThrough, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -222,6 +222,11 @@ data VizState = MkVizState
   -- own WHERE definitions inlined into it; 'Nothing' for a definition whose
   -- body keeps a local binding after that (see 'expandCall'). Each entry is
   -- computed at most once per decision, and only for a rule that is called.
+  , calleeReadsThrough :: IntMap Bool
+  -- ^ Unique.unique -> whether that definition, if written as clauses, reads
+  -- through within 'Transform.letInliningNodeBudget' ('Transform.clausesReadThrough').
+  -- A call to one that does not is not offered for expansion. Lazy per entry,
+  -- so only a callee that is called is read.
   , typeVariables :: IntMap (Set Unique)
   -- ^ Unique.unique -> the type variables (@GIVEN a IS A TYPE@) of each
   -- definition of 'defsForInlining' that has any; absent for every other one.
@@ -280,6 +285,7 @@ mkInitialVizState cfg =
     , appExprMakers = Map.empty
     , defsForInlining = Map.empty
     , expansionBodies = Map.empty
+    , calleeReadsThrough = Map.empty
     , typeVariables = Map.empty
     , leafExprs = Map.empty
     , callLeafTargets = Map.empty
@@ -426,6 +432,16 @@ hasDefForInlining (MkUnique _ uniq uniqUri) = do
   -- We don't want, e.g., to pick up on builtin Uniques, which can have the same Int unique as a user-defined Unique
   pure $ uniqUri == cfg.moduleUri && Map.member uniq defsForInlining
 
+-- | May a call to this definition be offered for expansion (@canInline@)? Only
+-- when it is a definition of this module ('hasDefForInlining') that, if
+-- written as clauses, reads through ('calleeReadsThrough'): the expand gesture
+-- leaves a call to one that does not as it is ('inlineExpr').
+canInlineCallee :: Unique -> Viz Bool
+canInlineCallee callee = do
+  known <- hasDefForInlining callee
+  readsThrough <- use #calleeReadsThrough
+  pure (known && Map.findWithDefault True callee.unique readsThrough)
+
 ------------------------------------------------------
 -- Viz state helpers
 ------------------------------------------------------
@@ -459,6 +475,12 @@ getKeyEnv vs = vs.keyEnv
 data VizError
   = InvalidProgramNoDecidesFound
   | InvalidDecideMustHaveBoolRetType
+  | ClauseGroupTooLarge Int
+    -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
+  | ClauseGroupTooLong Int
+    -- ^ a rule written as DECIDE clauses that, written out as the CONSIDER it
+    -- stands for, has more expression nodes than this
+    -- ('L4.Transform.letInliningNodeBudget')
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -469,6 +491,10 @@ prettyPrintVizError = \ case
     "The program isn't the right sort for visualization: there are no DECIDE rules that can be visualized."
   InvalidDecideMustHaveBoolRetType ->
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+  ClauseGroupTooLarge budget ->
+    "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
+  ClauseGroupTooLong budget ->
+    "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than " <> Text.pack (show budget) <> " parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Entrypoint: Visualise
@@ -516,6 +542,7 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     { functionName = (mkPrettyVizName funResolved).label
     , defsForInlining = defs
     , expansionBodies = Map.map expansionBodyOf defs
+    , calleeReadsThrough = Map.map (\ (_, Transform.MkUnfoldable _ rhs) -> Transform.clausesReadThrough rhs) defs
     , typeVariables = Map.restrictKeys (typeVariablesOf cfg.module') (Map.keysSet defs)
     -- A leaf's variable is keyed by an Int. A bare reference to one of this
     -- module's names uses the name's unique; every other leaf gets a fresh id
@@ -535,11 +562,14 @@ preparedState (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved _ _)
     defs = defsForInliningOf cfg.module'
     -- Inlining a definition's locals before its parameters are substituted
     -- gives what inlining them after would: the parameters are free in the body
-    -- and substitution is by unique, so nothing is captured.
-    expansionBodyOf (_, Transform.MkUnfoldable ps rhs)
-      | bindsLocally flat = Nothing
-      | otherwise = Just (ps, flat)
-      where flat = Transform.inlineLocalBindings rhs
+    -- and substitution is by unique, so nothing is captured. A called rule
+    -- written as clauses opens onto the CONSIDER it stands for, as it is drawn
+    -- on its own ('translateDecide'), and is read as that before anything else
+    -- is put in ('Transform.inlineLocalBindingsForDrawing'); clauses too long
+    -- to read through have no expansion.
+    expansionBodyOf (_, Transform.MkUnfoldable ps rhs) = do
+      flat <- Transform.inlineLocalBindingsForDrawing rhs
+      if bindsLocally flat then Nothing else Just (ps, flat)
     seedFrom
       | cfg.expandCalls = toListOf (gplate @Unique) cfg.module'
       | otherwise = toListOf (gplate @Unique) body
@@ -577,10 +607,24 @@ typeVariablesOf = Map.fromList . foldTopLevelDecides (foldDecides one)
 --
 -- Simple implementation: Translate Decide iff <= 1 Given
 translateDecide :: Decide Resolved -> Viz V.FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body) =
+translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) =
   do
-    unlessM (hasBooleanType (getAnno body)) $
+    -- Asked before anything is read through: a rule that returns a number is not
+    -- too large to draw, it is not a ladder at all.
+    unlessM (hasBooleanType (getAnno body0)) $
       throwError InvalidDecideMustHaveBoolRetType
+    -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
+    -- Whether it was is read off the rule as written, not off its body: a rule
+    -- written by hand that has a call to a clause group unfolded into it (the
+    -- IDE's l4/inlineExprs) is still a rule written by hand.
+    let isClauseGroup = Transform.writtenAsClauses asWritten
+    body <- case Transform.inlineLetsForViz body0 of
+      Right inlined -> pure inlined
+      -- Too big to read through. Clauses are refused, for a plan of any size
+      -- they would be drawn as one leaf that asks nothing. Anything else is
+      -- drawn as written: a LET the drafter wrote is never read through.
+      Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+             | otherwise     -> pure body0
 
     -- functionName, defsForInlining, maxId and typicallyDefaults are already
     -- set ('preparedState').
@@ -588,6 +632,11 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
+    -- The ladder of a rule written as clauses can be far larger than the clauses
+    -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
+    -- A rule that was not written as clauses is drawn as it always was.
+    when (isClauseGroup && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+      throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl
       vid
       -- didn't want a backtick'd name in the header
@@ -786,8 +835,8 @@ defaultUBoolVarCanInline = False
 varLeaf :: V.ID -> V.Name -> Resolved -> Viz IRExpr
 varLeaf vid vname resolved = do
   canInline <- case resolved of
-    Ref _ uniq _ -> hasDefForInlining uniq
-    Def uniq _ -> hasDefForInlining uniq
+    Ref _ uniq _ -> canInlineCallee uniq
+    Def uniq _ -> canInlineCallee uniq
     _ -> pure False
   -- TODO: Prob need to do this `canInline` thing for things that aren't App of no args too?
   let target = (getUnique resolved).unique
@@ -825,7 +874,7 @@ leafFromExpr expr = do
     Just callee -> do
       known <- hasDefForInlining callee
       when known $ #callLeafTargets %= Map.insert uniq callee.unique
-      pure known
+      canInlineCallee callee
     Nothing -> pure defaultUBoolVarCanInline
   expansion <-
     case calleeOf of
@@ -859,8 +908,8 @@ So an argument inlined from the call IS the caller's leaf for that argument:
 @a@ inlined from @limb a b@ has the caller's @a@'s unique, and so its atomId.
 
 The callee's own WHERE definitions are inlined into the substituted body
-('Transform.inlineLocalBindings', as @l4 verify@ does before it reads a call
-through) before anything is drawn. They have to be. A local name has ONE unique
+('Transform.inlineLocalBindingsForDrawing', as @l4 verify@ does before it reads
+a call through) before anything is drawn. They have to be. A local name has ONE unique
 in every call of its rule, and stands for a different proposition in each, since
 its definition has that call's arguments in it; drawn as a leaf it would be keyed
 by its name, and then @ok WHERE ok MEANS p@ called with @a@ and with @b@ was one
@@ -868,7 +917,7 @@ atom, a local named @a@ meaning @NOT p@ was the caller's input @a@, and a callee
 @both@ was the caller's own @both@ (all measured 2026-10-05). Inlined, each such
 leaf is drawn as what it says after substitution, keyed like any other.
 
-A local that 'Transform.inlineLocalBindings' leaves in place — recursive, an
+A local that 'Transform.inlineLocalBindingsForDrawing' leaves in place — recursive, an
 @ASSUME@, applied to one of its own parameters as a function, or referenced at
 another arity — would bring back exactly that problem, so a call whose reduced
 body still binds anything locally is not expanded at all.
@@ -1160,17 +1209,22 @@ inlineExprs vs = foldr (inlineExpr vs)
 inlineExpr :: VizState -> Int -> Decide Resolved -> Decide Resolved
 inlineExpr vs target =
   case Map.lookup definition vs.defsForInlining of
-    Just (u, Transform.MkUnfoldable ps rhs) -> over decideBody (transformOf (gplate @(Expr Resolved)) (unfold u ps (withLocalsInlined rhs)))
-    Nothing -> id
-  where
-    definition = Map.findWithDefault target target vs.callLeafTargets
     -- The definition's own WHERE definitions are inlined first, as 'expandCall'
     -- does and for the same reason: a local keeps ONE unique in every copy the
     -- unfolding makes, though each copy has that call's arguments in it, so two
     -- calls' copies of one local would be drawn as one proposition (found by
     -- adversarial review of smucclaw/l4-ide#1013). A local that cannot be
     -- inlined (a recursive one) still comes along as it is.
-    withLocalsInlined = Transform.inlineLocalBindings
+    Just (u, Transform.MkUnfoldable ps rhs)
+      | Just flat <- Transform.inlineLocalBindingsForDrawing rhs ->
+          over decideBody (transformOf (gplate @(Expr Resolved)) (unfold u ps flat))
+    -- No definition, or one written as clauses too long to read through: the
+    -- call stays as it is. Unfolded raw, the clauses' LETs would be drawn as a
+    -- leaf whose key reads them through, which does not finish; the leaf of
+    -- such a call is not offered for expansion ('calleeReadsThrough').
+    _ -> id
+  where
+    definition = Map.findWithDefault target target vs.callLeafTargets
     -- 'Transform.unfoldOnce' with one definition, except that a polymorphic
     -- one's types are instantiated at each call, as 'expandCall' does: unfolded
     -- without, a polymorphic callee's IF was one box after the expand gesture

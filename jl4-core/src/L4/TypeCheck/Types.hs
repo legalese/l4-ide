@@ -2079,10 +2079,24 @@ setAnnNlg nlg a = withRange a $ \r -> do
 setAnnResolvedType ::
      (HasAnno a, AnnoToken a ~ PosToken, AnnoExtra a ~ Extension)
   => Type' Resolved -> Maybe TermKind -> a -> Check a
-setAnnResolvedType t k a = withRange a $ \r -> do
-  let info = TypeInfo t k
-  addInfoForSrcRange r info
-  pure $ a & annoOf % annInfo ?~ info
+setAnnResolvedType t k a = case rangeOf (getAnno a) of
+  Just r -> do
+    let info = TypeInfo t k
+    addInfoForSrcRange r info
+    pure $ a & annoOf % annInfo ?~ info
+  -- A node the clause desugarer generated has no range, on purpose: it has no
+  -- source to point at, and a range would put it in the position index that
+  -- hover and go-to-definition search. Its type is still a fact about the
+  -- node, and the ladder reads a DECIDE body's type off the node
+  -- ('L4.Viz.Ladder.hasBooleanType'), so it is recorded ON the node and
+  -- nowhere else: the position index and every diagnostic are as they were.
+  Nothing
+    | isJust (Optics.view annPmSynthetic (getAnno a)) -> do
+        -- With the substitution so far applied: a group with no GIVETH is
+        -- checked against a fresh type that its clauses have already fixed.
+        t' <- applySubst t
+        pure $ a & annoOf % annInfo ?~ TypeInfo t' k
+    | otherwise -> pure a
 
 setAnnResolvedKind ::
      (HasAnno a, AnnoToken a ~ PosToken, AnnoExtra a ~ Extension)
