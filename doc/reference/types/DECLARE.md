@@ -91,6 +91,7 @@ DECLARE Pong IS A Ping
 The names a synonym is known by after `AKA` count as names for that synonym.
 In `DECLARE W AKA B IS A B` the `B` has no arguments after it, so it is `W` itself and not some other synonym called `B` that takes one (`DECLARE B a IS A LIST OF a`); that declaration is circular too.
 `B OF NUMBER` would be the one that takes an argument.
+Two synonyms, or a synonym and a record, may share a name when they take different numbers of arguments, and a use is read as the one that takes as many as it is given.
 
 **There is a limit to how long a chain can be.**
 To compare two types, L4 replaces a synonym by the type it stands for, and then does the same to that type if it is a synonym, and so on.

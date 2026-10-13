@@ -382,12 +382,6 @@ data CheckEnv =
     -- ^ Map from record type RawName to set of computed field RawNames.
     -- Used to produce better error messages when a user tries to supply
     -- a computed field in a record constructor.
-    , cyclicSynonyms       :: !(Set RawName)
-    -- ^ Primary names of type synonyms found to be cyclic at declaration
-    -- time. Their bodies are quarantined (installed as bodyless
-    -- 'KnownType's) so that synonym expansion never touches them — a
-    -- cyclic synonym has no finite expansion, and expanding one can
-    -- blow up exponentially before the expansion fuel runs out.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     }
@@ -434,7 +428,6 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
     , computedFields = Map.empty
-    , cyclicSynonyms = mempty
     , errorContext = None
     , sectionStack = []
     }
@@ -978,7 +971,6 @@ extendEnv cis env =
     , assumeDeclarations = e.assumeDeclarations
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
-    , cyclicSynonyms = e.cyclicSynonyms
     , sectionStack = e.sectionStack
     }
     where
