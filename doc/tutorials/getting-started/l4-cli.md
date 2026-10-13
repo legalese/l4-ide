@@ -298,6 +298,7 @@ A value is read as the type its parameter declares, whichever kind of file the c
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
 Text that does not spell one is left as it is, and the line is an error that names the text.
 A parameter declared through a synonym, such as `DECLARE Year IS A NUMBER`, is read as the type the synonym stands for, and so is a synonym for a `MAYBE`.
+A synonym that takes a type, such as `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`, is not read this way from a CSV cell or from text: a cell `2020` or the text `"2020"` is refused, so give such a parameter a plain number in a JSON file.
 Every other kind of parameter keeps a non-blank CSV cell exactly as written, however much it looks like a number or a boolean.
 A `STRING` receives `123456`, `018956` and `1.50` as the codes they are, a choice such as `DECLARE Answer IS ONE OF True, False, Unknown` receives the name `True` and not a boolean, and a `DATE` receives `2026-10-13` as text, so a cell that is not a date, such as `20261013`, is an error that names it.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
@@ -331,7 +332,7 @@ The command exits with status 0 when every case was `success`, and 1 when any ca
 
 `--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not four: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
 
-It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`.
+It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`. A synonym that takes a type (`Optional OF NUMBER`) is not: a case can be `valid` that a run refuses, and `invalid` that a run answers.
 
 **It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
 
@@ -363,7 +364,7 @@ So `valid` means a case has the right shape, not that the rules will accept ever
 - **The printed module has to be valid source.** If it is not, every case is an `error` line with the parser's message, and the cause is the rules file and not the cases. One shape that does this is a bare quoted string used as a condition inside a boolean expression, such as `a AND "and also" AND TRUE`.
 - **An exported function whose `MAYBE` input is followed by another input cannot be run.** The wrapper it needs is not valid, and every case is an `error` line. Put the `MAYBE` input last.
 - **Every case checks the whole module again,** and the modules it imports, so a large rules file with many cases takes time.
-- **A CSV file has to be UTF-8** (in Excel, save as "CSV UTF-8"). A file in another encoding stops the command with an error message from the Haskell runtime and a backtrace, and no `Error:` line.
+- **A CSV file has to be UTF-8** (in Excel, save as "CSV UTF-8"). A file in another encoding stops the command at the first bad byte, with an error message from the Haskell runtime and a backtrace, exit status 1, and no `Error:` line; in the default streaming output, the cases before the bad byte have already run and printed.
 
 #### When the command cannot start
 
