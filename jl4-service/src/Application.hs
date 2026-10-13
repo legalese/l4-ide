@@ -7,7 +7,7 @@ import ControlPlane (ControlPlaneApi, controlPlaneHandler)
 import DataPlane (DataPlaneApi, dataPlaneHandler, ShortRoutes, shortRoutesHandler)
 import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
-import DeploymentLoader (loadAndRegister)
+import DeploymentLoader (loadAllAndRegister)
 import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
 import Options (Options (..), buildOpts)
 import OpenApiDoc (buildOpenApiDoc)
@@ -21,11 +21,10 @@ import qualified Data.Aeson.Key as Aeson.Key
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
-import Control.Concurrent (forkIO, getNumCapabilities, newQSem, signalQSem, threadDelay, waitQSem)
+import Control.Concurrent (forkIO, threadDelay)
 import Control.Monad (forever)
-import Control.Concurrent.Async (mapConcurrently_)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
-import Control.Exception (SomeException, bracket_, finally, displayException)
+import Control.Exception (SomeException, finally, displayException)
 import Control.Monad (forM_)
 import System.Environment (lookupEnv)
 import Control.Monad.IO.Class (liftIO)
@@ -148,18 +147,9 @@ defaultMain = do
           Map.insert (DeploymentId did) (DeploymentPending mCachedMeta)
       logInfo logger "Lazy loading enabled" []
     else do
-      -- Eager mode: compile them all, as many at once as there are
-      -- capabilities. A restart compiles each deployment as a deploy does,
-      -- under @--compile-timeout@ and @--max-compile-memory-mb@, and a timeout
-      -- counts wall-clock time. If every deployment started together, each
-      -- would be waiting for the CPU behind all the others, and a store large
-      -- enough would run every one of them out of time at once.
+      -- Eager mode: compile them all
       logInfo logger "Compiling existing deployments" []
-      capabilities <- getNumCapabilities
-      slot <- newQSem capabilities
-      mapConcurrently_
-        (bracket_ (waitQSem slot) (signalQSem slot) . loadAndRegister logger options registry store)
-        deployIds
+      loadAllAndRegister logger options registry store deployIds
 
   -- Build middleware stack
   concLimiter <- concurrencyLimiter options.maxConcurrentRequests

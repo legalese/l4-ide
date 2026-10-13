@@ -53,7 +53,7 @@ import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import System.IO.Error (isPermissionError)
 import TestData (maybeSynonymJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -2307,6 +2307,33 @@ spec = describe "integration" do
           fmap (.dsStatus) status `shouldBe` Just "failed"
           messagesAbout "slow" logLines `shouldContain` ["Compilation timed out or exceeded memory limit"]
 
+    describe "when compiling a stored deployment throws" do
+      -- A source whose inputs collide once their names are sanitised
+      -- (`a b` and `a-b`) makes the compiler raise an error rather than refuse
+      -- it. The service loads every deployment of the store before it listens,
+      -- so one of them must not stop it: the deployment is failed, with the
+      -- reason, and the others load.
+      let deployments = [("fine", [("qualifies.l4", qualifiesJL4)]), ("clash", [("clash.l4", nameClashJL4)])]
+      it "fails that deployment and loads the others when the store is loaded eagerly" do
+        withServicesRestarted deployments (const (pure ())) \logLines baseUrl mgr -> do
+          status <- deploymentStatus baseUrl mgr "clash"
+          fmap (.dsStatus) status `shouldBe` Just "failed"
+          fmap (.dsError) status `shouldSatisfy` maybe False (maybe False ("collision after sanitization" `Text.isInfixOf`))
+          messagesAbout "clash" logLines `shouldContain` ["Deployment failed"]
+          fineStatus <- deploymentStatus baseUrl mgr "fine"
+          fmap (.dsStatus) fineStatus `shouldBe` Just "ready"
+          resp <- evalFunction baseUrl mgr "fine" "compute_qualifies" allTrueArgs
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+      it "fails it, with the reason, when the store is loaded lazily" do
+        withPendingService "clash-lazy" [("clash.l4", nameClashJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "clash-lazy" "clash" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldSatisfy` (>= 500)
+          status <- deploymentStatus baseUrl mgr "clash-lazy"
+          fmap (.dsStatus) status `shouldBe` Just "failed"
+          fmap (.dsError) status `shouldSatisfy` maybe False (maybe False ("collision after sanitization" `Text.isInfixOf`))
+
     describe "when the stored sources no longer check" do
       -- The sources on disk are what the operator last deployed, but they are
       -- only files. A restart compiles what they are now: if that does not
@@ -4185,8 +4212,7 @@ withServicesRestarted' opts deployments editStore act = withStoreDir "restarted"
   registry <- newTVarIO Map.empty
   withFile logPath WriteMode \h -> do
     restartLogger <- newLoggerTo h False
-    forM_ deployments \(deployId, _) ->
-      DeploymentLoader.loadAndRegister restartLogger opts registry store deployId
+    DeploymentLoader.loadAllAndRegister restartLogger opts registry store (map fst deployments)
   logLines <- Maybe.mapMaybe Aeson.decodeStrict . BS8.lines <$> BS.readFile logPath
 
   pendingUpd <- newTVarIO Map.empty

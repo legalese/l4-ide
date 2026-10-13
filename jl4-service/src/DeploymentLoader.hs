@@ -3,6 +3,7 @@
 -- Used by Application (eager/lazy startup) and DataPlane (compile-on-first-request).
 module DeploymentLoader (
   loadAndRegister,
+  loadAllAndRegister,
   triggerCompilationIfPending,
   tryCompileWithTimeout,
   CompilationResult (..),
@@ -16,9 +17,10 @@ import Options (Options (..))
 import qualified Shared
 import Types
 
-import Control.Concurrent.Async (async)
+import Control.Concurrent (getNumCapabilities, newQSem, signalQSem, waitQSem)
+import Control.Concurrent.Async (async, mapConcurrently_)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, retry)
-import Control.Exception (SomeException, catch, displayException)
+import Control.Exception (ErrorCall (..), SomeAsyncException, SomeException, bracket_, catch, displayException, fromException, throwIO, try)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks, ask)
 import Data.Aeson (toJSON)
@@ -41,8 +43,34 @@ import System.Timeout (timeout)
 -- one that no longer parses or type-checks is registered as failed, with the
 -- errors a deploy of those sources would get. A @bundle.cbor@ that an older
 -- build left beside the sources is not read, and not touched.
+--
+-- A deployment that cannot be loaded does not stop the service. The compiler
+-- can raise an error instead of refusing a source (inputs whose names collide
+-- once sanitised do), and a store can hold a @metadata.json@ that does not
+-- decode; either is registered as failed, with the message, like a refusal,
+-- for the eager startup and the lazy one alike. An asynchronous exception (the
+-- thread being cancelled) is not the deployment's, and goes on.
 loadAndRegister :: Logger -> Options -> TVar (Map.Map DeploymentId DeploymentState) -> BundleStore -> Text -> IO ()
 loadAndRegister logger options registry store deployId = do
+  outcome <- try (loadAndRegisterThrowing logger options registry store deployId)
+  case outcome of
+    Right () -> pure ()
+    Left e
+      | Just (_ :: SomeAsyncException) <- fromException e -> throwIO e
+      | otherwise -> do
+          let msg = case fromException e of
+                Just (ErrorCall err) -> Text.pack err
+                Nothing -> Text.pack (displayException e)
+          logError logger "Deployment failed"
+            [ ("deploymentId", toJSON deployId)
+            , ("error", toJSON msg)
+            ]
+          atomically $ modifyTVar' registry $
+            Map.insert (DeploymentId deployId) (DeploymentFailed msg)
+
+-- | 'loadAndRegister', without the net under it.
+loadAndRegisterThrowing :: Logger -> Options -> TVar (Map.Map DeploymentId DeploymentState) -> BundleStore -> Text -> IO ()
+loadAndRegisterThrowing logger options registry store deployId = do
   -- Load sources and metadata (always needed)
   (sources, storedMeta) <- BundleStore.loadBundle store deployId
 
@@ -113,6 +141,22 @@ loadAndRegister logger options registry store deployId = do
         [ ("deploymentId", toJSON deployId)
         , ("error", toJSON err)
         ]
+
+-- | Load every deployment of a store, as many at once as there are
+-- capabilities.
+--
+-- A restart compiles each deployment as a deploy does, under
+-- @--compile-timeout@ and @--max-compile-memory-mb@, and a timeout counts
+-- wall-clock time. If every deployment started together, each would be waiting
+-- for the CPU behind all the others, and a store large enough would run every
+-- one of them out of time at once.
+loadAllAndRegister :: Logger -> Options -> TVar (Map.Map DeploymentId DeploymentState) -> BundleStore -> [Text] -> IO ()
+loadAllAndRegister logger options registry store deployIds = do
+  capabilities <- getNumCapabilities
+  slot <- newQSem capabilities
+  mapConcurrently_
+    (bracket_ (waitQSem slot) (signalQSem slot) . loadAndRegister logger options registry store)
+    deployIds
 
 -- | If the deployment is in Pending state, compile it synchronously.
 -- Atomically transitions Pending → Compiling, then blocks until compilation

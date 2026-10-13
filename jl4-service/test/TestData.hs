@@ -80,6 +80,7 @@ module TestData (
   jsonDecodePersonJL4,
   taxpayerJL4,
   implicitFlagJL4,
+  nameClashJL4,
   lineBreakJL4,
 ) where
 
@@ -1652,4 +1653,17 @@ implicitFlagJL4 =
 GIVEN threshold IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE above IF threshold > 1 AND flag
+|]
+
+-- | Two inputs whose names are different in L4 and the same once the service
+-- turns spaces and hyphens into one character for its schemas (@a b@, @a-b@).
+-- The compiler does not refuse this module, it raises an error.
+nameClashJL4 :: Text
+nameClashJL4 =
+  [i|
+@export Two inputs that sanitise to one name
+GIVEN `a b` IS A NUMBER
+      `a-b` IS A NUMBER
+GIVETH A NUMBER
+DECIDE clash IS `a b` PLUS `a-b`
 |]
