@@ -196,7 +196,8 @@ batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
 -- BOOLEAN, a MAYBE), with the plain types beside them as the control, and the
 -- cases for each; and two CSV files that cannot be read.
 batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
-  , batchCsvBadQuote, batchCsvEmpty :: FilePath
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof :: FilePath
 batchSynonym         = fixtureDir </> "batch-synonym.l4"
 batchSynonymYearJson = fixtureDir </> "batch-synonym-year.json"
 batchSynonymFlagJson = fixtureDir </> "batch-synonym-flag.json"
@@ -204,6 +205,12 @@ batchSynonymYearCsv  = fixtureDir </> "batch-synonym-year.csv"
 batchSynonymFlagCsv  = fixtureDir </> "batch-synonym-flag.csv"
 batchCsvBadQuote     = fixtureDir </> "batch-csv-bad-quote.csv"
 batchCsvEmpty        = fixtureDir </> "batch-csv-empty.csv"
+batchCsvOpenQuoteEof     = fixtureDir </> "batch-csv-open-quote-eof.csv"
+batchCsvOpenQuoteMid     = fixtureDir </> "batch-csv-open-quote-mid.csv"
+batchCsvOpenQuoteCrlf    = fixtureDir </> "batch-csv-open-quote-crlf.csv"
+batchCsvOpenQuoteDoubled = fixtureDir </> "batch-csv-open-quote-doubled.csv"
+batchCsvOpenQuoteHeader  = fixtureDir </> "batch-csv-open-quote-header.csv"
+batchCsvQuoteClosesAtEof = fixtureDir </> "batch-csv-quote-closes-at-eof.csv"
 
 -- | A choice type with one constructor that has a field and one that has
 -- none. Only the second can be given as JSON input; every other value is
@@ -477,7 +484,8 @@ coreFixtures =
   , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
   , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
   , batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
-  , batchCsvBadQuote, batchCsvEmpty
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof
   , batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional
   , batchDeclaredTextDates, batchDeclaredTextSynonyms
   , batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture
@@ -1846,6 +1854,33 @@ spec bin = do
       code `shouldSatisfy` (/= ExitSuccess)
       sout `shouldSatisfy` ("the CSV file is empty" `isInfixOf`)
       sout `shouldNotSatisfy` ("not enough input" `isInfixOf`)
+
+    -- A quote that opens a cell and is never closed. cassava's reader of a
+    -- quoted cell takes everything to the end of the file and drops the last
+    -- byte, taking it for the closing quote: `"abc` was the text `ab` with
+    -- status success, and in the middle of a file the cell swallowed every row
+    -- after it. Each is refused, at the line where the quote opens.
+    describe "a quote that opens a CSV cell and is never closed" $ do
+      let refusedAt n file = do
+            Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", file]
+            code `shouldSatisfy` (/= ExitSuccess)
+            sout `shouldSatisfy` (("line " <> show (n :: Int) <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed") `isInfixOf`)
+            -- and no row is run
+            sout `shouldNotSatisfy` ("\"status\"" `isInfixOf`)
+
+      it "is refused at the end of the file, naming the line" $ refusedAt 2 batchCsvOpenQuoteEof
+      it "is refused in the middle of a file, rather than taking the rows after it" $ refusedAt 2 batchCsvOpenQuoteMid
+      it "is refused in a file with Windows line ends" $ refusedAt 2 batchCsvOpenQuoteCrlf
+      it "is refused when the last quote is half of a doubled one" $ refusedAt 2 batchCsvOpenQuoteDoubled
+      it "is refused in the header" $ refusedAt 1 batchCsvOpenQuoteHeader
+
+      -- The control: a cell that closes at the very end of the file, with no
+      -- line end after it, is a cell, so the check cannot be refusing every
+      -- file that ends in a quote.
+      it "does not refuse a cell that closes at the end of the file" $ do
+        Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvQuoteClosesAtEof]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"result\":\"abc\"" `isInfixOf`)
 
     it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
       -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
