@@ -338,7 +338,7 @@ Conditions on A: rule whether a losing `ROR` alternative's entries are kept, sin
 B covers red ink only: a plain `RECALL` of black ink stays order-dependent until A, and the how-to and the N9 tutorial say so.
 _Not part of the ruling — status and citations, checked 2026-10-11 against `origin/unstable` @ `def9a5e41`:_
 SEESAW was ruled on 2026-10-09 and landed on `unstable` in legalese/l4-ide#640, merge `c56278dd7`, 2026-10-13, so A's condition "after SEESAW is ruled" is met and its corpus differential can now be run against `unstable`; it has not been run.
-The landed `EVERY-EACH-QUANTIFIER-SPEC.md` §6.1.2 still calls N10 "trigger word METRONOME, pending in session `ledger`"; that is stale since 2026-10-11 (this section), and the correction belongs to that spec's owner.
+`EVERY-EACH-QUANTIFIER-SPEC.md` §6.1.2 called N10 "trigger word METRONOME, pending in session `ledger`" until legalese/l4-ide#665 (merged 2026-10-13, `d84dcb3d8`), made at Meng's word, corrected it to say N10 was ruled on 2026-10-11.
 The line numbers printed on the bench card (`Machine.hs:1549-1559`, `:2135-2210`, `:2622-2633`) were taken at an older commit and no longer point at these sites.
 On the current tip: `ValROp` pushes `RBinOp1` and runs the left operand over the full event list at `Machine.hs` ~1941, with the `RBinOp1` and `RBinOp2` arms at ~3100-3125; the `ROR` short-circuit, where a fulfilled left operand skips the right, is in the `RBinOp1` arm at ~3107; the stall guard is `maximumStalledReoffers` / `stalledChainRefusal` at ~1307-1322.
 
