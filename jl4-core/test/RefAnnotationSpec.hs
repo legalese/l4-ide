@@ -334,6 +334,21 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       refPlacements "DECIDE r IS 1 +\n  @ref https://example.com/operand\n  2\n"
         `shouldReturn` [((3, 3), "operand")]
 
+    it "is the operand after it, inside the LEFT operand of an infix call" $ do
+      -- The range of an infix call is its keyword and no more, so the call
+      -- starts after its left operand, and used to claim the ref in it.
+      refPlacements
+        (Text.unlines
+          [ "GIVEN a IS A NUMBER, b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "a `plus` b MEANS a + b"
+          , ""
+          , "DECIDE r IS (1 +"
+          , "  @ref https://example.com/two"
+          , "  2) `plus` 3"
+          ])
+        `shouldReturn` [((7, 3), "two")]
+
     it "is the type after it" $ do
       refPlacements "GIVEN x IS A\n  @ref https://example.com/type\n  NUMBER\nDECIDE r IS x\n"
         `shouldReturn` [((3, 3), "type")]
