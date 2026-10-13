@@ -1244,7 +1244,7 @@ function renderEventsAsArgListParam(events) {
 function renderEventOfTextParam(ev, actionForced) {
   let partyText;
   if (typeof ev.party === "string") {
-    partyText = /\s/.test(ev.party) ? "`" + ev.party + "`" : ev.party;
+    partyText = quoteL4NameIfNeeded(ev.party);
   } else {
     partyText = "`event party 0`";
   }
@@ -1738,7 +1738,7 @@ function renderParamEvent(ev, _idx, paramSchemas, activePartySchema) {
   let exampleParty;
   let resultParty;
   if (typeof ev.party === "string") {
-    exampleParty = /\s/.test(ev.party) ? "`" + ev.party + "`" : ev.party;
+    exampleParty = quoteL4NameIfNeeded(ev.party);
     resultParty = exampleParty;
   } else {
     // Record-typed party — placeholder + resolved value. Svc uses a
@@ -2003,7 +2003,7 @@ function renderContractAsSource(c, deadlineOverride) {
 // a sibling, so a runtime that predates it reads the same bundle correctly and
 // only its trace text lacks the backticks.
 function deonticLiteralAsSource(text, kind) {
-  return kind === "name" && /\s/.test(text) ? "`" + text + "`" : text;
+  return kind === "name" ? quoteL4NameIfNeeded(text) : text;
 }
 
 function renderDeonticExprForSource(e, kind) {
@@ -2053,11 +2053,21 @@ function renderEventOfText(ev, actionForced) {
   );
 }
 
+// A name as L4 source, as the printer (`quoteIfNeeded` in jl4-core's
+// L4/Print.hs) spells it: bare when it starts with a letter and holds only
+// letters, digits and underscores, backticked otherwise. So `ship-it`, `50%`,
+// `x.y`, `it's` and `2nd buyer` are backticked, as well as `the seller`; the
+// trace's source text then parses. Main's printer does not backtick a name that
+// spells a reserved word (`A`, `IS`), and neither does this, so the trace text
+// matches jl4-service's.
+function quoteL4NameIfNeeded(name) {
+  return name === "" || /^\p{L}[\p{L}\p{N}_]*$/u.test(name)
+    ? name
+    : "`" + name + "`";
+}
+
 function formatEventComponent(v) {
-  if (typeof v === "string") {
-    // Match svc's prettyLayout: backtick only multi-word names.
-    return /\s/.test(v) ? "`" + v + "`" : v;
-  }
+  if (typeof v === "string") return quoteL4NameIfNeeded(v);
   return JSON.stringify(v);
 }
 
