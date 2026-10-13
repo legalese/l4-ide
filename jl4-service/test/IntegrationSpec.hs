@@ -3,7 +3,7 @@
 
 -- | The helpers are exported for "StdlibResolutionSpec", which needs the same
 -- in-process service but must control the environment around it.
-module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess) where
+module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions) where
 
 import Test.Hspec
 
@@ -15,40 +15,45 @@ import Compiler (compileBundle, computeVersion)
 import qualified DeploymentLoader
 import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
-import Logging (newLogger)
+import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Types
 import L4.FunctionSchema (Parameters (..))
 
 import Control.Concurrent.Async (concurrently, forConcurrently)
-import Control.Monad (forM_, guard, unless)
+import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (bracket, try)
 import Data.Foldable (for_, toList)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Maybe as Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text.IO
 import Data.Time (diffUTCTime, getCurrentTime)
 import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (doesFileExist)
-import System.FilePath ((</>))
+import System.FilePath (takeDirectory, (</>))
+import System.Directory (removePathForcibly)
+import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
+import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import System.IO.Error (isPermissionError)
 import TestData (maybeSynonymJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1778,13 +1783,12 @@ spec = describe "integration" do
           statusCode' qpResp `shouldBe` 200
           cached `shouldReturn` True
 
-    -- A deployment outlives the process that compiled it. On restart the
-    -- service rehydrates from bundle.cbor, and CBOR carries no annotations —
-    -- which is where the ladder's boolean-return check reads its type from.
-    -- Both routes 400ed for every restarted deployment until Compiler.hs took
-    -- the AST from the typecheck it was already running.
-    it "serves the ladder after a restart that rehydrates from bundle.cbor" do
-      withServiceRestartedFromCbor "ladder-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+    -- A deployment outlives the process that compiled it. A restart used to
+    -- read a cache that carries no annotations, which is where the ladder's
+    -- boolean-return check reads its type from, and both routes 400ed for every
+    -- restarted deployment.
+    it "serves the ladder after a restart" do
+      withServiceRestarted "ladder-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         resp <- getLadder baseUrl mgr "ladder-restart" "compute_qualifies"
         statusCode' resp `shouldBe` 200
         case lookupKey "funDecl" (decodeObject (responseBody resp)) of
@@ -1793,10 +1797,10 @@ spec = describe "integration" do
             ladderAtomLabels fd `shouldBe` ["drinks", "eats", "walks"]
           other -> expectationFailure ("expected funDecl object, got: " <> show other)
 
-    it "serves query-plan after a restart that rehydrates from bundle.cbor" do
-      -- The sibling route, broken by the same cause and fixed by the same
-      -- change. Pinned here because nothing else in the suite restarts.
-      withServiceRestartedFromCbor "qp-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+    it "serves query-plan after a restart" do
+      -- The sibling route, broken by the same cause. Pinned here because
+      -- nothing else in the suite restarts.
+      withServiceRestarted "qp-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         resp <- queryPlan' baseUrl mgr "qp-restart" "compute_qualifies"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 200
@@ -1947,7 +1951,7 @@ spec = describe "integration" do
       -- The control. /evaluation needs no type annotations, so it kept working
       -- throughout; if this ever goes red the restart harness itself is broken,
       -- not the visualization path.
-      withServiceRestartedFromCbor "eval-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+      withServiceRestarted "eval-restart" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "eval-restart" "compute_qualifies"
           (Aeson.object
             [ "arguments" Aeson..= Aeson.object
@@ -2105,6 +2109,291 @@ spec = describe "integration" do
             ])
         statusCode' bound `shouldBe` 200
         lookupKey "determined" (decodeObject (responseBody bound)) `shouldBe` Just (Aeson.Bool False)
+
+  -- A deployment outlives the process that compiled it. On restart the service
+  -- compiles the stored sources again, as a deploy does. Everything below asks
+  -- one question of one deployment, once on the freshly compiled functions and
+  -- once on a service that came back from the store, and wants the same answer.
+  describe "after a restart" do
+    it "answers query-plan for a boolean rule as it did before the restart" do
+      let asks =
+            [ Aeson.object ["arguments" Aeson..= Aeson.object []]
+            , Aeson.object
+                [ "arguments" Aeson..= Aeson.object
+                    [ "walks" Aeson..= True
+                    , "eats" Aeson..= True
+                    , "drinks" Aeson..= True
+                    ]
+                ]
+            ]
+          probe baseUrl mgr deployId = forM asks \ask ->
+            answerOf baseUrl deployId <$> queryPlan' baseUrl mgr deployId "compute_qualifies" ask
+      (fresh, restarted) <- beforeAndAfterRestart "qp-restart-same" [("qualifies.l4", qualifiesJL4)] probe
+      map fst fresh `shouldBe` [200, 200]
+      restarted `shouldBe` fresh
+
+    it "answers query-plan for a rule that decodes JSON as it did before the restart" do
+      -- The call smucclaw/l4-ide#1040 measures: 200 before the restart, 400 after.
+      let probe baseUrl mgr deployId =
+            answerOf baseUrl deployId <$> queryPlan' baseUrl mgr deployId "is%20a%20person"
+              (Aeson.object ["arguments" Aeson..= Aeson.object []])
+      (fresh, restarted) <- beforeAndAfterRestart "qp-decode-restart" [("person.l4", jsonDecodePersonJL4)] probe
+      fst fresh `shouldBe` 200
+      restarted `shouldBe` fresh
+
+    it "decodes JSON into a record as it did before the restart" do
+      -- The seven requests of smucclaw/l4-ide#1040, in its order. The names are
+      -- percent-encoded because they go straight into the URL.
+      let cases =
+            [ ("age%20next%20year", "{\"name\":\"Alice\",\"age\":40}")
+            , ("age%20next%20year", "{\"name\":\"Alice\",\"age\":\"forty\"}")
+            , ("is%20a%20person", "{\"name\":\"Alice\",\"age\":40}")
+            , ("is%20a%20person", "{\"name\":\"Alice\",\"age\":\"forty\"}")
+            , ("is%20a%20person", "{\"foo\":1}")
+            , ("is%20a%20person", "[1,2]")
+            , ("is%20a%20person", "not json")
+            ]
+          probe baseUrl mgr deployId = forM cases \(fnName, json) -> do
+            resp <- evalFunction baseUrl mgr deployId fnName
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["json" Aeson..= (json :: Text)]])
+            let (status, body) = answerOf baseUrl deployId resp
+                contents = do
+                  Aeson.Object c <- lookupKey "contents" (body >>= asObject)
+                  pure c
+                result = resultValue body
+                -- {"tag": "Error", "contents": {"tag": "InterpreterError", "contents": "..."}}
+                message = Aeson.KeyMap.lookup "contents" =<< contents
+            pure (fnName, json, status, result, message)
+      (fresh, restarted) <- beforeAndAfterRestart "decode-restart" [("person.l4", jsonDecodePersonJL4)] probe
+      -- What the answers should be, so that "the same as before" cannot be
+      -- satisfied by two runs that are wrong in the same way.
+      [(status, result) | (_, _, status, result, _) <- fresh] `shouldBe`
+        [ (200, Just (Aeson.Number 41))
+        , (422, Nothing)
+        , (200, Just (Aeson.Bool True))
+        , (422, Nothing)
+        , (422, Nothing)
+        , (422, Nothing)
+        , (200, Just (Aeson.Bool False))
+        ]
+      -- The inputs whose answer, message included, changed across the restart.
+      [(f, r) | (f, r) <- zip fresh restarted, f /= r] `shouldBe` []
+
+    it "evaluates and describes functions as it did before the restart" do
+      -- The control. /evaluation needs no type annotations, so it kept working
+      -- throughout; if this goes red the restart harness itself is broken, not
+      -- the visualization or decoding paths.
+      let probe baseUrl mgr deployId = do
+            evalResp <- evalFunction baseUrl mgr deployId "compute_qualifies"
+              (Aeson.object
+                [ "arguments" Aeson..= Aeson.object
+                    [ "walks" Aeson..= True
+                    , "eats" Aeson..= True
+                    , "drinks" Aeson..= True
+                    ]
+                ])
+            detailsResp <- httpGet mgr (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/compute_qualifies")
+            listResp <- httpGet mgr (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions")
+            pure (map (answerOf baseUrl deployId) [evalResp, detailsResp, listResp])
+      (fresh, restarted) <- beforeAndAfterRestart "ctl-restart" [("qualifies.l4", qualifiesJL4)] probe
+      map fst fresh `shouldBe` [200, 200, 200]
+      restarted `shouldBe` fresh
+
+    it "reads a record input declared in an imported file as it did before the restart" do
+      let probe baseUrl mgr deployId = do
+            resp <- evalFunction baseUrl mgr deployId "applicant-is-an-adult"
+              (Aeson.object
+                [ "arguments" Aeson..= Aeson.object
+                    [ "applicant" Aeson..= Aeson.object
+                        [ "name" Aeson..= ("Alice" :: Text)
+                        , "age" Aeson..= (30 :: Int)
+                        ]
+                    ]
+                ])
+            pure (answerOf baseUrl deployId resp)
+      (fresh, restarted) <- beforeAndAfterRestart "record-restart"
+        [ ("imported_record_decl.l4", importedRecordDeclJL4)
+        , ("imported_record_main.l4", importedRecordMainJL4)
+        ] probe
+      resultValue (snd fresh) `shouldBe` Just (Aeson.Bool True)
+      restarted `shouldBe` fresh
+
+    it "words the error for an input no clause matches as it did before the restart" do
+      -- review of legalese/l4-ide#545: a rule written as clauses words its
+      -- run-time error from a mark on the CONSIDERs the clauses compile to.
+      let probe baseUrl mgr deployId =
+            answerOf baseUrl deployId <$> evalFunction baseUrl mgr deployId "price"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["c" Aeson..= ("Blue" :: Text)]])
+      (fresh, restarted) <- beforeAndAfterRestart "clauses-restart" [("price.l4", partialClausesJL4)] probe
+      show fresh `shouldSatisfy` ("No clause of `price` matches these inputs." `Text.isInfixOf`) . Text.pack
+      restarted `shouldBe` fresh
+
+    it "describes a function, and its fields, as it did before the restart" do
+      -- The schema is built from the DECLAREs, whose @desc text sits on
+      -- annotations that a cache of the checked module did not keep.
+      let probe baseUrl mgr deployId = do
+            let url path = baseUrl <> "/deployments/" <> Text.unpack deployId <> path
+            openapi <- httpGet mgr (url "/openapi.json")
+            details <- httpGet mgr (url "/functions/disclosure")
+            list <- httpGet mgr (url "/functions")
+            -- The document's version is the deployment's, which a test that
+            -- registers its functions directly never gave one.
+            let withoutInfo (status, body) = (status, withoutKey "info" <$> body)
+                withoutKey k (Aeson.Object o) = Aeson.Object (Aeson.KeyMap.delete (Aeson.Key.fromText k) o)
+                withoutKey _ v = v
+            pure
+              [ withoutInfo (answerOf baseUrl deployId openapi)
+              , answerOf baseUrl deployId details
+              , answerOf baseUrl deployId list
+              ]
+      (fresh, restarted) <- beforeAndAfterRestart "schema-restart" [("taxpayer.l4", taxpayerJL4)] probe
+      map fst fresh `shouldBe` [200, 200, 200]
+      -- the descriptions are there to be lost: the OpenAPI document and the
+      -- function's own page carry them (the list of functions does not)
+      forM_ (take 2 (map snd fresh)) \body ->
+        show body `shouldSatisfy` ("Income earned abroad, if any" `Text.isInfixOf`) . Text.pack
+      restarted `shouldBe` fresh
+
+    it "lists an input the module never declared as it did before the restart" do
+      -- The deploy turns a name the type checker finds out of scope into an
+      -- input, from the type checker's errors, which a cache of the checked
+      -- module did not hold. (Calling `above` answers "flag is not in scope"
+      -- on a fresh deploy too, so only the listing is compared.)
+      let probe baseUrl mgr deployId =
+            answerOf baseUrl deployId <$> httpGet mgr (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/above")
+      (fresh, restarted) <- beforeAndAfterRestart "implicit-restart" [("flag.l4", implicitFlagJL4)] probe
+      fst fresh `shouldBe` 200
+      show fresh `shouldSatisfy` ("flag" `Text.isInfixOf`) . Text.pack
+      restarted `shouldBe` fresh
+
+    it "serves a function added to a stored file, as a deploy of the edited files would" do
+      -- A restart used to take the list of files that had functions from its
+      -- cache, so a function added to any other file never appeared.
+      let helper = Text.unlines ["GIVEN n IS A NUMBER", "GIVETH A BOOLEAN", "DECIDE big IF n > 10"]
+          deployments = [("grown", [("qualifies.l4", qualifiesJL4), ("helper.l4", helper)])]
+          export = editSource "grown" "helper.l4" ("@export Whether a number is big\n" <>)
+      withServicesRestarted deployments export \_logLines baseUrl mgr -> do
+        listed <- httpGet mgr (baseUrl <> "/deployments/grown/functions")
+        functionNames (responseBody listed) `shouldBe` ["big", "compute_qualifies"]
+        resp <- evalFunction baseUrl mgr "grown" "big" (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (11 :: Int)]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "ignores a bundle.cbor that an older build left, and leaves it where it is" do
+      -- Older builds kept a cache of the checked module beside the sources and
+      -- started from it. This one compiles the sources and does not read it, so
+      -- what is in the file changes nothing; and the file is not touched, so a
+      -- rollback to a build that reads it finds it as it was.
+      storeDir <- newIORef ""
+      let oldCache = "what an older build wrote"
+          leave dir = do
+            writeIORef storeDir dir
+            Text.IO.writeFile (dir </> "old" </> "bundle.cbor") oldCache
+      withServicesRestarted [("old", [("qualifies.l4", qualifiesJL4)])] leave \logLines baseUrl mgr -> do
+        assertRecompiled "old" logLines
+        [m | m <- messagesAbout "old" logLines, "cbor" `Text.isInfixOf` Text.toLower m] `shouldBe` []
+        resp <- evalFunction baseUrl mgr "old" "compute_qualifies" allTrueArgs
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+        dir <- readIORef storeDir
+        Text.IO.readFile (dir </> "old" </> "bundle.cbor") `shouldReturn` oldCache
+
+    it "compiles a restarted deployment under --compile-timeout, as a deploy does" do
+      -- A timeout of zero is over before the compile starts. A restart that
+      -- read a cache instead did not compile, and so was not subject to it.
+      withServicesRestartedOpts testOptions {compileTimeout = 0}
+        [("slow", [("qualifies.l4", qualifiesJL4)])] (const (pure ())) \logLines baseUrl mgr -> do
+          status <- deploymentStatus baseUrl mgr "slow"
+          fmap (.dsStatus) status `shouldBe` Just "failed"
+          messagesAbout "slow" logLines `shouldContain` ["Compilation timed out or exceeded memory limit"]
+
+    describe "when compiling a stored deployment throws" do
+      -- A source whose inputs collide once their names are sanitised
+      -- (`a b` and `a-b`) makes the compiler raise an error rather than refuse
+      -- it. The service loads every deployment of the store before it listens,
+      -- so one of them must not stop it: the deployment is failed, with the
+      -- reason, and the others load.
+      let deployments = [("fine", [("qualifies.l4", qualifiesJL4)]), ("clash", [("clash.l4", nameClashJL4)])]
+      it "fails that deployment and loads the others when the store is loaded eagerly" do
+        withServicesRestarted deployments (const (pure ())) \logLines baseUrl mgr -> do
+          status <- deploymentStatus baseUrl mgr "clash"
+          fmap (.dsStatus) status `shouldBe` Just "failed"
+          fmap (.dsError) status `shouldSatisfy` maybe False (maybe False ("collision after sanitization" `Text.isInfixOf`))
+          messagesAbout "clash" logLines `shouldContain` ["Deployment failed"]
+          fineStatus <- deploymentStatus baseUrl mgr "fine"
+          fmap (.dsStatus) fineStatus `shouldBe` Just "ready"
+          resp <- evalFunction baseUrl mgr "fine" "compute_qualifies" allTrueArgs
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+      it "fails it, with the reason, when the store is loaded lazily" do
+        withPendingService "clash-lazy" [("clash.l4", nameClashJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "clash-lazy" "clash" (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldSatisfy` (>= 500)
+          status <- deploymentStatus baseUrl mgr "clash-lazy"
+          fmap (.dsStatus) status `shouldBe` Just "failed"
+          fmap (.dsError) status `shouldSatisfy` maybe False (maybe False ("collision after sanitization" `Text.isInfixOf`))
+
+    describe "when the stored sources no longer check" do
+      -- The sources on disk are what the operator last deployed, but they are
+      -- only files. A restart compiles what they are now: if that does not
+      -- parse or type-check, the deployment is failed, with the errors a deploy
+      -- of those sources would get and a warning that names the file and prints
+      -- them, and the others in the store load as usual.
+      let deployments =
+            [ ("kept", [("qualifies.l4", qualifiesJL4)])
+            , ("edited", [("qualifies.l4", qualifiesJL4)])
+            ]
+          -- @mention@ is something the errors must say: what a deploy of the
+          -- edited source would be told, and what the warning prints.
+          refusesTheEdit label edit mention =
+            it label do
+              withServicesRestarted deployments (editSource "edited" "qualifies.l4" edit) \logLines baseUrl mgr -> do
+                status <- deploymentStatus baseUrl mgr "edited"
+                fmap (.dsStatus) status `shouldBe` Just "failed"
+                -- the reason is given
+                fmap (.dsError) status `shouldSatisfy` maybe False (maybe False (mention `Text.isInfixOf`))
+                -- the log prints it, naming the file
+                errorsLoggedFor "edited" "qualifies.l4" logLines `shouldSatisfy` any (mention `Text.isInfixOf`)
+                -- and nothing is served
+                resp <- evalFunction baseUrl mgr "edited" "compute_qualifies" allTrueArgs
+                statusCode' resp `shouldBe` 500
+                -- the other deployment is not affected
+                keptStatus <- deploymentStatus baseUrl mgr "kept"
+                fmap (.dsStatus) keptStatus `shouldBe` Just "ready"
+                keptResp <- evalFunction baseUrl mgr "kept" "compute_qualifies" allTrueArgs
+                assertSuccess keptResp \r ->
+                  Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+      refusesTheEdit "fails a deployment whose stored source has a type error"
+        (Text.replace "walks AND eats AND drinks" "walks AND eats AND 5")
+        "is expected to be of type"
+      refusesTheEdit "fails a deployment whose stored source does not parse"
+        (<> "\nDECIDE ( IS\n")
+        "unexpected ("
+
+    it "answers a record input as before when an edit shifts the numbering of the types" do
+      -- The stored sources are re-checked, and the record's type is found by
+      -- its Unique, which is the position of its DECLARE in the file. Add a
+      -- DECLARE above it and every Unique after it moves.
+      let call baseUrl mgr deployId = do
+            resp <- evalFunction baseUrl mgr deployId "disclosure"
+              (Aeson.object
+                [ "arguments" Aeson..= Aeson.object
+                    [ "tp" Aeson..= Aeson.object
+                        [ "name" Aeson..= ("Alice" :: Text)
+                        , "income" Aeson..= (20000 :: Int)
+                        ]
+                    ]
+                ])
+            pure (answerOf baseUrl deployId resp)
+      fresh <- withServiceFromSources "shift-fresh" [("taxpayer.l4", taxpayerJL4)] \baseUrl mgr ->
+        call baseUrl mgr "shift-fresh"
+      fst fresh `shouldBe` 200
+      restarted <- withServicesRestarted [("shifted", [("taxpayer.l4", taxpayerJL4)])]
+        (editSource "shifted" "taxpayer.l4" ("DECLARE Shift HAS\n    sx IS A NUMBER\n\n" <>))
+        \_logLines baseUrl mgr -> call baseUrl mgr "shifted"
+      -- the same answer, or none, and never "not a known record"
+      restarted `shouldBe` fresh
 
   describe "evaluation with trace" do
     it "includes reasoning when trace=full" do
@@ -3340,10 +3629,27 @@ spec = describe "integration" do
       result <- compileBundle logger "test" sources
       case result of
         Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
-        Right (fns, meta, _bundles) -> do
+        Right (fns, meta) -> do
           Map.size fns `shouldSatisfy` (> 0)
           length meta.metaFunctions `shouldSatisfy` (> 0)
           Text.length meta.metaVersion `shouldBe` 64  -- SHA-256 hex
+
+    it "says why a source does not parse, to the caller and in the log" do
+      -- A file that does not parse has no check result at all, so the reason
+      -- is not among the type errors; it used to be said nowhere ("Typecheck
+      -- failed", and a warning that named the file and nothing else).
+      (logPath, h) <- openTempFile' "jl4-service-parse-error"
+      logger <- newLoggerTo h False
+      result <- compileBundle logger "test" (Map.singleton "broken.l4" (qualifiesJL4 <> "\nDECIDE ( IS\n"))
+      hClose h
+      logLines <- Maybe.mapMaybe Aeson.decodeStrict . BS8.lines <$> BS.readFile logPath
+      removePathForcibly (takeDirectory logPath)
+      case result of
+        Left err -> do
+          err `shouldSatisfy` ("broken.l4" `Text.isInfixOf`)
+          err `shouldSatisfy` ("unexpected (" `Text.isInfixOf`)
+        Right _ -> expectationFailure "A source that does not parse was compiled"
+      errorsLoggedFor "test" "broken.l4" logLines `shouldSatisfy` any ("unexpected (" `Text.isInfixOf`)
 
     it "rejects empty bundles" do
       logger <- newLogger False
@@ -3372,7 +3678,7 @@ spec = describe "integration" do
         Left err -> do
           err `shouldNotSatisfy` Text.isInfixOf "res"
           err `shouldSatisfy` (not . Text.null)
-        Right (_fns, meta, _bundles) ->
+        Right (_fns, meta) ->
           expectationFailure $
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
@@ -3387,7 +3693,7 @@ spec = describe "integration" do
       case result of
         Left err ->
           err `shouldSatisfy` Text.isInfixOf "`size` is published with @export, but its inputs have no names"
-        Right (_fns, meta, _bundles) ->
+        Right (_fns, meta) ->
           expectationFailure $
             "Expected rejection, but published the inputs "
               <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
@@ -3404,7 +3710,7 @@ spec = describe "integration" do
         ]
       case result of
         Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
-        Right (_fns, meta, _bundles) ->
+        Right (_fns, meta) ->
           [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions] `shouldBe` [("twice", ["b"])]
 
     it "publishes the same clause group with a GIVEN, under the names it gives" do
@@ -3416,7 +3722,7 @@ spec = describe "integration" do
         ]
       case result of
         Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
-        Right (_fns, meta, _bundles) ->
+        Right (_fns, meta) ->
           [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions] `shouldBe` [["c", "n"]]
 
 -- ----------------------------------------------------------------------------
@@ -3715,7 +4021,7 @@ withServiceFromSources' deployId sources act = withStoreDir (Text.unpack deployI
   result <- compileBundle logger "test" sourceMap
   (fns, meta) <- case result of
     Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
-    Right (f, m, _bundles) -> pure (f, m)
+    Right (f, m) -> pure (f, m)
 
   -- Register directly in the TVar
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
@@ -3758,7 +4064,7 @@ withServiceFromSourcesOpts' opts deployId sources act = withStoreDir (Text.unpac
   result <- compileBundle logger "test" sourceMap
   (fns, meta) <- case result of
     Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
-    Right (f, m, _bundles) -> pure (f, m)
+    Right (f, m) -> pure (f, m)
 
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
@@ -3809,7 +4115,7 @@ withServiceFromSourcesTVar' deployId sources act = withStoreDir (Text.unpack dep
   result <- compileBundle logger "test" sourceMap
   (fns, meta) <- case result of
     Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
-    Right (f, m, _bundles) -> pure (f, m)
+    Right (f, m) -> pure (f, m)
 
   registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
   pendingUpd <- newTVarIO Map.empty
@@ -3833,27 +4139,39 @@ hasDecisionQueryCache registry deployId fnName = do
       Nothing -> False
     _ -> False
 
--- | Compile a bundle, persist it to the store exactly as a deploy does —
--- sources, @metadata.json@ AND @bundle.cbor@ — then throw the in-memory
--- registry away and bring the deployment back through the production restart
--- path, 'DeploymentLoader.loadAndRegister'.
+-- | Persist each deployment to the store as a deploy does (its sources and its
+-- @metadata.json@), let the caller do something to the store while the service
+-- is down, then throw the in-memory registry away and bring every deployment
+-- back through the production restart path, 'DeploymentLoader.loadAndRegister'.
 --
 -- Every other helper in this file registers freshly-compiled
 -- 'ValidatedFunction's straight into the TVar, which makes the whole suite
--- blind to anything that differs only after a restart. The CBOR round-trip is
--- exactly such a thing: a bundle keeps no part of an annotation but the
--- multi-clause mark (@Serialise Anno@ in "L4.Syntax"), so a rehydrated AST
--- carries no type information. That is what made
--- @\/query-plan@ and @\/ladder@ answer 400 ("Can only visualize, as a ladder
--- diagram, a DECIDE that returns a boolean") on any process restarted since the
--- deploy, while @\/evaluation@ — which needs no annotations — kept working.
+-- blind to anything that differs only after a restart. A restart used to read
+-- a cache, @bundle.cbor@, that kept no part of an annotation but the
+-- multi-clause mark, so a restarted service answered differently from the one
+-- that was deployed: @\/query-plan@ answered 400 ("Can only visualize, as a
+-- ladder diagram, a DECIDE that returns a boolean"), a @JSONDECODE@ lost its
+-- record type, field descriptions vanished. These tests ask a question of a
+-- fresh deployment and of a restarted one, and want the same answer.
 --
--- The helper fails if @bundle.cbor@ is gone afterwards: 'loadAndRegister'
--- deletes it and silently recompiles from source whenever the CBOR rebuild
--- fails, and a test that quietly took the recompile path would prove nothing.
-withServiceRestartedFromCbor :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceRestartedFromCbor deployId sources act = do
-  resOrExc <- try (withServiceRestartedFromCbor' deployId sources act)
+-- The action gets the lines the restart logged, as JSON.
+withServicesRestarted
+  :: [(Text, [(FilePath, Text)])]
+  -> (FilePath -> IO ())
+  -- ^ Given the store's directory, while the service is down.
+  -> ([Aeson.Value] -> String -> Manager -> IO a)
+  -> IO a
+withServicesRestarted = withServicesRestartedOpts testOptions
+
+-- | 'withServicesRestarted' under the options the restarted service is given.
+withServicesRestartedOpts
+  :: Options
+  -> [(Text, [(FilePath, Text)])]
+  -> (FilePath -> IO ())
+  -> ([Aeson.Value] -> String -> Manager -> IO a)
+  -> IO a
+withServicesRestartedOpts opts deployments editStore act = do
+  resOrExc <- try (withServicesRestarted' opts deployments editStore act)
   case resOrExc of
     Left ioe ->
       if isPermissionError ioe
@@ -3863,50 +4181,192 @@ withServiceRestartedFromCbor deployId sources act = do
           pure undefined
     Right result -> pure result
 
-withServiceRestartedFromCbor' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withServiceRestartedFromCbor' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
-  let cborPath = tmpPath </> Text.unpack deployId </> "bundle.cbor"
+withServicesRestarted'
+  :: Options
+  -> [(Text, [(FilePath, Text)])]
+  -> (FilePath -> IO ())
+  -> ([Aeson.Value] -> String -> Manager -> IO a)
+  -> IO a
+withServicesRestarted' opts deployments editStore act = withStoreDir "restarted" \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
-  let sourceMap = Map.fromList sources
-      storedMeta = BundleStore.StoredMetadata
-        { BundleStore.smVersion = computeVersion sourceMap
-        , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
-        , BundleStore.smDescription = Nothing
-        , BundleStore.smServiceVersion = Nothing
-        , BundleStore.smDeploymentVersion = Nothing
-        }
-  result <- compileBundle logger deployId sourceMap
-  bundles <- case result of
-    Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
-    Right (_fns, _meta, bs) -> pure bs
-  BundleStore.saveBundle store deployId sourceMap storedMeta
-  BundleStore.saveBundleCbor store deployId bundles
+  forM_ deployments \(deployId, sources) -> do
+    let sourceMap = Map.fromList sources
+        storedMeta = BundleStore.StoredMetadata
+          { BundleStore.smVersion = computeVersion sourceMap
+          , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+          , BundleStore.smDescription = Nothing
+          , BundleStore.smServiceVersion = Nothing
+          , BundleStore.smDeploymentVersion = Nothing
+          }
+    BundleStore.saveBundle store deployId sourceMap storedMeta
 
-  -- The restart. Nothing survives it but the store on disk.
+  editStore tmpPath
+
+  -- The restart. Nothing survives it but the store on disk. The store's
+  -- directory is the only one this call owns, so the log goes beside it. The
+  -- file is closed, and read, before the service is up: a handle that is open
+  -- for writing locks the file against being read.
+  let logPath = takeDirectory tmpPath </> "restart.log"
   registry <- newTVarIO Map.empty
-  DeploymentLoader.loadAndRegister logger testOptions registry store deployId
-
-  stillCached <- doesFileExist cborPath
-  unless stillCached $
-    fail "Test setup: loadAndRegister discarded bundle.cbor and recompiled from source \
-         \— this test would not have exercised the CBOR rehydration path"
-  reg <- readTVarIO registry
-  case Map.lookup (DeploymentId deployId) reg of
-    Just (DeploymentReady _ _) -> pure ()
-    _ -> fail "Test setup: deployment was not ready after restart"
+  withFile logPath WriteMode \h -> do
+    restartLogger <- newLoggerTo h False
+    DeploymentLoader.loadAllAndRegister restartLogger opts registry store (map fst deployments)
+  logLines <- Maybe.mapMaybe Aeson.decodeStrict . BS8.lines <$> BS.readFile logPath
 
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
-    result' <- act baseUrl mgr
-    pure result'
+    act logLines baseUrl mgr
+
+-- | One deployment, restarted, and served.
+--
+-- Fails if the restart did not compile the deployment (see
+-- 'assertRecompiled'), or did not leave it ready.
+withServiceRestarted :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
+withServiceRestarted deployId sources act =
+  withServicesRestarted [(deployId, sources)] (const (pure ())) \logLines baseUrl mgr -> do
+    assertRecompiled deployId logLines
+    status <- deploymentStatus baseUrl mgr deployId
+    fmap (.dsStatus) status `shouldBe` Just "ready"
+    act baseUrl mgr
+
+-- | The restart compiled this deployment from its sources.
+--
+-- 'Compiler.compileBundle' logs @Compilation complete@ for a deployment with
+-- functions. A restart that served the deployment from anything else (a cache
+-- an older build kept, say) would not, and a test of what a restart serves
+-- would then be a test of something other than the restart.
+assertRecompiled :: Text -> [Aeson.Value] -> Expectation
+assertRecompiled deployId logLines =
+  unless ("Compilation complete" `elem` messagesAbout deployId logLines) $
+    expectationFailure
+      ( "Test setup: the restart did not compile " <> Text.unpack deployId
+        <> " from its sources. It logged: " <> show (messagesAbout deployId logLines)
+      )
+
+-- | The messages a restart logged about one deployment.
+messagesAbout :: Text -> [Aeson.Value] -> [Text]
+messagesAbout deployId logLines =
+  [ msg
+  | Aeson.Object o <- logLines
+  , Aeson.KeyMap.lookup "deploymentId" o == Just (Aeson.String deployId)
+  , Just (Aeson.String msg) <- [Aeson.KeyMap.lookup "msg" o]
+  ]
+
+-- | A new file in the system's temporary directory, open for writing.
+openTempFile' :: String -> IO (FilePath, Handle)
+openTempFile' template = do
+  tmp <- getCanonicalTemporaryDirectory
+  dir <- createTempDirectory tmp template
+  let path = dir </> "service.jsonl"
+  h <- openFile path WriteMode
+  pure (path, h)
+
+-- | The errors a warning about one deployment prints for one of its files:
+-- the @errors@ of the warnings that name the file.
+errorsLoggedFor :: Text -> FilePath -> [Aeson.Value] -> [Text]
+errorsLoggedFor deployId file logLines =
+  [ err
+  | Aeson.Object o <- logLines
+  , Aeson.KeyMap.lookup "level" o == Just (Aeson.String "warn")
+  , Aeson.KeyMap.lookup "deploymentId" o == Just (Aeson.String deployId)
+  , Aeson.KeyMap.lookup "file" o == Just (Aeson.String (Text.pack file))
+  , Just (Aeson.Array errs) <- [Aeson.KeyMap.lookup "errors" o]
+  , Aeson.String err <- toList errs
+  ]
+
+-- | The names in a deployment's list of functions, sorted.
+functionNames :: LBS.ByteString -> [Text]
+functionNames body = List.sort
+  [ name
+  | Just (Aeson.Array fns) <- [Aeson.decode body]
+  , Aeson.Object o <- toList fns
+  , Just (Aeson.Object f) <- [Aeson.KeyMap.lookup "function" o]
+  , Just (Aeson.String name) <- [Aeson.KeyMap.lookup "name" f]
+  ]
+
+-- | The arguments that make @compute_qualifies@ true.
+allTrueArgs :: Aeson.Value
+allTrueArgs = Aeson.object
+  [ "arguments" Aeson..= Aeson.object
+      [ "walks" Aeson..= True
+      , "eats" Aeson..= True
+      , "drinks" Aeson..= True
+      ]
+  ]
+
+-- | Change one of a deployment's stored sources, while the service is down.
+-- Fails if the edit changes nothing, so that a pattern that stopped matching
+-- cannot turn a test into one about an unedited deployment.
+editSource :: Text -> FilePath -> (Text -> Text) -> FilePath -> IO ()
+editSource deployId file edit storeDir = do
+  let path = storeDir </> Text.unpack deployId </> "sources" </> file
+  old <- Text.IO.readFile path
+  let new = edit old
+  when (new == old) $ fail ("Test setup: the edit did not change " <> path)
+  Text.IO.writeFile path new
+
+-- | A deployment's status, as the control plane reports it.
+deploymentStatus :: String -> Manager -> Text -> IO (Maybe DeploymentStatusResponse)
+deploymentStatus baseUrl mgr deployId = do
+  resp <- httpGet mgr (baseUrl <> "/deployments/" <> Text.unpack deployId)
+  pure (Aeson.decode (responseBody resp))
+
+-- | A response reduced to what a caller sees: the status and the decoded body,
+-- with the deployment's ID (also as the OpenAPI operation IDs spell it, with
+-- underscores) and the service's address blanked so that two deployments of the
+-- same sources can be compared.
+answerOf :: String -> Text -> Response LBS.ByteString -> (Int, Maybe Aeson.Value)
+answerOf baseUrl deployId resp =
+  ( statusCode' resp
+  , Aeson.decode
+      (LBS.fromStrict (Text.Encoding.encodeUtf8
+        ( Text.replace (Text.replace "-" "_" deployId) "DEPLOYMENT"
+        . Text.replace deployId "DEPLOYMENT"
+        . Text.replace (Text.pack baseUrl) "BASE"
+        . Text.Encoding.decodeUtf8
+        . LBS.toStrict
+        $ responseBody resp)))
+  )
+
+asObject :: Aeson.Value -> Maybe Aeson.Object
+asObject (Aeson.Object o) = Just o
+asObject _ = Nothing
+
+-- | The @value@ of an evaluation's answer:
+-- @{"tag": "SimpleResponse", "contents": {"result": {"value": ...}}}@.
+resultValue :: Maybe Aeson.Value -> Maybe Aeson.Value
+resultValue body = do
+  Aeson.Object c <- lookupKey "contents" (body >>= asObject)
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" c
+  Aeson.KeyMap.lookup "value" r
+
+httpGet :: Manager -> String -> IO (Response LBS.ByteString)
+httpGet mgr url = do
+  req <- parseRequest url
+  httpLbs req mgr
+
+-- | Ask the same questions of one deployment twice: on the freshly compiled
+-- functions, and on a service that came back from the store.
+--
+-- The probe gets the base URL, the HTTP manager and the deployment's ID, and
+-- returns whatever it saw. The two runs use different IDs, so the probe must
+-- not depend on the ID in what it returns ('answerOf' blanks it).
+beforeAndAfterRestart
+  :: Text -> [(FilePath, Text)] -> (String -> Manager -> Text -> IO a) -> IO (a, a)
+beforeAndAfterRestart deployId sources probe = do
+  let freshId = deployId <> "-fresh"
+      restartedId = deployId <> "-restarted"
+  fresh <- withServiceFromSources freshId sources \baseUrl mgr -> probe baseUrl mgr freshId
+  restarted <- withServiceRestarted restartedId sources \baseUrl mgr -> probe baseUrl mgr restartedId
+  pure (fresh, restarted)
 
 -- | Start a service with an empty deployment registry.
 withEmptyService :: (String -> Manager -> IO a) -> IO a

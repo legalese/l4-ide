@@ -33,7 +33,7 @@ withStoreDir name act =
 -- A test can end while the service is still writing into its store. A
 -- deployment compiled on first use compiles under 'async'
 -- ('DeploymentLoader.tryCompileWithTimeout'), so a test that accepts the 202
--- returns while @bundle.cbor@ is still to be written, and even after a 200 the
+-- returns while @metadata-cache.json@ is still to be written, and even after a 200 the
 -- compile goes on to write @metadata.json@ when it backfills a deployment
 -- version. A recursive delete that races either write fails with "Directory
 -- not empty", and on 2026-10-07 that failed a test whose assertions had all
