@@ -115,16 +115,20 @@ spec = describe "Unification" $ do
 
   describe "type synonym cycles (termination)" $ do
     it "rejects a self-recursive type synonym" $ do
-      ok <- checks $ Text.unlines
+      -- As a cycle: `ok` alone would also hold if the cycle went unnoticed
+      -- and the use were rejected for another reason, such as the expansion
+      -- limit being reached.
+      (ok, cycles) <- cycleReport $ Text.unlines
         [ "DECLARE Loop IS A Loop"
         , ""
         , "GIVETH A Loop"
         , "oops MEANS 42"
         ]
       ok `shouldBe` False
+      cycles `shouldBe` [["Loop"]]
 
     it "rejects mutually recursive type synonyms" $ do
-      ok <- checks $ Text.unlines
+      (ok, cycles) <- cycleReport $ Text.unlines
         [ "DECLARE Ping IS A Pong"
         , "DECLARE Pong IS A Ping"
         , ""
@@ -132,6 +136,7 @@ spec = describe "Unification" $ do
         , "oops MEANS 42"
         ]
       ok `shouldBe` False
+      cycles `shouldBe` [["Ping", "Pong"]]
 
     it "accepts a chain of non-cyclic synonyms" $ do
       ok <- checks $ Text.unlines
@@ -438,8 +443,10 @@ spec = describe "Unification" $ do
       -- is quarantined, so the application below reports IllegalApp
       -- instead of driving matchFunTy's expansion loop (whose fuel only
       -- bounds a chain of synonyms too long to follow); pre-fix this hung
-      -- forever.
-      ok <- checks $ Text.unlines
+      -- forever. The cycle is asserted, because the application is rejected
+      -- as a non-function either way: with the body quarantined, or with it
+      -- expanded until the fuel runs out.
+      (ok, cycles) <- cycleReport $ Text.unlines
         [ "DECLARE Loop IS A Loop"
         , ""
         , "GIVETH A Loop"
@@ -448,6 +455,7 @@ spec = describe "Unification" $ do
         , "result MEANS f 1"
         ]
       ok `shouldBe` False
+      cycles `shouldBe` [["Loop"]]
 
     it "accepts a deep acyclic synonym chain well within the fuel budget" $ do
       -- A 500-link alias chain needs 500 expansions along one path; the
