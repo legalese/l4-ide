@@ -2944,7 +2944,7 @@ checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
       Just oa -> anchorWords oa == anchorWords ca && not (isAt oa)
       Nothing -> case ca of
         AnchorArming{}   -> True
-        AnchorJoin{}     -> direct && slotIs InHence
+        AnchorJoin{}     -> direct && (slotIs InHence || (slotIs InLest && enclosingIs DMustNot))
         AnchorDeadline{} -> direct && slotIs InLest && not (enclosingIs DMustNot)
         AnchorAt{}       -> False
       where
@@ -2982,9 +2982,11 @@ checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
 -- 2026-09-16): the 'EdgeWord' only chooses the diagnostic's keyword.
 checkAnchor :: EdgeWord -> DeadlinePosition -> Anchor Name -> Check (Anchor Resolved)
 checkAnchor edge pos a = case a of
+  -- under a SHANT's LEST the join is the violating act (§2.6 card A3);
+  -- under any other LEST nothing joined
   AnchorJoin aann     -> AnchorJoin aann     <$ lifecycle (\ enc -> case enc.slot of
-                                                             InLest  -> Just JoinUnderLest
-                                                             InHence -> Nothing)
+                                                             InLest | enc.modal /= DMustNot -> Just JoinUnderLest
+                                                             _ -> Nothing)
   AnchorDeadline aann -> AnchorDeadline aann <$ lifecycle (\ enc ->
                                                              if enc.hasDeadline then Nothing else Just EnclosingHasNoDeadline)
   AnchorArming aann   -> pure (AnchorArming aann)
@@ -8048,7 +8050,8 @@ prettyCheckError (AnchorUnavailable edge a reason) =
       [ "OF THE JOIN cannot anchor " <> article <> " " <> kw <> " under LEST."
       , ""
       , "LEST runs because the obligation was NOT completed — its join did not"
-      , "fire — so there is no join to count from. Under LEST, anchor to"
+      , "fire — so there is no join to count from. (Under a SHANT's LEST there"
+      , "is: the act that broke the prohibition.) Under LEST, anchor to"
       , "OF THE DEADLINE (the deadline that was missed), to OF THE ARMING, or to"
       , "an instant; or leave the " <> kw <> " unanchored."
       ]

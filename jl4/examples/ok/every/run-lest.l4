@@ -452,8 +452,10 @@ GIVETH A DEONTIC Actor Action
 -- what THE ARMING names one level further down. Alice misses 10; the
 -- landlord's refund counts from 10, and Bob's approval, anchored OF THE
 -- ARMING of the refund obligation, is due at 10 + 3 = 13 — not at the WAIT
--- that revealed the miss (14) plus 3. The refund at 16 fires the HENCE; the
--- WAIT at 16 then reveals that Bob's window closed at 13.
+-- that revealed the miss (14) plus 3. The refund at 16 fires the HENCE and
+-- enters Bob's obligation three days after its own deadline: it could never
+-- be met, the run says so in a note, and it fails at 16, when it was entered
+-- (EVERY-EACH-QUANTIFIER-SPEC §6.1.2).
 GIVETH A DEONTIC Actor Action
 `arming under lest` MEANS
     PARTY alice MUST Sign alice WITHIN 10
@@ -484,18 +486,20 @@ GIVETH A DEONTIC Actor Action
 
 -- Three layers: Alice must sign by 10; failing that, by 5 OF THE ARMING —
 -- the enclosing obligation's arming, 0, so a window that had already
--- closed when the layer was entered; failing that, the landlord refunds
--- WITHIN 10 of that layer's deadline, 5, so by 15. A refund at 12 is the
--- first thing after 10: it reveals Alice's miss, is handed to the second
--- layer, reveals that miss too — at a deadline EARLIER than the one it had
--- just revealed — and is handed on again to the third, which it performs
--- in time. A WAIT at 11 before it changes nothing. At 20 the same refund
--- is late for the third layer, with or without the WAIT: the breach
--- reports 15. (Until round 2 of the adversarial pass of 2026-09-16 a copy
--- whose deadline had not advanced was consumed at the second layer, so
--- the refund at 12 alone left the third layer as an untouched residual
--- and the refund at 20 alone did the same, while the traces with the WAIT
--- gave FULFILLED and the breach — one instant, two verdicts.)
+-- closed when the layer was entered at 10. That layer could never be met:
+-- the run says so in a note, and it fails at 10, when it was entered, not
+-- at 5 (EVERY-EACH-QUANTIFIER-SPEC §2.6 card A2). So the landlord refunds
+-- WITHIN 10 of 10, by 20. A refund at 12 is the first thing after 10: it
+-- reveals Alice's miss, is handed to the second layer, reveals that miss
+-- too — at a deadline EARLIER than the one it had just revealed — and is
+-- handed on again to the third, which it performs in time. A WAIT at 11
+-- before it changes nothing. A refund at 20 is in time as well, at the
+-- deadline itself; at 21 it is late, with or without the WAIT, and the
+-- breach reports 20. (Until round 2 of the adversarial pass of 2026-09-16
+-- a copy whose deadline had not advanced was consumed at the second layer,
+-- so a refund at 12 alone left the third layer as an untouched residual,
+-- while the trace with the WAIT gave FULFILLED — one instant, two
+-- verdicts.)
 GIVETH A DEONTIC Actor Action
 `stuck in the middle` MEANS
     PARTY alice MUST Sign alice WITHIN 10
@@ -517,6 +521,13 @@ GIVETH A DEONTIC Actor Action
 #TRACE `stuck in the middle` AT 0 WITH
   (`WAIT UNTIL` 11)
   PARTY theLandlord DOES Refund theLandlord AT 20
+
+#TRACE `stuck in the middle` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 21
+
+#TRACE `stuck in the middle` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 21
 
 -- A `WITHIN 0` second chance — sign forthwith — is the same shape with the
 -- deadline EQUAL to the one before it (10, 10, then 15): the refund at 12

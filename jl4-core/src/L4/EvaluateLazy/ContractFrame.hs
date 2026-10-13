@@ -138,6 +138,12 @@ data ContractFrame
   --   'maybeEvaluate') so it can be keyed and the followup (e.g. a RECORD in a
   --   breach reparation) attributed to the real acting party, not the anonymous
   --   ledger. Mirrors how 'Contract6 PartyWHNF' forces the party on the match path.
+  | StampBreach StampBreachFrame
+  -- ^ SEESAW (EVERY-EACH-QUANTIFIER-SPEC §6.1.2): a breach that names a
+  -- declared failure with no timing yet has met the @[time, events]@ of the
+  -- hand-off that reached it; the clock is being forced, so the failure can
+  -- take it as its effective instant ('L4.EvaluateLazy.Machine', the @App1@
+  -- frame). A breach already timed is never re-stamped.
   | Handoff Lifecycle
   -- ^ R-Q7B: the value a @HENCE@ or @LEST@ evaluated to, about to be applied
   -- to @[time, events]@. Rebinds the hand-off's 'Lifecycle' into that value's
@@ -647,6 +653,14 @@ data BarrierFailDueFrame = BarrierFailDueFrame
   deriving stock Show
 
 -- | @BREACH BY e@, with @e@ under evaluation.
+-- | A breach whose declared failures are waiting for their hand-off clock
+-- ('StampBreach').
+data StampBreachFrame = StampBreachFrame
+  { reason    :: ReasonForBreach Reference -- ^ the breach as it arrived
+  , eventsRef :: Reference                 -- ^ the stream it was handed: a re-offered event at its head revealed it
+  }
+  deriving stock Show
+
 data BreachByFrame = BreachByFrame
   { partyRef :: Reference          -- ^ the whole @BY@ expression, allocated (forced on return)
   , acc      :: [Reference]        -- ^ list elements collected so far, reversed

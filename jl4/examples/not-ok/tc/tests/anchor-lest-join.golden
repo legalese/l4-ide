@@ -11,6 +11,7 @@ File: anchor-lest-join.l4
     OF THE JOIN cannot anchor a WITHIN under LEST.
 
     LEST runs because the obligation was NOT completed — its join did not
-    fire — so there is no join to count from. Under LEST, anchor to
+    fire — so there is no join to count from. (Under a SHANT's LEST there
+    is: the act that broke the prohibition.) Under LEST, anchor to
     OF THE DEADLINE (the deadline that was missed), to OF THE ARMING, or to
     an instant; or leave the WITHIN unanchored.

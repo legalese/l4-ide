@@ -672,6 +672,33 @@ peekClock rf = peekWHNF rf >>= pure . \ case
   Just (ValNumber t) -> Just t
   _                  -> Nothing
 
+-- | The event at the head of a stream, when it is a copy RE-OFFERED to a
+-- continuation (Contract5's expiry: the event that revealed a missed
+-- deadline, or a kept SHANT's discharge) — its party, action and stamp.
+-- Peeked, never forced: a re-offered copy is allocated as a value, so a head
+-- that is still a thunk is not one.
+revealingEvent :: Reference -> Eval (Maybe (Reference, Reference, Rational))
+revealingEvent evs = peekWHNF evs >>= \ case
+  Just (ValCons hd _) -> isReoffered hd >>= \ case
+    Nothing -> pure Nothing
+    Just _  -> peekWHNF hd >>= \ case
+      Just (ValEvent p a tR) -> fmap (p, a,) <$> peekClock tR
+      _                      -> pure Nothing
+  _ -> pure Nothing
+
+-- | A breach whose declared failures have no timing yet, given one (SEESAW,
+-- spec §6.1.2). When nothing in it had a timing — one @BREACH@, naming one
+-- party or a list — every entry now took effect at the one instant, so
+-- every entry is decisive; otherwise the decisive entries stay as they were.
+restamp :: Timing Reference -> ReasonForBreach Reference -> ReasonForBreach Reference
+restamp t reason = breachOf $
+  if allUntimed then filled {alsoDecisive = filter (/= anchorIndex filled) [0 .. length (blameList filled) - 1]}
+  else filled
+  where
+    blame = breachBlame reason
+    filled = fillDeclaredTiming t blame
+    allUntimed = all (isNothing . failureTiming) (blameList blame)
+
 -- | The action of a forced action reference, if forced.
 peekAction :: Reference -> Eval (Maybe Text)
 peekAction rf = fmap prettyLayout <$> peekWHNF rf
@@ -851,8 +878,8 @@ breachSummary reason = do
   let blame = breachBlame reason
   failures <- traverse failureSummary (toList (blameList blame))
   (party, name, deadline) <- case blame.anchor of
-    MissedDeadline partyR _ d -> (\ (p, n) -> (p, n, Just d)) <$> blameOf partyR
-    DeclaredBreach mParty _   -> (\ (p, n) -> (p, n, Nothing)) <$> maybe (pure (Nothing, Nothing)) blameOf mParty
+    MissedDeadline partyR _ d _ -> (\ (p, n) -> (p, n, Just d)) <$> blameOf partyR
+    DeclaredBreach mParty _ _   -> (\ (p, n) -> (p, n, Nothing)) <$> maybe (pure (Nothing, Nothing)) blameOf mParty
   pure MkBreachSummary
     { bsBlame = party
     , bsBlameName = name
@@ -871,10 +898,10 @@ breachSummary reason = do
       Just v  -> (Just (partyKeyWHNF v),) <$> peekName v
     peekParty rf = fmap partyKeyWHNF <$> peekWHNF rf
     failureSummary = \ case
-      MissedDeadline partyR act d -> do
+      MissedDeadline partyR act d _ -> do
         party <- peekParty partyR
         pure (MissedSummary party (prettyLayout act) d)
-      DeclaredBreach mParty mReason -> do
+      DeclaredBreach mParty mReason _ -> do
         -- whether BY named anyone is known without forcing; who, only if forced
         party <- maybe (pure NobodyNamed) (fmap PartyNamed . peekParty) mParty
         why <- maybe (pure Nothing) peekReason mReason
@@ -1831,7 +1858,7 @@ forwardExpr env = \ case
       -- ('declareBreach'). No norm (a terminal is not an obligation), no
       -- clock (the expression arm has none in hand), and the blame is
       -- peeked, never forced.
-      Nothing -> declareBreach (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef)))
+      Nothing -> declareBreach (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef Nothing)))
       Just p  -> do
         partyRef <- allocate_ p env
         pushFrame $ ContractFrame $ BreachBy BreachByFrame
@@ -2011,7 +2038,20 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         pushFrame (TernaryBuiltin1 fn arg2 z)
         continueRef arg1
       ValFulfilled -> continueBackward ValFulfilled
-      ValBreached r -> continueBackward (ValBreached r)
+      -- SEESAW (spec §6.1.2): a declared breach takes its effective instant
+      -- from the clock of the hand-off that reached it — the deadline (no
+      -- earlier than the failed obligation's arming) under a LEST, the
+      -- violating stamp under a SHANT's LEST, the act's stamp or a kept
+      -- SHANT's window end under a HENCE, the start of a run at the top.
+      -- Here, where every contract value meets its @[time, events]@, is the
+      -- one place every route to a BREACH passes. The clock is forced, and
+      -- the stamp goes on a FRESH value: a @BREACH@ shared by two
+      -- continuations is one cached thunk, reached at two clocks.
+      ValBreached r
+        | hasUntimed (breachBlame r), [t, evs] <- rs -> do
+            pushFrame (ContractFrame (StampBreach StampBreachFrame {reason = r, eventsRef = evs}))
+            continueRef t
+        | otherwise -> continueBackward (ValBreached r)
       -- An assumed function applied is a term (§4.2), keyed by the function
       -- and its arguments' values, read without forcing anything; an
       -- argument that cannot be read so leaves the call Stuck on the
@@ -2577,15 +2617,26 @@ backwardContractFrame val = \ case
       --     2026-09-16), so a defaulting party's silence cannot postpone
       --     the start of its own cure period; the re-offered event then
       --     decrements the continuation's WITHIN by the time that had
-      --     already passed since the deadline. It is the SAME reference
-      --     THE DEADLINE reads in that continuation ('lifecycleAt'), so
-      --     @WITHIN d@ and @WITHIN d OF THE DEADLINE@ agree under LEST by
-      --     construction. (For SHANT the failure is a violation, handled
-      --     at 'Contract10' with the violating event's own stamp.)
-      --   * under HENCE — here, a kept prohibition — it is the hand-off,
-      --     i.e. the revealing event's stamp, which is also THE JOIN there
-      --     (spec §5.1.1.1; moving a kept SHANT's join to its deadline is
-      --     a separate decision, not taken here).
+      --     already passed since the deadline. (For SHANT the failure is a
+      --     violation, handled at 'Contract10' with the violating event's
+      --     own stamp.)
+      --   * under HENCE — here, a kept prohibition — it is the window's end
+      --     (§2.6 card A3, built 2026-10-09): a kept SHANT achieves at its
+      --     deadline, and that instant is also THE JOIN there. The
+      --     revealing event's stamp would make the clock depend on how
+      --     many idle events the trace carried before it (measured:
+      --     @WAIT UNTIL 10@ alone left a @WITHIN 1@ follow-up pending,
+      --     @WAIT UNTIL 6@ then 10 breached it).
+      --
+      -- Both are floored at the obligation's own arming (§2.6 card A2,
+      -- built 2026-10-09): an obligation armed after its deadline — an
+      -- anchored WITHIN whose anchor lay before it was entered — could
+      -- never have been met, and fails (or lapses, or is kept) when it is
+      -- armed, not before it existed; the run says so in a note
+      -- ('armedAfterDeadlineNote'). THE DEADLINE in the continuation is
+      -- still the deadline as written ('lifecycleAt'); it and the clock
+      -- part only when the floor engages, so @WITHIN d@ and @WITHIN d OF
+      -- THE DEADLINE@ agree under LEST everywhere else.
       --
       -- Before 2026-09-16 both slots used the revealing event's stamp,
       -- which made the re-offered event decrement a LEST's WITHIN by zero.
@@ -2646,14 +2697,24 @@ backwardContractFrame val = \ case
         -- What the continuation may anchor to (R-Q7B): the deadline that
         -- just passed, this obligation's arming, and — only when the
         -- continuation is the HENCE, i.e. the join fired — the hand-off
-        -- clock as THE JOIN. Under LEST the hand-off clock IS 'deadlineR'
-        -- (§5.2): one reference, read both as the unanchored default and
-        -- as THE DEADLINE, so the two cannot drift apart. A barrier member
+        -- clock as THE JOIN. Under LEST the hand-off clock is the deadline
+        -- (§5.2), floored at the arming ('clockR', §2.6 card A2), and THE
+        -- DEADLINE is the deadline as written; the two are one reference
+        -- unless the floor engages. A barrier member
         -- hands that same reference to the failure sentinel as its anchor
         -- ('continueWithFollowup', 'sentinelArgs'), which is how the
         -- barrier's LEST comes to count from the failing member's deadline
         -- without a mechanism of its own ('barrierFail').
         deadlineR <- allocateValue (ValNumber deadline)
+        -- A2: the hand-off clock, no earlier than the arming, and a note
+        -- when that floor engages (see the clock NOTE above)
+        armedT <- peekClock armed
+        let effective = maybe deadline (max deadline) armedT
+        clockR <- case armedT of
+          Just a | a > deadline -> do
+            tellNote (armedAfterDeadlineNote act.modal act.action due a deadline)
+            allocateValue (ValNumber a)
+          _ -> pure deadlineR
         -- P2b: the 'Expired' step. It is built here, where the deadline and
         -- the revealing event are in hand, but LOGGED at the ResolveParty
         -- frame for the routed cases, because that is where the party gets
@@ -2671,11 +2732,10 @@ backwardContractFrame val = \ case
                 norm' <- maybe (pure norm) (`naming` norm) mBearer
                 pure $ Just $ plainStep (Just time') (Just ev)
                   (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline)
-        let lifecycleAt isHence t = MkLifecycle
-              { join = if isHence then Just t else Nothing
+        let lifecycleAt isHence = MkLifecycle
+              { join = if isHence then Just clockR else Nothing
               , deadline = Just deadlineR
               , armed }
-            clockAt isHence stampR = if isHence then stampR else deadlineR
             reofferResolve isHence followup' branch = do
               pending <- expiredStep branch Nothing
               -- The mark the copy carries on: a fresh event starts the walk
@@ -2696,7 +2756,7 @@ backwardContractFrame val = \ case
               evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
               markReoffered evR mark
               eventsR <- allocateValue (ValCons evR events)
-              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockAt isHence ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
+              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockR, pending, seen, lifecycle = lifecycleAt isHence})
               maybeEvaluate env party
         case act.modal of
           DMustNot ->
@@ -2725,7 +2785,8 @@ backwardContractFrame val = \ case
                 whenDeonticLog \ _ -> do
                   mBearer <- peekWHNF partyR
                   expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
-                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline))))
+                let timing = Timing {effective, observed = stamp, revealedBy = Just (ev'party, ev'act)}
+                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
               Just lestFollowup -> reofferResolve False lestFollowup ToLest
       else do
         -- NOTE: we have observed the event and do not branch, either, the
@@ -2831,9 +2892,13 @@ backwardContractFrame val = \ case
               -- is consumed, not re-offered — 'events' is what followed it.
               timeR <- allocateValue time
               deadlineR <- absoluteDeadline time due
-              -- LEST: the join did not fire, so no THE JOIN (R-Q7B); THE
-              -- DEADLINE is the window's end, which is NOT the clock here
-              let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineR, armed}
+              -- LEST: THE JOIN is the violating stamp, which is the clock
+              -- here (§2.6 card A3: a SHANT's failure is an act, so under
+              -- its LEST there is an instant to name — under a MUST's, DO's
+              -- or MAY's there is none, and the checker refuses THE JOIN
+              -- there); THE DEADLINE is the window's end, which is NOT the
+              -- clock here
+              let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
               continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
             Nothing -> do
@@ -2852,7 +2917,9 @@ backwardContractFrame val = \ case
               -- matrix only mandates SHANT+action => LEST/breach and does not
               -- prescribe the breach record's deadline field, so this does
               -- not contradict the spec.
-              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp))))
+              -- SEESAW: a violation takes effect when it happens, and is seen then
+              let timing = Timing {effective = stamp, observed = stamp, revealedBy = Just (ev'partyRef, ev'act)}
+              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp timing))))
           -- MUST, MAY, DO: action done = success
           _ -> do
             matchedStep ToHence
@@ -2893,6 +2960,19 @@ backwardContractFrame val = \ case
   -- environment the value happened to capture ('rebindLifecycle').
   Handoff lifecycle ->
     continueBackward (rebindLifecycle lifecycle val)
+  -- SEESAW: the hand-off clock a declared breach takes ('StampBreach'). It
+  -- is observed at that clock too, unless the stream it was handed starts
+  -- with a re-offered event — the event that revealed the miss its LEST (or
+  -- a kept SHANT's HENCE) answers — which is then the observation. A clock
+  -- that is not a number (an unknown, say) leaves the breach untimed.
+  StampBreach StampBreachFrame {..} -> case val of
+    ValNumber clock -> do
+      revealed <- revealingEvent eventsRef
+      let timing = case revealed of
+            Just (p, a, stamp) -> Timing {effective = clock, observed = max clock stamp, revealedBy = Just (p, a)}
+            Nothing            -> Timing {effective = clock, observed = clock, revealedBy = Nothing}
+      continueBackward (ValBreached (restamp timing reason))
+    _ -> continueBackward (ValBreached reason)
   -- EVERY, the roll call. One cons cell of the roll per step. A roll, or the
   -- rest of one, that is not known is Stuck on it: nobody can say who the
   -- group is.
@@ -3058,12 +3138,12 @@ backwardContractFrame val = \ case
       ValNil -> case reverse acc of
         []       -> userException (UserError (emptyBreachByRefusal clause))
         (p : ps) -> declareBreach $ ExplicitBreach
-          Blame { before = [], anchor = declared p, after = map declared ps }
+          Blame { before = [], anchor = declared p, after = map declared ps, alsoDecisive = [] }
       _ | null acc -> declareBreach (ExplicitBreach (singleBlame (declared partyRef)))
         | otherwise -> internalException $ RuntimeTypeError $
             "expected a LIST of parties after BREACH BY but found: " <> prettyLayout val
     where
-      declared p = DeclaredBreach (Just p) mReason
+      declared p = DeclaredBreach (Just p) mReason Nothing
   -- EVERY, the barrier: the WITHIN on the ONCE line (R-T2), which bounds the
   -- WHOLE (spec §2.2.7.5 point 3) rather than any one act.
   Barrier3 BarrierStateDueFrame {..} -> do
@@ -3149,46 +3229,35 @@ backwardContractFrame val = \ case
     | ValBreached r1 <- rval1
     , ValBreached r2 <- val
     -> do
-      -- NOTE: the compound breach is ANCHORED at one operand's breach and
-      -- NAMES every failure of both operands (R-T3, spec §6.1, built
-      -- 2026-09-15; per-entry detail and no dedup RULED the same day).
-      --
-      -- The anchor — whose kind ('DeadlineMissed' with its revealing event,
-      -- or 'ExplicitBreach') and whose time the result carries — is chosen
-      -- by time: the FIRST breach for RAND, because it is already the reason
-      -- the conjunction is lost; the SECOND for ROR, because that is when
-      -- the last alternative "missed its chance". When both happen at the
-      -- same time the tie goes to the left operand for RAND and the right
-      -- for ROR (consistently with CSL). ExplicitBreach carries no timestamp
-      -- (adding one would ripple through the constructor arity and the
-      -- jl4-service wire — known limitation), so a pair involving one is
-      -- treated as simultaneous and resolved by the same tie-break: with a
-      -- BECAUSE on both sides, the order they were lost in is never
-      -- consulted. Each entry keeps its own action, deadline or BECAUSE, so
-      -- nothing is lost by the choice except which side dates the breach.
+      -- NOTE: the compound breach NAMES every failure of both operands (R-T3,
+      -- spec §6.1, built 2026-09-15; per-entry detail and no dedup RULED the
+      -- same day) and is dated along the operand tree (SEESAW, spec §6.1.2,
+      -- RULED 2026-10-09): a RAND is lost at the EARLIER of its operands'
+      -- effective instants, because the first failure already loses the
+      -- conjunction; an ROR at the LATER, because that is when the last
+      -- alternative missed its chance. The entries that fix that instant are
+      -- the deciding operand's own decisive entries, or both operands' when
+      -- the instants are equal ('combineBlame'). Nothing is chosen by
+      -- position: swapping the operands decides the same entries, and only
+      -- the order of the list — the drafter's — changes. Until 2026-10-09
+      -- the operands' REVEALING stamps decided and a tie fell to the left
+      -- operand, so one event that revealed two misses reported deadline 5
+      -- one way round and 9 the other.
       --
       -- The failures are the CONCATENATION of both operands', left operand
       -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
       -- both missed names alice twice, once per way. A breach with no BY is
       -- one entry naming nobody.
-      let leftAnchored = case (breachTime r1, breachTime r2, op) of
-            (Just vt, Just vt', ValRAnd) -> vt <= vt'
-            (Just vt, Just vt', ValROr)  -> vt > vt'
-            (_, _, ValRAnd)              -> True
-            (_, _, ValROr)               -> False
-          -- P2b: simultaneous, or one side untimestamped, is CSL's tie-break
-          tieBreak = case (breachTime r1, breachTime r2) of
-            (Just vt, Just vt') -> vt == vt'
-            _                   -> True
-          (anchor, blame)
-            | leftAnchored = (r1, anchorLeft  (breachBlame r1) (breachBlame r2))
-            | otherwise    = (r2, anchorRight (breachBlame r1) (breachBlame r2))
-          chosen = rebase blame anchor
-      -- P2b: which side's breach anchors the compound's, and whether the
-      -- tie-break chose it. The summary names every failure of both sides.
+      let (decider, blame) = combineBlame op (breachBlame r1) (breachBlame r2)
+          chosen = breachOf blame
+      -- P2b: which operand decides the compound's instant (both, on a tie).
+      -- The summary names every failure of both sides.
       whenDeonticLog \ _ -> do
         summary <- breachSummary chosen
-        joinedStep op (JoinBreached summary) (Just (if leftAnchored then LeftSide else RightSide)) tieBreak
+        joinedStep op (JoinBreached summary) (Just (case decider of
+          LeftDecides  -> LeftSide
+          RightDecides -> RightSide
+          BothDecide   -> BothSides)) False
       continueBackward (ValBreached chosen)
 
   RBinOp2 MkRBinOp2 {..}
@@ -3333,12 +3402,6 @@ backwardContractFrame val = \ case
     dueFrameOfOpening ScrutinizeOpening {..} = ScrutinizeDue {time = armed, ..}
 
     pushCFrame = pushFrame . ContractFrame
-
-    -- | The time at which a breach materialized, if it carries one.
-    -- ExplicitBreach is untimestamped (see NOTE at the both-breached clause).
-    breachTime :: ReasonForBreach a -> Maybe Rational
-    breachTime (DeadlineMissed _ _ stamp _) = Just stamp
-    breachTime (ExplicitBreach _) = Nothing
 
     -- P2b: the branch a pending 'Expired' step was routed to.
     expiredBranch :: StepOutcome -> Maybe DS.Branch
@@ -3878,18 +3941,17 @@ barrierFinish step = case reverse step.failures of
     -- DEADLINE under a barrier's LEST is the earliest failer's, by the
     -- same choice)
     (_, BarrierFailedAt {failTimeRef, failEvsRef, failDueRef}) -> barrierFail step.ctx failDueRef failTimeRef failEvsRef
-    (i, BarrierBreached {failReason}) ->
-      -- Every failed member's own failure, in roll order, anchored at the
-      -- earliest's: the members before it on the roll are prepended, those
-      -- after it appended, each with its own action and deadline. A member
-      -- listed twice on the roll fails twice (no dedup, RULED 2026-09-15).
-      let (earlier, later) = splitAt i (f : fs)
-          own = breachBlame failReason
-          blame = own
-            { before = concatMap entries earlier ++ own.before
-            , after  = own.after ++ concatMap entries (drop 1 later) }
-          verdict = rebase blame failReason
-      in do
+    (_, BarrierBreached {}) ->
+      -- Every failed member's own failure, in roll order, combined as a
+      -- RAND (SEESAW, spec §6.1.2): the barrier is lost at the earliest
+      -- effective instant among them, and the members that failed at that
+      -- instant are its decisive entries. A member listed twice on the roll
+      -- fails twice (no dedup, RULED 2026-09-15).
+      case nonEmpty [ breachBlame r | BarrierBreached {failReason = r} <- f : fs ] of
+       Nothing -> internalException $ RuntimeTypeError
+         "a barrier with no LEST recorded a failure that is not a breach"
+       Just blames -> do
+        let verdict = breachOf (combineAll blames)
         -- P2b: the barrier's own step, logged once the verdict is decided
         -- (every member has run). The clock is the anchoring failure's
         -- revealing stamp — in hand for a missed deadline, absent only when
@@ -3921,10 +3983,6 @@ barrierFinish step = case reverse step.failures of
         Nothing       -> internalException $ RuntimeTypeError
           "the barrier finished with every member complete but no completion recorded"
         Just (t, evs) -> barrierJoined step.ctx t evs step.dueLatest
-  where
-    entries = \ case
-      BarrierBreached {failReason} -> toList (blameList (breachBlame failReason))
-      BarrierFailedAt {}           -> []
 
 -- | The earliest of a barrier's failures, with its position in the order
 -- they were recorded (roll order): a later one replaces the best so far only
@@ -3956,11 +4014,7 @@ earliestFailure (f :| fs) = foldl' pick (0, f) (zip [1 ..] fs)
       BarrierBreached {}        -> Nothing
     failureTime = \ case
       BarrierFailedAt {failAt} -> Just failAt
-      BarrierBreached {failReason} -> case failReason of
-        DeadlineMissed _ _ _ b -> case b.anchor of
-          MissedDeadline _ _ deadline -> Just deadline
-          DeclaredBreach _ _          -> Nothing
-        ExplicitBreach _ -> Nothing
+      BarrierBreached {failReason} -> breachEffective (breachBlame failReason)
 
 -- | The join has fired at @t@ (the last completion, or the arming for an
 -- empty cast), with the stream that followed it: run the HENCE through the
@@ -4093,7 +4147,10 @@ barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
-    continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason)))))
+    -- SEESAW: the state layer was lost at its deadline, and the late last
+    -- completion is what showed it
+    let timing = Timing {effective = deadline, observed = max deadline joinTime, revealedBy = Nothing}
+    continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason) (Just timing)))))
 
 -- | The state-layer LEST, applied to the trimmed stream ('BarrierTrim'):
 -- @cellRef@ is the first cell of the barrier's stream whose event is
@@ -4277,13 +4334,6 @@ partyKeyWHNF = \ case
   ValString t -> t
   v           -> prettyLayout v
 
--- | The same breach — same kind, same revealing event if any — carrying this
--- blame instead (R-T3, spec §6.1). The anchor of the blame must be of the
--- breach's own kind; every caller builds it so.
-rebase :: Blame a -> ReasonForBreach a -> ReasonForBreach a
-rebase blame = \ case
-  DeadlineMissed ev'p ev'a stamp _ -> DeadlineMissed ev'p ev'a stamp blame
-  ExplicitBreach _                 -> ExplicitBreach blame
 
 -- | What the machine says when @BREACH BY@ is given a list with nobody in it.
 emptyBreachByRefusal :: Text -> Text
@@ -7514,6 +7564,39 @@ floatingClockRefusal what d t = Text.unwords
 -- as a reference is printed bare, as the source spelled it. The generic
 -- 'Pattern' printer would re-emit it as @(EXACTLY name)@, the deprecated
 -- spelling, for a source that never wrote it.
+-- | An obligation entered after its own deadline (§2.6 card A2, and Meng's
+-- ruling with SEESAW on 2026-10-09: _"surely we should warn/error loudly
+-- about the impossible to satisfy obligation"_). It cannot be refused when
+-- the file is checked — deadlines are values the run computes — and an error
+-- would stop the whole trace, its @LEST@ (the drafter's own answer to a
+-- failure) included. So it runs, fails (or lapses, or is kept) the moment
+-- it is entered rather than before it existed, and the run says so here.
+armedAfterDeadlineNote :: DeonticModal -> Pattern Resolved -> MaybeEvaluated' (Maybe (Deadline Resolved)) -> Rational -> Rational -> Text
+armedAfterDeadlineNote modal actPat due entered deadline = Text.unwords $
+  [ what <> ", " <> modalWord <> " " <> act <> ","
+  , "was entered at " <> prettyRatio entered <> ", after its own deadline of " <> prettyRatio deadline <> ","
+  ] <> outcome <> cause <> [ "(EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)" ]
+  where
+    act = Text.strip (docText (printActionPattern actPat))
+    (what, modalWord) = case modal of
+      DMust    -> ("An obligation", "MUST")
+      DDo      -> ("An obligation", "DO")
+      DMay     -> ("A permission", "MAY")
+      DMustNot -> ("A prohibition", "SHANT")
+    outcome = case modal of
+      DMustNot -> [ "so nothing could violate it: it is kept at " <> prettyRatio entered <> ", when it was entered." ]
+      DMay     -> [ "so it could never be exercised in time: it lapses at " <> prettyRatio entered <> ", when it was entered." ]
+      _        -> [ "so it could never be met in time: it fails at " <> prettyRatio entered <> ", when it was entered." ]
+    cause = case due of
+      Left (Just (MkDeadline _ _ (Just AnchorArming{}))) ->
+        [ "Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when"
+        , "the obligation it continues was entered, not when this one was." ]
+      Left (Just (MkDeadline _ _ (Just anchor))) ->
+        [ "Its WITHIN counts from " <> Text.strip (prettyLayout anchor) <> ", which came before it was entered." ]
+      Left (Just (MkBefore _ _)) ->
+        [ "Its BEFORE date had already passed." ]
+      _ -> []
+
 earlyActNote :: DeonticModal -> NF -> Pattern Resolved -> Rational -> Rational -> Maybe Rational -> Text
 earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
   [ "PARTY " <> prettyLayout partyNF <> " did " <> Text.strip (docText (printActionPattern actPat))

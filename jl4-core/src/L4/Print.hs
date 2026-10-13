@@ -1881,6 +1881,7 @@ instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
       , i2 $ pretty (prettyRatio ev'time)
       ]
       <> anchorLines blame.anchor
+      <> together blame
       <> case blameList blame of
         _ :| [] -> []
         fs -> "and the breach names, in order" : map (i2 . printFailure "") (NE.toList fs)
@@ -1890,7 +1891,7 @@ instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
         -- a declared breach under a missed-deadline stamp is not built by any
         -- constructor site (spec §6.1.1) but prints rather than crashes
         anchorLines = \ case
-          MissedDeadline p action deadline ->
+          MissedDeadline p action deadline t ->
             [ "surpassed the deadline of party"
             , i2 $ printWithLayout p
             , "who had to do obligatory action"
@@ -1898,14 +1899,29 @@ instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
             , "before their deadline, which was at"
             , i2 $ pretty (prettyRatio deadline)
             ]
+            -- SEESAW (spec §6.1.2): an obligation entered after its own
+            -- deadline failed when it was entered, not before it existed
+            <> if t.effective > deadline
+                 then [ "but was only entered at, and so failed at"
+                      , i2 $ pretty (prettyRatio t.effective) ]
+                 else []
           f@DeclaredBreach {} ->
             [ "revealed the breach of", i2 $ printFailure "" f ]
     ExplicitBreach blame -> vcat $
       "BREACH" : case blameList blame of
-        DeclaredBreach mParty mReason :| [] ->
+        DeclaredBreach mParty mReason _ :| [] ->
           maybe [] (\p -> [ "BY" <+> printWithLayout p ]) mParty
           <> maybe [] (\r -> [ "BECAUSE" <+> printWithLayout r ]) mReason
         fs -> map (printFailure "BY ") (NE.toList fs)
+    where
+      -- SEESAW (spec §6.1.2): the other entries that failed at the
+      -- compound's instant — a tie, so the anchor is one of several, and
+      -- no operand's position chose it. Nothing is printed for the
+      -- ordinary case of one decisive entry.
+      together blame = case blame.alsoDecisive of
+        [] -> []
+        is -> "and at the same instant" :
+          [ indent 2 (printFailure "" f) | (i, f) <- zip [0 :: Int ..] (NE.toList (blameList blame)), i `elem` is ]
 
 -- | One failure of a compound breach, under a prefix (@BY @ under a declared
 -- anchor, nothing under a missed-deadline one). A party that owed an action
@@ -1913,14 +1929,14 @@ instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
 -- line, with its @BECAUSE@ if it has one; an entry that names nobody says so.
 printFailure :: LayoutPrinter a => Doc ann -> Failure a -> Doc ann
 printFailure prefix = \ case
-  MissedDeadline p action deadline -> vcat
+  MissedDeadline p action deadline _ -> vcat
     [ prefix <> printWithLayout p
     , indent 2 "who had to do obligatory action"
     , indent 4 $ printWithLayout action
     , indent 2 "before their deadline, which was at"
     , indent 4 $ pretty (prettyRatio deadline)
     ]
-  DeclaredBreach mParty mReason ->
+  DeclaredBreach mParty mReason _ ->
     prefix <> maybe "(nobody named)" printWithLayout mParty
       <> maybe mempty (\r -> " BECAUSE" <+> printWithLayout r) mReason
 

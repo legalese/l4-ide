@@ -1845,7 +1845,7 @@ serializeBreachReason ei = \case
     evPartyLit <- nfToFnLiteral ei evParty
     evActionLit <- nfToFnLiteral ei evAction
     anchorLits <- case blame.anchor of
-      Eval.MissedDeadline party action deadline -> do
+      Eval.MissedDeadline party action deadline _ -> do
         partyLit <- nfToFnLiteral ei party
         pure
           [ ("obligatedParty", partyLit)
@@ -1854,7 +1854,7 @@ serializeBreachReason ei = \case
           ]
       -- unreachable by construction (a DeadlineMissed is anchored at a
       -- missed deadline); still a well-formed object rather than a crash
-      Eval.DeclaredBreach mParty mReason -> do
+      Eval.DeclaredBreach mParty mReason _ -> do
         partyLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mParty
         reasonLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mReason
         pure [ ("obligatedParty", partyLit), ("detail", reasonLit) ]
@@ -1868,12 +1868,12 @@ serializeBreachReason ei = \case
       <> anchorLits <> arrays
   Eval.ExplicitBreach blame -> do
     anchorLits <- case blame.anchor of
-      Eval.DeclaredBreach mParty mReason -> do
+      Eval.DeclaredBreach mParty mReason _ -> do
         partyLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mParty
         reasonLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mReason
         pure [ ("party", partyLit), ("detail", reasonLit) ]
       -- unreachable by construction, as above
-      Eval.MissedDeadline party action deadline -> do
+      Eval.MissedDeadline party action deadline _ -> do
         partyLit <- nfToFnLiteral ei party
         pure
           [ ("party", partyLit)
@@ -1893,7 +1893,7 @@ serializeBreachReason ei = \case
         , ("anchor", FnLitInt (fromIntegral (Eval.anchorIndex blame)))
         ]
     failureLit = \case
-      Eval.MissedDeadline party action deadline -> do
+      Eval.MissedDeadline party action deadline _ -> do
         partyLit <- nfToFnLiteral ei party
         pure $ FnObject
           [ ("reason", FnLitString "deadline_missed")
@@ -1901,7 +1901,7 @@ serializeBreachReason ei = \case
           , ("action", (serializeRAction action).actionPat)
           , ("deadline", FnLitDouble $ fromRational deadline)
           ]
-      Eval.DeclaredBreach mParty mReason -> do
+      Eval.DeclaredBreach mParty mReason _ -> do
         partyLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mParty
         reasonLit <- maybe (pure FnUnknown) (nfToFnLiteral ei) mReason
         pure $ FnObject

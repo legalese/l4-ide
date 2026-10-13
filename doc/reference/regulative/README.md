@@ -91,9 +91,9 @@ The duration can be anchored with `OF`, and then the deadline is **absolute**: t
 
 "The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of — the one it is attached to when it runs. Usually that is the obligation it is written under; but a continuation can also arrive as a value (a rule with `GIVEN k IS A DEONTIC …` that ends `HENCE k`, or a `WHERE` local), and then the anchors name the obligation it is handed to, not the one it was written under — also when the value is one operand of a `RAND` or `ROR` there. It is the _nearest_ enclosing obligation: two levels down, `THE ARMING` is the middle obligation's arming, not the outermost rule's, so "within 10 days of this agreement" (below) works from one level down, where the phrase is written.
 
-An obligation is _entered_ at the instant its plain `WITHIN` counts from: at the top level, when the trace begins; under a `HENCE`, at the act; under a `LEST`, at the failure — so `THE ARMING` read from inside a reparation's own `HENCE` or `LEST` is the missed deadline (or the forbidden act), not the later event that revealed it (`jl4/examples/ok/every/run-lest.l4` §10).
+An obligation is _entered_ at the instant its plain `WITHIN` counts from: at the top level, when the trace begins; under a `HENCE`, at the act (or, after a kept prohibition, at the end of its window); under a `LEST`, at the failure — so `THE ARMING` read from inside a reparation's own `HENCE` or `LEST` is the missed deadline (or the forbidden act), not the later event that revealed it (`jl4/examples/ok/every/run-lest.l4` §10).
 
-For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohibition (`SHANT`) that was kept, the `HENCE` fires when the machine _learns_ it was kept — the first event after its deadline, not the deadline itself — and `THE JOIN` is that instant, the same one an unanchored `WITHIN` counts from. To count from the day a prohibition was discharged, anchor to `THE DEADLINE`.
+For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohibition (`SHANT`) that was kept, the join is the end of its window: the prohibition was discharged at its deadline, so its `HENCE` counts from there and `THE JOIN` names that instant, whenever the next event happens to come along. (The machine still only _learns_ it was kept at the first event after the deadline; that event is offered to the `HENCE`.) A prohibition that was broken has a join too: under its `LEST`, `THE JOIN` is the act that broke it, the same instant an unanchored `WITHIN` there counts from. Under the `LEST` of a `MUST`, `DO` or `MAY` nothing joined, and `THE JOIN` is refused.
 
 `THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position and are not reserved, so a program may still name a value `DEADLINE`.
 
@@ -140,7 +140,7 @@ absolute MEANS PARTY Seller MUST deliver WITHIN 5 OF closingDate
 
 A unit word is ordinary L4, not syntax: `WITHIN 5 days OF THE DEADLINE` checks once `days` is defined (`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`). Until it is, the file fails — how depends on what else is in scope. In a file with no imports and no other mixfix definition, like the one above, `5 days` parses as an application and the checker reports _could not find a definition for the identifier `days`_; once any mixfix operator is in scope (after `IMPORT prelude`, say, or one `DECIDE a plus b IS …`), the parser only accepts operator words it knows, and stops at `days` with _unexpected days_. Either way the fix is the one-line definition.
 
-An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. That is not an error: the first event reveals the expiry, exactly as if the deadline had been missed by waiting. Its `LEST` then counts from that deadline like any other (see [When the next clock starts](#lest-breach-consequence)), which can put the reparation's own deadline before the obligation it repairs was ever entered: a `WITHIN 5 OF 0` entered at 20 with `LEST … WITHIN 10` is due at 15, and the first event after 20 reveals both misses at once. That is the rule taken literally; whether the reparation's clock should instead start no earlier than the failed obligation's entry is an open question, recorded in the design spec.
+An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. Such an obligation could never be met. It is not refused when the file is checked, because the deadline is a value the run works out; instead the run reports it in a note, under `Notes:`, naming the obligation, when it was entered and the deadline it already had. The obligation then fails at the instant it was entered, not before it existed, and its `LEST` counts from there: a `WITHIN 5 OF 0` entered at 20 with `LEST … WITHIN 10` fails at 20 and its reparation is due at 30. A `MAY` entered after its deadline lapses then, and a `SHANT` is kept then. The common way to write one by accident is `WITHIN d OF THE ARMING` inside a `HENCE` or `LEST`, where `THE ARMING` is when the obligation it continues was entered, not this one; the note says so when that is the cause.
 
 ### Dates as anchors
 
@@ -264,7 +264,7 @@ Note that SHANT flips the polarity: for prohibitions, the action happening is th
 
 The last row applies only when the group did act. A member who never acts at all fails on the first row — its own `WITHIN`, when it has one — even if the `ONCE … WITHIN` deadline was the earlier of the two: with `EVERY Tenant t … WITHIN 14 … ONCE ALL HAVE WITHIN 10 … LEST … WITHIN 5`, one tenant who never signs puts the reparation at 14 + 5 = 19, not 10 + 5 = 15, and it would be 15 only if the members carried no `WITHIN` of their own. (Whether the group deadline should win there is an open question, recorded in the design spec.)
 
-So in the penalty clause below, Alice's 60 days to pay the larger sum run from day 30, whether the miss came to light on day 31 or on day 90 — a party who misses a deadline and then goes quiet does not push back the start of its own cure period. The same instant can be named outright as `WITHIN 60 OF THE DEADLINE` (see [WITHIN](#within-temporal-deadline)); for a missed `MUST`, `DO` or `MAY` the two spellings mean the same thing. They differ for a `SHANT`: there `THE DEADLINE` is the end of the prohibition's window, while the plain `WITHIN` counts from the violation. L4 still only _learns_ of a missed deadline when a later event arrives, and that event is offered to the `LEST` obligation, so a late payment that is the first thing recorded can still discharge the reparation it was written for — if it falls within the reparation's own window, counted from the deadline. When one event is past several windows in a chain of `LEST`s — a first chance, a second, a third — it is offered to each in turn until it reaches the first whose window is still open, and that is the obligation it performs or fails; how many other events the trace carries makes no difference to the verdict, and neither does a layer in the chain whose deadline is no later than the one before it (`WITHIN 0`, or anchored at an instant already past). The one chain that walk cannot finish is a `LEST` that names itself with a window that is never open — `WITHIN 0`, a negative `WITHIN`, or an anchored deadline that never moves — so that every incarnation is already past when it is entered; L4 refuses such a contract by name after a thousand hand-offs in a row rather than walking it forever. A breach, when one is finally reported, is dated at the event that revealed it and carries the deadline that was missed. (Before 2026-09-16 the `LEST` clock started at the revealing event instead. The tutorial [What Follows](../../tutorials/obligations/what-follows.md) works the rule through a late fee and a guarantor.)
+So in the penalty clause below, Alice's 60 days to pay the larger sum run from day 30, whether the miss came to light on day 31 or on day 90 — a party who misses a deadline and then goes quiet does not push back the start of its own cure period. The same instant can be named outright as `WITHIN 60 OF THE DEADLINE` (see [WITHIN](#within-temporal-deadline)); for a missed `MUST`, `DO` or `MAY` the two spellings mean the same thing. They differ for a `SHANT`: there `THE DEADLINE` is the end of the prohibition's window, while the plain `WITHIN` counts from the violation. L4 still only _learns_ of a missed deadline when a later event arrives, and that event is offered to the `LEST` obligation, so a late payment that is the first thing recorded can still discharge the reparation it was written for — if it falls within the reparation's own window, counted from the deadline. When one event is past several windows in a chain of `LEST`s — a first chance, a second, a third — it is offered to each in turn until it reaches the first whose window is still open, and that is the obligation it performs or fails; how many other events the trace carries makes no difference to the verdict, and neither does a layer in the chain whose deadline is no later than the one before it (`WITHIN 0`, or anchored at an instant already past). The one chain that walk cannot finish is a `LEST` that names itself with a window that is never open — `WITHIN 0`, a negative `WITHIN`, or an anchored deadline that never moves — so that every incarnation is already past when it is entered; L4 refuses such a contract by name after a thousand hand-offs in a row rather than walking it forever. A breach, when one is finally reported, is dated at the event that revealed it and carries the deadline that was missed; see [When a breach happened](#when-a-breach-happened) for the two instants every failure carries. (Before 2026-09-16 the `LEST` clock started at the revealing event instead. The tutorial [What Follows](../../tutorials/obligations/what-follows.md) works the rule through a late fee and a guarantor.)
 
 ### Syntax
 
@@ -470,6 +470,8 @@ ELSE PARTY lender MUST ...
 
 Parallel conjunction of deontic obligations. ALL component obligations must be fulfilled for the compound to be fulfilled. If either side breaches, the whole compound breaches (short-circuit).
 
+When both sides fail, the compound is breached at the **earlier** of the two failures, because the first failure already loses it, and the breach names both sides' failures, left first. Which side is written first makes no difference to when, or to which failure decided it; see [When a breach happened](#when-a-breach-happened).
+
 In concurrency theory terms, this is parallel composition where all threads must complete successfully.
 
 ### Syntax
@@ -498,7 +500,7 @@ RAND
 
 Disjunctive choice between deontic obligations. EITHER obligation being fulfilled suffices for the compound to be fulfilled. If either side fulfills, the whole compound fulfills (short-circuit).
 
-If ALL alternatives are breached, the compound is breached; the reported breach is the latest one (the last alternative "missed its chance"), falling back to the right operand when the breaches carry no distinguishing timestamps.
+If ALL alternatives are breached, the compound is breached at the **later** of the failures, when the last alternative missed its chance, and the breach names every alternative's failure, left first. As with `RAND`, the order the alternatives are written in makes no difference to when, or to which failure decided it; see [When a breach happened](#when-a-breach-happened).
 
 In concurrency theory terms, this is a race where the first to complete determines the outcome.
 
@@ -527,6 +529,52 @@ ROR
 - **HENCE**, **LEST** -- consequence clauses within each component
 
 ---
+
+## When a breach happened
+
+Every failure a breach names carries two instants.
+
+- **When it took effect.** For a missed deadline, the deadline — or, for an obligation entered after its own deadline, the moment it was entered (see [WITHIN](#within-temporal-deadline)). For a broken prohibition, the act that broke it. For a `BREACH` written in a `HENCE` or `LEST`, the instant that continuation counts from: the missed deadline under a `LEST`, the act (or a kept prohibition's deadline) under a `HENCE`.
+- **When it came to light.** The time of the event that showed it. L4 only learns that a deadline has passed when a later event arrives, so a deadline of 5 that nothing shows until an event at 10 took effect at 5 and came to light at 10.
+
+A compound is breached at the instant its parts' failures took effect, worked out the way the operators read: a `RAND` at the earliest, an `ROR` at the latest, and inside out when they are nested. With `(P MUST x WITHIN 1 ROR Q MUST y WITHIN 10) RAND R MUST z WITHIN 5` and nobody acting, the `ROR` holds until Q's deadline at 10, so the `RAND` is lost at 5, by R — not at 1, because P's miss lost nothing while Q could still act. The failures that fix that instant are the **decisive** ones. The breach report prints the first of them in the usual words, then any others that failed at the same instant, then every failure in the order the rule is written:
+
+```text
+DEONTIC BREACHED:
+  party
+    NEVERMATCHESPARTY
+  who did action
+    NEVERMATCHESACT
+  at
+    10
+  surpassed the deadline of party
+    P
+  who had to do obligatory action
+    MUST x
+  before their deadline, which was at
+    5
+  and at the same instant
+    Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        5
+  and the breach names, in order
+    P
+      ...
+    Q
+      ...
+```
+
+That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one event at 10. Written the other way round, it reports the same instant and the same two decisive failures; only the order of the lists follows the rule, and the first line names Q. The `at` is when the breach came to light; `NEVERMATCHESPARTY` and `NEVERMATCHESACT` are how a `` `WAIT UNTIL` `` event prints.
+
+`l4 batch` gives the same answer as data: each object in `failures` has `effective` and `observed`, and the breach has the compound's `effective` and `observed` instants and `decisive`, the positions in `failures` of the decisive ones. `anchor` is the position of the one the scalars describe.
+
+What this does **not** promise:
+
+- **That the verdict never depends on the order of the operands.** It does not, for operands that only make and miss deadlines. But each operand is run over the whole trace before the next one starts, so an operand that reads a fact the other one records (`RECALL` of a `RECORD` made in the sibling's `HENCE`) can see it or not depending on which is written first. Do not write a `RAND` or `ROR` whose operands read each other's records; the design spec has the open question.
+- **That an `ROR`'s operands both run.** Once one alternative is fulfilled, the other is not run further, so a `RECORD` it would have made is not made.
+- **The decision service's answer.** `jl4-service` reports the same breach without the new `effective`, `observed` and `decisive` fields: `l4 batch` carries them, and `l4 run` prints the decisive failures.
 
 ## BEFORE (Absolute Deadline)
 
