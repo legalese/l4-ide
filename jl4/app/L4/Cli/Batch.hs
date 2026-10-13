@@ -221,11 +221,12 @@ batchCmd opts = do
       -- what each input declares, for reading a case against it; a synonym
       -- (@DECLARE Year IS A NUMBER@) is this module's or an import's
       declares       = concatMap (moduleDeclares . (.module')) (tcRes : allDependencies tcRes)
-      declared       = declaredInputs (typeSynonyms declares) schema
+      synonyms       = typeSynonyms declares
+      declared       = declaredInputs synonyms schema
 
   -- Step 3: process each row into an envelope, honoring stop-on-error, and
   -- write the results in the requested format.
-  let process = processRow opts evalConfig filteredSource exportFn params schema declared
+  let process = processRow opts evalConfig filteredSource exportFn params schema synonyms declared
   withOutputHandle opts.batchOutput \h ->
     case opts.batchOutputFormat of
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
@@ -307,11 +308,12 @@ processRow
   -> ExportedFunction
   -> [(Text, Maybe (Type' Resolved))]        -- ^ params for wrapper gen
   -> [ExportedParam]                         -- ^ full schema for validation
+  -> Map.Map Unique (Type' Resolved)         -- ^ the type synonyms, for validation
   -> DeclaredInputs                          -- ^ what each input declares, for reading a case
   -> Int
   -> BatchRow
   -> IO (Aeson.Value, Bool)
-processRow opts _ _ _ _ _ _ _ (RefusedRow input reason)
+processRow opts _ _ _ _ _ _ _ _ (RefusedRow input reason)
   -- refused while reading the file: an error in either mode
   | opts.batchValidateOnly = pure
       ( Aeson.object
@@ -328,9 +330,9 @@ processRow opts _ _ _ _ _ _ _ (RefusedRow input reason)
           , Key.fromString "diagnostics" Aeson..= [reason]
           ]
       , True )
-processRow opts evalConfig filteredSource exportFn params schema declared idx (BatchRow source cells)
+processRow opts evalConfig filteredSource exportFn params schema synonyms declared idx (BatchRow source cells)
   | opts.batchValidateOnly =
-      let errs = validateRow schema input
+      let errs = validateRow synonyms schema input
           ok   = null errs
           env  = Aeson.object
             [ Key.fromString "input"  Aeson..= input
@@ -385,18 +387,22 @@ resultExceptionMsgs (MkEvalDirectiveResult _ res _) = case res of
 -- Checks that required (non-@MAYBE@) params are present and non-null, and
 -- that primitive-typed values have the right JSON kind. Lenient on
 -- compound/unknown types (never rejects what it cannot judge).
-validateRow :: [ExportedParam] -> Aeson.Value -> [Text]
-validateRow schema (Aeson.Object o) = concatMap checkParam schema
+validateRow :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> Aeson.Value -> [Text]
+validateRow synonyms schema (Aeson.Object o) = concatMap checkParam schema
   where
+    -- a synonym for @MAYBE@ is a @MAYBE@ (@DECLARE MaybeYear IS A MAYBE NUMBER@),
+    -- as evaluation reads it, though the export's own flag does not see that
+    isOptional p = maybe False (isMaybeType . expandSynonyms synonyms) p.paramType
+    required p = p.paramRequired && not (isOptional p)
     checkParam p =
       case KeyMap.lookup (Key.fromText p.paramName) o of
         Nothing ->
           [ "Missing required field: '" <> p.paramName <> "'" <> descSuffix p
-          | p.paramRequired ]
+          | required p ]
         Just Aeson.Null ->
           [ "Field '" <> p.paramName <> "' is null but required" <> descSuffix p
-          | p.paramRequired ]
-        Just v -> case primKind p.paramType of
+          | required p ]
+        Just v -> case primKind (throughMaybe synonyms <$> p.paramType) of
           Just k | not (jsonMatchesKind k v) ->
             [ "Type mismatch for field '" <> p.paramName <> "': expected "
               <> kindName k <> ", got " <> jsonKindName v <> descSuffix p ]
@@ -404,7 +410,7 @@ validateRow schema (Aeson.Object o) = concatMap checkParam schema
     descSuffix p = case p.paramDescription of
       Just d | not (Text.null d) -> " (" <> d <> ")"
       _ -> ""
-validateRow _ other =
+validateRow _ _ other =
   [ "Input record is not a JSON object: " <> jsonKindName other ]
 
 data PrimKind = KNum | KBool | KStr
@@ -550,19 +556,34 @@ declaredInputs :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> Declared
 declaredInputs synonyms schema = Map.fromList
   [ (p.paramName, maybe DeclaredUnknown declared p.paramType) | p <- schema ]
   where
-    declared ty = case primKind (Just (look Set.empty ty)) of
+    declared ty = case primKind (Just (throughMaybe synonyms ty)) of
       Just KNum  -> DeclaredNumber
       Just KBool -> DeclaredBoolean
       _          -> DeclaredText
-    -- a type as the primitive it comes to: through @MAYBE@, and through the
-    -- synonyms (@DECLARE Year IS A NUMBER@). A synonym cannot name itself, but
-    -- the walk does not rely on that.
-    look seen ty = case ty of
-      TyApp _ name [inner] | getUnique name == maybeUnique -> look seen inner
+
+-- | A type with its synonyms expanded at the head (@DECLARE Year IS A NUMBER@
+-- makes @Year@ a @NUMBER@). A synonym cannot name itself, but the walk does
+-- not rely on that.
+expandSynonyms :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+expandSynonyms synonyms = go Set.empty
+  where
+    go seen ty = case ty of
       TyApp _ name []
         | Just expansion <- Map.lookup (getUnique name) synonyms
-        , getUnique name `Set.notMember` seen -> look (Set.insert (getUnique name) seen) expansion
+        , getUnique name `Set.notMember` seen -> go (Set.insert (getUnique name) seen) expansion
       _ -> ty
+
+-- | A type as the primitive it comes to: through @MAYBE@, and through the
+-- synonyms, at any depth (@MAYBE Year@, or a synonym for @MAYBE NUMBER@).
+throughMaybe :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+throughMaybe synonyms ty = case expandSynonyms synonyms ty of
+  TyApp _ name [inner] | getUnique name == maybeUnique -> throughMaybe synonyms inner
+  other -> other
+
+-- | Whether a type is @MAYBE α@ itself.
+isMaybeType :: Type' Resolved -> Bool
+isMaybeType (TyApp _ name [_]) = getUnique name == maybeUnique
+isMaybeType _ = False
 
 -- | The type each synonym stands for (@DECLARE Year IS A NUMBER@), by the
 -- synonym's 'Unique'.

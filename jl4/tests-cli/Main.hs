@@ -10,7 +10,7 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad (forM_, unless)
 import Data.List (isInfixOf, isSuffixOf)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -224,6 +224,16 @@ batchDeclaredTextAnswers  = fixtureDir </> "batch-declared-text-answers.csv"
 batchDeclaredTextOptional = fixtureDir </> "batch-declared-text-optional.csv"
 batchDeclaredTextDates    = fixtureDir </> "batch-declared-text-dates.csv"
 batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
+
+-- | Inputs declared through a type synonym (@DECLARE Year IS A NUMBER@, a
+-- BOOLEAN, a MAYBE), with the plain types beside them as the control, and the
+-- cases for each.
+batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv :: FilePath
+batchSynonym         = fixtureDir </> "batch-synonym.l4"
+batchSynonymYearJson = fixtureDir </> "batch-synonym-year.json"
+batchSynonymFlagJson = fixtureDir </> "batch-synonym-flag.json"
+batchSynonymYearCsv  = fixtureDir </> "batch-synonym-year.csv"
+batchSynonymFlagCsv  = fixtureDir </> "batch-synonym-flag.csv"
 
 -- | CSV files that cannot be read: a stray quote, an empty file, and a quote
 -- that opens a cell and is never closed (at the end of the file, in the middle
@@ -815,6 +825,53 @@ spec bin = do
             resultOf number `shouldBe` Just (Number 25)
             show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
           other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
+
+      -- An input declared through a synonym is the type the synonym stands for
+      -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:
+      -- it used to look at the name `Year` and judge nothing, so text that is
+      -- no number, or a number for a flag, was `valid` and then refused when
+      -- the case was run. The plain exports in the fixture are the control.
+      describe "an input declared through a synonym" $ do
+        let run extra entry file = rowsOf ([batchSynonym, "-e", entry, "--inputs", file] <> extra)
+            -- one word for how a case went, run or validated
+            outcome row = case objField row "status" of
+              Just (String st) | st `elem` ["success", "valid"] -> "accepted"
+              _                                                  -> "refused" :: String
+            shape row = (outcome row, objField row "diagnostics", objField row "errors")
+
+        it "refuses text that is no number, as for a NUMBER, in JSON and in CSV" $ do
+          forM_ [batchSynonymYearJson, batchSynonymYearCsv] \file -> do
+            (_, _, plain)   <- run [] "plain number" file
+            (_, _, through) <- run [] "next year" file
+            map shape through `shouldBe` map shape plain
+            -- and the first row, the text `abc`, is the one refused, with the
+            -- message the plain NUMBER gets
+            take 1 (map outcome through) `shouldBe` ["refused"]
+            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("Expected JSON number but got: String" `isInfixOf`)
+
+        it "refuses text that is no boolean, and a number, as for a BOOLEAN, in JSON and in CSV" $ do
+          forM_ [batchSynonymFlagJson, batchSynonymFlagCsv] \file -> do
+            (_, _, plain)   <- run [] "plain flag" file
+            (_, _, through) <- run [] "flip flag" file
+            map shape through `shouldBe` map shape plain
+            take 1 (map outcome through) `shouldBe` ["refused"]
+
+        it "judges a synonym's value under --validate-only as it judges the plain type's" $ do
+          forM_ [ ("next year", "plain number", batchSynonymYearJson)
+                , ("flip flag", "plain flag", batchSynonymFlagJson) ] \(entry, control, file) -> do
+            (_, _, plain)   <- run ["--validate-only"] control file
+            (_, _, through) <- run ["--validate-only"] entry file
+            map shape through `shouldBe` map shape plain
+            -- the mismatch is named, as for the plain type
+            show (map (`objField` "errors") through) `shouldSatisfy` ("Type mismatch for field" `isInfixOf`)
+
+        it "validates what it would run: a case is valid exactly when it is accepted" $ do
+          forM_ [ ("next year", batchSynonymYearJson), ("flip flag", batchSynonymFlagJson)
+                , ("maybe year", batchSynonymYearJson), ("year maybe", batchSynonymYearJson) ]
+            \(entry, file) -> do
+              (_, _, validated) <- run ["--validate-only"] entry file
+              (_, _, ran)       <- run [] entry file
+              (entry, map outcome validated) `shouldBe` (entry, map outcome ran)
 
   -- A step of a trace is printed as source, and a string literal in source is
   -- spelled with escapes: a line break as \n, a tab as \t. #595 made the printer
