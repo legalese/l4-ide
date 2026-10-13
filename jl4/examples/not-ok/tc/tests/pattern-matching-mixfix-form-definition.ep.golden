@@ -1,0 +1,19 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-mixfix-form-definition.l4
+  Hidden: no
+  Range: 13:1-13:4
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    13 | Red `costs` n MEANS 1
+       | ^
+    This definition is written the way the rule
+
+      c `costs` n
+
+    is written, but Red is not an input its GIVEN names, so it is read as a rule of its own.
+    A rule written that way is one definition, with no cases of its own.
+    To treat some input differently, write the rule once and tell the cases apart inside it with CONSIDER.
+

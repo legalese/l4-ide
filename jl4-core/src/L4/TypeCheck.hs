@@ -112,6 +112,7 @@ import Data.Monoid
 import Control.Monad.Extra (mapMaybeM)
 import qualified Control.Monad.Extra as Extra
 import Data.Either (partitionEithers)
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
@@ -405,8 +406,10 @@ checkProgram written = do
   -- known, a run of clauses that the parser grouped on bare names alone is
   -- told apart from a run of overloads ('separateOverloads').
   rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
+    >>= quarantineResolvedSynonymCycles
   withDeclares rdeclares do
     module' <- separateOverloads written
+    warnClauseArityChange module'
     rdecides <- scanFunSigModule module'
     withDecides rdecides do
       (rprog, topEnv) <- inferProgram module'
@@ -414,6 +417,36 @@ checkProgram written = do
       -- so it can be propagated to importing modules
       let localMixfixRegistry = buildMixfixRegistry rdecides
       pure (rprog, topEnv, localMixfixRegistry)
+
+-- | Warn about a definition that looks like one more clause of the group above
+-- it and is not: it has the group's name and no GIVEN of its own, and another
+-- number of inputs than the group has patterns.
+--
+-- @DECIDE f Red IS 1@, @DECIDE f c IS 2@ and @DECIDE f Red Blue IS 3@: the
+-- parser gathers the clauses that have the same name and the same number of
+-- patterns, so the third is read as a definition of its own, which takes two
+-- inputs and calls them @Red@ and @Blue@. It checks, and @f Green Red@ gives
+-- 3. A GIVEN of its own would have said that a rule of its own is meant, so a
+-- definition with one is not asked about. Only a definition that is not itself
+-- a group is: two or more clauses with a distinguishable pattern are a
+-- deliberate rule. Run on the module as 'separateOverloads' leaves it, so a
+-- run of overloads is not mistaken for a group.
+warnClauseArityChange :: Module Name -> Check ()
+warnClauseArityChange (MkModule _ _ sec) = goSection sec
+  where
+    goSection (MkSection _ _ _ _ decls) = do
+      for_ (zip decls (drop 1 decls)) \ case
+        (Decide _ (MkDecide gann _ (MkAppForm _ ghd _ _) _), Decide _ (MkDecide dann (MkTypeSig _ (MkGivenSig _ []) Nothing) (MkAppForm _ hd args _) _))
+          | Just matrix <- view annPmMatrix gann
+          , Nothing <- view annPmMatrix dann
+          , rawName hd == rawName ghd
+          , length args /= length matrix.scrutinees
+          , Just r <- rangeOf hd ->
+              addWarning (ClauseArityChanged r hd (length matrix.scrutinees) args)
+        _ -> pure ()
+      for_ decls \ case
+        Section _ sub -> goSection sub
+        _ -> pure ()
 
 -- | Turn each run of clauses that the parser grouped only because their bare
 -- names differ ('L4.Parser.decidePatternMatch') back into the separate
@@ -5890,6 +5923,72 @@ matchPatFunTy  r t args =
 -- Forward References high level helpers
 -- ----------------------------------------------------------------------------
 
+-- | The second line of defence against a type synonym that refers to itself.
+--
+-- 'detectTypeSynonymCycles' reads spellings, before anything is resolved,
+-- and a spelling can hide a reference: a section-qualified name
+-- (@`One`.Loop@), an alias that a same-arity sibling in another section
+-- also answers to, which the checker settles by section and this pass does
+-- not see, or a use at the wrong number of arguments (a kind error, which
+-- the checker still resolves to the synonym; the pass over spellings leaves
+-- such uses alone, since a record or enum of that arity may be meant). A
+-- cycle it misses keeps its bodies, and the fuel in "L4.TypeCheck.Unify"
+-- bounds the depth of their expansion, not its work: two such synonyms
+-- that each name themselves twice, unified with each other, ran past 4 GiB.
+--
+-- So once every body is resolved, this reads the references themselves. A
+-- body names the 'Unique' of the synonym each type application in it
+-- resolved to, whatever it was spelled, and a name that did not resolve (an
+-- ambiguity, an unknown name) names none. A cycle among those is a cycle of
+-- expansions, and its members are given no body and reported as
+-- 'CyclicTypeSynonyms', as the spelling-based check does. A cycle that check
+-- already caught has no body left to follow, so this finds only what it
+-- missed. It cannot reject a program the other accepts correctly: a
+-- reference cycle among synonyms has no finite expansion.
+quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
+quarantineResolvedSynonymCycles decls = do
+  for_ cycles \ cyc -> case cyc of
+    []                       -> pure ()
+    (_, firstName, _) : _ ->
+      errorContext (WhileCheckingDeclare firstName) $
+        addError (CyclicTypeSynonyms [ n | (_, n, _) <- cyc ])
+  pure (map quarantine decls)
+  where
+    -- Every synonym that still has a body, in declaration order: the unique
+    -- all its spellings share, its declared name, and the uniques its body
+    -- applies.
+    synonyms :: [(Unique, Name, [Unique])]
+    synonyms =
+      [ (getUnique r, getOriginal r, map getUnique (typeHeads body))
+      | MkDeclChecked _ cis <- decls
+      , MkCheckInfo (r : _) (KnownType _ _ (Just body)) <- cis
+      ]
+
+    -- Each cycle's members in declaration order, the cycles in the order of
+    -- their first members.
+    cycles :: [[(Unique, Name, [Unique])]]
+    cycles =
+      map (map snd)
+        . List.sortOn (map fst)
+        $ [ List.sortOn fst members
+          | CyclicSCC members <- stronglyConnComp [ (ix, u, deps) | ix@(_, (u, _, deps)) <- indexed ]
+          ]
+
+    indexed :: [(Int, (Unique, Name, [Unique]))]
+    indexed = zip [0 ..] synonyms
+
+    quarantine :: DeclChecked DeclareOrAssume -> DeclChecked DeclareOrAssume
+    quarantine d = d { publicNames = map unbody d.publicNames }
+
+    unbody :: CheckInfo -> CheckInfo
+    unbody ci = case ci of
+      MkCheckInfo (r : _) (KnownType k ps (Just _))
+        | getUnique r `Set.member` cyclic -> ci { checkEntity = KnownType k ps Nothing }
+      _ -> ci
+
+    cyclic :: Set Unique
+    cyclic = Set.fromList [ u | cyc <- cycles, (u, _, _) <- cyc ]
+
 scanDeclares ::
   (a -> Check [DeclTypeSig]) ->
   (a -> Check [DeclChecked DeclareOrAssume]) ->
@@ -7762,6 +7861,16 @@ prettyCheckError (CyclicTypeSynonyms cycleSyns) =
   , "A type synonym must not refer to itself, directly or via other"
   , "synonyms, because it could then never be fully expanded."
   ]
+prettyCheckError (SynonymExpansionLimit limit syn) =
+  [ "I stopped following type synonyms at " <> quotedName (getName syn) <> "."
+  , ""
+  , "To compare two types I replace a type synonym by the type it stands for,"
+  , "and I give up after " <> Text.pack (show limit) <> " replacements in a row. Here a chain of synonyms,"
+  , "each defined as the next, is longer than that."
+  , ""
+  , "The types were not found to differ. Declare the first synonym in the chain"
+  , "as the type it finally stands for, to shorten the chain."
+  ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
   , ""
@@ -8110,6 +8219,14 @@ prettyCheckWarning = \ case
     [ "This clause of " <> quotedName headName <> " is never used."
     , "Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies."
     , "Remove it, or change its patterns."
+    ]
+  ClauseArityChanged _ headName patterns inputs ->
+    [ "This definition of " <> quotedName headName <> " is not another clause of the clauses above it."
+    , "Each of those has " <> Text.textShow patterns <> " pattern" <> (if patterns == 1 then "" else "s")
+        <> ", and this one has " <> Text.textShow (length inputs) <> " input" <> (if length inputs == 1 then "" else "s")
+        <> (if null inputs then "" else ", " <> Text.intercalate " and " (map quotedName inputs))
+        <> ", so it is a separate rule, and what follows its name is the names it gives its inputs, not patterns."
+    , "If it is meant as another clause, give it as many patterns as the others have; if it is a rule of its own, give it a GIVEN of its own."
     ]
   ClauseAnnotationUnused _ headName k annotation hasGiven ->
     [ "This " <> annotation <> " is above " <> whichClause <> " of " <> quotedName headName <> ", where it is not used."

@@ -34,11 +34,17 @@ import {
   isStateGraphResponse,
   stateGraphTargetGone,
   trackSrcPos,
+  EmbeddedLibraryRequestType,
   type DirectiveResult,
   type SrcPos,
   type StateGraphResponse,
 } from 'jl4-client-rpc'
 import { cmdRenderResult, cmdStateGraph } from './commands.js'
+import {
+  EMBEDDED_LIBRARY_SCHEME,
+  embeddedLibraryProvider,
+  l4DocumentSelector,
+} from './embedded-library.js'
 import { StateGraphPanel } from './state-graph-panel.js'
 import {
   SidebarProvider,
@@ -331,7 +337,7 @@ export async function activate(context: ExtensionContext) {
   }
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: langId, pattern: '**/*' }],
+    documentSelector: l4DocumentSelector(langId),
     diagnosticCollectionName: langName,
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     outputChannel,
@@ -496,6 +502,19 @@ export async function activate(context: ExtensionContext) {
   // Create the language client and start the client.
   client = new VSCodeL4LanguageClient(
     new LanguageClient(langId, langName, serverOptions, clientOptions)
+  )
+
+  // The stdlib jl4-lsp carries inside its binary has no file on disk, and
+  // go-to-definition into it answers with a `jl4-embedded:` URI. Serve those
+  // read-only, with the text the server itself holds.
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      EMBEDDED_LIBRARY_SCHEME,
+      embeddedLibraryProvider(
+        () => client.start(),
+        (uri) => client.sendRequest(EmbeddedLibraryRequestType, { uri })
+      )
+    )
   )
 
   // Legalese AI agent-core ports shared by every agent session in this

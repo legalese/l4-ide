@@ -98,6 +98,7 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.EmbeddedLibrary
     LSP.L4.Inspector
     LSP.L4.SemanticTokens
     LSP.L4.Rules
@@ -158,9 +159,16 @@ test-suite jl4-lsp-test
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    AtomKeySizeSpec
+    AtomKeySweepSpec
+    CheckSource
+    ClauseGeneratedNamesSpec
+    CorpusSweep
+    EmbeddedLibrarySpec
     HoverDisplaySpec
     ImportDiagnosticSpec
     ImportUriSpec
+    KeyEnvSharingSpec
     LadderAtomIdSpec
     LadderCallExpansionSpec
     LadderTermKeySpec
@@ -183,4 +191,6 @@ test-suite jl4-lsp-test
     jl4-query-plan,
     lsp-types,
     mtl,
-    text
+    optics,
+    text,
+    text-rope

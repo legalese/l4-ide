@@ -10,6 +10,8 @@ module LSP.L4.Viz.Ladder (
   -- * VizConfig, VizState
   VizConfig (..),
   mkVizConfig,
+  retargetVizConfig,
+  withSimplification,
   withCallExpansions,
   stampMixfixCalls,
   expansionNodeBudget,
@@ -24,6 +26,7 @@ module LSP.L4.Viz.Ladder (
   getLeafKeys,
   getFreshLeaves,
   getVizConfig,
+  getKeyEnv,
 
   -- * Conversion
   V.fromLspVerDocId,
@@ -103,7 +106,19 @@ mkVizConfig lspVerDocId module' substitution shouldSimplify =
     , substitution
     , shouldSimplify
     , expandCalls = False
+    , keyEnv = ConfigKeyEnv (withTypeExpander (TC.applyFinalSubstitution substitution moduleUri) (mkKeyEnv module'))
     }
+
+-- | A config for a newer check of the same document. The module, its
+-- substitution and its URI are replaced together, and the key environment is
+-- built afresh for them; the choices the reader made (simplify, expand) stay.
+--
+-- Use this, never a record update of @module'@, @substitution@ or @moduleUri@:
+-- 'keyEnv' is derived from those three, and an update would leave it describing
+-- the module the config used to draw.
+retargetVizConfig :: LSP.VersionedTextDocumentIdentifier -> Module Resolved -> TC.Substitution -> VizConfig -> VizConfig
+retargetVizConfig lspVerDocId module' substitution old =
+  (mkVizConfig lspVerDocId module' substitution old.shouldSimplify) { expandCalls = old.expandCalls }
 
 data VizConfig = MkVizConfig
   { moduleUri      :: !NormalizedUri
@@ -117,8 +132,31 @@ data VizConfig = MkVizConfig
   -- only when an @l4.visualize@ request asks for it with @{"expandCalls": true}@
   -- ('LSP.L4.Actions.VisualiseOptions'); the IDE's "Show decision graph" lens does
   -- not, and @l4 verify@, the service and the REPL never do.
+  , keyEnv         :: ConfigKeyEnv
+  -- ^ What names a leaf's term (R3, "L4.Viz.AtomKey"), for @module'@. It walks
+  -- the whole module, so it is built once per config, lazily, and every
+  -- 'doVisualize' drawn from the config shares it. A caller that draws every
+  -- decision of a file (@l4 verify@) must therefore make ONE config and derive the
+  -- rest by record update of 'shouldSimplify' or 'expandCalls'; a config made
+  -- per decision paid for the walk per decision, which is quadratic in the
+  -- module. See 'retargetVizConfig' for changing the module.
   }
   deriving stock (Show, Generic, Eq)
+
+-- | The 'KeyEnv' of a 'VizConfig'. It is a function of the config's @module'@,
+-- @substitution@ and @moduleUri@, which the derived 'Eq' compares, so it adds no
+-- distinction of its own; and it has no 'Show' worth reading.
+newtype ConfigKeyEnv = ConfigKeyEnv KeyEnv
+
+instance Eq ConfigKeyEnv where
+  _ == _ = True
+
+instance Show ConfigKeyEnv where
+  show _ = "<KeyEnv>"
+
+-- | The same config, simplifying (CNF) or not. Shares the key environment.
+withSimplification :: Bool -> VizConfig -> VizConfig
+withSimplification b cfg = cfg { shouldSimplify = b }
 
 -- | Turn call expansions on (WHERE-INLINING-SPEC §10).
 withCallExpansions :: VizConfig -> VizConfig
@@ -202,8 +240,9 @@ data VizState = MkVizState
   , typicallyDefaults :: IntMap Bool
   -- ^ Unique.unique -> the binder's BOOLEAN TYPICALLY default (see 'collectTypicallyDefaults').
   , keyEnv :: KeyEnv
-  -- ^ What names a leaf's term (R3, "L4.Viz.AtomKey"). Lazy: a pass that never
-  -- forces an atomId never walks the module.
+  -- ^ What names a leaf's term (R3, "L4.Viz.AtomKey"): the config's, shared with
+  -- every other pass drawn from it. Lazy: a pass that never forces an atomId
+  -- never walks the module.
   , leafKeys :: IntMap Text
   -- ^ Leaf id -> the C1 key of its term. The query plan names its atoms from
   -- these ('LSP.L4.Viz.QueryPlan.buildQueryPlanCache'), so the diagram and the
@@ -247,7 +286,7 @@ mkInitialVizState cfg =
     , atomDeps = Map.empty
     , atomInputRefs = Map.empty
     , typicallyDefaults = Map.empty
-    , keyEnv = withTypeExpander (TC.applyFinalSubstitution cfg.substitution cfg.moduleUri) (mkKeyEnv cfg.module')
+    , keyEnv = case cfg.keyEnv of ConfigKeyEnv env -> env
     , leafKeys = Map.empty
     , freshLeaves = 0
     , freshLeafIds = IntSet.empty
@@ -407,6 +446,11 @@ getAtomInputRefs vs = vs.atomInputRefs
 
 getVizConfig :: VizState -> VizConfig
 getVizConfig vs = vs.cfg
+
+-- | The key environment this pass named its leaves with. Two passes drawn from one
+-- config return the same one.
+getKeyEnv :: VizState -> KeyEnv
+getKeyEnv vs = vs.keyEnv
 
 ------------------------------------------------------
 -- VizError

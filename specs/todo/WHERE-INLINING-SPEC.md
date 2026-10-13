@@ -432,6 +432,26 @@ What it knowingly leaves, by kind of failure:
   `l4 verify` coalesces by `atomId`; the query plan does not. Not in scope here (smucclaw/l4-ide#1032).
 - **Silent, and the unsafe direction, pre-existing: `carameliseExpr` resets an `INERT`'s AND/OR context under a comparison**, so two comparisons that evaluate differently are drawn as one term and share an `atomId` (smucclaw/l4-ide#1031).
 
+> **R3c** (**ASSUMED 2026-10-13, not ruled**; written by session Scalpel, to be confirmed or changed by Meng).
+> The key of a leaf larger than **2,048 expression nodes** (`L4.Viz.AtomKey.digestThreshold`), counted with its locals put in, is not the `show` of that tree but a **digest** of it: `~` followed by a SHA-1 of the same tree.
+> At or under the threshold the key is what it always was.
+
+Why: the key is the `show` of the leaf with its locals put in, and a local that names another twice (`LET a1 BE a0 AND y OR a0`, and so on down a chain) is linear in the source and exponential once put in, so the key's length, the time to build it and the time to hash it all doubled with each local.
+Measured on jl4-service's `/query-plan`, 2026-10-12, at `708c40f72`: a chain of 3 such `LET`s took 0.49 s, 5 took 2.18 s, 6 took 4.39 s and 7 took 8.93 s.
+With the cost of each byte of the key removed (`L4.Crypto.SHA1` recomputed its message schedule on every read), a chain of 13 still took 2.18 s, again doubling at each step.
+
+What it keeps: **R3 at every size.** The digest is a function of the tree the leaf means, not of how it was written, so a `LET` and its body written out where it is used are one atom above the threshold as below it.
+The digest of a node is a hash of the node with each child replaced by a stand-in, and of its children's digests, in order; a local is digested once per distinct set of digests of its arguments, and that is remembered, so the work is linear in the source.
+
+What it costs:
+
+- **A leaf above the threshold gets a different `atomId`, once.** None in the corpus does: the largest leaf, locals put in, is **313 nodes** (537 files / 8,085 leaves under `jl4/examples` that are not deliberate errors, plus 130 files / 687 leaves in `jl4-core/libraries` and `doc`), and 267 with a local in it. The threshold is the next power of two above four times 313.
+- **The digest declines some terms**, which are then keyed by `show` at any size: a local that cannot be put in (a recursive one, or one that applies a parameter as a function), a local passed as a value, one Unique declared twice, and a term with a binder of its own (a lambda, a quantifier, a pattern variable), because a bound variable is named by how many binders enclose it, so the digest of a shared subterm would depend on where it is put. A doubling chain that also has one of these is still exponential, as it was.
+- **The two kinds of key cannot be equal.** A `show` key begins with the name of a constructor, a capital letter. A digest key begins with `~`. `AtomKeySweepSpec` checks that no leaf key in the corpus is a digest and that every one begins with a capital letter, and `AtomKeyDigestSpec` that a digest begins with `~`.
+
+The estimate of the size is `L4.Viz.AtomKey.inlinedSize`, which does not build the inlined term; `AtomKeySpec` and `AtomKeySizeSpec` pin it against the real pass.
+What would settle it: Meng's ruling on the number, and on whether an id moving once for a leaf this size is acceptable.
+
 ### 10.2 What was measured before building (2026-10-05)
 
 Rig: probe scripts in session `ed4dacbb`'s scratchpad (`ladder/inline.mts`, `ladder/probe991.mts`), each starting a copy of a `jl4-lsp` binary over a websocket and sending the `codeLens` → `workspace/executeCommand` sequence `ts-shared/ladder-svg/standalone/serve.mjs` sends.
