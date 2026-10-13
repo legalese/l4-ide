@@ -474,7 +474,7 @@ The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the exp
 A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
 Blank lines and comments between a `@ref` and that construct make no difference.
 
-**Several citations.** Write them one above the other.
+**Several citations.** Write them one above the other, each on a line of its own.
 The construct below keeps all of them, in the order written.
 
 ```l4
@@ -483,17 +483,18 @@ The construct below keeps all of them, in the order written.
 § `Dogs Act - 33D.1`
 ```
 
-An export that carries one citation per rule uses the first.
+An export that carries one citation per rule uses the nearest, which is the one written last, just above the construct.
 
 #### Two warnings
 
 Both are warnings, so `l4 check` still succeeds, and the IDE marks the `@ref` itself.
 
 **A `@ref` that follows code on its line.**
-A `@ref` written at the end of a line, after the code it means to cite, cites the next construct, not that code.
-Such a `@ref` still binds to the next construct. The warning names the code it trails:
+A `@ref` written at the end of a line, after the code it means to cite, cannot cite that code, because it cites what comes after it.
+It does not cite the next construct either: it is attached to nothing, so the next construct's citation, in the IDE and in every export, is not this one.
+The warning names the code it trails:
 
-> This @ref (`1981/61 sec. 2`) follows code on its line, but a @ref binds to what follows it, so it will bind to the next construct instead. Put it on the line above `GIVETH A BOOLEAN`.
+> This @ref (`1981/61 sec. 2`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`.
 
 The fix is to move it to the line above that code.
 An inline `<<…>>` is warned about only when it ends the line, because in the middle of a line it cites the word after it, which is what it is for.

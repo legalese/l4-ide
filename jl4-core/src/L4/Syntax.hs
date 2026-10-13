@@ -1107,14 +1107,20 @@ nlgFor want@(Just _) a =
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
--- | The @\@ref@ citations held by a node: every one written after the node
--- before it and before this one, in source order. A reader that can show one
--- citation takes the first.
+-- | The @\@ref@ citations held by a node: every one written on a line of its
+-- own after the node before it and before this one, in source order.
 --
 -- See 'L4.Parser.ResolveAnnotation.addRefCommentsToAst' for which node holds a
 -- ref. Not kept in a bundle: 'Serialise Anno' writes only 'annPmSynthetic'.
 annRefs :: Lens' Anno [Ref]
 annRefs = #extra % #ref % iso (\(MkRefs rs) -> rs) MkRefs
+
+-- | The ref nearest the node: the last of those it holds, the one written
+-- closest above it. What every reader that shows ONE citation per node reads,
+-- so a stack of refs shows its bottom one (ruled 2026-10-12, bench "Main Wave
+-- Rulings" card R1: in a stack the exporters show the nearest).
+annRef :: Getter Anno (Maybe Ref)
+annRef = annRefs % to (listToMaybe . reverse)
 
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn

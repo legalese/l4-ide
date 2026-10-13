@@ -276,7 +276,7 @@ All **[E]**. The selection layer is `L4.Export`:
   (`l4 ast` on `citations.l4`, three `LocalDecide` annos each carrying a `MkRef`) **[E]**. A
   node's `Anno` held at most one ref and the nearest preceding one won, every other becoming a
   `RefNotAttached` warning (`attachRef`) **[E]** when this was written; since 2026-10-13 it holds
-  every ref that precedes it, in source order (`specs/done/REF-ANNOTATION-SPEC.md`, "Amendment").
+  every ref that precedes it, in source order, and the lowerer reads the nearest, the last (`specs/done/REF-ANNOTATION-SPEC.md`, "Amendment").
   Either way each block's citation must be read from its _own_ node. The payload text **includes the herald**: `getRef`
   hands back `"@ref X"` verbatim (unlike `getDesc`, which strips), and the inline form hands back
   `"<<X>>"`, delimiters and all **[E]**. `@ref-src` and `@ref-map` are dead in the AST

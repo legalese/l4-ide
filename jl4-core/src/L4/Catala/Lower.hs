@@ -2497,9 +2497,9 @@ descOfAnno a = case a ^. annDesc of
 
 -- | The @\@ref@ citation attached to a declaration, if any (R8).
 refOfAnno :: Anno -> Maybe Text
-refOfAnno a = case a ^. annRefs of
-  []      -> Nothing
-  (r : _) -> let t = stripKeyword (Text.strip (getRef r))
+refOfAnno a = case a ^. annRef of
+  Nothing -> Nothing
+  Just r  -> let t = stripKeyword (Text.strip (getRef r))
              in if Text.null t then Nothing else Just t
  where
   -- 'getRef' keeps the annotation keyword the citation was written with.

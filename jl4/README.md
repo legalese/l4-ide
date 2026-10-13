@@ -192,8 +192,8 @@ A `regex:` row has to become one `@ref-map` line for each citation it matched.
 The annotations can be initiated using either `@ref` or `<<` and `>>` as shown in the example above.
 
 A citation refers to what comes AFTER it, so write it on the line above the thing it cites, as in the example.
-A citation written at the end of a line, after the code it means to cite, refers to the next construct instead, and `l4 check` warns about it.
-Several citations above one construct are all kept, in order.
+A citation written at the end of a line, after the code it means to cite, is attached to nothing, and `l4 check` warns about it.
+Several citations above one construct are all kept, in order, and an export that shows one citation per rule shows the nearest, the one written last.
 The rule, and the two warnings, are in [the syntax reference](../doc/reference/syntax/README.md#ref).
 
 When using this feature in the IDE, it will show the link of the matching `@ref-map` mapping as a hover link that can be clicked on.

@@ -92,9 +92,10 @@ data Warning
     -- one, at the end of the file.
   | RefTrailing RefWithSpan (Maybe Text)
     -- ^ A @ref follows code on its line, with nothing after it there. A @ref
-    -- binds to what FOLLOWS it, so this one binds to the next construct and
-    -- not to the code it trails. It still does; this is the warning. The text
-    -- is that code, when there is some on the line to quote.
+    -- refers to what FOLLOWS it, so it cannot cite the code it trails, and it
+    -- is attached to nothing rather than to the next construct (ruled
+    -- 2026-10-12, bench "Main Wave Rulings" card R1). The text is that code,
+    -- when there is some on the line to quote.
   | RefNoLocation Ref
     -- ^ A @ref had no source location. That's a bug.
   | FixityAnnotationMisplaced FixityWithSpan
@@ -1756,7 +1757,8 @@ data RefWarning
   | RefNotAttached RefWithSpan
     -- ^ A 'Ref' has no AST node after it. See 'RefUnattached'.
   | RefAfterCode RefWithSpan (Maybe Text)
-    -- ^ A 'Ref' follows code on its line. See 'RefTrailing'.
+    -- ^ A 'Ref' follows code on its line, and is attached to nothing. See
+    -- 'RefTrailing'.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -1795,7 +1797,7 @@ refUnattachedMessage r =
 refTrailingMessage :: Ref -> Maybe Text -> Text
 refTrailingMessage r code =
   "This @ref" <> quotedCitation r
-    <> " follows code on its line, but a @ref binds to what follows it, so it will bind to the next construct instead. Put it on the line above "
+    <> " follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above "
     <> maybe "the code it cites" (\c -> "`" <> c <> "`") code
     <> "."
 
@@ -1826,11 +1828,13 @@ quotedCitation r = case refCitation r of
 -- soon as they are claimed, so each ref is used at most once.
 --
 -- Two warnings come out of this pass, both about a ref that cannot do what
--- its author meant. A ref with nothing after it ('RefNotAttached') is the
--- only one left unattached. A ref that follows code on its line
--- ('RefAfterCode'; the 'TrailingRefs' say which, because only the tokens
--- know) still binds to what follows it, which is the next construct and not
--- the code it trails; the warning says to put it on the line above.
+-- its author meant, and a ref that draws one is attached to nothing. A ref
+-- with nothing after it ('RefNotAttached') has no node to attach to. A ref
+-- that follows code on its line ('RefAfterCode'; the 'TrailingRefs' say
+-- which, because only the tokens know) is not offered to any node, and not to
+-- the next construct either, which would make it that construct's citation;
+-- the warning says to put it on the line above (ruled 2026-10-12, bench
+-- "Main Wave Rulings" card R1, option A).
 --
 -- Like 'addNlgCommentsToAst', we merely add structured data to the ast node's
 -- respective 'Anno'; the exact-print annotations are left untouched.
@@ -1838,9 +1842,11 @@ addRefCommentsToAst :: HasRef a => TrailingRefs -> [Ref] -> a -> (a, RefS)
 addRefCommentsToAst trailing refs0 ast =
   let
     (withSpan, missing) = preprocessRefs refs0
+    isTrailing r = Map.member r.range.start trailing
+    -- A ref that trails code is offered to no node, so it cannot be claimed.
     initialS =
       RefS
-        { refs = List.sortOn (.range.end) withSpan
+        { refs = List.sortOn (.range.end) (filter (not . isTrailing) withSpan)
         , refWarnings = []
         }
     (ast', s') = runState (addRef ast) initialS
@@ -1849,13 +1855,8 @@ addRefCommentsToAst trailing refs0 ast =
       | r <- withSpan
       , Just code <- [Map.lookup r.range.start trailing]
       ]
-    -- Any refs that were never claimed become warnings. One that trails code
-    -- has its warning already, and moving it fixes both, so it gets only that.
-    leftovers =
-      [ (r.range.start, RefNotAttached r)
-      | r <- s'.refs
-      , not (Map.member r.range.start trailing)
-      ]
+    -- Any refs that were never claimed become warnings.
+    leftovers = [ (r.range.start, RefNotAttached r) | r <- s'.refs ]
     -- In source order.
     placed = fmap snd (List.sortOn fst (afterCode <> leftovers))
   in
@@ -1870,7 +1871,8 @@ addRefCommentsToAst trailing refs0 ast =
 -- ...@, runs to the end of the line, so code before it is enough. The inline
 -- form, @\<\<...\>\>@, can sit in the middle of an expression, where it binds to
 -- the word after it and is right to; it is flagged only when no code follows
--- it on its line (assumed, not ruled).
+-- it on its line. (Card R1 says \"written after code on the same line\"; that a
+-- mid-line @\<\<...\>\>@ is not trailing is an assumption, not a ruling.)
 type TrailingRefs = Map SrcPos (Maybe Text)
 
 -- | Where the scan for 'TrailingRefs' has got to.

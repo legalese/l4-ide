@@ -16,14 +16,16 @@ import L4.Syntax
   , Name
   , Section (..)
   , TopDecl (..)
+  , annRef
   , annRefs
   , getRef
   )
+import Optics (gplate, toListOf)
 import Test.Hspec
 
--- | The text of the first @\@ref@ an annotation holds, if any.
-firstRef :: Anno -> Maybe Text
-firstRef anno = getRef <$> listToMaybe (view annRefs anno)
+-- | The text of the ref nearest a node, if it holds any: what an exporter shows.
+nearestRef :: Anno -> Maybe Text
+nearestRef anno = getRef <$> view annRef anno
 
 -- | Parse a source snippet and return the @\@ref@ text (if any) attached to
 -- the 'Module' node and to the first top-level declaration ('TopDecl').
@@ -35,9 +37,9 @@ moduleAndFirstDeclRefs src = do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
     Right (m@(MkModule _ _ (MkSection _ _ _ _ decls)), _, _) -> do
-      let moduleRef = firstRef (getAnno m)
+      let moduleRef = nearestRef (getAnno m)
       firstDeclRef <- case decls of
-        (d : _) -> pure $ firstRef (getAnno d)
+        (d : _) -> pure $ nearestRef (getAnno d)
         []      -> do
           expectationFailure "Expected at least one top-level declaration"
           error "unreachable"
@@ -58,7 +60,7 @@ decideBodyRefs' uriStr src = do
       error "unreachable"
     Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
       pure
-        [ (body, firstRef (getAnno body))
+        [ (body, nearestRef (getAnno body))
         | Decide _ (MkDecide _ _ _ body) <- decls
         ]
 
@@ -79,6 +81,30 @@ declRefsAndMessages src = do
         ( [ fmap segment (view annRefs (getAnno d)) | d <- decls ]
         , mapMaybe refWarningMessage warnings
         )
+
+-- | The citation (as written) of every ref held by ANY node of the module, in
+-- the order the traversal meets them.
+heldRefs :: Text -> IO [Text]
+heldRefs src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-held")
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) -> pure [ getRef r | a <- toListOf (gplate @Anno) m, r <- view annRefs a ]
+
+-- | Parse a source snippet and return the last path segment of the ref NEAREST
+-- each top-level declaration, if it holds any.
+declNearestRefs :: Text -> IO [Maybe Text]
+declNearestRefs src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-nearest")
+      segment = Text.takeWhileEnd (/= '/') . Text.strip
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
+      pure [ segment <$> nearestRef (getAnno d) | d <- decls ]
 
 spec :: Spec
 spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
@@ -159,6 +185,19 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
     attached `shouldBe` [["one", "two"], ["three"]]
     messages `shouldBe` [endOfFile "https://example.com/four"]
 
+  -- What a reader that shows one citation per node reads is the NEAREST ref,
+  -- the one written last (card R1: in a stack the exporters show the nearest).
+  it "gives a node's nearest ref as the last of those it holds" $ do
+    nearest <-
+      declNearestRefs $
+        Text.unlines
+          [ "@ref https://example.com/one"
+          , "@ref https://example.com/two"
+          , "DECIDE a IS 1"
+          , "DECIDE b IS 2"
+          ]
+    nearest `shouldBe` [Just "two", Nothing]
+
   describe "a @ref with nothing after it" $ do
     it "says so, naming the citation" $ do
       (attached, messages) <-
@@ -177,14 +216,15 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       messages `shouldBe` [endOfFile "s.5 (1)"]
 
   describe "a @ref that follows code on its line" $ do
-    -- It still binds to what follows, as it always did: the warning is what is
-    -- new. A ref cannot be moved to the node before it without making a rule
-    -- that puts every other ref in the corpus one node late.
-    it "warns, and still binds to the construct after it" $ do
+    -- A ref refers to what FOLLOWS it, so one written after code cannot cite
+    -- that code; nor is it handed to the next construct, whose citation it
+    -- would then silently become. It is attached to nothing (card R1, option A).
+    it "warns, and is attached to nothing" $ do
       (attached, messages) <-
         declRefsAndMessages "DECIDE a IS 1 @ref https://example.com/cite\nDECIDE b IS 2\n"
-      attached `shouldBe` [[], ["cite"]]
+      attached `shouldBe` [[], []]
       messages `shouldBe` [afterCode "https://example.com/cite" "DECIDE a IS 1"]
+      heldRefs "DECIDE a IS 1 @ref https://example.com/cite\nDECIDE b IS 2\n" `shouldReturn` []
 
     it "warns once, and not also as having nothing after it, at the end of the file" $ do
       (_, messages) <-
@@ -195,11 +235,13 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       (_, messages) <-
         declRefsAndMessages "GIVEN x IS A BOOLEAN\nDECIDE p IF x <<s.5>>\n  AND TRUE\n"
       messages `shouldBe` [afterCode "s.5" "DECIDE p IF x"]
+      heldRefs "GIVEN x IS A BOOLEAN\nDECIDE p IF x <<s.5>>\n  AND TRUE\n" `shouldReturn` []
 
     it "does not warn about an inline <<...>> in the middle of a line, which binds to the next word" $ do
       (_, messages) <-
         declRefsAndMessages "GIVEN x IS A BOOLEAN\nDECIDE p IF x AND <<s.5>> TRUE\n"
       messages `shouldBe` []
+      heldRefs "GIVEN x IS A BOOLEAN\nDECIDE p IF x AND <<s.5>> TRUE\n" `shouldReturn` ["<<s.5>>"]
 
   describe "a @ref on a line of its own" $ do
     it "binds to the construct below it and draws no warning" $ do
@@ -309,4 +351,4 @@ endOfFile citation =
 -- | The message for a @\@ref@ that follows the given code on its line.
 afterCode :: Text -> Text -> Text
 afterCode citation code =
-  "This @ref (`" <> citation <> "`) follows code on its line, but a @ref binds to what follows it, so it will bind to the next construct instead. Put it on the line above `" <> code <> "`."
+  "This @ref (`" <> citation <> "`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `" <> code <> "`."
