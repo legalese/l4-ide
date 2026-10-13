@@ -66,6 +66,7 @@ import Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Options.Applicative
 import System.Exit (ExitCode (..), exitSuccess, exitWith)
 
@@ -421,7 +422,7 @@ decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = prettyLayout (getOriginal n)
 -- context, say — is not reported here. The callee has its own entry in the report,
 -- where its structure is its own text. See specs/todo/WHERE-INLINING-SPEC.md §9.
 analyseDecide
-  :: VerifyOptions -> Map Unique Transform.Unfoldable -> LadderViz.VizConfig -> Decide Resolved -> DecisionReport
+  :: VerifyOptions -> Callees -> LadderViz.VizConfig -> Decide Resolved -> DecisionReport
 analyseDecide opts callees cfg decide0 =
   case LadderViz.doVisualize decide cfg of
     Left err ->
@@ -546,7 +547,7 @@ noMeanings = CallMeanings Map.empty [] []
 -- normal form, stays opaque and is named in 'cmOpaque'.
 callMeanings
   :: VerifyOptions
-  -> Map Unique Transform.Unfoldable
+  -> Callees
   -> LadderViz.VizConfig
   -> Decide Resolved
   -> Text
@@ -563,6 +564,8 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
     }
   where
     label v = stripBackticks (Map.findWithDefault (Text.pack (show v)) v labels)
+    tooLongReason =
+      "its meaning could not be drawn: " <> LadderViz.prettyPrintVizError (LadderViz.ClauseGroupTooLong Transform.letInliningNodeBudget)
 
     attempts :: [(Int, Either Text (BDQ.BoolExpr Text))]
     attempts =
@@ -573,7 +576,13 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
       ]
 
     -- The call unfolded, or Nothing if the leaf is not a call to a known rule.
-    unfolded e = case Transform.unfoldCalls unfoldBudget callees e of
+    -- A call to a rule written as clauses too long to read through is left as a
+    -- box before anything is unfolded, so that refusing it costs only the
+    -- bounded reading of its clauses ('Callees'), not the callee's size.
+    unfolded e = case Transform.positionalCall e of
+      Just (r, _) | Set.member (getUnique r) callees.tooLong -> Just (Left tooLongReason)
+      _ -> unfoldedReadable e
+    unfoldedReadable e = case Transform.unfoldCalls unfoldBudget callees.readable e of
       Right (_, 0) -> Nothing
       Right (x, _) -> Just (Right x)
       Left size ->
@@ -586,8 +595,7 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
         -- It calls a rule written as clauses too long to read through. Drawn
         -- as it is, the clauses' LETs would be one leaf whose key reads them
         -- through, which does not finish; the call stays a box instead.
-        Nothing ->
-          Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError (LadderViz.ClauseGroupTooLong Transform.letInliningNodeBudget))
+        Nothing -> Left tooLongReason
         Just x' -> case LadderViz.doVisualize (MkDecide ann sig appForm x') (LadderViz.withSimplification False cfg) of
           Left err -> Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError err)
           Right (li, vs)
@@ -662,6 +670,14 @@ mapVarsTo f = \case
 unfoldBudget :: Int
 unfoldBudget = 200000
 
+-- | The rules a call may be read through to, and the rules written as clauses
+-- too long to read through ('Transform.clausesReadThrough'), a call to which is
+-- left as a box.
+data Callees = Callees
+  { readable :: Map Unique Transform.Unfoldable
+  , tooLong :: Set Unique
+  }
+
 -- | The rules a call may be unfolded into: every top-level DECIDE that returns a
 -- BOOLEAN, in this module and in every module it imports (transitively), minus the
 -- recursive ones ('Transform.pruneRecursive').
@@ -677,7 +693,7 @@ unfoldBudget = 200000
 -- variable. Measured: without the zonk such an imported rule is never recognised
 -- as boolean, is never unfolded, and a contradiction through it is missed
 -- (tests-cli/fixtures/verify-unfold-rules.l4 is written that way on purpose).
-unfoldableRules :: Rules.TypeCheckResult -> Map Unique Transform.Unfoldable
+unfoldableRules :: Rules.TypeCheckResult -> Callees
 unfoldableRules tc0 =
   -- Recursion is a property of which calls a body makes, which zonking does not
   -- change, so prune on the bodies as checked. The zonk itself is left as a thunk
@@ -685,8 +701,17 @@ unfoldableRules tc0 =
   -- is only ever zonked if some call is actually read through to it. Zonking every
   -- rule of every imported module up front, the prelude included, cost seconds
   -- per file for rules nobody called.
-  Map.mapWithKey (\u (Transform.MkUnfoldable ps rhs) -> Transform.MkUnfoldable ps (zonkFor u rhs)) kept
+  Callees
+    { readable = Map.mapWithKey (\u (Transform.MkUnfoldable ps rhs) -> Transform.MkUnfoldable ps (zonkFor u rhs)) readsThrough
+    , tooLong = Map.keysSet tooLongToRead
+    }
   where
+    -- Which rules written as clauses read through is decided on the bodies as
+    -- checked too, before any is zonked or unfolded, and on each rule's own body,
+    -- as the IDE decides whether to offer a call for expansion. A rule that calls
+    -- one that does not read through is still read through itself, with that
+    -- call left inside it as a box.
+    (readsThrough, tooLongToRead) = Map.partition (\ (Transform.MkUnfoldable _ rhs) -> Transform.clausesReadThrough rhs) kept
     candidates :: [(Unique, (Transform.Unfoldable, Rules.TypeCheckResult))]
     candidates = concatMap fromModule (Map.elems modules)
     kept = Transform.pruneRecursive (Map.fromList [(u, unf) | (u, (unf, _)) <- candidates])
