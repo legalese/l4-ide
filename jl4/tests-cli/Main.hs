@@ -10,6 +10,7 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Exception (IOException, finally, throwIO, try)
 import Control.Monad (unless, when)
 import Data.List (isInfixOf, isPrefixOf, tails)
 import qualified Data.ByteString as BS
@@ -24,15 +25,21 @@ import System.Directory
   , createDirectoryIfMissing
   , createFileLink
   , doesFileExist
+  , emptyPermissions
   , findExecutable
   , getTemporaryDirectory
   , makeAbsolute
   , removePathForcibly
+  , setOwnerReadable
+  , setOwnerSearchable
+  , setOwnerWritable
+  , setPermissions
   )
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
 import System.IO (hClose, hSetBinaryMode)
+import System.IO.Error (isPermissionError)
 import System.Process
   ( CreateProcess(..)
   , StdStream(..)
@@ -163,6 +170,24 @@ runL4In mCwd mEnv bin args = do
 -- @hasExplicitPath = False@ and the resolver consults the embedded stdlib and
 -- the ambient tiers). This is the dev regime the library-shadow
 -- tests exercise — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
+-- | Try to create a symbolic link; 'Left' says why it could not be made. On
+-- Windows an account without the symlink privilege gets "permission denied".
+-- Any other failure is a real one and is rethrown.
+tryLink :: FilePath -> FilePath -> IO (Either String ())
+tryLink target link = do
+  r <- try (createFileLink target link) :: IO (Either IOException ())
+  case r of
+    Right () -> pure (Right ())
+    Left e
+      | isPermissionError e -> pure (Left ("cannot create a symbolic link here (" <> show e <> ")"))
+      | otherwise -> throwIO e
+
+-- | Create a symbolic link, or mark the example pending where this account may
+-- not: the example is about what @l4@ does with a link, not about whether the
+-- platform lets a test make one.
+linkOrPending :: FilePath -> FilePath -> IO ()
+linkOrPending target link = tryLink target link >>= either pendingWith pure
+
 runL4WithXdgHome :: FilePath -> FilePath -> [String] -> IO Output
 runL4WithXdgHome = runL4WithXdgHomeIn Nothing
 
@@ -584,12 +609,30 @@ spec bin = do
       serr `shouldSatisfy` ("[chosen]   embedded stdlib" `isInfixOf`)
       serr `shouldSatisfy` ("[shadowed] XDG data dir" `isInfixOf`)
 
+    -- The example below makes a symbolic link, and is marked pending where the
+    -- account may not make one (Windows without the symlink privilege). This
+    -- pins that path: a link made in a folder the account may not write to is
+    -- reported, not thrown.
+    it "reports a link it may not create, instead of throwing" $ do
+      tmp <- getTemporaryDirectory
+      let locked = tmp </> "l4-shadow-locked"
+          target = tmp </> "l4-shadow-locked-target.l4"
+          open' = setOwnerWritable True (setOwnerSearchable True (setOwnerReadable True emptyPermissions))
+      removePathForcibly locked
+      createDirectoryIfMissing True locked
+      writeFile target poison
+      setPermissions locked emptyPermissions
+      r <- tryLink target (locked </> "prelude.l4") `finally` setPermissions locked open'
+      case r of
+        Left why -> why `shouldSatisfy` ("cannot create a symbolic link" `isInfixOf`)
+        Right () -> pendingWith "this account can make a link in a read-only folder (root, or a platform that ignores the mode)"
+
     it "dereferences symlinks when naming the shadowed copy" $ do
       tmp <- getTemporaryDirectory
       let target = tmp </> "l4-shadow-poison-target.l4"
       writeFile target poison
       realTarget <- canonicalizePath target
-      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> createFileLink target p
+      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> linkOrPending target p
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
       code `shouldBe` ExitSuccess
       -- The warning must print the symlink's real target, so a reader can see
