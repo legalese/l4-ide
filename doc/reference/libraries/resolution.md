@@ -60,7 +60,10 @@ set and therefore ignored.
 
 A consequence for anyone moving a deployment onto the service: a library you
 used to supply from the host's filesystem has to be a file in the bundle, in the
-same directory as the file that imports it, or it is not there.
+same directory as the file that imports it. A file elsewhere in the bundle is
+found only when its directory happens to be the one the service treats as the
+bundle's root, the directory of the first file in the bundle's sort order, so
+do not rely on it.
 
 A bundle that ships a file with the name of a standard library module, such as
 its own `prelude.l4`, is still honoured, as any project copy is: the importers

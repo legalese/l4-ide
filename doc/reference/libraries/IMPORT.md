@@ -53,7 +53,6 @@ L4 includes several standard libraries:
 | `excel-date`    | Excel date compatibility |
 | `currency`      | Currency handling        |
 | `legal-persons` | Legal entity types       |
-| `coercion`      | Type conversions         |
 
 ## Import Resolution
 
