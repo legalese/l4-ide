@@ -50,7 +50,8 @@ import qualified Data.Yaml as Yaml
 import Control.Monad (void)
 import Data.Char (isAlpha, isAlphaNum)
 import Data.Maybe (fromMaybe)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, decodeUtf8With, encodeUtf8)
+import Data.Text.Encoding.Error (lenientDecode)
 import Data.Word (Word8)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
@@ -628,8 +629,30 @@ data CsvRow
 -- alternative named there is that an unquoted line of spaces in a one-column
 -- file is a row whose cell is absent).
 csvRows :: BSL.ByteString -> Either String [CsvRow]
-csvRows = AL.eitherResult . AL.parse file
+csvRows bytes
+  | Just opened <- unclosedQuote (dropByteOrderMark bytes) =
+      Left $ "line " <> show (1 + lineEnds (BSL.toStrict (BSL.take (fromIntegral opened) (dropByteOrderMark bytes))))
+        <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed"
+  | otherwise = case AL.parse file bytes of
+  AL.Done _ parsed -> Right parsed
+  -- Attoparsec's own message is the name of the parser that gave up
+  -- (@endOfInput@, @13: not enough input@), which says neither where nor why.
+  -- What it does know is the input left at the point it stopped, and with the
+  -- input before that we can name the line.
+  AL.Fail unconsumed _ _
+    | BSL.null (dropByteOrderMark bytes) ->
+        Left "the CSV file is empty: its first line has to name the inputs"
+    | otherwise ->
+        let consumed = BSL.take (BSL.length bytes - BSL.length unconsumed) bytes
+            line     = 1 + lineEnds (BSL.toStrict consumed)
+            near     = BSL.takeWhile (\w -> w /= 10 && w /= 13) (BSL.take 30 unconsumed)
+            excerpt  = Text.unpack (decodeUtf8With lenientDecode (BSL.toStrict near))
+        in Left $ "line " <> show line <> " of the CSV file is not valid CSV"
+             <> (if null excerpt then ", where it ends" else ", near `" <> excerpt <> "`")
   where
+    dropByteOrderMark b
+      | BSL.take 3 b == BSL.pack [0xEF, 0xBB, 0xBF] = BSL.drop 3 b
+      | otherwise = b
     comma = 44
     file = do
       -- A UTF-8 byte-order mark is not part of the first column's name. Excel's
@@ -675,6 +698,45 @@ csvRows = AL.eitherResult . AL.parse file
         go n (10 : rest)      = go (n + 1) rest
         go n (_ : rest)       = go n rest
         go n []               = n
+
+-- | The offset of a quote that opens a cell and is never closed, in a CSV file.
+--
+-- cassava reads a quoted cell as everything to the end of the input when no
+-- closing quote follows, and then drops its last byte, taking it for the
+-- closing quote. So @"abc@ at the end of a file is the text @ab@, and a quote
+-- in the middle of a file takes every row after it into one cell, both read
+-- without complaint. This reads the file's quotes itself, ahead of the parser: a
+-- quote opens a cell where a cell begins, @""@ inside one is a quote, and any
+-- other quote closes it. A quote anywhere else is the parser's to refuse.
+unclosedQuote :: BSL.ByteString -> Maybe Int
+unclosedQuote = finish . BSL.foldl' step (0, Fresh)
+  where
+    finish (_, In opened) = Just opened
+    finish _              = Nothing
+    step :: (Int, QuoteState) -> Word8 -> (Int, QuoteState)
+    step (!i, st) w = let !st' = next st in (i + 1, st')
+      where
+        isQuote = w == 34
+        isBreak = w == 44 || w == 10 || w == 13
+        -- outside a quoted cell, after a byte that did not open one
+        outside | isBreak   = Fresh
+                | otherwise = Plain
+        next = \case
+          Fresh | isQuote   -> In i
+                | otherwise -> outside
+          Plain             -> outside
+          In opened | isQuote   -> Closing opened
+                    | otherwise -> In opened
+          -- a quote seen inside a cell: the second of @""@, or the closing one
+          Closing opened | isQuote   -> In opened
+                         | otherwise -> outside
+
+-- | Where 'unclosedQuote' is in a file.
+data QuoteState
+  = Fresh            -- ^ where a cell begins
+  | Plain            -- ^ inside a cell that is not quoted, or after a quoted one
+  | In !Int          -- ^ inside the quoted cell that opened at this offset
+  | Closing !Int     -- ^ just after a quote inside that cell
 
 -- | Infer a JSON value for the text of a non-empty CSV cell, when no declared
 -- input type says what it is ('declareInputs'):

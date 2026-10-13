@@ -225,6 +225,21 @@ batchDeclaredTextOptional = fixtureDir </> "batch-declared-text-optional.csv"
 batchDeclaredTextDates    = fixtureDir </> "batch-declared-text-dates.csv"
 batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
 
+-- | CSV files that cannot be read: a stray quote, an empty file, and a quote
+-- that opens a cell and is never closed (at the end of the file, in the middle
+-- of it, with Windows line ends, as half of a doubled quote, in the header),
+-- with the control of a cell that closes at the very end of the file.
+batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof :: FilePath
+batchCsvBadQuote     = fixtureDir </> "batch-csv-bad-quote.csv"
+batchCsvEmpty        = fixtureDir </> "batch-csv-empty.csv"
+batchCsvOpenQuoteEof     = fixtureDir </> "batch-csv-open-quote-eof.csv"
+batchCsvOpenQuoteMid     = fixtureDir </> "batch-csv-open-quote-mid.csv"
+batchCsvOpenQuoteCrlf    = fixtureDir </> "batch-csv-open-quote-crlf.csv"
+batchCsvOpenQuoteDoubled = fixtureDir </> "batch-csv-open-quote-doubled.csv"
+batchCsvOpenQuoteHeader  = fixtureDir </> "batch-csv-open-quote-header.csv"
+batchCsvQuoteClosesAtEof = fixtureDir </> "batch-csv-quote-closes-at-eof.csv"
+
 -- | CSV files whose shape the reader has to get right: a file with one column
 -- (where a row of one empty cell and a blank line look alike), a UTF-8
 -- byte-order mark before the header, records with too few or too many cells,
@@ -624,6 +639,50 @@ spec bin = do
         code `shouldBe` ExitSuccess
         map (`inputOf` "code") rows
           `shouldBe` [Just (String "plain"), Just (String "line one\nline two")]
+
+    -- A CSV file that cannot be read stops the command before any case runs.
+    -- It used to say only what the parser was called (`endOfInput`, `13: not
+    -- enough input`); cassava's own reader, before `csvRows`, named the input
+    -- it stopped at.
+    it "names the line of a CSV file it cannot read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvBadQuote]
+      code `shouldSatisfy` (/= ExitSuccess)
+      -- the stray quote is on line 2, after `ab`
+      sout `shouldSatisfy` ("line 2 of the CSV file is not valid CSV, near `\"c`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("endOfInput" `isInfixOf`)
+
+    it "says that an empty CSV file is empty" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvEmpty]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("the CSV file is empty" `isInfixOf`)
+      sout `shouldNotSatisfy` ("not enough input" `isInfixOf`)
+
+    -- A quote that opens a cell and is never closed. cassava's reader of a
+    -- quoted cell takes everything to the end of the file and drops the last
+    -- byte, taking it for the closing quote: `"abc` was the text `ab` with
+    -- status success, and in the middle of a file the cell swallowed every row
+    -- after it. Each is refused, at the line where the quote opens.
+    describe "a quote that opens a CSV cell and is never closed" $ do
+      let refusedAt n file = do
+            Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", file]
+            code `shouldSatisfy` (/= ExitSuccess)
+            sout `shouldSatisfy` (("line " <> show (n :: Int) <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed") `isInfixOf`)
+            -- and no row is run
+            sout `shouldNotSatisfy` ("\"status\"" `isInfixOf`)
+
+      it "is refused at the end of the file, naming the line" $ refusedAt 2 batchCsvOpenQuoteEof
+      it "is refused in the middle of a file, rather than taking the rows after it" $ refusedAt 2 batchCsvOpenQuoteMid
+      it "is refused in a file with Windows line ends" $ refusedAt 2 batchCsvOpenQuoteCrlf
+      it "is refused when the last quote is half of a doubled one" $ refusedAt 2 batchCsvOpenQuoteDoubled
+      it "is refused in the header" $ refusedAt 1 batchCsvOpenQuoteHeader
+
+      -- The control: a cell that closes at the very end of the file, with no
+      -- line end after it, is a cell, so the check cannot be refusing every
+      -- file that ends in a quote.
+      it "does not refuse a cell that closes at the end of the file" $ do
+        Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvQuoteClosesAtEof]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"result\":\"abc\"" `isInfixOf`)
 
     it "keeps a line break inside a string literal as it is written" $ do
       -- batch runs the re-printed module; before smucclaw/l4-ide#1028 the newline came back

@@ -360,7 +360,7 @@ So `valid` means a case has the right shape, not that the rules will accept ever
 
 If `l4 batch` cannot read the cases or the rules, it prints no line for any case and exits with status 1. It says why in one plain line that starts `Error:`, on standard output, which is where the case lines go, so a script that reads the output as JSON should look at the exit status before it parses:
 
-- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV;
+- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV; for a CSV file it names the line, as in ``line 2 of the CSV file is not valid CSV, near `"c` ``, an empty CSV file is said to be empty, and a quote that opens a cell and is never closed is refused at the line where it opens;
 - `Error: --input-format is required when the extension can't be inferred (e.g. reading from stdin)`;
 - `Error: type checking failed` for rules that do not type-check, with the type errors themselves on standard error;
 - `Error: no @export functions found in module`, or `Error: no @export function named 'name' found` when `--entrypoint` names one that is not there.
