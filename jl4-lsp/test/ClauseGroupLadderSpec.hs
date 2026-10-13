@@ -15,7 +15,7 @@ module ClauseGroupLadderSpec (spec) where
 import Data.Foldable (for_)
 import qualified Data.Text as T
 
-import Language.LSP.Protocol.Types (VersionedTextDocumentIdentifier (..), toNormalizedUri)
+import Language.LSP.Protocol.Types (CodeLens (..), Command (..), VersionedTextDocumentIdentifier (..), toNormalizedUri)
 
 import L4.Syntax
   ( AppForm (..)
@@ -30,6 +30,7 @@ import L4.Syntax
   )
 import qualified L4.Viz.Ladder as Core
 import qualified L4.Viz.VizExpr as V
+import LSP.L4.Actions (decisionGraphCodeLenses)
 import qualified LSP.L4.Viz.Ladder as Ladder
 import LSP.L4.Rules (TypeCheckResult (..))
 
@@ -162,6 +163,25 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
     (ver, tc) <- check "too-long" tooLong
     either id (const "drawn") (ideLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
     either id (const "drawn") (coreLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
+
+  -- A rule written as clauses that is refused keeps its lens, titled with
+  -- why: a lens that silently went missing would not tell its drafter anything.
+  -- Clicking it answers with the whole message ('LSP.L4.Actions.visualise').
+  describe "the decision-graph lens" $ do
+    it "keeps the lens of clauses too long to draw, titled with the refusal, beside an ordinary one" $ do
+      (ver, tc) <- check "lens-too-long" (tooLong <> smallRule)
+      lensTitles ver tc `shouldBe` ["No decision graph: these clauses are too long to draw", "Show decision graph"]
+    it "gives a rule that does not return a boolean no lens, however it is written" $ do
+      (ver, tc) <- check "lens-number" (T.unlines ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "DECIDE f 0 IS 1", "DECIDE f n IS n"] <> smallRule)
+      lensTitles ver tc `shouldBe` ["Show decision graph"]
+
+-- | The titles of the decision-graph lenses of a module, top to bottom.
+lensTitles :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [T.Text]
+lensTitles ver tc = [ c._title | CodeLens { _command = Just c } <- decisionGraphCodeLenses ver tc ]
+
+-- | A small rule after the one under test, which is drawn.
+smallRule :: T.Text
+smallRule = T.unlines ["", "GIVEN a IS A BOOLEAN", "GIVETH A BOOLEAN", "DECIDE `small` a IS a"]
 
 -- | Sixty rows of one NUMBER input, each a sum of two hundred ones: long, not
 -- branching, and more than 20,000 parts written out (24,301).
