@@ -1,7 +1,7 @@
 # Specification: @ref Annotation Attachment
 
-> Status: DONE — @ref annotations are attached to AST nodes as of PR #48. The parallel Citations.hs interval-map hyperlink mechanism is intentionally left separate.
-> Amended 2026-10-13, ruled 2026-10-12: a node keeps EVERY ref that precedes it, a ref after code on its line is attached to nothing, and two warnings replace the old one. See "Amendment 2026-10-13" at the end; the code listings below are as PR #48 built them. What `main` has is in `specs/as-built/ref-annotation.md`.
+> Status: DONE — @ref annotations are attached to AST nodes. The parallel Citations.hs interval-map hyperlink mechanism is intentionally left separate.
+> Amended 2026-10-13, ruled 2026-10-12: a node keeps EVERY ref that precedes it, a ref after code on its line is attached to nothing, and two warnings replace the old one. See "Amendment 2026-10-13" at the end; the code listings below are as first built. What `main` has is in `specs/as-built/ref-annotation.md`.
 
 ## Executive Summary
 
@@ -13,10 +13,10 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 | ----------------------- | ------ | ------------------------------------------------------------------------- |
 | Lexer recognizes `@ref` | ✅     | `jl4-core/src/L4/Lexer.hs:77` — `TRef !Text !AnnoType`                    |
 | Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs:73` — `PState.refs`                            |
-| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:724`                                           |
+| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:725`                                           |
 | Attachment to AST       | ✅     | `jl4-core/src/L4/Parser/ResolveAnnotation.hs:857` — `addRefCommentsToAst` |
 
-### Parser TODO (as it stood before #48)
+### Parser TODO (as it stood before @ref annotations were attached)
 
 ```haskell
 -- jl4-core/src/L4/Parser.hs:216-218
@@ -27,11 +27,11 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 
 ## Related Specifications
 
-| Annotation | Spec                                       | Attachment Rule                                    |
-| ---------- | ------------------------------------------ | -------------------------------------------------- |
-| `@nlg`     | (implemented)                              | Attaches to `Name` nodes based on source position  |
-| `@desc`    | `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` | Attaches to immediately following `TopDecl`        |
-| `@ref`     | this document                              | Attaches to **any** immediately following AST node |
+| Annotation | Spec                | Attachment Rule                                    |
+| ---------- | ------------------- | -------------------------------------------------- |
+| `@nlg`     | (implemented)       | Attaches to `Name` nodes based on source position  |
+| `@desc`    | (no spec on `main`) | Attaches to immediately following `TopDecl`        |
+| `@ref`     | this document       | Attaches to **any** immediately following AST node |
 
 ## Design
 
@@ -226,8 +226,7 @@ Add test files:
 ## References
 
 - `jl4-core/src/L4/Parser/ResolveAnnotation.hs` — existing `@nlg` attachment pattern
-- `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` — `@desc` attachment specification
-- `doc/dev/specs/todo/WASM-LSP-SPEC.md` — WASM compatibility (reason for `@ref-src` removal: No file-io)
+- `@ref-src` was removed because the WASM build has no file I/O. The specs for `@desc` attachment and for WASM compatibility are not on `main`.
 - Issue #635 — decision service improvements (related)
 
 ## Amendment 2026-10-13: a node keeps every ref before it; a ref after code is attached to nothing
@@ -240,7 +239,7 @@ What changed:
 
 1. `Extension.ref` holds a list of refs, not a `Maybe Ref` (`jl4-core/src/L4/Syntax.hs`): `annRefs` reads them all, in source order, and `annRef` reads the nearest, the last, which is what a reader that shows one citation per node reads.
    Before, a node kept the nearest and reported each of the others as "could not be attached to any following syntax node", which was untrue of a ref that had only been outranked.
-   The list is the newtype `Refs`, whose `show` is `Nothing` when empty, as `ref = Nothing` was; a later ruled change removes the newtype.
+   The list is the newtype `Refs`, whose `show` is `Nothing` when empty, as `ref = Nothing` was; ruling R6 (2026-10-12) removes the newtype, which has not landed.
 2. A ref with nothing after it draws its own warning: "This @ref (`…`) is at the end of the file, so there is nothing after it to attach to."
 3. A ref that follows code on its line, with nothing after it on that line, is attached to NOTHING and draws a warning: "This @ref (`…`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `…`."
    Before, such a ref bound to the next construct and became that construct's citation, with exit 0.

@@ -262,7 +262,7 @@ For references, we allow to write them as a comment
 starting with `@ref` or within double angle brackets.
 
 Annotations for specific entities refer to whatever
-precedes them, except references.
+precedes them, except references and a `@desc` on a line of its own, which refer to what follows.
 A reference refers to whatever FOLLOWS it, so it goes on the line above the thing it cites.
 A node keeps every reference written before it, in order.
 A reference written after code on the same line refers to nothing.

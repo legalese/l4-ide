@@ -434,13 +434,14 @@ data Extension = Extension
 
 -- | The refs a node holds; 'annRefs' reads them as a list.
 --
--- A newtype only so that 'show' of an EMPTY one is @Nothing@, as it was when
--- the field was a @Maybe Ref@. An atomId hashes 'show' of a term with its
--- annotations emptied, and 'show' of an 'Extension' lists every field, so
--- @ref = []@ where there was @ref = Nothing@ would move every atomId a
--- deployed service has handed out, though no leaf changed. A key only ever
--- sees the empty case, because the annotations are emptied first; a non-empty
--- one shows as the list it is.
+-- A newtype only so that 'show' of an EMPTY one is @Nothing@ and not @[]@, the
+-- spelling this change was carried over with from @unstable@. The text is
+-- visible only where an 'Extension' is shown raw: @l4 run --json@ on
+-- @ok/assumes.l4@, @ok/elem.l4@ and @ok/lazytrace-exception.l4@ prints
+-- @ref = Nothing@ in the value of the error. No atomId on @main@ depends on
+-- it: 'L4.Viz.Ladder.generateAtomId' hashes the function, the printed label
+-- and the input refs, and not an 'Anno'. Ruling R6 (2026-10-12) removes the
+-- newtype; that has not landed (specs/done/REF-ANNOTATION-SPEC.md).
 newtype Refs = MkRefs [Ref]
   deriving stock (GHC.Generic, Eq, Ord)
   deriving newtype (Semigroup, Monoid, NFData)

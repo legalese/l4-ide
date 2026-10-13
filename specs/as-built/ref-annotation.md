@@ -23,9 +23,9 @@ Nothing else on `main` reads the stored ref: `l4 ast` prints it, the type checke
 
 ## Where it lives
 
-- Storage: `Extension.ref :: Refs` (`jl4-core/src/L4/Syntax.hs:428`), a newtype over `[Ref]` whose `Show` prints `Nothing` when empty (`:435-446`); the lens `annRefs` (`:486-492`), the getter `annRef` (`:494-499`), `addRefs` (`:507-509`); `data Ref = MkRef Anno Text`, `getRef` (`:724-729`) and `refCitation`, the citation without its herald and delimiters (`:731-743`).
+- Storage: `Extension.ref :: Refs` (`jl4-core/src/L4/Syntax.hs:428`), a newtype over `[Ref]` whose `Show` prints `Nothing` when empty (`:435-451`); the lens `annRefs` (`:487-493`), the getter `annRef` (`:495-500`), `addRefs` (`:508-510`); `data Ref = MkRef Anno Text`, `getRef` (`:725-730`) and `refCitation`, the citation without its herald and delimiters (`:732-744`).
 - Collection, older than the change: `PState.refs` (`jl4-core/src/L4/Parser.hs:73`), `addRef` (`:82-83`), `refP` (`:105-108`).
-- Attachment, all in `jl4-core/src/L4/Parser/ResolveAnnotation.hs`: `RefWarning` and `RefS` (`:797-815`), `renderRefWarning` (`:817-824`), the message functions `refWarningMessage`, `refUnattachedMessage`, `refTrailingMessage`, `refNoLocationMessage` and `quotedCitation` (`:826-855`), `addRefCommentsToAst` (`:857-904`), `TrailingRefs` and `trailingRefsOf` (`:906-978`), `preprocessRefs` (`:980-986`), `takeMatchingRefs` (`:988-1008`), `refPrecedesNode` (`:1010-1019`), `attachRef` (`:1021-1031`), `class HasRef` (`:1037-1042`) and its 28 instances (`:1044-1361`).
+- Attachment, all in `jl4-core/src/L4/Parser/ResolveAnnotation.hs`: `RefWarning` and `RefS` (`:797-815`), `renderRefWarning` (`:817-824`), the message functions `refWarningMessage`, `refUnattachedMessage`, `refTrailingMessage`, `refNoLocationMessage` and `quotedCitation` (`:826-855`), `addRefCommentsToAst` (`:857-904`), `TrailingRefs` and `trailingRefsOf` (`:906-978`), `preprocessRefs` (`:980-986`), `takeMatchingRefs` (`:988-1008`), `refPrecedesNode` (`:1010-1019`), `attachRef` (`:1021-1031`), `class HasRef` (`:1037-1042`) and its 28 instances (`:1044-1366`).
 - Warning constructors on the shared parser `Warning` type: `RefUnattached`, `RefTrailing`, `RefNoLocation` (`ResolveAnnotation.hs:70-79`).
 - Wiring: `execParserForTokensWithHints` passes the token stream to `trailingRefsOf` (`Parser.hs:2146`).
 - LSP rendering: messages at `jl4-lsp/src/LSP/L4/Rules.hs:843-848`, ranges at `:864-869`.
@@ -46,7 +46,8 @@ So a ref is held by the outermost node that starts after it: a ref above a decla
 All seven `TopDecl` forms, `Declare`, `Decide`, `Assume`, the directives, `Event`, `Import`, type declarations, fields, signatures, types, names and every expression constructor call `attachRef`.
 `Deonton` and `RAction` only pass the ref to their children: the `Regulative` expression that holds a `Deonton` (`Syntax.hs`) starts where it does and has already taken the refs before it.
 An infix (mixfix) call has a source range that is its keyword and no more, so an operand to the LEFT of the keyword starts before the call does.
-The `App` arm visits those operands first (`ResolveAnnotation.hs:1238-1250`), so a ref inside `(1 + <<cite>> 2) `plus` 3` is held by `2` and not by the whole call.
+The `App` arm first lets the call claim the refs that end before its first left operand starts, because the call starts where that operand does: a ref above `(1 + 2) `plus` 3` is held by the call.
+It then visits the operands (`ResolveAnnotation.hs:1238-1256`), so a ref inside `(1 + <<cite>> 2) `plus` 3` is held by `2` and not by the whole call.
 That is the narrower of two repairs (the other widens the range the parser gives an infix call, as unstable does); it touches only ref attachment, and other nodes whose range is narrower than their children have not been audited.
 
 A ref that trails code is found in the token stream, because by the time a ref is a `Ref` it has a range and no memory of its neighbours (`trailingRefsOf`, `:935-978`).
