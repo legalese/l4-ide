@@ -606,10 +606,10 @@ spec bin = do
         diagnosticsOf (rows !! 1) `shouldSatisfy` ("Missing required field 'name'" `isInfixOf`)
 
       -- An unquoted line of spaces is not a row, any more than a blank line is;
-      -- `decodeByName` made it a row of one blank cell, so an error. Decided by
-      -- Claude overnight 2026-10-02, pending Meng's review (not ruled); the
-      -- alternative named in the spec is that such a line is a row whose cell
-      -- is absent.
+      -- `decodeByName` made it a row of one blank cell, so an error. Ruled by
+      -- Meng on 2026-10-13 (legalese/l4-ide#653): to give an empty value in a
+      -- one-column file, write `""`, which is a row whose cell is absent (the
+      -- case above).
       it "does not read a line of spaces, or a blank line, as a row" $ do
         (code, _, rows) <- csvRowsOf [batchOneColFixture, "--inputs", batchOneColSpacesCsv]
         code `shouldBe` ExitSuccess
@@ -625,12 +625,11 @@ spec bin = do
         statusesOf rows `shouldBe` [Just (String "success")]
         map (`inputOf` "age") rows `shouldBe` [Just (Number 25)]
 
-      -- Decided by Claude overnight 2026-10-02, pending Meng's review
-      -- (specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md on unstable, "Decided by
-      -- Claude overnight"): a record with fewer or more cells than the header is
-      -- refused, naming its line. A short record used to leave its last input
-      -- missing, and a long one lost its extra cells and was a success. The
-      -- line of a tab and a space is blank, so it is skipped and still counted.
+      -- Ruled by Meng on 2026-10-13 (legalese/l4-ide#653): a record with fewer
+      -- or more cells than the header is refused, naming its line. A short
+      -- record used to leave its last input missing, and a long one lost its
+      -- extra cells and was a success. The line of a tab and a space is blank,
+      -- so it is skipped and still counted.
       it "refuses a record whose cell count is not the header's, naming its line" $ do
         (code, sout, rows) <- csvRowsOf [batchEligFixture, "--inputs", batchRaggedCsv]
         code `shouldSatisfy` (/= ExitSuccess)

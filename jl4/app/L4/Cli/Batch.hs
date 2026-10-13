@@ -645,11 +645,10 @@ data CsvRow
 -- spaces or tabs; a quoted @"   "@ is a row whose cell is absent. A record
 -- with fewer or more cells than the header is refused, naming its line: a
 -- short one used to be run with its missing inputs left out, and a long one
--- lost its extra cells and ran as a success. Not ruled: decided by Claude
--- overnight 2026-10-02, pending Meng's review (unstable's
--- @TYPICALLY-ONE-BEHAVIOUR-SPEC.md@, "Decided by Claude overnight"; the
--- alternative named there is that an unquoted line of spaces in a one-column
--- file is a row whose cell is absent).
+-- lost its extra cells and ran as a success. Both ruled by Meng on 2026-10-13
+-- (legalese/l4-ide#653): the refusal stands, and in a one-column file a line
+-- of only spaces or tabs is a blank line and not a case; to give an empty
+-- value, write @""@, which is a row whose cell is absent.
 csvRows :: BSL.ByteString -> Either String [CsvRow]
 csvRows bytes
   | Just opened <- unclosedQuote (dropByteOrderMark bytes) =
