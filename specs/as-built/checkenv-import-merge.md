@@ -31,7 +31,7 @@ The result is built field by field from the accumulator (`accEnv`) and one depen
 - Reset to empty: the frame-local by-`SrcRange` maps `functionTypeSigs`, `declTypeSigs`, `declareDeclarations`, `assumeDeclarations`, whose readers only look up nodes of the module being checked.
 - Reset to empty: `computedFields`, because it is keyed by `RawName` and a union could conflate same-named records from different modules; the comment puts the cost at error-message quality only.
 - Also reset: `sectionBinderNames`, `sectionBinderDecls`, `localBindings`, `sectionStack`, and `inNonexhaustiveDecide = False`, `enclosingObligation = Nothing`, `errorContext = None`, `actionPatternPos = NotInActionPattern`.
-  `cyclicSynonyms` was in this list at 73a953821 (#55 added it); #637 deleted the field, and it is not a field of `CheckEnv` in this tree, where the function resets only `errorContext` and `sectionStack` of the fields listed here (`jl4-core/src/L4/TypeCheck/Types.hs:419-432`).
+  `cyclicSynonyms` was in this list at 73a953821 (#55 added it); #637 deleted the field, and it is not a field of `CheckEnv` in this tree, where the function resets only `errorContext` and `sectionStack` of the fields listed here (`jl4-core/src/L4/TypeCheck/Types.hs:487-500`).
 
 Precondition, documented and not checked: the imported `EntityInfo` is already zonked.
 `Resolution.hs` zonks it with `applyFinalSubstitution` just before the call (`jl4-core/src/L4/Import/Resolution.hs:369` in this tree); `Rules.hs` relies on `TypeCheckResult.entityInfo` being stored zonked (comment at `jl4-lsp/src/LSP/L4/Rules.hs:533-535` in this tree).
