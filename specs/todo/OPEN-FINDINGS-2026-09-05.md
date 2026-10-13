@@ -637,6 +637,30 @@ The fix is either `unstable`'s checker carried to `main`, or a targeted repair o
 
 ---
 
+## OF-17 — an `@export` or `@desc` that a rule cannot use is given to the next rule
+
+**Severity: a silent wrong answer: the wrong rule is published, and the rule the drafter meant is not. Filed as smucclaw/l4-ide#1041; unowned.**
+
+First seen on 2026-10-10 in clause-group annotation probes, and re-measured on 2026-10-13 on `main` `00298eb60`, `unstable` `0cfcf6960` and the head of legalese/l4-ide#545, `a55036989`.
+A note written between a rule's `GIVETH` and its `DECIDE`, or above a definition in its `WHERE`, is claimed by no node, and the next rule in the file takes it.
+`l4 check` says `Check succeeded.` and prints no warning.
+
+**Witness:** `GIVEN n IS A NUMBER`, `GIVETH A NUMBER`, `@export what one does`, `DECIDE one n IS n + 1`, then a second rule `two` with no note.
+Deployed to jl4-service, `GET /deployments/p/functions` returns `two` described as "what one does", and `one` is not published; `main`, `unstable` and #545 answer the same.
+The same file with `@desc` gives `two` the description when it has none of its own.
+An `@export` that has leaked also replaces the `@desc` that `two` carries itself; a leaked plain `@desc` does not.
+With the note above a `WHERE` definition of `one` instead, `main` and #545 publish the next rule under it, and `unstable` gives it to the definition.
+The probes and the table are in the issue.
+
+**Mechanism:** all in `jl4-core/src/L4/Parser/ResolveAnnotation.hs`, line numbers at `main` `99484f2cf`.
+A rule claims a note only if the note ends before the rule starts (`descPrecedesNode`, `:738-740`), and a rule's range starts at its `GIVEN`, so a note under the `GIVETH` is inside the rule.
+`instance HasDesc (Expr n)` is `addDesc = pure` on `main` and in #545 (`:673-674`), so a `WHERE` definition is never offered its note; `unstable` descends into `WHERE` and `LET` since 721e91d23 (legalese/l4-ide#267), which is why it is right for `WHERE` and wrong for the `GIVETH` gap.
+A note nobody claimed stays in the pool, and the next rule takes any whose start is at most 8 columns to the right of its own (`topLevelColumnSlack = 8`, `:741-742`, `:754-755`); written 11 columns in, the same note is taken by nobody.
+Among several candidates `pickLeadingDesc` prefers one that begins with `export` or `default` (`:713-717`), which is how a leaked `@export` beats the next rule's own `@desc`.
+For a group of clauses (#545 and `unstable`; `main` does not parse one) the note does not reach the next rule, but a group whose `@export` is written between the `GIVETH` and the first clause is not published either, and nothing says so.
+
+---
+
 ## Owed upstream
 
 Filed by whoever holds GitHub write authority. **Nothing here has been posted except the rows marked FILED.**
@@ -658,3 +682,4 @@ Filed by whoever holds GitHub write authority. **Nothing here has been posted ex
 | OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006. **FIXED** by legalese/l4-ide#549 (35d7b63b3) on `unstable`, re-measured 2026-10-08 (wrapper path `200 6`); #1006 closed. Not on `main`.               |
 | OF-15      | **FILED** 2026-10-06 as smucclaw/l4-ide#1007.                                                                                                                                                       |
 | OF-16      | **FILED** 2026-10-09 as smucclaw/l4-ide#1030. `main` only; `unstable` is right.                                                                                                                     |
+| OF-17      | **FILED** 2026-10-13 as smucclaw/l4-ide#1041. The `GIVETH` gap is live on `main`, `unstable` and #545; the `WHERE` half on `main` and #545 only.                                                    |
