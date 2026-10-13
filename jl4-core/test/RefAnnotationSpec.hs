@@ -164,10 +164,18 @@ windowsClockStep = 15625000000
 steppedClock :: Integer -> Clock -> Clock
 steppedClock step clock = (\ t -> t `div` step * step) <$> clock
 
+-- | How many steps of the Windows clock a stretch of parses has to span for
+-- 'linearTimeRatioOn' to read it: 32 of them are half a second, so that an
+-- error of one step is a thirty-second of the reading.
+measurableSteps :: Integer
+measurableSteps = 32
+
 -- | How long, in seconds of wall-clock time, 'linearTimeRatioOn' looks for a
--- stretch of parses that its clock can measure.
+-- stretch of parses that its clock can measure. The stretch is half a second
+-- of CPU time, and a busy machine gives a test a fraction of its wall-clock
+-- time, so this leaves room for the test to get one eighth of it.
 measurableSearchSeconds :: Double
-measurableSearchSeconds = 2.0
+measurableSearchSeconds = 4.0
 
 -- | Parse @src@ and count its definitions. The warnings are forced as well as
 -- the definitions, because they depend on the last state of every pass that
@@ -198,14 +206,16 @@ quadraticParse src = do
 -- if the clock could not measure the small file.
 --
 -- The small file is parsed over and over in one timed stretch, until the
--- stretch spans ten steps of the Windows clock, and its time is the stretch's
--- divided by the number of parses. One parse of 1,000 lines is about four
--- steps there, so a single reading is off by a quarter either way: on Windows,
--- two of 56 runs of the guard that read it once gave 16.5 and 17.0 against a
--- limit of 16 (review of legalese/l4-ide#648). The large file is parsed once,
--- since it is eight times longer. If no stretch spans ten steps within
--- 'measurableSearchSeconds' (a clock that never ticks, say) or 4,096 parses,
--- there is no ratio. A ratio short of twice the limit is measured again, up to
+-- stretch spans 'measurableSteps' steps of the Windows clock (half a second),
+-- and its time is the stretch's divided by the number of parses. One parse of
+-- 1,000 lines is about four steps there, so a single reading is off by a
+-- quarter either way: on Windows, two of 56 runs of the guard that read it
+-- once gave 16.5 and 17.0 against a limit of 16 (review of
+-- legalese/l4-ide#648). A stretch of 32 steps is off by at most a
+-- thirty-second, and the large file, parsed once, is eight times longer than
+-- the small one, so it is off by less. If no stretch spans that many steps
+-- within 'measurableSearchSeconds' (a clock that never ticks, say) or 4,096
+-- parses, there is no ratio. A ratio short of twice the limit is measured again, up to
 -- twice, so that one pause does not fail it; each measurement reads the small
 -- file again as well as the large one, and the smallest ratio counts.
 linearTimeRatioOn :: Clock -> (Text -> IO Int) -> Int -> Int -> Double -> (Int -> Text) -> IO (Maybe Double)
@@ -221,7 +231,7 @@ linearTimeRatioOn clock parse smallSize largeSize limit line = do
           n `shouldBe` k
         t1 <- clock
         pure (fromIntegral (t1 - t0) :: Double)
-      measurable = fromIntegral (10 * windowsClockStep) :: Double
+      measurable = fromIntegral (measurableSteps * windowsClockStep) :: Double
       maxReps = 4096 :: Int
   start <- getMonotonicTime
   let -- The number of parses of the small file that fills a measurable stretch.
@@ -506,7 +516,7 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
   -- and 1,000 lines parse in about four of those: the small sample was read
   -- once, to within a quarter either way (review of legalese/l4-ide#648). This
   -- runs the guard on a clock that reads as Windows' does; the guard times
-  -- enough parses of the small file to span ten steps.
+  -- enough parses of the small file to span half a second (32 steps).
   it "judges a linear parse linear on a clock that ticks every 15.625 ms" $
     attachesInLinearTimeOn (steppedClock windowsClockStep getCPUTime) 1000 8000 30 citedDefinition
 
