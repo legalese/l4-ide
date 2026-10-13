@@ -187,9 +187,10 @@ spec = describe "Unification" $ do
     it "rejects a synonym that reaches itself through an alias it shares with a one-parameter sibling" $ do
       -- `B1` in W1's body has no arguments, so it can only be W1's own alias:
       -- the sibling `B1` takes one parameter. W1 is then `Duo OF W1, W1`, and
-      -- so is W2. A pass over the spellings once gave the name to the
-      -- sibling, found no cycle, and left both bodies live: unifying W1 with
-      -- W2 branched twice per expansion, 500 deep (4 GiB and still going).
+      -- so is W2. Reading the spelling alone would give the name to the
+      -- sibling and miss the cycle, leaving both bodies live: unifying W1
+      -- with W2 would branch twice per expansion, 500 deep (4 GiB and still
+      -- going).
       (ok, cycles) <- cycleReport $ Text.unlines
         [ "DECLARE Duo OF a, b"
         , "  HAS fst IS AN a"
@@ -389,9 +390,9 @@ spec = describe "Unification" $ do
       mb `shouldBe` Just False
 
     it "terminates when a cycle only the resolved bodies show comes from an imported module" $ do
-      -- The same, for a cycle that a spelling hides (a use at the wrong number
-      -- of arguments): the module that declares it has them quarantined before
-      -- anyone imports it.
+      -- The same, for a cycle through a use at the wrong number of arguments:
+      -- the module that declares it has them quarantined before anyone
+      -- imports it.
       let vfs = vfsFromList
             [ ( "wloops"
               , Text.unlines

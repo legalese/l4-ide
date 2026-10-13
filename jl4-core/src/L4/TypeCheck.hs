@@ -2123,11 +2123,11 @@ matchPatFunTy  r t args =
 -- program the checker accepts correctly: a reference cycle among synonyms has
 -- no finite expansion.
 --
--- It replaced a pass over spellings, run before anything was resolved, which
--- was both too narrow (it could not see a use at the wrong number of
--- arguments) and too wide: it keyed synonyms by name, so a record, an import,
--- or a synonym of the same name and another arity was taken for the synonym
--- itself and valid programs were rejected.
+-- An earlier version on unstable also compared spellings, before anything
+-- was resolved. That reads a name for what it looks like, so a record, an
+-- import, or a synonym of the same name and another arity was taken for the
+-- synonym itself and valid programs were rejected, while a use at the wrong
+-- number of arguments was not seen.
 quarantineResolvedSynonymCycles :: [DeclChecked DeclareOrAssume] -> Check [DeclChecked DeclareOrAssume]
 quarantineResolvedSynonymCycles decls = do
   for_ cycles \ cyc -> case cyc of
