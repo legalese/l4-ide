@@ -3,7 +3,7 @@ title: "From the Bad Man to the Bad Robot: Can Executable Law Constrain AI Agent
 status: draft
 date: 2026-10-08
 facet: formal-methods-in-law
-words: 2491
+words: 2614
 license: CC-BY-NC-4.0
 sources_checked: "not rechecked for this replacement"
 audience: LessWrong, the AI Alignment Forum and the EA Forum (cross-post)
@@ -78,6 +78,8 @@ Nay’s October 2022 post, [“Learning societal values from law as part of an A
 
 Armin Heydari and Torben Leowald’s [Closing the Loop](https://arxiv.org/abs/2606.23913) proposes an independent formal verifier that supplies a training reward for legal AI. Their architecture extends Catala; its proposed verifier-based training loop is a research connection, not evidence that the L4 experiment below will work. This draft asks a related question at deployment: what changes when an agent can consult executable rules, or must pass their checks before acting? Both approaches depend on faithful legal formalization; the experiment here would use L4.
 
+James K. Wiles’s [Implementing Computational Law in Wolfram Language for the Governance of Artificial Intelligence](https://arxiv.org/abs/2608.13958) (2026) offers a small implementation study of Reified Input/Output Logic and a symbolic guard-dog case study. In one January 2024 GPT-4 session, three of four English-to-code translations accepted as correct contained silent semantic errors, discovered while preparing the paper. With one model, one session and no repeated trials, this establishes neither a general failure rate nor the effectiveness of enforced compliance. The guard-dog example computes normative conclusions; it does not demonstrate that an agent obeys them. Wiles also identifies mistakes in the case study’s tests. For this proposal, the lesson is to check formalizations and their tests independently, even when generated code runs and its outputs look plausible.[^wiles]
+
 ## Loopholes and the limits of verification
 
 An agent might find actions the checker accepts that defeat the underlying rule’s purpose. “The checker accepted it” would therefore be a poor definition of success.
@@ -144,6 +146,8 @@ This remains speculative: GRAM has not demonstrated a legal module or legal comp
 [^cosmides-tooby]: Leda Cosmides and John Tooby, [“Cognitive Adaptations for Social Exchange”](https://www.cep.ucsb.edu/wp-content/uploads/2023/05/Cogadapt.pdf), in _The Adapted Mind_, pp. 163–228 (1992).
 
 [^oracle-guided]: Susmit Jha, Sumit Gulwani, Sanjit A. Seshia and Ashish Tiwari, [“Oracle-Guided Component-Based Program Synthesis”](https://doi.org/10.1145/1806799.1806833), _ICSE_, Volume 1, pp. 215–224 (2010); [author-hosted PDF](https://www.csl.sri.com/users/tiwari/papers/icse2010.pdf). The paper instantiates oracle-guided synthesis for loop-free component-based programs using SMT. The stakeholder-elicitation connection here is an analogy, not a result about the coherence or legal authority of stakeholder preferences.
+
+[^wiles]: James K. Wiles, [“Implementing Computational Law in Wolfram Language for the Governance of Artificial Intelligence”](https://arxiv.org/abs/2608.13958), arXiv:2608.13958v1, August 14, 2026. [Full text](https://arxiv.org/html/2608.13958v1), §4 and §4.6 Table 1 (translation attempts), §5.4 (tests) and §5.6 (limits); checked October 12, 2026.
 
 The following acknowledgment is retained from Meng Weng Wong’s original article and refers to the research described there:
 
