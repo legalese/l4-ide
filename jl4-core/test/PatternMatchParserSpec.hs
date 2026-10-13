@@ -119,6 +119,23 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
     parsesInLinearTimeWith parseDecidesForcingWarnings 1000 8000 16 \ i ->
       "@ref https://example.com/s" <> T.pack (show i) <> "\nf" <> T.pack (show i) <> " x MEANS " <> T.pack (show i)
 
+  -- The guards above read the CPU clock. On Windows it ticks every 15.625 ms,
+  -- and 250 lines parse in less than that: the small sample read 0, and the
+  -- 1 ms floor under it turned the ratio into nonsense (review of
+  -- legalese/l4-ide#545, round 4). This runs the first guard on a clock that
+  -- reads as Windows' does; the guard now times enough parses of the small file
+  -- to span ten steps.
+  it "judges a linear parse linear on a clock that ticks every 15.625 ms" $
+    parsesInLinearTimeOn (steppedClock windowsClockStep getCPUTime) parseDecides 250 2000 24 \ i ->
+      "f x MEANS " <> T.pack (show i)
+
+  -- The control for the one above: on the same clock, a parse that takes time
+  -- quadratic in the lines is still failed (the work is made up, so that the
+  -- test does not depend on the parser).
+  it "still fails a quadratic parse on that clock" $
+    parsesInLinearTimeOn (steppedClock windowsClockStep getCPUTime) quadraticParse 250 2000 24 (const "x")
+      `shouldThrow` anyException
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 
@@ -133,25 +150,70 @@ parsesInLinearTime :: Int -> Int -> Double -> (Int -> T.Text) -> Expectation
 parsesInLinearTime = parsesInLinearTimeWith parseDecides
 
 -- | 'parsesInLinearTime', with the parse it times given by the caller.
-parsesInLinearTimeWith :: (T.Text -> IO [Decide Name]) -> Int -> Int -> Double -> (Int -> T.Text) -> Expectation
-parsesInLinearTimeWith parse smallSize largeSize limit line = do
+parsesInLinearTimeWith :: (T.Text -> IO [a]) -> Int -> Int -> Double -> (Int -> T.Text) -> Expectation
+parsesInLinearTimeWith = parsesInLinearTimeOn getCPUTime
+
+-- | A CPU clock, in picoseconds, as 'getCPUTime' reads it.
+type Clock = IO Integer
+
+-- | One step of the CPU clock on Windows, 15.625 ms in picoseconds: every
+-- reading there is a multiple of it, so a parse that takes less than a step
+-- reads as 0 or as a whole step.
+windowsClockStep :: Integer
+windowsClockStep = 15625000000
+
+-- | A clock that reads in whole steps, rounding down, as Windows' does.
+steppedClock :: Integer -> Clock -> Clock
+steppedClock step clock = (\ t -> t `div` step * step) <$> clock
+
+-- | 'parsesInLinearTimeWith' on a given clock.
+--
+-- The small file is parsed over and over in one timed stretch, until the
+-- stretch spans ten steps of the Windows clock, and its time is the stretch's
+-- divided by the number of parses: a single parse of 250 lines is shorter
+-- than a step there, reads as 0, and the ratio of the large time to it was
+-- nonsense (review of legalese\/l4-ide#545, round 4). The large file is parsed
+-- once, since it is at least several times longer. The verdict is a ratio
+-- of two non-zero times; if the clock never ticks within the longest stretch
+-- tried, there is no ratio to judge and the test is pending, not failed.
+parsesInLinearTimeOn :: Clock -> (T.Text -> IO [a]) -> Int -> Int -> Double -> (Int -> T.Text) -> Expectation
+parsesInLinearTimeOn clock parse smallSize largeSize limit line = do
   let file k = T.unlines (map line [1 .. k])
-      timeParse k = do
+      -- The CPU time of @reps@ parses of a file of @k@ lines, in picoseconds.
+      timeParses k reps = do
         src <- evaluate (file k)
         _ <- evaluate (T.length src)
-        t0 <- getCPUTime
-        n <- length <$> parse src
-        t1 <- getCPUTime
-        n `shouldBe` k
+        t0 <- clock
+        replicateM_ reps do
+          n <- length <$> parse src
+          n `shouldBe` k
+        t1 <- clock
         pure (fromIntegral (t1 - t0) :: Double)
-      fastest k tries = minimum <$> traverse (const (timeParse k)) [1 .. tries :: Int]
-  small <- fastest smallSize 3
-  let ratio large = large / max small 1.0e9
-      settle tries = do
-        r <- ratio <$> timeParse largeSize
-        if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-  r <- settle 3
-  r `shouldSatisfy` (< limit)
+      measurable = fromIntegral (10 * windowsClockStep) :: Double
+      maxReps = 4096 :: Int
+      -- The number of parses of the small file that fills a measurable stretch.
+      repsFor reps = do
+        t <- timeParses smallSize reps
+        if t >= measurable || reps >= maxReps then pure (reps, t) else repsFor (reps * 2)
+  (reps, firstStretch) <- repsFor 1
+  moreStretches <- traverse (const (timeParses smallSize reps)) [2 .. 3 :: Int]
+  let small = minimum (firstStretch : moreStretches) / fromIntegral reps
+  if small <= 0
+    then pendingWith "the CPU clock did not tick while the small file was parsed, so there is no ratio to judge"
+    else do
+      let settle tries = do
+            r <- (/ small) <$> timeParses largeSize 1
+            if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
+      r <- settle 3
+      r `shouldSatisfy` (< limit)
+
+-- | A parse of no real file: it takes time quadratic in the number of lines
+-- and finds one "definition" for each.
+quadraticParse :: T.Text -> IO [()]
+quadraticParse src = do
+  let k = length (T.lines src)
+  _ <- evaluate (foldl' (+) 0 [1 .. k * k * 50])
+  pure (replicate k ())
 
 parseDecides :: T.Text -> IO [Decide Name]
 parseDecides src = fst <$> parseDecidesAndWarningCount src
