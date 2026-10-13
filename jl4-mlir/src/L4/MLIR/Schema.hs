@@ -156,7 +156,7 @@ data DeonticContract
       }
   deriving stock (Eq, Show)
 
--- | Either a pre-rendered literal expression ('DELiteral' \"`the seller`\")
+-- | Either a pre-rendered literal expression ('DELiteral' \"the seller\")
 -- or a reference to a GIVEN parameter ('DEParam' \"driver\"). The JS
 -- runtime resolves DEParam against the request's @arguments@ bag at
 -- evaluation time, giving record-typed parties their actual value
@@ -956,19 +956,21 @@ deontonToContract deonton = do
 --
 -- A literal party is rendered with its PLAIN name, not 'Print.prettyLayout'.
 -- prettyLayout emits L4 /source/, so a multi-word party comes back
--- backtick-quoted; jl4-service evaluates the party to a constructor VALUE and
--- renders it through @Backend.Jl4.constructorText@
--- (@rawNameToText . rawName . getActual@), which carries no backticks. Emitting
--- @\`the seller\`@ where the reference says @the seller@ is a wrong answer at
--- @supported: true@, and it is the shape a caller compares against the
--- @enum@ the service declares in its own @returnSchema@.
+-- backtick-quoted; jl4-service renders a party as a constructor name through
+-- @Backend.Jl4.constructorText@ (@rawNameToText . rawName . getActual@), which
+-- carries no backticks, whether the party is an evaluated value
+-- (@eventParty@, @obligatedParty@) or the unevaluated expression of an
+-- OBLIGATION (@Backend.Jl4.partyText@). Emitting @\`the seller\`@ where the
+-- reference says @the seller@ is a wrong answer at @supported: true@, and it
+-- is the shape a caller compares against the @enum@ the service declares in
+-- its own @returnSchema@.
 --
--- The ACTION is deliberately NOT treated this way: the reference prints it
--- with 'Print.prettyLayout' of an unevaluated Name (@ValueLazyJSON@'s
--- @obligationAction .= prettyLayout action@), backticks included. Party and
--- action genuinely disagree on the wire, and this asymmetry is measured:
--- deontic-sale's residual OBLIGATION is @{"party":"the seller",
--- "action":"\`deliver the goods\`"}@ on both sides.
+-- The ACTION is spelled the same way ('patternToDeonticExpr'). Until
+-- 2026-10-13 it was not: jl4-service printed the action with prettyLayout,
+-- backticks included, beside a plain party, and this backend copied that
+-- asymmetry because the parity harness measured it. A client comparing
+-- @eventParty@ with @party@ got a false mismatch for a name with a space in
+-- it, so jl4-service now spells both plain and this backend follows it.
 exprToDeonticParty :: Expr Resolved -> DeonticExpr
 exprToDeonticParty e = case e of
   App _ headRes [] ->
@@ -983,13 +985,16 @@ partyLiteralText e = case e of
   App _ headRes [] -> rawNameToText (rawName (getActual headRes))
   _                -> Print.prettyLayout e
 
--- | Pattern variant: 'PatVar' is the param-ref shape; everything
--- else collapses to its pretty-printed form.
+-- | Pattern variant: 'PatVar' is the param-ref shape; a bare action name is
+-- its PLAIN name, as @Backend.Jl4.actionText@ spells it; everything else (an
+-- action that carries a value, @say "pay"@) collapses to its pretty-printed
+-- rule source.
 patternToDeonticExpr :: Pattern Resolved -> DeonticExpr
 patternToDeonticExpr p = case p of
   PatVar _ n ->
     let nm = rawNameToText (rawName (getActual n))
     in if isLikelyParam nm then DEParam nm else DELiteral nm
+  PatApp _ n [] -> DELiteral (rawNameToText (rawName (getActual n)))
   _ -> DELiteral (Print.prettyLayout p)
 
 -- | Heuristic: a bare lowercase identifier without surrounding

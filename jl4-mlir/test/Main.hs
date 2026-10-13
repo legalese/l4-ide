@@ -37,6 +37,45 @@ substitutedEntityInfo :: TypeCheckWithDepsResult -> EntityInfo
 substitutedEntityInfo r =
   applyFinalSubstitution r.tcdSubstitution r.tcdUri r.tcdEntityInfo
 
+-- | A party and an action whose names need backticks in L4 source are baked
+-- into the schema as their PLAIN names, as jl4-service spells them in an
+-- answer (@Backend.Jl4.partyText@ \/ @actionText@). Until 2026-10-13 the
+-- action was baked as source, backticks included, because the reference
+-- printed it that way. An action that carries a value stays rule source.
+testDeonticNamesPlain :: IO Bool
+testDeonticNamesPlain = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the seller`"
+        , "DECLARE Action IS ONE OF `deliver the goods`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the seller`"
+        , "    MUST `deliver the goods`"
+        , "    WITHIN 10"
+        , "    HENCE FULFILLED"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("party is plain",   T.isInfixOf "\"party\":\"the seller\"" json)
+            , ("action is plain",  T.isInfixOf "\"action\":\"deliver the goods\"" json)
+            , ("action not source", not (T.isInfixOf "\"action\":\"`" json))
+            , ("party not source",  not (T.isInfixOf "\"party\":\"`" json))
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
 main :: IO ()
 main = do
   results <- sequence
@@ -50,6 +89,7 @@ main = do
     , test "helper-read ASSUME threads through" testHelperReadAssumeThreaded
     , test "schema picks up imported DECLAREs" testSchemaUsesImportedDeclares
     , test "deontic contract baked into schema" testDeonticSchemaBaked
+    , test "deontic party/action names are plain" testDeonticNamesPlain
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn

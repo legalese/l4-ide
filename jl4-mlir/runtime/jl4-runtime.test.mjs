@@ -495,20 +495,54 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   const sale = {
     kind: "OBLIGATION",
     modal: "MUST",
-    party: "`the seller`",
-    action: "`deliver the goods`",
+    party: "the seller",
+    action: "deliver the goods",
     deadline: 14,
     hence: {
       kind: "OBLIGATION",
       modal: "MUST",
-      party: "`the buyer`",
-      action: "`pay the invoice`",
+      party: "the buyer",
+      action: "pay the invoice",
       deadline: 30,
       hence: { kind: "FULFILLED" },
       lest: { kind: "BREACH", by: null, because: null },
     },
     lest: { kind: "BREACH", by: null, because: null },
   };
+
+  // A residual obligation names its party and its action with the plain names
+  // the schema carries, observed or not (jl4-service: Backend.Jl4.partyText and
+  // actionText; until 2026-10-13 it printed both as source, backticks and all).
+  jeq(
+    "deontic: unobserved obligation → plain party and action",
+    runDeontic(sale, 0, [], {}, null),
+    {
+      OBLIGATION: {
+        action: "deliver the goods",
+        deadline: "14",
+        modal: "MUST",
+        party: "the seller",
+      },
+    },
+  );
+  jeq(
+    "deontic: residual obligation after an event → plain party and action",
+    runDeontic(
+      sale,
+      0,
+      [{ party: "the seller", action: "deliver the goods", at: 5 }],
+      {},
+      null,
+    ),
+    {
+      OBLIGATION: {
+        action: "pay the invoice",
+        deadline: "30",
+        modal: "MUST",
+        party: "the buyer",
+      },
+    },
+  );
 
   // Blocker 1 — out-of-order events must NOT be sorted. deliver@20 precedes
   // deliver@5; the first event (20) is already past the WITHIN-14 deadline, so
@@ -580,13 +614,13 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   const repay = {
     kind: "OBLIGATION",
     modal: "MUST",
-    party: "`the borrower`",
-    action: "`repay loan`",
+    party: "the borrower",
+    action: "repay loan",
     deadline: 30,
     hence: { kind: "FULFILLED" },
     lest: {
       kind: "BREACH",
-      by: "`the borrower`",
+      by: "the borrower",
       because: '"loan not repaid"',
     },
   };
@@ -606,12 +640,12 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         failures: [
           {
             detail: "loan not repaid",
-            party: "`the borrower`",
+            party: "the borrower",
             reason: "explicit",
           },
         ],
-        parties: ["`the borrower`"],
-        party: "`the borrower`",
+        parties: ["the borrower"],
+        party: "the borrower",
         reason: "explicit",
       },
     },
@@ -623,7 +657,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     kind: "OBLIGATION",
     modal: "MUST",
     party: { param: "driver" },
-    action: "`wear seatbelt`",
+    action: "wear seatbelt",
     deadline: 1,
     hence: {
       kind: "OBLIGATION",
@@ -651,18 +685,18 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         deadline: 1,
         // eventAction is the event's own action name, which the reference
         // renders PLAIN (a9caf2f6 replaced prettyLayout with constructorText
-        // in Backend.Jl4). obligationAction on the very same object keeps its
-        // backticks, because that one is still prettyLayout of an unevaluated
-        // Name in ValueLazyJSON. The asymmetry is the reference's, not ours,
-        // and the live differential run agrees: deontic-seatbelt is
-        // byte-identical against jl4-service with exactly these two spellings.
+        // in Backend.Jl4). Until 2026-10-13 obligationAction on the very same
+        // object kept its backticks, because the reference printed it with
+        // prettyLayout of an unevaluated Name; it now prints the plain name
+        // too, so the two agree and a client can compare them. The schema
+        // literal below is what the compiler emits (`patternToDeonticExpr`).
         eventAction: "wear seatbelt",
         eventParty: { Driver: { name: "Alice" } },
         // The blame list (R-T3): one failure, the anchor, carrying the same
         // party/action/deadline as the scalars.
         failures: [
           {
-            action: "`wear seatbelt`",
+            action: "wear seatbelt",
             deadline: 1,
             party: { Driver: { name: "Alice" } },
             reason: "deadline_missed",
@@ -674,7 +708,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         // modelling one obligation at a time.
         obligatedParties: [{ Driver: { name: "Alice" } }],
         obligatedParty: { Driver: { name: "Alice" } },
-        obligationAction: "`wear seatbelt`",
+        obligationAction: "wear seatbelt",
         reason: "deadline_missed",
         timestamp: 2,
       },
@@ -711,7 +745,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     runDeontic(seatbeltMust, 0, [], { driver: { name: "Alice" } }, driverMeta),
     {
       OBLIGATION: {
-        action: "`wear seatbelt`",
+        action: "wear seatbelt",
         deadline: "1",
         modal: "MUST",
         party: "driver",
