@@ -27,11 +27,11 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 
 ## Related Specifications
 
-| Annotation | Spec                | Attachment Rule                                    |
-| ---------- | ------------------- | -------------------------------------------------- |
-| `@nlg`     | (implemented)       | Attaches to `Name` nodes based on source position  |
-| `@desc`    | (no spec on `main`) | Attaches to immediately following `TopDecl`        |
-| `@ref`     | this document       | Attaches to **any** immediately following AST node |
+| Annotation | Spec                               | Attachment Rule                                    |
+| ---------- | ---------------------------------- | -------------------------------------------------- |
+| `@nlg`     | (implemented)                      | Attaches to `Name` nodes based on source position  |
+| `@desc`    | `specs/done/EXPORT-SYNTAX-SPEC.md` | Attaches to immediately following `TopDecl`        |
+| `@ref`     | this document                      | Attaches to **any** immediately following AST node |
 
 ## Design
 
@@ -226,7 +226,7 @@ Add test files:
 ## References
 
 - `jl4-core/src/L4/Parser/ResolveAnnotation.hs` — existing `@nlg` attachment pattern
-- `@ref-src` was removed because the WASM build has no file I/O. The specs for `@desc` attachment and for WASM compatibility are not on `main`.
+- `@ref-src` was removed because the WASM build has no file I/O. The specs for `@desc` attachment and for WASM compatibility are `specs/done/EXPORT-SYNTAX-SPEC.md` and `specs/done/WASM-LSP-SPEC.md`.
 - Issue #635 — decision service improvements (related)
 
 ## Amendment 2026-10-13: a node keeps every ref before it; a ref after code is attached to nothing
