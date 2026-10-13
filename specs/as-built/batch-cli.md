@@ -85,6 +85,12 @@ Validation messages (`:383-407`): `Missing required field: '<p>'`, `Field '<p>' 
 - Fixtures (#47): `jl4/tests-cli/fixtures/batch-elig.l4`, `batch-data.json`, `batch-data.csv`, `batch-mixed.json`, `batch-code.l4`, `batch-exponent.csv`, `batch-maybe.l4`, `batch-maybe-bad.json`.
 - Fixtures (#625): `jl4/tests-cli/fixtures/batch-declared-strings.json`, `batch-declared-strings.yaml`, `batch-declared-string-cells.csv`, `batch-declared-bad-number.json`, `batch-declared-number-for-string.json`.
 - Other `l4 batch` tests on `main` are not part of this change: the printer-bracket and grouping cases `describe "l4 batch keeps the grouping the rule wrote"` and `describe "l4 batch agrees with l4 run"` (`jl4/tests-cli/Main.hs:866` and `:885`).
+- Run against `main`'s own `l4` (`L4_BIN`), 31 of the 66 tests in that file fail.
+  Most of them fail because `main` has no `--format`, `--output`, `--continue-on-error` or `--validate-only`, and the new cases pass `--continue-on-error`; that says nothing about the behaviour.
+  The ones that fail for the behaviour itself, with only options `main` has, are the single-object case (`:419-425`), the string-literal step in `l4 trace` (`:760-778`) and the line-break case (`:628`).
+  The other behaviours were each measured by hand with `main`'s own options, as listed under "What changes against `main`".
+- Run against the `l4` built from this branch before the CSV reader and #635 (`150bd6547`), 7 of the 66 fail: the four cases of `describe "the CSV reader"` that change behaviour (a one-column `""` row, a line of spaces, a byte-order mark, a ragged record) and three of #635's four (a choice cell, a `MAYBE` choice cell, a `DATE` cell).
+  The synonym case and the CRLF case are pins that pass there, as their comments say.
 
 ## Limits and known defects
 
