@@ -148,4 +148,3 @@ The gateway is the default. But if you want a single, sharply-scoped skill for o
 
 - The public catalog reveals **nothing** about your deployments — only the single gateway plugin. Deployment names, descriptions, and tools surface only behind auth, via the discovery MCP's `search_rules` (or `legalese search`).
 - **Org scope is resolved from auth**, not the URL. This is the seam for a future where one account spans its own org plus public rules shared from other orgs — discovery just widens; nothing in the public manifest changes.
-- The CLI spec (commands, token store, OAuth client) lives in the `jl4-auth-proxy` repo at `docs/legalese-cli.md`.

@@ -25,7 +25,7 @@ What L4 accepts and computes does not change.
 - Sorting diagnostics: the partition at `jl4-lsp/src/LSP/L4/Rules.hs:546` and `success` at `:558`, with the field notes at `:128-129` (#82).
 - Schema golden encoding: `jl4JsonSchemaGolden`, `Main.hs:181-221`, the fix at `:197-211`, its import at `:8` (#419).
 - `jl4/jl4.cabal:101` adds `text` to `jl4-test`'s build-depends, which `Data.Text.Encoding` needs; on `unstable` that line came from #399.
-- Directive-results filter: `checkDirectiveResults`, `jl4-core/src/L4/TypeCheck/Types.hs:244-254` (#567).
+- Directive-results filter: `checkDirectiveResults`, `jl4-core/src/L4/TypeCheck/Types.hs:251-261` (#567).
   It is called at `jl4-lsp/app/LSP/L4/Handlers.hs:209` (the directive-results notification) and `:792` (the `#CHECK` result lookup).
 
 ## Behaviour and rules (read in code)
@@ -48,7 +48,7 @@ It round-tripped through `readFile`, so golden and actual agreed and the suite s
 
 Before this change, `main` partitioned with `partition ((== TypeCheck.SInfo) . TypeCheck.severity)` (`Rules.hs:542` at `71ebf5ca1`), so `SWarn` diagnostics stayed in `errors` and `infos` held `SInfo` entries only.
 `success` was the same expression then, so whether a module checks does not change.
-`CheckInfo` is the only diagnostic with severity `SInfo` (`severity`, `jl4-core/src/L4/TypeCheck.hs:4201-4206`).
+`CheckInfo` is the only diagnostic with severity `SInfo` (`severity`, `jl4-core/src/L4/TypeCheck.hs:4339-4344`).
 Of the readers of `infos`, only the golden harness shows the warnings:
 
 - the golden harness prints them after "Typechecking successful" (`jl4/tests/Main.hs`, `checkFile`), as `ok/tests/empty.golden` shows;
