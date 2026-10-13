@@ -401,6 +401,9 @@ verifyRecursiveLocalCopiesFixture = fixtureDir </> "verify-recursive-local-copie
 verifyLedgerReadsFixture :: FilePath
 verifyLedgerReadsFixture = fixtureDir </> "verify-ledger-reads.l4"
 
+verifyFieldReadsFixture :: FilePath
+verifyFieldReadsFixture = fixtureDir </> "verify-field-reads.l4"
+
 -- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
 -- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
 -- carries its own control; see its header.
@@ -514,7 +517,7 @@ coreFixtures =
   , verifyClauseTableLargeFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
-  , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture
+  , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture, verifyFieldReadsFixture
   , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
@@ -3206,6 +3209,16 @@ spec bin = do
     it "does not join two ledger reads that a RECORD between them can tell apart" $ do
       env <- jsonEnvelope bin ["verify", verifyLedgerReadsFixture, "--format", "json"]
       lookup "top" (findingsByDecision env) `shouldBe` Just []
+
+    -- `p's adult` and `adult p` are one field read, so one atom (smucclaw/l4-ide#1033).
+    it "joins a field read and the same read written as its selector applied" $ do
+      env <- jsonEnvelope bin ["verify", verifyFieldReadsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`either spelling contradicts`" found `shouldBe` Just ["unsat"]
+      lookup "`two people`" found `shouldBe` Just []
+      lookup "`computed, projection first`" found `shouldBe` Just ["unsat"]
+      lookup "`computed, projection only`" found `shouldBe` Just ["unsat"]
+      lookup "`ledger by projection`" found `shouldBe` Just []
 
     -- Reading through calls. `the arrow is broken` asks for an exception and the
     -- offence it defeats at once; with calls as opaque leaves that was two

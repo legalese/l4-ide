@@ -43,11 +43,12 @@ bindings, and the decision's @WHERE@ locals it reads ('withLocalsInScope'), are
 put in before keying, as a callee's are before its expansion is drawn. A local
 that cannot be put in (a recursive one) stays in the term with its definition.
 
-Two more things are normalised away before the term is shown, each because it
+Three more things are normalised away before the term is shown, each because it
 would split one proposition into two keys: an inference variable's counter (an
 untyped lambda parameter's type carries one, and it moves when anything checked
-earlier changes), and the named form of a call whose arguments are all given
-(keyed as the positional call). One thing that is NOT in the term is
+earlier changes), the named form of a call whose arguments are all given (keyed
+as the positional call), and a record field read written as its selector
+applied, @adult p@ (keyed as @p's adult@, 'fieldReads'). One thing that is NOT in the term is
 put back: the type a @JSONDECODE@ decodes into, which the evaluator reads off
 the node's annotation, so two decodes into different record types stay apart.
 
@@ -93,6 +94,7 @@ module L4.Viz.AtomKey
   , withTypeExpander
   , withLocalsInScope
   , isEffectful
+  , fieldReads
   , binderPaths
   , unmappedMarker
   ) where
@@ -106,7 +108,7 @@ import qualified Data.Text.Encoding as Text (encodeUtf8)
 import Numeric (showHex)
 import Optics
 
-import L4.Annotation (Anno_ (..), emptyAnno)
+import L4.Annotation (Anno_ (..), emptyAnno, getAnno)
 import L4.Syntax
 import L4.TypeCheck.Environment (jsonDecodeUnique)
 import qualified L4.Transform as Transform (inlineLocalBindings, positionalCall)
@@ -210,6 +212,10 @@ isEffectful :: KeyEnv -> Expr Resolved -> Bool
 isEffectful env = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
   App _ r (_ : _) -> Set.member (getUnique r) env.effectfulRules
   AppNamed _ r _ _ -> Set.member (getUnique r) env.effectfulRules
+  -- @a's f@ is @f a@ (R3b): a rule that reads the ledger, called by projection,
+  -- read either side of a RECORD, was keyed as one atom, and @l4 verify@
+  -- reported a satisfiable rule unsatisfiable (found by adversarial review).
+  Proj _ _ r -> Set.member (getUnique r) env.effectfulRules
   e -> touchesWorld e
 
 touchesWorld :: Expr Resolved -> Bool
@@ -493,7 +499,9 @@ textKey env expr =
       boundLevels
         . positional
         . over (gplate @(Type' Resolved)) eraseInfVars
-        $ over (gplate @Anno) (const emptyAnno) inlined
+        . over (gplate @Anno) (const emptyAnno)
+        -- before the annotations go: they are what says a name is a selector
+        $ fieldReads inlined
 
     -- JSONDECODE decodes into its node's inferred type, which is an annotation,
     -- so the stripped term no longer says what it decodes into: keep each
@@ -573,6 +581,62 @@ positionalStep = \case
     bySupplyName rn =
       let written = MkName emptyAnno (NormalName (unqualifiedRawNameToText (rawName (getActual rn))))
        in Ref written (MkUnique 's' 0 supplyUri) written
+
+-- | A record field read written as its selector applied, @adult p@, is the field
+-- read @p's adult@: the projection is sugar for the selector's application, and
+-- the evaluator desugars it so (@L4.EvaluateLazy.Machine@, the 'Proj' case), so
+-- the two spellings read one field of one record and are one proposition. Keyed
+-- alike, they are one atom (smucclaw/l4-ide#1033, gap 3, ruled by Meng
+-- 2026-10-11: "record accessor function desugaring").
+--
+-- Both are keyed as the projection, not the other way round, for two reasons.
+-- It is the evaluator's own term for both: a selector applied to an unknown
+-- record gives 'L4.Evaluate.ValueLazy.TField', the field read, whichever way it
+-- was written. And it leaves the key of every @p's adult@ where it was; only the
+-- rarer @adult p@ moves.
+--
+-- A name is a selector when the checker said so, on the reference or on the
+-- definition it refers to (the second because a reference with no source range
+-- carries no stamp; "L4.Dmn.Lower" reads computed selectors the same way). A
+-- computed field (@MEANS@ in a @DECLARE@) is read the same way, by projection or
+-- by its selector. Only an application to exactly one argument is a field read,
+-- written positionally or by name (@adult WITH `_self` IS p@,
+-- 'Transform.positionalCall'); a selector's type parameters are implicit, so it
+-- never takes more.
+--
+-- The checker's @ComputedSelector@ stamp is not trusted alone: it goes on ANY
+-- rule whose name is the name of a computed field of some record in the module
+-- (@scanFunSigDecide@), so @bonus n@ over a NUMBER, beside a record with a
+-- computed @bonus@, was read as the field read @n's bonus@, moved its atomId and
+-- named the input @n.bonus@ (found by adversarial review). A computed field's
+-- function is the one 'L4.Desugar.makeComputedDecide' synthesises, whose one
+-- parameter is @_self@ ('L4.Desugar.isComputedFieldDecide' tests the same
+-- shape), so that is required too.
+--
+-- The folded projection names the field as a projection writes it, unqualified:
+-- a selector written with its section, @`Alpha`.w OF r@, would otherwise name the
+-- input @r.Alpha.w@ where @r's w@ names @r.w@ (found by adversarial review). The
+-- key does not see the spelling, only the 'Unique'.
+fieldReads :: Expr Resolved -> Expr Resolved
+fieldReads = transformOf (gplate @(Expr Resolved)) $ \case
+  e@Proj {} -> e
+  e | Just (f, [record]) <- Transform.positionalCall e
+    , isSelector f -> Proj (getAnno e) record (asWritten f)
+  e -> e
+  where
+    isSelector r = any selectorKind [getActual r, getOriginal r]
+    selectorKind (MkName a _) = case a.extra.resolvedInfo of
+      Just (TypeInfo _ (Just Selector)) -> True
+      Just (TypeInfo ty (Just ComputedSelector)) -> takesSelf ty
+      _ -> False
+    takesSelf = \case
+      Forall _ _ t -> takesSelf t
+      Fun _ [MkOptionallyNamedType _ (Just n) _] _ -> rawName (getOriginal n) == NormalName "_self"
+      _ -> False
+    asWritten = \case
+      Ref _ u o -> Ref (unqualified o) u o
+      r -> r
+    unqualified (MkName a raw) = MkName a (NormalName (unqualifiedRawNameToText raw))
 
 -- | Rename every binder defined inside the term by its scope: how many binding
 -- nodes enclose it, and its place among its own node's binders (de Bruijn

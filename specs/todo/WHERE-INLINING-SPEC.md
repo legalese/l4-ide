@@ -406,7 +406,7 @@ A `WHERE` or `LET` local is not a name of its own in the key: the leaf's own loc
 A local that cannot be put in (a recursive one) stays in the term with its definition, so two unfolded copies of it with different arguments stay apart; keyed by name, they were one atom, and `l4 verify` reported a satisfiable rule unsatisfiable.
 A leaf whose value depends on when it is evaluated, because it reads or writes the ledger or the network or calls a rule of the module that does, is keyed per occurrence instead, numbered in drawing order (C1's `fresh`): C1 keys a built-in by its term because it is a function of its operands, and a `RECALL` is not, so two occurrences either side of a `RECORD` can be FALSE and TRUE in one evaluation.
 Keyed by term, they were one atom, and `l4 verify` reported such a rule unsatisfiable; it now also keeps these apart across the meanings it reads through (`getFreshLeaves`).
-Before showing the term, the key also drops an inference variable's counter (an untyped lambda parameter's type carries one, and it moves when anything checked earlier changes) and writes a call whose arguments are all named as the positional call.
+Before showing the term, the key also drops an inference variable's counter (an untyped lambda parameter's type carries one, and it moves when anything checked earlier changes), writes a call whose arguments are all named as the positional call, and writes a record field read written as its selector applied, `adult p`, as the projection `p's adult` (R3b).
 It puts back the one thing the term does not carry: the type a `JSONDECODE` decodes into, which the evaluator reads off the node's annotation.
 Each of these was found by adversarial review of the design or of the built key, and each has a test (`AtomKeySpec`, `LadderTermKeySpec`, `LadderCallExpansionSpec`, and `l4-cli-test`'s `verify-recursive-local-copies.l4`).
 
@@ -427,6 +427,36 @@ Conditions: one restamp of the pinned ids, landing after #551, #558 and #633 (wh
 Option B, keying imported and builtin names by name, is deferred until a client is shown storing ids across versions.
 A separate PR by Scalpel builds this, into unstable, after #545 and FLOTILLA; this record changes no code.
 Until it lands, what this section says of the key describes the code as built, which blanks each annotation but still prints its fields (`AtomKey.hs`, `over (gplate @Anno) (const emptyAnno)`).
+
+> **R3b** (**ANSWERED 2026-10-11**, ruled by Meng). A record field read written as its selector applied, `adult p`, is the same proposition as the projection `p's adult`, and the two carry one `atomId`.
+> The projection is sugar for the record accessor function applied to the record.
+
+Ruling, 2026-10-11, given inline in session `functions-in-ladder-diagrams` when the choice was put by smucclaw/l4-ide#1033 (gap 3: "Whether the key should fold the projection into the selector is a ruling, not a defect to patch."): fold them; no conditions; Meng's note: "DUSTPAN with adversarial review. after that please try to fix the third item -- record accessor function desugaring".
+It is what the evaluator already does: it desugars `p's adult` to the selector applied to `p` (the `Proj` case of `L4.EvaluateLazy.Machine`), and a selector applied to an unknown record gives the field-read term `TField` whichever way it was written (`Machine.hs:2120`), so on the evaluator's side the two were already one term, and R3, structural, was the only thing keeping them apart.
+
+Built on branch `mengwong/ladder-record-accessor`; not merged when this was written.
+`L4.Viz.AtomKey.fieldReads` rewrites a selector applied to exactly one argument into the projection before the annotations are stripped, since they are what says a name is a selector: the checker stamps the reference, or the definition it refers to, `Selector` or `ComputedSelector`.
+Two choices made without a ruling, each in a commit of its own:
+
+- **The direction.** Both spellings are keyed as the projection, not as the selector applied. That is the evaluator's term for both (`TField`), and it leaves the `atomId` of every `p's adult` where it was; only a leaf written with the selector applied moves.
+- **The planner's inputs.** Both ladders collect a leaf's input references after `fieldReads`, so `age p > 18` names the input `p's age`, as `p's age > 18` does; before, it named no input at all, since only a variable or a projection directly under the leaf was collected.
+
+`l4 verify` coalesces atoms by `atomId`, so it now sees `p's adult AND NOT adult p` as unsatisfiable (`verify-field-reads.l4`; base: two atoms, no finding).
+This makes the ladder's key and #556's `Term` agree on field reads; the general agreement test §10.6 calls owed is still owed.
+Measured over the corpus (2026-10-11, `l4 verify` on every `.l4` under `jl4/examples`, `jl4-core/libraries` and `doc`, base `def9a5e41` against this branch at `cff5b44f5`, which includes §10.7): of 844 files, 837 give identical output, one finishes on neither, two differ only in a worktree path inside an import error, and four with computed fields now report "N call(s) read through" where base read none, with no finding added or lost.
+
+What adversarial review changed (one reviewer with probe binaries; no false merge found in the fold):
+
+- **A projection is read through like its selector applied.** Coalesced atoms are read through by their first occurrence, and the unfolding passes knew only calls, so `l4 verify` lost a computed field's meaning whenever the projection came first. `Transform.positionalCall` (§10.7) now lets the unfolding passes read `e's f` as they read `f e`, as the evaluator does. Nothing rewrites the term itself to `f e`: the key and the label keep `p's adult`, as Meng's constraint of 2026-10-12 asks ("do not rewrite p's adult to adult p"; relayed, with field opening named as the alternative under consideration). So a computed field is read through whichever way it is written, which also finds the contradiction when the projection is the only spelling (base never did), and a computed field's projection opens in the IDE with the same expansion as its selector call. Assumed, not ruled.
+- **A selector called by name** (``adult WITH `_self` IS p``) is folded too, read through `positionalCall`.
+- **The checker's `ComputedSelector` stamp is not trusted alone.** It goes on any rule named like a computed field of a record in the module (`scanFunSigDecide`), so `bonus n` over a NUMBER was folded into `n's bonus`; the fold now also requires the function's one parameter to be `_self`, the shape `makeComputedDecide` synthesises.
+- **A section-qualified selector** (`` `Alpha`.w OF r ``) names the input `r.w`, as `r's w` does.
+- **Pre-existing, on base too, the unsafe direction:** a rule that reads the ledger, called by projection either side of a `RECORD`, was one atom, since `isEffectful` knew only calls, and `l4 verify` reported a satisfiable rule unsatisfiable. A projection is now checked like a call.
+
+What it knowingly leaves, by kind of failure:
+
+- **Silent, the safe direction:** a projection over an ordinary rule, `` p's `is adult` ``, and the rule applied, `` `is adult` p ``, are still two atoms (the fold reads only selectors), and a selector passed as a value does not merge with the lambda that reads the field.
+- **Pre-existing, outside the ladder:** the checker's over-broad `ComputedSelector` stamp is still read as it is by the DMN exporter, semantic tokens, completion and shadowing (the document exporter tests the `_self` shape instead, `Export/Document.hs:652-656`); correcting it is a change of its own, smucclaw/l4-ide#1038.
 
 What it knowingly leaves, by kind of failure:
 
