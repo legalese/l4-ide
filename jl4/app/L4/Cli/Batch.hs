@@ -310,11 +310,15 @@ batchCmd opts = do
 
   -- Step 3: process each row into an envelope, honoring stop-on-error, and
   -- write the results in the requested format.
+      declares       = concatMap (moduleDeclares . (.module')) (tcRes : allDependencies tcRes)
       -- every record an input may hold, this module's and its imports', for
       -- --validate-only's check of an unknown key (review M1)
-      shapes         = recordShapes (concatMap (moduleDeclares . (.module')) (tcRes : allDependencies tcRes))
+      shapes         = recordShapes declares
+      -- what each input declares, for reading a case against it (the synonyms
+      -- are this module's and its imports', as the records are)
+      declared       = declaredInputs (typeSynonyms declares) schema
 
-  let process = processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes
+  let process = processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes declared
   withOutputHandle opts.batchOutput \h ->
     case opts.batchOutputFormat of
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
@@ -411,10 +415,11 @@ processRow
   -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> [ExportedParam]                         -- ^ full schema for validation
   -> RecordShapes                            -- ^ the records an input may hold, for validation
+  -> DeclaredInputs                          -- ^ what each input declares, for reading a case
   -> Int
   -> BatchRow
   -> IO (Aeson.Value, RowOutcome)
-processRow opts _ _ _ _ _ _ _ _ _ (RefusedRow input reason)
+processRow opts _ _ _ _ _ _ _ _ _ _ (RefusedRow input reason)
   -- refused while reading the file: an error in either mode
   | opts.batchValidateOnly = pure
       ( Aeson.object
@@ -432,7 +437,7 @@ processRow opts _ _ _ _ _ _ _ _ _ (RefusedRow input reason)
           , Key.fromString "diagnostics" Aeson..= [reason]
           ]
       , RowFailed )
-processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes idx (BatchRow source cells)
+processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes declared idx (BatchRow source cells)
   | opts.batchValidateOnly =
       let errs = validateRow opts.batchPresumption schema shapes input
           ok   = null errs
@@ -494,7 +499,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
   where
     -- the case as the export's inputs declare it: what validation, the
     -- wrapper and the echoed @input@ all see
-    input = declareInputs schema source cells
+    input = declareInputs declared source cells
 
 -- | The inputs whose default this row's answer rests on (T6): every default
 -- the evaluation forced that belongs to the request, as the input's name or,
@@ -756,32 +761,67 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
 
 -- | A case with each value typed by what the export declares for that input.
 --
--- A NUMBER or BOOLEAN input (a @MAYBE@ one too) given as text is read as the
--- number or boolean the text spells, from any format: a spreadsheet cell is
--- text, and so is @"25"@ in a hand-written JSON or YAML file. Text that does
--- not read as one is left alone, so that the decode error names the value it
--- could not read.
+-- A NUMBER or BOOLEAN input (a @MAYBE@ one too, or one declared through a
+-- synonym) given as text is read as the number or boolean the text spells,
+-- from any format: a spreadsheet cell is text, and so is @"25"@ in a
+-- hand-written JSON or YAML file. Text that does not read as one is left
+-- alone, so that the decode error names the value it could not read.
 --
--- A STRING input keeps its text exactly as written (a blank CSV cell is not
--- text: 'parseBatchInput' leaves it out). JSON and YAML already say what a
--- string is, so a number sent for one stays the error it was; a CSV cell is
--- never a number just because it looks like one (@123456@, @1.50@, @018956@
--- are all codes to a STRING input).
+-- Every other declared input keeps a CSV cell as the text written (a blank
+-- cell is not text: 'parseBatchInput' leaves it out). A cell is never a number
+-- or a boolean just because it looks like one: @123456@, @1.50@ and @018956@
+-- are codes to a STRING input, @True@ is a choice of @Answer@ and @20261013@
+-- is a DATE, and a decoder that wants a string or a name must be given one.
+-- JSON and YAML already say what a string is, so a number sent for a STRING
+-- input stays the error it was.
 --
--- An input whose type is not one of those three, or which the export does not
--- declare, is not typed here: JSON and YAML values are left alone, and a CSV
--- cell is typed by what it looks like ('inferCsvCell').
-declareInputs :: [ExportedParam] -> RowSource -> Aeson.Value -> Aeson.Value
-declareInputs schema source (Aeson.Object o) = Aeson.Object (KeyMap.mapWithKey declare o)
+-- Only a column that no input declares, and an input whose type the export
+-- does not give, is typed by what the cell looks like ('inferCsvCell').
+declareInputs :: DeclaredInputs -> RowSource -> Aeson.Value -> Aeson.Value
+declareInputs declared source (Aeson.Object o) = Aeson.Object (KeyMap.mapWithKey declare o)
   where
-    kinds = Map.fromList [ (p.paramName, k) | p <- schema, Just k <- [primKind p.paramType] ]
-    declare key v = case (Map.lookup (Key.toText key) kinds, v) of
-      (Just KNum,  Aeson.String s) -> fromMaybe v (jsonNumber s)
-      (Just KBool, Aeson.String s) -> fromMaybe v (jsonBool s)
-      (Just KStr,  _)              -> v
-      (Nothing,    Aeson.String s) | FromCsv <- source -> inferCsvCell s
-      _                            -> v
+    declare key v = case (Map.lookup (Key.toText key) declared, v) of
+      (Just DeclaredNumber,  Aeson.String s) -> fromMaybe v (jsonNumber s)
+      (Just DeclaredBoolean, Aeson.String s) -> fromMaybe v (jsonBool s)
+      (Just DeclaredText,    _)              -> v
+      (_,                    Aeson.String s) | FromCsv <- source -> inferCsvCell s
+      _                                      -> v
 declareInputs _ _ v = v
+
+-- | What the export declares an input to be, so far as reading a case goes:
+-- the inputs by name.
+type DeclaredInputs = Map.Map Text DeclaredInput
+
+data DeclaredInput
+  = DeclaredNumber   -- ^ a NUMBER
+  | DeclaredBoolean  -- ^ a BOOLEAN
+  | DeclaredText     -- ^ any other type, whose JSON is a string, a name or a structure
+  | DeclaredUnknown  -- ^ the export gives no type for it
+
+declaredInputs :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> DeclaredInputs
+declaredInputs synonyms schema = Map.fromList
+  [ (p.paramName, maybe DeclaredUnknown declared p.paramType) | p <- schema ]
+  where
+    declared ty = case primKind (Just (look Set.empty ty)) of
+      Just KNum  -> DeclaredNumber
+      Just KBool -> DeclaredBoolean
+      _          -> DeclaredText
+    -- a type as the primitive it comes to: through @MAYBE@, and through the
+    -- synonyms (@DECLARE Year IS A NUMBER@). A synonym cannot name itself, but
+    -- the walk does not rely on that.
+    look seen ty = case ty of
+      TyApp _ name [inner] | getUnique name == maybeUnique -> look seen inner
+      TyApp _ name []
+        | Just expansion <- Map.lookup (getUnique name) synonyms
+        , getUnique name `Set.notMember` seen -> look (Set.insert (getUnique name) seen) expansion
+      _ -> ty
+
+-- | The type each synonym stands for (@DECLARE Year IS A NUMBER@), by the
+-- synonym's 'Unique'.
+typeSynonyms :: [Declare Resolved] -> Map.Map Unique (Type' Resolved)
+typeSynonyms decls = Map.fromList
+  [ (getUnique name, ty)
+  | MkDeclare _ _ (MkAppForm _ name _ _) (SynonymDecl _ ty) <- decls ]
 
 -- | The number a text spells, in JSON's grammar (so @1.50@ and @1e3@ are
 -- numbers, and @007@, @1,000@ and @+5@ are not).
