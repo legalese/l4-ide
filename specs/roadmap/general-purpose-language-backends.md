@@ -436,8 +436,8 @@ Per CLAUDE.md §4, a decision is recorded in its owning document in the same PR 
    the `X-EXPORT-SPEC` house style already set by DMN, Catala and Blawx.
 2. **The tiering position in §3 is not recorded by living here.** This is a roadmap note; it does
    not get to set company policy. The two nearest owners, neither of which currently covers
-   runtimes: `specs/todo/PROVABLE-MARKETPLACE-SPEC.md` owns the commercial access model and
-   metering (§3, §2.5), and `specs/todo/PRODUCT-STRATEGY-2025-01.md` owns the open-core framing
+   runtimes: the Provable marketplace spec (kept outside this repo) owns the commercial access
+   model and metering (§3, §2.5), and `specs/todo/PRODUCT-STRATEGY-2025-01.md` owns the open-core framing
    (the paragraph at line 823) **[E 2026-09-07]**. Whichever takes it, the ruling and the first emitter
    should land in the same PR — a shipped open PoC with the line still unwritten _is_ the ruling,
    made by default.
