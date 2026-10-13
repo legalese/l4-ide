@@ -3,6 +3,7 @@
 -- Used by Application (eager/lazy startup) and DataPlane (compile-on-first-request).
 module DeploymentLoader (
   loadAndRegister,
+  loadAllAndRegister,
   triggerCompilationIfPending,
   tryCompileWithTimeout,
   CompilationResult (..),
@@ -16,9 +17,10 @@ import Options (Options (..))
 import qualified Shared
 import Types
 
-import Control.Concurrent.Async (async)
+import Control.Concurrent (getNumCapabilities, newQSem, signalQSem, waitQSem)
+import Control.Concurrent.Async (async, mapConcurrently_)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, retry)
-import Control.Exception (ErrorCall (..), SomeAsyncException, SomeException, catch, displayException, fromException, throwIO, try)
+import Control.Exception (ErrorCall (..), SomeAsyncException, SomeException, bracket_, catch, displayException, fromException, throwIO, try)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks, ask)
 import Data.Aeson (toJSON)
@@ -139,6 +141,22 @@ loadAndRegisterThrowing logger options registry store deployId = do
         [ ("deploymentId", toJSON deployId)
         , ("error", toJSON err)
         ]
+
+-- | Load every deployment of a store, as many at once as there are
+-- capabilities.
+--
+-- A restart compiles each deployment as a deploy does, under
+-- @--compile-timeout@ and @--max-compile-memory-mb@, and a timeout counts
+-- wall-clock time. If every deployment started together, each would be waiting
+-- for the CPU behind all the others, and a store large enough would run every
+-- one of them out of time at once.
+loadAllAndRegister :: Logger -> Options -> TVar (Map.Map DeploymentId DeploymentState) -> BundleStore -> [Text] -> IO ()
+loadAllAndRegister logger options registry store deployIds = do
+  capabilities <- getNumCapabilities
+  slot <- newQSem capabilities
+  mapConcurrently_
+    (bracket_ (waitQSem slot) (signalQSem slot) . loadAndRegister logger options registry store)
+    deployIds
 
 -- | If the deployment is in Pending state, compile it synchronously.
 -- Atomically transitions Pending → Compiling, then blocks until compilation

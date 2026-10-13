@@ -2320,8 +2320,7 @@ withServicesRestarted' opts deployments editStore act = do
   registry <- newTVarIO Map.empty
   withFile logPath WriteMode \h -> do
     restartLogger <- newLoggerTo h False
-    forM_ deployments \(deployId, _) ->
-      DeploymentLoader.loadAndRegister restartLogger opts registry store deployId
+    DeploymentLoader.loadAllAndRegister restartLogger opts registry store (map fst deployments)
   logLines <- Maybe.mapMaybe Aeson.decodeStrict . BS8.lines <$> BS.readFile logPath
 
   pendingUpd <- newTVarIO Map.empty
