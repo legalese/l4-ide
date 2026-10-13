@@ -46,6 +46,7 @@ import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
+import TestData (maybeSynonymJL4)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4)
 import TestStoreDir (withStoreDir)
@@ -313,6 +314,68 @@ spec = describe "integration" do
               Map.lookup "extra_provided" fieldMap `shouldBe` Just (FnLitBool False)
             other ->
               expectationFailure ("Expected FnObject with named fields, got: " <> show other)
+
+    -- Three kinds of request go through the generated wrapper and not the direct
+    -- path: an input whose value is `{}`, a batch case with a `null`, and an MCP
+    -- call with a `null`. The wrapper's own test for a MAYBE (`isMaybeType`)
+    -- does not expand a synonym; what keeps that from mattering is that
+    -- `wrapperPlan` decodes such an input as its own type. These pin the
+    -- answers, with `plain maybe` as the control, so that a change to either
+    -- cannot turn a null for a synonym for a MAYBE into "missing required
+    -- parameter".
+    describe "a synonym for a MAYBE, on the wrapper path" do
+      let deployId = "maybe-synonym-wrapper"
+          withSynonyms = withServiceFromSources deployId [("synonym.l4", maybeSynonymJL4)]
+          pathOf fn = Text.unpack (Text.replace " " "%20" fn)
+      forM_ ["year maybe", "optional number", "plain maybe" :: Text] \fn -> describe (Text.unpack fn) do
+        it "answers a {} value as NOTHING" do
+          withSynonyms \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.object [] ] ])
+            let value = case Aeson.decode (responseBody resp) of
+                  Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                  _ -> Nothing
+            (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt 0))
+        it "answers a null, a {} and a left-out input in a batch case as NOTHING" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> pathOf fn <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), "y" Aeson..= (2020 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), "y" Aeson..= Aeson.Null ]
+                    , Aeson.object [ "@id" Aeson..= (3 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (4 :: Int), "y" Aeson..= Aeson.object [] ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just [ (CaseAnswered, Just (FnLitInt 2021))
+                              , (CaseAnswered, Just (FnLitInt 0))
+                              , (CaseAnswered, Just (FnLitInt 0))
+                              , (CaseAnswered, Just (FnLitInt 0)) ]
+        it "answers a null, a {} and a left-out input in an MCP tool call as NOTHING" do
+          withSynonyms \baseUrl mgr ->
+            forM_ ([ ("2020", Aeson.object [ "y" Aeson..= (2020 :: Int) ], "2021")
+                   , ("null", Aeson.object [ "y" Aeson..= Aeson.Null ], "0")
+                   , ("{}", Aeson.object [ "y" Aeson..= Aeson.object [] ], "0")
+                   , ("left out", Aeson.object [], "0") ] :: [(Text, Aeson.Value, Text)]) \(what, args, expected) -> do
+              req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= Text.replace " " "-" fn
+                    , "arguments" Aeson..= args
+                    ]
+                ]
+              resp <- httpLbs req mgr
+              let answered = case mcpToolText (responseBody resp) of
+                    Just (isErr, text) -> Just (isErr, ("\"value\":" <> expected) `Text.isInfixOf` text)
+                    Nothing -> Nothing
+              (what, statusCode' resp, answered) `shouldBe` (what, 200, Just (False, True))
 
     it "MAYBE parameter is not in the required list of the schema" do
       withServiceFromSources "maybe-schema" [("maybe.l4", maybeParamJL4)] \baseUrl mgr -> do

@@ -10,6 +10,7 @@ module TestData (
   qualifiesJL4,
   recordJL4,
   maybeParamJL4,
+  maybeSynonymJL4,
   saleContractJL4,
   deonticExportJL4,
   deonticDeadlineJL4,
@@ -383,6 +384,42 @@ DECIDE with_maybe IS Result WITH
         CONSIDER extra
             WHEN JUST x THEN TRUE
             WHEN NOTHING THEN FALSE
+|]
+
+-- | Inputs declared through a type synonym for a MAYBE: one without a type
+-- parameter, and one that takes a type (@Optional OF NUMBER@). Each answers
+-- NOTHING for a null, a @{}@ or a left-out input, as @MAYBE NUMBER@ itself
+-- does, which is the control.
+maybeSynonymJL4 :: Text
+maybeSynonymJL4 =
+  [i|
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+DECLARE Optional OF a IS A MAYBE a
+
+@export a year that may be left out, through a synonym
+GIVEN y IS A MaybeYear
+GIVETH A NUMBER
+`year maybe` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export a number that may be left out, through a synonym that takes a type
+GIVEN y IS AN Optional OF NUMBER
+GIVETH A NUMBER
+`optional number` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export a plain MAYBE, the control
+GIVEN y IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain maybe` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
 |]
 
 -- | L4 source with an exported boolean function and a regulative (sale contract) rule.
