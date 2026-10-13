@@ -175,13 +175,19 @@ L4 reads each clause knowing what the clauses above it have already settled, so 
 A clause whose pattern is a new name, such as `DECIDE warm other IS FALSE`, matches anything that reaches it, and is read as `OTHERWISE`.
 
 So the ladder diagram in the editor, the query plan behind the wizard (the `/query-plan` route of `jl4-service`, the service that publishes rules), and `l4 verify` treat the two forms alike: the same boxes, the same questions, asked in the same order.
-That holds when every pattern in the clauses is an enum value, a literal (a number, a piece of text, `TRUE` or `FALSE`), or a name.
+That holds for tables like the ones above, whose patterns are enum values or literals (a number, a piece of text, `TRUE` or `FALSE`).
+
+A name is read correctly wherever it is, but it can make the drawing larger.
+A clause that names an input, instead of giving its value, and then tests a later input, has the clauses after it drawn again under each answer to that later test, because L4 cannot tell from that clause which value the named input has.
+So the ladder can be larger than the `CONSIDER` you would write, and a long list can pass the limit below.
+If that happens, write that part of the rule as a `CONSIDER`, or split the rule as described below.
 
 ### Patterns that are not broken down
 
 A pattern with something inside it, such as `JUST TRUE`, `JUST x` or a list, is not broken down into questions.
 The rule, or the part of it that tests that input, is drawn as one box, as it is for a `CONSIDER` written by hand.
 `l4 verify` lists a rule written as clauses whose whole ladder is that one box as `NOT ANALYSED`, saying that it was not broken down into questions, rather than reporting that it found nothing.
+A rule only part of which is such a box is analysed as far as its other boxes go: the box is one question, and nothing inside it is checked.
 
 ### At most 300 boxes
 
@@ -221,8 +227,9 @@ A rule that answers something other than yes or no, such as a number, is not dra
 
 The 300 bounds how much is drawn, not how long the wizard's plan takes.
 A plan's cost depends on how its questions combine, not only on how many boxes there are.
-A table of 20 rows over an enum of 20 values and a yes-or-no input draws 61 boxes and took between 11 and 18 seconds to plan when measured; one of 24 rows draws 73 boxes and took about four minutes.
-The same rule written as a `CONSIDER` by hand takes as long.
+A table of 20 rows over an enum of 20 values and a yes-or-no input draws 61 boxes and took between 11 and 21 seconds to plan when measured, depending on how busy the machine was; one of 24 rows draws 73 boxes and took about four minutes.
+The same rule written as a `CONSIDER` by hand, with the same patterns, takes as long.
+Written with the input `b` itself where the clauses have the pattern `TRUE`, it plans in a hundredth of a second: the plan treats the 20 copies of the question "is `b` true?" as one question there, and as 20 questions in the table.
 
 ## Implementation
 

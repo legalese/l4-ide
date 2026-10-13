@@ -258,10 +258,13 @@ letInliningNodeBudget = 20000
 -- about a second.
 --
 -- A plan's cost is not a function of the ladder's size. A table of an enum of
--- 20 values by a BOOLEAN input draws 61 nodes and took 11 to 18 s of CPU to plan
--- (in two runs), and of 24 values, 73 nodes and about four minutes (measured in
--- review); the same rule written as a CONSIDER by hand costs the same. This
--- limit does not bound that.
+-- 20 values by a BOOLEAN input draws 61 nodes and took 11 to 21 s of CPU to plan
+-- (11 and 18 s here, 21 s in review with the machine's load at 20), and of 24
+-- values, 73 nodes and about four minutes (measured in review). The same rule
+-- written by hand with the same patterns costs the same; with @b@ in place of
+-- the pattern @TRUE@ it plans in 0.01 s, because its 20 leaves @b EQUALS TRUE@
+-- share one atomId but not one unique, and the plan makes each a variable of
+-- its own. This limit does not bound that.
 --
 -- On 708c40f72, before #626 and #629, naming the atoms (R3) also made large
 -- ladders far slower whoever wrote the rule: @l4 verify@ on 200 @n EQUALS i@
