@@ -179,7 +179,7 @@ The function's published `returnSchema` does not describe two of these shapes ye
 
 An input left out of `arguments`, or sent as `null`, is missing.
 Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
-On the direct path an input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+An input declared through a synonym for `MAYBE` is a `MAYBE`, on the wrapper path too, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.

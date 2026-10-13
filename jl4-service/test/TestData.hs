@@ -234,7 +234,7 @@ DECIDE with_maybe IS Result WITH
 -- | Inputs declared through a type synonym for a MAYBE: one without a type
 -- parameter, and one that takes a type (@Optional OF NUMBER@). Each must be a
 -- MAYBE to the service, so a value is a JUST and a null or a missing one is a
--- NOTHING, as for @MAYBE NUMBER@ itself.
+-- NOTHING, as for @MAYBE NUMBER@ itself, which is the control.
 synonymParamJL4 :: Text
 synonymParamJL4 =
   [i|
@@ -254,6 +254,14 @@ GIVETH A NUMBER
 GIVEN y IS AN Optional OF NUMBER
 GIVETH A NUMBER
 `optional number` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export a plain MAYBE, the control
+GIVEN y IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain maybe` y MEANS
   CONSIDER y
     WHEN JUST n THEN n PLUS 1
     WHEN NOTHING THEN 0

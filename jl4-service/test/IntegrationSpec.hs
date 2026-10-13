@@ -242,6 +242,66 @@ spec = describe "integration" do
           answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
           answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
 
+    -- Three kinds of request go through the generated wrapper and not the direct
+    -- path: an input whose value is `{}`, a batch case with a `null`, and an MCP
+    -- call with a `null`. The wrapper read the head of an input's type only, so
+    -- it took a synonym for a MAYBE as a required input and refused the null as
+    -- "missing required parameter" (for `Optional OF NUMBER`, with a parser
+    -- error). `plain maybe` is the control that always answered.
+    describe "a synonym for a MAYBE, on the wrapper path" do
+      let deployId = "maybe-synonym-wrapper"
+          withSynonyms = withServiceFromSources deployId [("synonym.l4", synonymParamJL4)]
+          pathOf fn = Text.unpack (Text.replace " " "%20" fn)
+      forM_ ["year maybe", "optional number", "plain maybe" :: Text] \fn -> describe (Text.unpack fn) do
+        it "answers a {} value as NOTHING" do
+          withSynonyms \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.object [] ] ])
+            let value = case Aeson.decode (responseBody resp) of
+                  Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                  _ -> Nothing
+            (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt 0))
+        it "answers a null, a {} and a left-out input in a batch case as NOTHING" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> pathOf fn <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), "y" Aeson..= (2020 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), "y" Aeson..= Aeson.Null ]
+                    , Aeson.object [ "@id" Aeson..= (3 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (4 :: Int), "y" Aeson..= Aeson.object [] ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just [ (CaseAnswered, Just (FnLitInt 2021))
+                              , (CaseAnswered, Just (FnLitInt 0))
+                              , (CaseAnswered, Just (FnLitInt 0))
+                              , (CaseAnswered, Just (FnLitInt 0)) ]
+        it "answers a null, a {} and a left-out input in an MCP tool call as NOTHING" do
+          withSynonyms \baseUrl mgr ->
+            forM_ ([ ("2020", Aeson.object [ "y" Aeson..= (2020 :: Int) ], "2021")
+                   , ("null", Aeson.object [ "y" Aeson..= Aeson.Null ], "0")
+                   , ("{}", Aeson.object [ "y" Aeson..= Aeson.object [] ], "0")
+                   , ("left out", Aeson.object [], "0") ] :: [(Text, Aeson.Value, Text)]) \(what, args, expected) -> do
+              req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= Text.replace " " "-" fn
+                    , "arguments" Aeson..= args
+                    ]
+                ]
+              resp <- httpLbs req mgr
+              let answered = case mcpToolText (responseBody resp) of
+                    Just (isErr, text) -> Just (isErr, ("\"value\":" <> expected) `Text.isInfixOf` text)
+                    Nothing -> Nothing
+              (what, statusCode' resp, answered) `shouldBe` (what, 200, Just (False, True))
+
     -- The same fault showed on a synonym for a record, an enum and a list: the
     -- service looked for each by the synonym's own name, and answered
     -- "FnObject but expected type is not a known record", "check equality on
@@ -2107,6 +2167,19 @@ decodeObject = Aeson.decode
 -- | Look up a key in a Maybe Object.
 lookupKey :: Text -> Maybe Aeson.Object -> Maybe Aeson.Value
 lookupKey k = (>>= Aeson.KeyMap.lookup (Aeson.Key.fromText k))
+
+-- | The text of an MCP tool call's answer, and whether the call was an error.
+mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
+mcpToolText body = do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  Aeson.Object c : _ <- pure (toList cs)
+  Aeson.String t <- Aeson.KeyMap.lookup "text" c
+  let isErr = case Aeson.KeyMap.lookup "isError" r of
+        Just (Aeson.Bool b) -> b
+        _                   -> False
+  pure (isErr, t)
 
 -- | Look up a JSON array in a Maybe Object, returning its length.
 lookupArrayLength :: Text -> Maybe Aeson.Object -> Maybe Int

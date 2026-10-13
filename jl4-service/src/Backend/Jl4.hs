@@ -429,6 +429,22 @@ expandSyn mi = go (16 :: Int)
       TyApp ann r ts -> TyApp ann r (map (subst sub) ts)
       other -> other
 
+-- | The types of a function's inputs, with a synonym for MAYBE read as the
+-- MAYBE it stands for. The generated wrapper decides from the head of an
+-- input's type whether the input may be left out or sent as @null@
+-- ('Backend.CodeGen'), and it does not expand a synonym, so an input declared
+-- through a synonym for MAYBE was a required one: a @null@ for it, in a batch
+-- case or an MCP call, or a @{}@ value anywhere, was refused as a missing
+-- parameter. Only a head that comes to a MAYBE is replaced; any other type is
+-- left as written.
+maybeSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
+maybeSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
+  where
+    mi = buildModuleInfo decls
+    headOf ty = case expandSyn mi ty of
+      expanded | isJust (stripMaybe expanded) -> expanded
+      _                                        -> ty
+
 -- | Look up an enum or record type by unique.
 lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
 lookupEnum mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miEnumVariants
@@ -605,8 +621,9 @@ evaluateWithCompiledDeontic
   -> Bool
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -759,8 +776,9 @@ evaluateWithWrapper
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
   -- Extract parameter types from the compiled function definition
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -1011,10 +1029,17 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat initErrs)
                   Just tcRes -> pure tcRes
 
-                -- 2. Get function definition and extract parameter types
+                -- 2. Get function definition and extract parameter types.
+                -- The entry module's own declarations are all this path has, as in
+                -- precompileModule's single-file fallback. It runs only after
+                -- precompileModule failed, and that fails only where typecheckModule
+                -- or getFunctionDefinition does (buildImportEnvironment falls back
+                -- to an empty environment instead). Both are repeated here with the
+                -- same arguments, so a request stops before it reaches the wrapper.
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
-                let givenParamTypes = extractParamTypes funDecide
-                    assumeParamTypes = extractAssumeParamTypes tcRes.module' funDecide
+                let givenParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module') (extractParamTypes funDecide)
+                    assumeParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module')
+                      (extractAssumeParamTypes tcRes.module' funDecide)
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting
