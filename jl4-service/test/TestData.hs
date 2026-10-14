@@ -17,6 +17,7 @@ module TestData (
   assumeParamJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
+  partialClausesJL4,
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
@@ -347,6 +348,22 @@ GIVETH A PROVISION OF Driver, `Driver Action`
                 MAY `drive`
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A rule written as clauses, with no clause for Blue. The error for Blue is
+-- worded from the clauses ("No clause of `price` matches these inputs"), and
+-- the evaluator reads that from a mark on the CONSIDERs the clauses compile
+-- to, which the bundle has to keep (review of legalese/l4-ide#545).
+partialClausesJL4 :: Text
+partialClausesJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default The price of a colour
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
 |]
 
 -- | One function per shape of answer. Every one but @pass@ has a spare MAYBE
