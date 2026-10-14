@@ -128,7 +128,7 @@ jobs:
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors and on directives that crash during evaluation, but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step greps for it (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
+- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step greps for it (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 

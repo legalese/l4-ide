@@ -694,6 +694,121 @@ spec bin = do
       T.count "Infinite loop detected" (T.pack sout) `shouldBe` 4
       sout `shouldNotSatisfy` ("Division by zero" `isInfixOf`)
 
+  describe "l4 run on an #ASSERT whose expression raises" $ do
+    -- Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
+    let assertRaisesFixture = fixtureDir </> "assert-raises.l4"
+        -- @#ASSERT P@ and @#ASSERT NOT P@ for a @P@ that raises, then one clean
+        -- TRUE and one clean FALSE as controls.
+        assertRaisesPairFixture = fixtureDir </> "assert-raises-pair.l4"
+        -- Every @#ASSERT@ decides: one holds, one does not.
+        assertCleanFixture = fixtureDir </> "assert-clean.l4"
+
+    -- An #ASSERT whose expression RAISES is a distinct outcome from one that
+    -- evaluates to FALSE. Before this was pinned, `#ASSERT P` and
+    -- `#ASSERT NOT P` both reported "assertion failed" whenever P raised
+    -- (division by zero, an assumed term, …), so a test suite could not tell
+    -- a wrong answer from an error.
+    it "reports an #ASSERT that raises as unevaluable, with the reason, never as failed" $ do
+      Output _ sout _ <- runL4 bin ["run", assertRaisesFixture]
+      sout `shouldSatisfy` ("assertion could not be evaluated" `isInfixOf`)
+      sout `shouldSatisfy` ("Division by zero" `isInfixOf`)
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+
+    -- It did not evaluate cleanly, so it is the crash that fails the run, as a
+    -- #EVAL that raises does. A clean FALSE (below) stays exit 0.
+    it "fails the run when an #ASSERT raises" $
+      expectFail bin ["run", assertRaisesFixture]
+
+    it "keeps kind \"assertion\", a null value and the reason in JSON when an #ASSERT raises" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> do
+          length v `shouldBe` 2
+          mapM_ (\r -> do
+                   objField r "kind"  `shouldBe` Just (String "assertion")
+                   objField r "value" `shouldBe` Just Null
+                   case objField r "error" of
+                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+                     other -> expectationFailure ("Expected an error string, got " ++ show other))
+                v
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the raising fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertRaisesFixture] "Check succeeded."
+
+    -- The second #ASSERT over a definition that raised must say what it raised.
+    it "reports both polarities over one raising definition with what it raised" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "assert-twice.l4"]
+      T.count "assertion could not be evaluated" (T.pack sout) `shouldBe` 2
+      T.count "Division by zero" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("Infinite loop" `isInfixOf`)
+
+    -- The control: a genuine loop is still a loop at every use.
+    it "reports an #ASSERT over a genuine loop as a loop, at every use" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "assert-loop.l4"]
+      T.count "assertion could not be evaluated" (T.pack sout) `shouldBe` 2
+      T.count "Infinite loop detected" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "does not report P and NOT P as failed when P raises, and keeps the clean verdicts" $ do
+      Output _ sout _ <- runL4 bin ["run", assertRaisesPairFixture]
+      let out = T.pack sout
+      T.count "assertion could not be evaluated" out `shouldBe` 2
+      -- the one clean FALSE (boom 2) is the only "failed"
+      T.count "assertion failed" out `shouldBe` 1
+      T.count "assertion satisfied" out `shouldBe` 1
+
+    it "gives P and NOT P a null value and a reason in JSON, and the controls true and false" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesPairFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> do
+          length v `shouldBe` 4
+          case foldr (:) [] v of
+            [p, notP, holds, fails] -> do
+              mapM_ (\r -> do
+                       objField r "value" `shouldBe` Just Null
+                       case objField r "error" of
+                         Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+                         other -> expectationFailure ("Expected an error string, got " ++ show other))
+                    [p, notP]
+              objField holds "value" `shouldBe` Just (Bool True)
+              objField holds "error" `shouldBe` Nothing
+              objField fails "value" `shouldBe` Just (Bool False)
+              objField fails "error" `shouldBe` Nothing
+            other -> expectationFailure ("Expected four results, got " ++ show other)
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics. A raising #ASSERT is
+    -- an Error that says why, and a satisfied one stays Information.
+    it "publishes a raising #ASSERT as an Error diagnostic that says it could not be evaluated" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesPairFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s | String s <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "7" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "7" `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("assertion satisfied" `T.isInfixOf`)
+          at "10" `shouldSatisfy` ("assertion failed" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- The other side of the line: a clean FALSE is a verdict, not a crash.
+    it "leaves a clean FALSE #ASSERT at exit 0, reported as failed" $ do
+      Output code sout _ <- runL4 bin ["run", assertCleanFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do
       Output code sout _ <- runL4 bin ["format", cleanFixture]

@@ -183,6 +183,7 @@ test-suite jl4-core-test
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
+    AssertRaisesSpec
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec

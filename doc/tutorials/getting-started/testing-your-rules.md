@@ -135,7 +135,29 @@ Result:
   assertion failed
 ```
 
-> **CI note:** `l4 run` exits non-zero for _type errors_ and for directives that _crash during evaluation_ (runtime errors), but not for failed assertions — a file with a failing `#ASSERT` still typechecks, so the exit code is `0`. In a CI pipeline, run with `--json` and check each result of `"kind": "assertion"` for `"value": false`, or simply grep the text output for `assertion failed`.
+### What an error looks like
+
+An assertion whose expression _raises_ — a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d — is neither satisfied nor failed: the evaluator could not decide it. `#ASSERT P` and `#ASSERT NOT P` then both report the same thing, with the reason:
+
+```l4
+ASSUME x IS A NUMBER
+
+#ASSERT x EQUALS 1
+```
+
+```
+Evaluation[1] @ stuck-assert.l4:3:1-19
+
+Result:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+```
+
+This is a crash, not a verdict: `l4 run` exits non-zero, and in `--json` the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"error"`.
+
+> **CI note:** `l4 run` exits non-zero for _type errors_ and for directives that _crash during evaluation_ (runtime errors, including an `#ASSERT` that raises), but not for failed assertions — a file with a failing `#ASSERT` still typechecks, so the exit code is `0`. In a CI pipeline, run with `--json` and check each result of `"kind": "assertion"` for `"value": false`, or simply grep the text output for `assertion failed`.
 
 ---
 
@@ -276,7 +298,7 @@ Run the whole suite with `l4 run loan-rules.l4`; wire the same command into CI a
 - `#CHECK` typechecks an expression and reports its type without running it
 - `#TRACE ... AT ... WITH PARTY ... DOES ... AT ...` simulates obligations over a timeline
 - Fulfillment prints `FULFILLED`; breach prints `DEONTIC BREACHED` with your `BECAUSE` reason
-- Failed assertions print `assertion failed` but do not change the exit code — check for them explicitly in CI
+- Failed assertions print `assertion failed` but do not change the exit code — check for them explicitly in CI; an assertion that _raises_ prints `assertion could not be evaluated` with the reason, and does fail the run
 
 ---
 
