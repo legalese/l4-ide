@@ -5,8 +5,9 @@ Written 2026-10-12 as a design note and revised 2026-10-14 after one skeptic rou
 Option C was then built on that branch, on Meng's instruction of 2026-10-14 to "proceed if it only weakens, doesn't overturn"; §9.1 says what the build changed, and §8 marks what it settled.
 Nothing on the branch is pushed, and C over A is not separately ruled.
 **Evidence:** the probes, scripts and saved sources this note cites are in `inline-one-of-field/` beside it; paths below are relative to this file.
+They are copied unchanged, except that `inline-one-of-field/measure/encdirs.txt` lists the encodings directories relative to the `legalese/commons` repository, where the copy the census read gave them as absolute paths on the machine it ran on.
 **Asked by:** Meng, 2026-10-12: "For symmetry it would be kind of nice to support this. Though iirc Haskell doesn't and there's probably good reason why not."
-**Trees:** code read on the integration tree `/Volumes/transcend/src/l4wt/integ` at `1747606b1`; probes run on the `l4-ln-551` snapshot binary; corpus measured on `legalese/l4-ide` origin/unstable `708c40f72` and `legalese/commons` main `f8ee9266`.
+**Trees:** code read on the integration tree at `1747606b1`; probes run on the `l4-ln-551` snapshot binary; corpus measured on `legalese/l4-ide` origin/unstable `708c40f72` and `legalese/commons` main `f8ee9266`.
 **Prior record:** `specs/proposals/GIVETH-INLINE-TYPE-DECL-SPEC.md` and `GIVETH-MULTIPLE-RESULTS-SPEC.md`, both rejected 5/5 on 2026-07-26 (`3f8259f0a`).
 
 ```l4
