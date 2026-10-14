@@ -67,6 +67,20 @@ Warning: The following CONSIDER branch is redundant:
 
 Redundancy matters legally too — an unreachable branch is usually a sign that the author _believed_ some case was being handled there, when in fact an earlier branch is absorbing it.
 
+### Multi-clause DECIDE
+
+A function written as [one DECIDE clause per case](../../reference/functions/multi-clause-DECIDE.md) is checked the same way, as a whole group: the warning lists the clauses still needed, ready to paste.
+
+```
+This multi-clause definition does not cover all cases. The following clauses are still needed:
+
+  DECIDE `price` Blue IS
+```
+
+Clauses that match enumeration values or `TRUE`/`FALSE` are checked, and so are clauses that match particular numbers or texts, for which the clause written with the input's name is suggested.
+The page linked above lists the groups that are not.
+A clause below one that matches every input is never reached, and is warned about too.
+
 ### The amendment scenario
 
 The payoff comes when a category grows. Add a fourth variant to `` `visa status` `` and every checked `CONSIDER` site that scrutinises it — every letter template, every fee rule, every appeal-rights determination — immediately warns that the new case "still needs to be considered". The legislature's amendment becomes a checklist of code sites to revisit. This is the property flattened boolean encodings cannot offer: a bundle of independent `IF` tests has no notion of "covering" a category, so nothing notices when the category changes.
@@ -75,9 +89,10 @@ The payoff comes when a category grows. Add a fourth variant to `` `visa status`
 
 ## Caveats and Escape Hatches
 
-### Primitive types are not checked
+### Numbers, text and dates
 
-The analysis works by enumerating constructors, so it applies only to algebraic types with a finite, known constructor set. Scrutinees of the primitive types `NUMBER`, `STRING`, and `DATE` are skipped — their values (numeric and string literals, dates) cannot be enumerated, so neither missing-case nor redundancy warnings are produced for them:
+The analysis works by enumerating constructors, and a `NUMBER`, a `STRING` or a `DATE` has none to enumerate: its values have no end.
+So a `WHEN` with a number or a piece of text matches one value, and a `CONSIDER` over such a scrutinee is complete only with an `OTHERWISE`, which the missing-case warning suggests:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -85,12 +100,28 @@ GIVETH A STRING
 `describe count` MEANS
     CONSIDER n
     WHEN 0 THEN "none"
-    OTHERWISE "some"    -- no warning either way; supply OTHERWISE yourself
+    WHEN 1 THEN "one"
+    -- warns: OTHERWISE
 ```
 
-`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. Other builtin container types (`MAYBE`, `EITHER`, `LIST`) are not yet analysed.
+A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is reported as a redundant branch.
 
-The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the safety property is silently lost. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
+`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. The builtin container types (`MAYBE`, `EITHER`, `LIST`) are analysed only inside: a missing `WHEN NOTHING` or `WHEN EMPTY` is not reported, but `WHEN JUST Basic` over a `MAYBE Tier` asks for `WHEN JUST Premium` and `WHEN JUST Gold`.
+
+A rule written as clauses, one `DECIDE` line per case, is read the same way.
+A number or a piece of text in a clause matches one value of its input, so such a rule is complete only with a clause written with the input's name, and the missing-case warning suggests that clause:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `describe count` 0 IS "none"
+DECIDE `describe count` 1 IS "one"
+-- warns: DECIDE `describe count` n IS
+```
+
+The enumeration inputs of the same rule are still analysed, and the two spellings of one determination warn alike over enumerations declared in the same file, numbers, text and `EXACTLY`; they can differ for a repeated value, and where a branch or clause names a constructor of a `MAYBE`, an `EITHER`, a list or a type declared in another file (see [CONSIDER](../../reference/control-flow/CONSIDER.md)).
+
+The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the check can only ask for an `OTHERWISE`; it cannot tell you which categories you left out. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
 
 The check applies wherever the `CONSIDER` appears — in a rule's main body and equally inside `WHERE`- or `LET`-bound local definitions.
 
@@ -127,17 +158,19 @@ The intended discipline: treat the warnings as a completeness report. A finished
 
 ## Summary
 
-| Property                                          | Behaviour                                                                |
-| ------------------------------------------------- | ------------------------------------------------------------------------ |
-| Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                      |
-| Unreachable branch                                | Compile-time warning that the branch is redundant                        |
-| `NUMBER` / `STRING` / `DATE` scrutinee            | Not analysed — values can't be enumerated                                |
-| `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                           |
-| `MAYBE` / `EITHER` / `LIST` scrutinee             | Not yet analysed                                                         |
-| `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                  |
-| `OTHERWISE`                                       | Completes the match, disables missing-case warnings                      |
-| Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero    |
-| Severity                                          | Warning, not error — the file still evaluates and its `#EVAL`s still run |
+| Property                                          | Behaviour                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------------------- |
+| Missing case in `CONSIDER`                        | Compile-time warning listing the uncovered branches                        |
+| Missing case in a multi-clause `DECIDE`           | Compile-time warning listing the clauses still needed                      |
+| Unreachable branch                                | Compile-time warning that the branch is redundant                          |
+| `NUMBER` / `STRING` / `DATE` scrutinee            | Analysed; `OTHERWISE` is suggested when it is missing                      |
+| Clauses over a `NUMBER` or `STRING` input         | Analysed; the clause with the input's name is suggested when it is missing |
+| `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
+| `MAYBE` / `EITHER` / `LIST` scrutinee             | Their contents analysed; their own constructors not listed                 |
+| `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                    |
+| `OTHERWISE`                                       | Completes the match, disables missing-case warnings                        |
+| Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero      |
+| Severity                                          | Warning, not error — the file still evaluates and its `#EVAL`s still run   |
 
 ---
 

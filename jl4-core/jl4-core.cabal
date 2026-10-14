@@ -164,10 +164,14 @@ test-suite jl4-core-test
     TemporalContextSpec
     UnifySpec
     MixfixParserSpec
+    PatternMatchParserSpec
+    PatternClausesMissingSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    MultiClausePrintSpec
+    ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     DirectiveAmbiguitySpec
@@ -177,6 +181,7 @@ test-suite jl4-core-test
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,

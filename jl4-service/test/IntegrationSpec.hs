@@ -16,6 +16,7 @@ import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Types
+import L4.FunctionSchema (Parameters (..))
 
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
@@ -46,7 +47,7 @@ import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -764,6 +765,19 @@ spec = describe "integration" do
             pure (map (answerOf baseUrl deployId) [evalResp, detailsResp, listResp])
       (fresh, restarted) <- beforeAndAfterRestart "ctl-restart" [("qualifies.l4", qualifiesJL4)] probe
       map fst fresh `shouldBe` [200, 200, 200]
+      restarted `shouldBe` fresh
+
+    -- A rule written as clauses words an input that no clause matches in the
+    -- drafter's terms, from a mark on the CONSIDERs the clauses compile to. The
+    -- mark is on their annotations, which bundle.cbor used to drop, so a
+    -- restarted service reported a CONSIDER the drafter never wrote (review of
+    -- legalese/l4-ide#545). A restart now compiles the sources again.
+    it "words a rule written as clauses as it did before the restart" do
+      let probe baseUrl mgr deployId = do
+            resp <- evalFunction baseUrl mgr deployId "price" blue
+            assertNoClauseForBlue resp
+            pure (answerOf baseUrl deployId resp)
+      (fresh, restarted) <- beforeAndAfterRestart "clauses-restart" [("price.l4", partialClausesJL4)] probe
       restarted `shouldBe` fresh
 
     it "reads a record input declared in an imported file as it did before the restart" do
@@ -1998,13 +2012,80 @@ spec = describe "integration" do
           expectationFailure $
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
+    -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
+    -- inputs that only the compiler named, and that nothing gives a type. It
+    -- used to be published as the inputs `input 1` and `input 2`, typed
+    -- "object", and every call to it failed; now the deploy is refused.
+    it "refuses a module that @exports a clause group with no GIVEN" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "size.l4" (exportedSizeGroup []))
+      case result of
+        Left err ->
+          err `shouldSatisfy` Text.isInfixOf "`size` is published with @export, but its inputs have no names"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    -- Overloads written one after another are gathered by the parser and
+    -- separated by the checker; the @export above the second one must stay
+    -- with it (refutation of legalese/l4-ide#545's review, round 3).
+    it "publishes the overload whose @export is written above it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "twice.l4" $ Text.unlines
+        [ "DECIDE twice n IS n * 2"
+        , "@export the boolean version"
+        , "DECIDE twice b IS b AND b"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions] `shouldBe` [("twice", ["b"])]
+
+    it "publishes the same clause group with a GIVEN, under the names it gives" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "size.l4" $ exportedSizeGroup
+        [ "GIVEN c IS A Colour"
+        , "      n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions] `shouldBe` [["c", "n"]]
+
 
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
 
+-- | What 'partialClausesJL4' says when called with Blue, which no clause matches.
+noClauseForBlue :: Text
+noClauseForBlue = "No clause of `price` matches these inputs."
+
+blue :: Aeson.Value
+blue = Aeson.object ["arguments" Aeson..= Aeson.object ["c" Aeson..= ("Blue" :: Text)]]
+
+assertNoClauseForBlue :: Response LBS.ByteString -> IO ()
+assertNoClauseForBlue resp = case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+  Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf noClauseForBlue
+  other -> expectationFailure ("Expected " <> show noClauseForBlue <> ", got: " <> show other)
+
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
+-- | A clause group published with @export, under the given signature lines
+-- (none: no GIVEN at all).
+exportedSizeGroup :: [Text] -> Text
+exportedSizeGroup signature = Text.unlines $
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+  , ""
+  , "@export"
+  ] <> signature <>
+  [ "DECIDE size Red   n IS n"
+  , "DECIDE size Green n IS n + 1"
+  , "DECIDE size Blue  n IS 0"
+  ]
+
 
 -- | What a client is meant to get back from an evaluation request.
 data WireOutcome

@@ -8,6 +8,7 @@
 - [Overview](reference/README.md)
 - [Types](reference/types/README.md)
 - [Functions](reference/functions/README.md)
+  - [Multi-clause DECIDE](reference/functions/multi-clause-DECIDE.md)
 - [Control Flow](reference/control-flow/README.md)
 - [Operators](reference/operators/README.md)
 - [Syntax](reference/syntax/README.md)

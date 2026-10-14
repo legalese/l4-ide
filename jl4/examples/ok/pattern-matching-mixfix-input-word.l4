@@ -1,0 +1,22 @@
+-- The same for the clauses of a group: `fee` takes the inputs `costs` and `n`,
+-- so `DECIDE fee costs 0 IS 0` is a clause of `fee`, whatever else `costs` is
+-- a word of. The mixfix rule beside it still works.
+-- The calls are written head first: main's exact-printer reorders an infix
+-- mixfix call (smucclaw/l4-ide#918, fixed on unstable), which the .ep.golden
+-- would then record.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS n
+
+GIVEN costs IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE fee costs 0 IS 0
+DECIDE fee costs n IS n
+
+#EVAL `costs` Red 5    -- 5
+#EVAL fee Red 0        -- 0
+#EVAL fee Red 7        -- 7
