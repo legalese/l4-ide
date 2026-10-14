@@ -32,17 +32,17 @@ describe('createPendingLogin', () => {
 })
 
 describe('buildLoginUrl', () => {
-  test('sends return_to with the challenge', () => {
+  test('opens the console with the callback and the challenge', () => {
     const url = new URL(
       buildLoginUrl(
-        'legalese.cloud',
+        'https://legalese.com/console',
         'vscode://legalese.l4-vscode/auth-callback',
         'abc'
       )
     )
-    assert.equal(url.origin + url.pathname, 'https://legalese.cloud/auth/login')
+    assert.equal(url.origin + url.pathname, 'https://legalese.com/console')
     assert.equal(
-      url.searchParams.get('return_to'),
+      url.searchParams.get('redirect_to'),
       'vscode://legalese.l4-vscode/auth-callback'
     )
     assert.equal(url.searchParams.get('code_challenge'), 'abc')

@@ -1,14 +1,18 @@
 /**
  * Legalese Cloud login hand-off (jl4-auth-proxy `src/auth/handoff.ts`).
  *
- * The extension starts the login with a PKCE challenge; the proxy then sends
- * back a short-lived code instead of the session token, and the extension
- * exchanges code + verifier at `POST /auth/exchange` for the token. The token
- * never travels in a URL (browser history, the console page, the `vscode://`
- * link), and a code is useless to anyone without this login's verifier.
+ * The extension opens the Legalese console with its callback and a PKCE
+ * challenge. The console shows who is signing in, and to which org (with
+ * Switch account), and on Continue starts the extension's own sign-in; the
+ * proxy then returns a short-lived code instead of the session token, which
+ * the extension exchanges with its verifier at `POST /auth/exchange`. The
+ * token never travels in a URL (browser history, the console page, the
+ * `vscode://` link), a code is useless to anyone without this login's
+ * verifier, and the editor's session is its own (signing out of the console
+ * doesn't sign it out).
  *
- * A proxy without hand-off support ignores the challenge and answers with the
- * legacy `?token=` callback, which is still accepted.
+ * A console or proxy without hand-off support ignores the challenge and
+ * answers with the legacy `?token=` callback, which is still accepted.
  *
  * Lives in its own zero-dependency module so `node --test` can exercise it
  * without dragging the vscode runtime through the import graph.
@@ -39,17 +43,19 @@ export function createPendingLogin(now = Date.now()): {
   }
 }
 
+/** The console page that confirms the account and org, then signs the
+ *  editor in (legalese.github.io `/console`, `redirect_to` + challenge). */
 export function buildLoginUrl(
-  domain: string,
+  consoleUrl: string,
   callbackUri: string,
   challenge: string
 ): string {
   const params = new URLSearchParams({
-    return_to: callbackUri,
+    redirect_to: callbackUri,
     code_challenge: challenge,
     code_challenge_method: 'S256',
   })
-  return `https://${domain}/auth/login?${params.toString()}`
+  return `${consoleUrl}?${params.toString()}`
 }
 
 export type AuthCallback =

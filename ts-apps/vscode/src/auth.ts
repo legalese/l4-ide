@@ -19,6 +19,8 @@ export interface ConnectionState {
 }
 
 export const LEGALESE_CLOUD_DOMAIN = 'legalese.cloud'
+/** Where sign-in starts: the console confirms account and org. */
+export const LEGALESE_CONSOLE_URL = 'https://legalese.com/console'
 const SECRET_KEY_SESSION = 'l4.sessionToken'
 // The PKCE verifier of a login in progress (see auth-handoff.ts). Kept in
 // SecretStorage, not memory: the OS may deliver the callback URI to a
@@ -316,9 +318,10 @@ export class AuthManager {
       return
     }
 
-    // No service URL → Legalese Cloud browser login. The PKCE challenge asks
-    // the proxy for a hand-off code instead of putting the session token in
-    // the callback URL.
+    // No service URL → Legalese Cloud browser login, through the console
+    // (account, org, Switch account). The PKCE challenge gets the extension
+    // its own sign-in and a hand-off code instead of a session token in the
+    // callback URL.
     const callbackUri = await vscode.env.asExternalUri(
       vscode.Uri.parse(
         `${vscode.env.uriScheme}://legalese.l4-vscode/auth-callback`
@@ -327,7 +330,7 @@ export class AuthManager {
     const { pending, challenge } = createPendingLogin()
     await this.secrets.store(SECRET_KEY_PENDING_LOGIN, JSON.stringify(pending))
     const loginUrl = buildLoginUrl(
-      LEGALESE_CLOUD_DOMAIN,
+      LEGALESE_CONSOLE_URL,
       callbackUri.toString(),
       challenge
     )
