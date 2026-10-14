@@ -1,0 +1,44 @@
+-- Positive control for census.py. Expected buckets are in census.py --control.
+DECLARE Solo IS ONE OF SA, SB
+DECLARE Shared IS ONE OF HA, HB
+DECLARE OnlyOut IS ONE OF OA, OB
+DECLARE Listed IS ONE OF LA, LB
+DECLARE `Pun` IS ONE OF UA, UB
+-- Ghost appears only in this comment, a string, a block comment and an annotation
+DECLARE Ghost IS ONE OF GA, GB
+DECLARE Exported IS ONE OF EA, EB
+DECLARE Syn IS ONE OF YA, YB
+DECLARE Other IS A Syn
+
+DECLARE Rec HAS
+    solo     IS A Solo
+    shared   IS A Shared
+    listed   IS A LIST OF Listed
+    `Pun`    IS A `Pun`
+    exported IS A Exported
+    note     IS A STRING @desc mentions Ghost in an annotation
+
+DECLARE Near IS ONE OF NA, NB
+DECLARE Rec2 HAS near IS A Near, flag IS A BOOLEAN
+
+DECLARE Pay IS ONE OF PA, PB
+DECLARE Shape IS ONE OF
+    Dot
+    Box HAS
+        kind IS A Pay
+
+DECLARE Rec3 HAS
+    a IS A NUMBER
+    b IS ONE OF X, Y
+DECLARE Inline1 IS ONE OF IA, IB
+DECLARE Rec4 HAS
+    c IS A Inline1
+
+{- Ghost in a block comment -}
+GIVEN s IS A Shared
+GIVETH A OnlyOut
+`f` s MEANS IF s EQUALS HA THEN OA ELSE OB
+
+GIVEN r IS A Rec
+GIVETH A STRING
+`g` r MEANS IF r's `Pun` EQUALS UA THEN "Ghost" ELSE "no"

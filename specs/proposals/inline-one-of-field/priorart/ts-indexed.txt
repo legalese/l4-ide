@@ -1,0 +1,228 @@
+TypeScript: Documentation - Indexed Access Types
+Skip to main contentTypeScriptDownload
+Docs
+Handbook
+Community
+Playground
+Tools
+in En
+Was this page helpful?
+Get StartedTS for the New Programmer
+TypeScript for JS Programmers
+TS for Java/C# Programmers
+TS for Functional Programmers
+TypeScript Tooling in 5 minutes
+HandbookThe TypeScript Handbook
+The Basics
+Everyday Types
+Narrowing
+More on Functions
+Object Types
+Type ManipulationCreating Types from Types
+Generics
+Keyof Type Operator
+Typeof Type Operator
+Indexed Access Types
+Conditional Types
+Mapped Types
+Template Literal Types
+Classes
+Modules
+ReferenceUtility Types
+Cheat Sheets
+Decorators
+Declaration Merging
+Enums
+Iterators and Generators
+JSX
+Mixins
+Namespaces
+Namespaces and Modules
+Symbols
+Triple-Slash Directives
+Type Compatibility
+Type Inference
+Variable Declaration
+Modules ReferenceIntroduction
+Theory
+GuidesChoosing Compiler Options
+Reference
+AppendicesESM/CJS Interoperability
+TutorialsASP.NET Core
+Gulp
+DOM Manipulation
+Migrating from JavaScript
+Using Babel with TypeScript
+What's NewTypeScript 6.0
+TypeScript 5.9
+TypeScript 5.8
+TypeScript 5.7
+TypeScript 5.6
+TypeScript 5.5
+TypeScript 5.4
+TypeScript 5.3
+TypeScript 5.2
+TypeScript 5.1
+TypeScript 5.0
+TypeScript 4.9
+TypeScript 4.8
+TypeScript 4.7
+TypeScript 4.6
+TypeScript 4.5
+TypeScript 4.4
+TypeScript 4.3
+TypeScript 4.2
+TypeScript 4.1
+TypeScript 4.0
+TypeScript 3.9
+TypeScript 3.8
+TypeScript 3.7
+TypeScript 3.6
+TypeScript 3.5
+TypeScript 3.4
+TypeScript 3.3
+TypeScript 3.2
+TypeScript 3.1
+TypeScript 3.0
+TypeScript 2.9
+TypeScript 2.8
+TypeScript 2.7
+TypeScript 2.6
+TypeScript 2.5
+TypeScript 2.4
+TypeScript 2.3
+TypeScript 2.2
+TypeScript 2.1
+TypeScript 2.0
+TypeScript 1.8
+TypeScript 1.7
+TypeScript 1.6
+TypeScript 1.5
+TypeScript 1.4
+TypeScript 1.3
+TypeScript 1.1
+Declaration FilesIntroduction
+Declaration Reference
+Library Structures
+.d.ts TemplatesModules .d.ts
+Module: Plugin
+Module: Class
+Module: Function
+Global .d.ts
+Global: Modifying Module
+Do's and Don'ts
+Deep Dive
+Publishing
+Consumption
+JavaScriptJS Projects Utilizing TypeScript
+Type Checking JavaScript Files
+JSDoc Reference
+Creating .d.ts Files from .js files
+Project ConfigurationWhat is a tsconfig.json
+Compiler Options in MSBuild
+TSConfig Reference
+tsc CLI Options
+Project References
+Integrating with Build Tools
+Configuring Watch
+Nightly Builds
+Indexed Access Types
+We can use an indexed access type to look up a specific property on another type:
+ts
+type Person = { age: number; name: string; alive: boolean };
+type Age = Person["age"];
+type Age = number
+Try
+The indexing type is itself a type, so we can use unions, keyof, or other types entirely:
+ts
+type I1 = Person["age" | "name"];
+type I1 = string | number
+type I2 = Person[keyof Person];
+type I2 = string | number | boolean
+type AliveOrName = "alive" | "name";
+type I3 = Person[AliveOrName];
+type I3 = string | boolean
+Try
+You’ll even see an error if you try to index a property that doesn’t exist:
+ts
+type I1 = Person["alve"];
+Property 'alve' does not exist on type 'Person'.2339Property 'alve' does not exist on type 'Person'.Try
+Another example of indexing with an arbitrary type is using number to get the type of an array’s elements.
+We can combine this with typeof to conveniently capture the element type of an array literal:
+ts
+const MyArray = [
+ { name: "Alice", age: 15 },
+ { name: "Bob", age: 23 },
+ { name: "Eve", age: 38 },
+];
+type Person = typeof MyArray[number];
+type Person = {
+ name: string;
+ age: number;
+}
+type Age = typeof MyArray[number]["age"];
+type Age = number
+// Or
+type Age2 = Person["age"];
+type Age2 = number
+Try
+You can only use types when indexing, meaning you can’t use a const to make a variable reference:
+ts
+const key = "age";
+type Age = Person[key];
+Type 'key' cannot be used as an index type.'key' refers to a value, but is being used as a type here. Did you mean 'typeof key'?2538
+2749Type 'key' cannot be used as an index type.'key' refers to a value, but is being used as a type here. Did you mean 'typeof key'?Try
+However, you can use a type alias for a similar style of refactor:
+ts
+type key = "age";
+type Age = Person[key];
+Try
+On this page
+Is this page helpful?
+ Yes No
+PreviousTypeof Type Operator
+Using the typeof operator in type contexts.
+NextConditional Types
+Create types which act like if statements in the type system.
+The TypeScript docs are an open source project. Help us improve these pages by sending a Pull Request ❤
+Contributors to this page:
+OT
+Last updated: Oct 05, 2026
+Customize
+Site Colours:
+SystemAlways LightAlways Dark
+Code Font:
+CascadiaCascadia (ligatures)ConsolasDank MonoFira CodeJetBrains MonoOpenDyslexicSF MonoSource Code Pro
+Popular Documentation Pages
+Everyday TypesAll of the common types in TypeScript
+Creating Types from TypesTechniques to make more elegant types
+More on FunctionsHow to provide types to functions in JavaScript
+More on ObjectsHow to provide a type shape to JavaScript objects
+NarrowingHow TypeScript infers types based on runtime behavior
+Variable DeclarationsHow to create and type JavaScript variables
+TypeScript in 5 minutesAn overview of building a TypeScript web app
+TSConfig OptionsAll the configuration options for a project
+ClassesHow to provide types to JavaScript ES6 classes
+Made with ♥ in Redmond, Boston, SF & Dublin
+© 2012-2026 Microsoft
+PrivacyTerms of Use
+Using TypeScript
+Get Started
+Download
+Community
+Playground
+TSConfig Ref
+Code Samples
+Why TypeScript
+Design
+Community
+Get Help
+Blog
+GitHub Repo
+Community Chat
+@TypeScript
+Mastodon
+Stack Overflow
+Web Repo
+MSG
+ 

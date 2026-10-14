@@ -1,0 +1,7 @@
+DECLARE `Plot's tenure` IS ONE OF Owner, Tenant, Lodger
+DECLARE Plot HAS
+    tenure IS A `Plot's tenure`
+
+GIVEN t IS A Plot's tenure
+GIVETH A BOOLEAN
+`is let` t MEANS t EQUALS Tenant

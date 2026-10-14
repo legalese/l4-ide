@@ -1,0 +1,3 @@
+[1 of 2] Compiling Main             ( Sums.hs, Sums.o )
+[2 of 2] Linking sums
+ld: warning: -U option is redundant when using -undefined dynamic_lookup

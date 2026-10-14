@@ -1,0 +1,17 @@
+DECLARE Tenure IS ONE OF Owner, Tenant, Lodger
+DECLARE Role   IS ONE OF Owner, Manager
+
+DECLARE Plot HAS
+    `tenure` IS A Tenure
+    `role`   IS A Role
+
+DECIDE `p` IS Plot WITH `tenure` IS Owner, `role` IS Owner
+
+#EVAL `p`'s tenure
+#EVAL `p`'s role
+GIVETH A STRING
+`role name` MEANS CONSIDER `p`'s role
+                   WHEN Owner   THEN "role owner"
+                   WHEN Manager THEN "manager"
+
+#EVAL `role name`

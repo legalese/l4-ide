@@ -1,0 +1,10 @@
+DECLARE `Lease's term`  IS ONE OF Fixed, Periodic
+DECLARE `Lease's term`  IS ONE OF Weekly, Monthly
+DECLARE Holding IS ONE OF
+    Freehold
+    Lease HAS
+        term IS A `Lease's term`
+DECLARE Interest IS ONE OF
+    Licence
+    Lease HAS
+        term IS A `Lease's term`
