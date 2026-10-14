@@ -678,6 +678,22 @@ spec bin = do
       results [batchClausesString, "--inputs", batchClausesColours]
         >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
 
+  describe "l4 run on a definition whose evaluation raised" $ do
+    -- A thunk whose evaluation raised is evaluated again on its next use, and
+    -- raises again. It used to keep the mark of the aborted force, so its
+    -- second use was reported as an infinite loop.
+    it "raises the same error again on a second use" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "raise-twice.l4"]
+      T.count "Division by zero" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("Infinite loop" `isInfixOf`)
+
+    -- The control: the check is still on. A definition that is its own operand,
+    -- and a pair that are each other's, are infinite loops at every use.
+    it "still reports a genuine loop as a loop, at every use" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "loop-twice.l4"]
+      T.count "Infinite loop detected" (T.pack sout) `shouldBe` 4
+      sout `shouldNotSatisfy` ("Division by zero" `isInfixOf`)
+
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do
       Output code sout _ <- runL4 bin ["format", cleanFixture]
