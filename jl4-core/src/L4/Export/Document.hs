@@ -49,7 +49,7 @@ import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
 import Optics (gplate, toListOf, (%), (^.))
 
-import L4.Annotation (emptyAnno)
+import L4.Annotation (HasSrcRange (rangeOf), emptyAnno)
 import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
@@ -474,7 +474,41 @@ buildDocument cfg mainModule0 deps0 =
     && isInstanceValueUnit u
     && not (isExportUnit u)
 
+  -- An enum whose options a field listed inline is not a term the author
+  -- defined: its options are listed under the field ('declareClause'), and
+  -- its generated name would otherwise sit beside the field as a defined
+  -- term of its own (INLINE-ONE-OF-FIELD-SPEC §5.11).
+  --
+  -- A COMPUTED field's options are found another way, because
+  -- 'desugarComputedFields' takes the field out of its record before the
+  -- checker runs, and the field's mark goes with it. Its synthetic DECIDE and
+  -- the DECLARE lifted out of it are both annotated with the field's own
+  -- range ('makeComputedDecide', 'L4.Desugar.inlineOptionsKey'), and no
+  -- written declaration can share a field's range, so a DECLARE at a computed
+  -- field's range is that field's options.
+  inlineTypes = Set.fromList $
+    [ getUnique r
+    | md <- mainModule : deps
+    , Declare _ d <- topDeclsRec md
+    , (r, _) <- inlineOptionsTypes d
+    ]
+    <>
+    [ getUnique tyName
+    | md <- mainModule : deps
+    , Declare _ (MkDeclare dAnn _ (MkAppForm _ tyName _ _) EnumDecl{}) <- topDeclsRec md
+    , Just r <- [rangeOf dAnn]
+    , Set.member r computedFieldRanges
+    ]
+  computedFieldRanges = Set.fromList
+    [ r
+    | md <- mainModule : deps
+    , Decide _ d@(MkDecide dAnn _ _ _) <- topDeclsRec md
+    , isComputedSelectorDecide d
+    , Just r <- [rangeOf dAnn]
+    ]
+
   renderUnit i u
+    | Set.member u.uPrimary inlineTypes = Nothing
     | isMain i =
         if isFixture i u || isComputedSelector u
           then Nothing
@@ -651,9 +685,12 @@ isExportUnit u = case u.uDecl of
 -- @_self@. These are shown under their record, not as standalone rules.
 isComputedSelector :: Unit -> Bool
 isComputedSelector u = case u.uDecl of
-  UDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ params) _) _ _) ->
-    any (\(MkOptionallyTypedName _ r _ _) -> nameToText (getActual r) == "_self") params
-  _ -> False
+  UDecide d -> isComputedSelectorDecide d
+  _         -> False
+
+isComputedSelectorDecide :: Decide Resolved -> Bool
+isComputedSelectorDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ params) _) _ _) =
+  any (\(MkOptionallyTypedName _ r _ _) -> nameToText (getActual r) == "_self") params
 
 -- ----------------------------------------------------------------------------
 -- Block rendering
@@ -958,6 +995,10 @@ declareClause = \case
   SynonymDecl _ ty      -> CLeaf (typeText ty)
   OpaqueDecl _          -> CLeaf "a kind of thing"
  where
+  -- A field whose options are listed inline shows them, as a one-line enum
+  -- reads ("one of …"); its lifted type is not rendered as a term of its own.
+  recordField (MkTypedName _ n _ (Just cons) _mTypically Nothing) =
+    (resolvedText n, "one of " <> oxford "or" (map conName cons))
   recordField (MkTypedName _ n ty _ _mTypically Nothing)     = (resolvedText n, typeText ty)
   recordField (MkTypedName _ n ty _ _mTypically (Just expr)) =
     (resolvedText n, typeText ty <> ", computed as " <> leafText expr)

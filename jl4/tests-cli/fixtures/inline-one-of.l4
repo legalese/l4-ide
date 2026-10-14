@@ -1,7 +1,8 @@
 -- A record whose fields list their options inline
--- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md). `l4 batch` re-prints the
--- module in its lifted form (`DECLARE `Plot's tenure` IS ONE OF …`) and runs
--- it once per row.
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md). `l4 render` lists each
+-- field's options under the field and prints no defined term for the type L4
+-- makes for them; `l4 batch` re-prints the module in its lifted form
+-- (`DECLARE `Plot's tenure` IS ONE OF …`) and runs it once per row.
 DECLARE Plot HAS
     `the occupier` IS A STRING
     `tenure`       IS ONE OF Owner, Tenant, Lodger TYPICALLY Owner
