@@ -1129,6 +1129,12 @@ prettyNlgResolveWarning = \ case
     , "The following annotations would be attached:"
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
+  Resolve.RefUnattached r ->
+    Resolve.refUnattachedMessage r.payload
+  Resolve.RefTrailing r code ->
+    Resolve.refTrailingMessage r.payload code
+  Resolve.RefNoLocation ref ->
+    Resolve.refNoLocationMessage ref
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1144,6 +1150,12 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange Nothing
   Resolve.Ambiguous name _ ->
     srcRangeToLspRange $ rangeOf name
+  Resolve.RefUnattached r ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefTrailing r _ ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefNoLocation _ ->
+    srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting

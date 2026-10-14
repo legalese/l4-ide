@@ -188,6 +188,7 @@ test-suite jl4-core-test
     ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
+    RefAnnotationSpec
     DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
@@ -198,5 +199,6 @@ test-suite jl4-core-test
     deepseq,
     hspec,
     jl4-core,
+    optics,
     text,
     time
