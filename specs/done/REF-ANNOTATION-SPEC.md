@@ -1,19 +1,22 @@
 # Specification: @ref Annotation Attachment
 
+> Status: DONE — @ref annotations are attached to AST nodes. The parallel Citations.hs interval-map hyperlink mechanism is intentionally left separate.
+> Amended 2026-10-13, ruled 2026-10-12: a node keeps EVERY ref that precedes it, a ref after code on its line is attached to nothing, and two warnings replace the old one. See "Amendment 2026-10-13" at the end; the code listings below are as first built. What `main` has is in `specs/as-built/ref-annotation.md`.
+
 ## Executive Summary
 
 This document specifies how `@ref` annotations should be attached to AST nodes. Unlike `@desc` (which attaches only to declarations), `@ref` can attach to **any AST node** to provide external reference links for documentation, traceability, and source mapping.
 
 ## Current Implementation Status
 
-| Component               | Status | Location                                               |
-| ----------------------- | ------ | ------------------------------------------------------ |
-| Lexer recognizes `@ref` | ✅     | `jl4-core/src/L4/Lexer.hs:77` — `TRef !Text !AnnoType` |
-| Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs:62` — `PState.refs`         |
-| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:639`                        |
-| Attachment to AST       | ❌     | TODO in `Parser.hs:216-218`                            |
+| Component               | Status | Location                                                                  |
+| ----------------------- | ------ | ------------------------------------------------------------------------- |
+| Lexer recognizes `@ref` | ✅     | `jl4-core/src/L4/Lexer.hs:77` — `TRef !Text !AnnoType`                    |
+| Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs:80` — `PState.refs`                            |
+| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:891`                                           |
+| Attachment to AST       | ✅     | `jl4-core/src/L4/Parser/ResolveAnnotation.hs:996` — `addRefCommentsToAst` |
 
-### Parser TODO (existing)
+### Parser TODO (as it stood before @ref annotations were attached)
 
 ```haskell
 -- jl4-core/src/L4/Parser.hs:216-218
@@ -24,11 +27,11 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 
 ## Related Specifications
 
-| Annotation | Spec                                       | Attachment Rule                                    |
-| ---------- | ------------------------------------------ | -------------------------------------------------- |
-| `@nlg`     | (implemented)                              | Attaches to `Name` nodes based on source position  |
-| `@desc`    | `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` | Attaches to immediately following `TopDecl`        |
-| `@ref`     | this document                              | Attaches to **any** immediately following AST node |
+| Annotation | Spec                               | Attachment Rule                                    |
+| ---------- | ---------------------------------- | -------------------------------------------------- |
+| `@nlg`     | (implemented)                      | Attaches to `Name` nodes based on source position  |
+| `@desc`    | `specs/done/EXPORT-SYNTAX-SPEC.md` | Attaches to immediately following `TopDecl`        |
+| `@ref`     | this document                      | Attaches to **any** immediately following AST node |
 
 ## Design
 
@@ -114,8 +117,10 @@ The lexer recognizes the following `@ref` variants:
 
 ```l4
 -- Ctrl+click opens the file if found in IMPORT search paths
-DECIDE foo IS TRUE @ref legal-opinion.pdf
-DECIDE bar IS FALSE @ref ../docs/regulation-summary.md
+@ref legal-opinion.pdf
+DECIDE foo IS TRUE
+@ref ../docs/regulation-summary.md
+DECIDE bar IS FALSE
 ```
 
 The IDE will search for the file in:
@@ -221,6 +226,32 @@ Add test files:
 ## References
 
 - `jl4-core/src/L4/Parser/ResolveAnnotation.hs` — existing `@nlg` attachment pattern
-- `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` — `@desc` attachment specification
-- `doc/dev/specs/todo/WASM-LSP-SPEC.md` — WASM compatibility (reason for `@ref-src` removal: No file-io)
+- `@ref-src` was removed because the WASM build has no file I/O. The specs for `@desc` attachment and for WASM compatibility are `specs/done/EXPORT-SYNTAX-SPEC.md` and `specs/done/WASM-LSP-SPEC.md`.
 - Issue #635 — decision service improvements (related)
+
+## Amendment 2026-10-13: a node keeps every ref before it; a ref after code is attached to nothing
+
+**Ruled 2026-10-12:** a @ref written after code on its line attaches to nothing and warns; in a stack, exporters show the nearest ref.
+
+The attachment rule itself is unchanged: a `@ref` on a line of its own attaches to the first node that starts after it.
+
+What changed:
+
+1. `Extension.ref` holds a list of refs, not a `Maybe Ref` (`jl4-core/src/L4/Syntax.hs`): `annRefs` reads them all, in source order, and `annRef` reads the nearest, the last, which is what a reader that shows one citation per node reads.
+   Before, a node kept the nearest and reported each of the others as "could not be attached to any following syntax node", which was untrue of a ref that had only been outranked.
+   The list is the newtype `Refs`, whose `show` is `Nothing` when empty, as `ref = Nothing` was; ruling R6 (2026-10-12) removes the newtype, which has not landed.
+2. A ref with nothing after it draws its own warning: "This @ref (`…`) is at the end of the file, so there is nothing after it to attach to."
+3. A ref that follows code on its line, with nothing after it on that line, is attached to NOTHING and draws a warning: "This @ref (`…`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `…`."
+   Before, such a ref bound to the next construct and became that construct's citation, with exit 0.
+   The flag is computed from the token stream (`trailingRefsOf`), because a `Ref` has no memory of its neighbours.
+4. The warning text is built from the citation without its herald, delimiters, trailing spaces or carriage return (`refCitation`).
+   The stored text (`getRef`) is unchanged, because a reader may strip what it needs for itself.
+
+Assumed, not ruled:
+
+- An inline `<<…>>` in the middle of a line is not flagged: it cites the word after it, which is what it is for. The ruling is about a ref written at the end of a code line, and a mid-line `<<…>>` keeps attaching to what follows it.
+- The timing guard in `RefAnnotationSpec` forces the warning count as well as the definitions, so that the whole attachment pass has run when the clock stops.
+
+The refs in `ok/ref.l4`, `lsp/semantic-tokens/annotations.l4`, `ok/nlg_ref_parse.l4`, the `ny-environmental` fixture and the `britishcitizen` experiments were moved to the line above what they cite.
+
+Not chosen: a same-line rule, under which a ref at the end of a line binds to that line's code and a ref under a `§` heading binds to the section; and a rule under which a ref attaches to the node BEFORE it, which moves every own-line ref in the corpus to the wrong node.
