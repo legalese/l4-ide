@@ -1,0 +1,15 @@
+-- Only a record's field can be computed. A MEANS on a payload field of an enum
+-- constructor used to be accepted and ignored (`Rect OF 2, 5` kept the 5
+-- whatever the clause said), so it is now an error (Lane C L7, ruled by Meng
+-- 2026-10-12).
+
+DECLARE Shape IS ONE OF
+  Rect HAS width IS A NUMBER TYPICALLY 2
+           height IS A NUMBER MEANS width TIMES 2
+  Dot
+
+-- a record's computed field is still fine
+DECLARE Box HAS width IS A NUMBER
+                height IS A NUMBER MEANS width TIMES 2
+
+#EVAL (Box WITH width IS 3)'s height

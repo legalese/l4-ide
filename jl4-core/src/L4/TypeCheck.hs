@@ -124,7 +124,7 @@ import Data.Function (on)
 import Control.Exception (assert)
 import Data.Char (isPrint)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectTypicallyOnComputedFields, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMeansOnAlternativeFields, detectTypicallyOnComputedFields, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -199,6 +199,13 @@ doCheckProgramWithDependencies checkState checkEnv program =
         -- construction takes, the one that cannot be is an error.
         [ MkCheckErrorWithContext (TypicallyOnComputedField fld) None
         | fld <- detectTypicallyOnComputedFields program
+        ]
+        ++
+        -- L7 (Lane C, ruled by Meng 2026-10-12): a payload field of an enum
+        -- constructor takes a TYPICALLY as a record field does, and cannot be
+        -- computed, so a MEANS there is an error and not an ignored clause.
+        [ MkCheckErrorWithContext (MeansOnAlternativeField con fld) None
+        | (con, fld) <- detectMeansOnAlternativeFields program
         ]
         ++
         [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
@@ -923,20 +930,21 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
       , value = d.value & annoOf %~ \ a -> a { extra = a.extra { resolvedInfo = Nothing } }
       }
 
--- | The defaults of a record's fields, keyed by the record's constructor.
+-- | The defaults of a record's fields, and of the payload fields of an enum
+-- constructor that carries data, keyed by the constructor.
 --
--- Only a record: the fields of an enum constructor that carries data are not
--- offered, so omitting one stays an error, as it was. T1 rules on record
--- fields ("any field declared TYPICALLY", under the heading of record
--- construction); the payload of an enum constructor is the same mechanism and
--- could be opened with it, but nobody has asked, and what is not ruled stays
--- loud. Assumed, not ruled.
+-- The payload of an enum constructor takes a @TYPICALLY@ exactly as a record
+-- field does, so a construction that leaves one out takes its default (Meng,
+-- 2026-10-12, Lane C L7: "we have sums-of-products and therefore our treatment
+-- of plain records (products) should carry across to records-in-enums"). Until
+-- then only a record was offered and omitting a payload field stayed an error.
 --
--- Every record constructor has an entry, EMPTY when no field declares a
--- default. That is how @T WITHAL@ ('inferWithal') tells a record from an enum
--- constructor that carries data, which has none, and from a rule with no
--- defaulted input; 'supplyAppNamed' reads a missing entry and an empty one the
--- same way.
+-- Every record constructor has an entry, and so has every enum constructor that
+-- carries data, EMPTY when no field declares a default. That is how @T WITHAL@
+-- ('inferWithal') tells a constructor with fields from a nullary one and from a
+-- rule with no defaulted input; 'supplyAppNamed' reads a missing entry and an
+-- empty one the same way. A nullary constructor has no entry: it has no fields
+-- to take defaults for.
 recordInputDefaults :: [Text] -> Declare Resolved -> InputDefaults
 recordInputDefaults heads = \ case
   MkDeclare _ _ _ (RecordDecl _ (Just con) tns) ->
@@ -946,6 +954,16 @@ recordInputDefaults heads = \ case
         [ (getUnique fn, MkInputDefault { owner = qualifiedOwner heads (getOriginal con), binder = getOriginal fn, declaredAt = rangeOf d, value = d })
         | MkTypedName _ fn _ (Just d) _ <- tns
         ]
+  MkDeclare _ _ _ (EnumDecl _ cds) ->
+    Map.fromList
+      [ (getUnique con, ds)
+      | MkConDecl _ con tns <- cds
+      , not (null tns)
+      , let ds = Map.fromList
+              [ (getUnique fn, MkInputDefault { owner = qualifiedOwner heads (getOriginal con), binder = getOriginal fn, declaredAt = rangeOf d, value = d })
+              | MkTypedName _ fn _ (Just d) _ <- tns
+              ]
+      ]
   _ -> Map.empty
 
 -- | Check each field's @TYPICALLY@ default, now that every constructor is in
@@ -5217,26 +5235,31 @@ inferAppNamed _noDefault r t nes = do
 -- spelling asks for every default, so a field that has none is the author
 -- being told the record is not defaulted all the way down.
 --
--- Records only, and a refusal for anything else, because what is not ruled
--- stays loud: @WITHAL@ on a rule is not offered ('WithalOnRule'), and neither
--- is it on an enum constructor that carries data, whose payload fields still
--- have to be given even when they carry a @TYPICALLY@
--- ('WithalOnAlternative').
+-- Constructors with fields only, and a refusal for anything else, because what
+-- is not ruled stays loud: @WITHAL@ on a rule is not offered ('WithalOnRule'),
+-- and neither is it on an alternative that carries nothing
+-- ('WithalOnPlainAlternative'). An alternative that carries data is built as a
+-- record is, because its payload fields take their @TYPICALLY@ defaults as a
+-- record's fields do (Lane C L7, ruled by Meng 2026-10-12): @Rect WITHAL@ gives
+-- every payload field its default, and a field with none is the same
+-- 'IncompleteWithal' error.
 --
--- __How a record is told from those: by its declaration.__ A record declared in
--- this module is found among 'declareDeclarations' as a @RecordDecl@ whose
--- constructor this is; one from an @IMPORT@ is found in the table that
--- 'recordInputDefaults' builds from the same declaration, which has an entry for
--- every record constructor, empty or not. Presence in the table alone would not do for
--- this module's own records: 'withCheckedFieldDefaults' installs their entries
--- AFTER the field defaults are checked, and 'scanFunSigModule' checks a rule's
--- @GIVEN@ defaults before it, so in @inner IS AN Inner TYPICALLY (Inner WITHAL)@
--- the table has no entry for @Inner@ yet and a record was reported as "one of the
+-- __How a constructor with fields is told from those: by its declaration.__ One
+-- declared in this module is found among 'declareDeclarations' as a
+-- @RecordDecl@ whose constructor this is, or an @EnumDecl@ with a constructor
+-- of this name that carries fields; one from an @IMPORT@ is found in the table
+-- that 'recordInputDefaults' builds from the same declaration, which has an
+-- entry for every record constructor and every enum constructor that carries
+-- data, empty or not. Presence in the table alone would not do for this
+-- module's own: 'withCheckedFieldDefaults' installs their entries AFTER the
+-- field defaults are checked, and 'scanFunSigModule' checks a rule's @GIVEN@
+-- defaults before it, so in @inner IS AN Inner TYPICALLY (Inner WITHAL)@ the
+-- table has no entry for @Inner@ yet and a record was reported as "one of the
 -- alternatives of a type declared with ONE OF" (review, not-ok/tc/
 -- withal-in-a-default.l4).
 --
--- That early state, a record of this module whose defaults are not installed
--- yet, says nothing and gives the record's type. It is reachable only while a
+-- That early state, a constructor of this module whose defaults are not
+-- installed yet, says nothing and gives the constructor's result type. It is reachable only while a
 -- @TYPICALLY@ default is being checked, and 'checkTypically' rejects every named
 -- application there as no literal ('TypicallyValueNotALiteral'), so the author
 -- is told, once, and in words that are true; a second error here about fields
@@ -5271,7 +5294,7 @@ inferWithal :: Bool -> Resolved -> Type' Resolved -> Check ([(Int, NamedExpr Res
 inferWithal overloaded r t = do
   mFields <- asks (Map.lookup (getUnique r) . (.visibleInputDefaults))
   declared <- asks (.declareDeclarations)
-  let ownRecord = any (declaresRecord . (.payload)) (Map.elems declared)
+  let ownConstructor = any (declaresConstructorWithFields . (.payload)) (Map.elems declared)
   case (resolvedTermKind r, mFields) of
     -- A name that is not in scope has been reported as that, and what it would
     -- have been is not known: a second error here would only be noise (the name
@@ -5286,12 +5309,12 @@ inferWithal overloaded r t = do
         pure (fills, res)
       -- A record with no fields has nothing to default.
       _ -> pure ([], t)
-    -- This module's own record, its defaults not installed yet: see above.
+    -- This module's own constructor, its defaults not installed yet: see above.
     (Just Constructor, Nothing)
-      | ownRecord                         -> pure ([], resultOf t)
-      | otherwise -> case t of
-          Fun {} -> refuse WithalOnAlternative
-          _      -> refuse WithalOnPlainAlternative
+      | ownConstructor                    -> pure ([], resultOf t)
+      -- Not in the table and not declared here: an alternative that carries
+      -- nothing, which has no entry. One that carries fields would have one.
+      | otherwise                         -> refuse WithalOnPlainAlternative
     _                                     -> refuse WithalOnRule
  where
   refuse why = do
@@ -5301,8 +5324,9 @@ inferWithal overloaded r t = do
   resultOf = \ case
     Fun _ _ res -> res
     other       -> other
-  declaresRecord = \ case
+  declaresConstructorWithFields = \ case
     MkDeclare _ _ _ (RecordDecl _ (Just con) _) -> getUnique con == getUnique r
+    MkDeclare _ _ _ (EnumDecl _ cds)            -> or [ getUnique con == getUnique r | MkConDecl _ con (_ : _) <- cds ]
     _                                           -> False
 
 -- | What the checker stamped on a resolved name when it looked it up: whether
@@ -8254,11 +8278,6 @@ prettyCheckError (IllegalWithal r why)                     =
       [ "is not a record: it is a rule, or a field of one. To use a rule and leave"
       , "some of its inputs to their defaults, name the other inputs with WITH."
       ]
-    WithalOnAlternative ->
-      [ "is one of the alternatives of a type declared with ONE OF, not a record."
-      , "Every field of such an alternative has to be given, even one that has a"
-      , "TYPICALLY, so write it with WITH or OF."
-      ]
     WithalOnPlainAlternative ->
       [ "is one of the alternatives of a type declared with ONE OF, not a record."
       , "It has no fields to take defaults for, so write just its name."
@@ -8380,6 +8399,13 @@ prettyCheckError (TypicallyOnComputedField n) =
   [ quotedName n <> " is a computed field (it has a MEANS clause), so its value always comes"
   , "from the MEANS expression and a TYPICALLY default would never be used."
   , "Remove the TYPICALLY, or make the field a stored one by removing the MEANS."
+  ]
+prettyCheckError (MeansOnAlternativeField con fld) =
+  [ quotedName fld <> " is a field of the alternative " <> quotedName con <> " and has a MEANS clause,"
+  , "but only the fields of a record can be computed. An alternative's fields are"
+  , "given when the alternative is built, so the MEANS would never be used."
+  , "Remove the MEANS, or give the alternative a field whose type is a record"
+  , "that computes it."
   ]
 prettyCheckError (TypicallyOnTypeVariable n) =
   [ quotedName n <> " is a type, which cannot carry a TYPICALLY default value."

@@ -1,6 +1,8 @@
--- WITHAL builds a RECORD from its defaults. It is not offered on anything
--- else, and each refusal says what the name is instead
--- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ruled by Meng 2026-10-09).
+-- WITHAL builds a value from the defaults of its fields: a record's, or those
+-- of an alternative that carries data (Lane C L7, ruled by Meng 2026-10-12;
+-- ok/typically-payload-field.l4). It is not offered on anything else, and each
+-- refusal says what the name is instead (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1,
+-- ruled by Meng 2026-10-09).
 -- The name of a type that is not a record (`Shape WITHAL`) is the ordinary
 -- "could not find a definition" error and nothing more, since only terms
 -- resolve; its message carries the checker's inference counter, so l4-cli-test
@@ -9,10 +11,6 @@
 DECLARE Shape IS ONE OF
   Rect HAS width IS A NUMBER, height IS A NUMBER TYPICALLY 1
   Dot
-
--- an alternative that carries data: its fields stay required, a TYPICALLY on
--- them or not (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, "Not built here")
-#EVAL Rect WITHAL
 
 -- an alternative that carries nothing
 #EVAL Dot WITHAL

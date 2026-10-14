@@ -1,0 +1,9 @@
+-- WITHAL on an alternative that carries data gives every payload field its
+-- default, and a field with none is the same error it is on a record: it names
+-- the field (Lane C L7, ruled by Meng 2026-10-12).
+
+DECLARE Shape IS ONE OF
+  Rect HAS width IS A NUMBER, height IS A NUMBER TYPICALLY 1
+  Dot
+
+#EVAL Rect WITHAL

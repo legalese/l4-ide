@@ -8,6 +8,7 @@ module L4.Desugar (
   desugarComputedFields,
   detectComputedFieldCycles,
   detectTypicallyOnComputedFields,
+  detectMeansOnAlternativeFields,
   extractComputedFieldNames,
   -- * Field opening (R5)
   --
@@ -869,6 +870,27 @@ detectTypicallyOnComputedFields (MkModule _ _ section) = go section
   go (MkSection _ _ _ _ topDecls) = concatMap top topDecls
   top (Declare _ (MkDeclare _ _ _ (RecordDecl _ _ tns))) =
     [ fn | MkTypedName _ fn _ (Just _) (Just _) <- tns ]
+  top (Section _ s) = go s
+  top _ = []
+
+-- | Find every payload field of an enum constructor that has a @MEANS@ clause.
+-- Returns each as its constructor and its field, in source order.
+--
+-- Only a record's field can be computed ('desugarComputedFields' moves it out of
+-- the record and defines it from the record's other fields). A constructor's
+-- payload is supplied when the constructor is applied, so a @MEANS@ there was
+-- accepted and never evaluated: @Rect OF 2, 5@ kept the 5 whatever the clause
+-- said. Lane C L7 (ruled by Meng 2026-10-12) makes it an error rather than
+-- metadata that does nothing, now that a @TYPICALLY@ on the same field is a
+-- default a construction takes.
+--
+-- Read off the parsed module, as 'detectTypicallyOnComputedFields' is.
+detectMeansOnAlternativeFields :: Module Name -> [(Name, Name)]
+detectMeansOnAlternativeFields (MkModule _ _ section) = go section
+ where
+  go (MkSection _ _ _ _ topDecls) = concatMap top topDecls
+  top (Declare _ (MkDeclare _ _ _ (EnumDecl _ cds))) =
+    [ (con, fn) | MkConDecl _ con tns <- cds, MkTypedName _ fn _ _ (Just _) <- tns ]
   top (Section _ s) = go s
   top _ = []
 

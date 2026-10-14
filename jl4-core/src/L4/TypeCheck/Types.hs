@@ -130,9 +130,6 @@ data CheckErrorWithContext =
 data WithalMisuse
   = WithalOnRule
     -- ^ @T@ is a rule or a field selector, not a record.
-  | WithalOnAlternative
-    -- ^ @T@ is an alternative of an enumeration or a choice (@ONE OF@) that
-    -- carries data: its payload fields stay required whatever they declare.
   | WithalOnPlainAlternative
     -- ^ @T@ is an alternative of an enumeration that carries nothing.
   | WithalOverloaded
@@ -364,6 +361,12 @@ data CheckError =
     -- ^ A TYPICALLY default was written on a computed field (one with a MEANS
     -- clause). The field is derived, so a default would never be used
     -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1). Carries the field.
+  | MeansOnAlternativeField Name Name
+    -- ^ A MEANS clause was written on a payload field of an enum constructor.
+    -- Only a record's field can be computed: a constructor's payload is
+    -- supplied when the constructor is applied, so the clause would never be
+    -- evaluated (Lane C L7, ruled by Meng 2026-10-12). Carries the constructor
+    -- and the field.
   | NonassertableOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
     -- ^ An @\@nonassertable@ annotation sits above something that is not a
     -- definition: the first text says what (a declaration, an input, a section
@@ -851,6 +854,7 @@ instance HasSrcRange CheckErrorContext where
 instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (TypicallyOnComputedField n)      = rangeOf n
+  rangeOf (MeansOnAlternativeField _ n)     = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
