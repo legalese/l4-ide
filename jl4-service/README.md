@@ -668,6 +668,8 @@ All options can also be set via environment variables. CLI arguments take preced
 | `--eval-timeout`            | `JL4_EVAL_TIMEOUT`            | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
 | `--compile-timeout`         | `JL4_COMPILE_TIMEOUT`         | Compilation timeout in seconds                                                                                                                                                           | `60`             |
 | `--max-ladder-nodes`        | `JL4_MAX_LADDER_NODES`        | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
+| `--check-store`             | -                             | Do not serve: compile every deployment stored in the given directory, report, and exit (see [Checking a store before a rollout](#checking-a-store-before-a-rollout))                     | -                |
+| `--json`                    | -                             | With `--check-store`, print the report as one JSON document                                                                                                                              | `false`          |
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 
@@ -720,6 +722,49 @@ What is still outside the limits:
 - **`X-Eval-Alloc-Bytes` counts the calling thread only.** On the wrapper path that is not where the evaluating happens, so the header understates what the call allocated: measured on 2026-10-07, a wrapper-path call that spent 1.2 s evaluating reported 29,520 bytes.
 - **Turning the answer into JSON text is outside both limits.** The answer is fully computed inside them, but writing it out happens after. That work grows with the size of the answer, not with how it was reached; it has not been measured separately, but the largest answer tried, 400 KB of digits, came back whole in 0.76 s end to end under a 1-second limit.
 - **A limit that stops a very deep recursion answers a little late.** Before it answers, the evaluator makes the values it was part-way through usable again, and that cannot be cut short. It costs about 0.2 µs for each frame of the evaluator's own stack, and the evaluator stops at 1,000,000 frames. A frame is not a level of recursion: a non-tail recursion such as `sum to` takes about 2.2 frames a level (measured on 2026-10-07, `sum to 400000` answers and `sum to 500000` is refused for exceeding 1,000,000). So the cost is at most about a quarter of a second, and only for a recursion some 450,000 levels deep. Measured with a 1-second limit and a call of `sum to 900000`, which the limit stops before it finishes, the answer came back after 1.12 to 1.27 s, where before it came back after 1.00 to 1.09 s.
+
+## Checking a store before a rollout
+
+A restart compiles every stored deployment with the binary that is starting (see [Persistence](#persistence)). A new binary can therefore refuse a deployment that the old one served: its sources type-check differently under the new compiler, a library it imports has changed, or it no longer fits the compile limits. That is found only once the new binary is serving, as a deployment that is `failed`.
+
+`jl4-service --check-store DIR` runs that compile first, with the new binary and the store it is about to serve.
+It compiles every deployment in `DIR` the way a restart does, under the same `--compile-timeout` and `--max-compile-memory-mb`, and no more at once than a restart compiles (one per capability).
+It prints one line for each deployment and a summary, and exits.
+It starts no server, and it writes nothing to `DIR`: it does not create the directory, clean up a stale `<id>.tmp` directory, backfill a `metadata.json`, or save a metadata cache.
+The log goes to stderr, so stdout holds the report alone. `--store-path` is not read in this mode: the directory is the argument.
+
+```
+$ jl4-service --check-store /var/lib/jl4-service/store --compile-timeout 120
+sales-rules	ok	3 functions
+claims-pilot	failed	Compilation timed out or exceeded memory limit
+travel-policy	failed	I found a problem while checking the definition of `is big`: There are multiple definitions for the identifier `__GT__` and I do not have sufficient information to make a choice between them. The options are: ...
+3 deployments: 1 ok, 2 failed
+```
+
+Each line is the deployment's id, `ok` or `failed`, and then the number of functions it publishes or the error, separated by tabs. An error that spans lines is joined onto one. A deployment is `failed` for the reasons a restart would register it as failed: its sources do not parse or type-check, the compiler raises an error (inputs whose names collide once sanitised), its `metadata.json` does not decode, or it does not compile within the limits.
+With `--json` the report is one JSON document instead, with each error as it is:
+
+```json
+{
+  "store": "/var/lib/jl4-service/store",
+  "deployments": [
+    {
+      "id": "sales-rules",
+      "status": "ok",
+      "functions": 3,
+      "error": null,
+      "bundleCbor": { "present": false, "writtenBy": null }
+    }
+  ],
+  "summary": { "total": 1, "ok": 1, "failed": 0 }
+}
+```
+
+The exit status is `0` when every deployment compiles (a store with none is `0 deployments`), `1` when any does not, and `2` when the check could not be made: the directory is not there or cannot be read, or the command line is wrong. A script can therefore stop a rollout on anything but `0`, and tell a failed deployment from a failed check.
+
+A `bundle.cbor` that an older build left beside a deployment's sources is not read, and the check does not touch it. The report says `bundle.cbor present, written by an unknown build` for such a deployment, because nothing in the file says which build wrote it.
+
+The check compiles; it does not evaluate. A deployment that compiles can still answer a call differently under a new binary.
 
 ## Persistence
 

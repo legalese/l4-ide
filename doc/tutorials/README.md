@@ -32,6 +32,7 @@ Who must do what, by when, and what follows: one tenancy, carried through four p
 ## Publish rules
 
 - [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md): mark rules with `@export`, deploy them to Legalese Cloud and call them.
+- [Checking a Store Before You Switch Versions](deploying-rules/checking-a-store-before-a-rollout.md): run `jl4-service --check-store` to find out which stored deployments a new version would refuse, before it serves them.
 - [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md): compile L4 decisions into a Blawx project with `l4 export blawx`, run them under s(CASP) with English justification trees, and lift Blawx projects back into L4.
 
 ## Use deployed rules

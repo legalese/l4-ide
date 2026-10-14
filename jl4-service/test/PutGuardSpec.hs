@@ -202,6 +202,8 @@ testOpts = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   , maxLadderNodes = 10000
+  , checkStore = Nothing
+  , checkJson = False
   }
 
 withService :: (String -> Manager -> IO a) -> IO a
