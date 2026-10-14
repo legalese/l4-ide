@@ -147,9 +147,13 @@ Rename one of them, or declare the options yourself under a name you choose.
 - **Not for a rule's inputs or result.** `GIVEN tenure IS ONE OF …`, a `GIVETH`, and an `ASSUME` are refused; declare the options with `DECLARE` and write `IS A Tenure`.
 - **One level deep.** A field of one of a field's inline options cannot list options of its own. Declare the inner options with `DECLARE`.
 - **Not in a record that takes a type as an input**, such as `DECLARE Box a HAS …`. The type L4 makes for the options would need that input too.
-- **On one line, an option with fields takes the rest of the line.** In `estate IS ONE OF Absolute, Leasehold HAS years IS A NUMBER, area IS A NUMBER`, `area` is a second field of `Leasehold`, not the next field of the record. Use several lines when an option has fields.
+- **On one line, an option with fields takes the rest of the line.** In `estate IS ONE OF Absolute, Leasehold HAS years IS A NUMBER, area IS A NUMBER`, `area` is a second field of `Leasehold`, not the next field of the record.
+  The same happens the other way round. On one line, the inline options of a field of a constructor take the rest of the line too: in `DECLARE E IS ONE OF Foo HAS t IS ONE OF X, Y, Bar`, `Bar` is a third option of `t`, not a second constructor of `E`.
+  Use several lines whenever an option or a constructor has fields.
 
-Each of these is refused with a message that says which rule was broken and what to write instead.
+The first four limits are refused with a message that says which rule was broken and what to write instead.
+The last one is not refused, because the line is valid L4 and L4 reads it as described.
+If that was not what you meant, you find out later: as a type error where the other reading was needed (`WHEN Bar` for an `E` is refused, because `Bar` is one of `t`'s options), or not at all.
 
 ## See also
 
