@@ -231,6 +231,8 @@ Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on th
 
 A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
 
+A synonym for a record, an enum or a `LIST` is read as the type it stands for on this path, and so is a synonym below the head of a type, as in `MAYBE Hue`: the decoder expands it.
+
 Every evaluation and batch response says which report it carries, as `"report": "default"`.
 The default report is the only one so far: it shows an answer that is still waiting for an input as the `422` above (UNKNOWN-EVALUATION-SPEC §4.7.4).
 
@@ -246,6 +248,17 @@ Measured 2026-10-06:
 
 - A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
   A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
+
+Measured 2026-10-15, on `unstable` at `6930bccf6`:
+
+- On the wrapper path, an input declared through a synonym for a `BOOLEAN` is decoded as its own type, where a `BOOLEAN` written out is lifted to `MAYBE` (above).
+  Left out, it is refused with `Missing required field 'b' in JSON object`, even when the rule never reads it; a `BOOLEAN` written out and left out is refused only if the rule reads it, and then names `b (not supplied)`.
+  A `null` for it in a batch case or an MCP call is refused with `Field 'b' is null, which means the value is not known: supply a value`, where a `BOOLEAN` written out is treated as left out.
+  A value, and a string that is not a boolean, are treated the same: the string is refused in both, with `Expected JSON boolean for field 'b' but got: String "maybe"`.
+- On the wrapper path, an input declared through a synonym for a `DATE`, `TIME` or `DATETIME` is decoded as its own type, where the type written out is read from a string and converted (above).
+  Left out, it is refused with `Missing required field 'd' in JSON object`; a string that does not parse, with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD` (`Could not parse time string …` for a `TIME`, `Could not parse datetime string …` for a `DATETIME`); a `null` in a batch case or an MCP call, with `Field 'd' is null, which means the value is not known: supply a value`.
+  The type written out gives `Parameter 'd': missing required parameter` and `Parameter 'd': could not read "garbage" as a DATE`.
+  A value that parses is answered the same.
 
 #### Trace Output
 
