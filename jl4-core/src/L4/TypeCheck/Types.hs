@@ -8,7 +8,7 @@ import Base
 import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
-import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
+import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
 import L4.Lexer (PosToken)
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
@@ -74,6 +74,16 @@ data CheckError =
   | TypeMismatch ExpectationContext (Type' Resolved) (Type' Resolved) -- expected, given
   | InconsistentNameInSignature Name (Maybe Name)
   | InconsistentNameInAppForm Name (Maybe Name)
+  | ClausePatternCountMismatch (Maybe SrcRange) Name Int Int
+    -- ^ The clauses of a multi-clause group have a different number of
+    -- patterns than its GIVEN names inputs ('L4.TypeCheck.clauseInputsAgainstGiven').
+    -- Carries the first clause's head range, the group's name, the number of
+    -- patterns in each clause, and the number of inputs the GIVEN names.
+  | ExportedClausesWithoutGiven (Maybe SrcRange) Name
+    -- ^ An @\@export@ed definition written as clauses with patterns, one
+    -- clause or several, with no GIVEN to name its inputs
+    -- ('L4.TypeCheck.refuseExportedClausesWithoutGiven'). Carries the range of
+    -- the @\@export@ and the definition's name.
   | NonDistinctError NonDistinctContext [[Name]]
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
@@ -108,9 +118,54 @@ data CheckError =
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
+-- | Why a clause of a multi-clause group is never tried.
+--
+-- Unstable also has @CoveredByClausesAbove@ (every input the clause matches
+-- is matched by a clause above it), found from the redundant rows of its
+-- coverage analysis. Main's analysis ('L4.TypeCheck.uncoveredRows') does not
+-- compute redundant rows, so that form is not reported here; see
+-- 'L4.TypeCheck.warnUnreachableClauses'.
+data UnreachableClause
+  = AfterClauseMatchingAnything Int
+    -- ^ a clause above it matches every input; carries how many further
+    -- clauses after this one are unreachable for the same reason
+  | AfterClauseBindingNewName [Name] Int
+    -- ^ a clause above it matches every input because its patterns are
+    -- new names (the first argument, as written), such as a misspelled
+    -- value; carries how many further clauses are unreachable for the same
+    -- reason
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
+  | PatternClausesMissing SrcRange Name Int [[Pattern Resolved]]
+    -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
+    -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the
+    -- clause-head ranges (the warning anchor — never @\<no location\>@), the
+    -- group's head name for display, how many clauses it has, and one row per
+    -- missing clause: one pattern per argument column, wildcard columns
+    -- pre-substituted with the column's GIVEN name so the renderer is dumb.
+  | PatternClauseUnreachable SrcRange Name UnreachableClause
+    -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
+    -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
+    -- range, the group's head name for display, and why.
+  | ClauseAnnotationUnused SrcRange Name Int Text Bool
+    -- ^ An @\@desc@, @\@export@ or @\@nlg@ written between two clauses of a
+    -- multi-clause group, which takes its annotations from above its first
+    -- clause only ('L4.TypeCheck.checkClauseMatrix'). Carries the
+    -- annotation's range, the group's head name, the later clause's number
+    -- (counting from 1), the annotation as written (@\@export@, say), and
+    -- whether the group has a GIVEN, which is where its @\@desc@ and
+    -- @\@export@ go.
+  | ClauseArityChanged SrcRange Name Int [Name]
+    -- ^ A definition with no GIVEN of its own, right after a multi-clause
+    -- group of the same name, that has another number of inputs than the
+    -- group has patterns ('L4.TypeCheck.warnClauseArityChange'). It is not a
+    -- clause of the group: it is a rule of its own, and the names after its
+    -- head are its inputs. Carries the head's range, the name, the number of
+    -- patterns each clause above has, and the definition's input names.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -137,6 +192,11 @@ data ExpectationContext =
   -- | ExpectProjectionSelectorContext
   | ExpectIfConditionContext -- condition of if-then-else
   | ExpectPatternScrutineeContext (Expr Resolved) -- pattern type must match type of scrutinee
+  | ExpectClauseInputContext RawName Int Bool
+    -- ^ a clause pattern of a multi-clause group must match the type of the
+    -- input it stands in for: the group's name, the input's 1-based
+    -- position, and whether the GIVEN declares its type. See
+    -- 'L4.TypeCheck.checkConsider'.
   | ExpectNotArgumentContext -- arg of NOT
   | ExpectPercentArgumentContext -- arg of '%'
   | ExpectConsArgument2Context -- second arg of cons
@@ -216,7 +276,15 @@ instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
+  rangeOf (ClausePatternCountMismatch r _ _ _) = r
+  rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (CheckInfo _ mr)                  = mr
+  -- The clause-head hull anchors the warning; it wins over the enclosing
+  -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
+  rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
+  rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
+  rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
+  rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -814,14 +882,76 @@ instance ApplySubst (Type' Resolved) where
 instance ApplySubst (OptionallyNamedType Resolved) where
   applySubst (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn <$> applySubst t
 
+-- | The type 'applySubst' makes of a type, read off a snapshot of the
+-- substitution. Only the path compression 'applySubst' writes back is left
+-- out, and that changes no answer: it saves later lookups, and every reader
+-- of the substitution chases it to the end.
+--
+-- For a structure that is only read, this is the cheap way to resolve the
+-- types in it. 'applySubst' through 'gplate' rebuilds every node of the
+-- structure inside 'Check', annotations and tokens included, and holds the
+-- rebuilt nodes as closures until they are read; @'Optics.over' ('gplate'
+-- \@('Type'' 'Resolved')) ('substituteInfVars' s)@ rebuilds a node when it
+-- is read.
+substituteInfVars :: Substitution -> Type' Resolved -> Type' Resolved
+substituteInfVars s = go
+  where
+    go = \ case
+      Type ann       -> Type ann
+      TyApp ann n ts -> TyApp ann n (map go ts)
+      Fun ann onts t -> Fun ann (map goNamed onts) (go t)
+      Forall ann ns t -> Forall ann ns (go t)
+      InfVar ann rn i -> maybe (InfVar ann rn i) go (Map.lookup i s)
+    goNamed (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn (go t)
+
 instance ApplySubst CheckError where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckError) applySubst
 
 instance ApplySubst CheckErrorContext where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorContext) applySubst
 
+-- | The context is resolved lazily ('substituteInfVars'), and only when it
+-- holds a type the substitution changes ('contextChanges'); otherwise it is
+-- kept as it is. It is the syntax that was being checked when the
+-- diagnostic was raised, as written, so it can be a whole definition, such
+-- as a CONSIDER of thousands of arms for a warning about that CONSIDER, and
+-- each level of it holds the levels inside it. 'applySubst' rebuilt all of
+-- it, for each diagnostic raised inside it, whether anything read it or
+-- not; rebuilt lazily, it is still rebuilt in full where the diagnostics
+-- are forced, as the language server's rules force them, and a copy per
+-- level made a CONSIDER nested 600 deep, warned about at the innermost
+-- level, peak at 520 MB. Kept, it is shared.
 instance ApplySubst CheckErrorWithContext where
-  applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorWithContext) applySubst
+  applySubst (MkCheckErrorWithContext e ctx) = do
+    e' <- applySubst e
+    s <- use #substitution
+    let ctx'
+          | contextChanges s ctx = Optics.over (gplate @(Type' Resolved)) (substituteInfVars s) ctx
+          | otherwise = ctx
+    pure (MkCheckErrorWithContext e' ctx')
+
+-- | Whether 'substituteInfVars' changes a type in this context. A context is
+-- syntax as written, over 'Name's, so a 'Type'' 'Resolved' can only sit in
+-- an annotation's extras (its 'resolvedInfo', or the names of a resolved
+-- annotation); each annotation's extras are searched, and the syntax around
+-- them is walked only as far as its annotations, never into their tokens,
+-- which are most of it.
+contextChanges :: Substitution -> CheckErrorContext -> Bool
+contextChanges s =
+  Optics.anyOf (gplate @Anno) \ (a :: Anno) ->
+    Optics.anyOf (gplate @(Type' Resolved) @Extension) (substitutionChanges s) (Optics.view annoExtra a)
+
+-- | Whether 'substituteInfVars' changes this type: whether it mentions an
+-- inference variable the substitution binds.
+substitutionChanges :: Substitution -> Type' Resolved -> Bool
+substitutionChanges s = go
+  where
+    go = \ case
+      Type _         -> False
+      TyApp _ _ ts   -> any go ts
+      Fun _ onts t   -> any (go . optionallyNamedTypeType) onts || go t
+      Forall _ _ t   -> go t
+      InfVar _ _ i   -> Map.member i s
 
 instance ApplySubst EntityInfo where
   applySubst = traverse (\(n, entity) -> (n, ) <$> applySubst entity)

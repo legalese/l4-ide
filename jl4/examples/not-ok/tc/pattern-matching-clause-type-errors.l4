@@ -1,0 +1,65 @@
+-- =============================================================================
+-- Type errors in multi-clause DECIDE groups are reported at the clause that
+-- has them, in terms of the clauses (review of legalese/l4-ide#545, items 3
+-- and 4). The warnings that go with them are pinned in
+-- jl4-core/test/PatternClausesMissingSpec.hs.
+-- =============================================================================
+
+-- (3) The clauses after one that matches every input are never used, and
+-- they are still checked: the third clause's body is a NUMBER where a STRING
+-- is due, and the fourth reads a name that does not exist.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `shadowed clauses` 0 IS "zero"
+DECIDE `shadowed clauses` n IS "other"
+DECIDE `shadowed clauses` 1 IS 42
+DECIDE `shadowed clauses` 2 IS `no such thing`
+
+-- (4) A body of the wrong type in a later clause is reported at that body.
+GIVEN m IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `wrong body` (JUST x) IS x
+DECIDE `wrong body` NOTHING  IS "none"
+
+-- (4) A pattern of the wrong type is reported as one for the input it
+-- stands for ...
+GIVEN m IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `wrong pattern` (JUST x) IS 1
+DECIDE `wrong pattern` TRUE     IS 2
+
+-- ... also when there is no GIVEN to name the input.
+DECIDE `wrong pattern without given` (JUST 1) IS 1
+DECIDE `wrong pattern without given` TRUE     IS 2
+
+-- (4) With no GIVETH, the clauses are read from the top, so the first clause
+-- settles the result type and the clause that disagrees is the one reported:
+-- "three", not the 1 and 2 above it.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECIDE `no giveth` Red   IS 1
+DECIDE `no giveth` Green IS 2
+DECIDE `no giveth` Blue  IS "three"
+
+-- ... and likewise for patterns: TRUE is reported, not the two clauses that
+-- agree on a MAYBE.
+DECIDE `odd last pattern` (JUST 1) IS 1
+DECIDE `odd last pattern` NOTHING  IS 2
+DECIDE `odd last pattern` TRUE     IS 3
+
+-- (3) No clause body can read the local definitions the clauses compile to,
+-- whether the clauses they hold can run or not: those definitions have names
+-- no source can spell. A body that writes out the text of one names a
+-- definition that does not exist, and is reported as an unknown name.
+-- (Until 2026-10-07 they were `__pm_fallthrough_<k>`, which a body could
+-- read.)
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `refs live` Red   IS `the result of clauses 2 to 3`
+DECIDE `refs live` Green IS 2
+DECIDE `refs live` c     IS 3
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `refs dead` c   IS `the result of clause 2`
+DECIDE `refs dead` Red IS 2
