@@ -80,6 +80,16 @@ captionFixture = fixtureDir </> "state-graph-captions.l4"
 unknownAnnotationFixture :: FilePath
 unknownAnnotationFixture = fixtureDir </> "unknown-annotation.l4"
 
+-- | `l4 batch` over a module with a misspelt @\@export@: one beside a correct
+-- @\@export@, and one alone. Batch shows no checker warnings, so the lexer's
+-- (an annotation line this version ignores) is said on stderr by the command
+-- itself; without that, the second reads "no @export functions found" and
+-- nothing says why.
+batchIgnoredAnnotation, batchIgnoredAnnotationOnly, batchIgnoredAnnotationJson :: FilePath
+batchIgnoredAnnotation     = fixtureDir </> "batch-ignored-annotation.l4"
+batchIgnoredAnnotationOnly = fixtureDir </> "batch-ignored-annotation-only.l4"
+batchIgnoredAnnotationJson = fixtureDir </> "batch-ignored-annotation.json"
+
 -- | A module whose first line is @\@lang@ with no language after it: a KNOWN
 -- annotation that does not have the form it needs. Ignored with a warning, as
 -- an unknown one is, and not a lexer error.
@@ -524,6 +534,7 @@ coreFixtures =
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson
+  , batchIgnoredAnnotation, batchIgnoredAnnotationOnly, batchIgnoredAnnotationJson
   , langEnAndUnknownFixture
   , batchUndeclaredColumnCsv, batchEscapeRoundtripJson
   , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
@@ -1749,6 +1760,21 @@ spec bin = do
           expectationFailure $
             "Expected batch stdout NOT to contain " ++ show frag
             ++ "\n--- stdout ---\n" ++ sout
+
+    it "says on stderr which annotation line it ignored, and still runs the exports it found" $ do
+      Output code sout serr <- runL4 bin ["batch", batchIgnoredAnnotation, "--inputs", batchIgnoredAnnotationJson]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+      serr `shouldSatisfy` ("Unknown annotation `@exprot`" `isInfixOf`)
+      serr `shouldSatisfy` ("Did you mean `@export`?" `isInfixOf`)
+      -- where it is: the file, the line and the column
+      serr `shouldSatisfy` ("batch-ignored-annotation.l4:6:1" `isInfixOf`)
+
+    it "says why a module has no exports when its only @export is misspelt" $ do
+      Output code sout serr <- runL4 bin ["batch", batchIgnoredAnnotationOnly, "--inputs", batchIgnoredAnnotationJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("no @export functions found" `isInfixOf`)
+      serr `shouldSatisfy` ("Did you mean `@export`?" `isInfixOf`)
 
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]

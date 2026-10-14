@@ -103,7 +103,8 @@ import L4.EvaluateLazy
   , prettyRefusal
   , prettyUndetermined
   )
-import L4.Lexer (showStringLit)
+import L4.IgnoredAnnotation (ignoredAnnotations, renderIgnoredAnnotation)
+import L4.Lexer (execLexer, showStringLit)
 import L4.Presumption (nearestName, requestRecordName, unrecognisedMessage)
 import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax
@@ -114,6 +115,30 @@ import L4.Syntax
 import L4.TypeCheck.Environment (listUnique, maybeUnique)
 
 import L4.Cli.Common
+
+----------------------------------------------------------------------------
+-- Ignored annotations
+----------------------------------------------------------------------------
+
+-- | Say, on stderr, which annotation lines of a file this version of L4
+-- ignores (an unknown name, or a known one without the form it needs), one
+-- line each: @file:line:column: message@.
+--
+-- The lexer lets such a line through as trivia, and the checker's warnings
+-- reach the user only through the commands that print them (@l4 check@,
+-- @l4 run@). This command prints none, so without this a misspelt @\@export@
+-- is a function it never finds, with nothing to say why. A file the lexer
+-- refuses says so itself, in the checker's own report: nothing to add for it.
+warnIgnoredAnnotations :: FilePath -> IO ()
+warnIgnoredAnnotations path = do
+  src <- decodeUtf8With lenientDecode <$> BS.readFile path
+  case execLexer (normalizedFilePathToUri (toNormalizedFilePath path)) src of
+    Left _ -> pure ()
+    Right toks ->
+      putDiagnostics
+        [ Text.pack path <> ":" <> renderIgnoredAnnotation a
+        | a <- ignoredAnnotations toks
+        ]
 
 ----------------------------------------------------------------------------
 -- Options
@@ -258,6 +283,11 @@ batchCmd opts = do
     Left err -> do
       TIO.putStrLn $ "Error: failed to parse inputs: " <> Text.pack err
       exitFailure
+
+  -- An annotation line this version ignores is trivia to the lexer, and this
+  -- command prints no checker warnings: say so, or a misspelt @export is a
+  -- function it never finds.
+  warnIgnoredAnnotations opts.batchFile
 
   -- Step 2: typecheck the source file, find the target @export function.
   (initErrs, mTc) <- runOneshot evalConfig opts.batchFile \nfp -> do
