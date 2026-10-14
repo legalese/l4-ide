@@ -186,6 +186,11 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalTraceFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 
+-- | A @\@ref@ that trails its code (line 4) and one with nothing after it
+-- (line 8): two warnings, no error.
+refTrailingFixture :: FilePath
+refTrailingFixture = fixtureDir </> "ref-trailing.l4"
+
 -- | Multi-clause groups whose compiled form, printed back as source for
 -- @l4 batch@, met a drafter's name or depended on the source text around it
 -- (review of legalese/l4-ide#545 and #581); see the fixtures.
@@ -217,7 +222,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , evalTraceFixture
+       , evalTraceFixture, refTrailingFixture
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
@@ -244,6 +249,43 @@ spec bin = do
       sout `shouldSatisfy` ("batch" `isInfixOf`)
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
+
+  describe "l4 deploy / redeploy / undeploy / deployments (no network)" $ do
+    let expectStderr args mEnv needle = do
+          Output code _ serr <- runL4In Nothing mEnv bin args
+          code `shouldNotBe` ExitSuccess
+          unless (needle `isInfixOf` serr) $
+            expectationFailure ("Expected stderr to contain " ++ show needle ++ "\n--- stderr ---\n" ++ serr)
+        -- Nothing listens on the discard port; every case below must stop
+        -- before connecting.
+        noServer = ["--server", "http://127.0.0.1:9"]
+
+    it "are listed in --help, and each takes --help" $ do
+      Output _ sout _ <- runL4 bin ["--help"]
+      mapM_ (\c -> sout `shouldSatisfy` (c `isInfixOf`)) ["deploy", "redeploy", "undeploy", "deployments", "install"]
+      expectOk bin ["deploy", "--help"] "--name"
+      expectOk bin ["install", "legalese", "--help"] "--dir"
+
+    it "refuses a deployment name the service would reject" $
+      expectStderr (["deploy", cleanFixture, "--name", "bad name!"] ++ noServer) Nothing "may only contain"
+
+    it "refuses to deploy a file that doesn't typecheck" $
+      expectStderr (["deploy", errorFixture] ++ noServer) Nothing "doesn't typecheck"
+
+    it "only takes --api-key-file with --server" $
+      expectStderr ["deployments", "--api-key-file", cleanFixture] Nothing "--api-key-file only applies with --server"
+
+    it "won't send an API key over plain http to another host" $
+      expectStderr ["deployments", "--server", "http://example.com"] (Just [("L4_API_KEY", "k")]) "over plain http"
+
+    it "needs the legalese CLI for Legalese Cloud" $ do
+      tmp <- getTemporaryDirectory
+      let emptyPath = tmp </> "l4-cli-test-empty-path"
+      createDirectoryIfMissing True emptyPath
+      expectStderr ["deployments"] (Just [("PATH", emptyPath)]) "l4 install legalese"
+
+    it "won't undeploy without a terminal unless --yes" $
+      expectStderr (["undeploy", "anything"] ++ noServer) Nothing "Pass --yes"
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -306,6 +348,22 @@ spec bin = do
     it "fails on unparseable garbage input" $ do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    -- The two warnings of the @ref pass, as the LSP renders them (their text is
+    -- quoted in doc/reference/syntax/README.md, which is the page to change
+    -- with it). They are warnings, so the check still succeeds.
+    it "warns about a @ref after code and a @ref with nothing after it, and still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", refTrailingFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      let err = filter (/= '\r') serr
+      err `shouldSatisfy` isInfixOf "Range:    4:18-4:49"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 4(1)(a) of the Act`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`."
+      err `shouldSatisfy` isInfixOf "Range:    8:1-8:15"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 9`) is at the end of the file, so there is nothing after it to attach to."
+      length (filter (isInfixOf "Severity: DiagnosticSeverity_Warning") (lines err)) `shouldBe` 2
 
     it "warns that a multi-clause DECIDE misses a case, and still succeeds" $ do
       let fixture = fixtureDir </> "multi-clause-missing.l4"

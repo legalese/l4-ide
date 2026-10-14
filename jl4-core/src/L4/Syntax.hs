@@ -576,6 +576,9 @@ data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
   , desc         :: Maybe Desc
+  , ref          :: Refs
+    -- ^ Every @\@ref@ written before this node and after the node before it,
+    -- in source order. See 'annRefs'.
   , pmMatrix     :: Maybe PmMatrix
   , pmSynthetic  :: Maybe PmSynthetic
     -- ^ Set on the nodes a multi-clause group is compiled to. See 'PmSynthetic'.
@@ -583,12 +586,33 @@ data Extension = Extension
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | The refs a node holds; 'annRefs' reads them as a list.
+--
+-- A newtype only so that 'show' of an EMPTY one is @Nothing@ and not @[]@, the
+-- spelling this change was carried over with from @unstable@. The text is
+-- visible only where an 'Extension' is shown raw: @l4 run --json@ on
+-- @ok/assumes.l4@, @ok/elem.l4@ and @ok/lazytrace-exception.l4@ prints
+-- @ref = Nothing@ in the value of the error. No atomId on @main@ depends on
+-- it: 'L4.Viz.Ladder.generateAtomId' hashes the function, the printed label
+-- and the input refs, and not an 'Anno'. Ruling R6 (2026-10-12) removes the
+-- newtype; that has not landed (specs/done/REF-ANNOTATION-SPEC.md).
+newtype Refs = MkRefs [Ref]
+  deriving stock (GHC.Generic, Eq, Ord)
+  deriving newtype (Semigroup, Monoid, NFData)
+
+instance Show Refs where
+  showsPrec _ (MkRefs []) = showString "Nothing"
+  showsPrec d (MkRefs rs) = showsPrec d rs
+
+instance ToExpr Refs where
+  toExpr (MkRefs rs) = toExpr rs
+
 instance Semigroup Extension where
-  Extension i1 nlg1 desc pm1 syn1 <> Extension i2 nlg2 desc' pm2 syn2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (pm1 <|> pm2) (syn1 <|> syn2)
+  Extension i1 nlg1 desc ref1 pm1 syn1 <> Extension i2 nlg2 desc' ref2 pm2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <> ref2) (pm1 <|> pm2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing (MkRefs []) Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -598,7 +622,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing (MkRefs []) Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -614,11 +638,30 @@ annNlg = #extra % #nlg
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
+-- | The @\@ref@ citations held by a node: every one written after the node
+-- before it and before this one, in source order.
+--
+-- See 'L4.Parser.ResolveAnnotation.addRefCommentsToAst' for which node holds a
+-- ref. Not kept in a bundle: 'Serialise Anno' writes only the unit.
+annRefs :: Lens' Anno [Ref]
+annRefs = #extra % #ref % iso (\(MkRefs rs) -> rs) MkRefs
+
+-- | The ref nearest the node: the last of those it holds, the one written
+-- closest above it. What every reader that shows ONE citation per node reads,
+-- so a stack of refs shows its bottom one (ruled 2026-10-12: in a stack the
+-- exporters show the nearest).
+annRef :: Getter Anno (Maybe Ref)
+annRef = annRefs % to (listToMaybe . reverse)
+
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
 
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
+
+-- | Hold further refs on a node, after any it already has.
+addRefs :: [Ref] -> Anno -> Anno
+addRefs rs a = a & annRefs %~ (<> rs)
 
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
@@ -852,6 +895,20 @@ data Ref = MkRef Anno Text
 getRef :: Ref -> Text
 getRef (MkRef _ t) = t
 
+-- | The citation itself, without the herald or the angle brackets it was
+-- written with and without the spaces and carriage return the lexer keeps.
+--
+-- For a message that quotes the citation. 'getRef' is not that: it hands back
+-- the token as written, @\"\@ref X  \"@ or @\"\<\<X\>\>\"@, because the exact
+-- printer reprints it byte for byte.
+refCitation :: Ref -> Text
+refCitation r =
+  let stripped = Text.strip (getRef r)
+      afterHerald = Text.strip (fromMaybe stripped (Text.stripPrefix "@ref" stripped))
+  in case Text.stripPrefix "<<" afterHerald of
+       Just inner -> Text.strip (fromMaybe inner (Text.stripSuffix ">>" inner))
+       Nothing    -> afterHerald
+
 data Desc = MkDesc Anno Text
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
@@ -1060,6 +1117,7 @@ deriving anyclass instance Serialise Nlg
 deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
+deriving anyclass instance Serialise Refs
 deriving anyclass instance Serialise Desc
 #endif
 
