@@ -618,6 +618,31 @@ p INTERSECT q MEANS ...
   line as the operand; at the head of an expression an aligned continuation
   line is also accepted.
 
+### An annotation L4 does not know
+
+An `@` followed by a name this version of L4 has no annotation for is not an error.
+It is ignored, together with the rest of its line, as a comment is, and L4 warns about it:
+
+```
+Unknown annotation `@exprot`: this version of L4 does not know it, so it is ignored, along with the rest of its line. Did you mean `@export`?
+```
+
+There are two ways to meet it.
+One is a misspelling of a known name, and the warning says which: a rule whose `@export` is misspelt is not published, and nothing else would have told you.
+The other is a file written for a newer version of L4 that has an annotation this one lacks.
+That file still opens, checks and is highlighted in the older version, which reads past what it does not know.
+An annotation that changes what a rule means is not applied by a version that does not know it, so the warning is the only sign that it was left out.
+
+The annotations this version knows are `@desc`, `@export`, `@infix`, `@infixl`, `@infixr`, `@lang`, `@nlg`, `@nonassertable`, `@nonexhaustive`, `@ref`, `@ref-map` and `@ref-src`.
+
+- **What counts as a name.** A letter, then letters, digits and underscores, with hyphens between them, as in `@ref-src`. An `@` followed by anything else, a space or a digit or a symbol, is still an error.
+- **A name that begins with a known annotation's is that annotation.** `@exports default x` is `@export` followed by the text `s default x`, and `@descr` is `@desc` followed by `r`, as they always have been. They are not unknown, so they are not warned about, and the stray text is the annotation's own: `@exports` publishes nothing, because the first word of an export's text must be `export`. The lexer ignores only a name it used to refuse.
+- **What it takes with it.** The rest of its line and nothing from the next line, as every line annotation does: there are no continuation lines. That holds in the middle of a line too, so `DECIDE f n IS n @oops + 1` ignores the `+ 1` along with `@oops`, and the warning says so.
+- **Where it can go.** Anywhere a comment can. It is not attached to the rule below it, it does not come between a known annotation and the rule that annotation describes, and it does not interrupt a table of ditto marks `^`: the rows on either side of it still copy from each other, as they do across a comment. A known annotation between ditto rows is an error (`unexpected ^`), so a table with an unknown annotation inside it stops parsing on the first version of L4 that knows that annotation: keep annotations out of ditto tables.
+- **A known annotation that lacks the form it needs is ignored too, with its own warning.** `@lang` is the only one that can: it needs a language code after a space, so a bare `@lang`, `@lang` followed by a tab, and `@lang` followed by a code with a non-ASCII letter are each ignored and warned about, instead of ending the file. Every other annotation accepts all of those forms. The module's language then stays what it would be with no `@lang` at all.
+- **An `@` that is not followed by a letter is still an error.** That is not the shape of an annotation, so no annotation of any version can take it, and L4 cannot tell what the line was meant to be.
+- **`l4 format` keeps the line** exactly as written, as it keeps comments.
+
 ---
 
 ## Directives
