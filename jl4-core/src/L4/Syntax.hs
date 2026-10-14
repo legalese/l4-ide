@@ -987,7 +987,8 @@ app :: n -> [Type' n] -> Type' n
 app = TyApp emptyAnno
 
 -- ----------------------------------------------------------------------------
--- Serialise instances (CBOR) for AST caching in jl4-service
+-- Serialise instances (CBOR) for the AST. jl4-service used them for its cache,
+-- @bundle.cbor@, and no longer does.
 -- ----------------------------------------------------------------------------
 
 #if defined(SERIALISE_ENABLED)

@@ -224,9 +224,9 @@ filesQueryHandler deployId mFileFilter mIdentifier mSearch = do
 --   - Block boundary detection is heuristic (indentation + keyword-based)
 --   - Unusual formatting or multi-line backtick identifiers may confuse it
 --
--- A future improvement could use the AST (SerializedBundle.sbModule has source
--- spans) for compiled deployments, falling back to text scanning for
--- pending/failed ones.
+-- A future improvement could use the AST (its annotations have source spans)
+-- for compiled deployments, falling back to text scanning for pending/failed
+-- ones.
 -- ----------------------------------------------------------------------------
 
 -- | Search for an L4 identifier across source files.
