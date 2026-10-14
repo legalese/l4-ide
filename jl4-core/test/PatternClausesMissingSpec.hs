@@ -1382,6 +1382,52 @@ considerSpec = describe "CONSIDER over numbers, text and EXACTLY" $ do
       ]
     missingArms ws `shouldBe` ["WHEN Rate 1.50 Premium THEN", "WHEN Rate `_` `_` THEN"]
 
+  -- The key is typed with the character in it (a tab, a line break, a
+  -- zero-width space), so that the token holds it raw. The suggestion is
+  -- written with Haskell-style escapes, which L4 reads back, and stays on
+  -- one line: written raw it would break over two lines, or hide the
+  -- character. A text spelled across lines cannot be followed by another
+  -- pattern argument (that fails to parse, before this change as well), so
+  -- the line break is exercised by the redundant arm below, which ends at
+  -- its key.
+  it "writes a text key with a character that does not print as an escape, on one line" $ do
+    let withKey key = considerWarnings $ Text.unlines
+          [ "DECLARE Tier IS ONE OF Basic, Premium"
+          , "DECLARE Rate HAS label IS A STRING"
+          , "                 tier IS A Tier"
+          , ""
+          , "GIVEN r IS A Rate"
+          , "GIVETH A NUMBER"
+          , "f r MEANS"
+          , "  CONSIDER r"
+          , "    WHEN Rate \"" <> key <> "\" Basic THEN 10"
+          , "    WHEN Rate \"other\" t THEN 20"
+          ]
+        suggested escaped = ["WHEN Rate \"" <> escaped <> "\" Premium THEN", "WHEN Rate `_` `_` THEN"]
+    tab <- withKey "a\tb"
+    missingArms tab `shouldBe` suggested "a\\tb"
+    zeroWidth <- withKey "a\x200B\&b"
+    missingArms zeroWidth `shouldBe` suggested "a\\8203b"
+    -- a text that prints is left as it is, a non-ASCII letter included
+    printable <- withKey "S\xE3o Paulo"
+    missingArms printable `shouldBe` suggested "S\xE3o Paulo"
+
+  it "writes a redundant arm's text key with a character that does not print as an escape" $ do
+    let redundantWith key escaped = do
+          ws <- considerWarnings $ Text.unlines
+            [ "GIVEN s IS A STRING"
+            , "GIVETH A NUMBER"
+            , "f s MEANS"
+            , "  CONSIDER s"
+            , "    WHEN \"" <> key <> "\" THEN 1"
+            , "    WHEN \"" <> key <> "\" THEN 2"
+            , "    OTHERWISE 3"
+            ]
+          map (mentions ("WHEN \"" <> escaped <> "\" THEN 2")) (filter (mentions "redundant") ws) `shouldBe` [True]
+    redundantWith "a\tb" "a\\tb"
+    redundantWith "a\n      b" "a\\n      b"
+    redundantWith "a\x200B\&b" "a\\8203b"
+
   it "counts EXACTLY of a constant over a number for nothing, and stands down over an enumeration" $ do
     numberWs <- considerWarnings $ number
       [ "    WHEN EXACTLY zero THEN \"zero\""
