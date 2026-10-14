@@ -1,0 +1,55 @@
+-- A rule written as clauses reads the annotations above its first clause as
+-- a plain definition with the same layout reads its own, and gives them no
+-- warning (refutation of legalese/l4-ide#545's review, round 3). Each group
+-- below has a plain twin, written the same way, and the two answer alike.
+
+-- An @export above the GIVEN publishes the rule; a @desc between the GIVETH
+-- and the first clause is not the rule's, for the group as for its twin.
+@export the steps of a number
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@desc not the rule's
+DECIDE steps 0 IS 1
+DECIDE steps 1 IS 2
+
+@export the step of a number
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@desc not the rule's
+DECIDE step n IS n + 1
+
+-- A @desc above the GIVEN is the rule's, and an @export between the GIVETH
+-- and the first clause is not: neither of these is published.
+@desc above the GIVEN
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@export not the rule's
+DECIDE hops 0 IS 1
+DECIDE hops 1 IS 2
+
+@desc above the GIVEN
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@export not the rule's
+DECIDE hop n IS n + 1
+
+-- An @nlg on the line above the first clause is the rule's.
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+@nlg the code of %c%
+DECIDE code Red IS 1
+DECIDE code Green IS 2
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+@nlg the hue of %c%
+DECIDE hue c IS 3
+
+#EVAL steps 1
+#EVAL step 1
+#EVAL hops 1
+#EVAL hop 1
+#EVAL code Green
+#EVAL hue Green

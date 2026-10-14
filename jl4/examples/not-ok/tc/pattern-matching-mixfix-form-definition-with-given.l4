@@ -1,0 +1,15 @@
+-- A GIVEN of its own does not excuse a line written like a mixfix rule when
+-- the GIVEN names no input where the rule has its word: `Red` is not an input
+-- of this GIVEN, and `costs` is not either, so the line is still refused, once.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+Red `costs` n MEANS 1
+
+#EVAL Red `costs` 0

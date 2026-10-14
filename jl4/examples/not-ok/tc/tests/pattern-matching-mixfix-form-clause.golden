@@ -1,0 +1,19 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-mixfix-form-clause.l4
+  Hidden: no
+  Range: 11:1-11:1
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    11 | Red `costs` 0 MEANS 1
+       | ^
+    This clause is written the way a rule with a word between its inputs is written, like this one:
+
+      c `costs` n
+
+    A rule written that way is one definition, so it cannot be split into clauses.
+    Write it once and tell the cases apart inside it with CONSIDER, or write the clauses with a name of their own first, one pattern for each input, as in DECIDE price Red 0 IS ...
+

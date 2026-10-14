@@ -23,7 +23,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..))
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -129,5 +129,9 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _} =
   where
     (kindText, valueJson) = case result of
       Assertion b             -> ("assertion" :: Text, Aeson.Bool b)
-      Reduction (Left exc)    -> ("error" :: Text, Aeson.String (Text.unlines ["evaluation exception:", Text.pack (show exc)]))
+      -- 'prettyEvalException', not 'show': 'show' leaks the raw Haskell
+      -- constructor names of the exception into the JSON (as on unstable,
+      -- 75e08b55e). A multi-clause group's no-match error would otherwise
+      -- print its internal 'MkPmGroup' record.
+      Reduction (Left exc)    -> ("error" :: Text, Aeson.String (Text.unlines ("evaluation exception:" : prettyEvalException exc)))
       Reduction (Right val)   -> ("value" :: Text, Aeson.String (renderEvalValue (Reduction (Right val))))

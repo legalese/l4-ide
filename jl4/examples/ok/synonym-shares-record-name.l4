@@ -1,0 +1,44 @@
+IMPORT prelude
+
+-- A type synonym may be spelled like a record that takes a different number
+-- of arguments, and use that record in its body. `Box OF NUMBER` is the
+-- record; the bare `Box` is the synonym. These declarations used to be
+-- rejected as "Circular dependency detected between type synonyms".
+
+DECLARE Box a HAS item IS AN a
+
+-- the Box this module means: a box of a number
+DECLARE Box IS A Box OF NUMBER
+
+DECLARE Crate a HAS item IS AN a
+
+DECLARE Shelf AKA Crate IS A LIST OF (Crate OF NUMBER)
+
+DECLARE Pair2 a b HAS one IS AN a
+                      two IS A b
+
+DECLARE Cell AKA Pair2 IS A Pair2 OF NUMBER, STRING
+
+DECLARE Status IS ONE OF Active, Closed
+
+DECLARE Tagged a HAS tag IS A Status
+                     val IS AN a
+
+DECLARE Account AKA Tagged IS A Tagged OF NUMBER
+
+GIVEN b IS A Box
+GIVETH A NUMBER
+contents b MEANS b's item
+
+GIVETH A Shelf
+shelf MEANS LIST (Crate OF 1), (Crate OF 2)
+
+GIVETH A Cell
+cell MEANS Pair2 OF 1, "x"
+
+GIVETH A Account
+account MEANS Tagged OF Active, 100
+
+#EVAL contents (Box OF 41) + 1
+#EVAL cell's two
+#EVAL account's val

@@ -96,6 +96,17 @@ GIVEN a IS A NUMBER
 add a b MEANS a PLUS b
 ```
 
+### One Clause per Case
+
+Several `DECIDE` lines can each match a different argument value; see [Multi-clause DECIDE](multi-clause-DECIDE.md):
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE factorial 0 IS 1
+DECIDE factorial n IS n TIMES factorial (n MINUS 1)
+```
+
 ### Boolean Decisions
 
 Use `DECIDE ... IF` for boolean-returning functions:

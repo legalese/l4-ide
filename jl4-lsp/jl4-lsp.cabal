@@ -159,6 +159,8 @@ test-suite jl4-lsp-test
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    CheckSource
+    ClauseGeneratedNamesSpec
     EmbeddedLibrarySpec
     HoverDisplaySpec
     LibraryResolutionSpec
@@ -173,4 +175,5 @@ test-suite jl4-lsp-test
     jl4-core,
     jl4-lsp,
     lsp-types,
-    text
+    text,
+    text-rope

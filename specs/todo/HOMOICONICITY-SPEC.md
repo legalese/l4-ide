@@ -2,7 +2,7 @@
 
 **Status:** Draft
 **Issue:** TBD
-**Related:** `regulative.md` (conceptual background), `regulative-spec.org`, `PATTERN-MATCHING-SPEC.md`
+**Related:** `regulative.md` (conceptual background), `regulative-spec.org`, `../done/PATTERN-MATCHING-SPEC.md`
 
 ## Executive Summary
 
