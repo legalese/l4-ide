@@ -27,8 +27,11 @@ import Options.Applicative
   , subparser
   )
 import qualified Options.Applicative as Options
+import qualified Data.Text as Text
 import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
+
+import LSP.L4.BuildInfo (buildInfoLine)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
@@ -187,12 +190,21 @@ verbatim :: String -> Pretty.Doc
 verbatim = Pretty.vsep . fmap Pretty.pretty . lines
 
 commandInfo :: ParserInfo Command
-commandInfo = info (helper <*> commandParser)
+commandInfo = info (helper <*> versionOption <*> commandParser)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
   <> progDesc "Typecheck, evaluate, format and visualize .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
   <> footer "Part of the L4 tool family from Legalese.com"
   )
+
+-- | @l4 --version@: one line naming the build, @dev@ for a local build
+-- ("LSP.L4.BuildInfo"). It is an option of @l4@ itself and not a subcommand,
+-- because @l4 version@ already means the file called @version@ (the
+-- fall-through to @l4 run@ above).
+versionOption :: Parser (a -> a)
+versionOption =
+  Options.infoOption (Text.unpack buildInfoLine)
+    (Options.long "version" <> Options.help "Print the version of this build and exit")
 
 main :: IO ()
 main = do

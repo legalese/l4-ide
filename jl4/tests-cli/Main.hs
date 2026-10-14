@@ -43,6 +43,7 @@ import Test.Hspec
 
 import CliTest.Common
 import qualified CliTest.Blawx as Blawx
+import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Docassemble as Docassemble
@@ -3387,6 +3388,7 @@ spec bin = do
   Blawx.spec bin
   Docassemble.spec bin
   Catala.spec bin
+  BuildVersion.spec bin
   where
     for_ xs f = mapM_ f xs
 

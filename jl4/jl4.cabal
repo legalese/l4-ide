@@ -155,6 +155,7 @@ test-suite l4-cli-test
   main-is: Main.hs
   other-modules:
     CliTest.Blawx
+    CliTest.BuildVersion
     CliTest.Catala
     CliTest.Common
     CliTest.DmnBpmn
@@ -165,7 +166,8 @@ test-suite l4-cli-test
   autogen-modules:
     Paths_jl4
   build-tool-depends:
-    jl4:l4
+    jl4:l4,
+    jl4-lsp:jl4-lsp
   build-depends:
     aeson,
     bytestring,
