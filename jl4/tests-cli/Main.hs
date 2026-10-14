@@ -74,6 +74,18 @@ bilingualFramesFixture = fixtureDir </> "bilingual-frames.l4"
 captionFixture :: FilePath
 captionFixture = fixtureDir </> "state-graph-captions.l4"
 
+-- | A module whose first line is an annotation this version does not know.
+-- A CLI fixture because what is under test is the exit status and the one
+-- diagnostic the command prints.
+unknownAnnotationFixture :: FilePath
+unknownAnnotationFixture = fixtureDir </> "unknown-annotation.l4"
+
+-- | A module whose first line is @\@lang@ with no language after it: a KNOWN
+-- annotation that does not have the form it needs. Ignored with a warning, as
+-- an unknown one is, and not a lexer error.
+malformedLangFixture :: FilePath
+malformedLangFixture = fixtureDir </> "malformed-lang.l4"
+
 -- | Typechecks cleanly, then THROWS when its @#EVAL@ is evaluated.
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
@@ -131,6 +143,13 @@ evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
 langEnHintFixture, langEnThenHeFixture :: FilePath
 langEnHintFixture   = fixtureDir </> "lang-en-hint.l4"
 langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
+
+-- | A module with BOTH a redundant @\@lang en@ and an annotation this version
+-- ignores. The two diagnostics are made side by side in the same rule; each is
+-- said once, the hint stays a hint, and the ignored annotation stays the
+-- module's only warning.
+langEnAndUnknownFixture :: FilePath
+langEnAndUnknownFixture = fixtureDir </> "lang-en-and-unknown-annotation.l4"
 
 -- | Typechecks cleanly; one @#ASSERT@ holds and one evaluates to FALSE.
 assertFailsFixture :: FilePath
@@ -505,6 +524,7 @@ coreFixtures =
   , breachTraceFixture, breachInputsFixture
   , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
   , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson
+  , langEnAndUnknownFixture
   , batchUndeclaredColumnCsv, batchEscapeRoundtripJson
   , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
   , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
@@ -590,6 +610,13 @@ spec bin = do
   describe "l4 run" $ do
     it "succeeds on a clean file" $
       expectOk bin ["run", cleanFixture] "Checking succeeded."
+
+    -- The line is ignored as a comment is: the file runs and gives its answer.
+    it "runs a file with an unknown annotation" $
+      expectOk bin ["run", unknownAnnotationFixture] "Result:\n  2\n"
+
+    it "runs a file whose @lang has no language" $
+      expectOk bin ["run", malformedLangFixture] "Result:\n  2\n"
 
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
@@ -995,6 +1022,32 @@ spec bin = do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
 
+    -- An annotation this version of L4 does not know is a warning, not a lexer
+    -- error: the file still checks and runs, and the one diagnostic names it.
+    it "succeeds on a file with an unknown annotation, and warns once" $ do
+      expectOk bin ["check", unknownAnnotationFixture] "Check succeeded."
+      env <- jsonEnvelope bin ["check", unknownAnnotationFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          length diags `shouldBe` 1
+          diags `shouldSatisfy` all ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          diags `shouldSatisfy` all ("@future-annotation" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    it "succeeds on a file whose @lang has no language, and warns once" $ do
+      expectOk bin ["check", malformedLangFixture] "Check succeeded."
+      env <- jsonEnvelope bin ["check", malformedLangFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          length diags `shouldBe` 1
+          diags `shouldSatisfy` all ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          diags `shouldSatisfy` all ("Malformed annotation `@lang`" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
   -- succeeds, with the same exit code and the same JSON verdict it would give
@@ -1040,6 +1093,19 @@ spec bin = do
       Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
       code `shouldBe` ExitSuccess
       serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    -- The hint reads `@lang` tokens and the ignored-annotation warning reads
+    -- the lexer's trivia, so neither can take the other's line: a module with
+    -- both gets both, once each, and the exit code is the check's.
+    it "gives the hint and the ignored-annotation warning once each, in one module" $ do
+      Output code _ serr <- runL4 bin ["check", langEnAndUnknownFixture]
+      code `shouldBe` ExitSuccess
+      length (T.breakOnAll (T.pack hintText) (T.pack serr)) `shouldBe` 1
+      length (T.breakOnAll "Unknown annotation `@future-annotation`" (T.pack serr)) `shouldBe` 1
+      -- the hint is a hint and the warning a warning, and nothing is an error
+      serr `shouldSatisfy` ("DiagnosticSeverity_Hint" `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Warning" `isInfixOf`)
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
 
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do

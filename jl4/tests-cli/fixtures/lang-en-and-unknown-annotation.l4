@@ -1,0 +1,5 @@
+@lang en
+@future-annotation this version has never heard of it
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add one` n IS n + 1

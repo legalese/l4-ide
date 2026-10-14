@@ -17,6 +17,7 @@ module L4.Presumption
   , nullRefusalText
   , unrecognisedMessage
   , nearestName
+  , editDistance
   , requestRecordName
   ) where
 
