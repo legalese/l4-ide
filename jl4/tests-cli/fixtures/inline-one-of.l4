@@ -1,0 +1,20 @@
+-- A record whose fields list their options inline
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md). `l4 batch` re-prints the
+-- module in its lifted form (`DECLARE `Plot's tenure` IS ONE OF …`) and runs
+-- it once per row.
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    `tenure`       IS ONE OF Owner, Tenant, Lodger TYPICALLY Owner
+    `boundary`     IS ONE OF
+        Fenced
+        Hedged
+        Open
+    `status`       IS ONE OF Settled, Disputed
+        MEANS IF boundary EQUALS Open THEN Disputed ELSE Settled
+
+@export Whether a plot is lived in by its owner.
+GIVEN p IS A Plot
+GIVETH A BOOLEAN
+DECIDE `owner occupied` p IS
+      p's tenure EQUALS Owner
+  AND p's boundary EQUALS Fenced

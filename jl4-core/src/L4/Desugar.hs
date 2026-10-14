@@ -3,6 +3,11 @@ module L4.Desugar (
   --
   carameliseExpr,
   carameliseNode,
+  -- * Inline ONE OF on a field
+  --
+  desugarInlineOptions,
+  detectInlineOptionsInParameterisedTypes,
+  inlineOptionsKey,
   -- * Computed Fields
   --
   desugarComputedFields,
@@ -28,7 +33,9 @@ import           Base
 import           Data.Graph               (stronglyConnComp, SCC(..))
 import qualified Data.Map.Strict          as Map
 import qualified Data.Set                 as Set
-import           L4.Annotation            (Anno_ (..), HasAnno (..), HasSrcRange (..), clearSourceAnno, emptyAnno, mkHoleWithSrcRangeHint)
+import qualified Base.Text                as Text
+import           L4.Annotation            (AnnoElement_ (..), Anno_ (..), ConcreteSyntaxNode_ (..), CsnCluster_ (..), HasAnno (..), HasSrcRange (..), clearSourceAnno, emptyAnno, mkHoleWithSrcRangeHint)
+import           L4.Lexer                 (PosToken (..), TKeywords (..), TokenType (..))
 import           L4.Names
 import           L4.Parser.SrcSpan        (SrcPos (MkSrcPos), SrcRange (MkSrcRange))
 -- The wave's @AFTER@ edge is 'L4.Syntax.Opening'; this module's own 'Opening'
@@ -259,6 +266,148 @@ builtinUnaryFunctions = Map.fromList
 -- Desugar Computed Fields
 -- ----------------------------------------------------------------------------
 
+-- ----------------------------------------------------------------------------
+-- Inline ONE OF on a field
+-- ----------------------------------------------------------------------------
+
+-- | Lift every field written @IS ONE OF …@ into an ordinary enum @DECLARE@,
+-- and point the field's type at it (Note [Inline ONE OF on a field] in
+-- "L4.Syntax"; specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md, option C):
+--
+-- @
+-- DECLARE Plot HAS                  DECLARE `Plot's tenure` IS ONE OF Owner, Tenant
+--     `tenure` IS ONE OF       ==>  DECLARE Plot HAS
+--         Owner, Tenant                 `tenure` IS A `Plot's tenure`
+-- @
+--
+-- The lifted @DECLARE@ goes immediately before the declaration the field
+-- belongs to, in the same section, so it has exactly that declaration's
+-- scope: section-local if it is, and visible to an importer as every
+-- top-level declaration is.
+--
+-- __The name__ is the parts exactly as written, joined by @'s @: the record
+-- and the field (@`Plot's tenure`@), or, for a field of a constructor, the
+-- type, the constructor and the field (@`Holding's Lease's term`@). The
+-- constructor alone is not enough, because two enums may share a
+-- constructor, and @`Lease's term`@ would then name two types. No article is
+-- stripped and no plural is made: a name the author can predict is worth more
+-- than a prettier one they cannot (INLINE-ONE-OF-FIELD-SPEC §3.4, §7). A
+-- clash with a type of the same name is reported at the field by
+-- 'L4.TypeCheck.inferInlineOptionsType'.
+--
+-- __Where it points.__ The lifted @DECLARE@'s annotation carries the field's
+-- source range (the checker keys a declaration by its range, and no other
+-- @DECLARE@ has a field's) and a copy of the field's @\@desc@. The generated
+-- name, where it is declared and where the field refers to it, carries the
+-- range of the field's @ONE OF@, so that going to the definition of
+-- @`Plot's tenure`@ from a rule lands on the field. Both are a single
+-- range-carrying hole and no tokens, the shape 'elaborateSectionBinder'
+-- uses: the lifted @DECLARE@ emits no tokens of its own, and the field, which
+-- still holds its options, emits them where the author wrote them.
+--
+-- The type the field now refers to has an EMPTY annotation, like the
+-- placeholder it replaces, so the token walk never reaches the name inside
+-- it: a 'Name' has no children to fill a hole with, and a range-carrying
+-- hole there failed the whole checked phase's semantic tokens.
+--
+-- Runs BEFORE 'desugarComputedFields', so that a computed field whose type is
+-- listed inline yields a synthetic @DECIDE@ whose @GIVETH@ already names the
+-- lifted type.
+desugarInlineOptions :: Module Name -> Module Name
+desugarInlineOptions (MkModule ann imports section) =
+  MkModule ann imports (goSection section)
+ where
+  goSection (MkSection sAnn sMn sMaka sMgiven topDecls) =
+    MkSection sAnn sMn sMaka sMgiven (concatMap goTopDecl topDecls)
+  goTopDecl = \ case
+    Declare dAnn decl -> liftInlineOptions dAnn decl
+    Section sAnn s    -> [Section sAnn (goSection s)]
+    other             -> [other]
+
+liftInlineOptions :: Anno -> Declare Name -> [TopDecl Name]
+liftInlineOptions dAnn (MkDeclare declAnn tysig appForm td) =
+  case td of
+    RecordDecl rAnn mCon tns ->
+      let (lifted, tns') = unzip (map (liftField [owner]) tns)
+      in catMaybes lifted <> [rebuilt (RecordDecl rAnn mCon tns')]
+    EnumDecl eAnn cds ->
+      let (lifted, cds') = unzip (map liftCon cds)
+      in concat lifted <> [rebuilt (EnumDecl eAnn cds')]
+    _ -> [rebuilt td]
+ where
+  rebuilt = Declare dAnn . MkDeclare declAnn tysig appForm
+  MkAppForm _ ownerName _ _ = appForm
+  owner = writtenName ownerName
+  liftCon (MkConDecl cAnn cn tns) =
+    let (lifted, tns') = unzip (map (liftField [owner, writtenName cn]) tns)
+    in (catMaybes lifted, MkConDecl cAnn cn tns')
+
+-- | Lift one field, if its options are listed inline. The path is the names
+-- the generated name is made of, before the field's own.
+liftField :: [Text] -> TypedName Name -> (Maybe (TopDecl Name), TypedName Name)
+liftField path tn@(MkTypedName fAnn fn _ (Just cds) mTypically mMeans) =
+  let
+    generated = NormalName (Text.intercalate "'s " (path <> [writtenName fn]))
+    keywords = rangeHole (inlineOptionsKeywordRange tn)
+    declAnno = Optics.set annDesc (Optics.view annDesc fAnn) (inlineOptionsKey tn)
+    lifted =
+      Declare declAnno
+        (MkDeclare declAnno
+          (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+          (MkAppForm keywords (MkName keywords generated) [] Nothing)
+          (EnumDecl emptyAnno cds))
+  in
+    ( Just lifted
+    , MkTypedName fAnn fn (TyApp emptyAnno (MkName keywords generated) []) (Just cds) mTypically mMeans
+    )
+liftField _ tn = (Nothing, tn)
+
+-- | A name as written, for building a generated name. Backticks are already
+-- gone: the lexer strips them.
+writtenName :: Name -> Text
+writtenName = unqualifiedRawNameToText . rawName
+
+-- | The annotation of the @DECLARE@ 'desugarInlineOptions' lifts out of a
+-- field: one hole carrying the field's range, which is how the checker finds
+-- the lifted declaration again ('L4.TypeCheck.checkFieldDefaults').
+inlineOptionsKey :: TypedName Name -> Anno
+inlineOptionsKey tn = rangeHole (rangeOf (getAnno tn))
+
+-- | An annotation with no tokens and one hole that carries a range: what
+-- 'rangeOf' reads, and nothing for a printer to print.
+rangeHole :: Maybe SrcRange -> Anno
+rangeHole r = Anno mempty r [mkHoleWithSrcRangeHint r]
+
+-- | The range of a field's @ONE OF@, read off the field's own annotation,
+-- where the parser put the two keywords ('L4.Parser.inlineOptions').
+inlineOptionsKeywordRange :: TypedName n -> Maybe SrcRange
+inlineOptionsKeywordRange tn =
+  rangeOf [ c.payload | AnnoCsn _ c <- (getAnno tn).payload, any isOneOf c.payload.tokens ]
+ where
+  isOneOf t = t.payload `elem` [TKeywords TKOne, TKeywords TKOf]
+
+-- | Fields written @IS ONE OF …@ in a declaration that takes a type
+-- parameter, @DECLARE Box a HAS …@ or @GIVEN a IS A TYPE DECLARE Box HAS …@:
+-- the declaration, the field, and the range of the field's @ONE OF@. The
+-- lifted type would need the parameter too, so this is refused
+-- (INLINE-ONE-OF-FIELD-SPEC §5.1).
+detectInlineOptionsInParameterisedTypes :: Module Name -> [(Name, Name, Maybe SrcRange)]
+detectInlineOptionsInParameterisedTypes (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goTopDecl decls
+  goTopDecl = \ case
+    Section _ s -> goSection s
+    Declare _ (MkDeclare _ (MkTypeSig _ (MkGivenSig _ params) _) (MkAppForm _ dn args _) td)
+      | not (null params && null args) ->
+          [ (dn, fn, inlineOptionsKeywordRange tn)
+          | tn@(MkTypedName _ fn _ (Just _) _ _) <- fieldsOf td
+          ]
+    _ -> []
+  fieldsOf = \ case
+    RecordDecl _ _ tns -> tns
+    EnumDecl _ cds     -> concat [ tns | MkConDecl _ _ tns <- cds ]
+    _                  -> []
+
 -- | Desugar computed fields in DECLARE blocks into synthetic DECIDE declarations.
 --
 -- For each computed field @f IS A T MEANS expr@ on record @R@, generates:
@@ -303,14 +452,14 @@ desugarCFDeclare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon tns
     let
       -- Extract type parameters from the DECLARE's GIVEN (e.g., GIVEN a IS A TYPE)
       MkTypeSig _ (MkGivenSig _ typeParams) _ = tysig
-      storedFields = [tn | tn@(MkTypedName _ _ _ _mTypically Nothing) <- tns]
+      storedFields = [tn | tn@(MkTypedName _ _ _ _ _mTypically Nothing) <- tns]
       syntheticDecides = mapMaybe (makeComputedDecide appForm typeParams) tns
       newDeclare = Declare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon storedFields))
     in newDeclare : map (uncurry Decide) syntheticDecides
 desugarCFDeclare dAnn decl = [Declare dAnn decl]
 
 isComputed :: TypedName n -> Bool
-isComputed (MkTypedName _ _ _ _mTypically (Just _)) = True
+isComputed (MkTypedName _ _ _ _ _mTypically (Just _)) = True
 isComputed _ = False
 
 -- | Generate a synthetic Decide for a computed field.
@@ -330,7 +479,7 @@ isComputed _ = False
 -- written @GIVEN p IS A Person@. One mechanism (IMPLICIT-PROPS-DESIGN §11.7):
 -- until R5 this function carried its own rewrite of the same shape.
 makeComputedDecide :: AppForm Name -> [OptionallyTypedName Name] -> TypedName Name -> Maybe (Anno, Decide Name)
-makeComputedDecide appForm typeParams (MkTypedName fieldAnn fieldName fieldType _mTypically (Just meansExpr)) =
+makeComputedDecide appForm typeParams (MkTypedName fieldAnn fieldName fieldType _ _mTypically (Just meansExpr)) =
   let
     -- Extract record name and type args from the DECLARE's AppForm
     MkAppForm _ recordName typeArgs _ = appForm
@@ -408,7 +557,7 @@ recordFieldsDeclared (MkModule _ _ section) = goSection section
   goSection (MkSection _ _ _ _ decls) = Map.unionsWith Set.union (map goTopDecl decls)
   goTopDecl = \ case
     Declare _ (MkDeclare _ _ (MkAppForm _ recName _ mAka) (RecordDecl _ _ tns)) ->
-      let fields = Set.fromList [ rawName fn | MkTypedName _ fn _ _ _ <- tns ]
+      let fields = Set.fromList [ rawName fn | MkTypedName _ fn _ _ _ _ <- tns ]
           spellings = rawName recName : maybe [] (\ (MkAka _ ns) -> map rawName ns) mAka
       in Map.fromList [ (sp, fields) | sp <- spellings ]
     Section _ s -> goSection s
@@ -838,11 +987,11 @@ detectCFCDeclare (MkDeclare _ _ appForm (RecordDecl _ _ tns))
     let
       MkAppForm _ recordName _ _ = appForm
       -- All field names in this record (for filtering references)
-      allFieldRawNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ _ <- tns]
+      allFieldRawNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ _ _ <- tns]
       -- Build SCC graph: (node=Name, key=RawName, deps=[RawName])
       graphData =
         [ (fn, rawName fn, Set.toList (exprFieldRefs allFieldRawNames e))
-        | MkTypedName _ fn _ _mTypically (Just e) <- tns
+        | MkTypedName _ fn _ _ _mTypically (Just e) <- tns
         ]
     in [ (recordName, cyc) | CyclicSCC cyc <- stronglyConnComp graphData ]
 detectCFCDeclare _ = []
@@ -872,7 +1021,7 @@ extractCFNSection (MkSection _ _ _ _ topDecls) =
 extractCFNTopDecl :: TopDecl Name -> Map.Map RawName (Set RawName)
 extractCFNTopDecl (Declare _ (MkDeclare _ _ (MkAppForm _ recName _ _) (RecordDecl _ _ tns)))
   | any isComputed tns =
-    let cfNames = Set.fromList [rawName fn | MkTypedName _ fn _ _mTypically (Just _) <- tns]
+    let cfNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ _mTypically (Just _) <- tns]
     in Map.singleton (rawName recName) cfNames
 extractCFNTopDecl (Section _ section) = extractCFNSection section
 extractCFNTopDecl _ = Map.empty

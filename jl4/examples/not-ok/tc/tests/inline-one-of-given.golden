@@ -1,0 +1,13 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-given.l4
+  Hidden: no
+  Range: 4:17-4:20
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+      |
+    4 | GIVEN tenure IS ONE OF Owner, Tenant, Lodger
+      |                 ^
+    ONE OF can list a field's options inside DECLARE ... HAS, but it cannot be the type of a rule's input or result. Declare the options with DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant, and then write IS A Tenure.

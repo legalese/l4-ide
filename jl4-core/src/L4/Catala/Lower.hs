@@ -2261,7 +2261,7 @@ collectRecords mods = Map.fromList $ concat
                }
   ]
  where
-  fieldOf tn@(MkTypedName _ fRes ty _ mMeans) =
+  fieldOf tn@(MkTypedName _ fRes ty _ _ mMeans) =
     RecField (catIdent (resolvedToText fRes)) (resolvedToText fRes) (getUnique fRes)
              (statusOf ty mMeans) (descOfAnno (getAnno tn))
   statusOf ty mMeans
@@ -2290,7 +2290,7 @@ collectEnums empties needed mods = vList
     let cn = resolvedToText c
     in case payload of
       []                       -> pure (CatCase (catUpper cn) cn Nothing)
-      [MkTypedName _ _ ty _ _] ->
+      [MkTypedName _ _ ty _ _ _] ->
         vIn tyNm (lowerTypeBare ty) `vThen` \ct -> case firstEmptyIn (Map.keysSet empties) ct of
           Just n  -> vBad [LowerError tyNm Nothing
                             ("constructor `" <> cn <> "` carries `"

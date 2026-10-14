@@ -1,0 +1,6 @@
+`short lease` with `Lease` with 5 and `Short`
+not `short lease` with `Freehold`
+`fixed` with `Fixed`
+`years remaining` with `Title` where `holder` is Alex and `estate` is `Leasehold` with 40 is equal to 40
+`Title` where `holder` is Alex and `estate` is `Possessory` 's `status` is equal to `Precarious`
+`Title` where `holder` is Alex and `estate` is `Absolute` 's `status` is equal to `Secure`

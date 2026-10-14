@@ -1,0 +1,73 @@
+{
+    "$defs": {
+        "Title": {
+            "properties": {
+                "estate": {
+                    "$ref": "#/$defs/Title's estate"
+                },
+                "holder": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "holder",
+                "estate"
+            ],
+            "type": "object"
+        },
+        "Title's estate": {
+            "oneOf": [
+                {
+                    "properties": {
+                        "tag": {
+                            "const": "Absolute"
+                        }
+                    },
+                    "required": [
+                        "tag"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "remaining years": {
+                            "default": 99,
+                            "type": "number"
+                        },
+                        "tag": {
+                            "const": "Leasehold"
+                        }
+                    },
+                    "required": [
+                        "tag",
+                        "remaining years"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "tag": {
+                            "const": "Possessory"
+                        }
+                    },
+                    "required": [
+                        "tag"
+                    ],
+                    "type": "object"
+                }
+            ]
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The years left on a title, if it is leasehold.",
+    "properties": {
+        "title": {
+            "$ref": "#/$defs/Title"
+        }
+    },
+    "required": [
+        "title"
+    ],
+    "title": "years remaining",
+    "type": "object"
+}

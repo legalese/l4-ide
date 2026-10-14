@@ -1,0 +1,6 @@
+-- ONE OF lists a field's options; it cannot be the type of a rule's input
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.1, third row). The same
+-- message answers GIVETH, ASSUME and the inside of those types.
+GIVEN tenure IS ONE OF Owner, Tenant, Lodger
+GIVETH A BOOLEAN
+`owned` tenure MEANS tenure EQUALS Owner

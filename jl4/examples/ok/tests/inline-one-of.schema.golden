@@ -1,0 +1,70 @@
+{
+    "$defs": {
+        "Plot": {
+            "description": "A plot of land on the register.",
+            "properties": {
+                "area in square metres": {
+                    "type": "number"
+                },
+                "boundary": {
+                    "$ref": "#/$defs/Plot's boundary",
+                    "default": "Fenced"
+                },
+                "tenure": {
+                    "$ref": "#/$defs/Plot's tenure",
+                    "default": "Owner",
+                    "description": "How the occupier holds the plot."
+                },
+                "the occupier": {
+                    "type": "string"
+                },
+                "use": {
+                    "$ref": "#/$defs/Plot's use"
+                }
+            },
+            "required": [
+                "the occupier",
+                "use",
+                "area in square metres"
+            ],
+            "type": "object"
+        },
+        "Plot's boundary": {
+            "enum": [
+                "Fenced",
+                "Hedged",
+                "Open"
+            ],
+            "type": "string"
+        },
+        "Plot's tenure": {
+            "description": "How the occupier holds the plot.",
+            "enum": [
+                "Owner",
+                "Tenant",
+                "Lodger"
+            ],
+            "type": "string"
+        },
+        "Plot's use": {
+            "enum": [
+                "Residential",
+                "Commercial"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether a plot is lived in by its owner.",
+    "properties": {
+        "p": {
+            "$ref": "#/$defs/Plot",
+            "description": "A plot of land on the register."
+        }
+    },
+    "required": [
+        "p"
+    ],
+    "title": "owner occupied",
+    "type": "object"
+}

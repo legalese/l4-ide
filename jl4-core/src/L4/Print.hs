@@ -577,10 +577,26 @@ instance LayoutPrinterWithName a => LayoutPrinter (OptionallyTypedName a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
   printWithLayout = \ case
-    MkTypedName _ a ty mTypically Nothing ->
+    -- A field whose options are listed inline, before they are lifted: the
+    -- type slot still holds 'inlineOptionsPlaceholder', whose name nothing
+    -- can write. Once 'L4.Desugar.desugarInlineOptions' has named the lifted
+    -- type, the field prints as @IS `Plot's tenure`@ below, beside the
+    -- lifted DECLARE: what @l4 batch@ and the REPL re-emit is the lifted
+    -- form, which re-parses to the same module (Note [Inline ONE OF on a
+    -- field], "L4.Syntax"). One option per line, as a DECLARE's are printed,
+    -- then any default on a line of its own.
+    MkTypedName _ a (TyApp _ placeholder []) (Just options) mTypically mMeans
+      | rawName (getName placeholder) == NormalName "" ->
+          align $ vcatHard $
+            [ printWithLayout a <+> "IS ONE OF"
+            , indent 4 (vcatHard (fmap printWithLayout options))
+            ]
+            <> [ indent 2 ("TYPICALLY" <+> printWithLayout e) | Just e <- [mTypically] ]
+            <> [ indent 4 ("MEANS" <+> printWithLayout e) | Just e <- [mMeans] ]
+    MkTypedName _ a ty _ mTypically Nothing ->
       printWithLayout a <+> "IS" <+> printWithLayout ty
         <> printTypically mTypically
-    MkTypedName _ a ty mTypically (Just meansExpr) ->
+    MkTypedName _ a ty _ mTypically (Just meansExpr) ->
       align $ vcatHard
         [ printWithLayout a <+> "IS" <+> printWithLayout ty <> printTypically mTypically
         , indent 4 ("MEANS" <+> printWithLayout meansExpr)

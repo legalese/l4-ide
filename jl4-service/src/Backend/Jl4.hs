@@ -449,7 +449,7 @@ buildModuleInfo decls = ModuleInfo
     recordFor (MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ (Just ctor) fields)) =
       Just (getUnique tyName, (ctor, map fieldOf fields))
       where
-        fieldOf (MkTypedName _ fn fty mTypically _) = (rawNameToText (rawName (getActual fn)), fty, mTypically)
+        fieldOf (MkTypedName _ fn fty _ mTypically _) = (rawNameToText (rawName (getActual fn)), fty, mTypically)
     recordFor _ = Nothing
 
     enumFor :: Declare Resolved -> Maybe (Unique, [(Text, Resolved)])

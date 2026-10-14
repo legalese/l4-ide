@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+inline-one-of-payload.l4:58:3-60:30:
+  I found a problem while checking the definition of `registered absolutely`:
+    The following branches still need to be considered:
+    
+      WHEN Possessory THEN
+    
+inline-one-of-payload.l4:62:1-42:
+  assertion satisfied
+inline-one-of-payload.l4:63:1-35:
+  assertion satisfied
+inline-one-of-payload.l4:64:1-22:
+  assertion satisfied
+inline-one-of-payload.l4:65:1-93:
+  assertion satisfied
+inline-one-of-payload.l4:66:1-87:
+  assertion satisfied
+inline-one-of-payload.l4:67:1-81:
+  assertion satisfied

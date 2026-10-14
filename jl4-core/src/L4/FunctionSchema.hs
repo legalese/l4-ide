@@ -209,18 +209,18 @@ typeToParameter declares visited ty =
           RecordDecl _ _ fields ->
             let
               visited' = Set.insert typeName visited
-              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ _ <- fields]
+              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ _ _ <- fields]
               props =
                 Map.fromList
                   [ (resolvedNameText fieldName, addDefault mTypically (addDesc fieldDesc (typeToParameter declares visited' fieldTy)))
-                  | MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans <- fields
+                  | MkTypedName fieldAnn fieldName fieldTy _ mTypically _mMeans <- fields
                   , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
                   ]
               -- A field with a TYPICALLY may be left out: the JSON decoders
               -- fill it from this DECLARE (T1b of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
               requiredFields =
                 [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy mTypically _ <- fields
+                | MkTypedName _ fieldName fieldTy _ mTypically _ <- fields
                 , not (isMaybeFieldType fieldTy)
                 , Maybe.isNothing mTypically
                 ]

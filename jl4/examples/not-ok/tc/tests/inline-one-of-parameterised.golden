@@ -1,0 +1,16 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-parameterised.l4
+  Hidden: no
+  Range: 7:19-7:25
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The options of the field `state` cannot be listed with ONE OF here,
+    because `Box` takes a type as an input, and the type that L4
+    makes for the options would need that input too.
+
+    Declare the options with DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant,
+    and give the field that type.

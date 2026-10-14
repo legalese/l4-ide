@@ -253,7 +253,7 @@ mapUnitBody f u = case u.uDecl of
 -- declaring type name do not share a 'Unique'.
 recordCtorFields :: [Module Resolved] -> Map.Map Text [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ <- fields ])
+  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ _ <- fields ])
   | m <- mods
   , Declare _ (MkDeclare _ _ (MkAppForm _ ctorName _ _) (RecordDecl _ _ fields)) <- topDeclsRec m
   ]
@@ -958,8 +958,8 @@ declareClause = \case
   SynonymDecl _ ty      -> CLeaf (typeText ty)
   OpaqueDecl _          -> CLeaf "a kind of thing"
  where
-  recordField (MkTypedName _ n ty _mTypically Nothing)     = (resolvedText n, typeText ty)
-  recordField (MkTypedName _ n ty _mTypically (Just expr)) =
+  recordField (MkTypedName _ n ty _ _mTypically Nothing)     = (resolvedText n, typeText ty)
+  recordField (MkTypedName _ n ty _ _mTypically (Just expr)) =
     (resolvedText n, typeText ty <> ", computed as " <> leafText expr)
   conName (MkConDecl _ n _) = resolvedText n
 

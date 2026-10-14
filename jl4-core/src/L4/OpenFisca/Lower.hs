@@ -424,7 +424,7 @@ collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
               , riPy     = pyType nm
               , riFields =
                   [ fieldInfo enums fRes fTy mMeans
-                  | MkTypedName _ fRes fTy mMeans _ <- fields
+                  | MkTypedName _ fRes fTy _ mMeans _ <- fields
                   ]
               })]
     Section _ sub -> goSection sub

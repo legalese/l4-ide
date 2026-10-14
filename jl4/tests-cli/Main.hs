@@ -91,6 +91,11 @@ earlyActFixture = fixtureDir </> "early-act.l4"
 multiClauseRenderFixture :: FilePath
 multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
+-- | A record whose fields list their options inline, and the rows to run it on.
+inlineOneOfFixture, inlineOneOfJson :: FilePath
+inlineOneOfFixture = fixtureDir </> "inline-one-of.l4"
+inlineOneOfJson    = fixtureDir </> "inline-one-of.json"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -966,6 +971,22 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
       sout `shouldNotSatisfy` mentionsOldName
+
+  -- A field that lists its options inline (INLINE-ONE-OF-FIELD-SPEC). L4
+  -- lifts the options into a type named after the field, `Plot's tenure`.
+  describe "a field that lists its options inline" $ do
+    -- `batch` re-prints the checked module, which holds the lifted DECLAREs,
+    -- and re-runs it per row: the printed field must name the lifted type
+    -- rather than list the options again, or the re-run declares them twice.
+    it "l4 batch re-prints the lifted form and runs it, default included" $ do
+      Output code sout _ <- runL4 bin ["batch", inlineOneOfFixture, "--inputs", inlineOneOfJson]
+      code `shouldBe` ExitSuccess
+      let rows = lines sout
+      length rows `shouldBe` 3
+      rows `shouldSatisfy` all ("\"status\":\"success\"" `isInfixOf`)
+      map ("\"result\":true" `isInfixOf`) rows `shouldBe` [True, False, True]
+      -- the third row leaves `tenure` out, and its TYPICALLY fills it
+      (rows !! 2) `shouldSatisfy` ("\"presumed\":[\"p.tenure\"]" `isInfixOf`)
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $

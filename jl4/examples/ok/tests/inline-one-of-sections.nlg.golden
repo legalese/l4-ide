@@ -1,0 +1,3 @@
+`Plots.owned` with `Plots.Plot` where `tenure` is `Owner`
+`managed` with `Manager`
+`label` with `Lodger` is equal to lodger
