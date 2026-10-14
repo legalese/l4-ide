@@ -1005,7 +1005,13 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
                   , range <- SP.nbspHitsInToken uri pt.range.start txt
                   ]
                 mk range = mkFileDiagnosticWithSource uri (mkNbspLintDiagnostic range) (MkNbspLint range)
-            pure (map mk nbspRanges, Just (ts, contents))
+                -- The redundant-@lang hint: a module that declares nothing is
+                -- English (R-M2), so `@lang en` can go. A hint, below the NBSP
+                -- lint's warning: it exists so that a stale skill or generator
+                -- cannot quietly put the line back, and it changes nothing
+                -- about exit codes or evaluation.
+                langHints = map (mkSimpleFileDiagnostic uri . mkRedundantLangEnHint) (Parser.redundantLangEnRanges ts)
+            pure (map mk nbspRanges <> langHints, Just (ts, contents))
 
   -- | GetMixfixRegistry collects mixfix hints from the current module AND all imports.
   -- This enables cross-module mixfix resolution.
@@ -1417,6 +1423,23 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , _codeDescription = Nothing
         , _source = Just "linter"
         , _message = "non-breaking space (U+00A0) used where a normal space was expected — this usually comes from pasted text; replace it with an ordinary space."
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
+    -- | The redundant @\@lang en@ hint: severity Hint, the lowest the LSP
+    -- has, sourced "linter" like the lints above. The range is the whole
+    -- @\@lang@ line, which is the thing to delete.
+    mkRedundantLangEnHint :: SrcRange -> Diagnostic
+    mkRedundantLangEnHint range =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just range)
+        , _severity = Just LSP.DiagnosticSeverity_Hint
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just "linter"
+        , _message = "A module that declares nothing is English; this line can go."
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing

@@ -16,6 +16,7 @@ module L4.Parser (
   PState (..),
   langTagOfToken,
   declaredModuleLang,
+  redundantLangEnRanges,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
   emptyMixfixHintRegistry,
@@ -180,6 +181,29 @@ langTagOfToken = \ case
 declaredModuleLang :: [PosToken] -> Maybe LangTag
 declaredModuleLang ts =
   listToMaybe [ tag | t <- reverse ts, Just tag <- [langTagOfToken t.payload] ]
+
+-- | The ranges of the @\@lang en@ lines that say nothing the module does not
+-- already say, read off the token stream like 'declaredModuleLang'.
+--
+-- A module that declares no @\@lang@ is English ('defaultModuleLang', R-M2), so
+-- a declaration of @en@ changes nothing. That holds only while EVERY
+-- declaration in the module is @en@: the last declaration wins, so in a
+-- module that also says @\@lang he@ an @en@ line is not redundant (written
+-- last it is the one that counts; written first it is overridden, and neither
+-- is "this line can go"). Such a module gets no hint at all.
+--
+-- The tag is compared exactly. The lexer does not fold case ('isLangTagChar'
+-- admits capitals) and 'MkLangTag' is compared as written, so @\@lang EN@ and
+-- @\@lang en-GB@ are NOT the default language as far as the pipeline is
+-- concerned, and are left alone.
+--
+-- The range is the token's own, which is the whole @\@lang@ line.
+redundantLangEnRanges :: [PosToken] -> [SrcRange]
+redundantLangEnRanges ts
+  | all ((== defaultModuleLang) . snd) decls = fst <$> decls
+  | otherwise = []
+  where
+    decls = [ (t.range, tag) | t <- ts, Just tag <- [langTagOfToken (computedPayload t)] ]
 
 refP :: Parser (Epa Ref)
 refP = do

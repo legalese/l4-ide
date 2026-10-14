@@ -292,6 +292,11 @@ the document as an English expression. Screen readers read it in the wrong voice
 So declare it if your module is not English — it is one line, and it is the only
 thing that tells a reader of the output which language it is in.
 
+**Do not write `@lang en`: it says what a module that declares nothing already is.**
+`l4 check` and your editor put a hint on the line: "A module that declares nothing is English; this line can go."
+It is only a hint, so a check that passed still passes.
+A module that also declares another language gets no hint, and neither does a tag other than `en`.
+
 **It applies to the whole file, wherever you write it**, including annotations
 above the declaration. Convention is the top; nothing breaks if it is not.
 
