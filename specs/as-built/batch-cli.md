@@ -89,11 +89,11 @@ Validation messages (`:387-415`): `Missing required field: '<p>'`, `Field '<p>' 
 - Fixtures (#47): `jl4/tests-cli/fixtures/batch-elig.l4`, `batch-data.json`, `batch-data.csv`, `batch-mixed.json`, `batch-code.l4`, `batch-exponent.csv`, `batch-maybe.l4`, `batch-maybe-bad.json`.
 - Fixtures (#625): `jl4/tests-cli/fixtures/batch-declared-strings.json`, `batch-declared-strings.yaml`, `batch-declared-string-cells.csv`, `batch-declared-bad-number.json`, `batch-declared-number-for-string.json`.
 - Other `l4 batch` tests on `main` are not part of this change: the printer-bracket and grouping cases `describe "l4 batch keeps the grouping the rule wrote"` and `describe "l4 batch agrees with l4 run"` (`jl4/tests-cli/Main.hs:1257` and `:1276`).
-- Run against `main`'s own `l4` (`L4_BIN`), 41 of the 78 tests in that file fail.
+- Run against `main`'s own `l4` (`L4_BIN`), `main` at `a80bc4d86`, 56 of the 115 tests in that file fail (0 fail against the `l4` built from this branch).
   Most of them fail because `main` has no `--format`, `--output`, `--continue-on-error` or `--validate-only`, and the new cases pass `--continue-on-error`; that says nothing about the behaviour.
   The ones that fail for the behaviour itself, with only options `main` has, are the single-object case (`:643-649`), the string-literal step in `l4 trace` (`:1151-1169`), the line-break case (`:901`), and the unreadable-file and unclosed-quote cases (`:857-899`), which use no option `main` lacks.
   The other behaviours were each measured by hand with `main`'s own options, as listed under "What changes against `main`".
-- Run against the `l4` built from this branch before #646, 11 of the 78 fail: the two cases of an unreadable CSV file, the five shapes of an unclosed quote, and four of the synonym cases (the control of a cell that closes at the end of the file passes there, as its comment says).
+- Run against the `l4` built from this branch before #646, 11 of the 78 fail (measured when the file had 78 tests): the two cases of an unreadable CSV file, the five shapes of an unclosed quote, and four of the synonym cases (the control of a cell that closes at the end of the file passes there, as its comment says).
 
 ## Limits and known defects
 
