@@ -1,6 +1,6 @@
 # Inline `ONE OF` on a record field
 
-**Status:** Proposed; built on local branch `feat/inline-one-of` (not pushed); C over A not ruled.
+**Status:** Proposed; built on `feat/inline-one-of`, on draft PR #684 (not merged); C over A not ruled.
 Written 2026-10-12 as a design note and revised 2026-10-14 after one skeptic round (verdict **weakens**; §9 lists what changed).
 Option C was then built on that branch, on Meng's instruction of 2026-10-14 to "proceed if it only weakens, doesn't overturn"; §9.1 says what the build changed, and §8 marks what it settled.
 Nothing on the branch is pushed, and C over A is not separately ruled.
@@ -560,7 +560,7 @@ B is not worth its spelling, D solves a namespace problem L4 does not have, and 
 
 ## 8. What I could not check
 
-- ~~**Nothing was built** when this note was written~~: built on 2026-10-14 on the local branch `feat/inline-one-of` (§9.1).
+- ~~**Nothing was built** when this note was written~~: built on 2026-10-14 on `feat/inline-one-of` (§9.1).
   The grammar, the lookahead fix, the multi-line `TYPICALLY` layout and every error message in §5.1 now run, each pinned by a test: `jl4/examples/ok/one-line-payload-comma.l4`, `jl4/examples/ok/inline-one-of*.l4`, and one `jl4/examples/not-ok/tc/inline-one-of-*.l4` per row of the §5.1 table.
 - **The census is a text heuristic.**
   It follows importer-relative imports within one directory only; it does not follow chains of type synonyms, transitive re-exports, or imports resolved through `JL4_LIBRARY_PATH` or the project root, and it does not see enums declared in libraries outside the two corpora.
@@ -591,7 +591,7 @@ Fact-check corrections taken: the census figures (§3.1–3.3, §6, §7), the il
 
 ### 9.1 What the build changed, 2026-10-14
 
-Option C is built on the local branch `feat/inline-one-of`, cut from origin/unstable `8c45e2a0a`; nothing is pushed.
+Option C is built on `feat/inline-one-of`, on draft PR #684 (not merged), cut from origin/unstable `8c45e2a0a`.
 The `file:line` citations above are to the integration tree named in the header, not to this branch.
 Where the build departed from or added to the note, it is listed here, each labelled assumed, not ruled, unless it is a fact found while building.
 

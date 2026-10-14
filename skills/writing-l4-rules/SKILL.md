@@ -78,7 +78,7 @@ DECLARE Driver HAS
 
 Records can declare **computed fields** (derived attributes) with `MEANS`; see [references/gotchas.md](references/gotchas.md) and <https://legalese.com/l4/reference/types/DECLARE.md>.
 
-**Inline options on a field** (on the local branch `feat/inline-one-of` only, not on `unstable`; C over the status quo is not ruled).
+**Inline options on a field** (on draft PR #684, not merged, not on `unstable`; C over the status quo is not ruled).
 A field may list its options in place of its type, `` `tenure` IS ONE OF Owner, Tenant, Lodger ``, one line or several, with `TYPICALLY` after the list.
 L4 names the type after the place: `` `Plot's tenure` `` (record, `'s`, field), or `` `Holding's Lease's term` `` for a field of a constructor.
 Use it only for a list that its one field uses.
