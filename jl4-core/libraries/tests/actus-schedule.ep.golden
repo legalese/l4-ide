@@ -18,8 +18,7 @@ IMPORT `actus-daycount`
 
 -- `add months` used to be defined here, with the day-clamping body now in
 -- `daydate`'s Calendar Arithmetic section. It moved because it is not an ACTUS
--- idea: the same clamp is Excel's EDATE, and -- measured 2026-08-05 -- FEEL's
--- `date + duration("P1M")` on both DMN engines. Schedule generation was simply
+-- idea: the same clamp is Excel's EDATE. Schedule generation was simply
 -- the first caller. This module IMPORTs daydate, so `add months` still resolves;
 -- the definition was deleted rather than left in place because two identical
 -- DATE x NUMBER -> DATE definitions would be a genuine overload ambiguity.

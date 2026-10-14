@@ -349,20 +349,12 @@ GIVETH A NUMBER
 -- first anniversary of 29 February 2024 is 28 February 2025.
 --
 -- The clamp is not one convention picked from several. It is what Excel's EDATE
--- does, what `actus-schedule` already did for schedule generation, and -- MEASURED
--- on 2026-08-05 against Drools/KIE 8.44.0.Final and Camunda 8.7.6 (zeebe-dmn) --
--- what FEEL's `date + duration("P1Y")` does on both DMN engines, over months and
--- years alike, in all six probed cases. Agreeing with all three is the point: it
--- is what lets an L4 module that computes an anniversary export to DMN and get
--- the same answer back from an engine we do not control.
+-- does, and what `actus-schedule` already did for schedule generation.
 --
 -- Contrast `Date d m y`, which is LENIENT and ROLLS FORWARD: `Date 29 2 2025` is
 -- 1 March 2025, not 28 February. Rolling is right for component arithmetic of the
 -- `Date 1 (month PLUS 6) year` kind and wrong for an anniversary, and the two
--- differ by exactly one day on precisely the dates anybody litigates. Note that
--- FEEL has no rolling form at all: `date(2025, 2, 29)` evaluates to null on both
--- engines, so an anniversary written by reconstructing components cannot be
--- exported at all, whereas one written here can.
+-- differ by exactly one day on precisely the dates anybody litigates.
 
 GIVEN date   IS A DATE
       months IS A NUMBER
