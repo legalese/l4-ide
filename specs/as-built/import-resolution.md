@@ -62,17 +62,17 @@ Measured on 2026-10-13 with the `l4`, `jl4-lsp` and `jl4-service` built from pla
 - `jl4-lsp/src/LSP/L4/Rules.hs:640-666`: `unresolvedImports`, the imports `GetImports` could not resolve (it gives each the importing file's own URI as a placeholder, `mkImportUri` at l.767-787); `jl4-service/src/Backend/Jl4.hs:154-179` and `:236-240` return them from `typecheckAndEvalBundle` as (importing file, module) pairs (#642).
 - `jl4-lsp/src/LSP/L4/Oneshot.hs:30-56`: `oneshotL4ActionAndErrorsIn` and `oneshotL4ActionIn` run a one-shot session under a chosen scope; the old names are the same with `AmbientLibraries`.
 - `jl4-lsp/src/LSP/Core/Shake.hs:338-403`: `embeddedLibraryUriScheme` (`"jl4-embedded"`), `embeddedLibraryUri`, `embeddedLibraryVfs`, `embeddedLibraryText`, and `getVirtualFile`'s fallback to it; `addVirtualFileUri` at l.422.
-- `jl4-lsp/src/LSP/L4/EmbeddedLibrary.hs`: the `l4/embeddedLibrary` request, `{uri}` to `{text}`, served from the same map the build graph reads; `jl4-lsp/app/LSP/L4/Handlers.hs:825-838` registers it.
+- `jl4-lsp/src/LSP/L4/EmbeddedLibrary.hs`: the `l4/embeddedLibrary` request, `{uri}` to `{text}`, served from the same map the build graph reads; `jl4-lsp/app/LSP/L4/Handlers.hs:820-833` registers it.
 - `ts-apps/vscode/src/embedded-library.ts`: the document selector that forwards `jl4-embedded:` documents to the server and the content provider that serves their text; `ts-apps/vscode/src/extension.mts:306` and `:395-406` wire them in, `ts-apps/vscode/src/sidebar-provider.ts:1284` keeps embedded modules out of deploy zips, and `ts-shared/jl4-client-rpc/custom-protocol.ts:253` defines the request type.
 - `jl4-core/src/L4/Import/Resolution.hs:180-252`: `resolveImports`, the API/WASM resolver; the already-resolved branch at l.190-191 is #102's fix.
-- `jl4-core/src/L4/TypeCheck/Types.hs:395-417`: `unionImportedCheckEnv` (#543, already on `main`): `entityInfo` is unioned left-biased (l.417), and the comment above it (l.395-399) gives the rationale that #143 wrote into `combineResolvedImports` (`jl4-core/src/L4/Import/Resolution.hs:347`).
+- `jl4-core/src/L4/TypeCheck/Types.hs:470-492`: `unionImportedCheckEnv` (#543, already on `main`): `entityInfo` is unioned left-biased (l.492), and the comment above it (l.470-474) gives the rationale that #143 wrote into `combineResolvedImports` (`jl4-core/src/L4/Import/Resolution.hs:347`).
 - `jl4-core/src/L4/API/EmbeddedLibraries.hs:44-95`: the TH splice that embeds `jl4-core/libraries/*.l4`; its `fail` at l.79 is #167's.
 - `jl4-core/jl4-core.cabal:21`: `data-files: libraries/*.l4`, above every section, with the reason in l.7-20 (l.7 begins "KEEP THIS ABOVE THE `flag` STANZAS").
 - `jl4/app/L4/Cli/Common.hs:185-194`: `isProgressChatter` drops Info/Debug `[Import Resolution]` lines and keeps Warning/Error ones.
 - `jl4-service/src/Backend/Jl4.hs:133-152`: `bundleScope = Rules.EmbeddedStdlibOnly`, which every session the service opens runs under (l.215, l.1120, l.1373, l.1393); l.184-227 registers each embedded library at `embeddedLibraryUri`, unless the bundle ships a file of the same basename.
 - `jl4-service/src/Compiler.hs:43-63` and `:107`: `logStdlibStandIns`, the `WARN` for a bundle file that stands in for a stdlib module; `:65-83` and its two calls (`:114`, `:330`): `logUnresolvedImports`, the `WARN` for an `IMPORT` that resolves to nothing, from `compileBundle` and from `buildFromCborBundle`; `jl4-service/src/Application.hs:109-116` logs the ignored `JL4_LIBRARY_PATH`.
-- `jl4-lsp/src/LSP/L4/Actions.hs:385-397`: hover renders a type through `prettyTypeForDisplay` (`jl4-core/src/L4/Print.hs:119`).
-- `jl4-lsp/jl4-lsp.cabal:156-176`: the `jl4-lsp-test` suite, created by #93.
+- `jl4-lsp/src/LSP/L4/Actions.hs:407-419`: hover renders a type through `prettyTypeForDisplay` (`jl4-core/src/L4/Print.hs:119`).
+- `jl4-lsp/jl4-lsp.cabal:156-179`: the `jl4-lsp-test` suite, created by #93.
 - User docs: `doc/reference/libraries/resolution.md` (the ladder table at l.26-34) and `jl4-core/libraries/README.md`, both from #134, and `doc/reference/libraries/IMPORT.md`, whose resolution rule this PR corrects.
   `doc/reference/libraries/README.md`, `doc/reference/README.md` and `prelude-example.l4` no longer say the prelude is imported automatically, which `main` measured as false (a file that calls `sum` without `IMPORT prelude` gets "could not find a definition"); the wording is unstable's (`ec899dc95`).
   `doc/reference/libraries/resolution.md` names the XDG store on Windows, `%APPDATA%\jl4\libraries\` unless `XDG_DATA_HOME` is set, taken from the `directory` package's source (`getXdgDirectory XdgData`) and not run on Windows.
@@ -121,7 +121,7 @@ CI step "The sdist must carry the standard library" (`.github/workflows/pr-check
 - Build failure: "L4.API.EmbeddedLibraries: found no standard library to embed.", followed by the three probed paths and the cwd (`EmbeddedLibraries.hs:79-93`).
 - Core API: "Module not found: <mod> (searched: embedded libraries, project VFS)" (`Resolution.hs:305`).
 - Service: "JL4_LIBRARY_PATH is set and ignored: deployments resolve IMPORTs against their own files and the standard library built into this binary" (`Application.hs:113-116`), "Bundle file stands in for a standard library module" (`Compiler.hs:57-62`), and "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name" with the deployment, the file and the module (`Compiler.hs:76-83`).
-- `l4/embeddedLibrary`: "Not an embedded library: <uri>" for a URI that is not a `jl4-embedded:` module this binary carries, such as a `file:` URI (`Handlers.hs:825-838`).
+- `l4/embeddedLibrary`: "Not an embedded library: <uri>" for a URI that is not a `jl4-embedded:` module this binary carries, such as a `file:` URI (`Handlers.hs:820-833`).
 
 ## Rulings
 
@@ -137,9 +137,9 @@ Two rulings of 2026-10-12 cover this feature; the source spec records them as it
 - `jl4-service/test/UnresolvedImportSpec.hs` (#642): a bundle that imports a module nobody supplies compiles, and the log has exactly one `WARN` naming the deployment, the importing file and the module; with several `IMPORT`s, the missing ones are named and `prelude`, `daydate` and a bundle file are not; rebuilding the deployment from `bundle.cbor` after an encode and decode, as a restart does, says it again on its own log; and a bundle whose `IMPORT`s all resolve logs nothing on either path (the positive control). With the two calls to `logUnresolvedImports` disabled, which is what the tree before this change does, the first three fail and the control passes.
 - Black-box, on the built `jl4-service` (2026-10-13): a bundle that imports `zznope` deploys "applied", answers 200 with 42, and logs one `WARN` at the deploy and one after a restart from `bundle.cbor`, each naming `d1`, `main.l4` and `zznope`.
 - `jl4-service/test/StdlibResolutionSpec.hs`: with a stray `prelude.l4` in the service's working directory, and with `JL4_LIBRARY_PATH` naming a directory that holds one, a deployment answers 200 from the real stdlib; a bundle's own `prelude.l4` wins and is warned about; a byte-for-byte copy of the stdlib's is not (#630). The first two fail on this PR's first commit with 422, and the warning case with no log line.
-- `jl4/tests-cli/Main.hs:520-548`: embedded-only diamond (#87), with fixture `jl4/tests-cli/fixtures/embedded-diamond/main.l4`.
-- `jl4/tests-cli/Main.hs:550-628`: black-box cases for the shadow order and warning, with fixtures `jl4/tests-cli/fixtures/library-shadow/{embedded-wins,sibling-wins,xdg-extra}/` (#134). The poisoned-XDG case asserts the two rows whole, `[chosen]   embedded stdlib` and `[shadowed] XDG data dir`.
-- `jl4/tests-cli/Main.hs:630-773`: entry-path spelling and embedded importers: a bare entry path (#148) for the project override and for the embedded stdlib; the stdlib's names in scope under a bare entry path (measured failing on `main`); the two embedded-importer cases of #148, adapted (below); one row per copy in the shadow warning; one `Module not found` warning per mistake in stderr, `check --json`, `run --json` and `ast` (#630).
+- `jl4/tests-cli/Main.hs:692-707`: embedded-only diamond (#87), with fixture `jl4/tests-cli/fixtures/embedded-diamond/main.l4`.
+- `jl4/tests-cli/Main.hs:714-805`: black-box cases for the shadow order and warning, with fixtures `jl4/tests-cli/fixtures/library-shadow/{embedded-wins,sibling-wins,xdg-extra}/` (#134). The poisoned-XDG case asserts the two rows whole, `[chosen]   embedded stdlib` and `[shadowed] XDG data dir`.
+- `jl4/tests-cli/Main.hs:814-950`: entry-path spelling and embedded importers: a bare entry path (#148) for the project override and for the embedded stdlib; the stdlib's names in scope under a bare entry path (measured failing on `main`); the two embedded-importer cases of #148, adapted (below); one row per copy in the shadow warning; one `Module not found` warning per mistake in stderr, `check --json`, `run --json` and `ast` (#630).
 - `jl4-core/test/ImportResolutionSpec.hs:88`: both diamond siblings type-check clean (#102).
 - `jl4-lsp/test/HoverDisplaySpec.hs:63-64`: hover shows `a`, never `x10` (#93).
 - `ts-apps/vscode/src/unit-tests/embedded-library.test.ts`: the document selector forwards `jl4-embedded:` documents, and the content provider asks for exactly the URI it is given, waits for the client, passes the text through untouched, and names the document when the server errors (#627).
@@ -152,7 +152,7 @@ Run against the `l4` built from plain `main`, eight of the CLI cases fail: the e
 The two "an embedded library sees the project-local override" cases of #148 assert that `l4 check` exits non-zero on an error inside an imported module, which needs `hasBlockingError` from unstable's #52, not on `main`.
 On `main` that error is printed and `l4 check` still exits 0, so here the cases keep their three stderr assertions (the arity error names `actus-schedule`; the shadow warning names `daydate`; `[chosen]   project root`) and drop the exit code.
 Measured: they fail against `main`'s `l4`, where the embedded `actus-schedule` keeps the embedded `daydate` and `l4 check` prints no diagnostic, and pass against this PR's.
-The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:283-290`) is not extended for the new fixtures.
+The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:329-340`) is not extended for the new fixtures.
 
 ## Limits and known defects (verified by reading the code)
 
@@ -167,4 +167,4 @@ The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:28
 ## Later changes
 
 - #451, a separate change on unstable that is not on `main`, adds `tiersInOrder` and `roundTrippingFileUri` (smucclaw/l4-ide#971), lists the not-found locations in ladder order deduplicated by file, adds the line "Nothing it defines is in scope here; ...", stops an unresolved import from producing the importer's own URI (the source of "Your module depends on itself"), and adds `ImportDiagnosticSpec` and `ImportUriSpec` to `jl4-lsp-test`.
-- On unstable the CLI runner `runL4EmbeddedOnly` (added by #87) later moved to a `CliTest/Common.hs`; `main` has no such file, and the runner is in `jl4/tests-cli/Main.hs:182`.
+- On unstable the CLI runner `runL4EmbeddedOnly` (added by #87) later moved to a `CliTest/Common.hs`; `main` has no such file, and the runner is in `jl4/tests-cli/Main.hs:207-208`.
