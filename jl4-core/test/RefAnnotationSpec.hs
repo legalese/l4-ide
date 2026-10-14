@@ -5,9 +5,10 @@ module RefAnnotationSpec (spec) where
 import qualified Data.Text as Text
 
 import Base
-import L4.Annotation (getAnno)
+import L4.Annotation (getAnno, rangeOf)
 import L4.Parser (execProgramParserWithHintPass)
 import L4.Parser.ResolveAnnotation (refWarningMessage)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
   ( Anno
   , Decide (..)
@@ -16,9 +17,11 @@ import L4.Syntax
   , Name
   , Section (..)
   , TopDecl (..)
+  , annPmSynthetic
   , annRef
   , annRefs
   , getRef
+  , refCitation
   )
 import Optics (gplate, toListOf)
 import Test.Hspec
@@ -44,6 +47,26 @@ moduleAndFirstDeclRefs src = do
           expectationFailure "Expected at least one top-level declaration"
           error "unreachable"
       pure (moduleRef, firstDeclRef)
+
+-- | For every @\@ref@ and the node that holds it: the line of that node (0 if
+-- it has no range), whether the parser generated the node while compiling a
+-- group of clauses ('annPmSynthetic'), and the last segment of the citation.
+-- Sorted, because a traversal of the tree meets a clause group's parts in the
+-- order of its fields and not of the source.
+refHolderMarks :: Text -> IO [(Int, Bool, Text)]
+refHolderMarks src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-marks")
+      segment = Text.takeWhileEnd (/= '/') . refCitation
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) ->
+      pure $ sort
+        [ (maybe 0 (\ r -> r.start.line) (rangeOf a), isJust (view annPmSynthetic a), segment ref)
+        | a <- toListOf (gplate @Anno) m
+        , ref <- view annRefs a
+        ]
 
 -- | Parse a source snippet and return the bodies of every top-level @DECIDE@,
 -- paired with the raw text of any @\@ref@ annotation attached to that body
@@ -267,6 +290,32 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
             ]
       attached `shouldBe` [["act", "part"]]
       messages `shouldBe` []
+
+  -- A group of clauses is compiled to one definition: a CONSIDER on the first
+  -- clause, and a local definition, with a range of its own, that holds the
+  -- clauses after it and is written after the first clause's body. A ref
+  -- inside the first clause, or above a later one, is held by the first node
+  -- the drafter wrote after it, and never by that generated definition.
+  describe "a @ref in a rule written as clauses" $ do
+    it "is held by a node the drafter wrote" $ do
+      holders <-
+        refHolderMarks
+          (Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A STRING"
+            , "@ref https://example.com/above-group"
+            , "DECIDE `how many` 0 IS <<in-clause-1>> \"none\""
+            , "@ref https://example.com/above-clause-2"
+            , "DECIDE `how many` 1 IS \"one\""
+            , "@ref https://example.com/above-clause-3"
+            , "DECIDE `how many` other IS \"many\""
+            ])
+      holders
+        `shouldBe` [ (4, False, "above-group")
+                   , (4, False, "in-clause-1")
+                   , (6, False, "above-clause-2")
+                   , (8, False, "above-clause-3")
+                   ]
 
   -- The inline `<<…>>` form shares its lexer with `@nlg`'s `[…]` form only in
   -- the sense that both are "an annotation between heralds". They must NOT
