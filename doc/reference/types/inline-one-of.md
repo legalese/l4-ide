@@ -82,6 +82,9 @@ DECLARE Title HAS
         Possessory
 ```
 
+A `TYPICALLY` or `MEANS` on a line of its own below such an option belongs to the option's field only when it starts to the right of the column where that field's name starts.
+Directly under the name, or anywhere to its left, it belongs to the outer field, `estate` here.
+
 **Wording for the natural-language output.**
 An `@nlg` written on an option's line belongs to that option, and a `@desc` above the field describes the field, as anywhere else.
 
