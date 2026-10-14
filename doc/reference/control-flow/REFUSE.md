@@ -161,6 +161,7 @@ directive exists to test.
 | the REPL              | `Refused: ` and the reason                                                                                                                                                                   |
 | an execution trace    | `↯ refused: <reason>` — a first-class event, distinct from a crash. Both renders say so: `l4 trace` text, and the `--format dot` node label                                                  |
 | the export schema     | nothing. A refusal is not an input, so it is not a parameter                                                                                                                                 |
+| the query plan        | `"determined": null`, nothing left to ask, and the reason under `"refusal"`. A refusal is never a question, so a wizard never asks it                                                        |
 
 That last row is what the corpus migration of 2026-09-06 made visible. Until then the encoding
 floor in `jl4/examples/canon/us/regcf/cleanroom/` was an `ASSUME`, so it appeared in the exported JSON
@@ -173,6 +174,37 @@ schema as
 and in that function's `required` list — a caller of the money decisions was being asked to supply
 the encoding floor. Written as a `REFUSE`, which it now is, it leaves the schema entirely; the
 schema golden beside that file records the removal.
+
+## The query plan reaches a refusal where evaluation does
+
+The decision service's query plan (`/query-plan`), which a wizard uses to choose its next question, reads a rule that refuses the way evaluation does: left to right, stopping as soon as the answer is known.
+For this rule:
+
+```l4
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the other conditions are not modelled`
+```
+
+the plan asks one question, `adult`.
+Answered `FALSE`, the plan says `Fails`, as evaluation does without ever reaching the refusal.
+Answered `TRUE`, it reports the refusal, with the reason evaluation gives.
+`` `the other conditions are not modelled` `` is never asked, because no answer to it would ever be used: evaluation does not take one, it reaches the `REFUSE`.
+Written the other way round, as `` `the other conditions are not modelled` AND adult ``, the plan reports the refusal before anything is asked, because evaluation reads the refusal first.
+
+The plan treats two things as a refusal: a `REFUSE` written in the rule, and a rule of no inputs that always refuses.
+A rule always refuses when its body is a `REFUSE`, or names a rule of no inputs that always refuses, however many steps away; a `WHERE` or `LET` around it makes no difference.
+A rule that refuses on only some paths, such as one ending `ELSE REFUSE "…"`, is still asked, as before (see the limits below).
+
+Until the plan can tell which refusal evaluation will reach, `refusal` lists every reason it can reach.
+For `IF resident THEN REFUSE "…" ELSE REFUSE "…"`, the plan reports the refusal before `resident` is answered, and gives both reasons.
+
+In the service, a rule with a refusal in it is drawn as written, not simplified, so its ladder diagram shows it as written too.
+Simplifying distributes `OR` over `AND`, and that can change which refusal evaluation reaches first.
 
 ## Limits, as they stand today
 
@@ -192,6 +224,17 @@ us or from a wrong answer.
   specific to refusals, and the fix is `Ref(f)` below.
 - **Order-dependence under lazy `AND` / `OR`**, as above, and no demand order at all under
   `RAND` / `ROR`.
+- **The query plan sees a refusal only where it can name one**: a `REFUSE` written in the rule, or
+  a rule of no inputs that always refuses. Everything else is still asked, as before, and an answer
+  to it is used by the plan where evaluation would refuse instead. That covers a rule of no inputs
+  that refuses on only some paths, because whether it refuses can turn on what the plan does not
+  see, such as the date the rules are read at. It covers a comparison or other question that reads
+  a refusing rule, such as `` amount > `the cap` ``, and a call with inputs to a rule that refuses.
+  And names are not followed into other files, so a refusal reached only through an `IMPORT`, the
+  prelude's `TBD` among them, is not seen.
+- **In the editor, the plan follows the ladder as drawn.** The ladder is drawn as written unless
+  you switch simplification on; with it on, a refusal inside a disjunction of conjunctions can be
+  planned in the simplified order rather than the written one.
 - **`#ASSERT REFUSED e BECAUSE "…"` where `e` ends in a `BREACH`**: `BREACH` itself takes an
   optional `BECAUSE`, and it wins. Bracket the expression if you need the outer reading.
 - **One backend carries a refusal; the rest refuse the module.** DMN has an image for it as of
