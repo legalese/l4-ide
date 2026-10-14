@@ -252,9 +252,17 @@ async function shelfRelease(spec) {
   if (spec === "latest") {
     // NOT /releases/latest: that endpoint excludes prereleases, and every
     // release on this shelf is one, so it answers 404 forever.
-    const r = await fetch(`${API}?per_page=10`, { headers: h });
+    //
+    // NOR the listing's first entry: the listing is not ordered by date. On
+    // 2026-10-14 it began unstable-20261013-c53e743 (published 14:44Z), with
+    // the newer unstable-20261013-72964e7 (20:13Z) second, and a bundle built
+    // with "latest" pinned the older one without a word. So sort by
+    // published_at here, newest first; a draft has none and is skipped.
+    const r = await fetch(`${API}?per_page=100`, { headers: h });
     if (!r.ok) throw new Error(`shelf listing: HTTP ${r.status}`);
-    const list = await r.json();
+    const list = (await r.json())
+      .filter((rel) => !rel.draft && rel.published_at)
+      .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
     if (!list.length) throw new Error("the shelf has published no releases");
     tag = list[0].tag_name;
   }
