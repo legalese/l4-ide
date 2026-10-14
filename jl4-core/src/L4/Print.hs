@@ -518,8 +518,20 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
     Regulative _ (MkDeonton _ p a t f l) -> prettyObligation p a t f l
+    -- One branch per line, aligned, and WITHOUT the comma separator.
+    -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
+    -- `manyLines` over comma-separated groups: continuation lines must start at
+    -- EXACTLY the first branch's column, and a comma at the end of a line is
+    -- instead eaten by whatever comma-list the branch body ended in (`… THEN
+    -- LIST x,` continues the LIST). The same layout is what keeps a CONSIDER
+    -- inside a branch apart from the branches after it: the arms of an inner
+    -- CONSIDER sit at the inner one's column, so the outer's next WHEN, at the
+    -- outer's, is not one of them. Written as a comma-separated list on one
+    -- hanging indent, as this was, the outer's later arms were read as more arms
+    -- of the inner CONSIDER.
     Consider   _ expr branches ->
-      "CONSIDER" <+> printWithLayout expr <+> hang 2 (vsep $ punctuate comma (fmap printWithLayout branches))
+      hang 2 $ vcatHard $
+        ("CONSIDER" <+> printWithLayout expr) : fmap printWithLayout branches
 
     Lit        _ lit -> printWithLayout lit
     Percent    _ expr -> parensIfNeeded expr <+> "%"
@@ -992,6 +1004,17 @@ prettyConj cnj (d:ds) =
   -- Use group with softline so it prefers single-line when possible
   -- This avoids layout issues when the output is re-parsed
   Prettyprinter.group $ d <> mconcat [softline <> pretty cnj <+> x | x <- ds]
+
+-- | 'vcat' whose line breaks cannot be flattened away.
+--
+-- Prettyprinter's 'vcat'/'vsep' separators are @FlatAlt Line _@: inside a
+-- 'group' (which 'prettyConj' introduces, and which
+-- @layoutPretty (LayoutOptions Unbounded)@ always resolves in favour of the
+-- flattened branch) they collapse to nothing or to a space, jamming the lines
+-- together. A break the layout parser needs is a 'hardline', which 'flatten'
+-- turns into a failure, so 'group' keeps the vertical rendering.
+vcatHard :: [Doc ann] -> Doc ann
+vcatHard = concatWith (\ x y -> x <> hardline <> y)
 
 
 escapeStringLiteral :: Text -> Text

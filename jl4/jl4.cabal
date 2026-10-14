@@ -111,7 +111,8 @@ test-suite l4-cli-test
   autogen-modules:
     Paths_jl4
   build-tool-depends:
-    jl4:l4
+    jl4:l4,
+    jl4-repl:jl4-repl
   build-depends:
     aeson,
     bytestring,
