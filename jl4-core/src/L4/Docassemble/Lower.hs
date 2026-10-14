@@ -1311,11 +1311,15 @@ scalarArts ctx var l4 dsc kind dflt = do
                             \is refused"))
       _ -> do
         fctl <- controlOf fkind f.fsL4
+        -- A payload field's TYPICALLY prefills its question, as a record
+        -- field's does (L7, ruled by Meng 2026-10-12); the DA-TYPICALLY note
+        -- lists it with the others.
+        payloadDflt <- traverse (lowerDefaultLit ctx) f.fsDefault
         pure MkDAQuestion
           { qId = "q_" <> payloadVar var f.fsSan, qVar = payloadVar var f.fsSan
           , qLabel = f.fsL4, qText = f.fsL4
           , qHelp = f.fsDesc <|> typeDescOf ctx f.fsTy
-          , qControl = fctl, qDefault = Nothing
+          , qControl = fctl, qDefault = payloadDflt
           , qShowIf = Just (DACmp DAEq (DAVar var) (DAStrLit ci.ciName))
           , qUndefine = [] }
 

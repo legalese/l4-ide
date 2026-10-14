@@ -1,0 +1,16 @@
+-- A TYPICALLY on a payload field of an enum constructor pre-fills that
+-- field's follow-up question, as a record field's does (Lane C L7, ruled by
+-- Meng 2026-10-12). The default is the radius question's `default: 1`, and the
+-- DA-TYPICALLY note lists the field.
+
+DECLARE Shape IS ONE OF
+  Circle HAS radius IS A NUMBER TYPICALLY 1
+  Dot
+
+@export the area of a shape
+GIVEN s IS A Shape
+GIVETH A NUMBER
+`area of` s MEANS
+  CONSIDER s
+    WHEN Circle r THEN r TIMES r TIMES 3
+    WHEN Dot THEN 0
