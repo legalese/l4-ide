@@ -4,7 +4,7 @@ As built on `main` by this PR.
 Source spec: none.
 Differences from the source spec: not applicable.
 The work came from `unstable`; this page describes only what `main` has.
-Line numbers are in this PR's tree, on `main` at `df9d37a4b`.
+Line numbers are in this PR's tree, on `main` at `a80bc4d86`.
 This page belongs to the `l4 batch` change, `batch-cli.md`, and is its thirteenth difference from `main`.
 
 Source: PR #51 (`fix/cli-quoting`; the fix is commit `3a8d77e76`; batch merge `c1c60fcd7`, landed on unstable through #77).
