@@ -82,7 +82,7 @@ library — does not stop the deploy, which still reports "applied": the file
 typechecks, and only a call that reaches something the missing module should have
 defined fails. The service logs a `WARN` for each one, naming the deployment, the
 importing file and the module (`Bundle IMPORT resolves to nothing`), when the
-bundle is compiled and again whenever it is rebuilt after a restart. A refusal at
+bundle is compiled, which a restart does again from the stored sources. A refusal at
 deploy time is not made; it would need a ruling of its own.
 
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`

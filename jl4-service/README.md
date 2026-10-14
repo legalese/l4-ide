@@ -81,7 +81,7 @@ The service logs three `WARN` lines about this:
 
 - `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
 - `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
-- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled and again when it is rebuilt after a restart. The deployment is still accepted, and a call that needs the missing definition answers 422.
+- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
 
 [Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
 

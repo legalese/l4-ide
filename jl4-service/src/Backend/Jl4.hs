@@ -146,9 +146,9 @@ buildCompiledFromShared shared funName = runExceptT $ do
 --
 -- Ruled 2026-10-12: a deployment resolves its own files and the built-in
 -- stdlib, nothing from the host. One of the conditions is that an IMPORT that
--- resolves to nothing is logged at WARN when a bundle is compiled or rebuilt
--- after a restart ('typecheckAndEvalBundle' returns them); a refusal would need
--- a later ruling.
+-- resolves to nothing is logged at WARN when a bundle is compiled, which a restart
+-- does again ('typecheckAndEvalBundle' returns them); a refusal would need a
+-- later ruling.
 bundleScope :: Rules.LibraryScope
 bundleScope = Rules.EmbeddedStdlibOnly
 
