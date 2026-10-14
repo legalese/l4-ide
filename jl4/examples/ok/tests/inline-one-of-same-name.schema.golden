@@ -1,0 +1,34 @@
+{
+    "$defs": {
+        "Lot": {
+            "properties": {
+                "kind": {
+                    "$ref": "#/$defs/Plot's tenure"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "Plot's tenure": {
+            "enum": [
+                "Freehold",
+                "Leasehold"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether a lot is freehold.",
+    "properties": {
+        "l": {
+            "$ref": "#/$defs/Lot"
+        }
+    },
+    "required": [
+        "l"
+    ],
+    "title": "freehold",
+    "type": "object"
+}

@@ -91,6 +91,31 @@ spec = do
           fmap (.parameterL4Type) (Map.lookup "t" ps.parameterMap) `shouldBe` Just Nothing
           fmap (.parameterEnum) (Map.lookup "t" ps.parameterMap) `shouldBe` Just ["Owner", "Tenant"]
 
+  -- Review round 1, item 6: a DECLAREd enum that shares its name with a lifted
+  -- type in another section keeps its x-l4-type. The schema writers once
+  -- recognised a lifted type by its name, so this one lost it too.
+  describe "a declared enum named like a lifted type, in another section" $ do
+    let twoSections = Text.unlines
+          [ "§ `Plots`"
+          , "DECLARE Plot HAS"
+          , "    `tenure` IS ONE OF Owner, Tenant"
+          , "§ `Lots`"
+          , "DECLARE `Plot's tenure` IS ONE OF Freehold, Leasehold"
+          , "DECLARE Lot HAS"
+          , "    `kind` IS A `Plot's tenure`"
+          , "@export"
+          , "GIVEN l IS A Lot"
+          , "GIVETH A BOOLEAN"
+          , "f l MEANS l's kind EQUALS Freehold"
+          ]
+    it "keeps its x-l4-type in the function schema" $
+      case exportSchema twoSections of
+        Left errs -> expectationFailure (show errs)
+        Right ps -> do
+          let kind = Map.lookup "l" ps.parameterMap >>= (.parameterProperties) >>= Map.lookup "kind"
+          fmap (.parameterEnum) kind `shouldBe` Just ["Freehold", "Leasehold"]
+          fmap (.parameterL4Type) kind `shouldBe` Just (Just "Plot's tenure")
+
   -- Review round 1, finding 1: a TYPICALLY on its own line after a list
   -- whose last option has a field went to that inner field.
   describe "a default after a list on several lines" $ do

@@ -49,6 +49,12 @@ data SchemaType
 data SchemaContext = SchemaContext
   { ctxDeclares :: !(Map Text (Declare Resolved))
   , ctxCollectedDefs :: !(Map Text SchemaType)
+  , ctxInlineTypes :: !(Set.Set Unique)
+    -- ^ The enums among 'ctxDeclares' that 'L4.Desugar.desugarInlineOptions'
+    -- lifted out of a field ('inlineOptionsTypeUniques'). 'generateJsonSchema'
+    -- works it out from 'ctxDeclares' once, so a caller need not set it; a
+    -- direct caller of 'typeToJsonSchema' that leaves it empty gets such an
+    -- enum under @$defs@, as any other.
   }
   deriving stock (Show)
 
@@ -57,6 +63,7 @@ emptyContext =
   SchemaContext
     { ctxDeclares = Map.empty
     , ctxCollectedDefs = Map.empty
+    , ctxInlineTypes = Set.empty
     }
 
 instance ToJSON JsonSchema where
@@ -134,8 +141,9 @@ schemaTypeToFields = \case
   descField = maybe [] (\d -> ["description" .= d])
 
 generateJsonSchema :: SchemaContext -> ExportedFunction -> JsonSchema
-generateJsonSchema ctx export =
-  let (paramSchema, finalDefs) = buildParamsSchema ctx export.exportParams
+generateJsonSchema ctx0 export =
+  let ctx = ctx0{ctxInlineTypes = inlineOptionsTypeUniques ctx0.ctxDeclares}
+      (paramSchema, finalDefs) = buildParamsSchema ctx export.exportParams
    in JsonSchema
         { schemaVersion = "https://json-schema.org/draft/2020-12/schema"
         , schemaTitle = export.exportName
@@ -228,8 +236,8 @@ typeToJsonSchema ctx = \case
               -- (INLINE-ONE-OF-FIELD-SPEC §5.10; Note [Inline ONE OF on a
               -- field] in "L4.Syntax"). It cannot recurse: its options'
               -- fields cannot list options of their own.
-              Just decl
-                | typeName `Set.member` inlineOptionsTypeNames ctx ->
+              Just decl@(MkDeclare _ _ (MkAppForm _ declHead _ _) _)
+                | getUnique declHead `Set.member` ctx.ctxInlineTypes ->
                     declareToJsonSchema ctx decl
               Just decl ->
                 if Map.member typeName ctx.ctxCollectedDefs
@@ -249,11 +257,14 @@ typeToJsonSchema ctx = \case
   InfVar _ _ _ ->
     (SString Nothing, ctx.ctxCollectedDefs)
 
--- | The enums 'L4.Desugar.desugarInlineOptions' lifted out of a field, by the
--- name 'ctxDeclares' is keyed by.
-inlineOptionsTypeNames :: SchemaContext -> Set.Set Text
-inlineOptionsTypeNames ctx =
-  Set.fromList [ resolvedToText r | d <- Map.elems ctx.ctxDeclares, (r, _) <- inlineOptionsTypes d ]
+-- | The enums 'L4.Desugar.desugarInlineOptions' lifted out of a field, among
+-- the given declarations, by 'Unique' (Note [Inline ONE OF on a field]). By
+-- 'Unique' and not by name, because a DECLAREd enum in another section may
+-- share a lifted type's name and must keep its own @$defs@ entry (review
+-- round 1).
+inlineOptionsTypeUniques :: Map Text (Declare Resolved) -> Set.Set Unique
+inlineOptionsTypeUniques declares =
+  Set.fromList [ getUnique r | d <- Map.elems declares, (r, _) <- inlineOptionsTypes d ]
 
 declareToJsonSchema :: SchemaContext -> Declare Resolved -> (SchemaType, Map Text SchemaType)
 declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
