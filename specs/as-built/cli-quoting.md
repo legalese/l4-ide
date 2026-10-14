@@ -42,20 +42,20 @@ The old escaper replaced only `"`, so the lexer read every backslash in the JSON
 
 ## Tests and fixtures that pin it
 
-- `jl4/tests-cli/Main.hs:732-743`: `l4 batch` on `batch-escape.l4` with `batch-escape-input.json` (a Windows path, embedded quotes, a newline, a tab, an apostrophe, braces and a percent sign) must report `"status":"success"`.
+- `jl4/tests-cli/Main.hs:866-877`: `l4 batch` on `batch-escape.l4` with `batch-escape-input.json` (a Windows path, embedded quotes, a newline, a tab, an apostrophe, braces and a percent sign) must report `"status":"success"`.
   This pins the loud half of the defect only: `echoFixed` ignores its input, so on the old escaper it fails only because the payload contains a `"`.
-- `jl4/tests-cli/Main.hs:745-766`: `l4 batch` on `batch-code.l4` (`echoCode code MEANS code`) with `batch-escape-roundtrip.json` (six rows: a Windows path, a backslash, a tab, a line break, `\u0041`, `\\n`) must report `success` for every row and a `result` equal to the `code` sent.
+- `jl4/tests-cli/Main.hs:879-900`: `l4 batch` on `batch-code.l4` (`echoCode code MEANS code`) with `batch-escape-roundtrip.json` (six rows: a Windows path, a backslash, a tab, a line break, `\u0041`, `\\n`) must report `success` for every row and a `result` equal to the `code` sent.
   This pins the silent half: a corrupted value, `null` or a different string, shows as a result that is not the one sent.
   Run by hand with `main`'s `l4` (which has no `--continue-on-error`, so the test itself cannot run there), none of the six rows comes back as sent: four are `null` and two are a different string.
-- `jl4/tests-cli/Main.hs:768-801`: the same round trip for a CSV file, `batch-escape-cells.csv`, eleven cells: plain text, a double quote, a backslash, a trailing backslash, a tab, a line break, a carriage return, a non-ASCII letter (`café`), `\u0041`, `\\n`, and an apostrophe with braces and a percent sign.
+- `jl4/tests-cli/Main.hs:902-935`: the same round trip for a CSV file, `batch-escape-cells.csv`, eleven cells: plain text, a double quote, a backslash, a trailing backslash, a tab, a line break, a carriage return, a non-ASCII letter (`café`), `\u0041`, `\\n`, and an apostrophe with braces and a percent sign.
   Each cell is its own example, so a failure names the cell, and each must come back as `success` with the cell as the `result`; one more example checks that there is a row per cell and that the command exits 0.
   This one is written by this PR and is not on unstable.
   Against the `l4` of the commit before this one, the example for the exit code and eight of the eleven cells fail: the double quote as a lexer error, and the backslash, the trailing backslash, the tab, the line break and the carriage return as `null`, and the escape-looking text and the two backslashes with an `n` as a different string, every one but the first under `success`.
   The other three, the plain text, the non-ASCII letter and the apostrophe case, are controls that pass there.
   `main`'s `l4` gives the same eleven answers.
-- The CRLF case of `describe "the CSV reader"` (`Main.hs:654-663`, `batch-crlf.csv`, a quoted cell holding a line break) asserts the answer as well as the input: the cell `line one\nline two` comes back from `echoCode` unchanged, where the code before this commit returned `null`.
-- Fixtures: `jl4/tests-cli/fixtures/batch-escape.l4`, `batch-escape-input.json`, `batch-escape-roundtrip.json` and `batch-escape-cells.csv`; all are in the suite's missing-fixture check (`Main.hs:311-313`).
-- The `l4 trace` cases of #51 are not part of this PR; `main` already has them under `describe "l4 trace (output path safety)"` (`Main.hs:979`), from #534.
+- The CRLF case of `describe "the CSV reader"` (`Main.hs:788-797`, `batch-crlf.csv`, a quoted cell holding a line break) asserts the answer as well as the input: the cell `line one\nline two` comes back from `echoCode` unchanged, where the code before this commit returned `null`.
+- Fixtures: `jl4/tests-cli/fixtures/batch-escape.l4`, `batch-escape-input.json`, `batch-escape-roundtrip.json` and `batch-escape-cells.csv`; all are in the suite's missing-fixture check (`Main.hs:332-339`).
+- The `l4 trace` cases of #51 are not part of this PR; `main` already has them under `describe "l4 trace (output path safety)"` (`Main.hs:1113`), from #534.
   Those are the cases that involve a shell; `l4 batch` runs none.
 
 ## Limits and known defects
