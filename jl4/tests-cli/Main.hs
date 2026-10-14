@@ -245,6 +245,43 @@ spec bin = do
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
 
+  describe "l4 deploy / redeploy / undeploy / deployments (no network)" $ do
+    let expectStderr args mEnv needle = do
+          Output code _ serr <- runL4In Nothing mEnv bin args
+          code `shouldNotBe` ExitSuccess
+          unless (needle `isInfixOf` serr) $
+            expectationFailure ("Expected stderr to contain " ++ show needle ++ "\n--- stderr ---\n" ++ serr)
+        -- Nothing listens on the discard port; every case below must stop
+        -- before connecting.
+        noServer = ["--server", "http://127.0.0.1:9"]
+
+    it "are listed in --help, and each takes --help" $ do
+      Output _ sout _ <- runL4 bin ["--help"]
+      mapM_ (\c -> sout `shouldSatisfy` (c `isInfixOf`)) ["deploy", "redeploy", "undeploy", "deployments", "install"]
+      expectOk bin ["deploy", "--help"] "--name"
+      expectOk bin ["install", "legalese", "--help"] "--dir"
+
+    it "refuses a deployment name the service would reject" $
+      expectStderr (["deploy", cleanFixture, "--name", "bad name!"] ++ noServer) Nothing "may only contain"
+
+    it "refuses to deploy a file that doesn't typecheck" $
+      expectStderr (["deploy", errorFixture] ++ noServer) Nothing "doesn't typecheck"
+
+    it "only takes --api-key-file with --server" $
+      expectStderr ["deployments", "--api-key-file", cleanFixture] Nothing "--api-key-file only applies with --server"
+
+    it "won't send an API key over plain http to another host" $
+      expectStderr ["deployments", "--server", "http://example.com"] (Just [("L4_API_KEY", "k")]) "over plain http"
+
+    it "needs the legalese CLI for Legalese Cloud" $ do
+      tmp <- getTemporaryDirectory
+      let emptyPath = tmp </> "l4-cli-test-empty-path"
+      createDirectoryIfMissing True emptyPath
+      expectStderr ["deployments"] (Just [("PATH", emptyPath)]) "l4 install legalese"
+
+    it "won't undeploy without a terminal unless --yes" $
+      expectStderr (["undeploy", "anything"] ++ noServer) Nothing "Pass --yes"
+
   describe "l4 run" $ do
     it "succeeds on a clean file" $
       expectOk bin ["run", cleanFixture] "Checking succeeded."
