@@ -738,6 +738,23 @@ spec bin = do
     it "still typechecks the raising fixture — l4 check succeeds on it" $
       expectOk bin ["check", assertRaisesFixture] "Check succeeded."
 
+    -- A bare assumed BOOLEAN is neither TRUE nor FALSE. `#ASSERT NOT b`
+    -- forces b and raises; `#ASSERT b` (and `#ASSERT TRUE AND b`, which is just
+    -- b) reduces to the symbolic b WITHOUT raising, and used to fall through to
+    -- "assertion failed" -- so the polarities disagreed about the same
+    -- undecidable term.
+    it "reports an #ASSERT on a bare assumed BOOLEAN as undecided, in every spelling" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "assert-assumed.l4"]
+      length (filter ("assertion could not be evaluated" `isInfixOf`) (lines sout)) `shouldBe` 3
+      sout `shouldSatisfy` ("assumed term" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+
+    -- Alone, so that it cannot be the `NOT b` (which raises either way) that
+    -- fails the run.
+    it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
+      expectFail bin ["run", fixtureDir </> "assert-assumed-bare.l4"]
+
     -- The second #ASSERT over a definition that raised must say what it raised.
     it "reports both polarities over one raising definition with what it raised" $ do
       Output _ sout _ <- runL4 bin ["run", fixtureDir </> "assert-twice.l4"]
