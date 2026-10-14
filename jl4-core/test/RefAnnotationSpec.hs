@@ -20,9 +20,11 @@ import L4.Syntax
   , Name
   , Section (..)
   , TopDecl (..)
+  , annPmSynthetic
   , annRef
   , annRefs
   , getRef
+  , refCitation
   )
 import Optics (gplate, toListOf)
 import Test.Hspec
@@ -128,6 +130,27 @@ refPlacements src = do
         | a <- toListOf (gplate @Anno) m
         , ref <- view annRefs a
         , Just r <- [rangeOf a]
+        ]
+
+-- | For every @\@ref@ and the node that holds it: the line of that node (0 if
+-- it has no range), whether the parser generated the node while compiling a
+-- group of clauses ('annPmSynthetic'), and the last segment of the citation.
+-- Sorted, because a traversal of the tree meets a clause group's parts in the
+-- order of its fields and not of the source.
+refHolderMarks :: Text -> IO [(Int, Bool, Text)]
+refHolderMarks src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-marks")
+      -- 'refCitation', not 'getRef': an inline @\<\<…\>\>@ keeps its delimiters in the latter.
+      segment = Text.takeWhileEnd (/= '/') . refCitation
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) ->
+      pure $ sort
+        [ (maybe 0 (\ r -> r.start.line) (rangeOf a), isJust (view annPmSynthetic a), segment ref)
+        | a <- toListOf (gplate @Anno) m
+        , ref <- view annRefs a
         ]
 
 -- | The source range of every node that holds a ref, and the source range of
@@ -500,6 +523,31 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
           , "  OTHERWISE 2"
           ])
         `shouldReturn` [((6, 3), "branch")]
+
+    -- A group of clauses is compiled to one definition: a CONSIDER on the first
+    -- clause, and a local definition, with a range of its own, that holds the
+    -- clauses after it and is written after the first clause's body. A ref
+    -- inside the first clause, or above a later one, is held by the first node
+    -- the drafter wrote after it, and never by that generated definition.
+    it "is a node the drafter wrote, in a rule written as clauses" $ do
+      holders <-
+        refHolderMarks
+          (Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A STRING"
+            , "@ref https://example.com/above-group"
+            , "DECIDE `how many` 0 IS <<in-clause-1>> \"none\""
+            , "@ref https://example.com/above-clause-2"
+            , "DECIDE `how many` 1 IS \"one\""
+            , "@ref https://example.com/above-clause-3"
+            , "DECIDE `how many` other IS \"many\""
+            ])
+      holders
+        `shouldBe` [ (4, False, "above-group")
+                   , (4, False, "in-clause-1")
+                   , (6, False, "above-clause-2")
+                   , (8, False, "above-clause-3")
+                   ]
 
   -- An @\@ref@ goes to the first node that starts at or after its end, and
   -- every node visited used to scan every ref not yet claimed, so a file with
