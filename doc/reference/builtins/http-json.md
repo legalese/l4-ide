@@ -129,7 +129,7 @@ Parses a JSON string into an L4 value.
 - JSON strings decode to STRING
 - JSON booleans decode to BOOLEAN
 - JSON null decodes to NOTHING (for MAYBE types)
-- A type declared as a synonym (for example `DECLARE Year IS A NUMBER`) is decoded as the type it stands for, and so is a synonym for a `MAYBE`
+- A type declared as a synonym (for example `DECLARE Year IS A NUMBER`) is decoded as the type it stands for, and so is a synonym for a `MAYBE`: with `DECLARE MaybeYear IS A MAYBE NUMBER`, the JSON `null` decodes to `NOTHING` and `2026` decodes to `JUST 2026`
 
 **Example:** [http-json-example.l4](http-json-example.l4)
 
