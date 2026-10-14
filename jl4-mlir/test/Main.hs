@@ -51,6 +51,7 @@ main = do
     , test "deontic contract baked into schema" testDeonticSchemaBaked
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "REFUSE marks the export unsupported" testRefuseUnsupported
+    , test "an unsupported helper unsupports its exports" testUnsupportedHelperLiftsToExport
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn
     , test "traceMeta pretty-print baked"      testTraceMetaBaked
@@ -274,6 +275,66 @@ testRefuseUnsupported = do
             && not (T.isInfixOf "\"supported\":true" json)
       if ok then pure () else putStrLn $ "\n    json: " <> T.unpack (T.take 500 json)
       pure ok
+
+-- | A helper is not an export, so a diagnostic raised while lowering it used to
+-- be dropped: the exported caller stayed @supported: true@ while the helper it
+-- calls is not, so the request ran in a WASM module that cannot evaluate the
+-- helper (what that module answers was not checked here). A refusal written as its own
+-- named definition, which is the house style, is exactly such a helper, and so
+-- is anything the backend cannot compile (an @EVENT@, a lambda) — here a
+-- refusal, reached from the export directly and through a second helper.
+-- The control is an export over a helper the backend can compile, which must
+-- stay supported.
+testUnsupportedHelperLiftsToExport :: IO Bool
+testUnsupportedHelperLiftsToExport = do
+  let refusing = T.unlines
+        [ "GIVETH A NUMBER"
+        , "`not modelled` MEANS REFUSE \"not modelled\""
+        , ""
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`middle` `age` MEANS IF `age` >= 18 THEN 1 ELSE `not modelled`"
+        , ""
+        , "@export Through one helper"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`outer` `age` MEANS `middle` `age`"
+        , ""
+        , "@export Straight to the refusal"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`straight` `age` MEANS IF `age` >= 18 THEN 1 ELSE `not modelled`"
+        ]
+      plain = T.unlines
+        [ "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`helper` `age` MEANS `age` PLUS 1"
+        , ""
+        , "@export Over a plain helper"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`caller` `age` MEANS `helper` `age`"
+        ]
+  case (schemaWithDiagnostics refusing, schemaWithDiagnostics plain) of
+    (Right r, Right p) -> do
+      let lifted = T.count "\"supported\":false" r == 2
+                && T.count "\"supported\":true" r == 0
+                && T.isInfixOf "depends on" r
+                && T.isInfixOf "REFUSE" r
+                -- Each export inherits the helper's reason once. The helper is
+                -- lowered twice (its own body and the @$trace@ clone), so before
+                -- 'propagateDiagnostics' dropped repeats the inherited text said
+                -- it twice: four, not two, over the two exports.
+                && T.count "REFUSE is not supported by the WASM backend" r == 2
+          control = T.isInfixOf "\"supported\":true" p
+                 && not (T.isInfixOf "\"supported\":false" p)
+      if lifted && control then pure () else do
+        putStrLn $ "\n    refusing: " <> T.unpack (T.take 400 r)
+        putStrLn $ "    plain: " <> T.unpack (T.take 300 p)
+      pure (lifted && control)
+    other -> do
+      putStrLn $ "\n    typecheck failed: " <> show (either id (const []) (fst other), either id (const []) (snd other))
+      pure False
 
 -- | A top-level regulative function yields a precomputed state graph in
 -- the schema, with Graphviz DOT rendered at compile time by the same
