@@ -1,0 +1,30 @@
+-- Groups with no GIVEN whose first clause matches anything, beside a
+-- drafter's `input 1`. The clauses after it are never tried, the checker
+-- drops them, and a single clause with no distinguishing pattern prints
+-- as a plain definition. Printed with the desugarer's names for its inputs,
+-- `input 1` in the body became the input, and `through Red` answered Red
+-- with status "success" (probe p3/fb1). Every answer is Blue.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+`input 1` MEANS Blue
+
+DECIDE h `_` IS `input 1`
+DECIDE h Red IS Green
+
+DECIDE h2 `_` `_` IS `input 1`
+DECIDE h2 Red Red IS Green
+
+-- The exports pass a fixed colour, not their input: `l4 batch` declares a
+-- record whose fields share the export's input names, and on main a
+-- function whose input type nothing fixes (as `h`'s) is then ambiguous
+-- between the input and the field. The answer does not depend on the input.
+@export one
+GIVEN c IS A Colour
+GIVETH A Colour
+DECIDE one c IS h Red
+
+@export two
+GIVEN c IS A Colour
+GIVETH A Colour
+DECIDE two c IS h2 Red Green

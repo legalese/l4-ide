@@ -1,0 +1,31 @@
+-- An @desc or @export written inside a rule written as clauses, where nothing
+-- of the rule claims it, is not the next rule's. The bodies of the clauses are
+-- not read for annotations, and the rule after took every one written before
+-- it, so that an @export between a group's GIVETH and its first clause, or
+-- above a definition in the WHERE of one of its clauses, published the rule
+-- after the group under that description (refutation of
+-- legalese/l4-ide#545's review, round 4). Neither publishes anything here.
+
+-- An @export between the GIVETH and the first clause.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@export between the GIVETH and the first clause
+DECIDE one 0 IS 1
+DECIDE one other IS 2
+
+-- An @export above a definition in the WHERE of a clause.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE two 0 IS helper 1
+  WHERE
+    @export above the helper
+    helper x MEANS x + 1
+DECIDE two other IS 2
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE three n IS n + 3
+
+#EVAL one 0
+#EVAL two 1
+#EVAL three 2

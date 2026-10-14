@@ -51,15 +51,15 @@ Each use still unifies the whole type, so the cost grows with the depth times th
 
 - `jl4-core/src/L4/TypeCheck/Unify.hs`: `synonymExpansionFuel = 1000` (`:49-50`), `unify`/`unifyFuel` (`:122-129`), `walkHead` (`:136-143`), `unify'` (`:149-156`), `sameUnderSubstitution` (`:166-180`), `isExpandableSynonym` (`:186-189`), `bindChecked` (`:196-199`), `plainTypeEqUnder` (`:214-229`), `expandAndUnify` (`:240-257`), `unifyBase` (`:265-278`), `bind` and its precondition comment (`:288-297`).
 - `jl4-core/src/L4/TypeCheck.hs`:
-  - the cycle check, `quarantineResolvedSynonymCycles` (`:2109-2184`), called from `checkProgram` between scanning the types and scanning the definitions (`:195-210`, the call at `:202`);
-  - fuelled synonym chase in `matchFunTy` (`:1994-2054`, the fuel is set at `:2005`);
-  - `runCheckUnique` and its INVARIANT comment (`:342-363`);
-  - `prune` on `inferDirective (Assert …)` (`:475-480`) and on `inferTopDecl (Timezone …)`, which also gains an `errorContext` (`:531-537`);
-  - the strict `error` for the projection case (`:1390-1399`);
-  - `prettyCheckError` for `CyclicTypeSynonyms` (`:3372-3379`) and `SynonymExpansionLimit` (`:3380-3389`).
-- `jl4-core/src/L4/TypeCheck/Types.hs`: `CyclicTypeSynonyms [Name]` (`:95`) and `SynonymExpansionLimit Int Resolved` (`:97-101`).
-  `unionImportedCheckEnv` (`:419`) and `extendEnv` (`:954`) are as on `main`: no `CheckEnv` field was added.
-- `jl4-core/src/L4/Parser.hs`: `timezone'` returns the `Timezone` declaration with its `TIMEZONE` and `IS` tokens kept in the annotation (`:606-612`), and `topdecl` tries it first (`:456`).
+  - the cycle check, `quarantineResolvedSynonymCycles` (`:3243-3318`), called from `checkProgram` between scanning the types and scanning the definitions (`:200-219`, the call at `:209`);
+  - fuelled synonym chase in `matchFunTy` (`:3128-3188`, the fuel is set at `:3139`);
+  - `runCheckUnique` and its INVARIANT comment (`:461-482`);
+  - `prune` on `inferDirective (Assert …)` (`:594-599`) and on `inferTopDecl (Timezone …)`, which also gains an `errorContext` (`:651-657`);
+  - the strict `error` for the projection case (`:2518-2527`);
+  - `prettyCheckError` for `CyclicTypeSynonyms` (`:4518-4525`) and `SynonymExpansionLimit` (`:4526-4535`).
+- `jl4-core/src/L4/TypeCheck/Types.hs`: `CyclicTypeSynonyms [Name]` (`:105`) and `SynonymExpansionLimit Int Resolved` (`:107-111`).
+  `unionImportedCheckEnv` (`:487`) and `extendEnv` (`:1084`) are as on `main`: no `CheckEnv` field was added.
+- `jl4-core/src/L4/Parser.hs`: `timezone'` returns the `Timezone` declaration with its `TIMEZONE` and `IS` tokens kept in the annotation (`:613-619`), and `topdecl` tries it first (`:463`).
 - `doc/reference/types/DECLARE.md:82-113`: the user-facing text on cycles, `AKA` names, shared names and the limit.
 
 ## Behaviour and rules
@@ -73,7 +73,7 @@ Each use still unifies the whole type, so the cost grows with the depth times th
   Other type constructors are left to the descent, because a structural comparison walks to the first difference, and in a type nested on the left that is at the bottom, so trying it at every level cost the square of the depth (`Unify.hs:98-120`).
 - **Fuel.** Each synonym expansion costs one unit from a budget of 1000 that is passed down, never reset, through constructor children.
   When it runs out with a synonym still to expand, `SynonymExpansionLimit` is reported and the two types are taken as unified, so the module fails once with that error and not twice.
-  `matchFunTy` keeps a separate count of the same size for its synonym chain (`TypeCheck.hs:2005-2048`); substitution-chase steps there cost nothing.
+  `matchFunTy` keeps a separate count of the same size for its synonym chain (`TypeCheck.hs:3139-3182`); substitution-chase steps there cost nothing.
   The fuel bounds the depth of an expansion, not its work: a synonym that names itself twice branches twice per expansion, so the cycle check below, and not the fuel, is what keeps a cycle from being expanded (`Unify.hs:26-47`).
 - **Cycle detection, by Unique.** `quarantineResolvedSynonymCycles` runs once every synonym body is resolved.
   A body names the `Unique` of the synonym each type application in it resolved to, whatever it was spelled: an alias, or a name at the wrong number of arguments (`DECLARE B a IS A PAIR OF B, B`, a kind error that the checker still resolves to the synonym).
@@ -92,8 +92,8 @@ Each use still unifies the whole type, so the cost grows with the depth times th
 
 ## Diagnostics
 
-- `Circular dependency detected between type synonyms:`, then each member quoted on its own line, then `A type synonym must not refer to itself, directly or via other` / `synonyms, because it could then never be fully expanded.` (`TypeCheck.hs:3372-3379`), reported at the first member's declaration.
-- ``I stopped following type synonyms at `S200`.``, then the explanation and what to do (`TypeCheck.hs:3380-3389`).
+- `Circular dependency detected between type synonyms:`, then each member quoted on its own line, then `A type synonym must not refer to itself, directly or via other` / `synonyms, because it could then never be fully expanded.` (`TypeCheck.hs:4518-4525`), reported at the first member's declaration.
+- ``I stopped following type synonyms at `S200`.``, then the explanation and what to do (`TypeCheck.hs:4526-4535`).
 - Directive ambiguity uses the existing message: `There are multiple definitions for the identifier` … `and I do not have sufficient information to make a choice between them.`
 
 ## Tests and fixtures that pin it
@@ -113,6 +113,6 @@ Each use still unifies the whole type, so the cost grows with the depth times th
 - A program that uses an aliased synonym which collides with an imported record of the same number of parameters (`IMPORT lib` declaring `Money`, then `DECLARE Cash AKA Money IS A Money` and a definition that uses `Cash` and `Money`) gets the two ambiguity errors followed by "I've encountered a resolved name that has no additional information stored for it".
   The output is the same on `main` and here; this change does not touch it, and it adds no cycle error to it.
   `unstable` (at `786fcac59`) no longer prints the internal-bug line.
-- `TIMEZONE IS` infers its expression with no expected type (`TypeCheck.hs:536`), so `TIMEZONE IS 42` checks clean.
+- `TIMEZONE IS` infers its expression with no expected type (`TypeCheck.hs:656`), so `TIMEZONE IS 42` checks clean.
   This is as it was before the change; `timezone-mixed-ambiguity.l4` pins the other side of the same fact.
 - `ok/tests/legal-persons-tests.ep.golden` still differs from its source file in the escaping of a non-ASCII string (`\206le` for `Île`); that comes from string-literal exact-print, which this change does not touch.

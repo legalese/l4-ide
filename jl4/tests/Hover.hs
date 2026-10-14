@@ -36,14 +36,7 @@ hoverGolden evalConfig dir inputFile = do
       Just tcRes ->
         let
           nuri = normalizedFilePathToUri nfp
-          hoverPositions =
-            [ (Position 4 6, "age")
-            , (Position 5 6, "income")
-            , (Position 6 6, "hasInsurance")
-            , (Position 15 6, "name")
-            , (Position 16 6, "salary")
-            , (Position 21 32, "name-ref")
-            ]
+          hoverPositions = positionsFor (takeFileName inputFile)
           hoverResults = map (getHoverAt tcRes nuri) hoverPositions
         in
           Text.unlines hoverResults
@@ -59,6 +52,31 @@ hoverGolden evalConfig dir inputFile = do
       , failFirstTime = True
       }
  where
+  -- Each fixture pins its own positions (zero-based line and column).
+  positionsFor :: FilePath -> [(Position, Text)]
+  positionsFor = \ case
+    "desc-hover.l4" ->
+      [ (Position 4 6, "age")
+      , (Position 5 6, "income")
+      , (Position 6 6, "hasInsurance")
+      , (Position 15 6, "name")
+      , (Position 16 6, "salary")
+      , (Position 21 32, "name-ref")
+      ]
+    -- A rule written as a list of clauses binds its inputs at the GIVEN's
+    -- own location (L4.Parser.givenInputBinding), so two nodes sit there.
+    "multi-clause-hover.l4" ->
+      [ (Position 5 6, "given")
+      , (Position 7 7, "rule")
+      , (Position 7 13, "pattern")
+      , (Position 8 20, "callee")
+      , (Position 8 25, "body-ref")
+        -- A pattern that is the input's own name compiles to no node.
+      , (Position 8 13, "input-pattern")
+      , (Position 22 11, "later-input-pattern")
+      ]
+    other -> error ("Hover.positionsFor: no positions pinned for " <> other)
+
   getHoverAt tcRes nuri (pos, label) =
     let mHover = Actions.typeHover pos nuri tcRes zeroMapping
     in  label <> ": " <> formatHover mHover
