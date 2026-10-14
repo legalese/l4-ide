@@ -1,7 +1,6 @@
 # Specification: Pattern Matching in Function Definitions
 
-**Status:** 📋 Draft  
-**Issue:** TBD
+**Status:** done (core), moved from `specs/todo/` on 2026-10-09. Phase 1, clauses with patterns desugared to CONSIDER/WHEN, is built; what was built, and where it differs from this spec, is in `specs/as-built/multi-clause-decide.md`. Not built: guard patterns, the tabular `|...|...|` sugar, and the Approach 2 decision-tree optimisation.
 
 ## Executive Summary
 

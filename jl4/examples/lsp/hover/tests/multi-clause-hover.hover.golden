@@ -1,0 +1,7 @@
+given: ``` | Colour | ``` |  | --- |  |  The colour being priced
+rule: ``` | FUNCTION FROM Colour TO NUMBER | ``` | 
+pattern: ``` | Colour | ``` | 
+callee: ``` | FUNCTION FROM Colour TO NUMBER | ``` | 
+body-ref: ``` | Colour | ``` | 
+input-pattern: ``` | Colour | ``` | 
+later-input-pattern: ``` | Colour | ``` | 

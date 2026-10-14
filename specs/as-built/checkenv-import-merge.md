@@ -11,7 +11,7 @@ The commit reports no behaviour change at `-O1`.
 
 ## Where it lives
 
-- `unionImportedCheckEnv`: `jl4-core/src/L4/TypeCheck/Types.hs:1068-1091 @ 73a953821`, with its design comment at `:1040-1067`.
+- `unionImportedCheckEnv`: `jl4-core/src/L4/TypeCheck/Types.hs:1076-1099 @ 73a953821`, with its design comment at `:1048-1075`.
 - Core caller: `combineOne` inside `combineResolvedImports`, `jl4-core/src/L4/Import/Resolution.hs:355, 382-410 @ 73a953821` (call at `:409`).
   This path serves `checkWithImports`, i.e. the API and WASM entry points.
 - LSP caller: `unionCheckEnv`, `jl4-lsp/src/LSP/L4/Rules.hs:880-881 @ 73a953821`, folded over the dependencies at `:884`.
@@ -31,11 +31,11 @@ The result is built field by field from the accumulator (`accEnv`) and one depen
 - Reset to empty: the frame-local by-`SrcRange` maps `functionTypeSigs`, `declTypeSigs`, `declareDeclarations`, `assumeDeclarations`, whose readers only look up nodes of the module being checked.
 - Reset to empty: `computedFields`, because it is keyed by `RawName` and a union could conflate same-named records from different modules; the comment puts the cost at error-message quality only.
 - Also reset: `sectionBinderNames`, `sectionBinderDecls`, `localBindings`, `sectionStack`, and `inNonexhaustiveDecide = False`, `enclosingObligation = Nothing`, `errorContext = None`, `actionPatternPos = NotInActionPattern`.
-  `cyclicSynonyms` was in this list at 73a953821 (#55 added it); #637 deleted the field, and it is not a field of `CheckEnv` in this tree, where the function resets only `errorContext` and `sectionStack` of the fields listed here (`jl4-core/src/L4/TypeCheck/Types.hs:419-432`).
+  `cyclicSynonyms` was in this list at 73a953821 (#55 added it); #637 deleted the field, and it is not a field of `CheckEnv` in this tree, where the function resets only `errorContext` and `sectionStack` of the fields listed here (`jl4-core/src/L4/TypeCheck/Types.hs:487-500`).
 
 Precondition, documented and not checked: the imported `EntityInfo` is already zonked.
 `Resolution.hs` zonks it with `applyFinalSubstitution` just before the call (`jl4-core/src/L4/Import/Resolution.hs:369` in this tree); `Rules.hs` relies on `TypeCheckResult.entityInfo` being stored zonked (comment at `jl4-lsp/src/LSP/L4/Rules.hs:533-535` in this tree).
-The old LSP site copied the importer's `errorContext`; the function sets `None`, which is what `initialCheckEnv` holds anyway (`jl4-core/src/L4/TypeCheck.hs:143, 178-179 @ 73a953821`; `:130, 157-158` in this tree).
+The old LSP site copied the importer's `errorContext`; the function sets `None`, which is what `initialCheckEnv` holds anyway (`jl4-core/src/L4/TypeCheck.hs:143, 178-179 @ 73a953821`; `:135, 162-163` in this tree).
 
 ## Where the design comment points
 

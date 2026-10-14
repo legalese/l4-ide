@@ -1,0 +1,16 @@
+-- A line in the form of a mixfix rule with a bare name for every input has no
+-- literal to tell it from a definition, so it is read as one: of a rule named
+-- Red with the inputs `costs` and n. It checked, and `Red `costs` 0` went on
+-- giving the one definition's answer, 0, where the line meant 1. It is refused,
+-- once, at the line (found by the pre-review of legalese/l4-ide#545,
+-- 2026-10-13).
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS n
+Red `costs` n MEANS 1
+
+#EVAL Red `costs` 0
+#EVAL Green `costs` 5

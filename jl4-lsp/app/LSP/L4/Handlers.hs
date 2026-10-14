@@ -528,8 +528,8 @@ handlers evalConfig recorder =
                             Just t  -> "DEONTIC" `Text.isPrefixOf` t
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals body)
+                        paramChildren = map (givenParamToSymbol lspRange) (outlineGivenParams givenParams)
+                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (outlineLocals body)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
                   Nothing -> []
 
@@ -629,11 +629,6 @@ handlers evalConfig recorder =
               | "FUNCTION" `Text.isPrefixOf` tyText        = SymbolKind_Field
               | otherwise                                 = SymbolKind_TypeParameter
 
-            collectLocals :: Expr Resolved -> [LocalDecl Resolved]
-            collectLocals (Where _ _ locals)  = locals
-            collectLocals (LetIn _ locals _)  = locals
-            collectLocals _                   = []
-
             localDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> LSP.Range -> LocalDecl Resolved -> [DocumentSymbol]
             localDeclToSymbol moduleNuri subst entInfo parentRange = \case
               LocalDecide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) localBody) ->
@@ -649,7 +644,7 @@ handlers evalConfig recorder =
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
                         paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals localBody)
+                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (outlineLocals localBody)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind parentRange selRange (paramChildren <> nestedLocals) ]
                   Nothing -> []
               LocalAssume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy) ->
