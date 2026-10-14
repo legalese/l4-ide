@@ -2034,16 +2034,22 @@ resolveTermFilteredIn shadowing preambleErr p viab n kont = do
 -- The one-success test must run AFTER the caller's continuation (the
 -- candidate branches can still fail inside 'matchFunTy'), which is why this
 -- takes the continuation explicitly rather than composing with '>>='.
+--
+-- A success is a VIABLE candidate ('viableCandidate'): one that carries only
+-- warnings or hints is a success, as it is for 'prune', 'softprune' and
+-- 'orElse', which is what the "every consumer" argument above is about. A
+-- test that counted only candidates with no diagnostic at all (@Plain@) kept
+-- the fallback whenever the one success carried a warning, such as a CONSIDER
+-- that misses a constructor or repeats one, and the fallback re-checks the
+-- arguments against fresh variables, each of which can fork again: a chain of
+-- n operands one of which carried a warning cost 2^n.
 forkWithLazyFallback :: forall a r. Bool -> [Check a] -> Check a -> (a -> Check r) -> Check r
 forkWithLazyFallback preambleErr cands fallback kont =
   MkCheck $ \ e s ->
     let
       ks = runCheck (choose cands >>= kont) e s
-
-      isSuccess (Plain _, _)  = True
-      isSuccess (With _ _, _) = False
     in
-      case filter isSuccess ks of
+      case filter (viableCandidate . fst) ks of
         [_] | not preambleErr -> ks
         _                     -> ks ++ runCheck (fallback >>= kont) e s
 
@@ -2324,16 +2330,18 @@ orElse m1 m2 = do
 -- an internal ambiguity error. Use this variant when wrapping a computation
 -- that already carries its own ambiguity reporting (e.g. whole-application
 -- inference); with at least one success it is observationally identity.
+--
+-- A success is a viable candidate ('viableCandidate'), as it is for 'orElse':
+-- one that carries only a warning counts. Judging it by whether it carries
+-- any diagnostic at all discarded the first computation, with its warning,
+-- for the second.
 orElseKeepAll :: Check a -> Check a -> Check a
 orElseKeepAll m1 m2 = do
   MkCheck $ \ e s ->
     let
       candidates = runCheck m1 e s
-
-      isSuccess (Plain _, _)  = True
-      isSuccess (With _ _, _) = False
     in
-      if any isSuccess candidates
+      if any (viableCandidate . fst) candidates
         then candidates
         else runCheck m2 e s
 
