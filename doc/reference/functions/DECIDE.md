@@ -38,6 +38,19 @@ DECIDE factorial n MEANS
   ELSE n TIMES factorial (n MINUS 1)
 ```
 
+### One Clause per Case
+
+A function can be written as several `DECIDE` lines, each matching a different argument value:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE factorial 0 IS 1
+DECIDE factorial n IS n TIMES factorial (n MINUS 1)
+```
+
+See [Multi-clause DECIDE](multi-clause-DECIDE.md) for the rules and limits.
+
 ### Omitting DECIDE
 
 For functions, DECIDE can be omitted:
@@ -92,6 +105,7 @@ DECIDE isEligible IF
 ## Related Keywords
 
 - **[MEANS](MEANS.md)** - Introduces the function body
+- **[Multi-clause DECIDE](multi-clause-DECIDE.md)** - One clause per case
 - **[GIVEN](GIVEN.md)** - Introduces parameters
 - **[GIVETH](GIVETH.md)** - Specifies return type
 - **[WHERE](WHERE.md)** - Local definitions

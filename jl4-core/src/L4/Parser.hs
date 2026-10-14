@@ -38,6 +38,7 @@ import qualified Control.Applicative as Applicative
 import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.List.Extra as List
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -46,6 +47,7 @@ import GHC.Records
 import Optics
 import Text.Megaparsec hiding (parseTest)
 import qualified Text.Megaparsec.Char.Lexer as Lexer
+import qualified Text.Megaparsec.Internal as Megaparsec
 import Text.Pretty.Simple
 
 import L4.Annotation
@@ -57,9 +59,14 @@ import qualified L4.Syntax
 import L4.Parser.SrcSpan
 import qualified Generics.SOP as SOP
 import L4.Parser.Anno
+import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..), givenParamNames)
 import L4.Parser.MixfixRegistry
 
-type Parser = ReaderT Env (StateT PState (Parsec Void TokenStream))
+-- | The clause memo ('ClauseMemo') sits BELOW megaparsec, where backtracking
+-- cannot roll it back: a clause parsed inside an alternative that then fails
+-- stays parsed. Everything above megaparsec ('Env', 'PState') is rolled back
+-- with the parser state, as before.
+type Parser = ReaderT Env (StateT PState (ParsecT Void TokenStream (StateT ClauseMemo Identity)))
 
 data Env = Env
   { moduleUri :: NormalizedUri
@@ -453,11 +460,10 @@ topdecl =
   -- TIMEZONE IS must be tried before withTypeSig because the meansKW
   -- alternative inside decide would consume TIMEZONE as an identifier
   -- via appForm, preventing backtracking to timezone'.
-      attachAnno
-        (Timezone  emptyAnno <$> annoHole (try timezone'))
+      try timezone'
   <|> withTypeSig (\ sig -> attachAnno $
         Declare   emptyAnno <$> annoHole (declare sig)
-    <|> Decide    emptyAnno <$> annoHole (decide sig)
+    <|> Decide    emptyAnno <$> annoHole (try (decidePatternMatch sig) <|> decideNotInMixfixForm sig)
     <|> Assume    emptyAnno <$> annoHole (assume sig)
   ) <|> attachAnno
         (Directive emptyAnno <$> annoHole directive)
@@ -600,11 +606,17 @@ import' =
 -- | Parse @TIMEZONE IS <expr>@
 -- TIMEZONE is not a keyword — it's matched as an identifier so it can
 -- also be used as a builtin name in expressions.
-timezone' :: Parser (Expr Name)
+--
+-- The TIMEZONE and IS tokens are captured into the node's 'Anno' (via
+-- 'annoLexeme') rather than skipped with '*>', so exactprint reproduces the
+-- @TIMEZONE IS <expr>@ source instead of emitting just the bare expression.
+timezone' :: Parser (TopDecl Name)
 timezone' =
-  spacedToken_ (TIdentifiers (TIdentifier "TIMEZONE"))
-    *> spacedKeyword_ TKIs
-    *> expr
+  attachAnno $
+    Timezone emptyAnno
+      <$  annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "TIMEZONE")))
+      <*  annoLexeme (spacedKeyword_ TKIs)
+      <*> annoHole expr
 
 assume :: TypeSig Name -> Parser (Assume Name)
 assume sig = do
@@ -681,7 +693,7 @@ decide sig = do
           <*  annoLexeme (spacedKeyword_ TKDecide)
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKIs <|> spacedKeyword_ TKIf)
-          <*> annoHole (indentedExpr current)
+          <*> annoHole (clauseBody current)
 
     meansKW current =
       attachAnno $
@@ -689,7 +701,659 @@ decide sig = do
           <$> annoHole (pure sig)
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKMeans)
-          <*> annoHole (indentedExpr current)
+          <*> annoHole (clauseBody current)
+
+-- ----------------------------------------------------------------------------
+-- Pattern matching in function definitions (Phase 1)
+--
+-- Haskell-style multi-clause function definitions with literal and constructor
+-- patterns on the DECIDE/MEANS left-hand side, desugared here (in the parser) to
+-- the existing CONSIDER/WHEN machinery. See
+-- specs/done/PATTERN-MATCHING-SPEC.md, "Approach 1: Desugar to CONSIDER/WHEN".
+--
+-- Note: the anonymous wildcard @_@ from the spec is not currently accepted by
+-- the lexer; per the spec's own guidance, an ignored argument reuses its GIVEN
+-- name instead (which desugars to nothing).
+--
+-- Example:
+--
+-- > GIVEN n IS A NUMBER
+-- > GIVETH A NUMBER
+-- > DECIDE factorial 0 IS 1
+-- > DECIDE factorial n IS n * factorial (n - 1)
+--
+-- is lowered to a single 'MkDecide' whose body is:
+--
+-- > CONSIDER n
+-- > WHEN 0 THEN 1
+-- > OTHERWISE n * factorial (n - 1)
+--
+-- The clauses share a single GIVEN/GIVETH signature (as in Haskell, the type
+-- signature precedes the clauses), so an entire pattern-matching function is
+-- one 'TopDecl'.
+-- ----------------------------------------------------------------------------
+
+-- | A single parsed clause of a (potentially) multi-clause pattern-matching
+-- function. This is an internal parser artifact only; it never enters the AST.
+-- (Positional rather than record fields because this module uses
+-- @NoFieldSelectors@.)
+data PMClause = PMClause Name [Pattern Name] (Maybe (Aka Name)) (Expr Name)
+
+pmHead :: PMClause -> Name
+pmHead (PMClause h _ _ _) = h
+
+pmPats :: PMClause -> [Pattern Name]
+pmPats (PMClause _ ps _ _) = ps
+
+pmAka :: PMClause -> Maybe (Aka Name)
+pmAka (PMClause _ _ ak _) = ak
+
+pmBody :: PMClause -> Expr Name
+pmBody (PMClause _ _ _ b) = b
+
+-- | Parse a group of one-or-more DECIDE/MEANS clauses that share a head name
+-- and arity (and the enclosing GIVEN/GIVETH signature), and lower them to a
+-- single 'MkDecide'. Fails (so the caller falls back to the ordinary 'decide'
+-- parser) unless at least one clause carries a /distinguishable/ pattern (a
+-- literal, an applied constructor, a cons, or an EXACTLY expression), or the
+-- run has two clauses or more whose bare names differ in some column. This
+-- keeps ordinary single-clause definitions (including mixfix and @OF@ forms) on
+-- the existing code path; a run of the second kind that turns out to be
+-- overloads is separated again by the checker ('L4.TypeCheck.separateOverloads').
+decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
+decidePatternMatch sig = do
+  clauseCol <- Lexer.indentLevel
+  -- A clause of a run already turned down below starts no group either, so
+  -- fail at once, with the error the run failed with (see 'turnDownRun').
+  start <- getOffset
+  turnedDown <- runTurnedDown start
+  for_ turnedDown parseError
+  recordRunFailure $ do
+    -- Capture the raw token span of the whole clause group. The clauses are
+    -- fused into a single CONSIDER tree below (whose synthetic nodes carry no
+    -- source tokens), so exactprint cannot reproduce the multi-clause source
+    -- structurally. Instead we store these verbatim tokens as one visible CSN on
+    -- the resulting Decide's annotation, and drop the hole for the fused body, so
+    -- @l4 format@ round-trips the source (see 'desugarPatternClauses').
+    (rawToks, (firstClause, rest, restStarts)) <- match $ do
+      firstClause <- pmClause clauseCol
+      let firstHead  = pmHead firstClause
+          firstArity = length (pmPats firstClause)
+      rest <- many (try (withIndent EQ clauseCol (\ _ -> (,) <$> getOffset <*> sameHeadClause clauseCol firstHead firstArity)))
+      pure (firstClause, map snd rest, map fst rest)
+    let clauses = firstClause : rest
+    -- Treat this as pattern matching when either:
+    --
+    --  * at least one clause carries a clearly /distinguishable/ pattern (a
+    --    literal, an applied constructor, a cons, or an EXACTLY expression); or
+    --
+    --  * it is a genuine multi-clause group (>= 2 clauses) discriminated only by
+    --    differing nullary columns, e.g. @DECIDE f TRUE IS 1 / DECIDE f FALSE IS
+    --    0@ or an enum decision table. A bare @PatApp n []@ is ambiguous at parse
+    --    time between a variable and a nullary constructor (@TRUE@ / @EMPTY@), so
+    --    we require >= 2 clauses AND at least one column whose bare names actually
+    --    differ across the group before committing.
+    --
+    -- The second kind can gather overloads: @show n MEANS n + 1@ followed by
+    -- @show b MEANS b AND TRUE@ is two definitions told apart by their types,
+    -- and its bare names differ too. Which it is depends on whether any of the
+    -- names is a constructor, which only resolving them tells, so the checker
+    -- turns such a group back into the separate definitions it is made of when
+    -- none is ('L4.TypeCheck.separateOverloads'). Overloads that each carry their
+    -- own GIVEN/GIVETH signature (such as the two @`is leap year`@ overloads in
+    -- daydate.l4) are never gathered here: an intervening GIVEN makes
+    -- 'sameHeadClause' fail. A lone bare-name clause still falls through to the
+    -- ordinary 'decide' path.
+    let isGroup = any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses
+    unless isGroup $ turnDownRun (start : restStarts)
+    guard isGroup
+    -- A group is made of clauses written with the rule's name first. A clause
+    -- written in the form of a mixfix rule is none, and is told so here,
+    -- where the run is read once and in full ('mixfixFormClause'). The error
+    -- is registered rather than raised, so that the group still parses and
+    -- the one error is the file's only error: a failure here would be caught
+    -- by the 'try' in 'topdecl', and the run read again as definitions.
+    hints <- asks (.mixfixHints)
+    for_ (mixfixFormClause hints (givenTermNames sig) (zip (start : restStarts) clauses)) \ (off, msg) ->
+      registerParseError (FancyError off (Set.singleton (ErrorFail (Text.unpack msg))))
+    pure (desugarPatternClauses sig rawToks firstClause rest)
+  where
+    sameHeadClause clauseCol h ar = do
+      c <- pmClause clauseCol
+      guard (rawName (pmHead c) == rawName h && length (pmPats c) == ar)
+      pure c
+    clauseIsPatternMatching c = any isDistinguishablePat (pmPats c)
+    -- A >= 2-clause group in which every argument column is a bare name and at
+    -- least one column's bare names differ across clauses (the hallmark of
+    -- discrimination by nullary constructors / booleans / enums).
+    nullaryOnlyDiscriminatingGroup cs =
+         length cs >= 2
+      && all (all isBareNullaryPat . pmPats) cs
+      && any columnDiffers (List.transpose (map pmPats cs))
+    isBareNullaryPat (PatApp _ _ []) = True
+    isBareNullaryPat _               = False
+    columnDiffers col =
+      length (List.nub [ rawName n | PatApp _ n [] <- col ]) > 1
+
+-- | A clause is @head patterns MEANS body@ (or @DECIDE head patterns IS body@),
+-- with the rule's name as its head. A mixfix rule is written the other way
+-- about, with a word between its inputs: @c `costs` n MEANS n@. It is one
+-- definition, found by its words wherever it is called (@Red `costs` 0@), and
+-- has no clauses. A line written in its form for one case of it,
+-- @Red `costs` 0 MEANS 1@, was read as a rule named @Red@ with the patterns
+-- @costs@ and @0@: the file checked, and @Red `costs` 0@ went on giving the
+-- one definition's answer, 0, where the line meant 1. Two lines
+-- @c `costs` 0@ and @c `costs` n@ were read as a group defining a rule named
+-- like its own input, and refused in twelve messages, three of them with no
+-- location (both found by the pre-review of legalese\/l4-ide#545,
+-- 2026-10-13). What the drafter meant is plain from the line, so it is
+-- refused here, once, at its first token.
+--
+-- Two things show the form, and the parser can see both:
+--
+--  * the line is written as a mixfix rule in scope, imports included
+--    ('mixfixRulesWrittenAs'): as long as the rule's pattern, with the rule's
+--    words where the pattern has them. That is the exact test. It needs the
+--    rule to be a definition that the first parse (which has no hints) could
+--    read as one, so it does not see a rule that is itself written as
+--    clauses. A token that sits where the rule has a word but is one of the
+--    group's own GIVEN inputs is an input, not the word: @DECIDE fee costs 0@
+--    under a GIVEN that names @costs@ is an ordinary rule called @fee@, and
+--    is left alone.
+--
+--  * the head is one of the group's own GIVEN inputs, followed by a word that
+--    is none. A definition whose head is also one of its inputs is already
+--    refused, written any way ("the defined term and all its inputs must have
+--    distinct names"), so this refuses nothing that was accepted. It shows
+--    the form of a rule that has no definition, only the clauses.
+--
+-- Returns the first such clause, with the offset it starts at.
+mixfixFormClause :: MixfixHintRegistry -> [Name] -> [(Int, PMClause)] -> Maybe (Int, Text)
+mixfixFormClause hints inputs = listToMaybe . mapMaybe check
+  where
+    inputNames = map rawName inputs
+    check (off, c) = (,) off <$> (writtenAsRule c <|> afterInput c)
+
+    writtenAsRule c = do
+      rule <- listToMaybe (mixfixRulesWrittenAs inputNames (Just (rawName (pmHead c)) : map barePattern (pmPats c)) hints)
+      pure $ mixfixFormMessage
+        "This clause is written the way a rule with a word between its inputs is written, like this one:"
+        (showMixfixPattern rule)
+
+    afterInput c = case pmPats c of
+      PatApp _ kw [] : _
+        | rawName (pmHead c) `elem` inputNames
+        , rawName kw `notElem` inputNames ->
+            let word = "`" <> rawNameToText (rawName kw) <> "`"
+            in Just $ mixfixFormMessage
+                 (Text.unwords
+                    [ "This clause begins with", rawNameToText (rawName (pmHead c)) <> ", an input of the GIVEN, and then the word"
+                    , word <> ". That is how a rule with a word between its inputs is written:" ])
+                 (Text.unwords [rawNameToText (rawName (pmHead c)), word, "..."])
+      _ -> Nothing
+
+    barePattern = \ case
+      PatApp _ n [] -> Just (rawName n)
+      _             -> Nothing
+
+-- | What 'mixfixFormClause' tells the drafter: how the line is written, the
+-- rule it is written like, and the two ways to write what the line was for.
+mixfixFormMessage :: Text -> Text -> Text
+mixfixFormMessage lead shape = Text.unlines
+  [ lead
+  , ""
+  , "  " <> shape
+  , ""
+  , "A rule written that way is one definition, so it cannot be split into clauses."
+  , "Write it once and tell the cases apart inside it with CONSIDER, or write the clauses with a name of their own first, one pattern for each input, as in DECIDE price Red 0 IS ..."
+  ]
+
+-- | A definition that is parsed as a definition ('decide'), unless it is
+-- written in the form of a mixfix rule but not with that rule's inputs: then
+-- the parse is as it was and the one error is registered.
+--
+-- A line like @Red `costs` n MEANS 1@, with no literal in it, is no clause
+-- ('decidePatternMatch' turned it down), so it is read as a definition of a
+-- rule named @Red@ with the inputs @costs@ and @n@. It checked, and
+-- @Red `costs` 0@ went on giving the one definition's answer, 0, where the
+-- line meant 1. Every token of a real definition of a mixfix rule that is not
+-- one of its words is an input its GIVEN names, so a line in a rule's form
+-- that holds a name which is none is no definition of that rule, whatever the
+-- drafter meant it as.
+-- A second definition of the same words with a GIVEN of its own, for other
+-- types, names its own inputs and is not touched. (The example line has no
+-- GIVEN of its own, so every input of the form it holds counts as a stray.)
+-- Neither is a definition whose GIVEN names, where the rule has a word, an
+-- input of its own: @total plus y@ with a GIVEN of @plus@ and @y@ is a rule
+-- called @total@ that takes those two, beside a rule @a `plus` b@.
+decideNotInMixfixForm :: TypeSig Name -> Parser (Decide Name)
+decideNotInMixfixForm sig = do
+  off <- getOffset
+  d@(MkDecide _ _ (MkAppForm _ hd args _) _) <- decide sig
+  hints <- asks (.mixfixHints)
+  let toks = hd : args
+      inputNames = givenParamNames sig
+      strays rule = [ t | (MixfixParam _, t) <- zip rule.pattern toks, rawName t `notElem` inputNames ]
+      rules = mixfixRulesWrittenAs inputNames (map (Just . rawName) toks) hints
+  for_ (traverse (\ rule -> (,) rule <$> listToMaybe (strays rule)) rules >>= listToMaybe) \ (rule, stray) ->
+    registerParseError $ FancyError off $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
+      [ "This definition is written the way the rule"
+      , ""
+      , "  " <> showMixfixPattern rule
+      , ""
+      , "is written, but " <> rawNameToText (rawName stray) <> " is not an input its GIVEN names, so it is read as a rule of its own."
+      , "A rule written that way is one definition, with no cases of its own."
+      , "To treat some input differently, write the rule once and tell the cases apart inside it with CONSIDER."
+      ]
+  pure d
+
+-- | Parse a single clause, in either the @DECIDE head pats IS body@ form or the
+-- @head pats MEANS body@ form. Argument patterns are parsed with
+-- 'atomicPattern', so applied constructors must be parenthesised (as in
+-- Haskell), e.g. @(JUST n)@ or @(x FOLLOWED BY xs)@.
+pmClause :: Pos -> Parser PMClause
+pmClause clauseCol =
+      pmDecideForm
+  <|> pmMeansForm
+  where
+    pmArgs = many (indented atomicPattern clauseCol)
+    pmDecideForm = do
+      _  <- spacedKeyword_ TKDecide
+      hd <- name
+      ps <- pmArgs
+      ak <- optional aka
+      _  <- spacedKeyword_ TKIs <|> spacedKeyword_ TKIf
+      b  <- clauseBody clauseCol
+      pure (PMClause hd ps ak b)
+    pmMeansForm = do
+      hd <- name
+      ps <- pmArgs
+      ak <- optional aka
+      _  <- spacedKeyword_ TKMeans
+      b  <- clauseBody clauseCol
+      pure (PMClause hd ps ak b)
+
+-- | The body of a @DECIDE@ or @MEANS@ clause that starts in column @col@,
+-- parsed at most once per position ('memoClauseBody'). Every definition is
+-- read first as a clause ('pmClause', for 'decidePatternMatch') and, unless it
+-- starts a clause group, again as an ordinary definition ('decide'); both
+-- readings parse the same body at the same position with the same column,
+-- so the second replays the first instead of parsing the body again.
+clauseBody :: Pos -> Parser (Expr Name)
+clauseBody col = memoClauseBody (unPos col) (indentedExpr col)
+
+-- | What the clause parsers have learnt in one run of the parser, by
+-- position. It lives below megaparsec in the 'Parser' stack, so backtracking
+-- does not discard it.
+data ClauseMemo = MkClauseMemo
+  { clauseBodies :: !(IntMap.IntMap (ClauseReply (Expr Name)))
+    -- ^ The body of a clause ('clauseBody'), keyed by position and column.
+  , notClauseGroups :: !(IntMap.IntMap (ParseError TokenStream Void))
+    -- ^ The positions of clauses that start no clause group, every clause of
+    -- a run 'decidePatternMatch' has turned down, with the error the run
+    -- failed with ('turnDownRun').
+  , turnedDownRun :: ![Int]
+    -- ^ The positions of the run just turned down, until the attempt that
+    -- turned it down fails ('recordRunFailure').
+  }
+  deriving stock Generic
+
+emptyClauseMemo :: ClauseMemo
+emptyClauseMemo = MkClauseMemo IntMap.empty IntMap.empty []
+
+-- | Everything one parse came to, as megaparsec reports it: the state it left
+-- (offset, input, delayed errors), whether it consumed input, and either the
+-- value with its hints and the annotations it collected, or the error.
+type ClauseReply a = Megaparsec.Reply Void TokenStream (a, PState)
+
+-- | @memoClauseBody col p@ behaves exactly as @p@, but parses at most once at
+-- each position (for each @col@, of which a position has only one).
+--
+-- Replaying is exact because what @p@ does depends on nothing but the
+-- position and @col@: the input at a position is always the same, since the
+-- stream only ever advances by dropping the tokens consumed; the source
+-- position cached in the state is read from the tokens themselves; the
+-- 'Env' is fixed for a whole run; and nothing reads the collected
+-- annotations ('PState') or megaparsec's delayed errors while parsing, which
+-- are only ever added to, at the front. So @p@ runs with both empty, and what
+-- it added is put in front of what was there, which is what running it with
+-- them would have made. (On unstable the same replay serves bracketed groups
+-- as well, as 'memoGroup', from legalese/l4-ide#582.)
+memoClauseBody :: Int -> Parser (Expr Name) -> Parser (Expr Name)
+memoClauseBody col p =
+  ReaderT \ env -> StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
+    let key = s.stateOffset * 4096 + min 4095 col
+    known <- gets (IntMap.lookup key . view #clauseBodies)
+    Megaparsec.Reply s' consumption result <- case known of
+      Just reply -> pure reply
+      Nothing -> do
+        reply <- Megaparsec.runParsecT (runStateT (runReaderT p env) mempty) s { stateParseErrors = [] }
+        modify' (over #clauseBodies (IntMap.insert key reply))
+        pure reply
+    let s'' = s' { stateParseErrors = s'.stateParseErrors ++ s.stateParseErrors }
+    case (consumption, result) of
+      (Megaparsec.Consumed, Megaparsec.OK hs (a, added)) -> cok (a, added <> outer) s'' hs
+      (Megaparsec.Consumed, Megaparsec.Error err) -> cerr err s''
+      (Megaparsec.NotConsumed, Megaparsec.OK hs (a, added)) -> eok (a, added <> outer) s'' hs
+      (Megaparsec.NotConsumed, Megaparsec.Error err) -> eerr err s''
+
+-- | Record that the clauses starting at these positions start no clause group.
+--
+-- 'topdecl' tries 'decidePatternMatch' at every definition. When it turns a
+-- run of same-headed clauses down, it has read them all, and each of them is
+-- then parsed as a definition of its own, where 'decidePatternMatch' is tried
+-- again and would read the rest of the run again: a run of @n@ clauses was
+-- read about @n * n / 2@ times, so a file of 4,000 lines @f x MEANS i@ took
+-- minutes to check. Every suffix of a run turned down is turned down too: no
+-- clause in it has a distinguishable pattern, and either it has one clause or
+-- no column of it holds two different names, and both stay true of every
+-- suffix. So the positions of its clauses are recorded below megaparsec,
+-- where backtracking does not undo them, and 'decidePatternMatch' fails at
+-- once at any of them.
+--
+-- It fails there with the error the run itself failed with
+-- ('recordRunFailure'): reading the rest of the run from any of its clauses
+-- fails at the same place, the run's end, in the same way, so the error a
+-- file reports is the same whether the run is read again or not. The
+-- positions wait in 'turnedDownRun' until the attempt fails, which it does at
+-- once, and are then recorded with its error.
+turnDownRun :: [Int] -> Parser ()
+turnDownRun starts =
+  lift (lift (lift (modify' (over #turnedDownRun (starts <>)))))
+
+-- | The error a run turned down at this position failed with
+-- ('turnDownRun'), if there is one.
+runTurnedDown :: Int -> Parser (Maybe (ParseError TokenStream Void))
+runTurnedDown start =
+  lift (lift (lift (gets (IntMap.lookup start . view #notClauseGroups))))
+
+-- | Run an attempt at a clause group, and when it fails having turned a run
+-- down ('turnDownRun'), record the error it failed with at every clause of
+-- that run. The error is the one handed on to what follows, hints included,
+-- so failing with it again is failing as the attempt did.
+--
+-- Every definition is tried as a clause group, and every definition that is
+-- not one fails here, so recording costs only the run just turned down, and
+-- nothing when there is none: a file of @n@ definitions with @n@ different
+-- names fails here @n@ times.
+recordRunFailure :: Parser a -> Parser a
+recordRunFailure p =
+  ReaderT \ env -> StateT \ st -> Megaparsec.ParsecT \ s cok cerr eok eerr ->
+    let record e = do
+          run <- gets (view #turnedDownRun)
+          unless (null run) $
+            modify' (over #notClauseGroups (IntMap.union (IntMap.fromList [ (o, e) | o <- run ])) . set #turnedDownRun [])
+    in Megaparsec.unParser (runStateT (runReaderT p env) st) s cok
+         (\ e s' -> record e >> cerr e s')
+         eok
+         (\ e s' -> record e >> eerr e s')
+
+
+-- | Extract the term (value) parameter names from a GIVEN signature, skipping
+-- type parameters (@x IS A TYPE@). These are used as the CONSIDER scrutinees.
+givenTermNames :: TypeSig Name -> [Name]
+givenTermNames = map fst . givenTermParams
+
+-- | The term parameters of a GIVEN signature, each with whether it declares
+-- a type.
+givenTermParams :: TypeSig Name -> [(Name, Bool)]
+givenTermParams (MkTypeSig _ (MkGivenSig _ otns) _) =
+  [ (n, isJust mt) | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
+  where
+    notTypeParam (Just (Type _)) = False
+    notTypeParam _               = True
+
+-- | Lower a non-empty list of same-head clauses to a single 'MkDecide' whose
+-- body is a (possibly nested) CONSIDER. Clauses are tried top-to-bottom,
+-- first match wins (Haskell semantics). If no clause matches at runtime, the
+-- generated CONSIDER falls through with no OTHERWISE, which the evaluator turns
+-- into a 'NonExhaustivePatterns' error (Haskell's non-exhaustive-match error).
+desugarPatternClauses :: TypeSig Name -> [PosToken] -> PMClause -> [PMClause] -> Decide Name
+desugarPatternClauses sig rawToks firstC restCs =
+  MkDecide decideAnno sig theAppForm body
+  where
+    clauses  = firstC : restCs
+    headName = pmHead firstC
+    mAka     = listToMaybe (mapMaybe pmAka clauses)
+    arity    = length (pmPats firstC)
+    givenNs  = givenTermNames sig
+    appFormAnno = mkHoleAnnoFor headName
+    usesGivenNames = length givenNs == arity && arity > 0
+    -- Whether the GIVEN declares each column's type; a synthesized column
+    -- has none.
+    typesDeclared
+      | usesGivenNames = map snd (givenTermParams sig)
+      | otherwise      = replicate arity False
+    -- The inputs are the GIVEN's names, written into the definition here at
+    -- the GIVEN's own location ('givenInputBinding'), or, when the GIVEN does
+    -- not name one input per pattern, names the desugarer makes up.
+    (theAppForm, scrutinees)
+      | usesGivenNames =
+          (MkAppForm appFormAnno headName (map givenInputBinding givenNs) mAka, givenNs)
+      | otherwise =
+          let synth = [ generatedName ("input " <> Text.pack (show i)) | i <- [1 .. arity] ]
+          in (MkAppForm appFormAnno headName synth mAka, synth)
+    grp = MkPmGroup { groupHead = rawName headName, clauseCount = length clauses }
+    body = matchClauses grp scrutinees typesDeclared clauses
+    -- The signature is exact-printed structurally (via its hole); the whole
+    -- clause group is reproduced verbatim from the captured raw tokens as a
+    -- single visible CSN. We deliberately emit NO holes for 'theAppForm' or the
+    -- fused 'body', so exactprint never descends into the synthetic CONSIDER
+    -- tree (whose nodes carry no source tokens) — it would otherwise emit
+    -- nothing and drop the clause bodies. The resulting annotation still spans
+    -- the sig + all clauses, giving the Decide a real, distinct SrcRange for the
+    -- type checker's per-function 'FunTypeSig' keying.
+    --
+    -- The source clause matrix is additionally recorded in the annotation's
+    -- 'Extension' ('setPmMatrix'), for the type checker's clause-matrix
+    -- exhaustiveness analysis: 'matchClauses' below destroys the per-clause
+    -- structure (its synthetic CONSIDERs are rangeless and OTHERWISE-total),
+    -- so the analysis must see the matrix as the drafter wrote it. We attach
+    -- it for EVERY fused group, n = 1 included, and the checker analyses
+    -- every one: the synthetic CONSIDERs are marked ('PmConsider') and never
+    -- warn about missing branches themselves. Exactprint is
+    -- unaffected: it reads the 'payload' CSNs, never the 'extra' field, and
+    -- 'fixAnnoSrcRange' sets only the range.
+    decideAnno =
+      setPmMatrix matrix (fixAnnoSrcRange (mkHoleAnnoFor sig <> rawTokensAnno rawToks))
+    matrix = MkPmMatrix
+      { scrutinees = scrutinees
+      , synthesizedScrutinees = not usesGivenNames
+      , clauses =
+          [ MkPmMatrixClause
+              { headRange = rangeOf (pmHead c)
+              , patterns  = pmPats c
+              , clauseHead = pmHead c
+              , clauseAka = pmAka c
+              , clauseDescs = []
+              , clauseNlgs = []
+              , bodyRange = rangeOf (pmBody c)
+              }
+          | c <- clauses
+          ]
+      , catchAll = List.findIndex (clauseMatchesAnything scrutinees . pmPats) clauses
+      }
+
+-- | A name the desugarer makes up, spelled with 'PreDef', which no source can
+-- write: a backticked @`input 1`@ is a 'NormalName', and so a different name.
+-- Neither direction can capture the other, so a drafter may use any name at
+-- all, and the generated code still means what the desugarer wrote. The text
+-- is how the name reads wherever it is shown (@l4 render@, a trace).
+--
+-- The one place it can be captured is a /printed/ module (@l4 batch@, the
+-- REPL), which writes it back as source.
+generatedName :: Text -> Name
+generatedName = MkName emptyAnno . PreDef
+
+-- | The binding of a GIVEN input in the definition of a multi-clause group.
+-- The drafter wrote the name once, in the GIVEN, so this copy has the GIVEN's
+-- location, to say where the input is defined (a message about it would
+-- otherwise call it "predefined"), but none of its tokens, so that nothing
+-- prints or highlights it twice. A name's location is read off its anno's
+-- elements, so the location is kept as a hole that holds no tokens.
+givenInputBinding :: Name -> Name
+givenInputBinding n = overAnno (set #payload [mkHoleWithSrcRangeHint (rangeOf n)]) n
+
+-- | How a generated CONSIDER reads the input it tests: by the input's name
+-- respelled with 'PreDef' (see 'generatedName'), so that a pattern variable an
+-- earlier column binds, which may have the same name, cannot capture it. For a
+-- GIVEN input the type checker makes this spelling another name of the input
+-- ('L4.TypeCheck.clauseInputSpellings'); a made-up input is already spelled so.
+scrutineeRef :: Name -> Expr Name
+scrutineeRef s = App emptyAnno (generatedName (nameToText s)) []
+
+-- | Build an annotation whose single visible concrete-syntax node holds the
+-- given tokens verbatim (no holes). Used to make a fused pattern-matching
+-- 'Decide' exact-print back to its original multi-clause source.
+--
+-- The last clause's final lexeme also consumed the whitespace, comments and
+-- annotations after the group (up to the next definition's first token).
+-- They are kept as trailing tokens (a hidden node): exactprint still
+-- reproduces them, but they are outside the node's range, so the group's
+-- range stops at its last clause and does not run over the next
+-- definition's comments, @\@desc@ or @\@export@.
+rawTokensAnno :: [PosToken] -> Anno
+rawTokensAnno toks =
+  mkSimpleEpaAnno Epa
+    { original       = reverse revBody
+    , trailingTokens = reverse revTrailing
+    , payload        = ()
+    , hiddenClusters = []
+    }
+  where
+    (revTrailing, revBody) = span isTrailingTrivia (reverse toks)
+    isTrailingTrivia t = isSpaceToken t || isAnnotationToken t
+
+-- | Build a decision list from the clauses. The last clause is compiled without
+-- an OTHERWISE fallthrough so that a non-match becomes a runtime
+-- non-exhaustive-pattern error.
+--
+-- To keep the emitted tree /linear/ in (clauses x columns) rather than
+-- exponential, we never duplicate the desugaring of the remaining clauses.
+-- 'matchOne' references the fall-through in every WHEN and OTHERWISE position,
+-- so if we inlined it we would copy the whole clause tail once per
+-- distinguishable column, compounding multiplicatively. Instead, at each
+-- non-final clause boundary we bind the remaining-clauses expression to a single
+-- fresh local (a nullary @LET ... IN@) and let 'matchOne' refer to it by name.
+-- The name says which clauses the binding holds (see 'fallthroughName'), and
+-- is spelled so that no source can write it ('generatedName'): a clause body
+-- naming a definition @`the result of clauses 2 to 3`@ reads that definition,
+-- never this binding. Nothing downstream reads the name: the binding and
+-- every generated CONSIDER are marked with 'PmSynthetic'.
+matchClauses :: PmGroup -> [Name] -> [Bool] -> [PMClause] -> Expr Name
+matchClauses grp scrutinees typesDeclared = go 0
+  where
+    columns = zip3 [1 ..] typesDeclared scrutinees
+    go :: Int -> [PMClause] -> Expr Name
+    go _ []  = error "L4.Parser.matchClauses: empty clause list (impossible)"
+    go _ [c] = matchLast grp columns (pmPats c) (pmBody c)
+    go k (c : cs) =
+      -- Bind the desugaring of the remaining clauses ONCE, then reference it
+      -- by name from every WHEN/OTHERWISE that 'matchOne' emits.
+      --
+      -- When every column of @c@ matches unconditionally, @c@ always fires and
+      -- 'matchOne' returns its body without referencing the fall-through, so
+      -- the binding is dead and the remaining clauses never run. It is bound
+      -- anyway, marked 'PmUnreachable', so that they are still type-checked
+      -- (the checker gives it the group's result type, see
+      -- 'L4.TypeCheck.checkClausesLet') and then dropped from the
+      -- checked tree, which is therefore the one this function emitted before
+      -- it bound them: evaluation and every exporter see no difference. The
+      -- checker warns that they are unreachable (from 'PmMatrix' @catchAll@).
+      let ftName = fallthroughName grp (k + 2)
+          ftExpr = go (k + 1) cs
+          tree   = matchOne grp columns (pmPats c) (pmBody c) (Var emptyAnno ftName)
+          mark
+            | clauseMatchesAnything scrutinees (pmPats c) = PmUnreachable grp
+            | otherwise                                   = PmFallthrough grp
+      in bindFallthrough mark ftName (clausesSrcAnno cs) ftExpr tree
+
+-- | Does every column of this clause match unconditionally? Then the clause
+-- always fires, and no clause after it is ever tried. This must mirror
+-- 'matchOne' / 'patAlwaysMatchesAs'.
+clauseMatchesAnything :: [Name] -> [Pattern Name] -> Bool
+clauseMatchesAnything scrutinees pats = and (zipWith patAlwaysMatchesAs scrutinees pats)
+
+-- | The name of the once-bound fall-through holding the clauses from clause
+-- @i@ (counting from 1) to the last: @the result of clauses 2 to 3@, or
+-- @the result of clause 3@. It is unique to its nesting level, so no two
+-- bindings of one group share a name.
+fallthroughName :: PmGroup -> Int -> Name
+fallthroughName grp i =
+  generatedName $ "the result of " <> case grp.clauseCount of
+    n | n == i    -> "clause " <> Text.pack (show n)
+      | otherwise -> "clauses " <> Text.pack (show i) <> " to " <> Text.pack (show n)
+
+-- | The source range of the binding of the clauses from the first of @cs@ on:
+-- the range of that clause's body. The synthesized fall-through 'MkDecide'
+-- needs a present, distinct src range because the type checker keys each
+-- function's 'FunTypeSig' by its Decide annotation's range (see
+-- 'scanFunSigDecide' / 'inferDecide'). Each level's first clause is a
+-- different clause, so these ranges are non-empty and mutually distinct.
+--
+-- Only the body, never more: anything that looks nodes up by position (hover,
+-- go-to-definition) finds this binding wherever its range reaches and no
+-- written node is closer. An earlier range, the hull of all the bodies, also
+-- covered the heads and patterns of the clauses between them, and hover on a
+-- pattern there answered with the type of the binding.
+-- Note: @cs@ is always non-empty here (the singleton clause list is handled by
+-- the @[c]@ case of 'matchClauses', so a fall-through is only bound when at least
+-- one further clause remains).
+clausesSrcAnno :: [PMClause] -> Anno
+clausesSrcAnno []      = emptyAnno
+clausesSrcAnno (c : _) = fixAnnoSrcRange (mkHoleAnnoFor (pmBody c))
+
+-- | Bind @ftExpr@ to @ftName@ via a nullary @LET ... IN@, so the fall-through is
+-- emitted exactly once and referenced by name from the CONSIDER tree. Evaluates
+-- identically to inlining @ftExpr@ at each reference (it is a pure, argument-less
+-- binding), but keeps the emitted AST linear. @ftAnno@ supplies the Decide's
+-- source range (see 'clausesSrcAnno').
+bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
+bindFallthrough mark ftName ftAnno ftExpr body =
+  LetIn emptyAnno
+    [ LocalDecide emptyAnno
+        (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
+    ]
+    body
+  where
+    emptyTypeSig = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
+
+-- | A CONSIDER the desugarer generates to test the input in column @col@.
+generatedConsider :: PmGroup -> (Int, Bool, Name) -> [Branch Name] -> Expr Name
+generatedConsider grp (col, declared, s) =
+  Consider (setPmSynthetic (PmConsider grp col declared) emptyAnno) (scrutineeRef s)
+
+-- | Compile one non-final clause: match every column against its scrutinee; on
+-- any mismatch, fall through to @ft@ (the desugaring of the remaining clauses).
+matchOne :: PmGroup -> [(Int, Bool, Name)] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
+matchOne _   _                  []       body _  = body
+matchOne grp (c@(_, _, s) : ss) (p : ps) body ft
+  -- A variable pattern that reuses the scrutinee's name (as the spec mandates),
+  -- or the anonymous wildcard, always matches and needs no (re)binding.
+  | patAlwaysMatchesAs s p = matchOne grp ss ps body ft
+  -- Everything else gets a WHEN plus an OTHERWISE fall-through. We must emit the
+  -- OTHERWISE even for a bare @PatApp n []@ because, at desugar time (pre
+  -- scope-check), we cannot tell a fresh variable (always matches) from a
+  -- nullary constructor such as @TRUE@ / @EMPTY@ / @NOTHING@ (can fail). Emitting
+  -- the fall-through is correct for both: a variable simply leaves it dead.
+  | otherwise =
+      generatedConsider grp c
+        [ MkBranch emptyAnno (When emptyAnno p) (matchOne grp ss ps body ft)
+        , MkBranch emptyAnno (Otherwise emptyAnno) ft
+        ]
+matchOne _   []                 (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
+
+-- | Compile the final clause without an OTHERWISE branch (so a non-match is a
+-- runtime non-exhaustive error, matching Haskell semantics).
+matchLast :: PmGroup -> [(Int, Bool, Name)] -> [Pattern Name] -> Expr Name -> Expr Name
+matchLast _   _                  []       body = body
+matchLast grp (c@(_, _, s) : ss) (p : ps) body
+  | patAlwaysMatchesAs s p = matchLast grp ss ps body
+  | otherwise =
+      generatedConsider grp c
+        [ MkBranch emptyAnno (When emptyAnno p) (matchLast grp ss ps body) ]
+matchLast _   []                 (_ : _)  body = body -- more patterns than scrutinees: ignore extras
+
 
 appForm :: Parser (AppForm Name)
 appForm = do
@@ -2160,7 +2824,9 @@ execParserForTokensWithHints hints p file input ts =
 
 runJl4Parser :: Env -> PState -> Parser a -> FilePath -> TokenStream -> Either (ParseErrorBundle TokenStream Void) (a, PState)
 runJl4Parser env initState p input stream =
-  parse (runStateT (runReaderT (p <* eof) env) initState) input stream
+  evalState
+    (runParserT (runStateT (runReaderT (p <* eof) env) initState) input stream)
+    emptyClauseMemo
 
 -- ----------------------------------------------------------------------------
 -- JL4 Program parser

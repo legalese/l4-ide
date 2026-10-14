@@ -17,6 +17,7 @@ import Control.Exception (Exception)
 import L4.Evaluate.ValueLazy
 import L4.Evaluate.Operators
 import L4.Print
+import L4.Annotation (emptyAnno)
 import L4.Syntax
 import L4.Utils.Ratio
 
@@ -42,7 +43,12 @@ data InternalEvalException =
 data UserEvalException =
     BlackholeForced (Expr Resolved)
   | EqualityOnUnsupportedType WHNF WHNF
-  | NonExhaustivePatterns (Either Reference WHNF) -- ^ 'Right' the forced scrutinee value when available, 'Left' the raw reference otherwise
+  | NonExhaustivePatterns (Maybe PmGroup) (Either Reference WHNF)
+    -- ^ A CONSIDER had no branch for its scrutinee. The group, when the
+    -- CONSIDER was generated from the clauses of a multi-clause definition
+    -- ('PmConsider'), so that the message is about the clauses the drafter
+    -- wrote. 'Right' the forced scrutinee value when available, 'Left' the
+    -- raw reference otherwise.
   | StackOverflow
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
@@ -91,13 +97,29 @@ prettyUserEvalException = \ case
     , "These were the values you tried to compare:" ]
     <> indentMany v1
     <> indentMany v2
-  NonExhaustivePatterns val ->
+  NonExhaustivePatterns Nothing val ->
     [ "The value" ]
     <> either indentMany indentMany val
     <> [ "reached a CONSIDER that has no branch for it."
        , "Add a WHEN branch for this case, or a catch-all OTHERWISE branch."
        , "The typechecker's exhaustiveness warning lists all missing branches."
        ]
+  -- Only the last clause's generated CONSIDERs have no OTHERWISE, so a
+  -- generated CONSIDER that runs out of branches is always in the last
+  -- clause, after every earlier clause has failed to match.
+  NonExhaustivePatterns (Just g) val
+    | g.clauseCount == 1 ->
+        [ "The only clause of " <> h <> " does not match these inputs."
+        , "The value it could not match is" ]
+        <> either indentMany indentMany val
+        <> [ "Add a clause for this case." ]
+    | otherwise ->
+        [ "No clause of " <> h <> " matches these inputs."
+        , "The value that the last clause could not match is" ]
+        <> either indentMany indentMany val
+        <> [ "Add a clause for this case, or end the clauses with one that matches every input." ]
+    where
+      h = quotedName (MkName emptyAnno g.groupHead)
   StackOverflow ->
     [ "Stack overflow: "
     , "Recursion depth of " <> Text.textShow maximumFrameDepth

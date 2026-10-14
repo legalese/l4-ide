@@ -15,6 +15,7 @@ import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger)
 import Options (Options (..))
 import Types
+import L4.FunctionSchema (Parameters (..))
 
 import Control.Monad (forM_, guard)
 import Control.Concurrent (threadDelay)
@@ -1722,6 +1723,48 @@ spec = describe "integration" do
           expectationFailure $
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
+    -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
+    -- inputs that only the compiler named, and that nothing gives a type. It
+    -- used to be published as the inputs `input 1` and `input 2`, typed
+    -- "object", and every call to it failed; now the deploy is refused.
+    it "refuses a module that @exports a clause group with no GIVEN" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "size.l4" (exportedSizeGroup []))
+      case result of
+        Left err ->
+          err `shouldSatisfy` Text.isInfixOf "`size` is published with @export, but its inputs have no names"
+        Right (_fns, meta, _bundles) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    -- Overloads written one after another are gathered by the parser and
+    -- separated by the checker; the @export above the second one must stay
+    -- with it (refutation of legalese/l4-ide#545's review, round 3).
+    it "publishes the overload whose @export is written above it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "twice.l4" $ Text.unlines
+        [ "DECIDE twice n IS n * 2"
+        , "@export the boolean version"
+        , "DECIDE twice b IS b AND b"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta, _bundles) ->
+          [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions] `shouldBe` [("twice", ["b"])]
+
+    it "publishes the same clause group with a GIVEN, under the names it gives" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "size.l4" $ exportedSizeGroup
+        [ "GIVEN c IS A Colour"
+        , "      n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta, _bundles) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions] `shouldBe` [["c", "n"]]
+
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -1729,6 +1772,19 @@ spec = describe "integration" do
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
+-- | A clause group published with @export, under the given signature lines
+-- (none: no GIVEN at all).
+exportedSizeGroup :: [Text] -> Text
+exportedSizeGroup signature = Text.unlines $
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+  , ""
+  , "@export"
+  ] <> signature <>
+  [ "DECIDE size Red   n IS n"
+  , "DECIDE size Green n IS n + 1"
+  , "DECIDE size Blue  n IS 0"
+  ]
+
 
 -- | What a client is meant to get back from an evaluation request.
 data WireOutcome

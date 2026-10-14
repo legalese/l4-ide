@@ -162,19 +162,26 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
+    PatternMatchParserSpec
+    PatternClausesMissingSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    MultiClausePrintSpec
+    ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
+    DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,

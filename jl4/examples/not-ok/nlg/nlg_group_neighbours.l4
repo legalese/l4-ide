@@ -1,0 +1,22 @@
+-- An @nlg that belongs to no node is not attached, and says so, after a rule
+-- written as clauses as after any other rule. The CONSIDERs a group of clauses
+-- is lowered to hold names that the parser made up; they used to take such an
+-- @nlg without a word (refutation of legalese/l4-ide#545's review, round 4).
+-- And an @nlg inside a WHERE of a clause is not written between two clauses,
+-- so no later clause takes it: it is the helper's, here as in a rule written as
+-- one definition (it used to be reported as not attached).
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE one 0 IS g 1
+  WHERE
+    @nlg the helper of the first clause %x%
+    g x MEANS x + 1
+DECIDE one other IS 2
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE two Red IS 1
+DECIDE two Green IS 2
+@nlg after the last rule of the file

@@ -5,6 +5,7 @@ import Base
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Text as Text
+import L4.Annotation (emptyAnno)
 import L4.Syntax
 import L4.Evaluate.ValueLazy
 import L4.EvaluateLazy.Exceptions (EvalException(..), InternalEvalException(..), UserEvalException(..), prettyEvalException)
@@ -303,7 +304,8 @@ printInternalEvalExceptionShort UnhandledPatternMatch = "unhandled pattern match
 printUserEvalExceptionShort :: UserEvalException -> Doc ann
 printUserEvalExceptionShort (BlackholeForced _)             = "loop detected"
 printUserEvalExceptionShort (EqualityOnUnsupportedType _ _) = "called equality on unsupported type"
-printUserEvalExceptionShort (NonExhaustivePatterns _)       = "non-exhaustive patterns"
+printUserEvalExceptionShort (NonExhaustivePatterns Nothing _)  = "non-exhaustive patterns"
+printUserEvalExceptionShort (NonExhaustivePatterns (Just g) _) = "no clause of " <> pretty (quotedName (MkName emptyAnno g.groupHead)) <> " matches"
 printUserEvalExceptionShort StackOverflow                   = "stack overflow"
 printUserEvalExceptionShort (DivisionByZero _)              = "division by zero"
 printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"

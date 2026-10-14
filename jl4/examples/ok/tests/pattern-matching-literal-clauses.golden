@@ -1,0 +1,115 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-literal-clauses.l4:26:8-27:16:
+  I found a problem while checking the definition of `describe`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `describe` n IS
+    
+pattern-matching-literal-clauses.l4:29:1-17:
+  "zero"
+pattern-matching-literal-clauses.l4:30:1-17:
+  No clause of `describe` matches these inputs.
+  The value that the last clause could not match is
+    2
+  Add a clause for this case, or end the clauses with one that matches every input.
+pattern-matching-literal-clauses.l4:39:1-36:
+  "many"
+pattern-matching-literal-clauses.l4:44:8-45:12:
+  I found a problem while checking the definition of `code`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `code` s IS
+    
+pattern-matching-literal-clauses.l4:50:8-51:10:
+  I found a problem while checking the definition of `ex`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `ex` n IS
+    
+pattern-matching-literal-clauses.l4:61:8-62:13:
+  I found a problem while checking the definition of `price`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `price` Blue IS
+    
+pattern-matching-literal-clauses.l4:70:1-18:
+  2
+pattern-matching-literal-clauses.l4:79:1-35:
+  "f"
+pattern-matching-literal-clauses.l4:85:8-88:14:
+  I found a problem while checking the definition of `charge`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `charge` level tier IS
+    
+pattern-matching-literal-clauses.l4:104:8-106:24:
+  I found a problem while checking the definition of `charge by plan`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `charge by plan` 1 Gold IS
+      DECIDE `charge by plan` level Gold IS
+    
+pattern-matching-literal-clauses.l4:112:8-114:27:
+  I found a problem while checking the definition of `charge with a gap`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `charge with a gap` 2 Premium IS
+      DECIDE `charge with a gap` level tier IS
+    
+pattern-matching-literal-clauses.l4:120:8-121:11:
+  I found a problem while checking the definition of `fee`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `fee` FALSE day IS
+    
+pattern-matching-literal-clauses.l4:134:8-135:21:
+  I found a problem while checking the definition of `two numbers`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `two numbers` 1 k IS
+      DECIDE `two numbers` n k IS
+    
+pattern-matching-literal-clauses.l4:141:8-26:
+  I found a problem while checking the definition of `one clause maybe`:
+    The following branches still need to be considered:
+    
+      WHEN Green THEN
+      WHEN Blue THEN
+    
+pattern-matching-literal-clauses.l4:146:8-147:13:
+  I found a problem while checking the definition of `boxed`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `boxed` (Box `_`) IS
+    
+pattern-matching-literal-clauses.l4:177:1-12:
+  "one"
+pattern-matching-literal-clauses.l4:178:1-12:
+  "tenth"
+pattern-matching-literal-clauses.l4:194:1-43:
+  "long"
+pattern-matching-literal-clauses.l4:195:1-41:
+  "other"
+pattern-matching-literal-clauses.l4:205:1-13:
+  "self"
+pattern-matching-literal-clauses.l4:222:8-223:22:
+  I found a problem while checking the definition of `constant key`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `constant key` n Basic IS
+    
+pattern-matching-literal-clauses.l4:231:8-232:18:
+  I found a problem while checking the definition of `long key`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `long key` n Basic IS
+    
+pattern-matching-literal-clauses.l4:237:8-24:
+  I found a problem while checking the definition of `long key alone`:
+    This clause does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `long key alone` 0.1234567890123456789 Premium IS
+      DECIDE `long key alone` n t IS
+    
