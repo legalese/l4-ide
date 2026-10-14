@@ -272,6 +272,15 @@ The ruling it carries out is R8's surface: _"the trace records a defaulted binde
 W2+W3 built the event (§4.1); this renders it.
 Measured on the branch's own `l4` and `jl4-service`; the tests named below pin it.
 
+**RATIFIED 2026-10-09, in chat (the two questions of "What Meng must decide" on legalese/l4-ide#552).**
+Meng, verbatim: _"For 552 the two things Meng must decide show status quo tentative decisions that I am happy to ratify as rulings."_
+
+- **W11's `NOTE:` line carries the default's value, one line per default** (§4.3): RATIFIED 2026-10-09.
+  The alternative, one line per directive naming them all, is not taken.
+- **The place quoted is the default's value as built, not the whole `GIVEN` line:** RATIFIED 2026-10-09.
+
+This settles the "pending Meng's review" notes of §4.3 on these two questions and no others; every other "decided overnight, pending Meng's review" note in §4.2 and §4.3 is unchanged.
+
 **The mechanism.**
 A default first forced during a traced evaluation emits a `TookDefault` trace action immediately before the `SetRef` of that force (`L4.EvaluateLazy.Machine.traceDefaultForce`, called from `runConfig`), so the event lands in the trace of whatever needed the value, beside the expression that needed it.
 The trace post-processing turns it into a `PreDefault` placeholder for the default's own address and then a `TraceDefault` node, whose steps are the default's own evaluation (empty for a literal, which until W7 is every default) and whose value is the default's.
