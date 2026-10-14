@@ -21,14 +21,19 @@ For comprehensive provisioning and deployment instructions, see:
 ### Redeploying to Existing Server
 
 ```sh
-# Remote deployment
+# Remote deployment, from a Linux machine with enough memory (lhs)
 nixos-rebuild switch --flake .#jl4-dev --target-host root@dev.jl4.legalese.com
 
-# Or on the server
-ssh root@dev.jl4.legalese.com
-cd /path/to/l4-ide && git pull
-nixos-rebuild switch --flake .#jl4-dev
+# The beta runs the unstable branch
+nixos-rebuild switch --flake github:legalese/l4-ide/unstable#jl4-aws-2505 \
+  --target-host root@jl4.legalese.com
 ```
+
+Do not run `nixos-rebuild` on the servers themselves.
+Both are t3a.small (2 GiB), which cannot build the closure: on 2026-07-27 a build on `dev.jl4.legalese.com` made it stop answering ssh and https until the instance was rebooted.
+
+`jl4.legalese.com` was production until the AWS deployment on the US west coast replaced it in October 2026.
+Its role is now a beta deployed from `unstable`; after a deploy from this config, `nixos-version --configuration-revision` on the box names the commit it was deployed from.
 
 ### Provisioning a New Server
 
