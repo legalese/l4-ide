@@ -13,7 +13,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.API.VirtualFS (checkWithImports, emptyVFS, vfsFromList)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
 import L4.Export (ExportedFunction(..), getExportedFunctions)
 import L4.FindDefinition (findDefinition)
 import L4.FunctionSchema (Parameters(..), Parameter(..), parametersFromDecide)
@@ -127,6 +128,32 @@ spec = do
           , nameToText (getActual con) == "Suspended"
           , MkTypedName _ _ _ _ mTypically _ <- fields
           ] `shouldBe` [False]
+
+  -- Review round 1, finding 4: a same-named type in an imported module is a
+  -- clash, as for any same-named type; one in another section is not.
+  describe "a clash with the generated name" $ do
+    let plotlib = Text.unlines
+          [ "DECLARE Plot HAS"
+          , "    `tenure` IS ONE OF Owner, Tenant"
+          ]
+        clashes vfs source = case checkWithImports vfs source of
+          Left errs -> Left errs
+          Right r -> Right [ () | MkCheckErrorWithContext{kind = InlineOptionsNameClash {}} <- r.tcdErrors ]
+    it "is reported for a type of that name in an imported module" $
+      clashes (vfsFromList [("plotlib", plotlib)]) (Text.unlines
+        [ "IMPORT plotlib"
+        , "DECLARE Plot HAS"
+        , "    `tenure` IS ONE OF Freehold, Leasehold"
+        ]) `shouldBe` Right [()]
+
+    it "is not reported for a type of that name in another section" $
+      clashes emptyVFS (Text.unlines
+        [ "§ `Plots`"
+        , "DECLARE Plot HAS"
+        , "    `tenure` IS ONE OF Owner, Tenant"
+        , "§ `Elsewhere`"
+        , "DECLARE `Plot's tenure` IS ONE OF Freehold, Leasehold"
+        ]) `shouldBe` Right []
 
   describe "going to a definition" $ do
     it "lands on the field's ONE OF from a rule that names the generated type" $

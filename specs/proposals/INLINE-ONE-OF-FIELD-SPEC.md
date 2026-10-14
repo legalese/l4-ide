@@ -619,7 +619,9 @@ Where the build departed from or added to the note, it is listed here, each labe
 6. **What counts as a clash.**
    §6 item 8 reports "any remaining clash" with an existing name.
    Built: a type of the same name that is as near to the field as the lifted one (the same section-proximity choice name resolution makes) is reported once, at the field, naming the generated type and where the other is declared, and the field takes the lifted type regardless.
-   A same-named type further away, in another section or imported, is not reported, because the lifted one is the nearer and is what resolution picks.
+   A same-named type in another section is not reported, because the lifted one is the nearer and is what resolution picks.
+   One in an imported module is reported, as for any same-named type, because an import is as near as the module's own declarations.
+   **Corrected in review round 1** (finding 4): this item first said an imported one was not reported either.
    Assumed, not ruled.
 7. **`x-l4-type` is left out wherever the lifted type is published**, including a rule's input that names it (`` GIVEN t IS A `Plot's tenure` ``), not only the field's property.
    The in-repository renderer does not read an enum's `x-l4-type` (§8).

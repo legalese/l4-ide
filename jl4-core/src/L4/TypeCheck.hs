@@ -2381,9 +2381,11 @@ inferSelector rappForm (MkTypedName ann n t mOptions _mTypically _mMeans) = do
 -- field, with the generated name and where the other is declared, instead of
 -- as an ambiguity at a name the author never wrote (INLINE-ONE-OF-FIELD-SPEC
 -- §6 item 8). The field's type is then the lifted one regardless, so nothing
--- else about the field is reported twice. A type of the same name that is
--- further away (in another section, or imported) is not a clash: the lifted
--- one is nearer, which is what 'resolveType' would have chosen too.
+-- else about the field is reported twice. A type of the same name in another
+-- section is not a clash: the lifted one is nearer, which is what
+-- 'resolveType' would have chosen too. One in an imported module IS reported,
+-- as for any same-named type: an import is as near as the module's own
+-- declarations (review round 1, finding 4).
 inferInlineOptionsType :: Anno -> Name -> Anno -> Name -> Check (Type' Resolved)
 inferInlineOptionsType fieldAnn field tann tn = do
   candidates <- sequenceA =<< resolveTypeCandidates tn

@@ -138,7 +138,8 @@ The inline form is best for a list that only its one field uses.
 
 ### When the name is already taken
 
-If something else as close to the field already has the generated name, for example a `` DECLARE `Plot's tenure` `` that you wrote yourself, L4 reports it at the field, names the type it was going to make, and says where the other one is declared.
+If something else as close to the field already has the generated name, for example a `` DECLARE `Plot's tenure` `` that you wrote yourself in the same section, or a type of that name in a module you import, L4 reports it at the field, names the type it was going to make, and says where the other one is declared.
+A type of that name in another section of the same file is not a clash: inside the record's section, the record's own is the nearer.
 Rename one of them, or declare the options yourself under a name you choose.
 
 ## Limits
