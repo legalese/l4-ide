@@ -11,6 +11,7 @@
   - [A / AN](types/A-AN.md)
   - [ASSUME (deprecated)](types/ASSUME.md)
   - [DECLARE](types/DECLARE.md)
+  - [A field's options, listed inline](types/inline-one-of.md)
   - [Type Keywords](types/keywords.md)
   - [FOR ALL (Polymorphism)](types/for-all.md)
   - [Coercions](types/coercions.md)
