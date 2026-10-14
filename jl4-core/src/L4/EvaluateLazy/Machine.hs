@@ -247,8 +247,10 @@ raiseException e = do
 --
 -- Without this the aborted force leaves the mark behind, and every later force
 -- of the same thunk, in the same file or on the same deployment, is reported as
--- an infinite loop: a definition that raised, used by a second directive, said
--- @Infinite loop detected@ instead of what it raised.
+-- an infinite loop. A thunk that REFUSES is such a thunk (the house style is
+-- one named definition per refusal, reached from many arms), and a refusal
+-- reported as @Infinite loop detected@ is an error where the program gave an
+-- answer.
 --
 -- A genuine loop is still found: the mark is only given back as the exception
 -- unwinds, and a loop forces the thunk again while its mark is still there.
@@ -271,6 +273,21 @@ userException = raiseException . UserEvalException
 
 stuckOnAssumed :: Resolved -> Eval a
 stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
+
+-- | REFUSE: stop evaluation with the author's reason.
+--
+-- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
+-- 'EvalException' anywhere in the tree, and it is used only at the directive
+-- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
+-- rethrows). There is no user-facing catch construct, so nothing between a
+-- 'Refuse' and the directive that demanded it can observe the refusal or turn
+-- it into a value: not a CONSIDER arm, not a boolean connective, not a
+-- WHERE\/LET binding. THIS IS AN INVARIANT, not an accident of the current
+-- code: a static refusal analysis is only sound while it holds. Anything that
+-- adds a second @try@ (a TRY\/RECOVER construct, a service-level resume)
+-- breaks it.
+refuseWith :: Refusal -> Eval a
+refuseWith = raiseException . RefusalException
 
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
@@ -557,6 +574,16 @@ forwardExpr env = \ case
     mPartyRef <- traverse (\p -> allocate_ p env) mParty
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
     continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+  -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
+  -- it, so a refusal inside an unforced thunk is never entered. That is what
+  -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
+  -- refuses: 'And' desugars to an 'IfThenElse' whose scrutinee is forced first.
+  Refuse _ann (Lit _ (StringLit _ txt)) ->
+    refuseWith (MkRefusal txt)
+  Refuse _ann _msg ->
+    -- Unreachable: the parser accepts only a literal message and the type
+    -- checker requires that literal to be a STRING.
+    internalException (RuntimeTypeError "the message of a REFUSE is not a string literal")
   Inert _ann _txt ctx ->
     -- Inert elements are grammatical scaffolding with context-aware evaluation
     -- In AND context: True (identity), in OR context: False (identity)

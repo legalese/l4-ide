@@ -558,6 +558,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "BREACH" <>
         maybe mempty (\p -> " BY" <+> printWithLayout p) mParty <>
         maybe mempty (\r -> " BECAUSE" <+> printWithLayout r) mReason
+    Refuse _ msg ->
+      "REFUSE" <+> printWithLayout msg
     Inert _ txt _ctx ->
       "..." <+> dquotes (pretty txt)
 
@@ -566,6 +568,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Lit{} -> printWithLayout e
     App _ _ [] -> printWithLayout e
     Var{} -> printWithLayout e
+    -- REFUSE is a keyword followed by a literal: an atom.
+    Refuse{} -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
 
 -- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
@@ -639,6 +643,7 @@ parensIfOpenTailed e
       Lam{}         -> True  -- the YIELD body keeps consuming
       Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
       Breach{}      -> True  -- open BY/BECAUSE clauses
+      Refuse{}      -> False -- REFUSE plus a literal: no open tail
       -- `NOT` binds LOOSER than the connectives, not tighter: measured,
       -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
       -- conjunct is always bracketed — inheriting the operand's tail was not

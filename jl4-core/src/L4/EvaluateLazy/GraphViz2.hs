@@ -18,7 +18,8 @@ import qualified Base.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import Control.Applicative ((<|>))
 import L4.EvaluateLazy.Trace (EvalTrace(..))
-import L4.EvaluateLazy.Machine (EvalException, boolView)
+import L4.EvaluateLazy.Machine (boolView)
+import L4.EvaluateLazy.Exceptions (EvalException (..), Refusal (..))
 import L4.EvaluateLazy.GraphVizOptions (GraphVizOptions(..), defaultGraphVizOptions)
 import L4.Evaluate.ValueLazy (NF(..))
 import L4.Syntax (Expr(..), Resolved, Branch(..), BranchLhs(..), Module(..), TopDecl(..), Decide(..), Section(..), AppForm(..), LocalDecl(..), Unique, getUnique, Desc, getDesc, annDesc)
@@ -531,6 +532,12 @@ formatTraceLabel opts mlabel steps result =
       resultText = if opts.includeValues
         then case result of
           Right nf -> "\n────────────────\n" <> firstLine (prettyLayout nf)
+          -- A refusal is not a crash, and the graph render must say so as the
+          -- text render does ('printEvalExceptionShort' emits @refused: <msg>@).
+          -- Reporting it as @<error>@ was the one surface where the two
+          -- disagreed, and the reason is statically known, so print it.
+          Left (RefusalException r) ->
+            "\n────────────────\n↯ refused: " <> firstLine r.message
           Left _ -> "\n────────────────\n<error>"
         else ""
   in labelText <> exprText <> resultText

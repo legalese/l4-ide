@@ -126,6 +126,7 @@ buildCompiledFromShared shared funName = runExceptT $ do
  where
   evalErrorToText :: EvaluatorError -> Text
   evalErrorToText (InterpreterError t) = t
+  evalErrorToText (EvaluatorRefused reason) = "The model refuses to answer: " <> reason
   evalErrorToText (RequiredParameterMissing pm) = "Required parameter missing: expected " <> Text.textShow pm.expected <> ", got " <> Text.textShow pm.actual
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
@@ -323,6 +324,7 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
  where
   evalErrorToText :: EvaluatorError -> Text
   evalErrorToText (InterpreterError t) = t
+  evalErrorToText (EvaluatorRefused reason) = "The model refuses to answer: " <> reason
   evalErrorToText (RequiredParameterMissing pm) = "Required parameter missing: expected " <> Text.textShow pm.expected <> ", got " <> Text.textShow pm.actual
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
@@ -749,8 +751,9 @@ handleEvalResultDirect
   -> ExceptT EvaluatorError IO ResponseWithReason
 handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case result of
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
-  Eval.Reduction (Left evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
-  Eval.Reduction (Right val) -> do
+  Eval.Reduction (Eval.ReducedRefused ref) -> throwError $ EvaluatorRefused ref.message
+  Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
+  Eval.Reduction (Eval.Reduced val) -> do
     r <- nfToFnLiteral ei val
     pure $ ResponseWithReason
       { fnResult = Map.singleton "value" r
@@ -920,7 +923,8 @@ fnLiteralToJson = \case
 -- 'FnUnknown' at the top level is now @NOTHING@ or @JUST NOTHING@, which are
 -- answers: refusing it here would refuse on this path an answer the direct
 -- path gives. "Could not compute" does not arrive as @null@ on either path:
--- an evaluation that fails is a @Reduction (Left _)@ and is refused. Nor can
+-- an evaluation that fails is a @ReducedErrored@ and is refused, and one that
+-- REFUSES is a @ReducedRefused@ and is reported as 'EvaluatorRefused'. Nor can
 -- the top-level value be the evaluator's 'Eval.Omitted' truncation marker:
 -- 'Eval.nf' starts at depth 'maximumStackSize' (200) and marks 'Eval.Omitted'
 -- only below depth 0, so the direct path's answer is read at depth 200 and
@@ -940,8 +944,8 @@ handleEvalResult
   -> ExceptT EvaluatorError IO ResponseWithReason
 handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule = do
   answer <- case (genCode.answerShape, result) of
-    (WrappedInJust, Eval.Reduction (Right envelope)) ->
-      Eval.Reduction . Right <$> openEnvelope envelope
+    (WrappedInJust, Eval.Reduction (Eval.Reduced envelope)) ->
+      Eval.Reduction . Eval.Reduced <$> openEnvelope envelope
     _ -> pure result
   handleEvalResultDirect ei answer trace traceLevel includeGraphViz mModule
   where

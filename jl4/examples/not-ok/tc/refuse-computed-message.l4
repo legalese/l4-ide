@@ -1,0 +1,11 @@
+-- A REFUSE message is a LITERAL, not an expression: the grammar admits only a
+-- literal in that position, so a computed message is a PARSE error rather than
+-- a type error.
+--
+-- That is deliberate. A refusal's reason has to be readable without running the
+-- program (so it can be reported and, later, analysed per reason), and keeping
+-- the payload a literal is also what lets the evaluation machine raise a
+-- refusal with no new stack frame.
+
+GIVETH A NUMBER
+`bad refusal` MEANS REFUSE (1 PLUS 1)

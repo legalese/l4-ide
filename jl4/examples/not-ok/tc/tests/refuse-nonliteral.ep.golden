@@ -1,0 +1,8 @@
+-- The message of a REFUSE must be a STRING literal. A numeric literal parses
+-- (so the grammar stays simple) and is rejected here, by the type checker.
+--
+-- See `refuse-computed-message.l4` for the other half of the restriction: a
+-- COMPUTED message does not parse at all.
+
+GIVETH A NUMBER
+`bad refusal` MEANS REFUSE 42

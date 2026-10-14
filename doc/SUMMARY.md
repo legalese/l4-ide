@@ -10,6 +10,7 @@
 - [Functions](reference/functions/README.md)
   - [Multi-clause DECIDE](reference/functions/multi-clause-DECIDE.md)
 - [Control Flow](reference/control-flow/README.md)
+  - [REFUSE](reference/control-flow/REFUSE.md)
 - [Operators](reference/operators/README.md)
 - [Syntax](reference/syntax/README.md)
 - [Regulative](reference/regulative/README.md)

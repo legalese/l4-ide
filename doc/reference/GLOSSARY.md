@@ -25,15 +25,16 @@ Keywords are reserved words that form the structure of L4 programs.
 
 ### Control Flow Keywords
 
-| Keyword       | Purpose                              | Reference                              |
-| ------------- | ------------------------------------ | -------------------------------------- |
-| **BRANCH**    | Alternative pattern matching keyword | [CONTROL-FLOW](control-flow/README.md) |
-| **CONSIDER**  | Pattern matching on values           | [CONSIDER](control-flow/CONSIDER.md)   |
-| **ELSE**      | Alternative branch of IF             | [CONTROL-FLOW](control-flow/README.md) |
-| **IF**        | Conditional expression               | [IF](control-flow/IF.md)               |
-| **THEN**      | Consequent branch of IF              | [CONTROL-FLOW](control-flow/README.md) |
-| **OTHERWISE** | Default case in CONSIDER             | [CONTROL-FLOW](control-flow/README.md) |
-| **WHEN**      | Introduces a pattern match case      | [CONSIDER](control-flow/CONSIDER.md)   |
+| Keyword       | Purpose                                                                                                                                    | Reference                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| **BRANCH**    | Alternative pattern matching keyword                                                                                                       | [CONTROL-FLOW](control-flow/README.md) |
+| **CONSIDER**  | Pattern matching on values                                                                                                                 | [CONSIDER](control-flow/CONSIDER.md)   |
+| **ELSE**      | Alternative branch of IF                                                                                                                   | [CONTROL-FLOW](control-flow/README.md) |
+| **IF**        | Conditional expression                                                                                                                     | [IF](control-flow/IF.md)               |
+| **THEN**      | Consequent branch of IF                                                                                                                    | [CONTROL-FLOW](control-flow/README.md) |
+| **OTHERWISE** | Default case in CONSIDER                                                                                                                   | [CONTROL-FLOW](control-flow/README.md) |
+| **REFUSE**    | Declines to answer: this case is outside what the model covers. No later rule can turn a refusal into an answer; only the boundary sees it | [REFUSE](control-flow/REFUSE.md)       |
+| **WHEN**      | Introduces a pattern match case                                                                                                            | [CONSIDER](control-flow/CONSIDER.md)   |
 
 ### Logical Keywords
 

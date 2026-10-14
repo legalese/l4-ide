@@ -50,6 +50,7 @@ main = do
     , test "schema picks up imported DECLAREs" testSchemaUsesImportedDeclares
     , test "deontic contract baked into schema" testDeonticSchemaBaked
     , test "plain fn stays supported"          testPlainFunctionSupported
+    , test "REFUSE marks the export unsupported" testRefuseUnsupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn
     , test "traceMeta pretty-print baked"      testTraceMetaBaked
@@ -250,6 +251,29 @@ testPlainFunctionSupported = do
     Right json ->
       pure $ T.isInfixOf "\"supported\":true" json
           && not (T.isInfixOf "\"supported\":false" json)
+
+-- | REFUSE has no WASM image: the compiled module has no way to stop with a
+-- reason, and lowering it to a value would answer where the program declined.
+-- So an export that contains one in its body is marked @supported: false@,
+-- which routes the request to the evaluator, and that one raises the refusal.
+testRefuseUnsupported :: IO Bool
+testRefuseUnsupported = do
+  let src = T.unlines
+        [ "@export Direct refusal"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`direct` `age` MEANS IF `age` >= 18 THEN 1 ELSE REFUSE \"not modelled\""
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "REFUSE" json
+            && not (T.isInfixOf "\"supported\":true" json)
+      if ok then pure () else putStrLn $ "\n    json: " <> T.unpack (T.take 500 json)
+      pure ok
 
 -- | A top-level regulative function yields a precomputed state graph in
 -- the schema, with Graphviz DOT rendered at compile time by the same

@@ -259,6 +259,12 @@ extractExpr mFromState expr = case expr of
     _ <- getTerminalState "Breach" TerminalBreach
     pure ()
 
+  -- A refusal is not a deontic terminal: it is the model declining to answer,
+  -- which has no state in the lifecycle graph. Deliberately no state is
+  -- created (the wildcard below would do the same; the arm is explicit so
+  -- that the decision is recorded rather than inherited).
+  Refuse _ _ -> pure ()
+
   _ -> pure ()  -- Skip other expressions
 
 -- | Check if a name refers to Fulfilled
@@ -381,6 +387,8 @@ classifyTarget :: Expr Resolved -> Target
 classifyTarget = \case
   App _ name [] | resolvedToText name == "Fulfilled" -> TargetFulfilled
   Breach{} -> TargetBreach
+  -- Not a breach: a refusal is not a deontic outcome at all.
+  Refuse{} -> TargetOther
   Regulative _ obl -> TargetDeonton obl
   Where _ e _ -> classifyTarget e
   LetIn _ _ e -> classifyTarget e

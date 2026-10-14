@@ -2689,6 +2689,19 @@ inferExpr' g =
       mParty' <- traverse (\p -> checkExpr ExpectRegulativePartyContext p partyT) mParty
       mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
       pure (Breach ann mParty' mReason', contract partyT actionT)
+    Refuse ann msg -> do
+      -- REFUSE is an expression AT ANY TYPE. That is not a special typing rule:
+      -- 'checkExpr' falls through to infer-then-'expect'
+      -- (see the catch-all of 'checkExpr' below), and a fresh inference
+      -- variable unifies with whatever type the context expects. So a refusal
+      -- can sit in an OTHERWISE arm of a NUMBER-valued decision and equally in
+      -- one at a user-declared record type.
+      --
+      -- ('Breach' is NOT the model for this: it returns a concrete
+      -- @CONTRACT party action@ built from two fresh variables.)
+      rmsg <- checkExpr ExpectRefuseMessageContext msg string
+      t <- fresh (NormalName "refused")
+      pure (Refuse ann rmsg, t)
     Inert ann txt ctx -> do
       -- Inert elements are grammatical scaffolding with context-aware evaluation
       -- In AND context: True (identity), in OR context: False (identity)
@@ -4224,6 +4237,11 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)
+      -- 'go False' on the message, NOT 'go True': the REFUSE message is a string
+      -- literal and must STAY one. Converting it to an 'Inert' node here would
+      -- make @TRUE AND REFUSE "x"@ carry a non-literal message, which the type
+      -- checker rejects and the machine cannot read.
+      Refuse ann m -> Refuse ann (go False ctx m)
       -- Other leaves don't need transformation
       e@Lit{} -> e
 
@@ -4888,6 +4906,8 @@ prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
+prettyTypeMismatch ExpectRefuseMessageContext expected given =
+  standardTypeMismatch [ "The message of a REFUSE is expected to be a string literal, of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text
