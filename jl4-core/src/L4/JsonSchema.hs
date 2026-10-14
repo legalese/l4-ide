@@ -335,7 +335,11 @@ enumWithPayloads ctx' desc constructors =
             SAnyOf opts _ -> SAnyOf opts (Just d)
             SStringFormat fmt _ -> SStringFormat fmt (Just d)
             SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy), typicallyToJson =<< mTypically) : acc, newDefs)
+        -- A payload field with a TYPICALLY is optional, as a record field's is
+        -- (L7, ruled by Meng 2026-10-12): a construction that leaves it out
+        -- takes the default, so a payload that omits it is a valid one.
+        isRequired = not (isMaybeOrOptionalType fieldTy) && isNothing mTypically
+     in ((fieldNameText, schemaWithDesc, isRequired, typicallyToJson =<< mTypically) : acc, newDefs)
 
 -- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema.
 -- Lower-cased for the same reason: the resolved builtin name is ALL-CAPS "MAYBE",

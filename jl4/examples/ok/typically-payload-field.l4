@@ -1,0 +1,42 @@
+-- A TYPICALLY on a payload field of an enum constructor works as it does on a
+-- record field (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1; Lane C L7, ruled by Meng
+-- 2026-10-12: "we have sums-of-products and therefore our treatment of plain
+-- records (products) should carry across to records-in-enums").
+--
+-- A construction that leaves such a field out takes its default, in the three
+-- places a record's does: a named application (`WITH`), `WITHAL`, and a
+-- payload read back through `CONSIDER`. The positional spelling (`OF`) still
+-- gives every field, as it does for a record.
+
+DECLARE Shape IS ONE OF
+  Circle HAS radius IS A NUMBER TYPICALLY 1
+  Rect HAS width IS A NUMBER TYPICALLY 2
+           height IS A NUMBER
+  Square HAS side IS A NUMBER TYPICALLY 3
+  Dot
+
+-- exported, so the schema shows it: a payload field with a TYPICALLY is not
+-- required (the first thing a caller reads), and its default is printed
+@export the area of a shape
+GIVEN s IS A Shape
+GIVETH A NUMBER
+`area of` s MEANS
+  CONSIDER s
+    WHEN Circle r THEN r TIMES r TIMES 3
+    WHEN Rect w h THEN w TIMES h
+    WHEN Square a THEN a TIMES a
+    WHEN Dot THEN 0
+
+-- the default is taken when the field is left out
+#ASSERT `area of` (Circle WITH radius IS 1) EQUALS 3
+#ASSERT `area of` (Rect WITH height IS 5) EQUALS 10
+
+-- and overridden when it is written
+#ASSERT `area of` (Rect WITH width IS 4, height IS 5) EQUALS 20
+
+-- WITHAL takes every default, for an alternative whose fields all have one
+#ASSERT `area of` (Circle WITHAL) EQUALS 3
+#ASSERT `area of` (Square WITHAL) EQUALS 9
+
+-- OF still writes every field
+#ASSERT `area of` (Rect OF 2, 5) EQUALS 10

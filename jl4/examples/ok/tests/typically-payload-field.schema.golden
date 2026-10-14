@@ -1,0 +1,80 @@
+{
+    "$defs": {
+        "Shape": {
+            "oneOf": [
+                {
+                    "properties": {
+                        "radius": {
+                            "default": 1,
+                            "type": "number"
+                        },
+                        "tag": {
+                            "const": "Circle"
+                        }
+                    },
+                    "required": [
+                        "tag"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "height": {
+                            "type": "number"
+                        },
+                        "tag": {
+                            "const": "Rect"
+                        },
+                        "width": {
+                            "default": 2,
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "tag",
+                        "height"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "side": {
+                            "default": 3,
+                            "type": "number"
+                        },
+                        "tag": {
+                            "const": "Square"
+                        }
+                    },
+                    "required": [
+                        "tag"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "tag": {
+                            "const": "Dot"
+                        }
+                    },
+                    "required": [
+                        "tag"
+                    ],
+                    "type": "object"
+                }
+            ]
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "the area of a shape",
+    "properties": {
+        "s": {
+            "$ref": "#/$defs/Shape"
+        }
+    },
+    "required": [
+        "s"
+    ],
+    "title": "area of",
+    "type": "object"
+}
