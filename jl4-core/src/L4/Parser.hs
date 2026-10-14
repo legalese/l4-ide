@@ -900,7 +900,21 @@ recordDecl =
 recordDecl' :: AnnoParser [TypedName Name]
 recordDecl' =
      annoLexeme (spacedKeyword_ TKHas)
-  *> annoHole (lsepBy (const reqParam) (spacedSymbol_ TComma))
+  *> annoHole (lsepBy (const reqParam) fieldComma)
+
+-- | The comma between two fields of one line, @HAS w IS A NUMBER, h IS A NUMBER@.
+--
+-- A field name is always followed by @IS@ (or @:@), and a constructor never
+-- is, so a comma counts as a field separator only when the next two tokens
+-- are a name and @IS@. Any other comma is left where it is, for the list the
+-- fields sit in: in @DECLARE Shape IS ONE OF Dot, Rect HAS w IS A NUMBER,
+-- Circle@ it separates @Rect@ from @Circle@. Consuming it made @Circle@ a
+-- field name and failed at the next token with "expecting IS", so a
+-- constructor with fields could only come last on its line
+-- (smucclaw/l4-ide#1045). The look-ahead is retried, not committed: 'try'
+-- puts the comma back when no field follows it.
+fieldComma :: Parser (Lexeme PosToken)
+fieldComma = try (spacedSymbol_ TComma <* lookAhead (name *> separator))
 
 enumOrSynonymDecl :: Parser (TypeDecl Name)
 enumOrSynonymDecl =

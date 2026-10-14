@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+one-line-payload-comma.l4:44:1-42:
+  assertion satisfied
+one-line-payload-comma.l4:45:1-34:
+  assertion satisfied
+one-line-payload-comma.l4:46:1-31:
+  assertion satisfied
+one-line-payload-comma.l4:47:1-39:
+  assertion satisfied
+one-line-payload-comma.l4:48:1-33:
+  assertion satisfied
+one-line-payload-comma.l4:49:1-46:
+  assertion satisfied
+one-line-payload-comma.l4:50:1-42:
+  assertion satisfied

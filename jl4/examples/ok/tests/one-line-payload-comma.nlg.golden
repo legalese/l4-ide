@@ -1,0 +1,7 @@
+`area of` with `Rect` with 2 and 3 is equal to 6
+`area of` with `Circle` is equal to 1
+`area of` with `Dot` is equal to 0
+`size of` with `Disc` with 4 is equal to 4
+`size of` with `Point` is equal to 0
+`volume of` with `Crate` with 2 and 5 is equal to 10
+`Size` with 3 and 4 's `columns` is equal to 4
