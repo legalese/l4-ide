@@ -138,6 +138,9 @@ jobs:
           restore-keys: |
             pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
 
+      # On a PR's first run this finds the cache haskell-dependencies.yml
+      # builds on main, under this same key. Keep the two jobs' environments
+      # identical, or the key will not match.
       - name: Restore cached dependencies
         uses: actions/cache/restore@v5
         id: deps-cache
