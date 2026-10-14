@@ -1,6 +1,6 @@
 # Using the l4 CLI
 
-Run, check, format, and render L4 files from the command line.
+Run, check, format, render, and deploy L4 files from the command line.
 
 **Prerequisites:** [Your First L4 File](first-l4-file.md)
 
@@ -58,6 +58,14 @@ Available commands:
                            GraphViz DOT
   render                   Render an L4 file to a formatted document
                            (html|text|json|plan)
+  deploy                   Deploy an L4 file and its imports as a new deployment
+                           (Legalese Cloud, or --server)
+  redeploy                 Update an existing deployment; refuses breaking
+                           changes unless --force
+  undeploy                 Delete a deployment
+  deployments              List deployments
+  install                  Install a companion tool: `l4 install legalese` (the
+                           Legalese Cloud CLI)
 ```
 
 Run `l4 <command> --help` for the options of any subcommand.
@@ -388,7 +396,59 @@ A cases file or a rules file that does not exist ends the command with the opera
 
 ---
 
-## Step 7: The REPL
+## Step 7: Deploy as an API
+
+`l4 deploy` turns a file into a live REST API on [Legalese Cloud](https://legalese.cloud), as the VS Code extension's **Deploy** tab does. Only rules marked `@export` become endpoints; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) explains how to mark them.
+
+### Sign in
+
+`l4` gets your Legalese Cloud credentials from the `legalese` CLI, so you sign in once and `l4` never stores a token:
+
+```bash
+l4 install legalese    # downloads it (checksum-verified) to /usr/local/bin or ~/.local/bin
+legalese login         # signs you in through the browser and picks your organization
+```
+
+`l4 install legalese` runs on macOS and Linux. Run it again to upgrade.
+
+### Deploy, update, list, remove
+
+```bash
+l4 deploy late-fee.l4 --description "Late fees for overdue invoices"
+```
+
+```
+Deploying 'late-fee' to Legalese Cloud org 'acme' (as you@example.com): late-fee.l4
+Compiling…
+Deployed 'late-fee' (version 1.0.0) with 1 function:
+  fee
+API: https://api.legalese.cloud/acme/late-fee
+```
+
+The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with everything it imports, standard libraries included.
+
+| Command            | What it does                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4 deploy FILE`   | Creates a deployment. Refuses if the name is taken.                                                                                                                 |
+| `l4 redeploy FILE` | Updates an existing deployment. If the update would break existing integrations (a rule removed, a parameter changed), it is rejected; `--force` applies it anyway. |
+| `l4 deployments`   | Lists your organization's deployments.                                                                                                                              |
+| `l4 undeploy NAME` | Deletes a deployment after you type its name to confirm. In scripts, pass `--yes`.                                                                                  |
+
+`--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile.
+
+### Your own jl4-service
+
+To deploy to a jl4-service you run yourself, name it with `--server`:
+
+```bash
+l4 deploy late-fee.l4 --server http://localhost:8080
+```
+
+If it needs an API key, put the key in the `L4_API_KEY` environment variable or in a file passed with `--api-key-file`. `l4` won't send a key over plain `http` to anything but `localhost`.
+
+---
+
+## Step 8: The REPL
 
 For interactive exploration there is a separate REPL executable. From a source checkout:
 
@@ -414,6 +474,7 @@ Useful REPL commands: `:help`, `:load <file>` / `:reload`, `:type <expr>`, `:inf
 - `--json` gives machine-readable output; `--fixed-now` pins the clock
 - `JL4_LIBRARY_PATH` controls where `IMPORT`ed libraries come from
 - `format`, `render`, `batch`, `trace`, `state-graph`, and `ast` round out the toolset
+- `l4 deploy`, `redeploy`, `deployments`, and `undeploy` manage live APIs on Legalese Cloud or your own jl4-service
 - `cabal run jl4-repl` starts an interactive session
 
 ---
