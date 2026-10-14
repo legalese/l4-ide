@@ -169,6 +169,12 @@ typeToParameter declares visited ty =
       , parameterDefault = Nothing
       }
 
+  -- The enums 'L4.Desugar.desugarInlineOptions' lifted out of a field, by
+  -- the name 'declares' is keyed by (Note [Inline ONE OF on a field]).
+  inlineTypeNames :: Set.Set Text
+  inlineTypeNames =
+    Set.fromList [ resolvedNameText r | d <- Map.elems declares, (r, _) <- inlineOptionsTypes d ]
+
   typeNameToParameter :: Resolved -> Parameter
   typeNameToParameter name =
     case primitiveJsonType name of
@@ -236,7 +242,15 @@ typeToParameter declares visited ty =
             (emptyParam "string")
               { parameterDescription = Maybe.fromMaybe "" (fmap getDesc (declAnn Optics.^. annDesc))
               , parameterEnum = [resolvedNameText c | MkConDecl _ c _ <- constructors]
-              , parameterL4Type = Just typeName
+              -- An enum whose options a field listed inline has no name the
+              -- author wrote, so it publishes none: @x-l4-type@ is "the L4
+              -- user-declared type name … when this node came from a
+              -- DECLARE", and this one did not. Keeping the generated name
+              -- out of every deployed schema also makes a later promotion to
+              -- a DECLARE additive rather than a rename
+              -- (INLINE-ONE-OF-FIELD-SPEC §5.10).
+              , parameterL4Type =
+                  if typeName `Set.member` inlineTypeNames then Nothing else Just typeName
               }
           SynonymDecl _ inner ->
             typeToParameter declares (Set.insert typeName visited) inner

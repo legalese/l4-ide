@@ -7,19 +7,33 @@
                     "type": "number"
                 },
                 "boundary": {
-                    "$ref": "#/$defs/Plot's boundary",
-                    "default": "Fenced"
+                    "default": "Fenced",
+                    "enum": [
+                        "Fenced",
+                        "Hedged",
+                        "Open"
+                    ],
+                    "type": "string"
                 },
                 "tenure": {
-                    "$ref": "#/$defs/Plot's tenure",
                     "default": "Owner",
-                    "description": "How the occupier holds the plot."
+                    "description": "How the occupier holds the plot.",
+                    "enum": [
+                        "Owner",
+                        "Tenant",
+                        "Lodger"
+                    ],
+                    "type": "string"
                 },
                 "the occupier": {
                     "type": "string"
                 },
                 "use": {
-                    "$ref": "#/$defs/Plot's use"
+                    "enum": [
+                        "Residential",
+                        "Commercial"
+                    ],
+                    "type": "string"
                 }
             },
             "required": [
@@ -28,30 +42,6 @@
                 "area in square metres"
             ],
             "type": "object"
-        },
-        "Plot's boundary": {
-            "enum": [
-                "Fenced",
-                "Hedged",
-                "Open"
-            ],
-            "type": "string"
-        },
-        "Plot's tenure": {
-            "description": "How the occupier holds the plot.",
-            "enum": [
-                "Owner",
-                "Tenant",
-                "Lodger"
-            ],
-            "type": "string"
-        },
-        "Plot's use": {
-            "enum": [
-                "Residential",
-                "Commercial"
-            ],
-            "type": "string"
         }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",

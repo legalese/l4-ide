@@ -3,7 +3,46 @@
         "Title": {
             "properties": {
                 "estate": {
-                    "$ref": "#/$defs/Title's estate"
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "tag": {
+                                    "const": "Absolute"
+                                }
+                            },
+                            "required": [
+                                "tag"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "properties": {
+                                "remaining years": {
+                                    "default": 99,
+                                    "type": "number"
+                                },
+                                "tag": {
+                                    "const": "Leasehold"
+                                }
+                            },
+                            "required": [
+                                "tag",
+                                "remaining years"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "properties": {
+                                "tag": {
+                                    "const": "Possessory"
+                                }
+                            },
+                            "required": [
+                                "tag"
+                            ],
+                            "type": "object"
+                        }
+                    ]
                 },
                 "holder": {
                     "type": "string"
@@ -14,48 +53,6 @@
                 "estate"
             ],
             "type": "object"
-        },
-        "Title's estate": {
-            "oneOf": [
-                {
-                    "properties": {
-                        "tag": {
-                            "const": "Absolute"
-                        }
-                    },
-                    "required": [
-                        "tag"
-                    ],
-                    "type": "object"
-                },
-                {
-                    "properties": {
-                        "remaining years": {
-                            "default": 99,
-                            "type": "number"
-                        },
-                        "tag": {
-                            "const": "Leasehold"
-                        }
-                    },
-                    "required": [
-                        "tag",
-                        "remaining years"
-                    ],
-                    "type": "object"
-                },
-                {
-                    "properties": {
-                        "tag": {
-                            "const": "Possessory"
-                        }
-                    },
-                    "required": [
-                        "tag"
-                    ],
-                    "type": "object"
-                }
-            ]
         }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",

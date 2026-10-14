@@ -14,6 +14,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import L4.Export (ExportedFunction (..), ExportedParam (..), honouredDefault, isRequiredInput)
 import L4.FunctionSchema (typicallyToJson)
@@ -220,6 +221,16 @@ typeToJsonSchema ctx = \case
              in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
             case Map.lookup typeName ctx.ctxDeclares of
+              -- An enum whose options a field listed inline is written in the
+              -- property itself, which is JSON Schema's native form for a
+              -- field's allowed values ("enum", Validation 2020-12 §6.1.2),
+              -- rather than under a name the author never wrote in @$defs@
+              -- (INLINE-ONE-OF-FIELD-SPEC §5.10; Note [Inline ONE OF on a
+              -- field] in "L4.Syntax"). It cannot recurse: its options'
+              -- fields cannot list options of their own.
+              Just decl
+                | typeName `Set.member` inlineOptionsTypeNames ctx ->
+                    declareToJsonSchema ctx decl
               Just decl ->
                 if Map.member typeName ctx.ctxCollectedDefs
                   then (SRef typeName Nothing, ctx.ctxCollectedDefs)
@@ -237,6 +248,12 @@ typeToJsonSchema ctx = \case
     typeToJsonSchema ctx inner
   InfVar _ _ _ ->
     (SString Nothing, ctx.ctxCollectedDefs)
+
+-- | The enums 'L4.Desugar.desugarInlineOptions' lifted out of a field, by the
+-- name 'ctxDeclares' is keyed by.
+inlineOptionsTypeNames :: SchemaContext -> Set.Set Text
+inlineOptionsTypeNames ctx =
+  Set.fromList [ resolvedToText r | d <- Map.elems ctx.ctxDeclares, (r, _) <- inlineOptionsTypes d ]
 
 declareToJsonSchema :: SchemaContext -> Declare Resolved -> (SchemaType, Map Text SchemaType)
 declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
