@@ -109,8 +109,10 @@ You will see the generated name wherever L4 has to name the type rather than sho
 - **In exports that need a name for every type.** The Decision Model and Notation (DMN) export calls it `Plot_s_tenure` (labelled "Plot's tenure"), the Catala export `PlotSTenure`, and the Blawx export `plot_s_tenure`. The docassemble export asks the question for the field and never shows the type's name.
 
 You will not see it in two places, on purpose.
-`l4 render` lists the options under the field ("tenure — one of Owner, Tenant, or Lodger") and does not show the generated name as a defined term.
+For a record's own fields, `l4 render` lists the options under the field ("tenure — one of Owner, Tenant, or Lodger") and does not show the generated name as a defined term.
 And when a rule is published as a service, the list of facts the service asks for (its **schema**) gives the field its options directly and does not publish the generated name.
+
+`l4 render` does not yet show the fields of an option, or a field computed with `MEANS`, so for those it keeps the list as a defined term under its generated name ("Holding's Lease's term means one of Short or Long."), which is the only place the options appear.
 
 ### Naming the type from a rule
 

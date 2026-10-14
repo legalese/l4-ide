@@ -466,6 +466,7 @@ Run by the skeptic on a hand-lifted probe (2026-10-14): Catala gives `PlotSTenur
 
 **`l4 render` does show the generated name**, and is the one consumer that must change: on the lifted probe it prints "Plot's tenure means one of Owner, Tenant, or Lodger." as a defined term, "tenure — Plot's tenure" under the record, and "the plot's tenure is Tenant" in the provisions, so a defined term and a projection phrase sit side by side.
 The build makes `Export/Document.hs` read the provenance mark, list the options under the field ("tenure — one of Owner, Tenant, or Lodger"), and print no defined term for the lifted type, pinned by a render golden.
+As built, that holds for a record's stored fields only (§9.1 item 8).
 
 **The precedent has the same hole today.** `l4 render --include-unused jl4/examples/ok/computed-fields.l4` lists `name`, `birth year` and `as at year` under `Person` and drops `age`, `adult`, `minor` and `category` (re-run 2026-10-14 on `~/.local/bin/l4`), because the "computed as" branch in `Export/Document.hs` cannot fire on a desugared record and `isComputedSelector` hides the selector by a name test.
 That is a separate defect, and this build does not fix it.
@@ -623,9 +624,10 @@ Where the build departed from or added to the note, it is listed here, each labe
 7. **`x-l4-type` is left out wherever the lifted type is published**, including a rule's input that names it (`` GIVEN t IS A `Plot's tenure` ``), not only the field's property.
    The in-repository renderer does not read an enum's `x-l4-type` (§8).
    Assumed, not ruled.
-8. **A computed field's options** (`` `status` IS ONE OF Active, Lapsed MEANS … ``) lose the field's mark, because `desugarComputedFields` takes the field out of its record before checking.
-   `l4 render` still hides their lifted type, by matching the lifted `DECLARE` to the computed field's synthetic `DECIDE`: both carry the field's own range, and no written declaration can.
-   The function and module schemas need no such case, because a computed field is never an input.
+8. **`l4 render` hides only the type lifted from a record's stored field**, whose options it lists under the field.
+   The type lifted from a field of a constructor, or from a computed field (`` `status` IS ONE OF Active, Lapsed MEANS … ``), stays an ordinary defined term under its generated name ("Holding's Lease's term means one of Short or Long."), because render shows neither a constructor's fields nor a computed field, and hiding the type left the options nowhere in the document.
+   **Revised in review round 1** (finding 2): the build first hid every lifted type, and found a computed field's by matching its lifted `DECLARE` to the field's synthetic `DECIDE`; that matching is gone.
+   The schemas are not affected: they do publish a constructor's fields, and treat a type lifted from one exactly as one lifted from a record's field; a computed field is never an input.
    Assumed, not ruled.
 9. **Exporters, run on an inline field and on its hand-lifted twin** (one record, one `@export`): DMN, Catala, docassemble and Blawx wrote byte-identical output for the two, and OpenFisca refused both with the same message ("unbound reference `Owner`"), the unrelated failure §5.11 records.
    DMN names the type `Plot_s_tenure` with label "Plot's tenure", Catala `PlotSTenure`, Blawx `plot_s_tenure`; docassemble asks for the field and never shows it.

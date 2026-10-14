@@ -1,5 +1,5 @@
 -- A record whose fields list their options inline
--- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md). `l4 render` lists each
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md). `l4 render` lists a stored
 -- field's options under the field and prints no defined term for the type L4
 -- makes for them; `l4 batch` re-prints the module in its lifted form
 -- (`DECLARE `Plot's tenure` IS ONE OF …`) and runs it once per row.
@@ -12,6 +12,12 @@ DECLARE Plot HAS
         Open
     `status`       IS ONE OF Settled, Disputed
         MEANS IF boundary EQUALS Open THEN Disputed ELSE Settled
+
+-- A field of a constructor that lists its options inline. Render shows no
+-- constructor's fields, so these options stay a defined term of their own.
+DECLARE Holding IS ONE OF
+    Freehold
+    Lease HAS `term` IS ONE OF Short, Long
 
 @export Whether a plot is lived in by its owner.
 GIVEN p IS A Plot

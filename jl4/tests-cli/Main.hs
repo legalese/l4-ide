@@ -974,19 +974,25 @@ spec bin = do
 
   -- A field that lists its options inline (INLINE-ONE-OF-FIELD-SPEC §5.11).
   -- L4 lifts the options into a type named after the field, `Plot's tenure`;
-  -- a reader of the rendered document should meet the options under the
-  -- field, and never that generated name as a term of its own. A computed
-  -- field's options (`status`) are hidden the same way, though the computed
-  -- field itself is not rendered (a separate, earlier defect).
+  -- a reader of the rendered document should meet a stored field's options
+  -- under the field, and not that generated name as a term of its own.
   describe "a field that lists its options inline" $ do
-    it "l4 render lists the options under the field and defines no generated term" $ do
+    it "l4 render lists a stored field's options under it and defines no generated term" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "text", inlineOneOfFixture]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("- tenure — one of Owner, Tenant, or Lodger" `isInfixOf`)
       sout `shouldSatisfy` ("- boundary — one of Fenced, Hedged, or Open" `isInfixOf`)
       sout `shouldNotSatisfy` ("Plot's tenure" `isInfixOf`)
       sout `shouldNotSatisfy` ("Plot's boundary" `isInfixOf`)
-      sout `shouldNotSatisfy` ("Plot's status" `isInfixOf`)
+
+    -- Render shows neither a constructor's fields nor a computed field, so
+    -- the options of such a field keep their defined term: hiding it too left
+    -- the options nowhere in the document (review round 1, finding 2).
+    it "l4 render keeps the options of a constructor's field and of a computed field" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", inlineOneOfFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Holding's Lease's term means one of Short or Long." `isInfixOf`)
+      sout `shouldSatisfy` ("Plot's status means one of Settled or Disputed." `isInfixOf`)
 
     -- `batch` re-prints the checked module, which holds the lifted DECLAREs,
     -- and re-runs it per row: the printed field must name the lifted type
