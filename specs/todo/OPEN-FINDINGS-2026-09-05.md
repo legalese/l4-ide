@@ -623,7 +623,9 @@ On that branch the wrapper path refuses both: the date with `Parameter 'd': coul
 
 ## OF-16 — on `main`, the CONSIDER exhaustiveness warning omits nested cases
 
-**Severity: silent at check time; a CONSIDER completed as the warning asks checks clean, then fails at run time. `main` only. Filed as smucclaw/l4-ide#1030; unowned.**
+**Severity: silent at check time; a CONSIDER completed as the warning asks checks clean, then fails at run time. `main` only. Filed as smucclaw/l4-ide#1030. FIXED on `main` by legalese/l4-ide#545 (merged 2026-10-14, `c6532c1d7`); #1030 closed.**
+
+Re-measured at `c6532c1d7`: `main`'s `ok/tests/empty.golden` now lists all eight missing cases of `xx`, as four lines (`faz bar _`, `faz baz _`, `faz qux bar`, `faz qux baz`), where it listed six.
 
 Found by the main pre-review of legalese/l4-ide#544 on 2026-10-08, and measured on `main` at `71ebf5ca1`; `jl4-core/src/L4/TypeCheck.hs` is unchanged from there to `134cf9f86`.
 With `foo` = `bar | baz | qux` and `foz` = `fab | faz HAS bla IS A foo, blup IS A foo`, the `xx` of `jl4/examples/ok/empty.l4` (branches `fab` and `faz qux qux`) draws a warning that lists six missing cases, where eight are missing: it omits `faz bar qux` and `faz baz qux`.
@@ -681,5 +683,5 @@ Filed by whoever holds GitHub write authority. **Nothing here has been posted ex
 | OF-13      | **FILED** 2026-10-06 as smucclaw/l4-ide#1005.                                                                                                                                                       |
 | OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006. **FIXED** by legalese/l4-ide#549 (35d7b63b3) on `unstable`, re-measured 2026-10-08 (wrapper path `200 6`); #1006 closed. Not on `main`.               |
 | OF-15      | **FILED** 2026-10-06 as smucclaw/l4-ide#1007.                                                                                                                                                       |
-| OF-16      | **FILED** 2026-10-09 as smucclaw/l4-ide#1030. `main` only; `unstable` is right.                                                                                                                     |
-| OF-17      | **FILED** 2026-10-13 as smucclaw/l4-ide#1041. The `GIVETH` gap is live on `main`, `unstable` and #545; the `WHERE` half on `main` and #545 only.                                                    |
+| OF-16      | **FILED** 2026-10-09 as smucclaw/l4-ide#1030. **FIXED** on `main` by legalese/l4-ide#545 (merged 2026-10-14, `c6532c1d7`); #1030 closed.                                                            |
+| OF-17      | **FILED** 2026-10-13 as smucclaw/l4-ide#1041. The `GIVETH` gap is live on `main` and `unstable`; the `WHERE` half on `main` only (#545 merged into `main` on 2026-10-14 with it).                   |
